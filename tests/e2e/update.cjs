@@ -233,6 +233,16 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   await inv('session:start', path.join(gWs, 'alpha'), { agentId: agent.id })
   await lib.acceptClaudeTrust(inv, path.join(gWs, 'alpha'), agent.id)
   check('#1647: downloaded, an agent running', await waitFor(async () => (await inv('update:state')).status === 'ready' && (await inv('session:live')).length === 1, HUNG_MS))
+  // HI-2425: the notice's Restart and Update, then Cancel in the quit dialog: its entry keeps the button and never says
+  // Installing.
+  const readyRow = () => page.evaluate(() => window.__hiveBell?.().find((t) => t.title === 'Hive Desktop 9.1.1 is ready') ?? null)
+  check('HI-2425: the ready notice is in the bell, with Restart and Update', !!(await lib.until(async () => (await readyRow())?.actions.includes('Restart and Update'), HUNG_MS)))
+  await inv('update:install', '9.1.1')
+  check('HI-2425: Restart and Update asks first (an agent is running)', await waitFor(async () => (await page.locator('.dialog', { hasText: 'Quit Hive?' }).count()) === 1, HUNG_MS))
+  await page.locator('.dialog button', { hasText: 'Cancel' }).click()
+  await waitFor(async () => (await inv('app:quitState')).request === null, HUNG_MS)
+  const afterCancel = await readyRow()
+  check('HI-2425: cancelled, its notice keeps Restart and Update and says nothing of installing', !!afterCancel && afterCancel.resolved === null && afterCancel.actions.includes('Restart and Update'), JSON.stringify(afterCancel))
   await inv('app:quit')
   check('#1647: quitting asks first (an agent is running)', await waitFor(async () => (await page.locator('.dialog', { hasText: 'Quit Hive?' }).count()) === 1, HUNG_MS))
   await page.locator('.dialog button', { hasText: 'Cancel' }).click()

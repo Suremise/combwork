@@ -101,7 +101,7 @@ import { COMMIT_WATCH_ARG } from '../shared/commitWatch'
 import { pinFollower } from './pin'
 import { closedNotice, startNoticeResolver } from './notices'
 import { setNotifyHost, tell } from './notify'
-import { initUpdater, installNow, installsOnQuit } from './updater'
+import { initUpdater, installNow, installsOnQuit, markInstalling } from './updater'
 import { flushMetrics } from './metrics'
 import { watchMainStalls } from './mainStalls'
 import { fileHolders } from './fileHolders'
@@ -668,6 +668,8 @@ async function quitNow(tellUser: boolean): Promise<void> {
   // Remember the windows before they close.
   saveWindows()
   quitting = true
+  // Restart and Update's notice says Installing only now (HI-2425): a quit cancelled before this kept its button.
+  if (installOnQuit) markInstalling()
   const stopped = sessions.liveCount()
   // Quitting without a dialog (or after waiting): say where the sessions went, as a Windows notification when no Hive
   // window is focused (HI-2320: its windows are closing, so never a pop-up; nothing while you are looking at Hive).

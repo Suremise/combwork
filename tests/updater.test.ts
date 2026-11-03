@@ -16,7 +16,8 @@ const st = vi.hoisted(() => ({
   feeds: [] as Record<string, unknown>[],
   updates: { checkAutomatically: true, downloadAutomatically: true, install: 'auto', prerelease: false },
   settingsChanged: [] as ((s: unknown, prev: unknown) => void)[],
-  toasts: [] as { level: string; title: string; actions?: { label: string; command: string; args?: unknown[] }[] }[]
+  toasts: [] as { level: string; title: string; actions?: { label: string; command: string; args?: unknown[] }[] }[],
+  resolved: [] as [string, string][]
 }))
 vi.mock('electron-updater', () => ({
   autoUpdater: {
@@ -39,7 +40,9 @@ vi.mock('../src/main/config', () => ({
     update: () => undefined
   }
 }))
-vi.mock('../src/main/events', () => ({ emit: () => undefined, toast: (level: string, title: string, _message: string, actions?: never) => void st.toasts.push({ level, title, actions }) }))
+// The offers' registry: what the notices' buttons resolve to (HI-2425).
+vi.mock('../src/main/notify', () => ({ resolveOffer: (offer: string, outcome: string) => (st.resolved.push([offer, outcome]), true), resolveOffers: () => 0 }))
+vi.mock('../src/main/events',() => ({ emit: () => undefined, toast: (level: string, title: string, _message: string, actions?: never) => void st.toasts.push({ level, title, actions }) }))
 vi.mock('../src/main/logger', async (original) => ({ ...(await original<typeof import('../src/main/logger')>()), createLogger: () => ({ info: (m: string) => st.logged.push(m), warn: (m: string) => st.warned.push(m), error: () => undefined }) }))
 
 const saved = { quiet: process.env.HIVE_TEST_QUIET, delay: process.env.HIVE_UPDATE_DELAY }
@@ -56,6 +59,7 @@ beforeEach(async () => {
   st.updates = { checkAutomatically: true, downloadAutomatically: true, install: 'auto', prerelease: false }
   st.settingsChanged = []
   st.toasts = []
+  st.resolved = []
   delete process.env.HIVE_UPDATE_DELAY
   ;((await import('electron')).app as { isPackaged: boolean }).isPackaged = true
 })
@@ -177,6 +181,22 @@ describe('installing a downloaded update (#1647)', () => {
     expect(st.installs).toEqual([[true, false]])
     updater.restartAndInstall()
     expect(restarts.n).toBe(1)
+  })
+
+  it("Restart and Update keeps its notice's button until the quit goes ahead: then it says Installing (HI-2425)", async () => {
+    const { updater, restarts } = await start({ version: '9.1.0' })
+    downloaded(updater)
+    // Clicked: the quit is asked for, and may still be cancelled (agents working, unsaved files), so nothing is resolved.
+    updater.restartAndInstall('9.1.1')
+    expect(restarts.n).toBe(1)
+    expect(st.resolved).toEqual([])
+    // The quit goes ahead (index.ts quitNow): now the notice says Installing in place of its button.
+    updater.markInstalling()
+    expect(st.resolved).toEqual([['update:9.1.1', 'Installing: Hive restarts']])
+    // An older version's click resolves its own entry and asks for nothing.
+    updater.restartAndInstall('9.0.0')
+    expect(restarts.n).toBe(1)
+    expect(st.resolved.at(-1)?.[0]).toBe('update:9.0.0')
   })
 
   it('over a local build of its own version: neither the quit nor Restart and Update installs it, and Hive says why', async () => {
