@@ -763,17 +763,22 @@ const tools: Tool[] = [
       type: 'object',
       properties: {
         number: cardArg,
-        comments: { type: 'number', description: 'Only the newest n comments.' },
+        comments: { type: 'number', description: 'Only the newest n.' },
         latestComment: { type: 'boolean', description: 'Only the newest comment.' },
         summary: { type: 'boolean', description: 'Each comment as its first line, with its whole length.' },
-        history: { type: 'boolean' }
+        history: { type: 'boolean' },
+        attachments: { type: 'boolean', description: 'All, when narrowed.' }
       },
       required: ['number']
     },
     run: (a) => {
       const n = enc(String(a.number))
-      if (a.latestComment) return api('GET', `/v1/tasks/${n}/comments/latest${a.summary ? '?summary=true' : ''}`)
-      const q = [a.history ? '' : 'history=false', Number(a.comments) > 0 ? `comments=${Math.floor(Number(a.comments))}` : '', a.summary ? 'summary=true' : ''].filter(Boolean).join('&')
+      const all = a.attachments === true ? 'attachments=true' : ''
+      if (a.latestComment) {
+        const lq = [a.summary ? 'summary=true' : '', all].filter(Boolean).join('&')
+        return api('GET', `/v1/tasks/${n}/comments/latest${lq ? `?${lq}` : ''}`)
+      }
+      const q = [a.history ? '' : 'history=false', Number(a.comments) > 0 ? `comments=${Math.floor(Number(a.comments))}` : '', a.summary ? 'summary=true' : '', all].filter(Boolean).join('&')
       return api('GET', `/v1/tasks/${n}${q ? `?${q}` : ''}`)
     }
   },

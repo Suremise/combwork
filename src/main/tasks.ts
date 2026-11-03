@@ -2671,10 +2671,11 @@ export async function endReviewsWithoutSession(ws: WorkspaceService, live: (proj
  * A card's newest comment (the last one added; comments are kept in the order they were added, so equal times
  * don't matter), or null when it has none. Read as `readTask` reads: a confined agent can't read another project's.
  */
-export async function latestComment(n: number, actor: TaskActor): Promise<{ number: number; comment: TaskComment | null }> {
+export async function latestComment(n: number, actor: TaskActor): Promise<{ number: number; comment: TaskComment | null; commentId: string | null; sources: Pick<TaskComment, 'id' | 'by' | 'at'>[] }> {
   const c = await readTask(n, actor)
   const last = c.comments.at(-1)
-  return { number: c.number, comment: last ? withoutId(last) : null }
+  // Its id and the card's comments' authors and times (HI-2402): for its attachments and where each came, never in a reply.
+  return { number: c.number, comment: last ? withoutId(last) : null, commentId: last?.id ?? null, sources: c.comments.map(({ id, by, at }) => ({ id, by, at })) }
 }
 
 /** A comment or history entry as callers see it: its id is the card watches' (#224). */

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Leaner card reads for agents** (HI-2402): reading a card's latest comment, its newest comments or its summary no longer brings back every file attached to the card, only those of the comments read, with a count of the rest. A busy card's latest step costs agents far fewer tokens; a full read still lists them all.
 - **A signer that wants your passphrase pauses the merge queue as "Signing waits for you" with newer Git too.** Newer Git (Git for Windows 2.56, for one) prints the signer's message only after the signer has stopped, and the queue read that as "Signing failed" with the wrong advice. Now it reads it as the signer's, and a hook's words still never count (HI-2399).
 ### Fixes
 
