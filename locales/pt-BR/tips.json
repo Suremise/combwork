@@ -51,7 +51,7 @@
   "tips.assistantLaneWatch.title": "Uma observação para todas as raias",
   "tips.assistantLanes.text": "Quando o Assistente põe um agente no próximo conjunto de cartões, ele dá ao agente uma nova conversa no mesmo passo (a antiga continua na aba Sessões). Conversas curtas custam muito menos: peça que ele faça o mesmo para qualquer cartão novo.",
   "tips.assistantLanes.title": "Uma nova conversa para cada raia",
-  "tips.assistantMcp.textAdded": "O Assistente recebe um servidor MCP do espaço de trabalho só quando você o adiciona para ele, como para um projeto: com + em Servidores MCP na visualização dele, na barra de atividades, ou marcando Assistente do Combwork em Adicionar a… na visualização MCP. Um servidor com suas próprias notas pode chegar ao Assistente e a nenhum projeto.",
+  "tips.assistantMcp.textAdded": "O Assistente recebe um servidor MCP do espaço de trabalho só quando você o adiciona para ele, como para um projeto: com + em Servidores MCP na visualização dele, na barra de atividades, ou marcando Assistente em Adicionar a… na visualização MCP. Um servidor com suas próprias notas pode chegar ao Assistente e a nenhum projeto.",
   "tips.assistantMcp.title": "Servidores MCP só para o Assistente",
   "tips.assistantMessages.text": "O Assistente não pode dar um trabalho novo a um agente que está esperando ou trabalhando, mas pode deixar uma mensagem para ele, como a sua resposta: ela é entregue assim que o agente puder recebê-la. Até lá, o painel do agente a mostra como não lida (✉); clique ali para cancelá-la.",
   "tips.assistantMessages.title": "O Assistente alcança um agente ocupado",
