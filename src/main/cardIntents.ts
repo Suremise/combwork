@@ -17,7 +17,7 @@ import { loopReviewerOf } from './loopReviewer'
 import { cardRef } from '../shared/projectKeys'
 import { HISTORY, storedText } from '../shared/taskHistory'
 import { laneBuilds } from '../shared/lanes'
-import { LANE_BUILDER_SKILL } from '../shared/tasks'
+import { laneBuilderSkill } from '../shared/tasks'
 import { rawLanes } from './lanes'
 import { briefOf } from './laneBriefs'
 import { placementDue } from './slotCards'
@@ -207,5 +207,5 @@ async function laneStartWords(ws: WorkspaceService, project: string, agentId: st
   const lane = (await rawLanes(ws).catch(() => [])).find((l) => laneBuilds([l], project, agentId, n))
   if (!lane) return null
   const brief = briefOf(lane)
-  return `${key} is a card of your lane (${lane.id}). ${LANE_BUILDER_SKILL}${brief ? `\n\n${brief}` : ''}` // i18n-ignore: agent-facing, the start's reply
+  return `${key} is a card of your lane (${lane.id}). ${laneBuilderSkill()}${brief ? `\n\n${brief}` : ''}` // i18n-ignore: agent-facing, the start's reply
 }

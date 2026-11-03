@@ -1,0 +1,190 @@
+{
+  "progress.args.cardNeedsValue": {
+    "placeholders": {}
+  },
+  "progress.args.checkNoCommand": {
+    "placeholders": {
+      "named": "select",
+      "check": "plain"
+    }
+  },
+  "progress.args.focusedNeedsCommand": {
+    "placeholders": {
+      "check": "plain"
+    }
+  },
+  "progress.args.isolatedNeedsCheck": {
+    "placeholders": {}
+  },
+  "progress.args.needsValue": {
+    "placeholders": {
+      "option": "plain"
+    }
+  },
+  "progress.args.noCommand": {
+    "placeholders": {}
+  },
+  "progress.args.noCommandAfterDashes": {
+    "placeholders": {}
+  },
+  "progress.args.unknownOption": {
+    "placeholders": {
+      "option": "plain"
+    }
+  },
+  "progress.change.edit": {
+    "placeholders": {}
+  },
+  "progress.change.reflog": {
+    "placeholders": {}
+  },
+  "progress.check.outsideHive": {
+    "placeholders": {
+      "check": "plain"
+    }
+  },
+  "progress.check.waiting": {
+    "placeholders": {
+      "what": "plain"
+    }
+  },
+  "progress.isolated.launcherDidntStart": {
+    "placeholders": {}
+  },
+  "progress.isolated.notRun": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "progress.isolated.notRunStatus": {
+    "placeholders": {
+      "status": "plain"
+    }
+  },
+  "progress.isolated.notRunUnreachable": {
+    "placeholders": {
+      "detail": "plain"
+    }
+  },
+  "progress.revision.form": {
+    "placeholders": {}
+  },
+  "progress.revision.notACommit": {
+    "placeholders": {
+      "named": "plain",
+      "folder": "plain"
+    }
+  },
+  "progress.revision.notCheckedOut": {
+    "placeholders": {
+      "named": "plain",
+      "head": "plain"
+    }
+  },
+  "progress.revision.nothingCheckedOut": {
+    "placeholders": {
+      "folder": "plain",
+      "named": "plain"
+    }
+  },
+  "progress.run.commandNotFound": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
+  "progress.run.exitCode": {
+    "placeholders": {
+      "code": "plain"
+    }
+  },
+  "progress.unanswered.answered": {
+    "placeholders": {
+      "lend": "select",
+      "check": "plain",
+      "status": "select"
+    }
+  },
+  "progress.unanswered.failed": {
+    "placeholders": {
+      "lend": "select",
+      "check": "plain",
+      "detail": "plain"
+    }
+  },
+  "progress.unanswered.refused": {
+    "placeholders": {
+      "lend": "select",
+      "check": "plain",
+      "refused": "select",
+      "detail": "plain",
+      "url": "plain"
+    }
+  },
+  "progress.unanswered.slow": {
+    "placeholders": {
+      "lend": "select",
+      "check": "plain",
+      "seconds": "plain",
+      "retried": "select",
+      "asked": "plain"
+    }
+  },
+  "progress.uncounted.changed": {
+    "placeholders": {
+      "check": "plain",
+      "listed": "select",
+      "changes": "plain",
+      "isolate": "select"
+    }
+  },
+  "progress.uncounted.dirty": {
+    "placeholders": {
+      "check": "plain",
+      "listed": "select",
+      "changes": "plain"
+    }
+  },
+  "progress.uncounted.moved": {
+    "placeholders": {
+      "check": "plain"
+    }
+  },
+  "progress.uncounted.notCheck": {
+    "placeholders": {
+      "check": "plain"
+    }
+  },
+  "progress.uncounted.notContained": {
+    "placeholders": {
+      "check": "plain"
+    }
+  },
+  "progress.uncounted.revisionChanged": {
+    "placeholders": {
+      "check": "plain"
+    }
+  },
+  "progress.unrecorded.endedBefore": {
+    "placeholders": {
+      "check": "plain"
+    }
+  },
+  "progress.unrecorded.noReply": {
+    "placeholders": {
+      "check": "plain"
+    }
+  },
+  "progress.unrecorded.noStart": {
+    "placeholders": {
+      "check": "plain"
+    }
+  },
+  "progress.unrecorded.refused": {
+    "placeholders": {
+      "check": "plain"
+    }
+  },
+  "progress.usage": {
+    "placeholders": {}
+  }
+}

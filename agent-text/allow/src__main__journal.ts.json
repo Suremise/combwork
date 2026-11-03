@@ -8,7 +8,6 @@
   "prose|call|DELETE FROM entries WHERE id IN (SELECT e.id FROM entries e{})": 1,
   "prose|call|DELETE FROM entries WHERE {} AND at < ?": 1,
   "prose|call|EXISTS (SELECT 1 FROM links l WHERE l.entry_id = e.id AND l.type = ? AND l.ref = ?)": 1,
-  "prose|call|INSERT INTO entries (at, kind, project, summary, detail, detail_z, why, source, importance, digest_of) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)": 1,
   "prose|call|INSERT INTO journal_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value": 1,
   "prose|call|INSERT OR IGNORE INTO links (entry_id, type, ref) VALUES (?, ?, ?)": 2,
   "prose|call|INSERT OR IGNORE INTO tags (entry_id, tag) VALUES (?, ?)": 2,

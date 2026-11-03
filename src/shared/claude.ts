@@ -1,6 +1,7 @@
 import { withCliOwn } from './cliOwnMode'
 import { footerPatterns, lastFooterMode, type FooterModeDef, type FooterPatterns } from './footerModes'
 import { msg } from './i18n/msg'
+import { agentMsg, say } from './agentText'
 import type { Tr } from './tasks'
 import type { PermissionMode } from './types'
 import type { ModeCaveatFacts, ModeOption, ModelGroup, ModelOption, ProviderDescriptor } from './providers'
@@ -31,12 +32,42 @@ export const EFFORT_TEXT = {
 /** The model pickers' group of older models, every provider's (#800). */
 export const OLDER_VERSIONS = msg({ id: 'agents.models.olderGroup', defaultMessage: 'Older versions', description: 'A group of the model picker: earlier models, hidden until shown.' })
 
+/** Claude Code's permission modes as agents and the Agent API read them (dialects, HI-2065): said when read (the getters below), so in the reader's dialect. The window has its own messages (`text`). */
+const M = {
+  manualLabel: agentMsg({ id: 'mode.claude.manual.label', text: 'Manual', note: "Claude Code's permission mode manual: its name, as agents and the Agent API read it (the window has its own message)." }),
+  manualDescription: agentMsg({ id: 'mode.claude.manual.desc', text: 'Asks before file edits and shell commands unless you have pre-approved them.', note: "What Claude Code's permission mode manual does, as agents and the Agent API read it (the window has its own message)." }),
+  acceptEditsLabel: agentMsg({ id: 'mode.claude.acceptEdits.label', text: 'Accept edits', note: "Claude Code's permission mode acceptEdits: its name, as agents and the Agent API read it (the window has its own message)." }),
+  acceptEditsDescription: agentMsg({ id: 'mode.claude.acceptEdits.desc', text: 'Makes file edits in the working folder without asking; still asks before shell commands.', note: "What Claude Code's permission mode acceptEdits does, as agents and the Agent API read it (the window has its own message)." }),
+  planLabel: agentMsg({ id: 'mode.claude.plan.label', text: 'Plan', note: "Claude Code's permission mode plan: its name, as agents and the Agent API read it (the window has its own message)." }),
+  planDescription: agentMsg({ id: 'mode.claude.plan.desc', text: 'Read-only: explores and proposes a plan, changes nothing until you approve.', note: "What Claude Code's permission mode plan does, as agents and the Agent API read it (the window has its own message)." }),
+  autoLabel: agentMsg({ id: 'mode.claude.auto.label', text: 'Auto', note: "Claude Code's permission mode auto: its name, as agents and the Agent API read it (the window has its own message)." }),
+  autoDescription: agentMsg({ id: 'mode.claude.auto.desc', text: 'A safety classifier approves low-risk actions itself and only asks about risky ones.', note: "What Claude Code's permission mode auto does, as agents and the Agent API read it (the window has its own message)." }),
+  dontAskLabel: agentMsg({ id: 'mode.claude.dontAsk.label', text: "Don't ask", note: "Claude Code's permission mode dontAsk: its name, as agents and the Agent API read it (the window has its own message)." }),
+  dontAskDescription: agentMsg({ id: 'mode.claude.dontAsk.desc', text: 'Never prompts. Anything not pre-approved is refused instead of asked about.', note: "What Claude Code's permission mode dontAsk does, as agents and the Agent API read it (the window has its own message)." }),
+  bypassPermissionsLabel: agentMsg({ id: 'mode.claude.bypassPermissions.label', text: 'Bypass permissions', note: "Claude Code's permission mode bypassPermissions: its name, as agents and the Agent API read it (the window has its own message)." }),
+  bypassPermissionsDescription: agentMsg({ id: 'mode.claude.bypassPermissions.desc', text: 'Never asks and allows everything — any edit, command or network call. Use only in disposable environments.', note: "What Claude Code's permission mode bypassPermissions does, as agents and the Agent API read it (the window has its own message)." }),
+  autoUnsupported: agentMsg({
+    id: 'mode.claude.autoUnsupported',
+    text: "Claude Code doesn't offer Auto with {model}: it runs in Manual instead (asking before edits and commands), and Hive shows that mode.",
+    note: "Claude Code said it won't run this model (model: its name) in Auto (its initialize reply, #129). Auto and Manual are the modes' names."
+  }),
+  autoMaybe: agentMsg({
+    id: 'mode.claude.autoMaybe',
+    text: "Claude Code may not offer Auto with {model}. If it doesn't, it runs in Manual (asking before edits and commands), and Hive shows that mode.",
+    note: "Without Claude Code's word on this model (model: its name), the guess from 2.1.286: Haiku doesn't run in Auto. Auto and Manual are the modes' names."
+  })
+}
+
 // The English labels and descriptions are what agents and the Agent API read; `text` is the window's (#800).
 export const CLAUDE_PERMISSION_MODES: ModeOption[] = [
   {
     value: 'manual',
-    label: 'Manual', // i18n-ignore: agent-facing English (text is the window's)
-    description: 'Asks before file edits and shell commands unless you have pre-approved them.', // i18n-ignore: agent-facing English (text is the window's)
+    get label() {
+      return say(M.manualLabel)
+    },
+    get description() {
+      return say(M.manualDescription)
+    },
     text: {
       label: msg({ id: 'agents.claude.manual', defaultMessage: 'Manual', description: "Claude Code's permission mode: it asks before edits and commands. Keep it short." }),
       description: msg({ id: 'agents.claude.manualDescription', defaultMessage: 'Asks before file edits and shell commands unless you have pre-approved them.', description: "What Claude Code's Manual permission mode does (the mode picker)." })
@@ -44,8 +75,12 @@ export const CLAUDE_PERMISSION_MODES: ModeOption[] = [
   },
   {
     value: 'acceptEdits',
-    label: 'Accept edits', // i18n-ignore: agent-facing English (text is the window's)
-    description: 'Makes file edits in the working folder without asking; still asks before shell commands.', // i18n-ignore: agent-facing English (text is the window's)
+    get label() {
+      return say(M.acceptEditsLabel)
+    },
+    get description() {
+      return say(M.acceptEditsDescription)
+    },
     text: {
       label: msg({ id: 'agents.claude.acceptEdits', defaultMessage: 'Accept edits', description: "Claude Code's permission mode: it edits files without asking. Keep it short." }),
       description: msg({ id: 'agents.claude.acceptEditsDescription', defaultMessage: 'Makes file edits in the working folder without asking; still asks before shell commands.', description: "What Claude Code's Accept edits permission mode does (the mode picker)." })
@@ -53,8 +88,12 @@ export const CLAUDE_PERMISSION_MODES: ModeOption[] = [
   },
   {
     value: 'plan',
-    label: 'Plan', // i18n-ignore: agent-facing English (text is the window's)
-    description: 'Read-only: explores and proposes a plan, changes nothing until you approve.', // i18n-ignore: agent-facing English (text is the window's)
+    get label() {
+      return say(M.planLabel)
+    },
+    get description() {
+      return say(M.planDescription)
+    },
     text: {
       label: msg({ id: 'agents.claude.plan', defaultMessage: 'Plan', description: "Claude Code's permission mode: it plans and changes nothing. Keep it short." }),
       description: msg({ id: 'agents.claude.planDescription', defaultMessage: 'Read-only: explores and proposes a plan, changes nothing until you approve.', description: "What Claude Code's Plan permission mode does (the mode picker)." })
@@ -62,8 +101,12 @@ export const CLAUDE_PERMISSION_MODES: ModeOption[] = [
   },
   {
     value: 'auto',
-    label: 'Auto', // i18n-ignore: agent-facing English (text is the window's)
-    description: 'A safety classifier approves low-risk actions itself and only asks about risky ones.', // i18n-ignore: agent-facing English (text is the window's)
+    get label() {
+      return say(M.autoLabel)
+    },
+    get description() {
+      return say(M.autoDescription)
+    },
     text: {
       label: msg({ id: 'agents.claude.auto', defaultMessage: 'Auto', description: "Claude Code's permission mode: a classifier approves low-risk actions. Keep it short." }),
       description: msg({ id: 'agents.claude.autoDescription', defaultMessage: 'A safety classifier approves low-risk actions itself and only asks about risky ones.', description: "What Claude Code's Auto permission mode does (the mode picker)." })
@@ -71,8 +114,12 @@ export const CLAUDE_PERMISSION_MODES: ModeOption[] = [
   },
   {
     value: 'dontAsk',
-    label: "Don't ask", // i18n-ignore: agent-facing English (text is the window's)
-    description: 'Never prompts. Anything not pre-approved is refused instead of asked about.', // i18n-ignore: agent-facing English (text is the window's)
+    get label() {
+      return say(M.dontAskLabel)
+    },
+    get description() {
+      return say(M.dontAskDescription)
+    },
     text: {
       label: msg({ id: 'agents.claude.dontAsk', defaultMessage: "Don't ask", description: "Claude Code's permission mode: it never prompts, and refuses what isn't pre-approved. Keep it short." }),
       description: msg({ id: 'agents.claude.dontAskDescription', defaultMessage: 'Never prompts. Anything not pre-approved is refused instead of asked about.', description: "What Claude Code's Don't ask permission mode does (the mode picker)." })
@@ -80,8 +127,12 @@ export const CLAUDE_PERMISSION_MODES: ModeOption[] = [
   },
   {
     value: 'bypassPermissions',
-    label: 'Bypass permissions', // i18n-ignore: agent-facing English (text is the window's)
-    description: 'Never asks and allows everything — any edit, command or network call. Use only in disposable environments.', // i18n-ignore: agent-facing English (text is the window's)
+    get label() {
+      return say(M.bypassPermissionsLabel)
+    },
+    get description() {
+      return say(M.bypassPermissionsDescription)
+    },
     danger: true,
     text: {
       label: msg({ id: 'agents.claude.bypass', defaultMessage: 'Bypass permissions', description: "Claude Code's permission mode with no guardrails: it allows everything. Keep it short." }),
@@ -213,8 +264,8 @@ export function claudeModeCaveat(mode: string, model: string, known?: ModeCaveat
       : tr(msg({ id: 'agents.claude.autoMaybe', defaultMessage: "Claude Code may not offer Auto with {model}. If it doesn't, it runs in Manual (asking before edits and commands), and Hive shows that mode.", description: 'A warning under the model and mode pickers: Claude Code may not run this model ({model}: its name) in the Auto permission mode. Auto and Manual are mode names.' }), { model: name })
   }
   return known?.supportsAuto === false
-    ? `Claude Code doesn't offer Auto with ${name}: it runs in Manual instead (asking before edits and commands), and Hive shows that mode.` // i18n-ignore: English without tr (main's and the Agent API's)
-    : `Claude Code may not offer Auto with ${name}. If it doesn't, it runs in Manual (asking before edits and commands), and Hive shows that mode.` // i18n-ignore: English without tr (main's and the Agent API's)
+    ? say(M.autoUnsupported, { model: name })
+    : say(M.autoMaybe, { model: name })
 }
 
 export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {

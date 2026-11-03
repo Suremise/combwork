@@ -47,7 +47,10 @@ describe('the schema', () => {
     j.closeJournal(h)
     const db = new DatabaseSync(j.journalFile(h), { readOnly: true })
     try {
-      expect(db.prepare('SELECT version, name FROM schema_version').all()).toEqual([{ version: 1, name: 'entries' }])
+      expect(db.prepare('SELECT version, name FROM schema_version').all()).toEqual([
+        { version: 1, name: 'entries' },
+        { version: 2, name: 'summary text' }
+      ])
       expect((db.prepare('PRAGMA journal_mode').get() as { journal_mode: string }).journal_mode).toBe('wal')
       expect((db.prepare('PRAGMA auto_vacuum').get() as { auto_vacuum: number }).auto_vacuum).toBe(2)
       const names = (db.prepare("SELECT name FROM sqlite_master WHERE type IN ('table', 'index', 'trigger') AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'entries_fts_%' ORDER BY name").all() as { name: string }[]).map((r) => r.name)
@@ -66,6 +69,32 @@ describe('the schema', () => {
     expect(() => write(h, { summary: 'x', links: [{ type: 'entry', ref: '999' }] })).toThrow(/no entry 999/)
     expect(() => write(h, { summary: 'x'.repeat(301) })).toThrow(/longer than 300/)
     expect(j.recall(h, {})).toEqual([])
+  })
+})
+
+// Dialects (HI-2438): a fact Hive writes keeps its message beside its English, to be said in each reader's dialect.
+describe("a summary's message", () => {
+  const stored = (h: string, id: number): string | null => {
+    j.closeJournal(h)
+    const raw = new DatabaseSync(j.journalFile(h), { readOnly: true })
+    try {
+      return (raw.prepare('SELECT summary_text AS t FROM entries WHERE id = ?').get(id) as { t: string | null }).t
+    } finally {
+      raw.close()
+    }
+  }
+
+  it("is kept with Hive's facts, none with the Assistant's own entries, and goes once the summary is edited", () => {
+    const h = home()
+    const text = { id: 'finish.journal.done', values: { card: 'AM-1', title: 'Fix it', how: 'queue', byUser: 'no', by: 'hive' } }
+    const fact = j.writeEntry(h, all, { kind: 'event', summary: 'AM-1 "Fix it" is Done', summaryText: text }, 'hive')
+    const own = write(h, { summary: 'Darren chose the greeting' })
+    expect(JSON.parse(stored(h, fact)!)).toEqual(text)
+    expect(stored(h, own)).toBeNull()
+    j.updateEntry(h, all, fact, { importance: 3 })
+    expect(JSON.parse(stored(h, fact)!)).toEqual(text)
+    j.updateEntry(h, all, fact, { summary: 'AM-1 is Done, and shipped' })
+    expect(stored(h, fact)).toBeNull()
   })
 })
 

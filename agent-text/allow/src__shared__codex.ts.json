@@ -1,17 +1,9 @@
 {
-  "prose|prop:text|An automatic reviewer approves safe actions itself and only asks about ones it thinks are risky.": 1,
-  "prose|prop:text|Approve for me": 1,
-  "prose|prop:text|Ask for approval": 1,
   "prose|prop:text|Extra high": 1,
-  "prose|prop:text|Full access": 1,
   "prose|prop:text|High": 1,
   "prose|prop:text|Low": 1,
   "prose|prop:text|Max": 1,
   "prose|prop:text|Medium": 1,
-  "prose|prop:text|No sandbox and no approvals: edits anything and uses the internet without asking. Use only in disposable environments.": 1,
   "prose|prop:text|Older versions": 1,
-  "prose|prop:text|Read only": 1,
-  "prose|prop:text|Reads and edits workspace files and runs commands in its sandbox; asks before internet access or edits outside the workspace.": 1,
-  "prose|prop:text|Reads workspace files; asks before any edit or internet access.": 1,
   "prose|prop:text|Ultra": 1
 }

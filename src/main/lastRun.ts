@@ -3,10 +3,11 @@ import { randomUUID } from 'crypto'
 import { existsSync, readFileSync, renameSync, rmSync, statSync } from 'original-fs'
 import { rm, writeFile } from 'original-fs/promises'
 import { join } from 'path'
+import { agentMsg, inDefaultDialect, say } from '../shared/agentText'
 import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { fmt, msg, tr } from '../shared/i18n'
 import { HEARTBEAT_MS, RUN_MARKER, parseRunMarker, LeftoverStops, resumeFailedLine, resumeHeldLine, unexpectedCloseText, type LaunchProcesses, type LeftMerge, type ResumeReport, type RunMarker, type RunningAgent } from '../shared/unexpectedClose'
-import type { ToastAction } from '../shared/types'
+import type { StoredText, ToastAction } from '../shared/types'
 import { endProcessesExactly, endTreesExactly, onLaunchProcessJoined, runningProcesses, stillRunningOf } from './agentProcesses'
 import { assistantHome } from './assistantControl'
 import { config } from './config'
@@ -307,13 +308,37 @@ export async function resumeAfterClose(): Promise<ResumeReport> {
   return r
 }
 
-/** The line the Assistant finds in its inbox (agent-facing: English). */
-function assistantLine(c: UnexpectedClose, r: ResumeReport | null, still: number): string {
-  const agents = c.agents.map((a) => `${a.agentName} (${a.project})`).join(', ') // i18n-ignore: the Assistant's inbox (agent-facing, English)
-  const resumed = r ? `Hive resumed ${r.resumed.length} of them (the user's setting)${r.failed.length ? `; ${r.failed.length} couldn't resume` : ''}${r.held?.length ? `; ${r.held.length} left stopped (their slots are free, to resume by hand, or hold other work)` : ''}.` : 'Nothing was resumed: the user decides.' // i18n-ignore: the Assistant's inbox (agent-facing, English)
-  const left = still ? ` ${still} process(es) the agents started are still running; the user can stop them from Hive's notice.` : '' // i18n-ignore: the Assistant's inbox (agent-facing, English)
-  return `Hive closed unexpectedly: last seen ${c.lastSeen}. ${c.agents.length ? `${c.agents.length} agent(s) were running: ${agents}. ${resumed}` : 'No agents were running.'}${left} Check for card loops and lanes that stalled and tell the user; don't restart or stop anything yourself.` // i18n-ignore: the Assistant's inbox (agent-facing, English)
+/** What the last run's unexpected close tells the Assistant and its journal (dialects, HI-2438). */
+const A = {
+  assistant: agentMsg({
+    id: 'restart.closed.assistant',
+    text: "Hive closed unexpectedly: last seen {lastSeen}. {agentCount, plural, =0 {No agents were running.} other {{agentCount} agent(s) were running: {agents}. {resumed}}}{still, plural, =0 {} other { {still} process(es) the agents started are still running; the user can stop them from Hive's notice.}} Check for card loops and lanes that stalled and tell the user; don't restart or stop anything yourself.",
+    note: "The line the Assistant finds in its inbox after an unexpected close (#987, #1031). agents: each running agent as \"name (project)\", joined by commas; resumed: restart.closed.resumed or restart.closed.nothingResumed; still: the processes the agents had started that still run. It doesn't act itself: the user decides."
+  }),
+  resumed: agentMsg({
+    id: 'restart.closed.resumed',
+    text: "Hive resumed {resumed} of them (the user's setting){failed, plural, =0 {} other {; {failed} couldn't resume}}{held, plural, =0 {} other {; {held} left stopped (their slots are free, to resume by hand, or hold other work)}}.",
+    note: 'With Settings → Sessions → Resume agents after an unexpected close on: how many were resumed, failed, and left stopped (#1434: their slots free, or holding other work).'
+  }),
+  nothingResumed: agentMsg({ id: 'restart.closed.nothingResumed', text: 'Nothing was resumed: the user decides.', note: 'With Settings → Sessions → Resume agents after an unexpected close off (the default): the notice offers Resume All.' }),
+  fact: agentMsg({
+    id: 'restart.closed.fact',
+    text: 'Hive closed unexpectedly (last seen {lastSeen}); {agentCount} agent(s) of this workspace were running',
+    note: "The journal's fact of an unexpected close (#1031): stored, so always the Default's."
+  })
 }
+
+/** The line the Assistant finds in its inbox (agent-facing). */
+export function assistantLine(c: Pick<UnexpectedClose, 'agents' | 'lastSeen'>, r: ResumeReport | null, still: number): string {
+  const agents = c.agents.map((a) => `${a.agentName} (${a.project})`).join(', ') // i18n-ignore: names, not wording (agent-protocol)
+  const resumed = r ? say(A.resumed, { resumed: r.resumed.length, failed: r.failed.length, held: r.held?.length ?? 0 }) : say(A.nothingResumed)
+  return say(A.assistant, { lastSeen: c.lastSeen, agentCount: c.agents.length, agents, resumed, still })
+}
+
+/** The journal's fact of an unexpected close, for a workspace (stored: the Default's words). */
+export const closeFact = (lastSeen: string, agentCount: number): string => inDefaultDialect(() => say(A.fact, { lastSeen, agentCount }))
+/** The fact's message, stored beside its English summary, to be said in each reader's dialect when read (5b, 6b). */
+export const closeFactText = (lastSeen: string, agentCount: number): StoredText => ({ id: A.fact.id, values: { lastSeen, agentCount } })
 
 /** Tells each workspace's Assistant that was open in the last run (one there to tell), for its next start. */
 async function tellAssistants(c: UnexpectedClose, r: ResumeReport | null, still: number): Promise<void> {
@@ -321,11 +346,13 @@ async function tellAssistants(c: UnexpectedClose, r: ResumeReport | null, still:
   for (const ws of homes) {
     const home = assistantHome(ws)
     // A fact for its journal (#1031), Assistant or not.
-    await journalFactAt(ws, { summary: `Hive closed unexpectedly (last seen ${c.lastSeen}); ${c.agents.filter((a) => a.workspace.toLowerCase() === ws).length} agent(s) of this workspace were running`, importance: 2, tags: ['incident', 'unexpected-close'] }) // i18n-ignore: a journal fact (the Assistant's, English)
+    const count = c.agents.filter((a) => a.workspace.toLowerCase() === ws).length
+    await journalFactAt(ws, { summary: closeFact(c.lastSeen, count), summaryText: closeFactText(c.lastSeen, count), importance: 2, tags: ['incident', 'unexpected-close'] })
     // A session host's own config is in its .hive folder: none, the workspace has no Assistant to tell.
     if (!existsSync(join(home, '.hive', 'project.json'))) continue
     // Its workspace may be open in no window now (#1395): left on a lease, for its next open, not admitted for this.
-    await leaveDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body: assistantLine(c, r, still) }).catch((e) => log.warn('telling the Assistant Hive closed unexpectedly', e))
+    // Stored for its next start: the Default's words until stored text is said when read (5b, 6b).
+    await leaveDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body: inDefaultDialect(() => assistantLine(c, r, still)) }).catch((e) => log.warn('telling the Assistant Hive closed unexpectedly', e))
   }
 }
 

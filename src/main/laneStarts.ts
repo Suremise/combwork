@@ -2,6 +2,7 @@ import { join } from 'path'
 import type { TaskCard } from '../shared/types'
 import { laneStartDue, type LaneStartWait, type LaneStartWhy } from '../shared/lanes'
 import { cardRef } from '../shared/projectKeys'
+import { agentMsg, inDialectOf, say } from '../shared/agentText'
 import { agentNowOf } from './cardStall'
 import { coalesced } from './coalesce'
 import { onHiveEvent } from './events'
@@ -33,6 +34,20 @@ import { inWorkspace, openWorkspaces, workspaceFor, type WorkspaceService } from
  */
 
 const log = createLogger('laneStarts')
+
+/** What the builder's prompt says as Hive starts its lane's card (dialects, HI-2438). */
+const A = {
+  first: agentMsg({
+    id: 'brief.start.firstCard',
+    text: "Hive started this card for you: it is your lane's first card. Use card-loop as its builder (hive_lane next names your cards).",
+    note: "HI-2029: with the rules on, Hive starts a lane's first card on its builder itself. The note of the card's start prompt."
+  }),
+  next: agentMsg({
+    id: 'brief.start.nextCard',
+    text: "Hive started this card for you: it is your lane's next card, after {card} went Done.",
+    note: "Hive starts a lane's next card on its builder once the one before it is Done. The note of the card's start prompt."
+  })
+}
 
 /** A board change and the status changes after it are looked at together. */
 const SETTLE_MS = 1000
@@ -192,7 +207,7 @@ async function lookAt(ws: WorkspaceService, path: string): Promise<void> {
     }
     const prev = lane.cards.slice(0, lane.cards.indexOf(next)).findLast((x) => x.column === 'done')
     // Agent-facing: the builder's prompt says why the card came now (its lane's first card too, HI-2029).
-    const note = await withCardNames(ws, () => (prev ? `Hive started this card for you: it is your lane's next card, after ${cardRef(prev.number)} went Done.` : "Hive started this card for you: it is your lane's first card. Use card-loop as its builder (hive_lane next names your cards).")) // i18n-ignore: agent-facing, the card's start prompt
+    const note = await withCardNames(ws, () => inDialectOf({ projectPath: join(path, lane.project), agentId: lane.builder.id }, () => (prev ? say(A.next, { card: cardRef(prev.number) }) : say(A.first))))
     try {
       await laneStartsTestHooks.beforeStart?.(lane.id, next.number)
       if (!stillDue(ws, path, lane, next.number)) throw new LaneChanged('its lane changed meanwhile') // i18n-ignore: for the log

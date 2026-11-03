@@ -1,0 +1,66 @@
+{
+  "stall.agent.notRunning": {
+    "text": "{agent} isn't running.",
+    "note": "The card's agent (or reviewer) has no session running."
+  },
+  "stall.agent.removed": {
+    "text": "{agent} was removed.",
+    "note": "The card's agent (or reviewer) was removed from the project."
+  },
+  "stall.agent.removedUnnamed": {
+    "text": "Its agent was removed.",
+    "note": "The card's agent was removed from the project, its name not kept."
+  },
+  "stall.doing.noAgent": {
+    "text": "In Doing, but no agent has it.",
+    "note": "A card in Doing that no agent has (#170)."
+  },
+  "stall.doing.startFailed": {
+    "text": "{agent}'s start failed: {why}",
+    "note": "HI-1976: the card's agent couldn't be started. why: the failure, in Hive's or the CLI's own words."
+  },
+  "stall.doing.startWaiting": {
+    "text": "{agent} waits to start: {why}",
+    "note": "HI-2304: the card's agent can't start in its slot yet. why: what holds the slot, in English (\"slot-a is held by WindowsSandboxServer, left running by MB1's last run\")."
+  },
+  "stall.duration.hours": {
+    "text": "{hours} h",
+    "note": "A stall's duration in whole hours: \"2 h\"."
+  },
+  "stall.duration.hoursMinutes": {
+    "text": "{hours} h {minutes} min",
+    "note": "A stall's duration over an hour: \"5 h 5 min\"."
+  },
+  "stall.duration.minutes": {
+    "text": "{minutes} min",
+    "note": "A stall's duration under an hour: \"40 min\"."
+  },
+  "stall.lane.orderWait": {
+    "text": "{reviewer} is waiting for {other}, before {card} in the lane, while {builder} waits on the review of {card}: each has waited on the other for {waited}.",
+    "note": "A lane deadlocked: its reviewer waits for a card before this one in the lane, while its builder waits for this card's verdict. waited: a duration (stall.duration.*)."
+  },
+  "stall.loop.designWait": {
+    "text": "{builder} posted a design on {card} for its reviewer to check and has waited {waited}: nobody has answered it, and it hasn't gone ahead as posted (hive_loop_step proceed).",
+    "note": "#1382: the builder posted a design for its reviewer to check before building; nobody answered, and it didn't go ahead once its wait was over. waited: a duration (stall.duration.*)."
+  },
+  "stall.loop.followUpWait": {
+    "text": "{builder} posted a follow-up on {card} for its reviewer to check and has waited {waited}: nobody has answered it (hive_loop_step ok or gaps).",
+    "note": "#1467: the builder posted a follow-up for its reviewer to check, and nobody answered. waited: a duration (stall.duration.*)."
+  },
+  "stall.loop.notWatching": {
+    "text": "{agent} isn't watching {card}: its turn ended with no card watch.",
+    "note": "#376: the agent looping on the card ended its turn with no card watch, so nothing wakes it."
+  },
+  "stall.loop.wakeUntaken": {
+    "text": "{agent} hasn't taken the wake Hive typed for {card}: it waits in its prompt.",
+    "note": "#777: the agent watched the card, and its wake waits untaken in its prompt (its CLI didn't take the line)."
+  },
+  "stall.review.noVerdict": {
+    "text": "{agent} started reviewing {card} but has given no verdict, and has only been watching it for {waited}.",
+    "note": "A card in Review: its reviewer started the review, then went back to watching without a verdict. waited: a duration (stall.duration.*)."
+  },
+  "stall.review.wait": {
+    "text": "{agent} is watching {card} but hasn't started reviewing it{state, select, silent { (it shows working, but has been silent for {silentMinutes} min: state unknown)} busy { (it is working on something else)} other {}}: in Review for {waited}.",
+    "note": "A card waiting in Review: its reviewer watches it but hasn't started. state: silent (it shows working, but has said nothing for silentMinutes), busy (working on something else) or none. waited: a duration (stall.duration.*)."
+  }
+}

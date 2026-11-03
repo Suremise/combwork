@@ -1,5 +1,0 @@
-{
-  "prose|prop:other|Hive passed no mode, so the CLI's own screen shows the one it is in.": 1,
-  "prose|prop:text|Hive passes no permission mode: the CLI starts in the mode its own config sets, or its default. Hive can't switch it in a running session.": 1,
-  "prose|prop:text|The CLI's own setting": 1
-}
