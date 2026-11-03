@@ -333,6 +333,37 @@ describe('one file per model in a CLI folder', () => {
     expect(await promoteDialect(dir, 'claude-code/Missing.json', 'claude-opus-5-5')).toEqual({ refused: 'missing', path: 'claude-code/Missing.json' })
   })
 
+  it('Promote onto a test copy with an entry that is not an override keeps it as written, and moves the claim (HR1 r1)', async () => {
+    const dir = folder()
+    write(dir, 'claude-code/New.json', '{"name":"New","texts":{"a.gone":null,"a.plain":{"text":"new","extra":1}}}')
+    expect(await promoteDialect(dir, 'claude-code/New.json', 'claude-opus-5-5')).toEqual({ from: 'claude-code/Opus 5.5.json' })
+    expect(JSON.parse(readFileSync(join(dir, 'claude-code', 'New.json'), 'utf8'))).toEqual({ name: 'New', model: 'claude-opus-5-5', texts: { 'a.gone': null, 'a.plain': { text: 'new', extra: 1 } } })
+    const set = await loadDialects(dir, SCHEMA)
+    expect(set.folders['claude-code'].files.filter((f) => f.model).map((f) => f.path)).toEqual(['claude-code/New.json'])
+  })
+
+  it('a Promote whose write fails puts back what it changed: the model keeps its claim (HR1 r1)', async () => {
+    const dir = folder()
+    const before = readFileSync(join(dir, 'claude-code', 'Opus 5.5.json'), 'utf8')
+    const v2Before = readFileSync(join(dir, 'claude-code', 'Opus 5.5 v2.json'), 'utf8')
+    vi.resetModules()
+    vi.doMock('../src/main/fsutil', async (orig) => {
+      const real = await orig<typeof import('../src/main/fsutil')>()
+      // The target's write fails (as a rename Windows refuses past its retries), after the old owner's was written.
+      return { ...real, writeTextAtomic: async (p: string, text: string, o?: { mkdir?: boolean }) => (p.endsWith('Opus 5.5 v2.json') ? Promise.reject(Object.assign(new Error('EPERM: rename'), { code: 'EPERM' })) : real.writeTextAtomic(p, text, o)) }
+    })
+    try {
+      const store = await import('../src/main/dialects/store')
+      await expect(store.promoteDialect(dir, 'claude-code/Opus 5.5 v2.json', 'claude-opus-5-5')).rejects.toThrow('EPERM')
+    } finally {
+      vi.doUnmock('../src/main/fsutil')
+      vi.resetModules()
+    }
+    expect(readFileSync(join(dir, 'claude-code', 'Opus 5.5.json'), 'utf8')).toBe(before)
+    expect(readFileSync(join(dir, 'claude-code', 'Opus 5.5 v2.json'), 'utf8')).toBe(v2Before)
+    expect(modelSlot((await loadDialects(dir, SCHEMA)).folders['claude-code'], 'claude-opus-5-5').chosen).toBe('claude-code/Opus 5.5.json')
+  })
+
   it('Duplicate makes a test copy beside it, with every text as it was', async () => {
     const dir = folder()
     write(dir, 'claude-code/Opus 5.5.json', file({ 'a.plain': 'opus', 'a.gone': 'outdated' }, { name: 'Opus 5.5', model: 'claude-opus-5-5' }))

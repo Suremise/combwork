@@ -156,13 +156,13 @@ export async function loadDialects(dir: string, schema: DialectSchema): Promise<
 // ---------------------------------------------------------------------------
 
 /** The models a folder's files claim now, by path (read under the folder's lock). */
-async function claimsIn(dir: string, folder: string): Promise<{ path: string; model: string; file: DialectFile }[]> {
-  const out: { path: string; model: string; file: DialectFile }[] = []
+async function claimsIn(dir: string, folder: string): Promise<{ path: string; model: string; file: DialectFile; raw: string }[]> {
+  const out: { path: string; model: string; file: DialectFile; raw: string }[] = []
   for (const name of (await jsonFiles(join(dir, folder))).sort()) {
     if (name === CLI_FILE) continue
     const raw = await readFile(join(dir, folder, name), 'utf8').catch(() => null)
     const parsed = raw === null ? null : parseDialectFile(raw)
-    if (parsed && 'file' in parsed && parsed.file.model) out.push({ path: `${folder}/${name}`, model: parsed.file.model, file: parsed.file })
+    if (raw !== null && parsed && 'file' in parsed && parsed.file.model) out.push({ path: `${folder}/${name}`, model: parsed.file.model, file: parsed.file, raw })
   }
   return out
 }
@@ -256,6 +256,9 @@ export async function duplicateDialect(dir: string, from: string, label: string)
  * Promote ("Use for <model>"): moves a model's claim onto a test copy. The file that had it keeps its texts and becomes
  * a test copy, as a backup. The claim is taken off the old file before it is put on the new one, so the folder never
  * has two. Agents on Auto pick it up at their next launch.
+ *
+ * All or nothing (HR1, HI-2439 r1): every file's new text is made before any is written, and a write that fails puts
+ * back the files already changed as they were, so a failed Promote never leaves the model unclaimed. It throws then.
  */
 export async function promoteDialect(dir: string, path: string, model: string): Promise<{ from: string | null } | DialectRefusal> {
   const place = placeOf(path)
@@ -265,11 +268,24 @@ export async function promoteDialect(dir: string, path: string, model: string): 
     const file = await readDialect(dir, path)
     if (!file) return { refused: 'missing', path }
     const others = (await claimsIn(dir, place.folder)).filter((c) => c.path.toLowerCase() !== path.toLowerCase() && sameModel(c.model, model))
-    for (const o of others) {
-      const { model: _dropped, ...rest } = o.file
-      await writeTextAtomic(join(dir, ...o.path.split('/')), dialectFileText(rest))
+    // Each write, old owners first, with what to put back: made in full before anything changes.
+    const writes = [
+      ...others.map((o) => {
+        const { model: _dropped, ...rest } = o.file
+        return { at: join(dir, ...o.path.split('/')), text: dialectFileText(rest), was: o.raw }
+      }),
+      { at: join(dir, ...path.split('/')), text: dialectFileText({ ...file, model: model.trim() }), was: null }
+    ]
+    const done: (typeof writes)[number][] = []
+    try {
+      for (const w of writes) {
+        await writeTextAtomic(w.at, w.text)
+        done.push(w)
+      }
+    } catch (e) {
+      for (const w of done.reverse()) if (w.was !== null) await writeTextAtomic(w.at, w.was).catch((err) => log.warn(`Promote of ${userText(path)} failed, and ${userText(w.at)} couldn't be put back as it was`, err))
+      throw e
     }
-    await writeTextAtomic(join(dir, ...path.split('/')), dialectFileText({ ...file, model: model.trim() }))
     log.info(`Promoted the dialect file ${userText(path)} for ${userText(model)}${others.length ? ` (from ${others.map((o) => userText(o.path)).join(', ')})` : ''}`)
     return { from: others[0]?.path ?? null }
   })

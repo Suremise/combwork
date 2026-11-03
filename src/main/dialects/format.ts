@@ -105,12 +105,21 @@ export function checkTexts(file: Pick<DialectFile, 'texts'>, schema: DialectSche
   return { texts, outdated }
 }
 
-/** A dialect file as Hive writes it: its fields in order, ids sorted, two-space JSON with a final newline. */
+/**
+ * A dialect file as Hive writes it: its fields in order, ids sorted, two-space JSON with a final newline. An entry that
+ * isn't `{ text, why? }` (an outdated one written by hand: `null`, a number) is kept as it is, never dropped or fatal:
+ * Hive doesn't rewrite what the user wrote (HR1, HI-2439 r1).
+ */
 export function dialectFileText(file: DialectFile): string {
-  const texts: Record<string, DialectText> = {}
+  const texts: Record<string, unknown> = {}
   for (const id of Object.keys(file.texts).sort()) {
-    const { text, why } = file.texts[id]
-    texts[id] = why !== undefined ? { text, why } : { text }
+    const entry: unknown = file.texts[id]
+    if (!isRecord(entry) || typeof entry.text !== 'string') {
+      texts[id] = entry === undefined ? null : entry
+      continue
+    }
+    const { text, why, ...rest } = entry
+    texts[id] = { text, ...(why !== undefined ? { why } : {}), ...rest }
   }
   return JSON.stringify({ name: file.name, ...(file.model !== undefined ? { model: file.model } : {}), texts }, null, 2) + '\n'
 }
