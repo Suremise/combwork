@@ -12,6 +12,7 @@
 import { type ChildProcess } from 'child_process'
 import { mkdirSync } from 'original-fs'
 import { basename, join } from 'path'
+import { agentMsg, inDefaultDialect, inDialectOf, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { app } from 'electron'
 import { advanced } from './advanced'
 import { processSupervisor } from './agentProcesses'
@@ -127,6 +128,18 @@ export function sweepSealsOf(root: string, o: { once?: boolean } = {}): void {
     .finally(() => sweeping.delete(key))
 }
 
+/** A slot run's errors (dialects, HI-2447): its end's error, kept on the slot by the pool (said in the Default there). */
+const T = {
+  noSupervisor: agentMsg({ id: 'slot.run.noSupervisor', text: "Hive's process supervisor isn't running, so it can't run a slot's commands", note: "A slot's or copy's setup error: Hive runs their commands in a job of its own, and can't now." }),
+  noJob: agentMsg({ id: 'slot.run.noJob', text: "its job couldn't be made: {problem}", note: "A slot's or copy's setup error: the job its command runs in couldn't be made. {problem} is why." }),
+  closed: agentMsg({ id: 'slot.run.closed', text: 'the workspace closed', note: "A slot's or copy's setup error: its workspace closed before its command ran." }),
+  merged: agentMsg({ id: 'slot.laneEnd.merged', text: '{card} merged at {commit}', note: "A card in slot.laneEnd.note's list: merged, with its merge commit's first 12 characters." }),
+  notMerged: agentMsg({ id: 'slot.laneEnd.notMerged', text: '{card} not merged', note: "A card in slot.laneEnd.note's list: not merged." }),
+  more: agentMsg({ id: 'slot.laneEnd.more', text: 'and {count} more', note: "The end of slot.laneEnd.note's list, past its first 20 cards. {count} is digits." }),
+  laneEnd: agentMsg({ id: 'slot.laneEnd.note', text: "{abandoned, select, yes {Lane {lane} was abandoned} other {Lane {lane} is finished}}{listed, select, yes {: {list}} other {}}. Your session ends once this turn does; Hive resumes it for your next lane. Close the lane's work in your reply, then end your turn.", note: "The note a lane's builder is given as its lane ends (HI-1706): each card (slot.laneEnd.merged or notMerged, joined by \"; \"), and that its session ends with its turn. Cut at 2000 characters." })
+}
+const sayStored = (m: AgentMsg, values?: AgentValues): string => inDefaultDialect(() => say(m, values))
+
 /**
  * A project's slot runs: each a run of "Hive (slot <name>)" in the Progress panel, in the job the pool recorded for it.
  * Fails closed: with no process supervisor, or its job not made, nothing runs. Its job is ended when the command
@@ -136,9 +149,9 @@ export function sweepSealsOf(root: string, o: { once?: boolean } = {}): void {
 export function appRunner(ws: WorkspaceService, projectPath: string, root: string): SlotRunner {
   return async (r) => {
     const host = processSupervisor()
-    if (!host.usable || !(await host.ensure())) return { ok: false, exitCode: null, spawnError: true, error: "Hive's process supervisor isn't running, so it can't run a slot's commands", logPath: null, settled: true } // i18n-ignore: agent-facing and the log
+    if (!host.usable || !(await host.ensure())) return { ok: false, exitCode: null, spawnError: true, error: sayStored(T.noSupervisor), logPath: null, settled: true }
     const opened = await LeaseJob.open(host, r.job, await journalPath(root, r.job, journalsOf(root)))
-    if ('problem' in opened) return { ok: false, exitCode: null, spawnError: true, error: `its job couldn't be made: ${opened.problem}`, logPath: null, settled: true } // i18n-ignore: agent-facing and the log
+    if ('problem' in opened) return { ok: false, exitCode: null, spawnError: true, error: sayStored(T.noJob, { problem: opened.problem }), logPath: null, settled: true }
     const job = opened
     const workspacePath = ws.path ?? ''
     // A copy's run is credited to the agent whose lease holds it (HI-1710), named as the project names it now.
@@ -168,7 +181,7 @@ export function appRunner(ws: WorkspaceService, projectPath: string, root: strin
     try {
       const minutes = Math.max(1, Number(advanced.get(SLOTS_SETUP_MINUTES)) || 60)
       const e = r.signal.aborted ? null : await execCommand({ spawn: jobSpawn(job), platform: process.platform, timeoutMs: minutes * 60_000, env: () => ({ ...checkEnv(childEnv()), ...r.env }) }, r.command, r.folder, out)
-      end = e ? { ok: !e.spawnError && !e.timedOut && e.exitCode === 0 && !r.signal.aborted, exitCode: e.exitCode, ...(e.timedOut ? { timedOut: true } : {}), ...(e.spawnError ? { spawnError: true } : {}), logPath: null, settled: false } : { ...end, error: 'the workspace closed' } // i18n-ignore: agent-facing and the log
+      end = e ? { ok: !e.spawnError && !e.timedOut && e.exitCode === 0 && !r.signal.aborted, exitCode: e.exitCode, ...(e.timedOut ? { timedOut: true } : {}), ...(e.spawnError ? { spawnError: true } : {}), logPath: null, settled: false } : { ...end, error: sayStored(T.closed) }
     } finally {
       r.signal.removeEventListener('abort', onClose)
       out.close()
@@ -438,11 +451,10 @@ const LANE_END_RECHECK_MS = 5000
  * merged), and that its session ends once its turn does. Agent-facing: English. At most NOTE_CARDS cards named.
  */
 export function laneEndNote(lane: string, abandoned: boolean, cards: readonly { key: string; merged: string | null }[]): string {
-  const named = cards.slice(0, NOTE_CARDS).map((c) => `${c.key} ${c.merged ? `merged at ${c.merged.slice(0, 12)}` : 'not merged'}`) // i18n-ignore: typed to the builder
-  const more = cards.length > NOTE_CARDS ? [`and ${cards.length - NOTE_CARDS} more`] : [] // i18n-ignore: typed to the builder
+  const named = cards.slice(0, NOTE_CARDS).map((c) => (c.merged ? say(T.merged, { card: c.key, commit: c.merged.slice(0, 12) }) : say(T.notMerged, { card: c.key })))
+  const more = cards.length > NOTE_CARDS ? [say(T.more, { count: String(cards.length - NOTE_CARDS) })] : []
   const list = [...named, ...more].join('; ')
-  const head = abandoned ? `Lane ${lane} was abandoned` : `Lane ${lane} is finished` // i18n-ignore: typed to the builder
-  const text = `${head}${list ? `: ${list}` : ''}. Your session ends once this turn does; Hive resumes it for your next lane. Close the lane's work in your reply, then end your turn.` // i18n-ignore: typed to the builder
+  const text = say(T.laneEnd, { abandoned: abandoned ? 'yes' : 'no', lane, listed: list ? 'yes' : 'no', list })
   return text.length > NOTE_MAX_CHARS ? `${text.slice(0, NOTE_MAX_CHARS - 1)}…` : text
 }
 
@@ -669,7 +681,7 @@ function laneEnd(projectPath: string, lease: SlotLease, slotName: string, w: Slo
       return { key: cardKeyOf(ws, c.number)?.key ?? `#${c.number}`, merged }
     })
     const st = sessions.liveFor(projectPath, w.agent)
-    const r = await createDelivery(projectPath, { agentId: w.agent, agentName: st?.agentName, conversation: st?.sessionId || null, kind: 'control', from: { kind: 'hive', name: 'Hive' }, body: laneEndNote(lane?.name ?? lease.lane ?? '', lease.why === 'laneAbandoned', cards), source: LANE_END_SOURCE, ref: lease.id, forRun: w.run }) // i18n-ignore: the product's name, as a delivery's sender
+    const r = await createDelivery(projectPath, { agentId: w.agent, agentName: st?.agentName, conversation: st?.sessionId || null, kind: 'control', from: { kind: 'hive', name: 'Hive' }, body: inDialectOf({ projectPath, agentId: w.agent }, () => laneEndNote(lane?.name ?? lease.lane ?? '', lease.why === 'laneAbandoned', cards)), source: LANE_END_SOURCE, ref: lease.id, forRun: w.run }) // i18n-ignore: the product's name, as a delivery's sender
     await offerNow(projectPath, w.agent)
     return r.id
   }

@@ -22,6 +22,7 @@
 // rules are enforced) it only releases: nothing is lent, prepared, placed or deleted, each step checking again after its
 // waits.
 
+import { agentMsg, inDefaultDialect, say } from '../shared/agentText'
 import { projectAgents } from '../shared/defaults'
 import { taskPrompt } from '../shared/tasks'
 import { agentWorkflowRole, buildsWork, takesCards } from '../shared/workflow/roles'
@@ -213,12 +214,31 @@ export async function leaseForStart(ws: WorkspaceService, projectPath: string, c
  * waits detached at the head of the line its last card worked to. No target: the slot keeps its own. Null when
  * recorded; why the start waits when that lease ended or changed hands meanwhile (agent-facing).
  */
+/** A card's slot's agent text (dialects, HI-2447): a start's waits, and why a builder isn't placed in its slot yet. */
+const T = {
+  leaseEnded: agentMsg({ id: 'slot.start.leaseEnded', text: "its slot's lease {lease} ended while the start took it: the start tries again", note: "A start's wait: the slot's lease ended between taking it and recording its target." }),
+  ownSlotWaits: agentMsg({ id: 'slot.start.ownSlotWaits', text: "{agent}'s own slot {slot}, its run still there, {because}: this start waits for it rather than take a second slot", note: "A start's wait (HI-1762): the builder's own run still writes in a slot that can't be taken over now. {because} is one of slot.takeover.*." }),
+  changed: agentMsg({ id: 'slot.takeover.changed', text: 'changed while it was taken over', note: 'As slot.takeover.gone: the slot changed while the start took it over, twice.' }),
+  notReady: agentMsg({ id: 'slot.place.notReady', text: "Hive couldn't get {slot} ready: {error}", note: "Why a builder's start ended (a card's stall): its slot couldn't be prepared for the card. Kept, so said in the Default." }),
+  notReadyFor: agentMsg({ id: 'slot.place.notReadyFor', text: "Hive couldn't get {slot} ready for {card}: {error}", note: "A card's notice and its builder's wake: its slot couldn't be prepared for it. Kept on the card, so said in the Default." }),
+  cantResume: agentMsg({ id: 'slot.place.cantResume', text: "Hive can't give {card} to {agent} yet: its conversation in {slot} can't resume now ({why}).", note: "A card's notice and its builder's wake: the builder's conversation in its slot can't resume yet. {why} is one of slot.hold.*, or why the slot is held. Kept on the card, so said in the Default." }),
+  resumeEnded: agentMsg({ id: 'slot.place.resumeEnded', text: "its conversation in {slot} didn't resume ({tries} tries): {why}", note: "Why a builder's start ended (a card's stall): resuming its conversation failed every try. Kept, so said in the Default." }),
+  resumeFailed: agentMsg({ id: 'slot.place.resumeFailed', text: "Hive couldn't resume {agent}'s conversation in {slot} for {card} (three tries): {why}. Resume {agent} from Sessions, or start it fresh, and Hive gives it {card}.", note: "A card's notice and its builder's wake: resuming its conversation failed three times. Kept on the card, so said in the Default." }),
+  draining: agentMsg({ id: 'slot.hold.draining', text: 'its last session there is still ending', note: "Why a builder's conversation in its slot can't resume yet: the end of slot.place.cantResume." }),
+  otherWork: agentMsg({ id: 'slot.hold.otherWork', text: 'its slot {slot} holds other work now', note: 'As slot.hold.draining: the slot was lent for other work since.' }),
+  otherSlot: agentMsg({ id: 'slot.hold.otherSlot', text: 'its agent keeps another slot ({slot})', note: 'As slot.hold.draining: one agent, one slot (HI-1762).' }),
+  slotChanged: agentMsg({ id: 'slot.hold.changed', text: 'its slot {slot} changed since it ran', note: "As slot.hold.draining: the slot's checkout changed since the conversation ran there." }),
+  slotGone: agentMsg({ id: 'slot.hold.gone', text: 'its slot {slot} is gone', note: "As slot.hold.draining: the slot's folder is gone." }),
+  reviews: agentMsg({ id: 'slot.hold.reviews', text: 'its agent reviews now', note: 'As slot.hold.draining: the agent is reviewing.' }),
+  byHand: agentMsg({ id: 'slot.hold.byHand', text: 'its slot {slot} is free, for a Resume by hand', note: 'As slot.hold.draining: the slot is free, and the user resumes the conversation.' })
+}
+
 async function startServes(ws: WorkspaceService, projectPath: string, lease: string, builder: string, target: string | null): Promise<string | null> {
   if (!target) return null
   const pool = await poolFor(ws, projectPath)
   if (await pool.serves(lease, builder, target)) return null
   log.info(`lease ${lease} ended before its start recorded its target ${userText(target)}`)
-  return `its slot's lease ${lease} ended while the start took it: the start tries again` // i18n-ignore: agent-facing, a start's wait
+  return say(T.leaseEnded, { lease })
 }
 
 async function slotForStart(ws: WorkspaceService, projectPath: string, card: Pick<CardRecord, 'id' | 'lane'>, builder: string, o: { dry: boolean; target: string | null }): Promise<SlotForStart> {
@@ -475,7 +495,7 @@ function writtenSlotOf(projectPath: string, pool: SlotPool, builder: string): Sl
  * dry start and a real one ask the takeover's own conditions (SlotPool.writtenNotTakeable, HI-1787), so they agree.
  */
 async function startOnWritten(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, req: { card?: number; lane?: string; agent: string }, agentName: string, dry = false): Promise<{ none: true } | { lease: SlotLease } | { dry: Slot } | { wait: string }> {
-  const waitFor = (s: Slot, because: string): { wait: string } => ({ wait: `${agentName}'s own slot ${s.name}, its run still there, ${because}: this start waits for it rather than take a second slot` }) // i18n-ignore: agent-facing, a start's wait
+  const waitFor = (s: Slot, because: string): { wait: string } => ({ wait: say(T.ownSlotWaits, { agent: agentName, slot: s.name, because }) })
   for (let tries = 0; tries < 2; tries++) {
     const slot = writtenSlotOf(projectPath, pool, builder)
     if (!slot) return { none: true }
@@ -487,7 +507,7 @@ async function startOnWritten(ws: WorkspaceService, projectPath: string, pool: S
     if (taken) return { lease: taken }
   }
   const still = writtenSlotOf(projectPath, pool, builder)
-  return still ? waitFor(still, 'changed while it was taken over') : { none: true } // i18n-ignore: agent-facing, a start's wait
+  return still ? waitFor(still, say(T.changed)) : { none: true }
 }
 
 async function takeWritten(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, req: { card?: number; lane?: string; agent: string }, agentName: string): Promise<SlotLease | null> {
@@ -1092,9 +1112,9 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
     if ('error' in r) {
       failed.add(key)
       log.warn(`Slot ${userText(st.slot)} couldn't be prepared for #${n}: ${userText(r.error)}`)
-      startEnded(projectPath, builder, `#${n}`, { failed: `Hive couldn't get ${st.slot} ready: ${r.error}` }) // i18n-ignore: agent-facing (a card's stall)
+      startEnded(projectPath, builder, `#${n}`, { failed: inDefaultDialect(() => say(T.notReady, { slot: st.slot, error: r.error })) })
       await wf.write(card.card, null, 'hive', (w) => {
-        const english = `Hive couldn't get ${st.slot} ready for ${card.card.key}: ${r.error}` // i18n-ignore: agent-facing, and the notice's English
+        const english = inDefaultDialect(() => say(T.notReadyFor, { slot: st.slot, card: card.card.key, error: r.error }))
         w.action('notify', { text: english, shown: workflowText(SLOT_NOTICES.notPrepared, { slot: st.slot, card: card.card.key, why: r.error }) })
         wf.wake(w, st.builder, english)
       })
@@ -1299,7 +1319,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
     log.info(`#${n} waits for ${userText(agent.name)}'s conversation in ${userText(cycle.started.slot)}: held (${conv.hold.is})`)
     if (!track.told.has(told)) {
       track.told.add(told)
-      await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeHeld, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: holdWords(conv.hold) }), `Hive can't give ${card.key ?? `#${n}`} to ${agent.name} yet: its conversation in ${cycle.started.slot} can't resume now (${holdWords(conv.hold)}).`) // i18n-ignore: agent-facing, and the notice's English
+      await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeHeld, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: holdWords(conv.hold) }), inDefaultDialect(() => say(T.cantResume, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: holdWords(conv.hold) })))
     }
     return 'wait'
   }
@@ -1315,7 +1335,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
     if (!track.told.has(told)) {
       track.told.add(told)
       log.info(`#${n} waits for ${userText(cycle.started.slot)} to be freed before ${userText(agent.name)} resumes there: ${userText(held)}`)
-      await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeHeld, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: held }), `Hive can't give ${card.key ?? `#${n}`} to ${agent.name} yet: its conversation in ${cycle.started.slot} can't resume now (${held}).`) // i18n-ignore: agent-facing, and the notice's English
+      await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeHeld, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: held }), inDefaultDialect(() => say(T.cantResume, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: held })))
     }
     return 'held'
   }
@@ -1344,7 +1364,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
         const told = 'refused'
         if (!track.told.has(told)) {
           track.told.add(told)
-          await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeHeld, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: e.message }), `Hive can't give ${card.key ?? `#${n}`} to ${agent.name} yet: its conversation in ${cycle.started.slot} can't resume now (${e.message}).`) // i18n-ignore: agent-facing, and the notice's English
+          await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeHeld, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: e.message }), inDefaultDialect(() => say(T.cantResume, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: e.message })))
         }
         throw new Waits()
       }
@@ -1354,8 +1374,8 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
         track.failures = 0
         const why = e instanceof Error ? e.message : String(e)
         log.warn(`#${n}: ${userText(agent.name)}'s conversation in ${userText(cycle.started.slot)} didn't resume (${tries} tries): ${userText(why)}`)
-        startEnded(projectPath, agentId, `#${n}`, { failed: `its conversation in ${cycle.started.slot} didn't resume (${tries} tries): ${why}` }) // i18n-ignore: agent-facing (a card's stall)
-        await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeFailed, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why }), `Hive couldn't resume ${agent.name}'s conversation in ${cycle.started.slot} for ${card.key ?? `#${n}`} (three tries): ${why}. Resume ${agent.name} from Sessions, or start it fresh, and Hive gives it ${card.key ?? `#${n}`}.`) // i18n-ignore: agent-facing, and the notice's English
+        startEnded(projectPath, agentId, `#${n}`, { failed: inDefaultDialect(() => say(T.resumeEnded, { slot: cycle.started.slot, tries: String(tries), why })) })
+        await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeFailed, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why }), inDefaultDialect(() => say(T.resumeFailed, { agent: agent.name, slot: cycle.started.slot, card: card.key ?? `#${n}`, why })))
         throw new GaveUp()
       }
       throw e
@@ -1384,6 +1404,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
       const brief = l.kind === 'lane' && l.lane ? briefOf((await rawLanes(ws)).find((x) => x.id === l.lane)) : null
       const prompt = brief ? `${cardPrompt}\n\n${brief}` : cardPrompt
       // How it is placed kept with it (HI-2134): a later pass finding it made records the placement as this one made it.
+      // agent-protocol: the sender is the product's name, Hive
       const nd = { agentId, agentName: agent.name, kind: 'task' as const, from: { kind: 'hive' as const, name: 'Hive' }, card: n, body: prompt, source: PLACEMENT, ref, meta: { how } } // i18n-ignore: who a delivery is from, as agents read it
       // Its builder can't take a line now (HI-2191: its input blocked, a line of Hive's being typed, watching, working):
       // it waits for that builder's next status (place's nextLook), making no delivery. One made and called off each
@@ -1441,20 +1462,20 @@ async function tellCard(wf: Workflow, card: Parameters<Workflow['write']>[0], bu
 function holdWords(h: ResumeHold): string {
   switch (h.is) {
     case 'draining':
-      return 'its last session there is still ending' // i18n-ignore: agent-facing
+      return say(T.draining)
     case 'after':
     case 'reused':
-      return `its slot ${h.slot} holds other work now` // i18n-ignore: agent-facing
+      return say(T.otherWork, { slot: h.slot })
     case 'holds':
-      return `its agent keeps another slot (${h.slot})` // i18n-ignore: agent-facing
+      return say(T.otherSlot, { slot: h.slot })
     case 'changed':
-      return `its slot ${h.slot} changed since it ran` // i18n-ignore: agent-facing
+      return say(T.slotChanged, { slot: h.slot })
     case 'gone':
-      return `its slot ${h.slot} is gone` // i18n-ignore: agent-facing
+      return say(T.slotGone, { slot: h.slot })
     case 'reviewer':
-      return 'its agent reviews now' // i18n-ignore: agent-facing
+      return say(T.reviews)
     case 'byHand':
-      return `its slot ${h.slot} is free, for a Resume by hand` // i18n-ignore: agent-facing
+      return say(T.byHand, { slot: h.slot })
   }
 }
 

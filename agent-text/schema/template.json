@@ -1,0 +1,171 @@
+{
+  "template.apply.gone": {
+    "placeholders": {}
+  },
+  "template.apply.running": {
+    "placeholders": {}
+  },
+  "template.connections.ambiguous": {
+    "placeholders": {
+      "ref": "plain",
+      "ids": "plain"
+    }
+  },
+  "template.connections.bad": {
+    "placeholders": {
+      "keys": "plain",
+      "count": "plural",
+      "roles": "plain",
+      "agents": "plain"
+    }
+  },
+  "template.connections.both": {
+    "placeholders": {
+      "first": "plain",
+      "key": "plain",
+      "place": "plain",
+      "agent": "plain"
+    }
+  },
+  "template.connections.none": {
+    "placeholders": {}
+  },
+  "template.connections.notObject": {
+    "placeholders": {
+      "roles": "plain"
+    }
+  },
+  "template.connections.notText": {
+    "placeholders": {
+      "key": "plain"
+    }
+  },
+  "template.connections.range": {
+    "placeholders": {
+      "key": "plain",
+      "count": "plain",
+      "agents": "plain"
+    }
+  },
+  "template.connections.required": {
+    "placeholders": {
+      "roles": "plain",
+      "agents": "plain",
+      "usable": "plain"
+    }
+  },
+  "template.connections.several": {
+    "placeholders": {
+      "key": "plain",
+      "count": "plain",
+      "choices": "plain"
+    }
+  },
+  "template.connections.unknown": {
+    "placeholders": {
+      "ref": "plain"
+    }
+  },
+  "template.find.from": {
+    "placeholders": {}
+  },
+  "template.find.none": {
+    "placeholders": {
+      "template": "plain",
+      "scoped": "select",
+      "scope": "plain",
+      "fromProject": "select",
+      "from": "plain"
+    }
+  },
+  "template.find.required": {
+    "placeholders": {}
+  },
+  "template.find.scope": {
+    "placeholders": {}
+  },
+  "template.find.several": {
+    "placeholders": {
+      "template": "plain",
+      "choices": "plain"
+    }
+  },
+  "template.find.unusable": {
+    "placeholders": {
+      "name": "plain",
+      "problem": "plain"
+    }
+  },
+  "template.load.needsGit": {
+    "placeholders": {}
+  },
+  "template.load.notYet": {
+    "placeholders": {
+      "blocked": "plain"
+    }
+  },
+  "template.load.optionsChanged": {
+    "placeholders": {}
+  },
+  "template.load.tooMany": {
+    "placeholders": {
+      "count": "plain",
+      "max": "plain"
+    }
+  },
+  "template.load.workflowCant": {
+    "placeholders": {
+      "problems": "plain"
+    }
+  },
+  "template.names.both": {
+    "placeholders": {
+      "first": "plain",
+      "key": "plain",
+      "place": "plain",
+      "agent": "plain"
+    }
+  },
+  "template.names.none": {
+    "placeholders": {
+      "key": "plain",
+      "keys": "plain"
+    }
+  },
+  "template.names.notObject": {
+    "placeholders": {
+      "keys": "plain"
+    }
+  },
+  "template.names.notText": {
+    "placeholders": {
+      "key": "plain"
+    }
+  },
+  "template.names.range": {
+    "placeholders": {
+      "key": "plain",
+      "count": "plain",
+      "keys": "plain"
+    }
+  },
+  "template.names.several": {
+    "placeholders": {
+      "key": "plain",
+      "count": "plain",
+      "choices": "plain"
+    }
+  },
+  "template.taken.one": {
+    "placeholders": {
+      "name": "plain",
+      "project": "plain",
+      "suggestion": "plain"
+    }
+  },
+  "template.taken.refused": {
+    "placeholders": {
+      "taken": "plain"
+    }
+  }
+}

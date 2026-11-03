@@ -43,6 +43,13 @@ const traverse = traverseModule.default ?? traverseModule
 export const ALLOW_DIR = 'agent-text/allow'
 
 const norm = (s) => s.replace(/\s+/g, ' ').trim()
+/**
+ * An SQL statement, not wording (HI-2447: the slot and copy pools' hundred-odd statements read as prose to the shared
+ * heuristic): it starts with a statement's keywords, in capitals, as this codebase writes them. A fragment of one (a
+ * WHERE clause kept in a constant) takes `// agent-protocol: SQL`.
+ */
+const SQL = /^(SELECT [\s\S]+ FROM |INSERT INTO |UPDATE \w+ SET |DELETE FROM |BEGIN( IMMEDIATE| EXCLUSIVE)?$|COMMIT$|ROLLBACK$)/
+export const isSql = (text) => SQL.test(text.trim())
 const calleeName = (c) => (c?.type === 'Identifier' ? c.name : (c?.type === 'MemberExpression' || c?.type === 'OptionalMemberExpression') && c.property.type === 'Identifier' ? c.property.name : '')
 
 /** A comment's lines and, when it has its line to itself, the next one. */
@@ -89,7 +96,7 @@ export function agentSitesOf(file, code) {
   const inDescriptor = (at) => at !== undefined && at !== null && ranges.some(([a, b]) => at >= a && at < b)
   const sites = []
   for (const i of proseItems(ast)) {
-    if (inDescriptor(i.start) || protocol.has(i.line) || (!whole && !agentLines.has(i.line))) continue
+    if (inDescriptor(i.start) || protocol.has(i.line) || (!whole && !agentLines.has(i.line)) || isSql(i.text)) continue
     sites.push({ site: `prose|${i.kind}|${norm(i.text.replace(/\{x\}/g, '{}'))}`, line: i.line })
   }
   return { sites, problems }
