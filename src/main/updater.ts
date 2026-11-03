@@ -212,8 +212,14 @@ export function restartAndInstall(version?: string): void {
     toast('warning', tr(msg({ id: 'main.update.notInstalled', defaultMessage: "{app} {version} wasn't installed", description: "A notice: the user chose Restart and Update, and Hive didn't install the downloaded update. {app} is Hive's name." }), { app: APP_NAME, version: state.version ?? '' }), notInstalledText())
     return
   }
-  if (version !== undefined) resolveOffer(`update:${version}`, tr(OUTCOME.installing))
+  // Its notice keeps its button until the quit goes ahead (HI-2425): the quit may still ask, and Cancel leaves Hive
+  // and the offer as they were. markInstalling() says Installing once it does.
   restartForUpdate()
+}
+
+/** The quit is going ahead and installs the update (HI-2425): its notice says so in place of Restart and Update. */
+export function markInstalling(): void {
+  if (state.status === 'ready' && state.version) resolveOffer(`update:${state.version}`, tr(OUTCOME.installing))
 }
 
 /** Why a downloaded update isn't installed, for the notice. */
