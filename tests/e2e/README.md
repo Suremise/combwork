@@ -334,8 +334,8 @@ same code while every required check still runs:
   suites a change needs, such as a review round's fixes, and isn't any merge's gate.
 - **A flake fix, or a change to a suite's waits**, is proven by focused repeats under load (the `investigate-flake`
   skill): the suite with its neighbours (its area's suites in `affected.mjs`, filling the four jobs) three times,
-  `npm run e2e -- <suite> <neighbours> --build --record --repeat 3` (at most 2 spinner workers; a flake seen only
-  under a full run's load waits for the release window unless it blocks merges: AGENTS.md, Tests per card). The full-set check is the next quiet-time or
+  `npm run e2e -- <suite> <neighbours> --build --record --repeat 3` (within AGENTS.md's flake caps, Tests per card;
+  a flake seen only under a full run's load waits for the release window unless it blocks merges). The full-set check is the next quiet-time or
   release run (above), not the card's or the merge's; the full set repeated (`--all --repeat 5`) runs only when the
   user asks: it holds a heavy slot for over an hour while other lanes queue, and under that load it fails on their
   flakes (a failure in another lane's suite is a card of its own, not a reason to fail the fix).
