@@ -10,7 +10,7 @@ import { hooksMissingText, shownMergeSlot, shownStatusMessage } from '@shared/ru
 import * as actions from '../actions'
 import { call } from '../api'
 import { commandKeybinding, runCommand } from '../commands'
-import { get, notify, projectKeyOf, projectStarting, projectState, startingLabel, prompt, set, setProjectTab, toggleCompactSidebar, useStore } from '../store'
+import { get, leaveSettingsForSidePanel, notify, projectKeyOf, projectStarting, projectState, startingLabel, prompt, set, setProjectTab, toggleCompactSidebar, useStore } from '../store'
 import { cx, formatKeybinding } from '../util'
 import { Icon, IconButton, InfoTip, LoadFailed, OneLineTitle, SearchInput, StaleNote, StatusDot, STATUS_TEXT, Switch, Tooltip, useContextMenu, type MenuEntry } from './ui'
 import { addSkill, deleteSkill, DeliveredSwitch, HiveSkillsWarning, restoreBundled, SKILL_LEVEL_TIP, skillDescription, SkillRow } from './Skills'
@@ -181,7 +181,8 @@ export function Sidebar() {
   }
 
   return (
-    <div className={cx('sidebar', compact && 'compact')} style={{ width: compact ? RAIL_WIDTH : width }}>
+    // Captured, so the row's own click runs after Settings has stepped aside (HI-2525); the resizer is the panel's edge.
+    <div className={cx('sidebar', compact && 'compact')} style={{ width: compact ? RAIL_WIDTH : width }} onClickCapture={(e) => !(e.target as HTMLElement).closest('.sidebar-resizer') && leaveSettingsForSidePanel()}>
       {view === 'projects' && (compact ? <ProjectsRail /> : <ProjectsPanel />)}
       {view === 'overview' && <WorkspaceOverviewPanel />}
       {view === 'activity' && <WorkspaceActivityPanel />}

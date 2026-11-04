@@ -452,6 +452,8 @@ export const AREAS = [
   { paths: ['src/main/recentWorkspaces.ts'], suites: ['recent', 'windows'] },
   { paths: ['src/renderer/src/components/Resizer.tsx'], suites: ['resize', 'progress'] },
   { paths: ['src/renderer/src/components/Sidebar.tsx'], suites: ['agentstable', 'cardchip', 'rail', 'windows', 'contrast', 'panelroom'] },
+  // Leaving Settings for a view (HI-2525): the activity bar, the side panel, shortcuts, and what is half typed.
+  { paths: ['tests/e2e/settingsleave.cjs', 'src/renderer/src/components/Sidebar.tsx', 'src/renderer/src/components/Shell.tsx', 'src/renderer/src/views/SettingsView.tsx', 'src/renderer/src/App.tsx'], suites: ['settingsleave'] },
   // Room for the work beside the side panels (HI-1737).
   { paths: ['src/renderer/src/layoutRoom.ts'], suites: ['panelroom', 'presetstep', 'rail'] },
   // The session toolbar (#975): Panes | Tiles, the summary chip, + Add ▾.
