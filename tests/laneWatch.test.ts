@@ -13,6 +13,7 @@ import { taskWaitText } from '../src/shared/toolReplies'
 import { REVIEW_WAIT_STALL_MS } from '../src/shared/tasks'
 import { IDLE_WATCH_STALL_MS } from '../src/shared/idleWatch'
 import { tempDir } from './tempDir'
+import { putStoreDocs, storeDocs } from './storeDocs'
 import { follow } from './followDoorbell'
 import { LANE_NEXT_STALL_MS, laneNextWaitReason, replyWaitReason, RETURN_STALL_MS, returnedWaitReason, setStallRuns, STALE_STALL_MS, staleWaitReason } from '../src/main/cardStall'
 import type { ProgressRun } from '../src/shared/types'
@@ -31,7 +32,7 @@ const card = (over: Partial<LaneMark['cards'][string]> = {}) => ({ c: 'doing' as
 describe('what a lane watch counts (#531)', () => {
   it('the condition: lane ids or "all", and events (default: all but passed and moved)', () => {
     expect(readLaneCondition({ lanes: ['all'] })).toEqual({ ids: 'all', events: LANE_DEFAULT_EVENTS })
-    expect(readLaneCondition({ lanes: ['lane-1a2b3c', 'lane-4d5e6f'], events: ['failed', 'passed'] })).toEqual({ ids: ['lane-1a2b3c', 'lane-4d5e6f'], events: ['failed', 'passed', 'paused-user'] })
+    expect(readLaneCondition({ lanes: ['lane-1a2b3c', 'lane-4d5e6f'], events: ['failed', 'passed'] })).toEqual({ ids: ['lane-1a2b3c', 'lane-4d5e6f'], events: ['failed', 'passed', 'paused-user', 'ended', 'abandoned'] })
     expect(readLaneCondition({ lanes: [] })).toMatch(/lanes must be/)
     expect(readLaneCondition({ lanes: ['a b'] })).toMatch(/lanes must be/)
     expect(readLaneCondition({ lanes: ['all'], events: ['merged'] })).toMatch(/events must be/)
@@ -1387,6 +1388,28 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await watches.evaluateWatches(w)
     await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
     expect(st.told[0]).toMatch(/^\[CW\] Lane B3 \/ R1: was abandoned\./)
+    await disposeWorkspaceService(w)
+  })
+
+  it('HI-2521 round 1 finding: a named-lane watch read back from before, saved counting only failed, is still woken by its lane ending; an "all" watch keeps its events', async () => {
+    expect(readLaneCondition({ lanes: ['lane-a'], events: ['failed'] })).toEqual({ ids: ['lane-a'], events: ['failed', 'paused-user', 'ended', 'abandoned'] })
+    expect(readLaneCondition({ lanes: ['all'], events: ['failed'] })).toEqual({ ids: 'all', events: ['failed', 'paused-user'] })
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const [a] = await newCards(w, 'b1', 1)
+    const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })).lane
+    st.status = 'watching'
+    await watches.registerLaneWatch(w, home, 'assistant', { ids: [l.id], events: ['failed'] })
+    // Saved as a build from before HI-2521 saved it: failed (and the question for the user) only.
+    const saved = storeDocs(w.path!, 'watches')
+    expect(saved).toHaveLength(1)
+    await putStoreDocs(w.path!, 'watches', [{ ...saved[0], lanes: { ids: [l.id], events: ['failed', 'paused-user'] } }])
+    watches.forgetWatches(w)
+    await vi.waitFor(() => expect(watches.watchFor(home, 'assistant')).not.toBeNull(), { timeout: HUNG_MS })
+    await lanes.endLane(w, l.id, { mergeCommit: '47a3d54c0ffee1234567890abcdef1234567890a' })
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toMatch(/^\[CW\] Lane B1 \/ R1: ended: merged at 47a3d54c0ffe\./)
     await disposeWorkspaceService(w)
   })
 
