@@ -172,6 +172,8 @@
   "tips.connectionOrder.title": "アカウントを並べ替える",
   "tips.connectionSetups.text": "「設定」→「アカウントと接続」でアカウントの下の「接続を追加」を使うと、同じサインインに別の設定を作れます（「Claude · Medium」の横に「Claude · High」など）。エージェントは接続を選ぶので、1回の編集でその接続のすべてのエージェントが変わります。",
   "tips.connectionSetups.title": "1つのサインインに複数の設定",
+  "tips.connectionTags.text": "両方のアカウントの接続に同じタグ（例: BuildersやAssistant）を付けます（接続のダイアログの「タグ」欄）。使用量による移動でエージェントが別のアカウントに移るとき、各エージェントは同じタグの接続に移り、アシスタントも移ります。",
+  "tips.connectionTags.title": "接続にタグを付けて、移動したエージェントの種類を保つ",
   "tips.connectionTrust.text": "新しい接続のセットアップでは、ワークスペースのフォルダーでClaude Codeに一度だけ、その中のすべてのプロジェクトを信頼するか尋ねます。Codexエージェントは尋ねません。各エージェントがその起動で自分のフォルダーを信頼します（「設定」→「詳細」→「Codex」）。",
   "tips.connectionTrust.title": "1回の回答でワークスペースを信頼",
   "tips.connections.text": "「設定」→「アカウントと接続」では、Claude CodeやCodexのサインインを複数、またはこのPC上のOllamaなどのサーバーを保持できます。ワークスペースごとにオンにするアカウントを選び、各エージェントは選んだ接続で動きます。別の接続は「エージェント設定」で選べます。",

@@ -4963,6 +4963,22 @@ h2.section#unused-worktrees {
   border: 1px solid var(--border);
   color: var(--fg-muted);
 }
+/* A connection's tag (HI-2530): beside its name, like First, with a tag icon. */
+.connection-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+  font-weight: normal;
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--fg);
+}
+.connection-tag .codicon {
+  font-size: 11px;
+}
 .connection-summary,
 .connection-users {
   font-size: 12px;

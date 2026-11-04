@@ -172,6 +172,8 @@
   "tips.connectionOrder.title": "Konten ordnen",
   "tips.connectionSetups.text": "„Verbindung hinzufügen“ unter einem Konto in Einstellungen → Konten & Verbindungen legt eine weitere Einrichtung auf derselben Anmeldung an, etwa „Claude · Hoch“ neben „Claude · Mittel“. Agenten wählen eine Verbindung, also ändert eine Bearbeitung jeden Agenten darauf.",
   "tips.connectionSetups.title": "Mehrere Einrichtungen auf einer Anmeldung",
+  "tips.connectionTags.text": "Gib Verbindungen auf beiden Konten dasselbe Tag, etwa Builders oder Assistant (das Feld Tag im Dialog einer Verbindung): Schickt eine Nutzungsverschiebung Agenten zum anderen Konto, wechselt jeder zur Verbindung mit seinem Tag, und auch der Assistent wechselt.",
+  "tips.connectionTags.title": "Verbindungen taggen, damit verschobene Agenten ihre Art behalten",
   "tips.connectionTrust.text": "Einrichten einer neuen Verbindung fragt Claude Code einmal, im Ordner des Arbeitsbereichs, ob es jedem Projekt darin vertraut. Codex-Agenten fragen nie: Jeder vertraut für diesen Start seinem eigenen Ordner (Einstellungen → Erweitert → Codex).",
   "tips.connectionTrust.title": "Einem Arbeitsbereich mit einer Antwort vertrauen",
   "tips.connections.text": "Einstellungen → Konten & Verbindungen behält mehrere Anmeldungen für Claude Code und Codex oder einen Server wie Ollama auf diesem PC. Jeder Arbeitsbereich wählt, welche Konten eingeschaltet sind, und jeder Agent läuft auf der Verbindung, die er gewählt hat: Wähle in den Agent-Einstellungen eine andere.",

@@ -174,6 +174,8 @@ interface HiveMessageValues {
   'tips.connectionOrder.title': undefined
   'tips.connectionSetups.text': undefined
   'tips.connectionSetups.title': undefined
+  'tips.connectionTags.text': undefined
+  'tips.connectionTags.title': undefined
   'tips.connectionTrust.text': undefined
   'tips.connectionTrust.title': undefined
   'tips.connections.text': undefined

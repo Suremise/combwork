@@ -505,7 +505,7 @@
     "text": "No connection named \"{name}\" is usable in this workspace, and none has that id."
   },
   "api.connection.nothingToChange": {
-    "text": "Nothing to change: give name, model, effort, mode, context200k or extraArgs."
+    "text": "Nothing to change: give name, model, effort, mode, context200k, extraArgs or tag."
   },
   "api.connection.oldFields": {
     "text": "An agent no longer takes {fields}: it runs on a connection, which holds its model, effort, context and mode, and its CLI follows from it. Pass connection (its id or name). {on} cw_connection lists every one, and makes one when the user agrees."

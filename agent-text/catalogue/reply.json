@@ -131,6 +131,10 @@
     "text": "{name} (id {id}) on {account}, {cli}: {values}{unusable, select, yes {. Not usable here: its account is off} other {}}",
     "note": "cw_connection list (HI-2108): a connection, its account and CLI, its values, and whether it is usable here."
   },
+  "reply.connection.tag": {
+    "text": "tag {tag}",
+    "note": "A connection's free-text tag (HI-2530), which a usage move matches by."
+  },
   "reply.connection.unknownCli": {
     "text": "unknown CLI",
     "note": "A connection whose CLI isn't known."

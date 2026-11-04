@@ -62,6 +62,7 @@ interface HiveMessageValues {
   'main.connections.nameTaken': { account: string | number; name: string | number }
   'main.connections.noName': undefined
   'main.connections.notFound': undefined
+  'main.connections.tagTooLong': { max: number }
   'main.connections.userIn': { agent: string | number; project: string | number }
   'main.console.noWorkspace': undefined
   'main.console.title': { workspace: string | number }
@@ -466,6 +467,7 @@ interface HiveMessageValues {
   'main.update.whatsNew': undefined
   'main.usageMove.blockedBody': { reason: string; to: string | number; share: number; window: string; workspace: string | number; agents: string | number }
   'main.usageMove.blockedTitle': { from: string | number; to: string | number }
+  'main.usageMove.movedAgent': { agent: string | number; by: string; tag: string | number }
   'main.usageMove.movedBody': { from: string | number; share: number; window: string; agents: string | number; to: string | number }
   'main.usageMove.movedTitle': { count: number; from: string | number; to: string | number }
   'main.viewerTokens.noName': undefined

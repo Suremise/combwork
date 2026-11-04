@@ -172,6 +172,8 @@
   "tips.connectionOrder.title": "Ordonne tes comptes",
   "tips.connectionSetups.text": "Ajouter une connexion, sous un compte dans Paramètres → Comptes et connexions, crée une autre configuration sur le même compte, par exemple « Claude · High » à côté de « Claude · Medium ». Les agents choisissent une connexion : une seule modification change donc tous les agents qui l’utilisent.",
   "tips.connectionSetups.title": "Plusieurs configurations sur un même compte",
+  "tips.connectionTags.text": "Donne la même étiquette à des connexions des deux comptes, comme Builders ou Assistant (le champ Étiquette de la boîte de dialogue d’une connexion) : quand un déplacement envoie des agents vers l’autre compte, chacun passe sur la connexion de son étiquette, et l’Assistant se déplace aussi.",
+  "tips.connectionTags.title": "Étiqueter les connexions pour que les agents déplacés gardent leur rôle",
   "tips.connectionTrust.text": "Configurer une nouvelle connexion demande une seule fois à Claude Code, dans le dossier de l’espace de travail, de faire confiance à chaque projet qu’il contient. Les agents Codex ne demandent jamais : chacun fait confiance à son propre dossier pour ce lancement (Paramètres → Avancé → Codex).",
   "tips.connectionTrust.title": "Faire confiance à un espace de travail en une réponse",
   "tips.connections.text": "Paramètres → Comptes et connexions garde plusieurs comptes Claude Code et Codex, ou un serveur comme Ollama sur ce PC. Chaque espace de travail choisit les comptes activés, et chaque agent tourne sur la connexion qu’il a choisie : choisis-en une autre dans les Paramètres de l’agent.",

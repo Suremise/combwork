@@ -1,10 +1,14 @@
 // An account's usage move (HI-2195), end to end with the fake Claude Code (the test seam off, no browser): two accounts
 // signed in through the fake, each with a "Main" and a "Builder" connection; Max 1's rule moves its agents to Max 2 at 90%
-// of its weekly limit. One (running, idle, on Max 1's Builder) reports Max 1's limits at 95% weekly ("planusage F W", as
-// Claude Code's status line does): it is switched to Max 2's Builder and resumed, and Two (stopped, on Max 1's Main) is
-// moved to Max 2's Main at once; a notice names who moved. The workspace's Hive Assistant, on Max 1 too, stays there. Nothing moves back when Max 1 reads low again. Screenshots of
-// the rule in Settings → Accounts & Connections, in both themes, and the Assistant's view of it (cw_connection list's
-// usage, through GET /v1/connections).
+// of its weekly limit. HI-2530: connections tagged too. Max 1's Builder is tagged "Builders" in its dialog, Max 2 has
+// "Opus builders" tagged " builders" beside its untagged Builder, and each has an Assistant connection tagged
+// "Assistant"/"assistant"; Max 1 also has "Solo", which nothing on Max 2 matches. One (running, idle, on Max 1's Builder)
+// reports Max 1's limits at 95% weekly ("planusage F W", as Claude Code's status line does): it is switched to Max 2's
+// Opus builders by tag (not its same-named Builder) and resumed; Two (stopped, on Main) moves to Main by name and Three
+// (on Solo) to Max 2's first, at once; the Assistant moves to Max 2's Assistant connection by tag. One notice names them
+// all, each with how it was matched. Nothing moves back when Max 1 reads low again. Screenshots of the rule and a tag in
+// Settings → Accounts & Connections, in both themes, and the Assistant's view of it (cw_connection list's usage, through
+// GET /v1/connections).
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -35,7 +39,7 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   lib.gitProject(alpha)
   fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }, { id: 'a-two', name: 'Two' }] }))
+  fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }, { id: 'a-two', name: 'Two' }, { id: 'a-three', name: 'Three' }] }))
 
   const { app, page, inv } = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_CLI_HOME_CONNECTION: '0', HIVE_TEST_NOTIFY_LOG: notifyLog }, viewport: { width: 1400, height: 900 } })
   try {
@@ -61,8 +65,18 @@ const check = (name, ok, extra = '') => {
     }
     const max1 = await connect('Max 1', 'one@example.com')
     const max2 = await connect('Max 2', 'two@example.com')
+    // HI-2530's tags (Max 1's Builder's in its dialog, below): Max 2's tagged builders after its untagged Builder, so the
+    // tag, not the name, has to choose it; an Assistant connection on each; Max 1's Solo, matched by nothing on Max 2.
+    const max2Builders = await inv('connection:add', max2.id, { name: 'Opus builders', tag: ' builders' })
+    check('a tag is saved trimmed, as given otherwise', max2Builders.tag === 'builders', JSON.stringify(max2Builders))
+    const max1Asst = await inv('connection:add', max1.id, { name: 'Max 1 · Assistant', tag: 'Assistant' })
+    const max2Asst = await inv('connection:add', max2.id, { name: 'Helper', tag: 'assistant' })
+    const solo = await inv('connection:add', max1.id, { name: 'Solo' })
     await inv('agents:update', alpha, 'a-one', { connection: max1.builder })
     await inv('agents:update', alpha, 'a-two', { connection: max1.main })
+    await inv('agents:update', alpha, 'a-three', { connection: solo.id })
+    const assistantHome = path.join(ws, '.combwork', 'assistant')
+    await inv('agents:update', assistantHome, 'assistant', { connection: max1Asst.id })
     await inv('session:start', alpha, { agentId: 'a-one' })
     check('One runs on Max 1’s Builder', !!(await lib.until(async () => (await live('a-one'))?.status === 'ready' && (await live('a-one')).launchedConnection?.id === max1.id, HUNG_MS)))
 
@@ -81,6 +95,16 @@ const check = (name, ok, extra = '') => {
     await percent.fill('90')
     await percent.press('Enter')
     check('…and the share changed to 90%', !!(await lib.until(async () => (await inv('connections:list')).connections.find((c) => c.id === max1.id)?.usageMove?.percent === 90, HUNG_MS)))
+    // HI-2530: Max 1's Builder tagged "Builders" in its dialog (⋯ → Edit…), shown beside its name on its row.
+    const builderRow = block.locator(`[data-connection="${max1.builder}"]`)
+    await builderRow.locator('[data-action="connection-menu"]').click()
+    await page.locator('.menu .menu-item', { hasText: 'Edit…' }).first().click()
+    const tagBox = page.locator('[data-connection-tag]')
+    await tagBox.waitFor({ timeout: HUNG_MS })
+    await tagBox.fill('Builders')
+    await page.locator('[data-save-connection]').click()
+    check('a tag set in the connection’s dialog is saved', !!(await lib.until(async () => (await rows()).find((c) => c.id === max1.builder)?.tag === 'Builders', HUNG_MS)), JSON.stringify((await rows()).find((c) => c.id === max1.builder)))
+    check('…and shown beside its name on its row', !!(await lib.until(async () => ((await builderRow.locator('[data-tag]').innerText().catch(() => '')).includes('Builders') ? true : null), HUNG_MS)))
     await page.mouse.move(5, 5)
     const box = await block.boundingBox()
     for (const theme of ['dark', 'light']) {
@@ -96,15 +120,17 @@ const check = (name, ok, extra = '') => {
     // --- One reports Max 1 at 95% of its weekly limit: One switches to Max 2's Builder and resumes; Two moves at once.
     const since = (await live('a-one'))?.statusSince
     await lib.sendPrompt(inv, lib.ptyKey(alpha, 'a-one'), 'planusage 10 95', { submitted: async () => (await live('a-one'))?.statusSince !== since })
-    check('Two (stopped) moves to Max 2’s Main', !!(await lib.until(async () => (await agentConnection('a-two')) === max2.main, HUNG_MS)), String(await agentConnection('a-two')))
-    check('One (running) moves to Max 2’s Builder, the same name', !!(await lib.until(async () => (await agentConnection('a-one')) === max2.builder, HUNG_MS)), String(await agentConnection('a-one')))
+    check('Two (stopped) moves to Max 2’s Main, by name', !!(await lib.until(async () => (await agentConnection('a-two')) === max2.main, HUNG_MS)), String(await agentConnection('a-two')))
+    check('Three (stopped, on Solo) moves to Max 2’s first connection', !!(await lib.until(async () => (await agentConnection('a-three')) === max2.main, HUNG_MS)), String(await agentConnection('a-three')))
+    check('One (running) moves to Max 2’s Opus builders by its tag, not to the same-named Builder', !!(await lib.until(async () => (await agentConnection('a-one')) === max2Builders.id, HUNG_MS)), String(await agentConnection('a-one')))
     check('…and is resumed on Max 2 once its turn is over', !!(await lib.until(async () => (await live('a-one'))?.launchedConnection?.id === max2.id && (await live('a-one')).status === 'ready', HUNG_MS)), JSON.stringify((await live('a-one'))?.launchedConnection ?? null))
+    // HI-2530: the Assistant, on Max 1's Assistant connection, moves too: to Max 2's by tag (Settings → Assistant shows
+    // its agent's connection, so it shows the new one).
+    check('the Assistant moves to Max 2’s Assistant connection, by tag', !!(await lib.until(async () => (assistantConnection() ?? [])[0] === max2Asst.id, HUNG_MS)), JSON.stringify({ before: assistantBefore, now: assistantConnection() }))
     const notices = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)) : []).filter((e) => e.kind === 'notification' && /move from Max 1 to Max 2/.test(e.title ?? '')) // each tell() also logs an `entry` line (HI-2320, HI-2369)
     const told = await lib.until(async () => (notices().length ? notices() : null), HUNG_MS)
-    check('a notice says who moved and why: One and Two', !!told && told.length === 1 && /2 agents move from Max 1 to Max 2/.test(told[0].title) && /One and Two/.test(told[0].body ?? ''), JSON.stringify(told))
-    // The workspace's Assistant runs on Max 1 too (its CLI's first account here), and is never moved: its connection is
-    // the user's (Settings → Assistant).
-    check('the Hive Assistant stays where it was', JSON.stringify(assistantConnection()) === JSON.stringify(assistantBefore), JSON.stringify({ before: assistantBefore, now: assistantConnection() }))
+    const body = told?.[0]?.body ?? ''
+    check('one notice names them all, with how each was matched', !!told && told.length === 1 && /4 agents move from Max 1 to Max 2/.test(told[0].title) && body.includes('One (by tag builders)') && body.includes('Two (by name)') && body.includes('Three (to its first connection)') && body.includes('Assistant (by tag assistant)'), JSON.stringify(told))
 
     // --- The Assistant's view: GET /v1/connections gives the limits and the rule (cw_connection list's lines).
     const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token

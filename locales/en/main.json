@@ -243,6 +243,10 @@
     "defaultMessage": "There is no such connection.",
     "description": "An error (HI-2107): a connection named by its id is not in Settings → Accounts & Connections (removed meanwhile)."
   },
+  "main.connections.tagTooLong": {
+    "defaultMessage": "A tag can be at most {max, number} characters.",
+    "description": "An error saving a connection (HI-2530): its tag, a short free-text label the user gives it (\"Builders\"), is too long. {max} is the most it can be."
+  },
   "main.connections.userIn": {
     "defaultMessage": "{agent} ({project})",
     "description": "One user of a connection in the error refusing its removal (HI-2107): an agent ({agent}) and its project ({project})."
@@ -1859,9 +1863,13 @@
     "defaultMessage": "Combwork can't move {from}'s agents to {to}",
     "description": "A notice's title (HI-2195): an account ({from}) reached the share of its usage limit its rule sets, but its agents can't move to the account the rule names ({to}); the text says why."
   },
+  "main.usageMove.movedAgent": {
+    "defaultMessage": "{agent} ({by, select, tag {by tag {tag}} name {by name} other {to its first connection}})",
+    "description": "One agent in a usage move's notice (HI-2530), listed with the others: its name ({agent}; the Assistant's when it moves) and how its connection on the other account was chosen: the one with the same tag ({tag}, a free-text label the user gave both connections, such as \"Builders\"), the one with the same name, or, with neither, the account's first connection."
+  },
   "main.usageMove.movedBody": {
     "defaultMessage": "{from} has used {share, number, ::percent} of its {window, select, weekly {weekly limit} other {5-hour limit}}. {agents}: each moves to the matching connection on {to} and resumes its conversation there, a working agent once its turn ends. Combwork doesn't move them back: to move one back, choose its connection in Agent Settings.",
-    "description": "A notice's text (HI-2195), under the title saying agents move from one account to another. {from} and {to} are accounts' names, {share} how much of the limit is used (\"98%\"), {agents} the agents' names joined into a list. The limit is the weekly one or the 5-hour one. Agent Settings names a dialog."
+    "description": "A notice's text (HI-2195), under the title saying agents move from one account to another. {from} and {to} are accounts' names, {share} how much of the limit is used (\"98%\"), {agents} the agents (the Assistant among them when it moves), each with how its connection was matched, joined into a list. The limit is the weekly one or the 5-hour one. Agent Settings names a dialog."
   },
   "main.usageMove.movedTitle": {
     "defaultMessage": "{count, plural, one {# agent moves} other {# agents move}} from {from} to {to}",

@@ -747,7 +747,7 @@ function route(method: string, path: string, handler: Handler): void {
 }
 
 /** The Agent API's contract version: goes up when a route or field changes in a way a client would notice. */
-export const API_VERSION = 12
+export const API_VERSION = 13
 
 /** Who Hive takes a request's caller for, and what it may reach (GET /v1/status). */
 async function callerInfo(): Promise<Record<string, unknown>> {
@@ -1189,7 +1189,7 @@ const connectionsHere = (ws: WorkspaceService): Connection[] => usableConnection
 
 /** A connection's values as the Agent API shows them (HI-2108): only those set (each absent: the CLI decides); its extra arguments to `wide` callers only. */
 function connectionValues(c: Connection, wide: boolean): Record<string, unknown> {
-  return { ...(c.model ? { model: c.model } : {}), ...(c.effort ? { effort: c.effort } : {}), ...(c.use200kContext ? { context200k: true } : {}), ...(c.permissionMode ? { mode: c.permissionMode } : {}), ...(wide && c.extraArgs ? { extraArgs: c.extraArgs } : {}) }
+  return { ...(c.model ? { model: c.model } : {}), ...(c.effort ? { effort: c.effort } : {}), ...(c.use200kContext ? { context200k: true } : {}), ...(c.permissionMode ? { mode: c.permissionMode } : {}), ...(wide && c.extraArgs ? { extraArgs: c.extraArgs } : {}), ...(c.tag ? { tag: c.tag } : {}) }
 }
 
 /** A connection as the Agent API lists it (HI-2108): its id, name, account (its name and CLI), its values, and `usable: false` where it can't be used here. */
@@ -1317,6 +1317,8 @@ export function connectionValuesArg(body: any): ConnectionPatch {
   if (body?.effort !== undefined) out.effort = text(body.effort) as EffortLevel | null
   if (body?.mode !== undefined) out.permissionMode = text(body.mode) as PermissionMode | null
   if (body?.extraArgs !== undefined) out.extraArgs = text(body.extraArgs)
+  // Its tag (HI-2530): free text, "" or null for none; its length is checked as Settings' save does.
+  if (body?.tag !== undefined) out.tag = text(body.tag)
   const c = body?.context200k
   if (c !== undefined) {
     if (c === true || c === 'on') out.use200kContext = true

@@ -6,7 +6,7 @@ import { accountOnIn, resolveAgentConnection } from '../shared/accounts'
 import { projectAgents } from '../shared/defaults'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { agentProvider } from '../shared/providers'
-import { limitDue, limitKind, liveRecords, matchConnection, movedOffWithinPeriod, periodRecord, ruleLimits, samePeriod, sameRule, targetProblem, USAGE_MOVE_TRIES, type UsageMoveProblem } from '../shared/usageMoves'
+import { limitDue, limitKind, liveRecords, matchConnection, type MatchedBy, movedOffWithinPeriod, periodRecord, ruleLimits, samePeriod, sameRule, targetProblem, USAGE_MOVE_TRIES, type UsageMoveProblem } from '../shared/usageMoves'
 import { advanced } from './advanced'
 import { accountById, allAccounts, allConnections, getConnection, onConnectionSignedIn } from './accounts'
 import { choiceCount, onManualChoice } from './agentChoice'
@@ -23,7 +23,10 @@ import { inWorkspace, openWorkspaces, workspaceOf, type WorkspaceService } from 
  * Usage moves (HI-2195, SPEC §11.2; the design is HI-2195's s7 as revised by s9, s11 and s13): an account's rule moves its
  * agents to another account's connections once one of its limits reaches a share.
  *
- * - It moves project agents, never the Hive Assistant (its connection is the user's own choice, Settings → Assistant).
+ * - It moves project agents and, by the same rule and only between its turns, the Assistant (HI-2530, Darren: "Assistant
+ *   -> Assistant"; before, never: its connection was the user's own choice, Settings → Assistant).
+ * - Each goes to the target's connection with the same tag as the one it is on, else the same name, else the target's
+ *   first (matchConnection), and the notice says which rule matched each.
  * - It fires once per limit and reset period (`config.usageMoves`, kept until the reset passes): agents it handled (moved,
  *   kept on the user's own choice, or given up after failed writes) aren't looked at again in that period, so a manual
  *   return holds and nothing moves back after a reset.
@@ -50,6 +53,9 @@ interface Pending {
   firing: string
   rule: UsageMoveRule
   to: string
+  /** Which rule matched its connection on the target (HI-2530), for the notice; `tag`, the tag it matched by. */
+  by: MatchedBy
+  tag?: string
   saved: string | undefined
   count: number
   /** Its switch ended or it was dropped (HR1's round 1): never written after, however long its write waited for the lock. */
@@ -88,7 +94,12 @@ const MOVED_TITLE = msg({
 const MOVED_BODY = msg({
   id: 'main.usageMove.movedBody',
   defaultMessage: "{from} has used {share, number, ::percent} of its {window, select, weekly {weekly limit} other {5-hour limit}}. {agents}: each moves to the matching connection on {to} and resumes its conversation there, a working agent once its turn ends. Combwork doesn't move them back: to move one back, choose its connection in Agent Settings.",
-  description: "A notice's text (HI-2195), under the title saying agents move from one account to another. {from} and {to} are accounts' names, {share} how much of the limit is used (\"98%\"), {agents} the agents' names joined into a list. The limit is the weekly one or the 5-hour one. Agent Settings names a dialog."
+  description: "A notice's text (HI-2195), under the title saying agents move from one account to another. {from} and {to} are accounts' names, {share} how much of the limit is used (\"98%\"), {agents} the agents (the Assistant among them when it moves), each with how its connection was matched, joined into a list. The limit is the weekly one or the 5-hour one. Agent Settings names a dialog."
+})
+const MOVED_AGENT = msg({
+  id: 'main.usageMove.movedAgent',
+  defaultMessage: '{agent} ({by, select, tag {by tag {tag}} name {by name} other {to its first connection}})',
+  description: "One agent in a usage move's notice (HI-2530), listed with the others: its name ({agent}; the Assistant's when it moves) and how its connection on the other account was chosen: the one with the same tag ({tag}, a free-text label the user gave both connections, such as \"Builders\"), the one with the same name, or, with neither, the account's first connection."
 })
 const BLOCKED_TITLE = msg({
   id: 'main.usageMove.blockedTitle',
@@ -196,7 +207,7 @@ async function commit(m: Pending): Promise<boolean> {
     r.handled[key] = 'moved'
     if (r.tries) delete r.tries[key]
   })
-  log.info(`${userText(m.name)}: moved by ${userText(acc.name)}'s usage move to ${userText(getConnection(m.to)?.name ?? m.to)}`)
+  log.info(`${userText(m.name)}: moved by ${userText(acc.name)}'s usage move to ${userText(getConnection(m.to)?.name ?? m.to)} (by ${m.by})`)
   return true
 }
 
@@ -212,8 +223,9 @@ async function fire(acc: Account, rule: UsageMoveRule, l: PlanLimit, now: number
   const target = accountById(rule.to)!
   const movedNames: string[] = []
   for (const ws of openWorkspaces()) {
-    // Never the Hive Assistant (Darren, 30 Oct: "Set you manually"): its connection is the user's, in Settings → Assistant.
-    const hosts = await ws.listProjectPaths().catch(() => [] as string[])
+    // The Assistant too (HI-2530, Darren 4 Nov: "Assistant -> Assistant"), as an agent of its home: moved only between its
+    // turns (switchAtSafePoint), once per period, never back. Before HI-2530 it never moved.
+    const hosts = [...(await ws.listProjectPaths().catch(() => [] as string[])), ...(ws.path ? [ws.assistantHome] : [])]
     for (const projectPath of hosts) {
       const pc = await ws.projectConfig(projectPath).catch(() => null)
       if (!pc || !ws.path) continue
@@ -229,9 +241,9 @@ async function fire(acc: Account, rule: UsageMoveRule, l: PlanLimit, now: number
         }
         // HR1: no rule moves an agent back onto an account a rule moved it off in a period not reset yet.
         if (movedOffWithinPeriod(key, target.id, records(), now)) continue
-        const to = matchConnection(choice.connection.name, target.id, allConnections())
-        if (!to) continue
-        const m: Pending = { ws, projectPath, agentId: a.id, name: a.name, account: acc.id, limit: l.id, firing: rec.firing, rule: { ...rule }, to: to.id, saved: a.connection ?? undefined, count: choiceCount(projectPath, a.id) }
+        const match = matchConnection(choice.connection, target.id, allConnections())
+        if (!match) continue
+        const m: Pending = { ws, projectPath, agentId: a.id, name: a.name, account: acc.id, limit: l.id, firing: rec.firing, rule: { ...rule }, to: match.connection.id, by: match.by, ...(match.by === 'tag' && match.connection.tag ? { tag: match.connection.tag } : {}), saved: a.connection ?? undefined, count: choiceCount(projectPath, a.id) }
         keys.set(m, key)
         pending.set(key, m)
         const r = inWorkspace(ws, () =>
@@ -243,10 +255,11 @@ async function fire(acc: Account, rule: UsageMoveRule, l: PlanLimit, now: number
             }
           })
         )
+        const named = tr(MOVED_AGENT, { agent: a.name, by: m.by, tag: m.tag ?? '' })
         if (r === 'notRunning') {
           pending.delete(key)
-          if (await commit(m)) movedNames.push(a.name)
-        } else movedNames.push(a.name)
+          if (await commit(m)) movedNames.push(named)
+        } else movedNames.push(named)
       }
     }
   }
