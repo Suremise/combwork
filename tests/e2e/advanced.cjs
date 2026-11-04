@@ -64,7 +64,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     const providers = (await inv('settings:get')).providers
     const enabled = (id) => !!providers?.[id]?.enabled
     check('a CLI turned off: its tab dimmed, its name saying so; one on: not', t0.slice(1).every((t) => t.muted === !enabled(t.id) && (!t.muted || /is turned off: these settings apply once you turn it on/.test(t.name ?? ''))), JSON.stringify([t0.map((t) => [t.id, t.muted, t.name]), providers]))
-    const prefix = { hive: 'hive.', 'claude-code': 'claude-code.', codex: 'codex.', copilot: 'copilot.' }
+    const prefix = { cw: 'cw.', 'claude-code': 'claude-code.', codex: 'codex.', copilot: 'copilot.' }
     for (const t of t0) {
       await tab(t.id).click()
       check(`the ${t.label} tab shows only its own values`, !!(await lib.until(async () => { const v = await visibleIds(); return (await selectedTab()) === t.id && v.length > 5 && v.every((id) => id.startsWith(prefix[t.id])) }, HUNG_MS)), JSON.stringify((await visibleIds()).slice(0, 5)))
