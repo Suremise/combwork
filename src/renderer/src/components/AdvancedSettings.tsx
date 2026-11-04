@@ -26,7 +26,7 @@ const T = {
   tabs: msg({ id: 'settings.advancedList.tabs', defaultMessage: 'Combwork and the CLIs', description: "Accessible name of Settings → Advanced's tabs: Hive, then one per CLI (Claude Code, Codex, GitHub Copilot)." }),
   cliOff: msg({ id: 'settings.advancedList.cliOff', defaultMessage: '{cli} is turned off: these settings apply once you turn it on', description: "Tooltip of a dimmed tab of Settings → Advanced, and part of its name for screen readers: the CLI is turned off in Settings → Providers. {cli} is its name." }),
   off: msg({ id: 'settings.advancedList.off', defaultMessage: 'off', description: "A short mark on the tab of a CLI turned off in Settings → Advanced (beside its name, such as Codex). Lower case, one short word." }),
-  noMatchHere: msg({ id: 'settings.advancedList.noMatchHere', defaultMessage: 'No settings of {group} match.', description: "A tab of Settings → Advanced with none of the filtered values: {group} is Hive or the CLI's name." })
+  noMatchHere: msg({ id: 'settings.advancedList.noMatchHere', defaultMessage: 'No settings of {group} match.', description: "A tab of Settings → Advanced with none of the filtered values: {group} is Combwork or the CLI's name." })
 }
 
 /** The tab the list remembers (HI-1839). */
@@ -172,7 +172,7 @@ function AdvancedItem({ row, cli, workspace, restartDue }: { row: AdvancedRow; c
     if (err) throw new Error(err)
   }
   const title = shownText(def.text.title)
-  const label = tr(msg({ id: 'settings.advancedList.label', defaultMessage: '{group}: {title}', description: "The name, for screen readers, of an advanced value's box: Hive or the CLI it belongs to, then its title." }), { group: groupName(def.group), title })
+  const label = tr(msg({ id: 'settings.advancedList.label', defaultMessage: '{group}: {title}', description: "The name, for screen readers, of an advanced value's box: Combwork or the CLI it belongs to, then its title." }), { group: groupName(def.group), title })
   const about = [
     shownText(advancedTakesText(def)),
     def.applies === 'sessions' ? tr(msg({ id: 'settings.advancedList.appliesToSessions', defaultMessage: 'Applies to sessions started afterwards.', description: "A line of an advanced value's info tip." })) : '',
