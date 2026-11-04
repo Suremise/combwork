@@ -103,6 +103,16 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
   check("…and the Workspace and CLI files, which her chain has too, not the test copy", (await row('workspace.json').locator('[data-users]').count()) === 1 && (await row(TEST_COPY).locator('[data-users]').count()) === 0)
   await shot('overview')
 
+  // --- Each file's on/off switch names the layer its texts fall back to (HI-2524).
+  const onTip = (p, want) => lib.hoverTip(page, row(p).locator('.skill-delivered'), (t) => t.includes(want), HUNG_MS)
+  for (const [p, want] of [['claude-code/Opus 5.5.json', 'falls back to the Claude Code file'], [TEST_COPY, 'falls back to the Claude Code file'], ['claude-code/cli.json', 'falls back to the Workspace file'], ['api/cli.json', 'falls back to the Workspace file'], ['workspace.json', "falls back to Combwork's Default"]]) {
+    const t = await onTip(p, want)
+    check(`${p}'s switch says it ${want}`, t.includes(want), t)
+  }
+  await onTip('claude-code/Opus 5.5.json', 'Claude Code file')
+  await shot('on-tip')
+  await page.mouse.move(5, 5)
+
   // --- A file: every text, inherited ones dimmed with their layer; expanding shows each layer.
   await row(TEST_COPY).click()
   const pane = page.locator(`.dialect-detail[data-dialect-file="${TEST_COPY}"]`)

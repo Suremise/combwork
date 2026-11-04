@@ -58,7 +58,7 @@
   "dialects.note": "Notatka",
   "dialects.onFailed": "Nie udało się włączyć ani wyłączyć {name}",
   "dialects.onSwitch": "{name} włączony",
-  "dialects.onTip": "Włączony: jego teksty obowiązują. Wyłączony: jego miejsce w łańcuchu jest puste, więc teksty pochodzą z warstwy niżej. Obowiązuje od następnego uruchomienia każdego agenta.",
+  "dialects.onTip": "Włączony: jego teksty obowiązują. Wyłączony: {to, select, cli {teksty pochodzą z pliku {name}} workspace {teksty pochodzą z pliku Obszaru roboczego} other {teksty pochodzą z Domyślnego Combwork}}. Zmiany obowiązują od następnego uruchomienia każdego agenta.",
   "dialects.outdatedBadge": "{count, plural, one {# nieaktualny} few {# nieaktualne} many {# nieaktualnych} other {# nieaktualnego}}",
   "dialects.outdatedGroup": "Nieaktualne",
   "dialects.override": "Zmień tutaj",

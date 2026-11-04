@@ -58,7 +58,7 @@
   "dialects.note": "Notiz",
   "dialects.onFailed": "{name} konnte nicht ein- oder ausgeschaltet werden",
   "dialects.onSwitch": "{name} ein",
-  "dialects.onTip": "Ein: Ihre Texte gelten. Aus: Ihr Platz in der Kette ist leer, sodass ihre Texte auf die Ebene darunter zurückfallen. Gilt ab dem nächsten Start jedes Agenten.",
+  "dialects.onTip": "Ein: Ihre Texte gelten. Aus: {to, select, cli {sie fällt auf die Datei von {name} zurück} workspace {sie fällt auf die Arbeitsbereich-Datei zurück} other {sie fällt auf den Standard von Combwork zurück}}. Änderungen gelten ab dem nächsten Start jedes Agenten.",
   "dialects.outdatedBadge": "{count, plural, one {# veraltet} other {# veraltet}}",
   "dialects.outdatedGroup": "Veraltet",
   "dialects.override": "Hier ändern",

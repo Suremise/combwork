@@ -58,7 +58,7 @@
   "dialects.note": "メモ",
   "dialects.onFailed": "{name}のオン・オフを切り替えられませんでした",
   "dialects.onSwitch": "{name}をオン",
-  "dialects.onTip": "オン：このファイルのテキストが適用されます。オフ：チェーン内のこのファイルの位置が空になり、テキストは下のレイヤーのものになります。各エージェントの次回の起動から適用されます。",
+  "dialects.onTip": "オン：このファイルのテキストが適用されます。オフ：{to, select, cli {{name}のファイルにフォールバックします} workspace {ワークスペースのファイルにフォールバックします} other {Combworkの既定にフォールバックします}}。変更は各エージェントの次回の起動から適用されます。",
   "dialects.outdatedBadge": "{count, plural, other {#件が古くなっています}}",
   "dialects.outdatedGroup": "古くなったテキスト",
   "dialects.override": "ここで変更",

@@ -58,7 +58,7 @@
   "dialects.note": "Nota",
   "dialects.onFailed": "No se pudo activar ni desactivar {name}",
   "dialects.onSwitch": "{name} activado",
-  "dialects.onTip": "Activado: sus textos se aplican. Desactivado: su lugar en la cadena queda vacío, así que sus textos pasan a la capa de abajo. Se aplica en el próximo inicio de cada agente.",
+  "dialects.onTip": "Activado: sus textos se aplican. Desactivado: {to, select, cli {pasa al archivo de {name}} workspace {pasa al archivo del Espacio de trabajo} other {pasa al Predeterminado de Combwork}}. Los cambios se aplican en el próximo inicio de cada agente.",
   "dialects.outdatedBadge": "{count, plural, one {# desactualizado} many {# desactualizados} other {# desactualizados}}",
   "dialects.outdatedGroup": "Desactualizados",
   "dialects.override": "Cambiar aquí",

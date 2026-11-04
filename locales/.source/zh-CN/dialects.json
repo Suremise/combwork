@@ -58,7 +58,7 @@
   "dialects.note": "Note",
   "dialects.onFailed": "Couldn't switch {name} on or off",
   "dialects.onSwitch": "{name} on",
-  "dialects.onTip": "On: its texts apply. Off: its place in the chain is empty, so its texts fall through to the layer below. Applies at each agent's next launch.",
+  "dialects.onTip": "On: its texts apply. Off: {to, select, cli {it falls back to the {name} file} workspace {it falls back to the Workspace file} other {it falls back to Combwork's Default}}. Changes apply at each agent's next launch.",
   "dialects.outdatedBadge": "{count, plural, one {# outdated} other {# outdated}}",
   "dialects.outdatedGroup": "Outdated",
   "dialects.override": "Change Here",
