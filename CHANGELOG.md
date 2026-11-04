@@ -25,6 +25,7 @@
 
 ### Fixed
 
+- **Performance's tables keep names readable in a narrow window** (HI-2534). At 900 px the Cards table squeezed a card's name to a word a line, and the Agent API table broke a route such as `/v1/progress` into fragments; a card's name now keeps a readable width and a route stays on one line, and the table scrolls sideways instead.
 - **Folder lists in Settings keep what you type** (HI-2538). Card attachments: more folders and Agents' temp folder take folders separated by semicolons, but the box and the Assistant showed a space after each semicolon that you hadn't typed. The box now shows the folders `;` apart, as you typed them, and `a; b` and `a;b` are the same list. Only a semicolon separates folders: a comma is kept as part of a folder's name.
 - **Settings section names cut short show in full on hover** (HI-2531). In a narrow window, Settings and Project Settings cut long section names ("Accounts & C…", "Keyboard Sho…"); hovering one now shows its whole name in a tooltip, and the list keeps its compact rows.
 - **Cut-off descriptions in side-panel lists show in full on hover** (HI-2527). Modes, MCP servers, Skills, Dialects, Templates and the MCP catalogue keep each row's description on one line, cut with "…"; hovering a cut one, or reaching it with Tab, now shows the whole text in a tooltip.
