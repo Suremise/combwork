@@ -322,7 +322,7 @@ const steps = {
     res.facts.keptWorkspaceAfter = fs.existsSync(KEPT_WS) ? fs.readdirSync(KEPT_WS) : null
     check('4.workspace-moved', "The workspace from before opens with its .hive folders moved to .combwork (the workspace's and the project's)", !!moved, JSON.stringify(res.facts.keptWorkspaceAfter))
     const cards = await inv('tasks:list').catch((e) => ({ error: String(e) }))
-    const card = Array.isArray(cards) ? cards.find((c) => c.title === KEPT_CARD) : null
+    const card = Array.isArray(cards) ? cards.find((x) => x.title === KEPT_CARD) : null
     res.facts.keptCard = card ? { number: card.number, description: card.description } : cards
     check('4.workspace-card', 'Its card is on the board, its path now into .combwork', !!card && card.description === `The plan: ${path.join(KEPT_WS, '.combwork', 'shared', 'plan.md')}`, JSON.stringify(res.facts.keptCard))
     await shot('after-upgrade-light')
