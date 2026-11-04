@@ -1,7 +1,7 @@
 // HI-2137: where the test copy's PATH git is Git for Windows' launcher (<root>\cmd\git.exe, as a Start-menu PATH has it,
 // with no other Git folder on PATH), Hive starts the real git beneath it directly: git's trace2 ancestry shows no
 // launcher layer (git.exe < electron.exe) for the test copy's own git, and a hook, and an alias through sh run from it,
-// see the launcher's PATH folders first (/mingw64/bin, /usr/bin). Skipped where git isn't Git for Windows. Throwaway
+// see the launcher's PATH folders first (its MinGW folder's bin, such as /mingw64/bin or /ucrt64/bin, then /usr/bin). Skipped where git isn't Git for Windows. Throwaway
 // profile and workspace, quiet; no agent is started.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -81,7 +81,8 @@ function traced(before = new Set()) {
     check("Hive's checkout ran the hook, and the hook the alias through sh", !!said, said ?? 'no hook output')
     // Git puts its exec-path first itself; then the launcher's folders, then ~/bin (the real git alone, with no MSYSTEM,
     // would put ~/bin first).
-    check("…the hook's PATH starts as through the launcher: git's exec-path, /mingw64/bin, /usr/bin, ~/bin; sed from /usr/bin", /^first=\/mingw64\/libexec\/git-core:\/mingw64\/bin:\/usr\/bin:[^:]*\/bin(:|$)/m.test(said ?? '') && !/^first=.*:\/mingw64\/bin:.*:\/mingw64\/bin(:|$)/m.test(said ?? '') && /^sed=\/usr\/bin\/sed$/m.test(said ?? ''), said)
+    // The MinGW folder is Git's build's (mingw64, or ucrt64 from Git 2.5x; gitTool.ts's MINGW): the same one throughout.
+    check("…the hook's PATH starts as through the launcher: git's exec-path, its MinGW bin, /usr/bin, ~/bin; sed from /usr/bin", /^first=\/(mingw64|ucrt64|clangarm64|mingw32)\/libexec\/git-core:\/\1\/bin:\/usr\/bin:[^:]*\/bin(:|$)/m.test(said ?? '') && !/^first=.*:\/(mingw64|ucrt64|clangarm64|mingw32)\/bin:.*:\/\1\/bin(:|$)/m.test(said ?? '') && /^sed=\/usr\/bin\/sed$/m.test(said ?? ''), said)
     check('…and it switched the branch', lib.git(repo, ['rev-parse', '--abbrev-ref', 'HEAD']).trim() === 'hive/direct')
     await inv('git:history', repo)
     await inv('git:status', repo)
