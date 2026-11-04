@@ -11,7 +11,7 @@ const userData = path.join(lib.WORK, 'testedclis-profile')
 const ws = path.join(lib.WORK, 'testedclis-ws')
 const home = path.join(lib.WORK, 'testedclis-claude-home')
 const manifest = path.join(lib.WORK, 'testedclis-manifest.json')
-const NEWER = 'This version came out after this Hive release was tested. Most updates work; if something behaves oddly, report it (Copy Diagnostics).'
+const NEWER = 'This version came out after this Combwork release was tested. Most updates work; if something behaves oddly, report it (Copy Diagnostics).'
 const OLDER = 'Older than tested; consider updating.'
 let failed = 0
 const check = (name, ok, extra = '') => {

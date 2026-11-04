@@ -25,7 +25,7 @@ const skillsTab = async (page, name) => {
   await lib.openMoreTab(page, 'Skills')
   const pick = page.locator('.skill-provider-pick select')
   await lib.until(async () => (await pick.count()) === 1, 10000)
-  return { pick, hive: page.locator('.skill-group-toggle', { hasText: 'Hive' }).first(), provider: page.locator('.skill-provider-toggle') }
+  return { pick, hive: page.locator('.skill-group-toggle', { hasText: 'Combwork' }).first(), provider: page.locator('.skill-provider-toggle') }
 }
 
 ;(async () => {
