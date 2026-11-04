@@ -43,16 +43,17 @@ beforeEach(() => {
 })
 afterEach(() => void process.off('unhandledRejection', onUnhandled))
 
+const HUNG_MS = 10000 // Bounds a hung ended handler; completion is observed through the condition.
 /** Waits until the condition holds (the ended handler's work is fire-and-forget). */
-async function until(cond: () => boolean): Promise<void> {
-  await vi.waitFor(() => expect(cond()).toBe(true))
+async function until(cond: () => boolean, ms: number): Promise<void> {
+  await vi.waitFor(() => expect(cond()).toBe(true), { timeout: ms })
 }
 
 describe('answerRelay: a relay ended unread', () => {
   it('logs a failure to tell the user, with no unhandled rejection', async () => {
     st.noteFails = true
     st.source!.ended({ meta: { card: 12, project: 'hive', askerName: 'HB1' } }, 'C:\\ws\\.hive\\assistant')
-    await until(() => st.warned.length > 0)
+    await until(() => st.warned.length > 0, HUNG_MS)
     expect(st.warned[0].line).toBe('telling the user an answer reached nobody else')
     expect(String(st.warned[0].error)).toContain('the board is locked')
     // A turn of the event loop, for any unhandled rejection to be reported.
@@ -62,7 +63,7 @@ describe('answerRelay: a relay ended unread', () => {
 
   it('tells the user on the card, logging nothing', async () => {
     st.source!.ended({ meta: { card: 12, project: 'hive' } }, 'C:\\ws\\.hive\\assistant')
-    await until(() => st.noted.length > 0)
+    await until(() => st.noted.length > 0, HUNG_MS)
     await new Promise((r) => setImmediate(r))
     expect(st.noted).toEqual([12])
     expect(st.warned).toEqual([])

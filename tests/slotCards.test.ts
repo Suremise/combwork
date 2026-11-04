@@ -1121,11 +1121,16 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
     const placing = place(ws, e.project, e.wf, n, cycle, lease)
     await vi.waitFor(() => expect(notices(e)).toHaveLength(1), { timeout: HUNG_MS })
     expect(notices(e)[0]).toMatch(/can't give AM-\d+ to B1 yet: its conversation in slot-a can't resume now \(slot-a still has another session in it \(test\)\)/)
+    // HI-2454: a mock start is recorded before its awaited error import rejects. Wait for launchWith to cancel
+    // each refused launch's delivery before sending another status; the call alone can precede the next wait.
+    const refused = () => state.deliveries.filter((delivery) => delivery.state === 'cancelled').length
     // Each look refused again: still a wait, not told again, never given up on.
     for (const tries of [2, 3]) {
+      await vi.waitFor(() => expect(refused()).toBe(tries - 1), { timeout: HUNG_MS })
       status()
       await vi.waitFor(() => expect(state.calls).toHaveLength(tries), { timeout: HUNG_MS })
     }
+    await vi.waitFor(() => expect(refused()).toBe(3), { timeout: HUNG_MS })
     expect(notices(e)).toHaveLength(1)
     // The slot ready: the next look resumes it.
     status()
@@ -1583,6 +1588,118 @@ describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
       life.abort()
     }
     expect(heldRetryOf(e.home, e.project)).toBeNull()
+  })
+
+  it.each(['close', 'remove project', 'stop'] as const)('HI-2469: %s forgets a still-held lane and its retry, with other live workspaces preserved', async (action) => {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    state.waiting = [{ id: 'lane-1', project: 'project', builder: { id: 'b1', name: 'B1' }, cards: [7], slotWait: { since: '2026-10-25T00:00:00.000Z' } }]
+    state.pool = {
+      leaseOf: () => null,
+      leasesOf: () => [],
+      lend: async () => ({ ok: false, refusal: { why: 'busy', slot: 'slot-a', held: 'process' } })
+    }
+    const life = new AbortController()
+    const otherLife = new AbortController()
+    let projects = [{ name: 'project', path: e.project }]
+    const ws = { path: e.home, lifetime: life.signal, info: () => ({ projects }), projectConfig: async () => ({ agents: [] }) } as never
+    const otherPath = `${e.home}-other`
+    const other = { path: otherPath, lifetime: otherLife.signal, info: () => ({ projects: [{ name: 'project', path: e.project }] }), projectConfig: async () => ({ agents: [] }) } as never
+    startSlotCards()
+    try {
+      await settleSlotCards(ws, e.project)
+      await settleSlotCards(other, e.project)
+      for (const path of [e.home, otherPath]) {
+        expect(laneSlotHeld(path, 'lane-1')).toEqual({ slot: 'slot-a', held: 'process' })
+        expect(heldRetryOf(path, e.project)).toEqual({ tries: 1, waiting: true })
+      }
+      if (action === 'close') life.abort()
+      else if (action === 'remove project') {
+        projects = []
+        tellListeners({ type: 'workspace-changed', workspace: null })
+      } else stopSlotCards()
+      expect(laneSlotHeld(e.home, 'lane-1')).toBeNull()
+      expect(heldRetryOf(e.home, e.project)).toBeNull()
+      if (action === 'stop') {
+        expect(laneSlotHeld(otherPath, 'lane-1')).toBeNull()
+        expect(heldRetryOf(otherPath, e.project)).toBeNull()
+      } else {
+        expect(laneSlotHeld(otherPath, 'lane-1')).toEqual({ slot: 'slot-a', held: 'process' })
+        expect(heldRetryOf(otherPath, e.project)).toEqual({ tries: 1, waiting: true })
+      }
+      expect(state.calls).toEqual([])
+    } finally {
+      life.abort()
+      otherLife.abort()
+      stopSlotCards()
+    }
+  })
+
+  it.each(['close', 'stop'] as const)('HI-2469: a lend finishing after %s cannot restore cached status or its retry', async (action) => {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    state.waiting = [{ id: 'lane-1', project: 'project', builder: { id: 'b1', name: 'B1' }, cards: [7], slotWait: { since: '2026-10-25T00:00:00.000Z' } }]
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const lend = vi.fn(async () => {
+      await held
+      return { ok: false, refusal: { why: 'busy', slot: 'slot-a', held: 'process' } }
+    })
+    state.pool = { leaseOf: () => null, leasesOf: () => [], lend }
+    const life = new AbortController()
+    const ws = { path: e.home, lifetime: life.signal, info: () => ({ projects: [{ name: 'project', path: e.project }] }), projectConfig: async () => ({ agents: [] }) } as never
+    const pass = settleSlotCards(ws, e.project)
+    try {
+      await vi.waitFor(() => expect(lend).toHaveBeenCalledOnce(), { timeout: HUNG_MS })
+      if (action === 'close') life.abort()
+      else stopSlotCards()
+      release()
+      await pass
+      expect(laneSlotHeld(e.home, 'lane-1')).toBeNull()
+      expect(heldRetryOf(e.home, e.project)).toBeNull()
+    } finally {
+      release()
+      await pass
+      life.abort()
+    }
+  })
+
+  it('HI-2469: a pass paused before waiting lanes cannot restore held status or a retry after stop', async () => {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    state.waiting = [{ id: 'lane-1', project: 'project', builder: { id: 'b1', name: 'B1' }, cards: [7], slotWait: { since: '2026-10-25T00:00:00.000Z' } }]
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const lanes = vi.fn(async () => {
+      await held
+      return []
+    })
+    state.lanes = lanes
+    const lend = vi.fn(async () => ({ ok: false, refusal: { why: 'busy', slot: 'slot-a', held: 'process' } }))
+    state.pool = { leaseOf: () => null, leasesOf: () => [], slots: () => [], lend }
+    const life = new AbortController()
+    const ws = { path: e.home, lifetime: life.signal, info: () => ({ projects: [{ name: 'project', path: e.project }] }), projectConfig: async () => ({ agents: [] }) } as never
+    startSlotCards()
+    const pass = settleSlotCards(ws, e.project)
+    try {
+      await vi.waitFor(() => expect(lanes).toHaveBeenCalledOnce(), { timeout: HUNG_MS })
+      // A coalesced request must not admit the old pass again under the stopped service's generation.
+      expect(settleSlotCards(ws, e.project)).toBe(pass)
+      stopSlotCards()
+      release()
+      await pass
+      expect(laneSlotHeld(e.home, 'lane-1')).toBeNull()
+      expect(heldRetryOf(e.home, e.project)).toBeNull()
+      expect(lend).not.toHaveBeenCalled()
+      expect(state.waitingLooks).toBe(0)
+      expect(lanes).toHaveBeenCalledOnce()
+      expect(state.logged.filter((l) => l.startsWith('warn'))).toEqual([])
+    } finally {
+      release()
+      await pass
+      life.abort()
+      stopSlotCards()
+    }
   })
 
   it('a pass that never ends holds the quit only for its bound', async () => {

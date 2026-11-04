@@ -33,6 +33,9 @@ const SAMPLE: RefusalValues = {
   waiting: 'AM-12/s44',
   step: 'followUp',
   minutes: 12,
+  // review.inProgress (HI-2487): who has the review (an agent, by name; the user's branch: its own test).
+  who: 'agent',
+  reviewer: 'HR2',
   files: 'src/a.ts',
   path: 'node_modules/pad/index.js',
   folder: 'D:\\work\\am',
@@ -131,6 +134,27 @@ describe('the workflow text in every locale', () => {
       expect(b.message, code).toContain('b4c5d6e')
       expect(b.message, code).toContain('team@example.com')
       expect(b.next, code).toContain('git commit --amend --no-edit --reset-author')
+    }
+  })
+
+  it("renders both branches of review.inProgress's {who} select in every locale: the user's in each language's words, an agent's by its name (HI-2487, HR1's round 2)", async () => {
+    // runtime.ts's reviewTaken: the user's review is who 'user' with no name; an agent's is who 'agent' with its name.
+    const user = { card: 'AM-12', who: 'user', reviewer: '', submission: 40, minutes: 3 }
+    const agent = { card: 'AM-12', who: 'agent', reviewer: 'HR2', submission: 40, minutes: 3 }
+    expect(refusal('review.inProgress', user)).toMatchObject({ message: "The user is reviewing AM-12's submission 40, and has been for 3 minutes.", next: "Leave it to the user: don't review AM-12 or give it a verdict." })
+    expect(refusal('review.inProgress', agent)).toMatchObject({ message: "HR2 is reviewing AM-12's submission 40, and has been for 3 minutes.", next: "Leave it to HR2: don't review AM-12 or give it a verdict." })
+    for (const code of LOCALES) {
+      setLanguage(code, await loadCatalogue(code), code)
+      const [u, a] = [refusalLines('review.inProgress', user, WINDOW), refusalLines('review.inProgress', agent, WINDOW)]
+      for (const line of [u.message, u.next, a.message, a.next]) {
+        expect(line, code).not.toMatch(/[{}]/)
+        expect(line, code).toContain('AM-12')
+        expect(line, code).not.toMatch(/the user/i)
+      }
+      expect(a.message, code).toContain('HR2')
+      expect(a.next, code).toContain('HR2')
+      expect(u.message, code).not.toContain('HR2')
+      expect(u.message, code).not.toBe(a.message)
     }
   })
 

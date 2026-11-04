@@ -69,7 +69,6 @@ import * as tasks from './tasks'
 import { changeProjectKey, createProjectWithKey, keyProjects, sayKeysOnce } from './projectKeys'
 import { startTask } from './taskStart'
 import * as assistantControl from './assistantControl'
-import { revertSetting } from './settingsTools'
 import { finalWhys } from '../shared/assistantActivity'
 import { changeGroups } from './assistantChanges'
 import { UndoNotFound, userUndo } from './assistantUndo'
@@ -1533,10 +1532,6 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     // Its question while its panel is hidden here (HI-2320): told once, as the routing table says.
     'assistant:tellQuestion': (id) => (workspace.path && typeof id === 'string' ? assistantControl.tellQuestion(workspace.path, id) : false),
     'assistant:switchMode': (modeId, save) => switchMode(String(modeId), save !== false),
-    'assistant:revertSetting': async (actionId) => {
-      if (!workspace.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
-      await revertSetting(workspace.path, String(actionId))
-    },
     // The window words what can't be undone in its language, from the reasons' codes (#1283).
     'assistant:changes': () => (workspace.path ? changeGroups(currentWorkspace()).map((g) => ({ ...g, changes: g.changes.map((c) => (c.final ? { ...c, finalWhy: finalWhys(c.final) } : c)) })) : []),
     'assistant:undo': async (sel) => {

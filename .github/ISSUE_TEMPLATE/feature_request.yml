@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for the idea. Please check the [open issues](https://github.com/Suremise/hive-desktop/issues) first: someone may have asked for it already.
+        Thank you for the idea. Please check the [open issues](https://github.com/Suremise/combwork/issues) first: someone may have asked for it already.
   - type: textarea
     id: problem
     attributes:

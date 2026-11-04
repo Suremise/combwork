@@ -4,7 +4,7 @@ Thank you for helping. This page is mostly about **translations**: fixing a word
 adding a new language. You can do a small fix in GitHub's web editor without installing anything. The checks run on
 your pull request. Code changes are covered briefly at the end.
 
-**Found a bug, or have an idea?** [Open an issue](https://github.com/Suremise/hive-desktop/issues/new/choose): there
+**Found a bug, or have an idea?** [Open an issue](https://github.com/Suremise/combwork/issues/new/choose): there
 are forms for a bug report (with **Help → Copy Diagnostics…**), a feature request, a translation and anything else.
 A **security problem** goes privately, never in an issue: see [SECURITY.md](.github/SECURITY.md). Pull requests start
 from [a short template](.github/PULL_REQUEST_TEMPLATE.md). Everyone taking part follows the
@@ -84,7 +84,7 @@ Say a German button reads badly.
    translation that wasn't outdated needs no record.
 6. **Look at it in Hive** (optional, but the best check of length and tone). Any one of these:
    - **Installed Hive:** quit Hive, then start it with `--lang=de`. In PowerShell:
-     `& "$env:LOCALAPPDATA\Programs\Hive\Hive.exe" --lang=de`. Your edited file only appears once a build includes it,
+     `& "$env:LOCALAPPDATA\Programs\Combwork\Combwork.exe" --lang=de`. Your edited file only appears once a build includes it,
      so this shows the current release's German.
    - **From the source:** `npx install-electron --no` once, then `npm run dev -- -- --lang=de` (both `--` are
      needed: the first is npm's, the second electron-vite's).
@@ -96,7 +96,7 @@ Say a German button reads badly.
 
    A language started this way stays for that run only. The setting (**Settings → General → Language**) says so and
    applies from the next start.
-7. **Open a pull request** against `main` on [Suremise/hive-desktop](https://github.com/Suremise/hive-desktop). Say
+7. **Open a pull request** against `main` on [Suremise/combwork](https://github.com/Suremise/combwork). Say
    what you changed and why, and add a screenshot if you have one. Keep each pull request to one language.
 
 **The English itself is wrong?** English text lives in the code, not in `locales/`. Open an issue, or change the

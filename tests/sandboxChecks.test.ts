@@ -64,12 +64,12 @@ test('build folder: the common folder of both installers; different drives and t
   assert.throws(() => buildRoot('D:\\Hive-Setup-0.6.0.exe', null), /drive root/)
 })
 
-test('--only: anything but fresh or upgrade is refused before anything runs', () => {
-  assert.throws(() => plan(['--only', 'frseh', '--installer', 'x']), /--only is fresh or upgrade, not "frseh"/)
+test('--only: anything but fresh, upgrade, manual or edges is refused before anything runs', () => {
+  assert.throws(() => plan(['--only', 'frseh', '--installer', 'x']), /--only is fresh or upgrade or manual or edges, not "frseh"/)
   const s = scratch('only')
   const r = runner(['--only', 'frseh', '--installer', 'x', '--report', path.join(s.dir, 'report')], s.env())
   assert.strictEqual(r.status, 2)
-  assert.match(r.stderr, /NOT RUN: --only is fresh or upgrade/)
+  assert.match(r.stderr, /NOT RUN: --only is fresh or upgrade or manual or edges/)
   assert.deepStrictEqual(s.read().calls, [], 'wsb or the server was called')
 })
 
@@ -174,7 +174,7 @@ test('what the server gets: hive\'s own scripts and fakes mapped from this check
   assert.deepStrictEqual(run.starts.map((a) => [a.build, a.network, a.tools]), [[path.join(run.s.dir, 'builds', 'hive'), false, ['node', 'playwright', 'hive-tests']], [path.join(run.s.dir, 'builds', 'hive'), false, ['node', 'playwright', 'hive-tests']]])
   // Every script the runner runs inside is here, at the path the Sandbox maps it to.
   const inside = run.guests.flatMap((g) => [...g.matchAll(/C:\\tools\\hive-tests\\([^\s"]+)/g)].map((m) => m[1]))
-  assert.deepStrictEqual([...new Set(inside)].sort(), ['sandbox\\inside\\drive.cjs', 'sandbox\\inside\\install.ps1'])
+  assert.deepStrictEqual([...new Set(inside)].sort(), ['sandbox\\inside\\drive.cjs', 'sandbox\\inside\\install.ps1', 'sandbox\\inside\\start-app.ps1'])
   for (const f of inside) assert.ok(fs.existsSync(path.join(__dirname, ...f.split('\\'))), f)
   assert.ok(!run.guests.some((g) => /wsb-mcp/i.test(g)), 'a script from the server\'s own folder')
   assert.match(run.log, new RegExp(`server ${FAKE_SERVER.replace(/[\\.]/g, '\\$&')}`))

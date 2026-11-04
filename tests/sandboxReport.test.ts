@@ -11,24 +11,32 @@ type Json = Record<string, any>
 const { evaluate, markdown, verdict, REQUIRED } = require('./sandbox/report.cjs')
 
 const HOME = 'C:\\Users\\WDAGUtilityAccount'
-const lnk = (name: string, folder: string) => ({ name, folder: `${HOME}\\${folder}`, target: `${HOME}\\AppData\\Local\\Programs\\Hive\\Hive.exe` })
+// The build's names (checks.cjs appNames: HI-2458, HI-2460), and Hive Desktop's before it.
+const APP = { productName: 'Combwork', shortcutName: 'Combwork', exeName: 'Combwork' }
+const lnk = (name: string, folder: string, exe = 'Combwork') => ({ name, folder: `${HOME}\\${folder}`, target: `${HOME}\\AppData\\Local\\Programs\\${exe}\\${exe}.exe` })
 const DESKTOP = 'Desktop'
 const START = 'AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs'
+const combwork = { path: `${HOME}\\AppData\\Local\\Programs\\Combwork`, exe: 'Combwork.exe', exists: true, hiveExe: true, uninstaller: true, appAsarSha256: 'bbbb' }
 const state = (over: Json = {}): Json => ({
-  uninstallEntries: [{ displayName: 'Combwork 0.6.0' }],
-  installDir: { exists: true, hiveExe: true, uninstaller: true, appAsarSha256: 'bbbb' },
-  profileDir: { exists: true },
-  shortcuts: [lnk('Hive Desktop', DESKTOP), lnk('Hive Desktop', START)],
+  uninstallEntries: [{ displayName: 'Combwork 0.6.0', key: '10a7595a-0e90-558c-b6b6-ae33bdd80748' }],
+  installs: { combwork, hive: { exists: false } },
+  installDir: combwork,
+  profiles: { roamingCombwork: { exists: true }, roamingHive: { exists: false }, localCombwork: { exists: true, record: '{"v":1,"from":"x","movedAt":"t","by":"installer"}' }, localHive: { exists: false } },
+  profileDir: { path: `${HOME}\\AppData\\Roaming\\Combwork`, exists: true },
+  shortcuts: [lnk('Combwork', DESKTOP), lnk('Combwork', START)],
+  run: [],
   git: false,
   ...over
 })
+/** Hive Desktop 1.0 installed, before the upgrade. */
+const hiveState = (): Json => state({ uninstallEntries: [{ displayName: 'Hive Desktop 0.4.1' }], shortcuts: [lnk('Hive Desktop', DESKTOP, 'Hive'), lnk('Hive Desktop', START, 'Hive')], installs: { combwork: { exists: false }, hive: { exists: true, hiveExe: true, appAsarSha256: 'aaaa' } }, run: [{ name: 'electron.app.Hive Desktop', command: '"C:\\x\\Hive.exe" --hidden' }] })
 /** A finished driver record with all its required checks passing. */
 const driverOk = (kind: string, key: string): Json => {
   const req = REQUIRED[kind].drivers[key]
-  return { completed: true, checks: req.ids.map((id: string) => ({ id, scenario: Number(id.split('.')[0]), name: `check ${id}`, ok: true })), facts: { version: '0.6.0', gitMissing: true, hive: ['workspace.json'], views: {} } }
+  return { completed: true, checks: req.ids.map((id: string) => ({ id, scenario: Number(id.split('.')[0]), name: `check ${id}`, ok: true })), facts: { version: '0.6.0', exe: 'Combwork.exe', gitMissing: true, hive: ['workspace.json'], views: {} } }
 }
 const allShots = [...REQUIRED.fresh.shots, ...REQUIRED.upgrade.shots]
-const meta = (over: Json = {}): Json => ({ installer: 'Hive-Setup-0.6.0.exe', installerVersion: '0.6.0', previousVersion: '0.5.1', ran: ['fresh', 'upgrade'], date: 'd', hostBuild: '10.0.26200', minutes: '3.0', shots: allShots, steps: [{ scenario: 1, what: '1. install', ok: true }], ...over })
+const meta = (over: Json = {}): Json => ({ app: APP, installer: 'Combwork-Setup-0.6.0.exe', installerVersion: '0.6.0', previousVersion: '0.5.1', ran: ['fresh', 'upgrade'], date: 'd', hostBuild: '10.0.26200', minutes: '3.0', shots: allShots, steps: [{ scenario: 1, what: '1. install', ok: true }], ...over })
 const good = (): Json => ({
   's1-run': { exitCode: 0, seconds: 10 },
   's1-state': state(),
@@ -38,11 +46,13 @@ const good = (): Json => ({
   's5-run': { exitCode: 0, seconds: 5 },
   's5-state': state({ uninstallEntries: [], installDir: { exists: false }, shortcuts: [] }),
   's4-prev-run': { exitCode: 0, seconds: 10 },
-  's4-prev-state': state({ uninstallEntries: [{ displayName: 'Hive 0.4.1' }], shortcuts: [lnk('Hive', DESKTOP), lnk('Hive', START)], installDir: { exists: true, hiveExe: true, appAsarSha256: 'aaaa' } }),
+  's4-prev-state': hiveState(),
   's4-mark': driverOk('upgrade', 's4-mark'),
-  's4-new-run': { exitCode: 0, seconds: 20, hiveRunning: true },
+  's4-prev-started': { pid: 4242, window: true, seconds: 5 },
+  's4-new-run': { exitCode: 0, seconds: 20, hiveRunning: true, running: ['combwork'], arguments: '--updated /S --force-run' },
   's4-new-state': state(),
-  's4-after': driverOk('upgrade', 's4-after')
+  's4-after': driverOk('upgrade', 's4-after'),
+  's4-notify': driverOk('upgrade', 's4-notify')
 })
 const failedNames = (r: Json): string[] => r.checks.filter((c: Json) => !c.ok).map((c: Json) => c.name)
 
@@ -52,22 +62,24 @@ test('all facts as expected: every check passes, and the report says so', () => 
   assert.ok(r.checks.length >= 36)
   const md = markdown(r)
   assert.match(md, /\*\*PASSED: all \d+ checks\*\*/)
-  assert.match(md, /## 4\. Upgrade[\s\S]*Shortcuts renamed or kept: only "Hive Desktop".*\(before: Hive \(Desktop\), Hive \(Start menu\)\)/)
+  assert.match(md, /## 4\. Upgrade[\s\S]*Shortcuts: only "Combwork", starting Combwork\.exe.*\(before: Hive Desktop \(Desktop\), Hive Desktop \(Start menu\)\)/)
   assert.match(md, /No Git/)
   assert.ok(!/both say/.test(md))
 })
 
 test('each wrong fact fails its check, named in "Failed checks"', () => {
   const f = good()
-  f['s1-state'] = state({ uninstallEntries: [{ displayName: 'Combwork 0.6.0' }, { displayName: 'Hive 0.4.1' }] })
-  f['s4-new-state'] = state({ shortcuts: [lnk('Hive Desktop', DESKTOP), lnk('Hive', START)], installDir: { exists: true, hiveExe: true, appAsarSha256: 'aaaa' } })
+  f['s1-state'] = state({ uninstallEntries: [{ displayName: 'Combwork 0.6.0' }, { displayName: 'Hive Desktop 0.4.1' }] })
+  // Hive Desktop left behind: its entry, a shortcut, its folder, its Launch at login, and its profile folders.
+  f['s4-new-state'] = state({ uninstallEntries: [{ displayName: 'Combwork 0.6.0' }, { displayName: 'Hive Desktop 0.4.1' }], shortcuts: [lnk('Combwork', DESKTOP), lnk('Hive Desktop', START, 'Hive')], installs: { combwork, hive: { exists: true } }, profiles: { roamingCombwork: { exists: false }, roamingHive: { exists: true }, localCombwork: { exists: false }, localHive: { exists: true } }, run: [{ name: 'electron.app.Hive Desktop', command: '"C:\\x\\Hive.exe"' }] })
   f['s4-new-run'].hiveRunning = false
+  f['s4-new-run'].running = ['hive']
   f['s5-state'] = state({ uninstallEntries: [], installDir: { exists: false }, shortcuts: [], profileDir: { exists: false } })
   f.s3.checks[4].ok = false
   f.s3.checks[4].detail = 'not found'
   const r = evaluate(meta(), f)
   const failed = failedNames(r)
-  for (const re of [/One Installed-apps entry: "Combwork 0.6.0"/, /only "Hive Desktop"/, /--force-run starts Hive/, /profile .* is kept/, /check 3\.check-again-finds/, /app code changed/]) {
+  for (const re of [/One Installed-apps entry: "Combwork 0.6.0"/, /no Hive Desktop/, /only "Combwork"/, /--force-run starts Combwork/, /Hive Desktop no longer runs/, /Hive Desktop's folder gone/, /profile folders moved/, /installer's record/, /Launch at login removed/, /profile .* is kept/, /check 3\.check-again-finds/]) {
     assert.ok(failed.some(n => re.test(n)), `${re} not among ${JSON.stringify(failed)}`)
   }
   const md = markdown(r)
@@ -88,7 +100,7 @@ test('a driver interrupted after a passing check fails: not finished, and its ot
 
 test('empty driver records fail every required check and fact', () => {
   const f = good()
-  for (const k of ['s1', 's3', 's6', 's4-mark', 's4-after']) f[k] = {}
+  for (const k of ['s1', 's3', 's6', 's4-mark', 's4-after', 's4-notify']) f[k] = {}
   const r = evaluate(meta(), f)
   const failed = failedNames(r)
   const required = [...Object.values(REQUIRED.fresh.drivers as Json), ...Object.values(REQUIRED.upgrade.drivers as Json)].reduce((n: number, d: Json) => n + d.ids.length, 0)

@@ -433,10 +433,42 @@ function settledNow(retries: Map<string, Retry>, ws: WorkspaceService, projectPa
 /**
  * The free slot each lane waiting for one was last refused as held, and what holds it (HI-2466), by
  * "<workspace>\n<lane>", with the lane's workspace, project (lower-cased) and id: for its status (lanes.ts' slotView).
- * Set and cleared by its project's pass as it tries.
+ * Set and cleared by its project's pass as it tries; owned by the workspace's lifetime (HI-2469).
  */
-const laneHolds = new Map<string, LaneSlotHeld & { ws: string; project: string; lane: string }>()
+const laneHolds = new Map<string, LaneSlotHeld & { ws: string; project: string; lane: string; life: AbortSignal }>()
 const laneHoldKey = (wsPath: string, lane: string): string => `${wsPath.toLowerCase()}\n${lane}`
+const holdLifetimes = new Map<AbortSignal, { ws: WorkspaceService; drop: () => void }>()
+let holdGeneration = 0
+
+/** One listener per workspace lifetime, regardless of how many lanes are held. */
+function ownLaneHolds(ws: WorkspaceService, life: AbortSignal): void {
+  if (holdLifetimes.has(life)) return
+  const drop = (): void => {
+    for (const [key, h] of laneHolds) if (h.life === life) laneHolds.delete(key)
+    life.removeEventListener('abort', drop)
+    holdLifetimes.delete(life)
+  }
+  holdLifetimes.set(life, { ws, drop })
+  life.addEventListener('abort', drop, { once: true })
+}
+
+/** A removed project's holds and retry go too; other projects and windows keep theirs. */
+function pruneLaneHolds(): void {
+  for (const [life, { ws, drop }] of holdLifetimes) {
+    if (life.aborted || ws.lifetime !== life) {
+      drop()
+      continue
+    }
+    const projects = new Set(ws.info()?.projects.map((p) => p.path.toLowerCase()))
+    for (const [key, h] of laneHolds) {
+      if (h.life !== life || projects.has(h.project)) continue
+      laneHolds.delete(key)
+      const retryKey = `${h.ws}\n${h.project}`
+      const r = heldRetries.get(retryKey)
+      if (r?.life === life) forget(heldRetries, retryKey, r)
+    }
+  }
+}
 
 /** Lane `lane`'s held slot as its last try found it, or null (lanes.ts reads it into the lane's status). */
 export function laneSlotHeld(wsPath: string, lane: string): LaneSlotHeld | null {
@@ -860,13 +892,17 @@ export function settleSlotCards(ws: WorkspaceService, projectPath: string): Prom
     running.again = true
     return running.done
   }
+  // Admission owns the token: an earlier step may still be awaiting when the service stops (HI-2469).
+  const life = ws.lifetime
+  const generation = holdGeneration
+  const passIsCurrent = (): boolean => !ended(ws) && !life.aborted && ws.lifetime === life && generation === holdGeneration
   const pass = { again: false, done: Promise.resolve() }
   pass.done = withoutWriteFence(async () => {
     try {
       do {
         pass.again = false
-        await settleOnce(ws, projectPath).catch((e) => failedStep(`settling the slots of ${userText(projectPath)}`, e)) // i18n-ignore: a log line (failedStep logs it)
-      } while (pass.again && !ended(ws))
+        await settleOnce(ws, projectPath, life, generation).catch((e) => failedStep(`settling the slots of ${userText(projectPath)}`, e)) // i18n-ignore: a log line (failedStep logs it)
+      } while (pass.again && passIsCurrent())
     } finally {
       passes.delete(key)
     }
@@ -1051,8 +1087,8 @@ export async function finishedSlot(projectPath: string, wf: Workflow, n: number,
   return detached
 }
 
-async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<void> {
-  if (!ws.path || ended(ws)) return
+async function settleOnce(ws: WorkspaceService, projectPath: string, life: AbortSignal, generation: number): Promise<void> {
+  if (!ws.path || ended(ws) || life.aborted || ws.lifetime !== life || generation !== holdGeneration) return
   const wf = await workflowFor(ws, projectPath).catch(() => null)
   if (!wf) return
   const pool = await poolFor(ws, projectPath)
@@ -1163,8 +1199,8 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
     }
   }
   // 4. Lanes started from the window waiting for a slot.
-  if (ended(ws)) return
-  await startWaitingLanes(ws, projectPath, pool)
+  if (ended(ws) || life.aborted || ws.lifetime !== life || generation !== holdGeneration) return
+  await startWaitingLanes(ws, projectPath, pool, life, generation)
   // 5. Adopted slots, once free, renamed to generic names (#1441).
   if (ended(ws)) return
   await renameAdopted(ws, projectPath, pool)
@@ -1783,21 +1819,25 @@ async function lendLaneSlot(ws: WorkspaceService, projectPath: string, lane: str
  * A lend refused because the free slot is held (HI-2466: a session or a process in it) is kept for the lane's status
  * and tried again by a later pass (`heldRetries`), as nothing may say when what holds it has gone.
  */
-async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool: SlotPool): Promise<void> {
+async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool: SlotPool, life: AbortSignal, generation: number): Promise<void> {
+  const stopped = (): boolean => !workflowEnforced() || ended(ws) || life.aborted || ws.lifetime !== life || generation !== holdGeneration || !ws.info()?.projects.some((p) => samePlace(p.path, projectPath))
   const name = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.name
   const waiting = (await lanesWaitingForSlot(ws)).filter((l) => l.project.toLowerCase() === name?.toLowerCase()).sort((a, b) => a.slotWait!.since.localeCompare(b.slotWait!.since))
   // The rules off, or Hive quitting (#1628): looked at again after each await, nothing more lent or started.
-  const stopped = (): boolean => !workflowEnforced() || ended(ws)
+  if (stopped()) return
   // Each lane's held slot as this pass finds it (HI-2466); the lanes no longer waiting forgotten. The window told of a change.
   const wsPath = ws.path ?? ''
   const project = projectPath.toLowerCase()
   let holdsChanged = false
   const setHold = (lane: string, h: LaneSlotHeld | null): void => {
+    if (stopped()) return
     const key = laneHoldKey(wsPath, lane)
     const was = laneHolds.get(key)
     if (h ? was && was.slot === h.slot && was.held === h.held && was.agent === h.agent && was.broker === h.broker && was.idle === h.idle : !was) return
-    if (h) laneHolds.set(key, { ...h, ws: wsPath.toLowerCase(), project, lane })
-    else laneHolds.delete(key)
+    if (h) {
+      ownLaneHolds(ws, life)
+      laneHolds.set(key, { ...h, ws: wsPath.toLowerCase(), project, lane, life })
+    } else laneHolds.delete(key)
     holdsChanged = true
   }
   const ids = new Set(waiting.map((l) => l.id))
@@ -1989,6 +2029,7 @@ export function startSlotCards(): void {
   const seen = new WeakSet<AbortSignal>()
   const offOpen = onHiveEvent((e) => {
     if (e.type !== 'workspace-changed') return
+    pruneLaneHolds()
     for (const ws of openWorkspaces()) {
       if (!ws.path || seen.has(ws.lifetime)) continue
       seen.add(ws.lifetime)
@@ -2032,6 +2073,9 @@ export function startSlotCards(): void {
 }
 
 export function stopSlotCards(): void {
+  holdGeneration++
+  for (const { drop } of [...holdLifetimes.values()]) drop()
+  for (const [key, r] of heldRetries) forget(heldRetries, key, r)
   stop?.()
   stop = null
 }

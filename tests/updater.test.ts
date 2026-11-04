@@ -124,7 +124,7 @@ describe('update checks', () => {
     delete process.env.HIVE_TEST_QUIET
     const { HiveGitHubProvider } = await import('../src/main/updateFeed')
     ;(await import('../src/main/updater')).initUpdater({ restart: () => undefined })
-    expect(st.feeds).toEqual([{ provider: 'custom', updateProvider: HiveGitHubProvider, owner: 'Suremise', repo: 'hive-desktop' }])
+    expect(st.feeds).toEqual([{ provider: 'custom', updateProvider: HiveGitHubProvider, owner: 'Suremise', repo: 'combwork' }])
     vi.resetModules()
     st.feeds = []
     ;((await import('electron')).app as { isPackaged: boolean }).isPackaged = false

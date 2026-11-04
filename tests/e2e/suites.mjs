@@ -324,6 +324,7 @@ export const SUITES = [
   { name: 'slotswitches' },
   { name: 'slotupgrade' },
   { name: 'slotwindows' },
+  { name: 'slotwriterhold' },
   { name: 'stagenames' },
   { name: 'stalewatch' },
   { name: 'stalls' },

@@ -38,6 +38,7 @@ import { ASSISTANT_NAME, assistantModeId } from '../shared/assistant'
 import { MARKED_LOG } from '../shared/redact'
 import { APP_NAME, DEV_APP_NAME, appName, legacyProfileFolder, profileFolder } from '../shared/appName'
 import { chooseProfile, choiceLine, setProfileChoices } from './profileFolders'
+import { syncLoginItemAtStart } from './loginItem'
 import { startProfileNotices } from './profileNotices'
 import { PROVIDERS, dangerModes, labelList, projectProviderConfig, providerSettings } from '../shared/providers'
 import { projectAgents } from '../shared/defaults'
@@ -82,7 +83,7 @@ import { startCopies, stopCopies } from './copiesApp'
 import { startReviewCopies, stopReviewCopies } from './reviewCopies'
 import { setAgentBusy, startLineUpdates } from './workflow/lineUpdates'
 import { startLockRecords } from './workflow/lockRecord'
-import { setQueueLive, setRunsGoing, workflowFor } from './workflow/service'
+import { setAgentRunning, setQueueLive, setRunsGoing, workflowFor } from './workflow/service'
 import { isOpenRun } from '../shared/progress'
 import { createLogger, userText, logsDir } from './logger'
 import { killAll } from './ptyHost'
@@ -194,7 +195,8 @@ startCrashDumps()
 
 // Windows ties the taskbar icon and notification name/icon to this ID. Dev and test builds run as
 // electron.exe, so they get their own ID; sharing it made Windows show Electron's icon for Hive.
-const APP_ID = app.isPackaged ? 'com.hive.desktop' : 'com.hive.desktop.dev'
+// Combwork's (HI-2460): Hive Desktop's was com.hive.desktop (.dev), which its installer removes.
+const APP_ID = app.isPackaged ? 'it.surmise.combwork' : 'it.surmise.combwork.dev'
 app.setAppUserModelId(APP_ID)
 if (!app.isPackaged && process.platform === 'win32') registerDevAppId()
 
@@ -985,6 +987,8 @@ app.whenReady().then(async () => {
     return new Response(Readable.toWeb(createReadStream(p)) as ReadableStream, { headers: { 'Content-Type': servableType(p), 'Content-Length': String(st.size) } })
   })
   nativeTheme.themeSource = config.settings.appearance.theme
+  // Launch at login for this exe (HI-2460: an update can move it), when it is on.
+  syncLoginItemAtStart(config.settings.general.launchAtLogin)
   setDateStyle({ date: config.settings.general.dateFormat, time: config.settings.general.timeFormat })
   Menu.setApplicationMenu(null)
   // Says the log marks the user's own text (userText()), so Copy Diagnostics can tell this run's lines from older ones.
@@ -1246,6 +1250,12 @@ app.whenReady().then(async () => {
     const runs = openWorkspaces().flatMap((w) => (w.path ? progress.list(w.path) : [])).filter((r) => r.source === 'agent' && r.agentId === agent && r.projectPath?.toLowerCase() === p && isOpenRun(r))
     const tasks = sessions.agentNow(project, agent)?.backgroundTasks ?? 0
     return [...runs.map((r) => r.title), ...(tasks ? [`its background tasks (${tasks})`] : [])] // i18n-ignore: agent-facing: what a refused submit names
+  })
+
+  // A review in progress holds another agent's start of it while its reviewer's session runs (HI-2487).
+  setAgentRunning((project, agent) => {
+    const now = sessions.agentNow(project, agent)
+    return !!now && now.status !== 'stopped' && now.status !== 'error'
   })
 
   // A review waiting on its builder's Progress run for the card isn't stalled (HI-1993).

@@ -37,7 +37,7 @@ const threadLines = (report) => {
   const first = lib.git(alpha, ['rev-parse', '--abbrev-ref', 'HEAD']).trim()
   lib.git(alpha, ['branch', 'other'])
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData })
-  const app = await _electron.launch({ executablePath: path.join(lib.ROOT, 'dist/win-unpacked/Hive.exe'), args: [], cwd: lib.ROOT, env })
+  const app = await _electron.launch({ executablePath: lib.PACKAGED_EXE, args: [], cwd: lib.ROOT, env })
   // Closed whatever fails from here on, not only when every step does.
   try {
     const page = await app.firstWindow()

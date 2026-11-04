@@ -13,7 +13,7 @@ import { existsSync } from 'original-fs'
 import { readFile, stat } from 'original-fs/promises'
 import { msg } from '../shared/i18n/msg'
 import { tr } from '../shared/i18n'
-import { OUR_CATALOG_URL, catalogRowShown, catalogUrlAllowed, checkRequirements, compareVersions, editionOf, readCatalog, type PcFacts, type ReadCatalog } from '../shared/mcpCatalog'
+import { OUR_CATALOG_URL, OUR_OLD_CATALOG_URLS, catalogRowShown, isOurCatalogUrl, sameCatalogSource, catalogUrlAllowed, checkRequirements, compareVersions, editionOf, readCatalog, type PcFacts, type ReadCatalog } from '../shared/mcpCatalog'
 import type { McpCatalogCheck, McpCatalogFilter, McpCatalogPrepared, McpCatalogRow, McpCatalogServer, McpCatalogSettings, McpCatalogSourcePage, McpServerDef, McpShown } from '../shared/types'
 import { advanced } from './advanced'
 import { config } from './config'
@@ -81,12 +81,12 @@ const M = {
 /** The sources as settings have them: ours first (unless turned off), then the user's that are on. */
 export function catalogSources(): { url: string; ours: boolean; noted: boolean }[] {
   const s: McpCatalogSettings = config.settings.mcpCatalogs ?? { oursOn: true, sources: [] }
-  return [...(s.oursOn ? [{ url: OUR_CATALOG_URL, ours: true, noted: true }] : []), ...s.sources.filter((x) => x.on && x.url !== OUR_CATALOG_URL).map((x) => ({ url: x.url, ours: false, noted: !!x.noted }))]
+  return [...(s.oursOn ? [{ url: OUR_CATALOG_URL, ours: true, noted: true }] : []), ...s.sources.filter((x) => x.on && !isOurCatalogUrl(x.url)).map((x) => ({ url: x.url, ours: false, noted: !!x.noted }))]
 }
 
 /** The sources changed in Settings (HI-545): ours on or off, and the user's own (added, turned on or off, removed, reordered). */
 export function setCatalogSources(next: McpCatalogSettings): McpCatalogSettings {
-  const seen = new Set<string>([OUR_CATALOG_URL])
+  const seen = new Set<string>([OUR_CATALOG_URL, ...OUR_OLD_CATALOG_URLS])
   const sources: McpCatalogSettings['sources'] = []
   const was = config.settings.mcpCatalogs?.sources ?? []
   for (const x of Array.isArray(next?.sources) ? next.sources : []) {
@@ -282,8 +282,8 @@ const checksOf = (server: McpCatalogServer, pc: PcFacts): McpCatalogCheck[] => c
 // The view: pages of each source's rows, for a search and a filter.
 // ---------------------------------------------------------------------------
 
-/** An installed server from this catalogue entry (its provenance, whatever name it was installed under). */
-const fromEntry = (def: McpServerDef | null | undefined, source: string, name: string): boolean => def?.catalog?.source === source && def.catalog.name === name && typeof def.catalog.version === 'string'
+/** An installed server from this catalogue entry (its provenance, whatever name it was installed under; ours by any of its addresses, HI-2472). */
+const fromEntry = (def: McpServerDef | null | undefined, source: string, name: string): boolean => !!def?.catalog && typeof def.catalog.source === 'string' && sameCatalogSource(def.catalog.source, source) && def.catalog.name === name && typeof def.catalog.version === 'string'
 
 /**
  * Whether a catalogue entry is installed: its version (found by provenance, under any name), `other` when its name is

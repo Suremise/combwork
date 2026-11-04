@@ -82,10 +82,10 @@ const renamable = (dir) => {
   const beat4 = path.join(tools, 'hold4-beat.txt')
   fs.writeFileSync(turn, `const fs = require('fs'); const { spawn } = require('child_process'); const c = spawn(process.execPath, [${JSON.stringify(hold)}, require('path').join(process.cwd(), '.hive', 'hold4.lock'), ${JSON.stringify(go4)}, ${JSON.stringify(beat4)}, '${HUNG_MS * 4}'], { detached: true, stdio: 'ignore', windowsHide: true }); c.unref(); const t = Date.now(); const tick = () => { if (fs.existsSync(${JSON.stringify(turnGo)}) || Date.now() - t > ${HUNG_MS * 3}) process.exit(0); setTimeout(tick, 100) }; tick()\n`)
   // Step 6's stand-in broker (HI-2467): only its current folder in the slot, no file open, until stand-go.txt (bounded),
-  // writing its heartbeat. brokers.txt lists the stand-ins' ids (HIVE_TEST_SYSTEM_BROKER), brokers-active.txt the
+  // writing its own PID/current-folder heartbeat. brokers.txt lists the stand-ins' ids (HIVE_TEST_SYSTEM_BROKER), brokers-active.txt the
   // Sandbox's own processes running now (HIVE_TEST_SYSTEM_BROKER_ACTIVE; while it is missing, none).
   const stand = path.join(tools, 'stand.js')
-  fs.writeFileSync(stand, `const fs = require('fs'); const [go, beat, ms] = process.argv.slice(2); const t = Date.now(); const tick = () => { if (fs.existsSync(go) || Date.now() - t > Number(ms)) process.exit(0); fs.writeFileSync(beat, String(Date.now())); setTimeout(tick, 100) }; tick()\n`)
+  fs.writeFileSync(stand, `const fs = require('fs'); const [go, beat, ms] = process.argv.slice(2); const t = Date.now(); const tick = () => { if (fs.existsSync(go) || Date.now() - t > Number(ms)) process.exit(0); fs.writeFileSync(beat, JSON.stringify({ pid: process.pid, cwd: process.cwd(), at: Date.now() })); setTimeout(tick, 100) }; tick()\n`)
   const brokers = path.join(tools, 'brokers.txt')
   const brokersActive = path.join(tools, 'brokers-active.txt')
   fs.writeFileSync(brokers, '')
@@ -100,6 +100,7 @@ const renamable = (dir) => {
   const h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' } })
   const { app, page, inv } = h
   let holder = null
+  let stopBrokerStatus = null
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(inv)
@@ -146,7 +147,7 @@ const renamable = (dir) => {
         while (watching.on) {
           const l = await laneOf(n).catch(() => null)
           const s = await slotNow().catch(() => null)
-          const now = JSON.stringify({ state: l?.state, status: l?.status ? { reason: l.status.reason, why: l.status.why, slot: l.status.slot, held: l.status.held } : null, slot: l?.slot ?? null, lease: s?.lease?.lane ?? null, b1: (await live(b1.id).catch(() => null))?.status ?? 'stopped' })
+          const now = JSON.stringify({ state: l?.state, status: l?.status ? { reason: l.status.reason, why: l.status.why, slot: l.status.slot, held: l.status.held, broker: l.status.broker, idle: l.status.idle } : null, slot: l?.slot ?? null, lease: s?.lease?.lane ?? null, b1: (await live(b1.id).catch(() => null))?.status ?? 'stopped' })
           if (now !== last) seen.push(`${Date.now() - t0} ms ${now}`)
           last = now
           await new Promise((r) => setTimeout(r, 250))
@@ -264,12 +265,21 @@ const renamable = (dir) => {
     await inv('lanes:end', (await laneOf(c4)).id, true)
     check('the lane is ended, B1 stopped, slot-a free and held by nothing', !!(await until(settled, HUNG_MS)), JSON.stringify(await slotNow()))
     const standGo = path.join(tools, 'stand-go.txt')
-    const standBeat = path.join(tools, 'stand-beat.txt')
-    /** A stand-in broker: runs with its current folder `cwd` (no file open) until stand-go.txt, its id listed as a broker's. */
+    let standInstance = 0
+    /** A stand-in broker, ready only once that process has reported its own PID and working folder. */
     const standIn = (cwd) => {
+      const standBeat = path.join(tools, `stand-beat-${++standInstance}.json`)
       const c = spawn(process.execPath, [stand, standGo, standBeat, String(HUNG_MS * 3)], { cwd, stdio: 'ignore', windowsHide: true, env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '' } })
       fs.writeFileSync(brokers, `${c.pid}\n`)
-      return { c, exited: new Promise((r) => c.once('exit', r)) }
+      const ready = () => {
+        try {
+          const beat = JSON.parse(fs.readFileSync(standBeat, 'utf8'))
+          return c.exitCode === null && beat.pid === c.pid && same(beat.cwd, cwd) && Date.now() - beat.at < 2000 ? beat : null
+        } catch {
+          return null // The child hasn't written yet, or this read overlapped its next heartbeat.
+        }
+      }
+      return { c, ready, exited: new Promise((r) => c.once('exit', r)) }
     }
     // 6a. The broker working elsewhere while a process holds slot-a (a file in it open): only the process is said.
     const go6 = path.join(tools, 'hold6-go.txt')
@@ -277,9 +287,10 @@ const renamable = (dir) => {
     const holder6 = spawn(process.execPath, [hold, path.join(slotA, '.hive', 'hold6.lock'), go6, beat6, String(HUNG_MS * 3)], { cwd: tools, stdio: 'ignore', windowsHide: true, env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '' } })
     const exited6 = new Promise((r) => holder6.once('exit', r))
     const away = standIn(tools)
-    check('a process holds slot-a, the broker running elsewhere', !!(await until(() => beating(beat6) && beating(standBeat) && !renamable(slotA), HUNG_MS)))
+    check('a process holds slot-a, the broker running elsewhere', !!(await until(() => beating(beat6) && away.ready() && !renamable(slotA), HUNG_MS)))
     const c5 = await create('Retry five')
     const fifth = await apiLane([c5])
+    stopBrokerStatus = watchStatus(c5, Date.now())
     check('a lane recorded through the API: it waits for a slot', fifth.status === 200 && !(await live(b1.id)), JSON.stringify(fifth.body))
     const status5 = async () => (await laneOf(c5))?.status ?? null
     check('…its status names the process, not the broker working elsewhere', !!(await until(async () => (await status5())?.reason === 'slot' && (await status5())?.held === 'process' && !(await status5())?.broker, HUNG_MS)), JSON.stringify(await status5()))
@@ -288,7 +299,15 @@ const renamable = (dir) => {
     fs.rmSync(standGo, { force: true })
     // 6b. The broker working in slot-a, the process gone: the broker is named, idle (none of the Sandbox's processes run).
     const here = standIn(slotA)
-    check('the broker works in slot-a', !!(await until(() => beating(standBeat) && !renamable(slotA), HUNG_MS)))
+    // HI-2489: the away broker's fresh heartbeat and holder6's file used to satisfy this before here had started.
+    // Keep the file held until this new process is ready, so its startup leaves no quiet gap for a waiting lend.
+    const hereReady = await until(() => {
+      const beat = here.ready()
+      return beat && !renamable(slotA) ? beat : null
+    }, HUNG_MS)
+    check('the new broker reports its own PID and slot-a before the file closes', !!hereReady, JSON.stringify(here.ready()))
+    if (!hereReady) throw new Error('the slot broker was not ready before closing the file holder')
+    console.log(`INFO broker handoff ready: ${JSON.stringify(hereReady)}`)
     fs.writeFileSync(go6, 'go')
     await exited6
     const brokerSaid = (idle) => async () => {
@@ -313,6 +332,7 @@ const renamable = (dir) => {
   } catch (e) {
     check('no exception', false, e?.stack ?? String(e))
   } finally {
+    if (stopBrokerStatus) console.log(`INFO step 6's lane, as it went: ${(await stopBrokerStatus()).join(' | ')}`)
     for (const f of [holdGo, turnGo, path.join(tools, 'hold4-go.txt'), path.join(tools, 'hold5-go.txt'), path.join(tools, 'hold6-go.txt'), path.join(tools, 'stand-go.txt')]) fs.writeFileSync(f, 'go')
     if (holder && holder.exitCode === null) holder.kill()
     await app.close().catch(() => undefined)

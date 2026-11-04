@@ -5,8 +5,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for reporting it. Please check the [open issues](https://github.com/Suremise/hive-desktop/issues) first: someone may have reported it already.
-        A security problem? Don't open an issue: report it privately, as [SECURITY.md](https://github.com/Suremise/hive-desktop/blob/main/.github/SECURITY.md) says.
+        Thank you for reporting it. Please check the [open issues](https://github.com/Suremise/combwork/issues) first: someone may have reported it already.
+        A security problem? Don't open an issue: report it privately, as [SECURITY.md](https://github.com/Suremise/combwork/blob/main/.github/SECURITY.md) says.
   - type: textarea
     id: what-happened
     attributes:

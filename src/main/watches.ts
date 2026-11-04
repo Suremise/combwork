@@ -2,6 +2,7 @@ import { randomBytes } from 'crypto'
 import { rename, writeFile } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
 import { projectAgents } from '../shared/defaults'
+import { agentWorkflowRole } from '../shared/workflow/roles'
 import { cardChange, carriedOver, ownCut, changesBetween, handoffsSince, hearsHandoffs, decisionLine, historyVerdict, reviewStep, changesSince, entryWithin, ENTRY_KEY, limitLine, markOf, movedIntoSince, seenOf, readMark, readSavedCondition, WAKE_MAX_BYTES, wakeAbout, watchLabel, cardWakeLine, userNameOf, releasedLine, withLanesTail, RELEASE_REASONS, type Released, type ReplyNote, alreadyThere, cardOver, encodeSince, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_CARDS, WATCH_MAX_LIMIT_MINUTES, type Baseline, type CardChange, type CardMark, type ReviewWhere, type Seen, type WatchChange, type WatchCondition } from '../shared/watch'
 import { loopReviewerOf, poolCard } from './loopReviewer'
 import { agentBusy, agentEvent, agentLimitLine, agentMarkOf, agentPart, agentWakeLine, agentWatchLabel, readSavedAgentCondition, readSavedAgentMark, replyFirstLine, replyPart, REPLY_CHARS, type AgentEvent, type AgentMark, type AgentNow, type AgentWatchCondition, type WatchedAgent } from '../shared/agentWatch'
@@ -866,6 +867,13 @@ const stopDelivery = (store: Store, rec: WatchRecord | undefined, why: AgentMsg 
   if (rec?.fired?.delivery) inBackground('cancelling a wake', cancelFromSource(rec.projectPath, 'watch', wakeRef(rec), inDialectOf(sessionOf(rec), () => say(T.cancelled, { why: say(why) }))))
 }
 
+/** Whether an agent's workflow role is reviewer (HI-2487); false when its project can't be read. */
+async function isReviewerAgent(ws: WorkspaceService, projectPath: string, agentId: string): Promise<boolean> {
+  const cfg = await ws.projectConfig(projectPath).catch(() => null)
+  const a = cfg ? projectAgents(cfg).find((x) => x.id === agentId) : undefined
+  return !!a && agentWorkflowRole(a) === 'reviewer'
+}
+
 export type WatchResult = ({ watching: TaskWatchInfo } | { already: CardChange }) & { lanesLeft?: string[] }
 
 /**
@@ -916,11 +924,15 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
     // blocked card stays (#481): it is paused, not gone, and the watch carries on until it moves again.
     const on: Record<string, OnCard> = {}
     let already: CardChange | null = null
+    // HI-2487: a reviewer agent watching another's card for anything but Done (a design it checked, its next round) waits
+    // for it as for its arrival in Review: another reviewer reviewing it ends its watch on it, which says who (HR1's watch
+    // on HI-2444, set after HR2 had started, woke it with "in Review" and it started a review of its own).
+    const reviewerHere = scope !== null && cond.column !== 'done' && (await isReviewerAgent(ws, projectPath, agentId))
     for (const n of cond.cards) {
       const card = await cardIn(store, n, scope)
       await testHooks.afterRead?.()
       if (!card) throw unknownTask(n)
-      const role = scope === null ? null : card.agent === agentId ? 'agent' : card.review?.agent === agentId ? 'reviewer' : cond.column === 'review' ? 'awaiting' : null
+      const role = scope === null ? null : card.agent === agentId ? 'agent' : card.review?.agent === agentId ? 'reviewer' : cond.column === 'review' || reviewerHere ? 'awaiting' : null
       if (role) on[n] = { role }
       const mark = markOf(card)
       const intent = start?.card.number === n

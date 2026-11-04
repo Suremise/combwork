@@ -11,7 +11,7 @@ import { attributeFolder } from '../src/main/workflow/reconcile'
 import { compile, loadRuleset } from '../src/shared/workflow/compile'
 import { agentActor } from '../src/shared/workflow/facts'
 import { allOff, contradictions, preset, reviewerModeOf, takesOption, type WorkflowOptions } from '../src/shared/workflow/options'
-import { designReviewer, openDesign, poolAssignments, preferredReviewer, submissionReviewers, type PoolAgent, type PoolCard } from '../src/shared/workflow/reviewerPool'
+import { designReviewer, openDesign, poolAssignments, preferredReviewer, reviewsInProgress, submissionReviewers, type PoolAgent, type PoolCard } from '../src/shared/workflow/reviewerPool'
 import type { LaneRecord } from '../src/shared/lanes'
 import type { AgentDef } from '../src/shared/types'
 
@@ -42,8 +42,23 @@ const state = vi.hoisted(() => ({
   onRefused: null as null | ((agentId: string) => void),
   calls: [] as string[],
   /** Awaited as a stopped agent's launch prepares, before its `allowed` (HI-2046: a change landing meanwhile). */
-  beforeSpawn: null as null | (() => void | Promise<void>)
+  beforeSpawn: null as null | (() => void | Promise<void>),
+  /** The timer suite drives this board's changes explicitly; its stand-alone fact store also triggers the DB poll. */
+  manualBoard: null as string | null
 }))
+
+vi.mock('../src/main/events', async (orig) => {
+  const actual = await orig<typeof import('../src/main/events')>()
+  return {
+    ...actual,
+    emit: (event: Parameters<typeof actual.emit>[0]) => {
+      // HI-2455: the harness writes facts on another connection, unlike the app's board-owned runtime. Its poll is
+      // an extra board change, not a retry. Only the clock suite supplies those changes itself (without a path).
+      if (event.type === 'tasks-changed' && event.workspacePath === state.manualBoard) return
+      actual.emit(event)
+    }
+  }
+})
 
 vi.mock('../src/main/workflow/service', async (orig) => ({ ...(await orig<object>()), workflowEnforced: () => state.enforced, agentRunsGoing: (_p: string, a: string) => (state.runs.has(a) ? [{}] : []), workflowFor: async () => state.wf }))
 vi.mock('../src/main/workflow/lineUpdates', async (orig) => ({ ...(await orig<object>()), agentBusy: (_p: string, a: string) => state.busy.has(a) || state.pending.has(a) }))
@@ -100,7 +115,7 @@ afterEach(() => {
   lives.clear()
   env?.close()
   env = null
-  Object.assign(state, { enforced: true, wf: null, lanes: [], busy: new Set(), running: new Set(), status: new Map(), background: new Set(), runs: new Set(), pending: new Set(), hooksMissing: new Set(), deliveries: [], next: [], refuse: new Set(), onRefused: null, calls: [], beforeSpawn: null })
+  Object.assign(state, { enforced: true, wf: null, lanes: [], busy: new Set(), running: new Set(), status: new Map(), background: new Set(), runs: new Set(), pending: new Set(), hooksMissing: new Set(), deliveries: [], next: [], refuse: new Set(), onRefused: null, calls: [], beforeSpawn: null, manualBoard: null })
   // Nothing armed by this test outlives it (HI-2360).
   expect(poolTestHooks.retriesPending()).toBe(0)
 })
@@ -279,6 +294,17 @@ describe("the pool's choice (#1443)", () => {
     expect(submissionReviewers([f(6, 'ReviewerAssigned', 'R1'), f(7, 'ReviewStarted', 'R1'), f(8, 'Verdict', 'R1')], 5, known)).toEqual({ seen: ['R1'], reviewing: null })
     // An earlier submission's, or an agent removed since, doesn't hold the card.
     expect(submissionReviewers([f(3, 'ReviewerAssigned', 'R1', 2), f(6, 'ReviewerAssigned', 'gone')], 5, known)).toEqual({ seen: ['gone'], reviewing: null })
+  })
+
+  it("a submission's reviews in progress (HI-2487): started with no verdict, by an agent still here, oldest first and since its first start", () => {
+    const f = (seq: number, kind: string, reviewer: string, at: string, submission = 5) => ({ seq, kind, at, data: { reviewer, submission } })
+    const here = (id: string) => id !== 'gone'
+    const facts = [f(6, 'ReviewerAssigned', 'R1', 't6'), f(7, 'ReviewStarted', 'R1', 't7'), f(8, 'ReviewStarted', 'R2', 't8'), f(9, 'ReviewStarted', 'R1', 't9'), f(10, 'ReviewStarted', 'gone', 't10'), f(11, 'ReviewStarted', 'user', 't11'), f(12, 'ReviewStarted', 'R3', 't12', 4)]
+    // The user's counts, always present (HR1's round 1: a review the user took is the user's until its verdict).
+    expect(reviewsInProgress(facts, 5, here)).toEqual([{ reviewer: 'R1', since: 't7' }, { reviewer: 'R2', since: 't8' }, { reviewer: 'user', since: 't11' }])
+    // A verdict ends its reviewer's; one only given (not started) isn't in progress.
+    expect(reviewsInProgress([...facts, f(13, 'Verdict', 'R1', 't13'), f(14, 'Verdict', 'user', 't14')], 5, here)).toEqual([{ reviewer: 'R2', since: 't8' }])
+    expect(reviewsInProgress([f(6, 'ReviewerAssigned', 'R1', 't6')], 5, here)).toEqual([])
   })
 })
 
@@ -1038,7 +1064,11 @@ describe("a refused pool line's retry through the pool's events (HI-2343)", { ti
 
   /** A pool card submitted with R1 watching and its line refused until told otherwise, the pool started and given it once. */
   const refusedOnce = async (agents: AgentDef[] = ONE) => {
+    // Own the board poll's clock too (HI-2455): setup opens it, so installing timers afterward leaves that event source
+    // on real time. A loaded test must not gain board events while only its fake retry clock advances.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
+    state.manualBoard = e.home
     state.wf = e.wf
     state.running = new Set(['R1'])
     state.status.set('R1', 'watching')
@@ -1049,7 +1079,6 @@ describe("a refused pool line's retry through the pool's events (HI-2343)", { ti
       status(e, a)
     }
     poolTestHooks.retryMs = RETRY
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     open(e, e.home, agents)
     startReviewerPool()
     // R1's status as the pool first sees it (an agent's events start with its session), before anything is owed.

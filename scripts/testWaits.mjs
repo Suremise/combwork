@@ -3,7 +3,7 @@
 // state no bound of their own (#570): a `vi.waitFor`, `expect.poll` or `until` left to its default (Vitest's 1 s,
 // until's 10 s), or bounded by a number under 5 s, which is a time budget, not a bound for a hung run.
 //   npm run test:waits             the sleeps this branch adds or changes since main (uncommitted and new files too),
-//                                  and every wait in the tests with no bound; exits 1 when there is one
+//                                  and waits added or changed with no bound; exits 1 when there is one
 //   npm run test:waits -- --all    every such sleep in the tests, the backlog #524's audit ranks, and the waits with no
 //                                  bound (lists only, exits 0)
 //   --base <ref>                   compare with another ref than main
@@ -205,7 +205,7 @@ const WAIT_CALL = /(?<![\w.$])(?:lib\.)?until\s*\(|\bvi\.waitFor\s*\(|\bexpect\.
  * The arguments are read as code: a timeout only in a comment or a string isn't one. Only a short bound can have a
  * reason (`commented`: a retry's pace, a quiet period); a wait with no bound never has one, so it is never commented.
  */
-export function findUnbounded(text) {
+export function findUnbounded(text, changed = null) {
   const src = codeOnly(text)
   const lines = text.split(/\r?\n/)
   const out = []
@@ -244,6 +244,10 @@ export function findUnbounded(text) {
     } else if (bound) tooShort = short(bound)
     if (given && !tooShort) continue
     const i = src.slice(0, m.index).split('\n').length - 1
+    // A change anywhere in the call counts, including removing a multiline timeout. A short bound also depends on
+    // its preceding reason comment. With no changed-line set this remains the full audit.
+    const end = src.slice(0, j).split('\n').length
+    if (changed && ![...changed].some((n) => n >= i + (tooShort ? 0 : 1) && n <= end)) continue
     out.push({ line: i + 1, code: lines[i].trim(), commented: given && commented(lines, i) })
   }
   return out
@@ -263,6 +267,11 @@ function changedLines(base) {
     if (file && hunk) {
       const set = changed.get(file) ?? new Set()
       for (let n = +hunk[1]; n < +hunk[1] + +(hunk[2] ?? 1); n++) set.add(n)
+      // A deletion-only hunk touches the gap after this line: keep both sides so removing a bound or reason counts.
+      if (hunk[2] === '0') {
+        set.add(+hunk[1])
+        set.add(+hunk[1] + 1)
+      }
       changed.set(file, set)
     }
   }
@@ -283,16 +292,18 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   const all = args.includes('--all')
   const base = args.includes('--base') ? args[args.indexOf('--base') + 1] : 'main'
   let found = 0
-  // Waits with no bound of their own (#570), in every test file: there is no backlog of them to keep.
   let unbounded = 0
-  for (const f of allFiles(join(ROOT, 'tests'))) {
-    for (const w of findUnbounded(readFileSync(f, 'utf8')).filter((x) => !x.commented)) {
-      unbounded++
-      console.log(`${relative(ROOT, f)}:${w.line}  ${w.code.slice(0, 140)}`)
-    }
+  const reportUnbounded = () => {
+    if (unbounded) console.log(`\n${unbounded} wait(s) with no bound of their own, or one under ${MIN_BOUND_MS / 1000} s with no comment saying why: give each a named bound for a hung run (HUNG_MS, 10–30 s; tests/README.md).\n`)
   }
-  if (unbounded) console.log(`\n${unbounded} wait(s) with no bound of their own, or one under ${MIN_BOUND_MS / 1000} s with no comment saying why: give each a named bound for a hung run (HUNG_MS, 10–30 s; tests/README.md).\n`)
   if (all) {
+    for (const f of allFiles(join(ROOT, 'tests'))) {
+      for (const w of findUnbounded(readFileSync(f, 'utf8')).filter((x) => !x.commented)) {
+        unbounded++
+        console.log(`${relative(ROOT, f)}:${w.line}  ${w.code.slice(0, 140)}`)
+      }
+    }
+    reportUnbounded()
     for (const f of allFiles(join(ROOT, 'tests'))) {
       for (const w of findWaits(readFileSync(f, 'utf8')).filter((x) => !x.commented)) {
         found++
@@ -313,13 +324,19 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   for (const [f, lines] of changed) {
     const p = join(ROOT, f)
     if (SKIP.test(p + '/') || !TEST_FILE.test(f) || !existsSync(p)) continue
-    for (const w of findWaits(readFileSync(p, 'utf8'))) {
+    const text = readFileSync(p, 'utf8')
+    for (const w of findUnbounded(text, lines === 'all' ? null : lines).filter((x) => !x.commented)) {
+      unbounded++
+      console.log(`${f}:${w.line}  ${w.code.slice(0, 140)}`)
+    }
+    for (const w of findWaits(text)) {
       if (w.commented || (lines !== 'all' && !lines.has(w.line))) continue
       found++
       console.log(`${f}:${w.line}  ${w.code.slice(0, 140)}`)
     }
   }
   console.log(found ? `\n${found} new or changed sleep(s) followed by a check: wait for the condition instead, or say in a comment why the sleep is meant (tests/README.md).` : `No new sleep followed by a check since ${base}.`)
-  if (!unbounded) console.log('Every wait states its bound.')
+  reportUnbounded()
+  if (!unbounded) console.log(`Every new or changed wait states its bound since ${base}.`)
   process.exit(found || unbounded ? 1 : 0)
 }

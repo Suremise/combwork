@@ -91,11 +91,11 @@ at start), and `lib.cjs`'s `_electron.launch` also gives every packaged Hive `HI
 The guard: when a suite ends, each packaged Hive's `hive.log` must show no `[updates] Checking for update` since it
 was started, or the suite fails, naming the lines. The Sandbox checks run with their network off.
 
-Nor does a test ever start the installed Hive (`%LOCALAPPDATA%\Programs\Hive`): `lib.cjs` refuses it and any Hive.exe
+Nor does a test ever start the installed app (`%LOCALAPPDATA%\Programs\Combwork`, or 1.0's `Programs\Hive`): `lib.cjs` refuses it and any exe
 outside this checkout, the test folders, the main checkout's `dist\win-unpacked`, `HIVE_E2E_HIVE09` and `HIVE_EXE`. And
 children of the run context get no `%APPDATA%\Combwork\bin` or `Combwork-Dev\bin` (nor 1.0's `Hive\bin`, `Hive-Dev\bin`) on their PATH (an agent session has them):
-those `hive-progress` shims run the installed Hive.exe. A `hive-progress` run seen in a process list is itself
-`Programs\Hive\Hive.exe` (as Node, no window), not the app.
+those `hive-progress` shims run the installed exe. A `hive-progress` run seen in a process list is itself
+`Programs\Combwork\Combwork.exe` (1.0's `Programs\Hive\Hive.exe`; as Node, no window), not the app.
 
 **Several at once.** Suites run four at a time (`--jobs N` for another number; `--jobs 1` runs them one after
 another). Each gets its own profile, folders and Agent API port: the runner sets `HIVE_E2E_PORT` and `HIVE_API_PORT`,

@@ -9,7 +9,7 @@ améliorations sont les bienvenues.*
 **Improving it:** this translation was drafted by an AI model and has not been checked by a native speaker yet, so
 some wording will be stiff or wrong. Corrections are very welcome: edit `locales/fr/<area>.json`, run
 `npm run i18n:check` (it must pass), and open a pull request on
-[Suremise/hive-desktop](https://github.com/Suremise/hive-desktop) saying what you changed and why. A change to a
+[Suremise/combwork](https://github.com/Suremise/combwork) saying what you changed and why. A change to a
 term in the table below changes it everywhere: change this page first, then every message that uses it. Once a
 native speaker has reviewed the whole language, its `ai` flag comes off.
 

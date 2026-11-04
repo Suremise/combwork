@@ -2709,10 +2709,6 @@
     "text": "to sessions started afterwards (running agents show Restart session)",
     "note": "When a change applies: to new sessions (#676). Restart session is the name of the button: keep it as the window shows it."
   },
-  "settings.agent.tool.reverted": {
-    "text": "You reverted {path}{inProject, select, yes { in {project}} other {}}",
-    "note": "The Assistant's activity: the user reverted a setting it changed (#1282). {path} is where the setting is; {project} the project's folder name."
-  },
   "settings.agent.tool.switchRefused": {
     "text": "{error} Tell the user, or leave it as it is.",
     "note": "Switching a project's version control refused (#1419). {error} is why, a sentence."

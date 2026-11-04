@@ -102,7 +102,7 @@ async function endFromOutside(app, spare = []) {
     check('…not listed as held', (await slotA())?.writer?.held === false && !(await agentInfo(b1.id))?.heldSlot)
     const releaseNow = (run) => inv('slots:releaseWriter', alpha, 'slot-a', run, false).then(() => 'released', (e) => String(e?.message ?? e))
     const refused = await releaseNow(w1.run)
-    check('Release is refused while its run is live', /still running in this Hive/.test(refused), refused)
+    check('Release is refused while its run is live', /still running in this Combwork/.test(refused), refused)
     check('…and slot-a keeps its writer', (await slotA())?.writer?.agent === b1.id)
 
     // B1 leaves a process running and is stopped: while Hive follows it, still live; kept running, held by this Hive.
@@ -115,7 +115,7 @@ async function endFromOutside(app, spare = []) {
     await inv('session:stop', alpha, b1.id)
     check('…stopped, its leftover listed', !!(await until(async () => !(await live(b1.id)) && (await inv('session:leftovers')).some((l) => l.agentId === b1.id), HUNG_MS)))
     const followed = await releaseNow(w1.run)
-    check('Release is refused while Hive still follows what it left running', /still running in this Hive/.test(followed), followed)
+    check('Release is refused while Hive still follows what it left running', /still running in this Combwork/.test(followed), followed)
     await inv('session:settleLeftovers', alpha, b1.id, 'keep')
     const wSelf = await until(async () => {
       const w = await inv('slots:heldWriter', alpha, 'slot-a')
@@ -126,7 +126,7 @@ async function endFromOutside(app, spare = []) {
     await lib.menuEntry(h.page, 'Release Slot…').click()
     await dialog().waitFor({ timeout: HUNG_MS })
     const saidSelf = await dialog().innerText()
-    check('its question names the run and this Hive (its process, running)', saidSelf.includes(`(run ${w1.run})`) && saidSelf.includes(`in this Hive (process ${w1.hive.pid}, running)`), saidSelf)
+    check('its question names the run and this Hive (its process, running)', saidSelf.includes(`(run ${w1.run})`) && saidSelf.includes(`in this Combwork (process ${w1.hive.pid}, running)`), saidSelf)
     await themed('self', dialog())
     await dialog().getByRole('button', { name: 'Release', exact: true }).click()
     await dialog().waitFor({ state: 'detached', timeout: HUNG_MS })
@@ -185,7 +185,7 @@ async function endFromOutside(app, spare = []) {
     await row.locator('[data-action="release-held"]').click()
     await dialog().waitFor({ timeout: HUNG_MS })
     const said = await dialog().innerText()
-    check('its question names the run and the Hive that has gone, and lists the process still running', said.includes("Release B1's slot slot-a?") && said.includes(`(run ${w1.run}) in a Hive that is no longer running (process ${w1.hive.pid})`) && said.includes(`(process ${r2.pid})`) && /Hive lists 1 process/.test(said), said)
+    check('its question names the run and the Hive that has gone, and lists the process still running', said.includes("Release B1's slot slot-a?") && said.includes(`(run ${w1.run}) in a Combwork that is no longer running (process ${w1.hive.pid})`) && said.includes(`(process ${r2.pid})`) && /Combwork lists 1 process/.test(said), said)
     await themed('gone', dialog())
     await dialog().getByRole('button', { name: 'Release', exact: true }).click()
     await dialog().waitFor({ state: 'detached', timeout: HUNG_MS })

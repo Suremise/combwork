@@ -3,7 +3,8 @@
 // - after the installer moved the local folder (HI-2460), once: the connections that show signed out, by name.
 //
 // The installer's record of its move is `profile-move.json` in the new local folder, `{ v: 1, from, movedAt, by:
-// "installer" }`, written after its rename succeeded (the contract HI-2460 shares). The app reads it for this check only
+// "installer" }` (the contract HI-2460 shares): the installer puts it in the old local folder just before renaming that
+// folder, so it arrives with the rename (a start in between runs on the fallback, which never reads it). The app reads it for this check only
 // and records it done (`signInChecked`), keeping every field it has; the names already said (`signInNamed`) are kept
 // too, so a check that couldn't finish (a connection whose check failed) is tried again next start without saying a name
 // twice. A record that can't be read, or isn't the installer's, is left exactly as it is. Hive never signs in for the
@@ -24,11 +25,11 @@ const log = createLogger('profile')
 export const MOVE_RECORD = 'profile-move.json'
 
 const M = {
-  fallbackTitle: msg({ id: 'main.profileMove.fallbackTitle', defaultMessage: 'Combwork is using its data folders from before Combwork', description: "A notice at start (HI-2461): the app's data folders are now named Combwork (the app's new name, keep it as it is), which the installer moves them to; they weren't moved yet, so Hive uses its old folders. Nothing is lost." }),
-  fallbackBody: msg({ id: 'main.profileMove.fallbackBody', defaultMessage: "{n, plural, one {The Combwork folder isn't there, so Combwork runs from {folders}, as before.} other {The Combwork folders aren't there, so Combwork runs from {folders}, as before.}} Installing Combwork with Combwork closed moves {n, plural, one {it} other {them}}; nothing is lost meanwhile.", description: 'The notice that Hive uses its old data folders. {folders} lists their paths; {n} is how many (1 or 2). "Installing Combwork": running the installer of the app under its new name.' }),
+  fallbackTitle: msg({ id: 'main.profileMove.fallbackTitle', defaultMessage: "Combwork is using Hive Desktop's data folders", description: "A notice at start (HI-2461): the app's data folders are now named Combwork (the app's new name, keep it as it is), which the installer moves them to; they weren't moved yet, so Hive uses its old folders. Nothing is lost." }),
+  fallbackBody: msg({ id: 'main.profileMove.fallbackBody', defaultMessage: "{n, plural, one {The Combwork folder isn't there, so Combwork runs from {folders}, Hive Desktop's, as before.} other {The Combwork folders aren't there, so Combwork runs from {folders}, Hive Desktop's, as before.}} Running the Combwork installer with Combwork closed moves {n, plural, one {it} other {them}}; nothing is lost meanwhile.", description: 'The notice that Hive uses its old data folders. {folders} lists their paths; {n} is how many (1 or 2). "Installing Combwork": running the installer of the app under its new name.' }),
   fallbackBodyDev: msg({ id: 'main.profileMove.fallbackBodyDev', defaultMessage: "{n, plural, one {The {name} folder isn't there, so this dev build runs from {folders}.} other {The {name} folders aren't there, so this dev build runs from {folders}.}} To move {n, plural, one {it} other {them}}, close Combwork and rename {n, plural, one {it} other {each}} to {name}.", description: "The same notice for a development build of Hive (no installer moves its folders). {name} is the new folder name (Combwork-Dev: keep it as it is); {folders} lists the old folders' paths; {n} is how many (1 or 2)." }),
   signInTitle: msg({ id: 'main.profileMove.signInTitle', defaultMessage: '{n, plural, one {Sign in to # connection again} other {Sign in to # connections again}}', description: "A notice at start (HI-2461), once: after the app's data moved to the Combwork folder (the app's new name), some connections' sign-ins didn't carry across. {n} is how many." }),
-  signInBody: msg({ id: 'main.profileMove.signInBody', defaultMessage: 'Since Combwork moved its data to the Combwork folder, {names} {n, plural, one {shows} other {show}} signed out. Sign in again in Settings → Accounts & Connections.', description: 'The notice naming the connections that show signed out after the data moved. {names} lists them by name; {n} is how many.' })
+  signInBody: msg({ id: 'main.profileMove.signInBody', defaultMessage: 'Since its data moved to the Combwork folder, {names} {n, plural, one {shows} other {show}} signed out. Sign in again in Settings → Accounts & Connections.', description: 'The notice naming the connections that show signed out after the data moved. {names} lists them by name; {n} is how many.' })
 }
 
 /** The installer's record, as read: its own fields and any other, kept as they are. */

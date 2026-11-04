@@ -15,7 +15,7 @@ import { awaitsAgentMerge, baseRulesetId, compile, hasStage, skipReviewOf, type 
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
 import { FOCUSED_PICK, reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
-import { submissionReviewers } from '../../shared/workflow/reviewerPool'
+import { reviewsInProgress, submissionReviewers } from '../../shared/workflow/reviewerPool'
 import { chosenTests, focusedCheckName, reviewProved, type FocusedChoice, type FocusedTest, type PathChange } from '../../shared/workflow/focused'
 import { pathChanges, pickAtRevision, type PickOutcome } from './focusedRun'
 import type { GuardId, MoveId } from '../../shared/workflow/pieces'
@@ -149,6 +149,12 @@ export interface WorkflowConfig {
   slotUnused?: (lease: string) => Promise<void>
   /** Runs an agent started that are still going (G13). */
   runsOf?: (agent: string) => string[]
+  /**
+   * HI-2487: the project's agents that may be reviewing now (in the project, their session running), by id with their
+   * names: a review one of them has in progress refuses another agent's start of it. Left out, none (unit tests without
+   * sessions).
+   */
+  reviewersPresent?: () => Promise<ReadonlyMap<string, string>>
   /**
    * An agent's own worktree (SPEC §16.19.1: before P7's slots, it stands in for a card's slot): its folder, and the line
    * its project.json names as its base. Null for an agent without one.
@@ -1608,14 +1614,45 @@ export class Workflow {
     const sub = args.submission !== undefined ? s.submissions.find((x) => x.id === args.submission) : s.latest
     if (!sub) return this.refuse(card, actor, 'start review', { rule: 'review.noSubmission', values: { card: card.key } }) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     const r = this.rulesetOf(card, s)
+    const present = await this.reviewersPresent(actor)
     const out = await this.write(card, r, actor, (w) => {
-      const bad = this.stillAt(w, s, 'start review') ?? this.check(w, 'startReview', { agent: agentOf(actor) }) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+      const bad = this.stillAt(w, s, 'start review') ?? this.check(w, 'startReview', { agent: agentOf(actor) }) ?? this.reviewTaken(w, sub.id, agentOf(actor), present) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (bad) return bad
       w.fact('ReviewStarted', { reviewer: agentOf(actor) ?? 'user', submission: sub.id, revision: sub.revision })
       return null
     })
     if (out) return this.refuse(card, actor, 'start review', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     return this.ok(card, 'review', 'review', { submission: sub.id, revision: sub.revision, base: sub.base, files: sub.files, ...focusedForReview(sub.focused) })
+  }
+
+  /**
+   * The agents that may be reviewing now (cfg.reviewersPresent), read before a write: for an agent's start of a review
+   * only (null: not checked). `unknown` when they couldn't be read (HR1's round 1): never taken for gone.
+   */
+  private async reviewersPresent(actor: Actor): Promise<ReadonlyMap<string, string> | 'unknown' | null> {
+    if (!agentOf(actor) || !this.cfg.reviewersPresent || !this.enforced()) return null
+    return this.cfg.reviewersPresent().catch(() => 'unknown' as const)
+  }
+
+  /**
+   * HI-2487: another reviewer's review of the submission in progress refuses an agent's start of it (a stale wake once
+   * took HI-2444's from HR2): one that started it, has given no verdict, and is still here (`present`). With G1b = 2, as
+   * many may review at once as there are passes still needed. The user's own review in progress holds it too, and the
+   * user's start takes any over; with the rules off, nothing refuses. Who is present unread (`unknown`), a review that
+   * would hold it refuses as unknown (HR1's round 1: never taken for its reviewer gone).
+   */
+  private reviewTaken(w: Write, submission: number, agent: string | null, present: ReadonlyMap<string, string> | 'unknown' | null): GuardRefusal | null {
+    if (!agent || !present || !this.enforced()) return null
+    const needed = Math.max(1, (w.ruleset?.options.reviewers ?? 1) - passingReviewers(w.state()).length)
+    const holding = (here: (id: string) => boolean) => reviewsInProgress(w.tx.facts(w.card.id), submission, here).filter((x) => x.reviewer !== agent)
+    if (present === 'unknown') return holding(() => true).length < needed ? null : { rule: 'platform.unknown', values: { card: w.card.key, what: workflowText(UNREADABLE.reviewers, { card: w.card.key }), rule: 'review.inProgress' } }
+    const others = holding((id) => present.has(id))
+    if (others.length < needed) return null
+    const first = others[0]
+    const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(first.since)) / 60_000)) || 0
+    // The user's review: said by the message's own words (`who`), translated; an agent's by its name.
+    const user = first.reviewer === 'user'
+    return { rule: 'review.inProgress', values: { card: w.card.key, who: user ? 'user' : 'agent', reviewer: user ? '' : (present.get(first.reviewer) ?? first.reviewer), submission, minutes } }
   }
 
   /** verdict (§16.7.2): always recorded; a pass may finish, ask the user, or go stale at once if the head moved to another change. */
@@ -1640,6 +1677,7 @@ export class Workflow {
     // others' merges had superseded) is proposed no code. Read before the write; unknown is no proposal.
     const merged = args.pass && card.kind === 'code' && sub?.revision && sub.base && s.started?.target && !this.store.facts(card.id).some((f) => f.kind === 'KindProposed' || f.kind === 'KindDecided') ? await this.platform(r.options).contains(s.started.target, { base: sub.base, revision: sub.revision, key: sub.key }) : null
     const nothingToMerge = !!merged && !isUnknown(merged)
+    const present = args.startReview ? await this.reviewersPresent(actor) : null
     await this.cfg.hooks?.beforeWrite?.('verdict')
     if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.verdict(ref, actor, args))
     const out = await this.writeWhole(card, r, actor, (w) => {
@@ -1648,7 +1686,7 @@ export class Workflow {
       // `startReview`: its review started in the same write, under start review's guards (an agent's old verdict, #1268:
       // one write, so a refusal or an error later in it leaves nothing of either).
       if (args.startReview && sub) {
-        const notYet = this.check(w, 'startReview', { agent })
+        const notYet = this.check(w, 'startReview', { agent }) ?? this.reviewTaken(w, sub.id, agent, present)
         if (notYet) return notYet
         w.fact('ReviewStarted', { reviewer: agent ?? 'user', submission: sub.id, revision: sub.revision })
       }

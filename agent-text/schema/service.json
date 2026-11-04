@@ -674,26 +674,6 @@
       "cli": "plain"
     }
   },
-  "service.settingsRevert.busy": {
-    "placeholders": {}
-  },
-  "service.settingsRevert.changed": {
-    "placeholders": {
-      "path": "plain",
-      "value": "plain"
-    }
-  },
-  "service.settingsRevert.done": {
-    "placeholders": {}
-  },
-  "service.settingsRevert.gone": {
-    "placeholders": {}
-  },
-  "service.settingsRevert.models": {
-    "placeholders": {
-      "path": "plain"
-    }
-  },
   "service.slots.notPrepared": {
     "placeholders": {
       "slot": "plain",

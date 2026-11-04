@@ -42,7 +42,7 @@ const HUNG_MS = 10000
 ;(async () => {
   lib.enableProviders(userData)
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData })
-  const app = await _electron.launch({ executablePath: path.join(lib.ROOT, 'dist/win-unpacked/Hive.exe'), args: [], env })
+  const app = await _electron.launch({ executablePath: lib.PACKAGED_EXE, args: [], env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => results.push(`PAGEERROR ${e.message}`))
   await lib.appReady(page)

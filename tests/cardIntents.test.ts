@@ -159,6 +159,60 @@ describe('a card by intent (#1267)', () => {
     expect(k.filter((x) => x === 'Submitted')).toHaveLength(2)
   })
 
+  it("another agent's start of a review in progress is refused, naming who and since when; free once it stops, and the user takes it over (HI-2487)", async () => {
+    const running = new Set(['a2', 'a3'])
+    service.setAgentRunning((_p, a) => running.has(a))
+    try {
+      const { w, wt } = await workspace()
+      const card = await create(w)
+      await act(w, card, builder, { kind: 'start' })
+      commit(wt, 'r.txt')
+      await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+      await act(w, card, reviewer, { kind: 'startReview' })
+      // a3, on a stale wake: refused, naming a2 and how long it has reviewed, and nothing written.
+      const before = kinds(w, card).length
+      const err = (await act(w, card, other, { kind: 'startReview' }).then(
+        () => ({}),
+        (e: unknown) => e
+      )) as { refusal?: { rule: string; message: string; next: string; change?: string } }
+      expect(err.refusal).toMatchObject({ rule: 'review.inProgress', message: "Reviewer is reviewing p-1's submission 3, and has been for less than a minute.", next: "Leave it to Reviewer: don't review p-1 or give it a verdict." })
+      expect(err.refusal?.change).toMatch(/Only the user takes a review over/)
+      expect(kinds(w, card).slice(before)).toEqual(['Refused'])
+      // Nor by a verdict that would start it in the same write (the board's patch, #1268).
+      expect(await refused(inWorkspace(w, () => tasks.updateTask(card, { review: 'passed' }, other)))).toBe('review.inProgress')
+      // Its own start again goes through (a follow-up's renewed review).
+      expect(await refused(act(w, card, reviewer, { kind: 'startReview' }))).toBeNull()
+      // a2's session stopped: the review is free again.
+      running.delete('a2')
+      expect(await refused(act(w, card, other, { kind: 'startReview' }))).toBeNull()
+      // The user's start always takes it over, a3's review running; then it is the user's, a3's start again refused (HR1's round 1).
+      expect(await refused(act(w, card, user, { kind: 'startReview' }))).toBeNull()
+      expect(await refused(act(w, card, other, { kind: 'startReview' }))).toBe('review.inProgress')
+      // With the rules off, nothing refuses it.
+      running.add('a2')
+      await advanced.set(ENFORCE, false)
+      expect(await refused(act(w, card, reviewer, { kind: 'startReview' }))).toBeNull()
+    } finally {
+      service.setAgentRunning(null)
+    }
+  })
+
+  it("a review in progress whose reviewer left the project, or gave its verdict, doesn't hold another's start (HI-2487)", async () => {
+    service.setAgentRunning(() => true)
+    try {
+      const { w, wt } = await workspace()
+      const card = await create(w)
+      await act(w, card, builder, { kind: 'start' })
+      commit(wt, 'g.txt')
+      await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+      await act(w, card, reviewer, { kind: 'startReview' })
+      await w.mutateProjectConfig(join(w.path!, 'p'), (cfg) => ({ agents: (cfg.agents ?? []).filter((a: { id: string }) => a.id !== 'a2') }))
+      expect(await refused(act(w, card, other, { kind: 'startReview' }))).toBeNull()
+    } finally {
+      service.setAgentRunning(null)
+    }
+  })
+
   it("an agent's plain number is refused, naming the key and #N forms (S48); #N and the key aren't", async () => {
     const { w } = await workspace()
     const card = await create(w)
@@ -326,6 +380,48 @@ describe('a card by intent (#1267)', () => {
       await vi.waitFor(() => expect(wakes('a1')).toHaveLength(1), { timeout: 10_000 })
       // The verdict's wake (its wording under load is HI-2016's: told as the comment, or as the failure).
       expect(wakes('a1')[0]).toMatch(/Round 1: FAILED|failed it/)
+    } finally {
+      made.mockRestore()
+      Object.assign(sessions, { liveFor })
+      watches.testHooks.settleMs = settle
+      for (const a of ['a1', 'a2']) await watches.cancelWatch(w, repo, a)
+    }
+  })
+
+  // HI-2487: HR1's watch on HI-2444 from its design check, set again after HR2 had started its review, woke it with "in
+  // Review" and it started a review of its own. A reviewer's watch on a card another reviews now leaves it, saying who.
+  it("a reviewer's watch on a card another agent reviews ends on that card, saying who reviews it; a watch for Done keeps it (HI-2487)", async () => {
+    const { w, repo, wt } = await workspace()
+    const card = await create(w)
+    const later = await create(w, 'Later')
+    const { readCondition } = await import('../src/shared/watch')
+    const { sessions } = await import('../src/main/sessions')
+    const deliveries = await import('../src/main/deliveries')
+    const liveFor = sessions.liveFor
+    Object.assign(sessions, { liveFor: (p: string, id: string) => (id === 'a2' ? ({ projectPath: repo, agentId: id, status: 'watching', runId: `r-${id}` } as never) : liveFor.call(sessions, p, id)) })
+    const made = vi.spyOn(deliveries, 'createDelivery')
+    const wakes = (): string[] => made.mock.calls.filter((c) => c[1].agentId === 'a2' && c[1].source === 'watch').map((c) => c[1].body)
+    const settle = watches.testHooks.settleMs
+    watches.testHooks.settleMs = 0
+    try {
+      await act(w, card, builder, { kind: 'start' })
+      commit(wt, 'x.txt')
+      await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+      await act(w, card, other, { kind: 'startReview' })
+      // a2 (a reviewer by its name) watches it with another card, for comments: the card leaves its watch, the other stays.
+      await inWorkspace(w, () => watches.registerWatch(w, repo, 'a2', readCondition({ cards: [card, later], changes: ['comment', 'column'] }) as never))
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(watches.watchFor(repo, 'a2')?.cards).toEqual([later]), { timeout: 10_000 })
+      const board = await inWorkspace(w, () => tasks.getTask(card, w))
+      expect(board.history.at(-1)?.what).toBe("Ended Reviewer (p)'s watch on it: Other reviews it")
+      await watches.cancelWatch(w, repo, 'a2')
+      // A watch for its Done keeps it.
+      await inWorkspace(w, () => watches.registerWatch(w, repo, 'a2', readCondition({ cards: [card], column: 'done' }) as never))
+      await watches.evaluateWatches(w)
+      await watches.settled()
+      expect(watches.watchFor(repo, 'a2')?.cards).toEqual([card])
+      // Never woken with the card "in Review" as if it were its own to review.
+      expect(wakes().some((b) => /is in Review/.test(b) && !/reviewed by/.test(b))).toBe(false)
     } finally {
       made.mockRestore()
       Object.assign(sessions, { liveFor })
