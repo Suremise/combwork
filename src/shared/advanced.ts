@@ -406,7 +406,20 @@ const FIELD = /^[A-Za-z_][A-Za-z0-9_]*$/
 const NAME = /^[a-z0-9][a-z0-9_-]*$/i
 /** A folder as a paths list takes it (HI-2480): a drive's or a share's full path, or one starting with a %VARIABLE%. */
 const FOLDER = /^(?:[a-z]:[\\/]|\\\\[^\\/]|%[a-z_][a-z0-9_]*%)/i
+/**
+ * A comma before another full path (HI-2538): two folders joined by a comma, not one folder. A comma can be in a
+ * folder's name, but a drive (`C:`), a share (`\\`) or a %VARIABLE% can't start a name inside a path.
+ */
+const COMMA_JOINED = /,\s*(?:[a-z]:[\\/]|\\\\[^\\/]|%[a-z_][a-z0-9_]*%)/i
 const MAX_FOLDER = 1000
+
+/**
+ * A list of folders' text (HI-2538): the parse and format pair that Settings' box, the tools and advanced.json's check
+ * share, so a list round-trips exactly. Folders are semicolons apart, as Windows lists paths. Spaces around each are
+ * trimmed, so `a; b` and `a;b` are the same list, and empty ones are dropped. It's written back with `;` alone.
+ */
+export const folderList = (text: string): string[] => text.split(';').map((s) => s.trim()).filter(Boolean)
+export const foldersText = (folders: readonly string[]): string => folders.join(';')
 
 const FIX = 'tests/fixtures'
 
@@ -3134,8 +3147,9 @@ export function checkAdvanced(def: AdvancedDef, raw: unknown): { value: string |
         // only the default as written ([]): text with no folder is refused, and Settings' empty box resets instead. A
         // workspace's [] counts as Hive's list (extraFolders), as its emptied box does.
         if (Array.isArray(raw) && !raw.length) return { value: [] }
-        const folders = Array.isArray(raw) ? raw.map((x) => (typeof x === 'string' ? x.trim() : x)).filter((x) => x !== '') : typeof raw === 'string' ? raw.split(';').map((s) => s.trim()).filter(Boolean) : null
-        if (!folders || !folders.length || folders.length > (def.max ?? 10) || folders.some((x) => typeof x !== 'string' || x.length > MAX_FOLDER || !FOLDER.test(x))) return refused(def.max === 1 ? withValues(NOT_TAKEN.folder, { title }) : withValues(NOT_TAKEN.folders, { title, most: String(def.max ?? 10) }))
+        // Two folders joined by a comma are refused, not kept as one folder that doesn't exist (HI-2538).
+        const folders = Array.isArray(raw) ? raw.map((x) => (typeof x === 'string' ? x.trim() : x)).filter((x) => x !== '') : typeof raw === 'string' ? folderList(raw) : null
+        if (!folders || !folders.length || folders.length > (def.max ?? 10) || folders.some((x) => typeof x !== 'string' || x.length > MAX_FOLDER || !FOLDER.test(x) || COMMA_JOINED.test(x))) return refused(def.max === 1 ? withValues(NOT_TAKEN.folder, { title }) : withValues(NOT_TAKEN.folders, { title, most: String(def.max ?? 10) }))
         return { value: folders as string[] }
       }
       const list = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(',').map((s) => s.trim()).filter(Boolean) : null
@@ -3291,7 +3305,7 @@ export function advancedRow(def: AdvancedDef, state: Pick<AdvancedState, 'values
 /** A value as the tools show it, in English: "300 s", "on", "activity, project-name". */
 export function advancedText(def: AdvancedDef, v: unknown): string {
   if (v === undefined || v === null) return '—'
-  if (Array.isArray(v)) return v.join(def.paths ? '; ' : ', ')
+  if (Array.isArray(v)) return def.paths ? foldersText(v) : v.join(', ')
   if (typeof v === 'boolean') return v ? 'on' : 'off' // i18n-ignore: the tools' English (advancedShown is Settings')
   if (def.kind === 'number') return `${String(v)}${def.unit ? ` ${def.unit}` : ''}`
   return String(v)

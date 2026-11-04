@@ -21,7 +21,7 @@ const store = await import('../src/main/boardStore')
 const att = await import('../src/main/cardAttachments')
 const { advanced } = await import('../src/main/advanced')
 const { planCleanup, planPurge } = await import('../src/shared/storage')
-const { CARD_ATTACHMENT_FOLDERS_ID, CARD_ATTACHMENT_MAX_ID, advancedDef, advancedText, checkAdvanced } = await import('../src/shared/advanced')
+const { AGENT_TEMP_FOLDER_ID, CARD_ATTACHMENT_FOLDERS_ID, CARD_ATTACHMENT_MAX_ID, advancedDef, advancedText, checkAdvanced, folderList, foldersText } = await import('../src/shared/advanced')
 const { attachmentMarkdown, attachmentRefs, escapeLinkText, withAttachmentPaths, withStoredIds } = await import('../src/shared/cardAttachments')
 
 advanced.load(join(base, 'profile'))
@@ -397,7 +397,7 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
     expect(def).toMatchObject({ kind: 'list', paths: true, default: [], workspace: true })
     expect(checkAdvanced(def, 'C:\\Evidence; D:/runs;\\\\server\\share\\x; %LOCALAPPDATA%\\combwork-cli')).toEqual({ value: ['C:\\Evidence', 'D:/runs', '\\\\server\\share\\x', '%LOCALAPPDATA%\\combwork-cli'] })
     expect(checkAdvanced(def, 'C:\\a, b\\c')).toEqual({ value: ['C:\\a, b\\c'] })
-    // As shown and read back (Settings' box joins a list of folders with "; "): every folder kept apart.
+    // As shown and read back (Settings' box joins a list of folders with ";", HI-2538): every folder kept apart.
     const two = ['C:\\Evidence, runs', 'D:\\Runs']
     expect(checkAdvanced(def, advancedText(def, two))).toEqual({ value: two })
     // Empty only as the default is written (HI-2480 round 2): text with no folder is refused (Settings' empty box resets).
@@ -406,6 +406,31 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
       const r = checkAdvanced(def, bad)
       expect('error' in r && r.error, JSON.stringify(bad)).toBe('Card attachments: more folders takes up to 20 folders, each a full path (C:\\…, \\\\server\\…, or starting with a variable such as %LOCALAPPDATA%), separated by semicolons.')
     }
+  })
+
+  it('a list of folders round-trips exactly: parsed and written with ";", spaces around each trimmed (HI-2538)', () => {
+    const two = ['%LOCALAPPDATA%\\combwork-cli', '%LOCALAPPDATA%\\hive-test\\scratch']
+    for (const typed of ['%LOCALAPPDATA%\\combwork-cli;%LOCALAPPDATA%\\hive-test\\scratch', '%LOCALAPPDATA%\\combwork-cli; %LOCALAPPDATA%\\hive-test\\scratch', ' %LOCALAPPDATA%\\combwork-cli ;  %LOCALAPPDATA%\\hive-test\\scratch ;'])
+      expect(folderList(typed), typed).toEqual(two)
+    expect(foldersText(two)).toBe('%LOCALAPPDATA%\\combwork-cli;%LOCALAPPDATA%\\hive-test\\scratch')
+    expect(folderList(foldersText(two))).toEqual(two)
+    const def = advancedDef(CARD_ATTACHMENT_FOLDERS_ID)!
+    // What the tools and Settings show is what was typed with ";": never a comma, never a space added.
+    expect(advancedText(def, two)).toBe(foldersText(two))
+    expect(checkAdvanced(def, advancedText(def, two))).toEqual({ value: two })
+    expect(checkAdvanced(def, 'C:\\a; D:\\b')).toEqual({ value: ['C:\\a', 'D:\\b'] })
+    expect(checkAdvanced(def, 'C:\\a;D:\\b')).toEqual({ value: ['C:\\a', 'D:\\b'] })
+  })
+
+  it('folders joined by a comma are refused, not kept as one folder (HI-2538); a comma inside a folder stays', () => {
+    const def = advancedDef(CARD_ATTACHMENT_FOLDERS_ID)!
+    const one = advancedDef(AGENT_TEMP_FOLDER_ID)!
+    for (const joined of ['%LOCALAPPDATA%\\combwork-cli,%LOCALAPPDATA%\\hive-test\\scratch', 'C:\\a, D:\\b', 'C:\\a,\\\\server\\share', ['C:\\a,D:/b']]) {
+      const r = checkAdvanced(def, joined)
+      expect('error' in r && r.error, JSON.stringify(joined)).toMatch(/separated by semicolons\.$/)
+      expect('error' in checkAdvanced(one, joined), JSON.stringify(joined)).toBe(true)
+    }
+    expect(checkAdvanced(def, 'C:\\Evidence, runs;D:\\x,y')).toEqual({ value: ['C:\\Evidence, runs', 'D:\\x,y'] })
   })
 
   it("Attach to card from a pane: only that host's session attachments", async () => {
