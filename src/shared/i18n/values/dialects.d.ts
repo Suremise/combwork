@@ -2,8 +2,11 @@
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
   'dialects.brokenBadge': undefined
+  'dialects.cancel': undefined
   'dialects.changedOutside': undefined
+  'dialects.claimMoved': { name: string | number; model: string | number; from: string | number }
   'dialects.claimTaken': { by: string | number; model: string | number }
+  'dialects.claimedBy': { name: string | number }
   'dialects.copyLabel': { name: string | number }
   'dialects.counts': { overrides: number; total: number }
   'dialects.create': undefined
@@ -51,16 +54,29 @@ interface HiveMessageValues {
   'dialects.layerOff': { layer: string | number }
   'dialects.listTarget': undefined
   'dialects.loading': undefined
+  'dialects.modelControl': undefined
+  'dialects.modelEmpty': undefined
+  'dialects.modelOptional': undefined
+  'dialects.nameCli': undefined
+  'dialects.nameEmpty': undefined
+  'dialects.nameEnd': undefined
+  'dialects.nameInFolder': { name: string | number }
+  'dialects.nameLong': { max: number }
   'dialects.nameProblem': undefined
+  'dialects.nameReserved': { name: string | number }
+  'dialects.newMessage': undefined
+  'dialects.newModel': undefined
+  'dialects.newTitle': { cli: string | number }
   'dialects.noDefault': undefined
   'dialects.noMatch': undefined
   'dialects.noPlaceholders': undefined
   'dialects.noWorkspace': undefined
   'dialects.none': undefined
+  'dialects.notSeen': undefined
   'dialects.note': undefined
   'dialects.onFailed': { name: string | number }
   'dialects.onSwitch': { name: string | number }
-  'dialects.onTip': undefined
+  'dialects.onTip': { to: string; name: string | number }
   'dialects.outdatedBadge': { count: number }
   'dialects.outdatedGroup': undefined
   'dialects.override': undefined
@@ -83,6 +99,7 @@ interface HiveMessageValues {
   'dialects.refused.modelClaimed': { by: string | number; model: string | number }
   'dialects.refused.modelHere': undefined
   'dialects.refused.nameTaken': { path: string | number }
+  'dialects.refused.notYours': undefined
   'dialects.refused.path': undefined
   'dialects.refused.protected': undefined
   'dialects.refused.title': undefined
@@ -94,6 +111,7 @@ interface HiveMessageValues {
   'dialects.revertTitle': { name: string | number }
   'dialects.save': undefined
   'dialects.saved': { name: string | number }
+  'dialects.savedAs': { model: string | number }
   'dialects.saving': undefined
   'dialects.search': undefined
   'dialects.select': undefined
@@ -111,6 +129,7 @@ interface HiveMessageValues {
   'dialects.text': undefined
   'dialects.tip': undefined
   'dialects.title': undefined
+  'dialects.unresolvedAlias': { model: string | number }
   'dialects.updateBadge': undefined
   'dialects.usedBy': { count: number; agents: string | number }
   'dialects.why': undefined

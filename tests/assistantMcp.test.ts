@@ -120,7 +120,7 @@ describe("the Assistant's MCP servers move from the old Advanced switch (HI-1472
       await disposeWorkspaceService(w)
     }
     // Another setting changed meanwhile: the old one is kept as it was, and not listed as unknown.
-    await advanced.set('hive.mcp.replySeconds', 30)
+    await advanced.set('cw.mcp.replySeconds', 30)
     expect(json(join(profile, 'advanced.json')).values['hive.assistant.otherMcpServers']).toBe(true)
     expect(advanced.state(null).unknown).not.toContain('hive.assistant.otherMcpServers')
     expect(advanced.legacy('hive.assistant.otherMcpServers')).toBe(true)

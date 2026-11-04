@@ -12,11 +12,12 @@ import { permissionLabel, providerDescriptor } from './providers'
  * (its main repository root) its CLI doesn't trust yet, where Set Up opens; `unknown`, some couldn't be told.
  */
 export interface ConnectionTrust {
-  pending: { project: string; folder: string }[]
+  /** The folders still to trust; `git`: a Git root, which a trusted folder above it never covers (HI-2520). */
+  pending: { project: string; folder: string; git: boolean }[]
   unknown: boolean
   /**
-   * Where Set Up asks the trust question next (HI-1871): the workspace's folder (`workspace`), which covers every
-   * project in it for a CLI whose trust is inherited, else the first pending project's main root.
+   * Where Set Up asks the trust question next (HI-1871): the workspace's folder (`workspace`), which covers the
+   * projects without Git in it for a CLI whose trust is inherited, else the first pending project's main root.
    */
   setUpIn?: { folder: string; project?: string; workspace?: true }
   /** Its answer for the workspace's current projects isn't in yet (HI-1870 round 3): shown as Checking…, never set up. */
@@ -69,13 +70,28 @@ export interface ConnectionUser {
 export type ConnectionRow = Connection & { users: ConnectionUser[]; effortUnusable?: true }
 
 /** A connection's values as a patch sets them (HI-2107): each null or '' leaves it to the CLI. */
-export type ConnectionPatch = { name?: string } & { [K in keyof LaunchValues]?: LaunchValues[K] | null }
+export type ConnectionPatch = { name?: string; tag?: string | null } & { [K in keyof LaunchValues]?: LaunchValues[K] | null }
+
+/** The longest a connection's tag may be (HI-2530): a short label, like its name. */
+export const TAG_MAX = 40
+
+/** A tag as saved (HI-2530): trimmed, inner runs of spaces as one; empty is none. */
+export function cleanTag(tag: string | null | undefined): string | undefined {
+  const t = (tag ?? '').trim().replace(/\s+/g, ' ')
+  return t || undefined
+}
+
+/** Two tags the same for a usage move's matching (HI-2530): both set, equal ignoring case and spacing. */
+export const sameTag = (a: string | null | undefined, b: string | null | undefined): boolean => {
+  const x = cleanTag(a)
+  return !!x && x.toLowerCase() === cleanTag(b)?.toLowerCase()
+}
 
 /** A patch as a caller sent it (IPC, the Agent API), with only its known fields of the right types kept. */
 export function connectionInput(raw: unknown): ConnectionPatch {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const out: Record<string, unknown> = {}
-  for (const k of ['name', 'model', 'effort', 'permissionMode', 'extraArgs'] as const) if (typeof r[k] === 'string' || r[k] === null) out[k] = r[k]
+  for (const k of ['name', 'model', 'effort', 'permissionMode', 'extraArgs', 'tag'] as const) if (typeof r[k] === 'string' || r[k] === null) out[k] = r[k]
   if (typeof r.use200kContext === 'boolean' || r.use200kContext === null) out.use200kContext = r.use200kContext
   return out as ConnectionPatch
 }

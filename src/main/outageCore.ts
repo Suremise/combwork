@@ -214,7 +214,7 @@ export function reachable(url: string, timeoutMs = REACH_TIMEOUT_MS): Promise<bo
   const one = (family: 4 | 6): Promise<boolean> =>
     new Promise((resolve) => {
       const send = target.protocol === 'https:' ? httpsRequest : httpRequest
-      const req = send(target, { method: 'HEAD', family, timeout: timeoutMs, headers: { 'User-Agent': 'Hive' } }, (res) => { // i18n-ignore: an HTTP header the API host reads
+      const req = send(target, { method: 'HEAD', family, timeout: timeoutMs, headers: { 'User-Agent': 'Combwork' } }, (res) => { // i18n-ignore: an HTTP header the API host reads
         res.resume()
         resolve(true)
         req.destroy()

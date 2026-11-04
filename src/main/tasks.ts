@@ -2541,7 +2541,7 @@ async function updateTasksUnbatched(numbers: number[], patch: BatchPatch, actor:
  */
 async function reviewChange(card: TaskCard, patch: TaskPatch, actor: TaskActor, said: StoredText[]): Promise<boolean> {
   const me = selfIn(actor, card.project)
-  if (!me) throw new TaskPermissionError(msg({ id: 'tasks.error.reviewAgentsOnly', defaultMessage: "Only an agent of the card's project reviews it, through its own hive tools.", description: "An error: the user, the Assistant or a script tried to start or end a card's review; only an agent of the card's project does that, with its hive tools (a name: keep it)." }))
+  if (!me) throw new TaskPermissionError(msg({ id: 'tasks.error.reviewAgentsOnly', defaultMessage: "Only an agent of the card's project reviews it, through its own Combwork tools.", description: "An error: the user, the Assistant or a script tried to start or end a card's review; only an agent of the card's project does that, with its Combwork tools (the app's name)." }))
   const since = (r: NonNullable<TaskCard['review']>): string => r.since.slice(0, 16).replace('T', ' ')
   const n = card.number
   if (patch.review === 'start') {

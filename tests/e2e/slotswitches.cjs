@@ -70,8 +70,8 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     // Pair with Hive merges into integration (checked out nowhere), cards in slots, G15 off.
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] }, slotsUpToDate: false } })
     check('G15 (Slots are brought up to date before each card) is off', (await inv('workflow:form', alpha))?.options?.slotsUpToDate === false, JSON.stringify((await inv('workflow:form', alpha))?.options))
-    await inv('advanced:set', 'hive.slots.deleteMergedLines', false)
-    await inv('advanced:set', 'hive.slots.renameAdopted', false)
+    await inv('advanced:set', 'cw.slots.deleteMergedLines', false)
+    await inv('advanced:set', 'cw.slots.renameAdopted', false)
     await inv('project:updateConfig', alpha, { slots: { setup: `node "${setup}"` } })
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1', workflowRole: 'builder' })
     const r1 = await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'reviewer' })
@@ -137,8 +137,8 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     check('Rename adopted worktrees off: hb2, free, keeps its name and folder', (await slots()).some((s) => s.name === 'hb2' && same(s.folder, hb2)) && fs.existsSync(hb2), JSON.stringify(await slots()))
 
     // --- Both on: the next pass (a board change) deletes the line and renames hb2.
-    await inv('advanced:set', 'hive.slots.deleteMergedLines', true)
-    await inv('advanced:set', 'hive.slots.renameAdopted', true)
+    await inv('advanced:set', 'cw.slots.deleteMergedLines', true)
+    await inv('advanced:set', 'cw.slots.renameAdopted', true)
     await create('Switch three')
     check("turned on, card 1's merged line is deleted, and noted on card 1", !!(await until(async () => !hasLine(line(c1, 'switch-one')) && (await kinds(c1)).includes('LineDeleted'), HUNG_MS)), JSON.stringify(await kinds(c1)))
     check("…card 2's line, checked out in slot-a, is kept", hasLine(line(c2, 'switch-two')))

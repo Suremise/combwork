@@ -21,7 +21,7 @@ export { findSecretWarnings }
 /** MCP servers' refusals and what a server runs, in the window's language (#849); the Agent API's list reads `error` in English. */
 const M = {
   invalidName: msg({ id: 'mcp.error.invalidName', defaultMessage: 'Invalid server name', description: 'An error: an MCP server name Hive refuses.' }),
-  badName: msg({ id: 'content.mcp.badName', defaultMessage: 'Server names may contain letters, numbers, "-" and "_" (max 64 characters). "hive" is reserved.', description: 'An error adding an MCP server: its name has a character a server name can\'t have, is too long, or is hive (Hive\'s own server: keep it).' }),
+  badName: msg({ id: 'content.mcp.badName', defaultMessage: 'Server names may contain letters, numbers, "-" and "_" (max 64 characters). "combwork" and "hive" are reserved.', description: 'An error adding an MCP server: its name has a character a server name can\'t have, is too long, or is combwork or hive (Combwork\'s own server and its name before HI-2463: keep them).' }),
   exists: msg({ id: 'content.mcp.exists', defaultMessage: 'A server named "{name}" already exists', description: 'An error making a new MCP server: the workspace has one called {name}.' }),
   notJson: msg({ id: 'content.mcp.notJson', defaultMessage: "{file} isn't valid JSON ({reason}).", description: "An error adding an MCP server from a file: its definition {file} can't be read as JSON. {reason} is the JSON reader's own words (English)." }),
   runs: msg({ id: 'content.mcp.runs', defaultMessage: 'Runs: {command}', description: 'What an MCP server runs, shown before it is turned on: {command} is its command line, as it is.' }),

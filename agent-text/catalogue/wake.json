@@ -268,24 +268,24 @@
     "note": "A lane watch wake's event: a lane's card failed review. card: \"HI-12\"; by: \" (R1 (alpha))\", its reviewer, or nothing."
   },
   "wake.lane.label": {
-    "text": "Waiting on {lanes, select, all {all running lanes} one {lane {lane}} other {{n} lanes}}{also, select, yes { and {list}} other {}}",
-    "note": "A lane watch's label (a watching agent's status, the Agent API). lanes: all (every running lane), one (lane: its id) or some (n: how many); also: yes with the cards and agents beside them (list: \"HI-12, HI-14, B2\")."
+    "text": "Waiting on {lanes, select, all {all running lanes} one {{lane}} other {{n} lanes}}{also, select, yes { and {list}} other {}}",
+    "note": "A lane watch's label (a watching agent's status, the Agent API). lanes: all (every running lane), one (lane: as wake.lane.oneLane names it, HI-2522) or some (n: how many); also: yes with the cards and agents beside them (list: \"HI-12, HI-14, B2\")."
   },
   "wake.lane.lane": {
     "text": "Lane {lane}: {events}",
-    "note": "A lane watch wake: one lane and what happened in it. lane: its label (\"B1 / R1 (greetings)\") or id; events: its events, \"; \" between."
+    "note": "A lane watch wake: one lane and what happened in it. lane: its label (\"B1 / R1 (greetings)\"), or shorter its name (\"greetings\", else \"B1 / R1\"; HI-2522); events: its events, \"; \" between."
   },
   "wake.lane.lanesChanged": {
     "text": "{n, plural, one {{n} lane changed} other {{n} lanes changed}}: {lanes}",
-    "note": "A lane watch wake too long to tell in full: how many lanes changed, then each lane's id with its events by name (\"l-1 (HI-12 failed, merge-due)\")."
+    "note": "A lane watch wake too long to tell in full: how many lanes changed, then each lane's name (HI-2522: else \"B1 / R1\") with its events by name (\"greetings (HI-12 failed, merge-due)\")."
   },
   "wake.lane.last": {
     "text": "That was your lane's last card: the lane ends by itself, so end your turn unless you have other work",
     "note": "HI-1990: a builder's Done wake on its lane's last card."
   },
   "wake.lane.limit": {
-    "text": "Nothing to tell on {lanes, select, all {the running lanes} one {lane {lane}} other {{n} lanes}}{also, select, yes { or {list}} other {}} in {hours, select, yes {{time} h} other {{time} min}}: your lane watch has ended. Check them (cw_lane list{agents, select, yes {, cw_agent_activity} other {}}), then watch again, or tell the user (cw_notify) if one seems stuck.",
-    "note": "Typed when a lane watch's limit passes with nothing to tell. lanes: all, one (lane: its id) or some (n: how many); also: yes with the cards and agents beside them (list); hours: yes when time is in hours (\"1.5\"), else minutes; agents: yes when it follows agents (HI-1987)."
+    "text": "Nothing to tell on {lanes, select, all {the running lanes} one {{lane}} other {{n} lanes}}{also, select, yes { or {list}} other {}} in {hours, select, yes {{time} h} other {{time} min}}: your lane watch has ended. Check them (cw_lane list{agents, select, yes {, cw_agent_activity} other {}}), then watch again, or tell the user (cw_notify) if one seems stuck.",
+    "note": "Typed when a lane watch's limit passes with nothing to tell. lanes: all, one (lane: as wake.lane.oneLane names it, HI-2522) or some (n: how many); also: yes with the cards and agents beside them (list); hours: yes when time is in hours (\"1.5\"), else minutes; agents: yes when it follows agents (HI-1987)."
   },
   "wake.lane.mergeDue": {
     "text": "all its cards passed: its merge is due",
@@ -322,6 +322,10 @@
   "wake.lane.nextWaits": {
     "text": "Your lane's next card is {card} (\"{title}\"): cw_lane next says when it can start",
     "note": "HI-1990: a builder's Done wake when its next card can't start yet."
+  },
+  "wake.lane.oneLane": {
+    "text": "{kind, select, named {lane {name}} both {{builder}'s lane {name}} builder {{builder}'s lane} other {a lane}}",
+    "note": "HI-2522: one lane as a lane watch's label and limit line name it, never by its lane-… id. kind: named (name: its name), both (another lane has that name: builder, its builder's name, too), builder (it has no name: its builder's lane), or none (a lane not known: a watch from before HI-2522 on a lane no longer listed)."
   },
   "wake.lane.passed": {
     "text": "{card} passed review{by}",

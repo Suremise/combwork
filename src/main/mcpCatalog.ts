@@ -40,9 +40,9 @@ export const CATALOG_PAGE = 50
 const PREPARED_MAX = 4
 const PREPARED_MS = 10 * 60 * 1000
 
-export const FETCH_SECONDS = 'hive.mcpCatalog.fetchSeconds'
-export const DOWNLOAD_SECONDS = 'hive.mcpCatalog.downloadSeconds'
-export const PROBE_SECONDS = 'hive.mcpCatalog.probeSeconds'
+export const FETCH_SECONDS = 'cw.mcpCatalog.fetchSeconds'
+export const DOWNLOAD_SECONDS = 'cw.mcpCatalog.downloadSeconds'
+export const PROBE_SECONDS = 'cw.mcpCatalog.probeSeconds'
 const seconds = (id: string, fallback: number): number => {
   const v = advanced.get(id)
   return typeof v === 'number' && v > 0 ? v : fallback
@@ -412,7 +412,7 @@ export function dropPrepared(id: string): void {
  */
 export async function installCatalogServer(id: string, name: string, replace: boolean): Promise<void> {
   const h = heldFor(id)
-  if (!validMcpName(name)) throw hiveError(msg({ id: 'mcp.catalog.badName', defaultMessage: 'Server names may contain letters, numbers, "-" and "_" (max 64 characters). "hive" is reserved.', description: 'An error installing a catalogue server (HI-545) under a name a server can\'t have.' }), undefined, { kind: 'invalid' })
+  if (!validMcpName(name)) throw hiveError(msg({ id: 'mcp.catalog.badName', defaultMessage: 'Server names may contain letters, numbers, "-" and "_" (max 64 characters). "combwork" and "hive" are reserved.', description: 'An error installing a catalogue server (HI-545) under a name a server can\'t have.' }), undefined, { kind: 'invalid' })
   const p = h.prepared
   const def = name === p.server.name ? p.def : { ...retarget(p.def, p.server.name, name) }
   await inTurn(() =>

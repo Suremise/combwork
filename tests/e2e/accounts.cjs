@@ -144,7 +144,9 @@ const check = (name, ok, extra = '') => {
       return a?.accepted?.email === 'one@example.com' && a.observed?.loggedIn === true ? a : null
     }, HUNG_MS)
     check('once the sign-in ends, it is signed in as that login, taken on as its own', !!signed, JSON.stringify((await list()).connections))
-    check('…and its row says so', !!(await lib.until(async () => /Signed in/.test(await row('Personal').innerText().catch(() => '')) && /one@example\.com · max/.test(await row('Personal').innerText().catch(() => '')), HUNG_MS)))
+    // HI-2528: its card's fields, each in its own place: Signed in as, Plan (as the CLI names it, title-cased), State.
+    const fact = (name, which) => row(name).locator(`[data-fact="${which}"] .account-fact-value`).innerText().catch(() => '')
+    check('…and its row says so: signed in as its email, on its plan', !!(await lib.until(async () => /Signed in/.test(await fact('Personal', 'state')) && (await fact('Personal', 'email')) === 'one@example.com' && (await fact('Personal', 'plan')) === 'Max', HUNG_MS)), JSON.stringify({ email: await fact('Personal', 'email'), plan: await fact('Personal', 'plan'), state: await fact('Personal', 'state') }))
     check('…with its CLI and its icon', (await row('Personal').locator('.account-cli .provider-icon').count()) === 1 && /Claude Code/.test(await row('Personal').locator('.account-cli').innerText()))
     // A browser sign-in leaves the first-run screens unanswered (its .claude.json without the onboarding field): said.
     check('…and that it needs set up, Set Up primary, with what it is for', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="needed"]').count()) === 1, HUNG_MS)) && (await row('Personal').locator('[data-set-up].primary').count()) === 1 && /first-run questions/.test(await row('Personal').locator('[data-set-up-note]').innerText().catch(() => '')))
@@ -227,6 +229,24 @@ const check = (name, ok, extra = '') => {
     fs.mkdirSync(path.join(ws1, 'delta'), { recursive: true })
     await inv('workspace:refresh')
     check('a project with no agent on this CLI isn’t counted', (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1 && JSON.stringify(await trustOf(inv, personal.id)) === JSON.stringify({ pending: [], unknown: false }))
+    // A Git repository in the trusted workspace folder (HI-2520): Claude Code asks for it anyway (a folder above a
+    // repository doesn't cover it), so it needs Set Up, at its own folder, not the workspace's again. Then removed.
+    const epsilon = path.join(ws1, 'epsilon')
+    lib.gitProject(epsilon)
+    projectWithAgent(epsilon)
+    await inv('workspace:refresh')
+    check('a Git project in the trusted workspace folder: its agent put on it', await onPersonal(inv, epsilon))
+    const epsilonReal = fs.realpathSync.native(epsilon)
+    const gitTrust = await lib.until(async () => {
+      const t = await trustOf(inv, personal.id)
+      return t && !t.checking && t.pending.length ? t : null
+    }, HUNG_MS)
+    check('…it needs set up, naming it: the workspace folder’s trust doesn’t cover a repository', !!gitTrust && JSON.stringify(gitTrust.pending) === JSON.stringify([{ project: 'epsilon', folder: epsilonReal, git: true }]) && !!(await lib.until(async () => /epsilon/.test(await row('Personal').locator('[data-not-trusted]').innerText().catch(() => '')), HUNG_MS)), JSON.stringify(gitTrust))
+    check('…its Set Up would open in the repository’s own folder, not the workspace’s', !!gitTrust && gitTrust.setUpIn?.folder === epsilonReal && !gitTrust.setUpIn.workspace, JSON.stringify(gitTrust?.setUpIn))
+    await shots('git-not-covered')
+    fs.rmSync(epsilon, { recursive: true, force: true })
+    await inv('workspace:refresh')
+    check('…removed, it is set up again', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
 
     // --- Rename: the name only.
     await menuOf('Personal', 'Rename…')

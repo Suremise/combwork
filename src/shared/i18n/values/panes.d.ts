@@ -257,6 +257,7 @@ interface HiveMessageValues {
   'panes.watch.cards': { cards: string | number }
   'panes.watch.cardsInto': { cards: string | number; column: string | number }
   'panes.watch.lanes': { lanes: string; lane: string | number; n: number; cards: string }
+  'panes.watch.oneLane': { kind: string; name: string | number; builder: string | number }
   'panes.watchCancel.failed': undefined
   'panes.watchCell.agents': { agents: string | number }
   'panes.watchCell.cardsInto': { cards: string | number; column: string | number }

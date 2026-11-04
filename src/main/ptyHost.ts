@@ -155,7 +155,7 @@ export function childEnv(extra: Record<string, string> = {}): Record<string, str
 }
 
 /**
- * A session terminal's environment with its type named as Hive's terminal is (HI-2004, `hive.sessions.terminalType`):
+ * A session terminal's environment with its type named as Hive's terminal is (HI-2004, `cw.sessions.terminalType`):
  * TERM=xterm-256color unless the environment names one already (the user's own, or the session's), and no
  * WT_SESSION inherited from a Windows Terminal Hive was opened from. So the CLIs draw the same however Hive was opened.
  * Off, the environment as given.

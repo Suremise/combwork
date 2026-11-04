@@ -1,6 +1,8 @@
 // Generated from locales/en/settings.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
+  'settings.accounts.accountSettings': undefined
+  'settings.accounts.accountSettingsTitle': { name: string | number }
   'settings.accounts.addAccount': undefined
   'settings.accounts.addConnection': undefined
   'settings.accounts.affected': { n: number }
@@ -11,17 +13,35 @@ interface HiveMessageValues {
   'settings.accounts.closeRunningMessage': { cli: string | number }
   'settings.accounts.closeRunningTitle': undefined
   'settings.accounts.closeTerminal': undefined
+  'settings.accounts.col.args': undefined
+  'settings.accounts.col.connection': undefined
+  'settings.accounts.col.context': undefined
+  'settings.accounts.col.effort': undefined
+  'settings.accounts.col.mode': undefined
+  'settings.accounts.col.model': undefined
+  'settings.accounts.col.tag': undefined
+  'settings.accounts.col.usedBy': undefined
   'settings.accounts.connection.base': undefined
   'settings.accounts.connection.baseTip': undefined
   'settings.accounts.connection.duplicate': undefined
   'settings.accounts.connection.edit': undefined
+  'settings.accounts.connection.editNamed': { name: string | number }
   'settings.accounts.connection.failed': undefined
+  'settings.accounts.connection.moveDown': { name: string | number }
+  'settings.accounts.connection.moveUp': { name: string | number }
   'settings.accounts.connection.remove': undefined
   'settings.accounts.connection.removeMessage': undefined
+  'settings.accounts.connection.removeNamed': { name: string | number }
   'settings.accounts.connection.removeTitle': { name: string | number }
-  'settings.accounts.copilotAs': { account: string | number }
+  'settings.accounts.connection.tagTip': undefined
   'settings.accounts.copilotNotSignedIn': undefined
   'settings.accounts.defaults.failed': undefined
+  'settings.accounts.expired': { date: string | number }
+  'settings.accounts.expires': { date: string | number }
+  'settings.accounts.fact.plan': undefined
+  'settings.accounts.fact.signIn': undefined
+  'settings.accounts.fact.signedInAs': undefined
+  'settings.accounts.fact.state': undefined
   'settings.accounts.keep': undefined
   'settings.accounts.keepFailed': undefined
   'settings.accounts.keepRename': { name: string | number }
@@ -46,9 +66,9 @@ interface HiveMessageValues {
   'settings.accounts.notice.line': { project: string | number; agent: string | number; setting: string | number }
   'settings.accounts.notice.model': { value: string | number }
   'settings.accounts.notice.title': undefined
+  'settings.accounts.offHere': undefined
   'settings.accounts.onHere': undefined
   'settings.accounts.onHereShort': undefined
-  'settings.accounts.plan': { email: string | number; plan: string | number }
   'settings.accounts.providerSetup': undefined
   'settings.accounts.remove': undefined
   'settings.accounts.removeAccountMessage': undefined
@@ -61,6 +81,8 @@ interface HiveMessageValues {
   'settings.accounts.rename': undefined
   'settings.accounts.renameConfirm': undefined
   'settings.accounts.renameTitle': { name: string | number }
+  'settings.accounts.resetsAt': { time: string | number }
+  'settings.accounts.resetsOn': { when: string | number }
   'settings.accounts.sameLoginAccount': { names: string | number }
   'settings.accounts.setUpChecking': undefined
   'settings.accounts.setUpDone': undefined
@@ -80,7 +102,7 @@ interface HiveMessageValues {
   'settings.accounts.state.unchecked': undefined
   'settings.accounts.switchAffected': undefined
   'settings.accounts.thisPc': undefined
-  'settings.accounts.usage': { window: string; label: string | number; used: number }
+  'settings.accounts.usageLabel': { window: string; label: string | number }
   'settings.accounts.usageMove.any': undefined
   'settings.accounts.usageMove.failed': undefined
   'settings.accounts.usageMove.fiveHour': undefined
@@ -92,6 +114,7 @@ interface HiveMessageValues {
   'settings.accounts.usageMove.targetLabel': undefined
   'settings.accounts.usageMove.turnOn': undefined
   'settings.accounts.usageMove.weekly': undefined
+  'settings.accounts.usageNone': undefined
   'settings.accounts.usedBy': { assistant: string; n: number }
   'settings.advanced.claude-code.accounts.dropEnv.desc': undefined
   'settings.advanced.claude-code.accounts.dropEnv.title': undefined
@@ -99,6 +122,8 @@ interface HiveMessageValues {
   'settings.advanced.claude-code.accounts.emailField.title': undefined
   'settings.advanced.claude-code.accounts.loggedInField.desc': undefined
   'settings.advanced.claude-code.accounts.loggedInField.title': undefined
+  'settings.advanced.claude-code.accounts.loginExpiresField.desc': undefined
+  'settings.advanced.claude-code.accounts.loginExpiresField.title': undefined
   'settings.advanced.claude-code.accounts.loginFiles.desc': undefined
   'settings.advanced.claude-code.accounts.loginFiles.title': undefined
   'settings.advanced.claude-code.accounts.onboardedField.desc': undefined
@@ -757,6 +782,8 @@ interface HiveMessageValues {
   'settings.connection.args': undefined
   'settings.connection.argsHint': { cli: string | number }
   'settings.connection.cancel': undefined
+  'settings.connection.cell.cliOwn': undefined
+  'settings.connection.cell.noArgs': undefined
   'settings.connection.context': undefined
   'settings.connection.context1m': undefined
   'settings.connection.context200k': undefined
@@ -777,6 +804,9 @@ interface HiveMessageValues {
   'settings.connection.summary.effort': undefined
   'settings.connection.summary.mode': undefined
   'settings.connection.summary.model': undefined
+  'settings.connection.tag': undefined
+  'settings.connection.tagHint': undefined
+  'settings.connection.tagPlaceholder': undefined
   'settings.connection.usedBy': { users: string | number }
   'settings.connection.userIn': { agent: string | number; project: string | number }
   'settings.connections.add.addServer': undefined
@@ -1264,6 +1294,7 @@ interface HiveMessageValues {
   'settings.section.workflow.label': undefined
   'settings.section.workspace.desc': undefined
   'settings.section.workspace.label': undefined
+  'settings.sections': undefined
   'settings.sessions.backupRetention.desc': undefined
   'settings.sessions.backupRetention.option.d180': undefined
   'settings.sessions.backupRetention.option.d30': undefined

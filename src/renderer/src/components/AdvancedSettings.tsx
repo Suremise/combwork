@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react'
-import { ADVANCED_DEFS, advancedRow, type AdvancedGroup, advancedShown, advancedTakesText, advancedUnit, checkAdvanced, cliFacing, groupName, shownText, type AdvancedDef, type AdvancedRow } from '@shared/advanced'
+import { ADVANCED_DEFS, advancedRow, type AdvancedGroup, advancedShown, advancedTakesText, advancedUnit, checkAdvanced, cliFacing, folderList, foldersText, groupName, shownText, type AdvancedDef, type AdvancedRow } from '@shared/advanced'
 import { msg, tr, tRich } from '@shared/i18n'
 import { INBOX_SWITCH_ID } from '@shared/inboxSwitches'
 import type { ProviderId } from '@shared/types'
@@ -26,7 +26,7 @@ const T = {
   tabs: msg({ id: 'settings.advancedList.tabs', defaultMessage: 'Combwork and the CLIs', description: "Accessible name of Settings → Advanced's tabs: Hive, then one per CLI (Claude Code, Codex, GitHub Copilot)." }),
   cliOff: msg({ id: 'settings.advancedList.cliOff', defaultMessage: '{cli} is turned off: these settings apply once you turn it on', description: "Tooltip of a dimmed tab of Settings → Advanced, and part of its name for screen readers: the CLI is turned off in Settings → Providers. {cli} is its name." }),
   off: msg({ id: 'settings.advancedList.off', defaultMessage: 'off', description: "A short mark on the tab of a CLI turned off in Settings → Advanced (beside its name, such as Codex). Lower case, one short word." }),
-  noMatchHere: msg({ id: 'settings.advancedList.noMatchHere', defaultMessage: 'No settings of {group} match.', description: "A tab of Settings → Advanced with none of the filtered values: {group} is Hive or the CLI's name." })
+  noMatchHere: msg({ id: 'settings.advancedList.noMatchHere', defaultMessage: 'No settings of {group} match.', description: "A tab of Settings → Advanced with none of the filtered values: {group} is Combwork or the CLI's name." })
 }
 
 /** The tab the list remembers (HI-1839). */
@@ -38,7 +38,7 @@ const TABS_KEY = 'settings.advanced'
  */
 const GROUPS: AdvancedGroup[] = (() => {
   const used = new Set(ADVANCED_DEFS.map((d) => d.group))
-  const ordered: AdvancedGroup[] = ['hive', ...PROVIDERS.map((p) => p.id).filter((id) => used.has(id))]
+  const ordered: AdvancedGroup[] = ['cw', ...PROVIDERS.map((p) => p.id).filter((id) => used.has(id))]
   return [...ordered, ...[...used].filter((g) => !ordered.includes(g))].filter((g) => used.has(g))
 })()
 
@@ -69,7 +69,7 @@ export function AdvancedSettings({ query, modifiedOnly: outerModified }: { query
   useEffect(() => {
     setClicked((c) => (c && c.key !== filterKey ? null : c))
   }, [filterKey])
-  const remembered = useRememberedTab<AdvancedGroup>(TABS_KEY, GROUPS, 'hive')
+  const remembered = useRememberedTab<AdvancedGroup>(TABS_KEY, GROUPS, 'cw')
   const count = (g: AdvancedGroup): number => shown.filter((r) => r.def.group === g).length
   // A value's own id searched for opens its group's tab, whatever is remembered.
   const exact = ADVANCED_DEFS.find((d) => words.length === 1 && d.id.toLowerCase() === words[0])?.group
@@ -172,7 +172,7 @@ function AdvancedItem({ row, cli, workspace, restartDue }: { row: AdvancedRow; c
     if (err) throw new Error(err)
   }
   const title = shownText(def.text.title)
-  const label = tr(msg({ id: 'settings.advancedList.label', defaultMessage: '{group}: {title}', description: "The name, for screen readers, of an advanced value's box: Hive or the CLI it belongs to, then its title." }), { group: groupName(def.group), title })
+  const label = tr(msg({ id: 'settings.advancedList.label', defaultMessage: '{group}: {title}', description: "The name, for screen readers, of an advanced value's box: Combwork or the CLI it belongs to, then its title." }), { group: groupName(def.group), title })
   const about = [
     shownText(advancedTakesText(def)),
     def.applies === 'sessions' ? tr(msg({ id: 'settings.advancedList.appliesToSessions', defaultMessage: 'Applies to sessions started afterwards.', description: "A line of an advanced value's info tip." })) : '',
@@ -271,14 +271,18 @@ function InboxAvailableNote() {
   )
 }
 
-/** A value as its text box shows it: a list of folders semicolons apart, as it is read back (HI-2480: a comma can be in a folder's name). */
-const boxText = (def: AdvancedDef, v: unknown): string => (v === null || v === undefined ? '' : Array.isArray(v) ? v.join(def.paths ? '; ' : ', ') : String(v))
+/** A value as its text box shows it: a list of folders semicolons apart, as it is read back (HI-2480: a comma can be in a folder's name; HI-2538: `;` alone, as typed). */
+const boxText = (def: AdvancedDef, v: unknown): string => (v === null || v === undefined ? '' : Array.isArray(v) ? (def.paths ? foldersText(v) : v.join(', ')) : String(v))
 
 /** The value's box: a switch, a number field, or text saved on Enter or leaving it (empty: back to the default, or Settings'). */
 function ValueBox({ def, value, label, placeholder, onCommit }: { def: AdvancedDef; value: unknown; label: string; placeholder?: string; onCommit: (v: unknown) => Promise<void> }) {
   const shown = (v: unknown): string => boxText(def, v)
   const [draft, setDraft] = useState(shown(value))
-  useEffect(() => setDraft(boxText(def, value)), [def, value])
+  // Follows the value only when its text changes (HI-2537): Settings reloads the advanced state on every change, its own
+  // or the workspace's, and each reload gives a list value as a new array. Keyed on the array, a reload landing while
+  // something was typed reset the box, and Enter then saved nothing (the text was the value's again).
+  const text = shown(value)
+  useEffect(() => setDraft(text), [text])
   // A workspace's own switch or choice (HI-2344): a select whose first option follows Settings' value (null, so no
   // override), shown as that value, then each value; a bare switch couldn't show inheriting or go back to it.
   if (placeholder !== undefined && (def.kind === 'boolean' || def.kind === 'choice')) {
@@ -310,7 +314,11 @@ function ValueBox({ def, value, label, placeholder, onCommit }: { def: AdvancedD
     return <NumberField value={typeof value === 'number' ? value : null} min={def.min} max={def.max} step={1} inherit={placeholder} label={label} unit={advancedUnit(def) ?? undefined} onCommit={(v) => onCommit(v)} />
   const commit = (): void => {
     const v = draft.trim()
-    if (v === shown(value)) return
+    // The same folders typed with other spaces (`a; b` for `a;b`) are no change: shown as kept (HI-2538).
+    if (v === shown(value) || (def.paths && Array.isArray(value) && foldersText(folderList(v)) === shown(value))) {
+      setDraft(shown(value))
+      return
+    }
     void onCommit(v === '' ? null : def.kind === 'list' ? v : draft).catch(() => setDraft(shown(value)))
   }
   return (

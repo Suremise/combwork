@@ -128,6 +128,12 @@ export interface ProviderCapabilities {
    */
   failureEndsTurn?: boolean
   /**
+   * The CLI's model aliases (HI-2523): words it takes in place of a model ID and resolves itself ("opus", Copilot's
+   * "auto"), compared without case or a "[…]" suffix. One its catalogue doesn't resolve leaves a launch's model unknown
+   * for dialects; any other word is a model ID of its own ("gemma"). The catalogue's own aliases count too.
+   */
+  modelAliases?: readonly string[]
+  /**
    * The CLI draws a full-screen interface that a resize while it starts can leave drawn at the wrong width, until the
    * next resize (Copilot, #486): Hive gives it a size refresh, as resizing the window by hand would, once it has
    * started (its first status), again once it is ready, and after Hive switches its mode live.
@@ -180,8 +186,10 @@ export interface ProviderCapabilities {
     orgs: boolean
     setUp: Msg
     /**
-     * HI-1871: the CLI's trust of a folder covers the folders inside it (measured: Claude Code 2.1.311), so Set Up asks
-     * it once, in the workspace's folder, for every project there. Absent: once per project (Codex: its main root).
+     * HI-1871: the CLI's trust of a folder covers the folders inside it that aren't Git repositories (HI-2520, measured:
+     * Claude Code 2.1.316–2.1.318; a repository asks unless its own root is trusted), so Set Up asks it once, in the
+     * workspace's folder, for every such project there, then at each Git root. Absent: once per project (Codex: its
+     * main root).
      */
     trustInherits?: true
     server?: ServerCaps

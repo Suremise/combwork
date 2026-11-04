@@ -80,7 +80,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const homeOf = (a) => (a.provider === 'codex' ? codexHome : claudeHome)
     const notices = (a) => lines(path.join(homeOf(a), 'fake-notices.jsonl')).filter((n) => n.agent === a.name)
     const wakes = (a) => lines(path.join(homeOf(a), 'fake-wakes.jsonl')).filter((w) => w.agent === a.name).map((w) => w.text)
-    const setSwitch = (which, value) => inv('advanced:set', `hive.inbox.${which}`, value)
+    const setSwitch = (which, value) => inv('advanced:set', `cw.inbox.${which}`, value)
     const command = (id) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: id, args: [] })
     const ownNow = async (key) => (await inv('workspace:refresh')).projects.find((x) => x.path.toLowerCase() === alpha.toLowerCase())?.config[key]
     /** The project's own value, chosen in Project Settings → Sessions (inherit, on, off), then back to the Session tab. */
@@ -239,7 +239,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     await page.keyboard.press('Control+,')
     await page.locator('.settings-nav .row', { hasText: 'Advanced' }).click()
     await page.getByRole('textbox', { name: 'Search settings' }).fill('inbox')
-    const rows = page.locator('.advanced-row[data-advanced^="hive.inbox."]')
+    const rows = page.locator('.advanced-row[data-advanced^="cw.inbox."]')
     check('Advanced lists the three switches, with the inbox note linking to the Agent API', !!(await until(async () => (await rows.count()) === 3 && (await page.locator('[data-note="inbox-available"]', { hasText: 'Agents can read their inbox' }).count()) === 1, HUNG_MS)), String(await rows.count()))
     await rows.first().evaluate((e) => e.scrollIntoView({ block: 'start' }))
     await themed('advanced')

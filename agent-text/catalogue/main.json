@@ -179,6 +179,11 @@
     "note": "An error (HI-2107): a connection named by its id is not in Settings → Accounts & Connections (removed meanwhile).",
     "audience": "both"
   },
+  "main.connections.tagTooLong": {
+    "text": "A tag can be at most {max, number} characters.",
+    "note": "An error saving a connection (HI-2530): its tag, a short free-text label the user gives it (\"Builders\"), is too long. {max} is the most it can be.",
+    "audience": "both"
+  },
   "main.finished.inProject": {
     "text": "{n, plural, one {# agent finished in {project}} other {# agents finished in {project}}}",
     "note": "A notification for several agents of one project that finished together. {n} is how many (2 or more); the agents are listed under it.",

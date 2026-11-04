@@ -8,6 +8,7 @@ import type { ActivityKind, ActivityTarget, UndoFinalWhy } from './assistantActi
 import type { AttachmentKind } from './attachments'
 import type { AgentProcess } from './agentProcesses'
 import type { StartFailure } from './startFailure'
+import type { FreshReason } from './sessionFresh'
 import type { TipsState } from './tips'
 import type { SuggestedPreset, TemplateAgent, TemplateScope } from './templates'
 import type { ConnectionOption } from './templateConnections'
@@ -188,7 +189,7 @@ export interface AppSettings {
     /** The Progress panel (long runs agents report, with taskbar progress). Off: reports are accepted and ignored. */
     progressPanel: boolean
     /**
-     * Agents run long commands (about 30 s or more) through hive-progress without being asked, so they show in the
+     * Agents run long commands (about 30 s or more) through cw-progress without being asked, so they show in the
      * panel: Hive's session guidance says so. Off, or with the panel off: only when the user asks. New sessions.
      */
     progressCommands: boolean
@@ -731,6 +732,8 @@ export interface ConnectionObserved {
   orgId?: string
   /** Its plan, as the CLI names it ("max"). */
   plan?: string | null
+  /** When its sign-in expires, as the CLI says (HI-2528: Claude Code's `loginExpiresAt`); absent when it doesn't. */
+  loginExpiresAt?: string
   /** A check that failed (a timeout, output Hive couldn't read), in English for the log; the last good identity is kept. */
   error?: string
   /** Its folder isn't there, or isn't a folder Hive made (replaced from outside). */
@@ -813,6 +816,11 @@ export interface Connection {
   permissionMode?: PermissionMode
   /** Extra command-line arguments, as typed (split at launch: splitArgs). */
   extraArgs?: string
+  /**
+   * A free-text tag of the user's (HI-2530: "Builders", "Assistant"), trimmed, never empty. Combwork reads no meaning
+   * into it: a usage move only compares it (any case) to match an agent to the same-tagged connection on the target.
+   */
+  tag?: string
 }
 
 /** What a connection launches with (HI-2106): two connections on one account with the same values are the same setup. */
@@ -1949,6 +1957,8 @@ export interface ResumeTarget {
   titleAtRename?: string | null
   /** Why it can't resume now in the slot it ran in (#1434): Resume All and startup leave an agent with one. */
   hold?: ResumeHold
+  /** Why a resume of it starts a new conversation instead (HI-2540: shared/sessionFresh); absent: it resumes. */
+  fresh?: FreshReason
   /** The retired home it resumes in (#1441), by its folder's name, while a new conversation starts elsewhere (#1552). */
   home?: string
 }
@@ -2295,6 +2305,16 @@ export interface RuntimeFacts {
   composer: 'held' | 'free'
 }
 
+/**
+ * A lane as a watch's label names it (HI-2522: "Waiting on lane lane-1d1c05" read as a commit id): by its name, else as
+ * its builder's lane; `twin`, another lane in the watcher's view has the same name, so its builder is named too.
+ */
+export interface LaneTitle {
+  name: string | null
+  builder: string
+  twin?: true
+}
+
 /** An agent's wake-on-change watch, as its state shows it: the cards and condition, since when, and its overall limit. */
 export interface TaskWatchInfo {
   cards: number[]
@@ -2304,6 +2324,11 @@ export interface TaskWatchInfo {
   agents?: string[]
   /** A lane watch's lanes, by id, or ["all"] (#531; its cards are those beside the lanes, #726). */
   lanes?: string[]
+  /**
+   * HI-2522: how its labels name each lane of `lanes` (by id), as the lanes were when the watch began; a lane missing
+   * (a watch from before) is named by its id.
+   */
+  laneTitles?: Record<string, LaneTitle>
   /** Accounts' usage watched beside its cards or lanes, or alone (HI-2195; HI-2285: such a watch waits on more than its cards). */
   usage?: true
   /** "Waiting for #12 → Review", "Waiting for B6 to finish". */
@@ -2366,6 +2391,9 @@ export interface RetryWaited {
   ms: number
   latest: { since: string; ended: string; tries: number; status: number | null; network?: true }
 }
+
+/** What a start replies (sessions.start): the session as it starts, and why a resume asked for started a new conversation instead (HI-2540). */
+export type StartedSession = LiveSessionState & { startedFresh?: FreshReason }
 
 export interface LiveSessionState {
   provider: ProviderId
@@ -3267,6 +3295,8 @@ export interface SessionListItem extends Partial<SessionRecord> {
   slot?: string
   /** Why it can't resume in its slot now, or that only its own Resume takes the slot (`byHand`); absent: it may. */
   hold?: ResumeHold
+  /** Why a resume of it starts a new conversation instead (HI-2540: shared/sessionFresh); absent: it resumes. */
+  fresh?: FreshReason
 }
 
 /**

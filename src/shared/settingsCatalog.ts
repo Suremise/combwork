@@ -101,7 +101,7 @@ function modeLabel(m: Pick<ModeOption, 'label' | 'text'>): TextPart {
 function advancedRows(): Row[] {
   // One of Hive's settings (Show developer features) keeps its own entry, under its settings key.
   return ADVANCED_DEFS.filter((d) => !d.setting).flatMap((d): Row[] => {
-    const title = withValues(msg({ id: 'settings.advancedRow.title', defaultMessage: '{group}: {title}', description: "An advanced setting's title where it is named alone: {group} is Hive or the CLI it belongs to, {title} the setting's own title." }), { group: groupName(d.group), title: d.text.title })
+    const title = withValues(msg({ id: 'settings.advancedRow.title', defaultMessage: '{group}: {title}', description: "An advanced setting's title where it is named alone: {group} is Combwork or the CLI it belongs to, {title} the setting's own title." }), { group: groupName(d.group), title: d.text.title })
     const tip = withValues(
       msg({
         id: 'settings.advancedRow.tip',
@@ -487,7 +487,7 @@ const APP_ROWS: Row[] = [
   { section: 'agentApi', key: 'status', title: msg({ id: 'settings.agentApi.status.title', defaultMessage: 'Status', description: "A setting's title (Settings → Agent API)." }), tip: msg({ id: 'settings.agentApi.status.tip', defaultMessage: 'Whether the Agent API is listening.', description: 'The info tip of the setting "Status" (Settings → Agent API): more on what it does and when it applies.' }), type: 'custom' },
   { section: 'agentApi', key: 'enabled', title: msg({ id: 'settings.agentApi.enabled.title', defaultMessage: 'Enable Agent API', description: "A setting's title (Settings → Agent API)." }), desc: msg({ id: 'settings.agentApi.enabled.desc', defaultMessage: 'Run a local HTTP API that agents and scripts can use to talk to Combwork.', description: 'What the setting "Enable Agent API" does, under its title (Settings → Agent API).' }), tip: msg({ id: 'settings.agentApi.enabled.tip', defaultMessage: 'Listens on 127.0.0.1 only and requires the bearer token below. See Help → Agent API Reference. Turned off, the port still answers the Assistant alone (it has its own token, and Settings → Assistant → Control decides what it may do).', description: 'The info tip of the setting "Enable Agent API" (Settings → Agent API): more on what it does and when it applies.' }), type: 'boolean' },
   { section: 'agentApi', key: 'port', title: msg({ id: 'settings.agentApi.port.title', defaultMessage: 'Port', description: "A setting's title (Settings → Agent API)." }), desc: msg({ id: 'settings.agentApi.port.desc', defaultMessage: 'Local port for the Agent API.', description: 'What the setting "Port" does, under its title (Settings → Agent API).' }), tip: msg({ id: 'settings.agentApi.port.tip', defaultMessage: 'Change this if the port is used by another program.', description: 'The info tip of the setting "Port" (Settings → Agent API): more on what it does and when it applies.' }), type: 'number', min: 1024, max: 65535 },
-  { section: 'agentApi', key: 'provideHiveMcp', title: msg({ id: 'settings.agentApi.provideHiveMcp.title', defaultMessage: 'Provide Combwork tools to sessions', description: "A setting's title (Settings → Agent API)." }), desc: msg({ id: 'settings.agentApi.provideHiveMcp.desc', defaultMessage: 'Add the built-in "hive" MCP server to every session.', description: 'What the setting "Provide Hive tools to sessions" does, under its title (Settings → Agent API).' }), tip: msg({ id: 'settings.agentApi.provideHiveMcp.tip', defaultMessage: 'Gives agents tools for shared notes, handovers, project status and notifications.', description: 'The info tip of the setting "Provide Hive tools to sessions" (Settings → Agent API): more on what it does and when it applies.' }), type: 'boolean' },
+  { section: 'agentApi', key: 'provideHiveMcp', title: msg({ id: 'settings.agentApi.provideHiveMcp.title', defaultMessage: 'Provide Combwork tools to sessions', description: "A setting's title (Settings → Agent API)." }), desc: msg({ id: 'settings.agentApi.provideHiveMcp.desc', defaultMessage: 'Add the built-in "combwork" MCP server to every session.', description: 'What the setting "Provide Combwork tools to sessions" does, under its title (Settings → Agent API).' }), tip: msg({ id: 'settings.agentApi.provideHiveMcp.tip', defaultMessage: 'Gives agents tools for shared notes, handovers, project status and notifications.', description: 'The info tip of the setting "Provide Combwork tools to sessions" (Settings → Agent API): more on what it does and when it applies.' }), type: 'boolean' },
   {
     section: 'agentApi',
     key: 'allowSessionInput',
@@ -502,7 +502,7 @@ const APP_ROWS: Row[] = [
     section: 'agentApi',
     key: 'devConsole',
     title: msg({ id: 'settings.agentApi.devConsole.title', defaultMessage: 'Let agents read the developer console', description: "A setting's title (Settings → Agent API)." }),
-    desc: msg({ id: 'settings.agentApi.devConsole.desc', defaultMessage: 'Give agents and the Assistant a read-only hive tool for the developer console: what their CLI sends Combwork, next to what Combwork made of it.', description: 'What the setting "Let agents read the developer console" does, under its title (Settings → Agent API).' }),
+    desc: msg({ id: 'settings.agentApi.devConsole.desc', defaultMessage: 'Give agents and the Assistant a read-only Combwork tool for the developer console: what their CLI sends Combwork, next to what Combwork made of it.', description: 'What the setting "Let agents read the developer console" does, under its title (Settings → Agent API).' }),
     tip: msg({ id: 'settings.agentApi.devConsole.tip', defaultMessage: "Each agent reads only its own sessions; the Assistant reads its workspace's agents and Combwork's own events. Combwork captures only while the developer console is open on a source (reading starts nothing), and what it captures is redacted: no prompt or reply text, commands, tokens or sign-in details. Running sessions get the tool after a restart.", description: 'The info tip of the setting "Let agents read the developer console" (Settings → Agent API): more on what it does and when it applies.' }),
     type: 'boolean'
   },
@@ -521,12 +521,12 @@ const APP_ROWS: Row[] = [
     section: 'advanced',
     key: 'showDeveloperFeatures',
     // Its text is its advanced value's (it is kept in advanced.json too, #367).
-    title: advancedDef('hive.showDeveloperFeatures')!.text.title,
-    desc: advancedDef('hive.showDeveloperFeatures')!.text.desc,
+    title: advancedDef('cw.showDeveloperFeatures')!.text.title,
+    desc: advancedDef('cw.showDeveloperFeatures')!.text.desc,
     tip: msg({ id: 'settings.advanced.showDeveloperFeatures.tip', defaultMessage: 'For power users and for developing Combwork. The console opens in a window of its own; Combwork captures a source only while it is open on it, redacted. Turning this off closes it.', description: 'The info tip of the setting this (Settings → Advanced): more on what it does and when it applies.' }),
     type: 'boolean',
     // Drawn in the list below, first among Hive's own (#367): kept in Hive's settings under this key, and in
-    // advanced.json as hive.showDeveloperFeatures (the two are one value).
+    // advanced.json as cw.showDeveloperFeatures (the two are one value).
     hidden: true
   },
   {
@@ -895,8 +895,8 @@ const SENSITIVE: [RegExp, AgentMsg][] = [
   [/^workspace\.(onClose|onOpen|commands)$|^general\.(onQuit|commands)$/, agentMsg({ id: 'settings.agent.sensitive.commands', text: 'Its commands run on this machine by themselves or by hand: the user saves them, the Assistant may only propose (HI-1954): only the user can change it, in {path}.', note: "Why the Assistant can't save commands (HI-1954): it may only propose them. {path} is where the user changes them." })],
   [/^updates\.prerelease$/, agentMsg({ id: 'settings.agent.sensitive.prerelease', text: 'It decides which builds of Combwork install: only the user can change it, in {path}.', note: "Why the Assistant can't choose pre-release builds (#186). {path} is where the user changes it." })],
   [/(^|\.)maxAgents$/, agentMsg({ id: 'settings.agent.sensitive.maxAgents', text: "Maximum agents is the user's team size, the most agents you may add: only the user can change it, in {path}.", note: "Why the Assistant can't change Maximum agents, the user's team size. {path} is where the user changes it." })],
-  [/^(workspace\.)?advanced\.hive\.cards\.attachmentFolders$/, agentMsg({ id: 'settings.agent.sensitive.attachmentFolders', text: 'It decides which folders agents, the Assistant and scripts may attach files to cards from: only the user can change it, in {path}.', note: "Why the Assistant can't change Card attachments: more folders (HI-2480): it would widen where it and agents may read files from. {path} is where the user changes it." })],
-  [/^(workspace\.)?advanced\.hive\.agents\.tempFolder$/, agentMsg({ id: 'settings.agent.sensitive.agentTempFolder', text: "It decides where agents and the Assistant itself write their temporary files: only the user can change it, in {path}.", note: "Why the Assistant can't change Agents' temp folder (HI-2496): it redirects every agent's file writes, its own launch's too. {path} is where the user changes it." })]
+  [/^(workspace\.)?advanced\.cw\.cards\.attachmentFolders$/, agentMsg({ id: 'settings.agent.sensitive.attachmentFolders', text: 'It decides which folders agents, the Assistant and scripts may attach files to cards from: only the user can change it, in {path}.', note: "Why the Assistant can't change Card attachments: more folders (HI-2480): it would widen where it and agents may read files from. {path} is where the user changes it." })],
+  [/^(workspace\.)?advanced\.cw\.agents\.tempFolder$/, agentMsg({ id: 'settings.agent.sensitive.agentTempFolder', text: "It decides where agents and the Assistant itself write their temporary files: only the user can change it, in {path}.", note: "Why the Assistant can't change Agents' temp folder (HI-2496): it redirects every agent's file writes, its own launch's too. {path} is where the user changes it." })]
 ]
 
 /** Read-only to the Assistant for now, though not sensitive (#186: keybindings). */

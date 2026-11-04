@@ -1157,7 +1157,7 @@
   },
   "assistant.sidebar.hiveServerDesc": {
     "defaultMessage": "Combwork tools for agents: projects, shared notes, handovers, notifications",
-    "description": "Under the built-in hive server: what it gives agents."
+    "description": "Under the built-in combwork server: what it gives agents."
   },
   "assistant.sidebar.hiveServerTip": {
     "defaultMessage": "Controlled in Settings → Agent API",
@@ -1305,11 +1305,11 @@
   },
   "assistant.sidebar.off": {
     "defaultMessage": "Off",
-    "description": "A badge: the built-in hive server is off."
+    "description": "A badge: the built-in combwork server is off."
   },
   "assistant.sidebar.on": {
     "defaultMessage": "On",
-    "description": "A badge: the built-in hive server is on."
+    "description": "A badge: the built-in combwork server is on."
   },
   "assistant.sidebar.openFirst": {
     "defaultMessage": "Open a workspace first",
@@ -1732,8 +1732,8 @@
     "description": "What a skill that ships with Hive (coordinate-agents) is for: under its name in the Skills view and a project's Skills tab. Keep Hive Assistant as Hive names it."
   },
   "assistant.skills.shipped.generalist": {
-    "defaultMessage": "General work done well: understand first, change carefully, prove it works, report honestly. Use when no other skill fits.",
-    "description": "What a skill that ships with Hive (generalist) is for: under its name in the Skills view and a project's Skills tab. It is for work outside the board's skills, such as whatever the user asks an agent in its pane."
+    "defaultMessage": "General work: understand, change carefully, prove it, report honestly. Use when no other skill fits, not for inbox lines.",
+    "description": "What a skill that ships with Hive (generalist) is for: under its name in the Skills view and a project's Skills tab. It is for work outside the board's skills, such as whatever the user asks an agent in its pane. Inbox lines are the lines Combwork types into an agent's session when its inbox has something (\"[CW] New in your inbox…\"): that work names its own skill."
   },
   "assistant.skills.shipped.handover": {
     "defaultMessage": "Write a handover so a later session or another agent can carry on cold. Use when asked to wrap up for later, hand over or stop for the day. Readying a branch to merge is merge-ready.",
@@ -1777,7 +1777,7 @@
   },
   "assistant.skills.shipped.useHiveApi": {
     "defaultMessage": "A Combwork tool's cases in detail (tools.md), and Combwork's HTTP API for scripts. Use when a tool's description isn't enough, or to automate Combwork over HTTP: board and notes work uses the tools.",
-    "description": "What a skill that ships with Hive (use-cw-api) is for: under its name in the Skills view and a project's Skills tab. Keep HTTP and API; hive tools are the tools Hive gives agents (hive_…), keep hive in lower case."
+    "description": "What a skill that ships with Hive (use-cw-api) is for: under its name in the Skills view and a project's Skills tab. Keep HTTP and API; Combwork tools are the tools Combwork gives agents (cw_…)."
   },
   "assistant.skills.shipped.workOnCard": {
     "defaultMessage": "Carry a card from Combwork's task board through its work, from Active to Review with a summary. Use when given a card to work on (\"work on AM-12\", a card Combwork started you on, more work on one back from Review). Not for reviewing one, nor a card loop (card-loop).",

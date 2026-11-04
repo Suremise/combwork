@@ -150,7 +150,7 @@ export interface UpdateRetry {
 }
 
 /** A home folder's sign-in, as its CLI reports it (HI-980): `ok: false` when it couldn't be told, `error` in English. */
-export type ConnectionStatus = { ok: true; loggedIn: boolean; email?: string; orgId?: string; plan?: string | null } | { ok: false; error: string }
+export type ConnectionStatus = { ok: true; loggedIn: boolean; email?: string; orgId?: string; plan?: string | null; loginExpiresAt?: string } | { ok: false; error: string }
 
 /**
  * A workspace folder a connection's CLI must trust (HI-1870), as the CLIs look trust up (probed with Claude Code 2.1.311

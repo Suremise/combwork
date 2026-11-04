@@ -175,7 +175,7 @@ vi.mock('../src/main/logger', async (orig) => {
 vi.mock('../src/main/advanced', async (orig) => {
   const actual = await orig<typeof import('../src/main/advanced')>()
   const advanced = Object.create(actual.advanced) as typeof actual.advanced
-  advanced.get = ((id: string, ...rest: unknown[]) => (id === 'hive.slots.deleteMergedLines' ? state.deleteOn : (actual.advanced.get as (...a: unknown[]) => unknown)(id, ...rest))) as typeof advanced.get
+  advanced.get = ((id: string, ...rest: unknown[]) => (id === 'cw.slots.deleteMergedLines' ? state.deleteOn : (actual.advanced.get as (...a: unknown[]) => unknown)(id, ...rest))) as typeof advanced.get
   return { ...actual, advanced }
 })
 vi.mock('../src/main/sessions', async (orig) => {

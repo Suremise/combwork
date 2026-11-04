@@ -305,8 +305,8 @@
     "audience": "both"
   },
   "tasks.error.reviewAgentsOnly": {
-    "text": "Only an agent of the card's project reviews it, through its own hive tools.",
-    "note": "An error: the user, the Assistant or a script tried to start or end a card's review; only an agent of the card's project does that, with its hive tools (a name: keep it).",
+    "text": "Only an agent of the card's project reviews it, through its own Combwork tools.",
+    "note": "An error: the user, the Assistant or a script tried to start or end a card's review; only an agent of the card's project does that, with its Combwork tools (the app's name).",
     "audience": "both"
   },
   "tasks.error.reviewNotInReview": {

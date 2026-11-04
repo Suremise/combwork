@@ -1086,7 +1086,7 @@ app.whenReady().then(async () => {
         CW_WORKSPACE: workspaceOf(projectPath).path ?? '',
         // Which agent's tools these are: Hive names it as the author of the handovers it writes.
         ...(agentId ? { HIVE_AGENT_ID: agentId } : {}),
-        // Whether its instructions tell it to run long commands through hive-progress unasked.
+        // Whether its instructions tell it to run long commands through cw-progress unasked.
         HIVE_PROGRESS_COMMANDS: wrapsLongCommands(config.settings.general) ? '1' : '0',
         // Whether it gives Hive's guidance as its instructions (#1285: Settings → Advanced, Hive's guidance for agents).
         HIVE_GUIDANCE: advanced.get<boolean>(HIVE_GUIDANCE) ? '1' : '0',

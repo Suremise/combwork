@@ -180,7 +180,7 @@
   "workspace.mcpView.toolReadNote": "Leer una nota compartida",
   "workspace.mcpView.toolSessionUsage": "Uso de tokens, caché y compactaciones de una sesión",
   "workspace.mcpView.toolWriteNote": "Crear, sobrescribir o ampliar una nota compartida",
-  "workspace.mcpView.tryAsking": "Prueba a pedirle a un agente: *“Escribe un traspaso para la próxima sesión con las herramientas de hive.”*",
+  "workspace.mcpView.tryAsking": "Prueba a pedirle a un agente: *“Escribe un traspaso para la próxima sesión con las herramientas de Combwork.”*",
   "workspace.mcpView.whatItDoes": "Qué hace",
   "workspace.mcpView.whatItRuns": "Qué ejecuta",
   "workspace.move.branchesBanner": "{count, plural, one {La rama de un agente aún lleva el nombre de una carpeta antigua; Reparar la renombra.} many {Las ramas de # agentes aún llevan el nombre de una carpeta antigua; Reparar las renombra.} other {Las ramas de # agentes aún llevan el nombre de una carpeta antigua; Reparar las renombra.}}",

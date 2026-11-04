@@ -228,10 +228,10 @@ const beta = path.join(fx.ws, 'beta')
     check('a new lane uses the new options: no old rules', !!l3 && (await laneNow(l3))?.oldRules === false && !!(await waitHung(async () => (await row(l3).count()) === 1)) && (await tag(l3).count()) === 0, JSON.stringify(await laneNow(l3)))
 
     // With the rules not enforced, the marks still show (they are facts) and say so.
-    await inv('advanced:set', 'hive.workflow.enforce', false)
+    await inv('advanced:set', 'cw.workflow.enforce', false)
     check('rules not enforced: the old rules mark still shows, saying they aren’t enforced', !!(await waitHung(async () => (await tag(l2).count()) === 1 && /aren’t enforced now/.test((await tag(l2).getAttribute('aria-label')) ?? ''))), await row(l2).innerText())
     check('…and the card’s line says so too', !!(await waitHung(async () => /Workflow rules aren’t enforced now/.test(await label(nx)))), await label(nx))
-    await inv('advanced:set', 'hive.workflow.enforce', true)
+    await inv('advanced:set', 'cw.workflow.enforce', true)
 
     // --- Links: the lane header's project opens its Version Control tab at Workflow; the queue card at Merge queue.
     const link = row(l2).locator('.progress-lane-project')

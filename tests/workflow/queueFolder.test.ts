@@ -12,7 +12,7 @@ import { createRequire } from 'module'
 const { baseEnv } = createRequire(import.meta.url)('../e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
 import { readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
+import { B1, commit, GIT_HEAVY_MS, moved, R1, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { MergeQueue, type QueueConfig, type QueueHook } from '../../src/main/workflow/mergeQueue'
 import { FactStore } from '../../src/main/workflow/factStore'
@@ -531,7 +531,9 @@ describe("every target write authorised in the lock, from state read there (HR4'
     expect(r.wf.state(a).stage).toBe('merging')
   })
 
-  it("the commands keep a ref as it is: a branch named topic$part, run in PowerShell as given, finishes the merge", async () => {
+  // GIT_HEAVY_MS (HI-2453's decision, HI-2025's rule): a card built, approved, drained to a crash and recovered by another
+  // queue, 76 git processes, 9.0 s alone with no wait between them; past 20 s in HI-2499's run of 353 files (3 workers).
+  it("the commands keep a ref as it is: a branch named topic$part, run in PowerShell as given, finishes the merge", { timeout: GIT_HEAVY_MS }, async () => {
     const branch = 'topic$part'
     const e = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], target: branch }))
     sh(e.project, 'branch', '-m', 'main', branch)
@@ -561,7 +563,9 @@ describe("every target write authorised in the lock, from state read there (HR4'
 })
 
 describe('S42: the checks run without the lock', () => {
-  it("a user's commit in the folder during the checks isn't held up; the swap catches it and tests again", async () => {
+  // GIT_HEAVY_MS (HI-2453's decision, HI-2025's rule): a card built, approved and drained, tested twice as the user commits,
+  // 76 git processes, 10.4 s alone with no wait between them; past 20 s in HI-2499's run of 353 files (3 workers).
+  it("a user's commit in the folder during the checks isn't held up; the swap catches it and tests again", { timeout: GIT_HEAVY_MS }, async () => {
     const e = setup({ ...preset('git', 'team', { quick: ['quick'], tests: [] }), preChecks: [], okBefore: { mode: 'never', labels: [] }, commands: { quick: 'npm run quick' } })
     env = e
     const card = await queued(e)

@@ -79,13 +79,13 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
   // Pulse leaves out a Solo project's lanes unless one runs (#1421); the Lanes tab shows every lane.
   const lanes = full ? given : pulseLanes(given, (p) => stages.get(p.toLowerCase())?.preset)
   // Off, an old rules mark still shows (it is a fact) and says the rules aren't enforced (#1421).
-  const enforced = useAdvancedValue<boolean>('hive.workflow.enforce')
+  const enforced = useAdvancedValue<boolean>('cw.workflow.enforce')
   const [foldedKept, toggle] = usePanelFold(ws ? foldKey(ws) : null)
   const folded = foldedKept && !full
   const key = ws ? rowsKey(ws) : null
   const kept = useStore((s) => (key ? s.panes[key] : undefined))
   // The lanes shown until the edge is dragged: Settings → Advanced's, or the workspace's own (#367).
-  const fallback = useAdvancedValue<number>('hive.progress.lanesShown')
+  const fallback = useAdvancedValue<number>('cw.progress.lanesShown')
   const list = useRef<HTMLDivElement>(null)
   // Measured as the panel changes (a resize, zoom, a merge card, lanes coming and going): a lane's height with its
   // margin, so the list shows whole lanes, and the room the lanes could have: the list and the runs above share the
@@ -629,8 +629,8 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
   const queued = change ? queuedChangeText(change, (n) => cardLabelOf({ tasks }, n), tr, fmt.list) : null
   const word = stateWord(l.state)
   // How long it has waited (HI-1926: since main saw the wait begin), marked past its bound (Settings → Advanced).
-  const youMin = useAdvancedValue<number>('hive.lanes.waitYouMinutes')
-  const reviewerMin = useAdvancedValue<number>('hive.lanes.waitReviewerMinutes')
+  const youMin = useAdvancedValue<number>('cw.lanes.waitYouMinutes')
+  const reviewerMin = useAdvancedValue<number>('cw.lanes.waitReviewerMinutes')
   const wait = why ? laneWaitTime(l.status, Date.now(), youMin, reviewerMin) : null
   const waited = wait ? (l.status?.atLeast ? tr(WAITED_AT_LEAST, { time: durationText(wait.ms, tr) }) : durationText(wait.ms, tr)) : null
   // Its cost on the hover of its top line (#602), read when the hover first shows.

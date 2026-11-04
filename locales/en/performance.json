@@ -177,7 +177,7 @@
   },
   "performance.compare.callsByAgent": {
     "defaultMessage": "Combwork calls by agent in the measured window, baseline → run: {agents}",
-    "description": "A line under a scenario's measures in Performance → Compare (HI-2186): each agent's hive tool calls, on average a sample. {agents} is a list of entries like \"Coder (builder): 1 → 4\"."
+    "description": "A line under a scenario's measures in Performance → Compare (HI-2186): each agent's Combwork tool calls, on average a sample. {agents} is a list of entries like \"Coder (builder): 1 → 4\"."
   },
   "performance.compare.cantCompare": {
     "defaultMessage": "Can’t compare that file",
@@ -192,8 +192,8 @@
     "description": "Column header in Performance → Compare: calls of Hive's tools, and how many repeated an earlier one."
   },
   "performance.compare.col.callsTip": {
-    "defaultMessage": "The hive tool calls of the session under test (the Assistant, or the agent the scenario tests), and how many repeated an earlier one.",
-    "description": "Tooltip of the Calls (repeated) column in Performance → Compare (HI-2186). Keep hive (Hive's tools)."
+    "defaultMessage": "The Combwork tool calls of the session under test (the Assistant, or the agent the scenario tests), and how many repeated an earlier one.",
+    "description": "Tooltip of the Calls (repeated) column in Performance → Compare (HI-2186). Keep Combwork (the app's name)."
   },
   "performance.compare.col.change": {
     "defaultMessage": "Change",
@@ -652,8 +652,8 @@
     "description": "Tooltip of a token measure in Performance → Compare: the provider's own count."
   },
   "performance.compare.measureTip.contextBytes": {
-    "defaultMessage": "What Combwork put in the session’s context: launch guidance (core, project, the Assistant’s role and mode, skills’ catalog), the hive tools’ list and every tool reply. Exact UTF-8 bytes, not tokens. Unknown if any part wasn’t measured.",
-    "description": "Tooltip of the Hive context measure in Performance → Compare. \"hive tools\" are Hive's tools for agents (keep hive)."
+    "defaultMessage": "What Combwork put in the session’s context: launch guidance (core, project, the Assistant’s role and mode, skills’ catalog), the Combwork tools’ list and every tool reply. Exact UTF-8 bytes, not tokens. Unknown if any part wasn’t measured.",
+    "description": "Tooltip of the Hive context measure in Performance → Compare. \"Combwork tools\" are Combwork's tools for agents (keep Combwork)."
   },
   "performance.compare.measureTip.costUsd": {
     "defaultMessage": "API-equivalent; only when every sample on both sides has a cost (≈ when Combwork estimated one).",
@@ -672,8 +672,8 @@
     "description": "Tooltip of the Tool replies measure in Performance → Compare of exports."
   },
   "performance.compare.measureTip.exportToolListPerLaunch": {
-    "defaultMessage": "The hive tools’ names, descriptions and schemas as each session’s CLI got them, in characters, on average (not per hour). Sessions from before Combwork counted characters are left out.",
-    "description": "Tooltip of the Tool list a launch measure in Performance → Compare of exports. Keep hive (the tools' name)."
+    "defaultMessage": "The Combwork tools’ names, descriptions and schemas as each session’s CLI got them, in characters, on average (not per hour). Sessions from before Combwork counted characters are left out.",
+    "description": "Tooltip of the Tool list a launch measure in Performance → Compare of exports. Keep Combwork (the app's name)."
   },
   "performance.compare.measureTip.guidanceBytes": {
     "defaultMessage": "Core contract, project additions, the Assistant’s role and mode, and the skills’ catalog, at launch.",
@@ -684,12 +684,12 @@
     "description": "Tooltip of the Launch guidance (characters) measure in Performance → Compare."
   },
   "performance.compare.measureTip.hiveCallErrors": {
-    "defaultMessage": "hive tool calls that failed.",
-    "description": "Tooltip of the Failed calls measure in Performance → Compare. Keep hive (the tools' name)."
+    "defaultMessage": "Combwork tool calls that failed.",
+    "description": "Tooltip of the Failed calls measure in Performance → Compare. Keep Combwork (the app's name)."
   },
   "performance.compare.measureTip.hiveCalls": {
-    "defaultMessage": "hive tool calls the server ran (its own log).",
-    "description": "Tooltip of the Calls run measure in Performance → Compare. Keep hive (the tools' name)."
+    "defaultMessage": "Combwork tool calls the server ran (its own log).",
+    "description": "Tooltip of the Calls run measure in Performance → Compare. Keep Combwork (the app's name)."
   },
   "performance.compare.measureTip.outputTokens": {
     "defaultMessage": "Reasoning included, as the provider reported them.",
@@ -748,12 +748,12 @@
     "description": "Tooltip of the Tool replies (bytes) measure in Performance → Compare."
   },
   "performance.compare.measureTip.toolCalls": {
-    "defaultMessage": "hive tool calls measured by the bridge.",
-    "description": "Tooltip of the Tool calls measure in Performance → Compare. Keep hive (the tools' name); the bridge is Hive's MCP server between the CLI and Hive."
+    "defaultMessage": "Combwork tool calls measured by the bridge.",
+    "description": "Tooltip of the Tool calls measure in Performance → Compare. Keep Combwork (the app's name); the bridge is Combwork's MCP server between the CLI and Hive."
   },
   "performance.compare.measureTip.toolChars": {
-    "defaultMessage": "Characters of the hive tools’ replies, as the model got them.",
-    "description": "Tooltip of the Tool replies measure in Performance → Compare. Keep hive (the tools' name)."
+    "defaultMessage": "Characters of the Combwork tools’ replies, as the model got them.",
+    "description": "Tooltip of the Tool replies measure in Performance → Compare. Keep Combwork (the app's name)."
   },
   "performance.compare.measureTip.toolDetailCalls": {
     "defaultMessage": "Calls that asked for the full form.",
@@ -764,8 +764,8 @@
     "description": "Tooltip of the Tool errors measure in Performance → Compare. The bridge is Hive's MCP server between the CLI and Hive."
   },
   "performance.compare.measureTip.toolListBytes": {
-    "defaultMessage": "The hive tools’ names, descriptions and schemas as the CLI got them.",
-    "description": "Tooltip of the Tool list measure in Performance → Compare. Keep hive (the tools' name)."
+    "defaultMessage": "The Combwork tools’ names, descriptions and schemas as the CLI got them.",
+    "description": "Tooltip of the Tool list measure in Performance → Compare. Keep Combwork (the app's name)."
   },
   "performance.compare.measureTip.toolListChars": {
     "defaultMessage": "The same list in characters (UTF-16 code units). Unknown for a run from before Combwork counted them.",
@@ -788,8 +788,8 @@
     "description": "Performance → Compare, a note on a scenario of model trials. Keep ≈ (it marks an estimate)."
   },
   "performance.compare.note.fakePerCall": {
-    "defaultMessage": "With the fake Claude Code or fake Codex, each hive call starts a hive MCP server of its own: API requests and tool-list starts count per call, not per session.",
-    "description": "Performance → Compare, a note on a comparison of scenario runs on the scripted fake CLIs (HI-2186): what they do differs from a real CLI. Keep hive (Hive's tools), MCP, Claude Code and Codex."
+    "defaultMessage": "With the fake Claude Code or fake Codex, each Combwork tool call starts a combwork MCP server of its own: API requests and tool-list starts count per call, not per session.",
+    "description": "Performance → Compare, a note on a comparison of scenario runs on the scripted fake CLIs (HI-2186): what they do differs from a real CLI. Keep Combwork (the app's name), MCP, Claude Code and Codex."
   },
   "performance.compare.note.fakeUsage": {
     "defaultMessage": "Provider usage isn’t compared: a fake’s tokens are simulated, not a provider’s.",
@@ -1408,7 +1408,7 @@
     "description": "Column header of the Agent API table: the size of the replies Hive sent."
   },
   "performance.routes.tip": {
-    "defaultMessage": "Requests by route (its template, never the path asked for). The hive tools call these too; a tool call and its request are the same work, so don't add them up.",
+    "defaultMessage": "Requests by route (its template, never the path asked for). The Combwork tools call these too; a tool call and its request are the same work, so don't add them up.",
     "description": "Info tip beside the Agent API heading."
   },
   "performance.routes.waits": {
@@ -1613,7 +1613,7 @@
   },
   "performance.toolList.heading": {
     "defaultMessage": "Combwork tool list",
-    "description": "Heading of the Performance page's table of the hive tools' list each session was given (HI-2063). Keep hive (the tools' name)."
+    "description": "Heading of the Performance page's table of the Combwork tools' list each session was given (HI-2063). Keep Combwork (the app's name)."
   },
   "performance.toolList.params": {
     "defaultMessage": "Parameters",
@@ -1628,8 +1628,8 @@
     "description": "Column header of the Hive tool list table: how many session starts were given the list."
   },
   "performance.toolList.tip": {
-    "defaultMessage": "The hive tools’ names, descriptions and schemas as each session’s CLI got them, once a start, on average, for every provider (not recorded per provider). Characters are the list’s JSON; Descriptions and Parameters are the tools’ descriptions and their parameters’ descriptions in it; Schemas is the rest: names, types, keys, punctuation and escapes. A dash: not measured (sessions from before Combwork measured it).",
-    "description": "Tooltip of the Hive tool list table on the Performance page (HI-2063). Descriptions, Parameters and Schemas are its columns: name them as there. Keep hive (the tools' name)."
+    "defaultMessage": "The Combwork tools’ names, descriptions and schemas as each session’s CLI got them, once a start, on average, for every provider (not recorded per provider). Characters are the list’s JSON; Descriptions and Parameters are the tools’ descriptions and their parameters’ descriptions in it; Schemas is the rest: names, types, keys, punctuation and escapes. A dash: not measured (sessions from before Combwork measured it).",
+    "description": "Tooltip of the Hive tool list table on the Performance page (HI-2063). Descriptions, Parameters and Schemas are its columns: name them as there. Keep Combwork (the app's name)."
   },
   "performance.toolList.tools": {
     "defaultMessage": "Tools",
@@ -1657,14 +1657,14 @@
   },
   "performance.tools.heading": {
     "defaultMessage": "Combwork tools",
-    "description": "Heading of the Performance page's table of the hive tools agents called."
+    "description": "Heading of the Performance page's table of the Combwork tools agents called."
   },
   "performance.tools.perCall": {
     "defaultMessage": "Per call",
     "description": "Column header of the Hive tools table: its replies' characters per call, on average."
   },
   "performance.tools.tip": {
-    "defaultMessage": "Each hive tool's replies as the models got them: characters and UTF-8 bytes, exactly. Detail: calls that asked for the full form. Sorted by characters, what costs a context most.",
+    "defaultMessage": "Each Combwork tool's replies as the models got them: characters and UTF-8 bytes, exactly. Detail: calls that asked for the full form. Sorted by characters, what costs a context most.",
     "description": "Info tip beside the Hive tools heading. Detail is a column of the table: keep it as named there."
   },
   "performance.tools.tool": {

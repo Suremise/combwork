@@ -8,7 +8,7 @@ import { loopReviewerOf, poolCard } from './loopReviewer'
 import { agentBusy, agentEvent, agentLimitLine, agentMarkOf, agentPart, agentWakeLine, agentWatchLabel, readSavedAgentCondition, readSavedAgentMark, replyFirstLine, replyPart, REPLY_CHARS, type AgentEvent, type AgentMark, type AgentNow, type AgentWatchCondition, type WatchedAgent } from '../shared/agentWatch'
 import { isProjectId, type ProjectIdIndex } from '../shared/projectIds'
 import { rebase } from '../shared/movePaths'
-import type { LaneInfo, LiveSessionState, StoredText, TaskCard, TaskColumn, TaskWatchInfo } from '../shared/types'
+import type { LaneInfo, LaneTitle, LiveSessionState, StoredText, TaskCard, TaskColumn, TaskWatchInfo } from '../shared/types'
 import { HISTORY, storedText } from '../shared/taskHistory'
 import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { config } from './config'
@@ -19,7 +19,7 @@ import { dbGenerationAt, onDbReplaced } from './boardStore'
 import { coalesced } from './coalesce'
 import { createLogger, userText } from './logger'
 import { listLanes } from './lanes'
-import { keepAsked, LANE_ALWAYS_EVENTS, LANE_CARD_CHANGES, laneCardMark, laneHits, laneLimitLine, laneWakeLine, laneWatchLabel, mergeDue, mergeStallReason, newLaneBase, readSavedLaneCondition, readSavedLaneMark, verdictsOf, type LaneAgentHit, type LaneAsked, type LaneHit, type LaneMark, type LaneNow, type LaneWatchAgents, type LaneWatchCards, type LaneWatchCondition, type WaitHit } from '../shared/laneWatch'
+import { keepAsked, LANE_CARD_CHANGES, laneCardMark, laneOverPart, laneHits, laneLimitLine, laneWakeLine, laneWatchLabel, mergeDue, mergeStallReason, newLaneBase, laneTitlesOf, withAlwaysEvents, readSavedLaneCondition, readSavedLaneMark, verdictsOf, type LaneAgentHit, type LaneAsked, type LaneHit, type LaneMark, type LaneNow, type LaneWatchAgents, type LaneWatchCards, type LaneWatchCondition, type WaitHit } from '../shared/laneWatch'
 import { cardStallIn, laneOrderView } from './cardStall'
 import { noteLoopWatch } from './loopCheck'
 import { isResuming } from './restartResume'
@@ -120,6 +120,8 @@ interface WatchRecord {
    */
   lanes?: LaneWatchCondition
   laneMarks?: Record<string, LaneMark>
+  /** HI-2522: how its labels name each lane it names (ids, not "all"), as the lanes were when it began. */
+  laneTitles?: Record<string, LaneTitle>
   /**
    * A usage watch (HI-2195): accounts whose limit reaching a share fires it, alone (no cards: `cond` is NO_CARDS) or
    * beside a card or lane watch's cards and lanes.
@@ -284,6 +286,8 @@ export const testHooks: {
   cardRead?: (n: number) => void
   /** HI-2197: a pause before a new conversation's end of an old watch cancels that watch's wake. */
   beforeWakeCancel?: () => Promise<void>
+  /** HI-2521: a pause in a lane watch's setup, after its lanes were read and before it is saved. */
+  afterLanesRead?: () => Promise<void>
 } = {}
 /** The same seams by their first name (round-one probes use it). */
 export const testPauses = testHooks
@@ -419,6 +423,23 @@ function load(ws: WorkspaceService): Promise<Store> {
         list.push({ ...rec, scope: scopeFor(ws, rec.projectPath) })
       }
     }
+    // HI-2522 round 1 finding: a watch on named lanes saved before HI-2522 has no titles, so its label would name each lane
+    // by its id: they are taken from the lanes as they are now, in its view, and kept. One no longer listed is "a lane".
+    const untitled = list.filter((r) => r.lanes && r.lanes.ids !== 'all' && r.lanes.ids.some((id) => !r.laneTitles?.[id]))
+    if (untitled.length) {
+      const all = await listLanes(ws, { all: true }).catch((e: unknown) => {
+        log.warn('reading the lanes to name old lane watches', e)
+        return null
+      })
+      if (!open()) throw closedError()
+      for (const r of all ? untitled : []) {
+        const missing = (r.lanes!.ids as string[]).filter((id) => !r.laneTitles?.[id])
+        const found = laneTitlesOf(missing,all!.filter((l) => r.scope === null || same(l.project, r.scope)))
+        if (!Object.keys(found).length) continue
+        r.laneTitles = { ...r.laneTitles, ...found }
+        migrated = true
+      }
+    }
     // What was migrated is saved at the next tick.
     const store: Store = { ws, path, life, list, invalid, dirty: migrated || stamped || gone.size > 0, queue: Promise.resolve(), delivering: new Map(), woke: new Map(), wokeAgents: new Map(), wokeLanes: new Map(), wokeReplies: new Map(), gen, place }
     // Read back too big for every watch to end (a hand edit, an older build): room is made, nothing is lost.
@@ -533,6 +554,19 @@ async function readFileOf(path: string, open: () => boolean): Promise<Saved | nu
 }
 
 /** A saved watch, checked in full (the file can be edited by hand) and rebuilt from what checks out; null if it isn't one. */
+/** Saved lane titles (HI-2522), each of a lane the watch names and checked: those that don't read are left out. */
+function readLaneTitles(v: unknown, ids: readonly string[]): Record<string, LaneTitle> | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined
+  const text = (x: unknown, max: number): x is string => typeof x === 'string' && x.length > 0 && x.length <= max
+  const out: Record<string, LaneTitle> = {}
+  for (const id of ids) {
+    const t = (v as Record<string, { name?: unknown; builder?: unknown; twin?: unknown } | undefined>)[id]
+    if (!t || (t.name !== null && !text(t.name, 300)) || !text(t.builder, 300)) continue
+    out[id] = { name: t.name as string | null, builder: t.builder as string, ...(t.twin === true ? { twin: true as const } : {}) }
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
 function readRecord(v: unknown): WatchRecord | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null
   const r = v as Record<string, unknown>
@@ -557,6 +591,7 @@ function readRecord(v: unknown): WatchRecord | null {
   // A lane watch (#531): its lanes and their marks, and the agents (HI-1987) and cards (#726) beside them, if any.
   let lanes: LaneWatchCondition | undefined
   let laneMarks: Record<string, LaneMark> | undefined
+  let laneTitles: Record<string, LaneTitle> | undefined
   if (r.lanes !== undefined) {
     const c = readSavedLaneCondition(r.lanes)
     if (!c || !r.laneMarks || typeof r.laneMarks !== 'object' || Array.isArray(r.laneMarks)) return null
@@ -569,6 +604,8 @@ function readRecord(v: unknown): WatchRecord | null {
       laneMarks[id] = mark
     }
     lanes = c
+    // HI-2522: its lanes' titles; one from before has none (named by id), and one that doesn't read is left out.
+    if (r.laneTitles !== undefined && c.ids !== 'all') laneTitles = readLaneTitles(r.laneTitles, c.ids)
     if (r.laneSince !== undefined && !time(r.laneSince)) return null
     if (r.waitSeq !== undefined && (typeof r.waitSeq !== 'number' || !Number.isInteger(r.waitSeq) || r.waitSeq < 0)) return null
   }
@@ -650,7 +687,7 @@ function readRecord(v: unknown): WatchRecord | null {
   }
   const from = { ...(seen ? { seen } : {}), ...(r.self ? { self: r.self as string } : {}) }
   // The scope is set by the workspace that loads it (from the agent's folder), whatever the file says.
-  return { id: r.id, projectPath: r.projectPath, ...(isProjectId(r.projectId) ? { projectId: r.projectId } : {}), agentId: r.agentId, scope: '', cond, ...(agents ? { agents, agentMarks } : {}), ...(usage ? { usage } : {}), ...(lanes ? { lanes, laneMarks, ...(r.laneSince ? { laneSince: r.laneSince as string } : {}), ...(typeof r.waitSeq === 'number' ? { waitSeq: r.waitSeq } : {}) } : {}), marks, current: { ...marks }, since: r.since, ...from, limitMinutes: minutes, limitAt: r.limitAt, ...(typeof r.replySeq === 'number' ? { replySeq: r.replySeq } : {}), ...(on ? { on } : {}), ...(r.watcherName ? { watcherName: r.watcherName as string } : {}), ...(released ? { released } : {}), ...(fired ? { fired } : {}) }
+  return { id: r.id, projectPath: r.projectPath, ...(isProjectId(r.projectId) ? { projectId: r.projectId } : {}), agentId: r.agentId, scope: '', cond, ...(agents ? { agents, agentMarks } : {}), ...(usage ? { usage } : {}), ...(lanes ? { lanes, laneMarks, ...(laneTitles ? { laneTitles } : {}), ...(r.laneSince ? { laneSince: r.laneSince as string } : {}), ...(typeof r.waitSeq === 'number' ? { waitSeq: r.waitSeq } : {}) } : {}), marks, current: { ...marks }, since: r.since, ...from, limitMinutes: minutes, limitAt: r.limitAt, ...(typeof r.replySeq === 'number' ? { replySeq: r.replySeq } : {}), ...(on ? { on } : {}), ...(r.watcherName ? { watcherName: r.watcherName as string } : {}), ...(released ? { released } : {}), ...(fired ? { fired } : {}) }
 }
 
 /** An agent watch's condition on cards: none. */
@@ -760,7 +797,7 @@ function kindInfoOf(r: WatchRecord): TaskWatchInfo {
   const names = ws?.path ? cardNamesOf(ws, ws.isAssistantHome(r.projectPath) ? null : basename(r.projectPath)) : null
   return namedBy(names, () =>
     r.lanes
-      ? { cards: r.cond.cards, changes: r.cond.changes, lanes: r.lanes.ids === 'all' ? ['all'] : [...r.lanes.ids], ...(r.agents ? { agents: r.agents.agents.map((a) => a.name) } : {}), label: laneWatchLabel(r.lanes, r.cond.cards, r.agents?.agents), since: r.since, limitAt: r.limitAt }
+      ? { cards: r.cond.cards, changes: r.cond.changes, lanes: r.lanes.ids === 'all' ? ['all'] : [...r.lanes.ids], ...(r.laneTitles ? { laneTitles: { ...r.laneTitles } } : {}), ...(r.agents ? { agents: r.agents.agents.map((a) => a.name) } : {}), label: laneWatchLabel(r.lanes, r.cond.cards, r.agents?.agents, r.laneTitles), since: r.since, limitAt: r.limitAt }
       : r.agents
         ? { cards: [], changes: [], agents: r.agents.agents.map((a) => a.name), label: agentWatchLabel(r.agents), since: r.since, limitAt: r.limitAt }
         : { cards: r.cond.cards, changes: r.cond.changes, ...(r.cond.column ? { column: r.cond.column } : {}), label: watchLabel(r.cond), since: r.since, limitAt: r.limitAt }
@@ -1644,13 +1681,14 @@ async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'l
       const v = card ? verdictsOf(card) : null
       cards.push({ number: lc.number, blocked: card?.blocked ?? null, stalled, failedBy: v?.failed?.by ?? null, passedBy: v?.passed?.by ?? null, ...(asked ? { asked } : {}) })
     }
-    const label = `${l.builder.name}${l.reviewer ? ` / ${l.reviewer.name}` : ''}${l.name ? ` (${l.name})` : ''}`
+    const pair = `${l.builder.name}${l.reviewer ? ` / ${l.reviewer.name}` : ''}`
+    const label = `${pair}${l.name ? ` (${l.name})` : ''}`
     // #869: a merge due with its builder idle and no merge slot claimed (a step it stopped on for the user) is a stall.
     const builder = ws.path ? (sessions.liveFor(join(ws.path, l.project), l.builder.id) ?? null) : null
     // A builder queued to resume after a restart (HI-1707) isn't a stall meanwhile.
     const resuming = !builder && !!ws.path && isResuming(join(ws.path, l.project), l.builder.id)
     const mergeStall = resuming ? null : mergeStallReason({ state: l.state, builder: l.builder.name, cards: changed }, builder)
-    out.push({ id: l.id, label, mark: { state: l.state, mergeDue: mergeDue(Object.values(marks)), ...(mergeStall ? { ms: true } : {}), cards: marks }, cards, mergeStall, status: l.status, mergeCommit: l.mergeCommit })
+    out.push({ id: l.id, label, short: l.name?.trim() || pair, mark: { state: l.state, mergeDue: mergeDue(Object.values(marks)), ...(mergeStall ? { ms: true } : {}), cards: marks }, cards, mergeStall, status: l.status, mergeCommit: l.mergeCommit })
   }
   return out
 }
@@ -1879,7 +1917,9 @@ async function evaluateLanes(store: Store): Promise<void> {
   for (const rec of store.list.filter((r) => r.lanes && r.fired)) await deliver(store, rec)
 }
 
-export type LaneWatchResult = { watching: TaskWatchInfo; replaced?: string; cards?: LaneWatchCards; agents?: LaneWatchAgents }
+export type LaneWatching = { watching: TaskWatchInfo; replaced?: string; cards?: LaneWatchCards; agents?: LaneWatchAgents }
+/** `already` (HI-2521): the lanes it names that have ended or been abandoned, each told; no watch was started. */
+export type LaneWatchResult = LaneWatching | { already: string[]; replaced?: string }
 
 /**
  * Starts (or replaces) an agent's watch on lanes (#531): the lanes it names (each in its view, else an error), or every
@@ -1891,9 +1931,12 @@ export type LaneWatchResult = { watching: TaskWatchInfo; replaced?: string; card
  * out, the last lane watch's cards are kept (the one it replaces, or the one whose wake was read), less those since done
  * or gone; [] drops them. The reply says which (`cards`).
  */
+// A watch on every running lane names no lane that has ended: it is always a watch.
+export async function registerLaneWatch(ws: WorkspaceService, projectPath: string, agentId: string, asked: LaneWatchCondition & { ids: 'all' }, limitMinutes?: number, extra?: { cards?: number[]; changes?: WatchChange[]; agents?: AgentWatchCondition }): Promise<LaneWatching>
+export async function registerLaneWatch(ws: WorkspaceService, projectPath: string, agentId: string, asked: LaneWatchCondition, limitMinutes?: number, extra?: { cards?: number[]; changes?: WatchChange[]; agents?: AgentWatchCondition }): Promise<LaneWatchResult>
 export async function registerLaneWatch(ws: WorkspaceService, projectPath: string, agentId: string, asked: LaneWatchCondition, limitMinutes = WATCH_DEFAULT_LIMIT_MINUTES, extra: { cards?: number[]; changes?: WatchChange[]; agents?: AgentWatchCondition } = {}): Promise<LaneWatchResult> {
-  // A question for the user always counts (HI-1991), whoever made the condition.
-  const cond: LaneWatchCondition = { ...asked, events: [...new Set([...asked.events, ...LANE_ALWAYS_EVENTS])] }
+  // A question for the user always counts (HI-1991), whoever made the condition; so does named lanes' end (HI-2521).
+  const cond: LaneWatchCondition = { ...asked, events: withAlwaysEvents(asked.ids, asked.events) }
   // Waits for the user are new from here (#726 round 1 finding): taken before anything waits, so one that begins while
   // the lanes and cards are read is told, not taken as its baseline.
   const waitsFrom = latestWaitSeq()
@@ -1924,7 +1967,29 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
     const laneSince = told?.at ?? since
     const toldMarks = told ? Object.fromEntries(told.marks) : undefined
     const nows = await lanesNow(store, { scope, lanes: cond, laneSince, ...(toldMarks ? { laneMarks: toldMarks } : {}) })
+    await testHooks.afterLanesRead?.()
+    const old = recordOf(store, projectPath, agentId)
+    // HI-2521: a lane it names that has ended or been abandoned is the answer at once, as an agent not working is for an
+    // agent watch: no watch starts (it would start from the end, with nothing left to tell), and one it had ends.
+    const over = cond.ids === 'all' ? [] : nows.flatMap((n) => laneOverPart(n) ?? [])
+    if (over.length) {
+      const before = store.list
+      store.list = store.list.filter((x) => x !== old)
+      if (old) {
+        try {
+          await save(store)
+        } catch (e) {
+          store.list = before
+          throw new Error(say(T.notSaved, { error: (e as Error).message }), { cause: e })
+        }
+      }
+      stopDelivery(store, old)
+      log.info(`${userText(agentId)} asked to watch ${(cond.ids as string[]).join(', ')}: ended already`)
+      return { already: over, ...(old ? { replaced: infoOf(old).label } : {}) }
+    }
     const allLanes = await listLanes(ws, { all: true })
+    // HI-2522: how its labels name the lanes it names, among the lanes in its view (a name two lanes share adds the builder).
+    const titles = cond.ids === 'all' ? undefined : laneTitlesOf(cond.ids, allLanes.filter((l) => scope === null || same(l.project, scope)))
     const started = new Map(allLanes.map((l) => [l.id, l.startedAt]))
     // The watched lanes' own cards (#1531, #1346 item 3): listed as cards too, each wakes it on every move.
     const watchedIds = new Set(nows.map((n) => n.id))
@@ -1936,7 +2001,6 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
       // Started since that wake: left unmarked, so the first check measures it from an empty start.
       else if (!(told && Date.parse(started.get(n.id) ?? '') > Date.parse(laneSince))) laneMarks[n.id] = keepAsked(null, n.mark, laneSince)
     }
-    const old = recordOf(store, projectPath, agentId)
     // The cards beside its lanes (#726): those named, else the last lane watch's (the one it replaces, or the one whose
     // wake was read), less those done or gone since (a card named must be one it may see).
     const last = old?.lanes ? (old.cond.cards.length ? { cards: old.cond.cards, changes: old.cond.changes } : undefined) : told?.cards
@@ -2006,7 +2070,7 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
     const before = store.list
     if (!old && store.list.length >= MAX_WATCHES) throw new Error(say(T.tooMany, { max: String(MAX_WATCHES) }))
     const minutes = Math.min(WATCH_MAX_LIMIT_MINUTES, Math.max(1, Math.round(limitMinutes)))
-    const rec: WatchRecord = { id: randomBytes(6).toString('hex'), projectPath, ...projectIdOf(ws, projectPath), agentId, scope, cond: cardCond, lanes: cond, laneMarks, laneSince, waitSeq, ...(followed.length ? { agents: { ignoreBackground: wanted!.ignoreBackground, agents: followed }, agentMarks } : {}), marks, current, since, ...from, limitMinutes: minutes, limitAt: new Date(Date.now() + minutes * 60_000).toISOString() }
+    const rec: WatchRecord = { id: randomBytes(6).toString('hex'), projectPath, ...projectIdOf(ws, projectPath), agentId, scope, cond: cardCond, lanes: cond, laneMarks, ...(titles ? { laneTitles: titles } : {}), laneSince, waitSeq, ...(followed.length ? { agents: { ignoreBackground: wanted!.ignoreBackground, agents: followed }, agentMarks } : {}), marks, current, since, ...from, limitMinutes: minutes, limitAt: new Date(Date.now() + minutes * 60_000).toISOString() }
     const next = [...store.list.filter((x) => x !== old), rec]
     if (budget(store, next) > MAX_FILE_BYTES && !((await setAside(store)) && budget(store, next) <= MAX_FILE_BYTES)) throw new Error(say(T.tooBig))
     store.list = next
@@ -2022,7 +2086,9 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
     return { watching: infoOf(rec), ...(old ? { replaced: infoOf(old).label } : {}), ...(cardsOut ? { cards: cardsOut } : {}), ...(agentsOut ? { agents: agentsOut } : {}) }
   })
   sessions.watchChanged(projectPath, agentId)
-  // Checked once in place: an event since a wake, or while it was being set up, isn't missed.
+  if ('already' in result) return result
+  // Checked once in place: an event since a wake, or while it was being set up (a lane ending after its state was read
+  // above, HI-2521), isn't missed.
   inBackground('checking lane watches', evaluateLanes(store))
   if (result.agents?.now.length) inBackground('checking agent watches', evaluateAgents(store))
   return result
@@ -2947,7 +3013,7 @@ export async function tick(now = Date.now()): Promise<void> {
         if (!rec.fired && Date.parse(rec.limitAt) <= now) {
           const plain = !rec.lanes && !rec.agents && !usageOnly(rec)
           const where = plain ? await reviewWhere(store, rec) : []
-          rec.fired = { line: lineFor(store, rec, () => (rec.lanes ? laneLimitLine(rec.lanes, rec.limitMinutes, rec.cond.cards, rec.agents?.agents) : rec.agents ? agentLimitLine(rec.agents, rec.limitMinutes) : usageOnly(rec) ? usageLimitLine(rec.usage!, rec.limitMinutes) : limitLine(rec.cond, rec.limitMinutes, rec.released ?? [], where))), at: new Date(now).toISOString(), cards: [], ...(plain ? { limit: true as const } : {}) }
+          rec.fired = { line: lineFor(store, rec, () => (rec.lanes ? laneLimitLine(rec.lanes, rec.limitMinutes, rec.cond.cards, rec.agents?.agents, rec.laneTitles) : rec.agents ? agentLimitLine(rec.agents, rec.limitMinutes) : usageOnly(rec) ? usageLimitLine(rec.usage!, rec.limitMinutes) : limitLine(rec.cond, rec.limitMinutes, rec.released ?? [], where))), at: new Date(now).toISOString(), cards: [], ...(plain ? { limit: true as const } : {}) }
           changed = true
         }
       }

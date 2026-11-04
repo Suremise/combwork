@@ -65,7 +65,7 @@
   "tasks.error.refsNotNumber": "{field}: \"{value}\" is not a card number",
   "tasks.error.refsSelf": "{field}: a card can't refer to itself",
   "tasks.error.repairNoProject": "{project} isn't a project of the workspace now",
-  "tasks.error.reviewAgentsOnly": "Only an agent of the card's project reviews it, through its own hive tools.",
+  "tasks.error.reviewAgentsOnly": "Only an agent of the card's project reviews it, through its own Combwork tools.",
   "tasks.error.reviewNotInReview": "{card} is in {column, select, hold {On Hold} todo {Todo} doing {Doing} passed {Passed} done {Done} other {{column}}}. A card is reviewed in Review; if it needs more work, that is work on it (move it to doing).",
   "tasks.error.reviewOnItsOwn": "Start a review on its own: the card stays where it is, with its agent.",
   "tasks.error.reviewSkipInReview": "{card} is in Review: whether it skips review is decided before it is submitted. To take it past its review now, the user moves it on (an override, with their reason).",

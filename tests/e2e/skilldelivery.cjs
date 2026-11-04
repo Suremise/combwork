@@ -174,12 +174,12 @@ const BOTH = ['handover', 'pick-up', 'split-work', 'workspace-note', 'use-cw-api
   check('the project folder keeps its copies when its agent stops', (await stopped(proj, codex.id)) && copies(codexDir).includes('work-on-card'), copies(codexDir).join(','))
 
   // Everywhere: the project folder's go too, and the user's folder named like a copy stays.
-  await inv('advanced:set', 'hive.skills.removeIdleCopies', 'everywhere')
+  await inv('advanced:set', 'cw.skills.removeIdleCopies', 'everywhere')
   await inv('session:start', proj, { agentId: codex.id })
   await ready(proj, codex.id)
   check('Everywhere: the project folder loses them too once its last agent stops', (await stopped(proj, codex.id)) && !!(await until(async () => copies(codexDir).join(',') === 'handover', HUNG_MS)), copies(codexDir).join(','))
   check("…but never the user's folder named like a copy", fs.readFileSync(path.join(codexDir, 'cw-handover', 'SKILL.md'), 'utf8').includes('MY OWN'))
-  await inv('advanced:set', 'hive.skills.removeIdleCopies', null)
+  await inv('advanced:set', 'cw.skills.removeIdleCopies', null)
 
   // A skill switched off for the project isn't delivered at the next launch: not copied, not in Claude Code's plugin, not
   // named in the guidance. Its copy stays while another agent of Hive's works in the folder (it may be reading it), and

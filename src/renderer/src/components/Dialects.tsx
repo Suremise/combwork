@@ -17,6 +17,8 @@ import {
   changedAnywhere,
   changedHere,
   dialectFileText,
+  dialectLabelProblem,
+  DIALECT_LABEL_MAX,
   layerValues,
   parseDialectFile,
   shownText,
@@ -24,6 +26,7 @@ import {
   type DialectCatalogueText,
   type DialectFile,
   type DialectFileView,
+  type DialectLabelProblem,
   type DialectLayer,
   type DialectRefusal,
   type DialectRow,
@@ -32,14 +35,19 @@ import {
   type TextProblem,
   type TextSource
 } from '@shared/dialects'
+import { dialectModelOf, dialectModelProblem } from '@shared/models'
+import type { ProviderId } from '@shared/types'
 import { call } from '../api'
 import * as actions from '../actions'
 import { confirm, notify, prompt, set, useStore } from '../store'
 import { useScopedLoad } from '../scopedLoad'
 import { cx } from '../util'
+// Its own line, apart from the ui import below that HB5's HI-2523 changes (HI-2527).
+import { OneLineDesc } from './ui'
 import { CodeEditor } from './Editors'
+import { dialectOnTip } from './dialectOnTip'
 import { Section } from './Sidebar'
-import { Icon, IconButton, LoadFailed, SearchInput, Switch, Tooltip } from './ui'
+import { BusyButton, Icon, IconButton, LoadFailed, Modal, SearchInput, Switch, Tooltip, useBusy } from './ui'
 
 const M = {
   title: msg({ id: 'dialects.title', defaultMessage: 'Dialects', description: 'Title of the Dialects view (HI-2444): the wording Hive gives agents, tuned per model and CLI. Glossary: dialect.' }),
@@ -73,7 +81,6 @@ const M = {
   claimTaken: msg({ id: 'dialects.claimTaken', defaultMessage: 'Another file of this folder, {by}, claims model {model} first: Auto never picks this one.', description: "A warning on a dialect file whose model another file of the same CLI folder claims too (made outside Hive): {by} is that file, {model} the model ID. Glossary: dialect." }),
   usedBy: msg({ id: 'dialects.usedBy', defaultMessage: '{count, plural, one {Used by # running agent: {agents}} other {Used by # running agents: {agents}}}', description: 'Tooltip on the agents count of a dialect file in the Dialects view: the running agents whose dialect chain has it, by name. Glossary: dialect.' }),
   onSwitch: msg({ id: 'dialects.onSwitch', defaultMessage: '{name} on', description: "A dialect file's on/off switch in the Dialects view, for screen readers. {name} is the file's name. Glossary: dialect." }),
-  onTip: msg({ id: 'dialects.onTip', defaultMessage: "On: its texts apply. Off: its place in the chain is empty, so its texts fall through to the layer below. Applies at each agent's next launch.", description: "Tooltip on a dialect file's on/off switch in the Dialects view. Glossary: dialect, chain." }),
   onFailed: msg({ id: 'dialects.onFailed', defaultMessage: "Couldn't switch {name} on or off", description: 'A notice: switching a dialect file on or off failed. {name} is the file. Glossary: dialect.' }),
   // The file
   save: msg({ id: 'dialects.save', defaultMessage: 'Save', description: "The Dialects view's Save button: writes the file's changes, checked against this Hive's texts first." }),
@@ -82,19 +89,31 @@ const M = {
   saved: msg({ id: 'dialects.saved', defaultMessage: "{name} saved: it applies at each agent's next launch.", description: 'A notice after saving a dialect file. {name} is the file. Glossary: dialect.' }),
   duplicate: msg({ id: 'dialects.duplicate', defaultMessage: 'Duplicate…', description: "A button of a dialect file in the Dialects view: makes a test copy of it beside it (no model), to try on one agent. Glossary: test copy." }),
   duplicateTitle: msg({ id: 'dialects.duplicateTitle', defaultMessage: 'Duplicate {name}', description: 'Title of the dialog naming a copy of a dialect file. {name} is the file. Glossary: dialect.' }),
-  duplicateMessage: msg({ id: 'dialects.duplicateMessage', defaultMessage: "The copy has the same texts and no model, so no agent uses it until its Dialect setting picks it (Agent Settings). Use for a model makes it the one Auto picks.", description: 'The Duplicate dialog of a dialect file. "Use for a model" names the Promote button. Glossary: dialect, test copy.' }),
+  duplicateMessage: msg({ id: 'dialects.duplicateMessage', defaultMessage: "The copy has the same texts. With a model, agents on Auto running it get the copy from their next launch. Without one it's a test copy, which an agent uses only when its Dialect setting picks it (Agent Settings).", description: 'The Duplicate dialog of a dialect file (HI-2523): what the copy is, with a model ID typed or without. Glossary: dialect, test copy.' }),
   copyLabel: msg({ id: 'dialects.copyLabel', defaultMessage: '{name} copy', description: "A copy's suggested name in the Duplicate dialog. {name} is the file copied." }),
-  create: msg({ id: 'dialects.create', defaultMessage: 'Create', description: "The Duplicate and Import dialogs' button." }),
+  create: msg({ id: 'dialects.create', defaultMessage: 'Create', description: "The New Model File, Duplicate and Import dialogs' button." }),
+  cancel: msg({ id: 'dialects.cancel', defaultMessage: 'Cancel', description: "The New Model File, Duplicate and Set Model dialogs' button: closes the dialog, changing nothing." }),
+  newModel: msg({ id: 'dialects.newModel', defaultMessage: 'New Model File…', description: "A button on a CLI's group in the Dialects view (HI-2523): makes an empty dialect file for a model of that CLI. Glossary: dialect." }),
+  newTitle: msg({ id: 'dialects.newTitle', defaultMessage: 'New Model File for {cli}', description: 'Title of the New Model File dialog (HI-2523). {cli} is the CLI ("Codex"). Glossary: dialect.' }),
+  newMessage: msg({ id: 'dialects.newMessage', defaultMessage: "An empty file: it inherits every text until you change one in it. With a model, agents on Auto running it get this file from their next launch. Without one it's a test copy, which an agent uses only when its Dialect setting picks it.", description: 'The New Model File dialog (HI-2523): what the new file is, with a model ID typed or without. Glossary: dialect, test copy.' }),
+  modelOptional: msg({ id: 'dialects.modelOptional', defaultMessage: 'None: a test copy', description: "The placeholder of the New Model File and Duplicate dialogs' Model ID field (HI-2523): left empty, the file is a test copy. Glossary: test copy." }),
+  savedAs: msg({ id: 'dialects.savedAs', defaultMessage: 'Saved as {model}, the ID agents run it as.', description: "Under the Model ID field of a dialect file's dialog (HI-2523): what was typed is an alias or a form of a model ID the CLI knows, saved as its real ID ({model})." }),
+  claimedBy: msg({ id: 'dialects.claimedBy', defaultMessage: '{name} already has this model: it becomes a test copy.', description: "Under the Model ID field of a dialect file's dialog (HI-2523): another file of the folder ({name}) claims the model; saving moves the claim, and that file keeps its texts as a test copy. Glossary: test copy." }),
+  notSeen: msg({ id: 'dialects.notSeen', defaultMessage: 'No agent has run this model yet.', description: "Under the Model ID field of a dialect file's dialog (HI-2523): no agent of the workspace has run that model ID. Information only: the file can be made for it anyway." }),
+  unresolvedAlias: msg({ id: 'dialects.unresolvedAlias', defaultMessage: "{model} is an alias Combwork can't resolve now: agents running it show as model unknown, so this file wouldn't match. Type the model's ID.", description: "Under the Model ID field of a dialect file's dialog (HI-2523): the text typed ({model}: \"opus\") is one of the CLI's aliases, and its catalogue doesn't say which model it stands for." }),
+  modelEmpty: msg({ id: 'dialects.modelEmpty', defaultMessage: 'Enter a model ID.', description: 'The Set Model dialog of a dialect file (HI-2523): the Model ID field is empty.' }),
+  modelControl: msg({ id: 'dialects.modelControl', defaultMessage: 'A model ID has no control characters or line breaks.', description: "A dialect file's dialog (HI-2523): the Model ID typed has a control character or a line break." }),
+  claimMoved: msg({ id: 'dialects.claimMoved', defaultMessage: '{name} has model {model} now: {from} became a test copy.', description: 'A notice after a dialect file took a model another file had (HI-2523). {name} is the file, {model} the model ID, {from} the file that had it. Glossary: test copy.' }),
   export: msg({ id: 'dialects.export', defaultMessage: 'Export…', description: 'A button of a dialect file in the Dialects view: writes it as it is to a file you choose.' }),
   exported: msg({ id: 'dialects.exported', defaultMessage: 'Exported to {path}', description: 'A notice after exporting a dialect file. {path} is where it was written.' }),
   revert: msg({ id: 'dialects.revert', defaultMessage: 'Revert to Shipped', description: 'A button of an edited shipped dialect file: puts back the file as Hive ships it. Glossary: dialect.' }),
   revertTitle: msg({ id: 'dialects.revertTitle', defaultMessage: 'Revert {name}?', description: 'Title of the confirmation before reverting a dialect file. {name} is the file.' }),
   revertMessage: msg({ id: 'dialects.revertMessage', defaultMessage: "Your changes to it are lost, and it follows Combwork's updates again.", description: 'The confirmation before reverting a dialect file to the version Hive ships. Glossary: dialect.' }),
-  promote: msg({ id: 'dialects.promote', defaultMessage: 'Use for a Model…', description: "A button of a test copy in the Dialects view: makes it the file Auto picks for a model ID (the file that had it becomes a test copy). Glossary: test copy." }),
-  promoteTitle: msg({ id: 'dialects.promoteTitle', defaultMessage: 'Use {name} for a model', description: 'Title of the Promote dialog of a test copy. {name} is the file. Glossary: dialect.' }),
-  promoteMessage: msg({ id: 'dialects.promoteMessage', defaultMessage: "Agents on Auto running this model ID get this file from their next launch. A file that had the model keeps its texts, as a test copy.", description: 'The Promote dialog of a test copy (Dialects view). Glossary: dialect, test copy.' }),
-  promoteField: msg({ id: 'dialects.promoteField', defaultMessage: 'Model ID', description: 'The Promote dialog\'s field: the real model ID ("claude-opus-5-5").' }),
-  promoteButton: msg({ id: 'dialects.promoteButton', defaultMessage: 'Use for This Model', description: "The Promote dialog's button." }),
+  promote: msg({ id: 'dialects.promote', defaultMessage: 'Set Model…', description: "A button of the user's own dialect files (a test copy, a model file they made or imported) in the Dialects view (HI-2523): sets the model ID the file is for, which Auto picks it for (a file that had that model becomes a test copy). Glossary: dialect, test copy." }),
+  promoteTitle: msg({ id: 'dialects.promoteTitle', defaultMessage: 'Set Model of {name}', description: 'Title of the Set Model dialog of a dialect file (HI-2523). {name} is the file. Glossary: dialect.' }),
+  promoteMessage: msg({ id: 'dialects.promoteMessage', defaultMessage: "Agents on Auto running this model ID get this file from their next launch. A file that had the model keeps its texts, as a test copy.", description: 'The Set Model dialog of a dialect file (Dialects view). Glossary: dialect, test copy.' }),
+  promoteField: msg({ id: 'dialects.promoteField', defaultMessage: 'Model ID', description: 'The Model ID field of the New Model File, Duplicate and Set Model dialogs (HI-2523): the model ID the file is for ("claude-opus-5-5", "qwen3:32b"), typed or picked from those agents have run.' }),
+  promoteButton: msg({ id: 'dialects.promoteButton', defaultMessage: 'Set Model', description: "The Set Model dialog's button (HI-2523)." }),
   deleteFile: msg({ id: 'dialects.delete', defaultMessage: 'Delete', description: 'A button of a dialect file the user made: moves it to the Recycle Bin.' }),
   deleteTitle: msg({ id: 'dialects.deleteTitle', defaultMessage: 'Delete {name}?', description: 'Title of the confirmation before deleting a dialect file. {name} is the file.' }),
   deleteMessage: msg({ id: 'dialects.deleteMessage', defaultMessage: 'It goes to the Recycle Bin. Agents whose Dialect setting names it use Auto from their next launch.', description: 'The confirmation before deleting a dialect file. Glossary: dialect.' }),
@@ -156,7 +175,8 @@ const M = {
     nameTaken: msg({ id: 'dialects.refused.nameTaken', defaultMessage: '{path} is already there: choose another name.', description: "A dialect file's import or copy refused: a file of that name ({path}) exists. Glossary: dialect." }),
     missing: msg({ id: 'dialects.refused.missing', defaultMessage: '{path} is no longer there.', description: 'A change to a dialect file refused: the file ({path}) was deleted meanwhile.' }),
     changedOnDisk: msg({ id: 'dialects.refused.changedOnDisk', defaultMessage: 'The file changed outside Combwork since you started editing it: nothing was saved.', description: "A dialect file's save refused: it changed on disk meanwhile (an editor, git, another window). The view then offers Reload or Keep My Changes." }),
-    protected: msg({ id: 'dialects.refused.protected', defaultMessage: "The Workspace file, a CLI's file and a shipped file can't be deleted.", description: 'A dialect file\'s delete refused: it is part of the chain\'s baseline (a shipped one has Revert).' })
+    protected: msg({ id: 'dialects.refused.protected', defaultMessage: "The Workspace file, a CLI's file and a shipped file can't be deleted.", description: 'A dialect file\'s delete refused: it is part of the chain\'s baseline (a shipped one has Revert).' }),
+    notYours: msg({ id: 'dialects.refused.notYours', defaultMessage: 'Only your own model files and test copies take Set Model: not a shipped file, nor the CLI, API or Workspace files.', description: "A dialect file's Set Model refused (HI-2523): the file is one Combwork ships, or a CLI's, the API's or the Workspace file. Glossary: dialect, test copy." })
   },
   fileProblem: {
     json: msg({ id: 'dialects.fileProblem.json', defaultMessage: "it isn't JSON", description: 'Why a text isn\'t a dialect file (Dialects view). Lower case: it follows a colon.' }),
@@ -168,7 +188,13 @@ const M = {
   importName: msg({ id: 'dialects.importName', defaultMessage: 'Name', description: "The Import and Duplicate dialogs' field: the file's name." }),
   imported: msg({ id: 'dialects.imported', defaultMessage: '{path} imported.', description: 'A notice after importing a dialect file. {path} is where it went.' }),
   importedCopy: msg({ id: 'dialects.importedCopy', defaultMessage: '{path} imported as a test copy: its model is already claimed in that folder.', description: 'A notice after importing a dialect file whose model another file of the folder claims: it came in without a model. Glossary: test copy.' }),
-  nameProblem: msg({ id: 'dialects.nameProblem', defaultMessage: 'A name with no / \\ : * ? " < > |, not starting with a dot.', description: "The Import and Duplicate dialogs: the name has a character Windows refuses in a file name, or starts with a dot. Keep the characters." }),
+  nameProblem: msg({ id: 'dialects.nameProblem', defaultMessage: 'A name with no / \\ : * ? " < > |, not starting with a dot.', description: "The Import, New Model File and Duplicate dialogs: the name has a character Windows refuses in a file name, or starts with a dot. Keep the characters." }),
+  nameEmpty: msg({ id: 'dialects.nameEmpty', defaultMessage: 'Enter a name.', description: "A dialect file's dialog (HI-2523): the Name field is empty." }),
+  nameEnd: msg({ id: 'dialects.nameEnd', defaultMessage: "A name can't end with a dot or a space.", description: "A dialect file's dialog (HI-2523): Windows doesn't keep a trailing dot or space in a file name." }),
+  nameReserved: msg({ id: 'dialects.nameReserved', defaultMessage: '{name} is a name Windows keeps for itself, as it does CON, NUL and COM1.', description: "A dialect file's dialog (HI-2523): the name ({name}) is a Windows device name, which can't be a file's. Keep CON, NUL and COM1 as they are." }),
+  nameCli: msg({ id: 'dialects.nameCli', defaultMessage: '"cli" is the name of the CLI\'s own file: choose another.', description: "A dialect file's dialog (HI-2523): the name \"cli\" is taken by the CLI's own dialect file (cli.json). Keep \"cli\" as it is." }),
+  nameLong: msg({ id: 'dialects.nameLong', defaultMessage: 'At most {max, number} characters.', description: "A dialect file's dialog (HI-2523): the name is too long; {max} is the limit." }),
+  nameInFolder: msg({ id: 'dialects.nameInFolder', defaultMessage: '{name} is already in this folder: choose another name.', description: "A dialect file's dialog (HI-2523): a file of that name ({name}) is already in the CLI's folder (names are compared without case)." }),
   failed: msg({ id: 'dialects.failed', defaultMessage: "Couldn't change {name}", description: 'A notice: an action on a dialect file failed. {name} is the file.' })
 }
 
@@ -272,13 +298,42 @@ function refusalLines(r: DialectRefusal): string[] {
       return [tr(M.refused.changedOnDisk)]
     case 'protected':
       return [tr(M.refused.protected)]
+    case 'name':
+      return [nameProblemText(r.problem, '')]
+    case 'model':
+      return [tr(r.problem === 'empty' ? M.modelEmpty : M.modelControl)]
+    case 'notYours':
+      return [tr(M.refused.notYours)]
+  }
+}
+
+/** Why a name can't be a dialect file's, in words (HI-2523). */
+function nameProblemText(p: DialectLabelProblem, name: string): string {
+  switch (p) {
+    case 'empty':
+      return tr(M.nameEmpty)
+    case 'chars':
+    case 'dot':
+      return tr(M.nameProblem)
+    case 'end':
+      return tr(M.nameEnd)
+    case 'reserved':
+      return tr(M.nameReserved, { name })
+    case 'cli':
+      return tr(M.nameCli)
+    case 'long':
+      return tr(M.nameLong, { max: DIALECT_LABEL_MAX })
   }
 }
 
 const isRefusal = (r: unknown): r is DialectRefusal => !!r && typeof r === 'object' && 'refused' in r
 
 /** A file name Windows takes, not hidden (as the service checks it). */
-const labelProblem = (v: string): string | null => (!v.trim() || /[\\/:*?"<>|\x00-\x1f]/.test(v) || v.trim().startsWith('.') ? tr(M.nameProblem) : null)
+const labelProblem = (v: string, importing = false): string | null => {
+  const p = dialectLabelProblem(v.trim())
+  // An import may be a CLI's own file (cli.json); a new file or a copy never is.
+  return p && !(importing && p === 'cli') ? nameProblemText(p, v.trim()) : null
+}
 
 // ---------------------------------------------------------------------------
 // The list
@@ -291,6 +346,7 @@ export function DialectsPanel() {
   const rows = loaded.data ?? NO_ROWS
   const usage = useUsage(wsPath)
   const [filter, setFilter] = useState('')
+  const [dialog, setDialog] = useState<FileDialog | null>(null)
   const f = filter.trim().toLowerCase()
   const shown = rows.filter((r) => !f || `${r.name} ${r.model ?? ''} ${r.path}`.toLowerCase().includes(f))
   const groups: { key: string; title: string; rows: DialectRow[] }[] = []
@@ -323,12 +379,13 @@ export function DialectsPanel() {
           </div>
         )}
         {groups.map((g) => (
-          <Section key={g.key} title={g.title} count={g.rows.length}>
+          <Section key={g.key} title={g.title} count={g.rows.length} buttons={isKnownProvider(g.key) ? <IconButton icon="add" title={tr(M.newModel)} action={`dialect-new:${g.key}`} onClick={() => setDialog({ kind: 'new', folder: g.key })} /> : undefined}>
             {g.rows.map((r) => (
               <DialectListRow key={r.path} row={r} selected={selected === r.path} users={usage.filter((u) => u.files.includes(r.path))} />
             ))}
           </Section>
         ))}
+        {dialog && <DialectFileDialog dialog={dialog} onClose={() => setDialog(null)} />}
       </div>
     </>
   )
@@ -347,9 +404,7 @@ function DialectListRow({ row, selected, users }: { row: DialectRow; selected: b
           {row.outdated > 0 && <span className="badge warn" data-outdated={row.outdated}>{tr(M.outdatedBadge, { count: row.outdated })}</span>}
           {row.broken && <span className="badge warn">{tr(M.brokenBadge)}</span>}
         </div>
-        <div className="desc" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {kindText(row)}
-        </div>
+        <OneLineDesc text={kindText(row)} />
       </div>
       {users.length > 0 && (
         <Tooltip content={tr(M.usedBy, { count: users.length, agents: fmt.list(users.map((u) => u.agent)) })}>
@@ -359,7 +414,7 @@ function DialectListRow({ row, selected, users }: { row: DialectRow; selected: b
         </Tooltip>
       )}
       <div className="skill-delivered" onClick={(e) => e.stopPropagation()}>
-        <Tooltip content={tr(M.onTip)}>
+        <Tooltip content={dialectOnTip(row, folderName, tr)}>
           <Switch small checked={row.on} label={tr(M.onSwitch, { name: row.name })} onChange={change} />
         </Tooltip>
       </div>
@@ -380,7 +435,7 @@ async function importDialect(): Promise<void> {
       message: tr(M.importMessage),
       fieldLabel: tr(M.importName),
       initial: label,
-      validate: labelProblem,
+      validate: (v) => labelProblem(v, true),
       confirmLabel: tr(M.create),
       select: { label: tr(M.importFolder), options: folders.map((f) => ({ value: f, label: folderName(f) })), initial: folder, set: (v) => (folder = v) }
     })
@@ -473,6 +528,7 @@ function DialectFilePane({ ws, view, catalogue, usage }: { ws: string; view: Dia
   const path = view.row.path
   const key = draftKey(ws, path)
   const [, rerender] = useState(0)
+  const [dialog, setDialog] = useState<FileDialog | null>(null)
   const draft = drafts.get(key)
   const dirty = !!draft
   const file = draft ? draft.file : view.file
@@ -601,7 +657,7 @@ function DialectFilePane({ ws, view, catalogue, usage }: { ws: string; view: Dia
           </div>
           <span className={cx('badge', view.row.state === 'edited' && 'accent')}>{tr(M.state[view.row.state])}</span>
           {view.row.outdated > 0 && <span className="badge warn">{tr(M.outdatedBadge, { count: view.row.outdated })}</span>}
-          <Tooltip content={tr(M.onTip)}>
+          <Tooltip content={dialectOnTip(view.row, folderName, tr)}>
             <Switch small checked={view.row.on} label={tr(M.onSwitch, { name: view.row.name })} onChange={(on) => void actions.attempt(tr(M.onFailed, { name: view.row.name }), () => call('dialects:setOn', path, on))} />
           </Tooltip>
         </div>
@@ -615,12 +671,13 @@ function DialectFilePane({ ws, view, catalogue, usage }: { ws: string; view: Dia
             </button>
           )}
           {(view.row.kind === 'model' || view.row.kind === 'copy') && (
-            <button className="btn small subtle" data-dialect-duplicate onClick={() => void duplicate(view)}>
+            <button className="btn small subtle" data-dialect-duplicate onClick={() => setDialog({ kind: 'duplicate', view })}>
               <Icon name="copy" /> {tr(M.duplicate)}
             </button>
           )}
-          {view.row.kind === 'copy' && (
-            <button className="btn small subtle" data-dialect-promote onClick={() => void promote(view)}>
+          {/* Set Model (HI-2523): the user's own model files and test copies, never a shipped file. */}
+          {view.row.state === 'yours' && (view.row.kind === 'model' || view.row.kind === 'copy') && (
+            <button className="btn small subtle" data-dialect-promote onClick={() => setDialog({ kind: 'setModel', view })}>
               <Icon name="pass" /> {tr(M.promote)}
             </button>
           )}
@@ -634,6 +691,7 @@ function DialectFilePane({ ws, view, catalogue, usage }: { ws: string; view: Dia
           )}
           {deletable && <IconButton icon="trash" title={tr(M.deleteFile)} onClick={() => void remove(view, () => edit(null))} />}
         </div>
+        {dialog && <DialectFileDialog dialog={dialog} onClose={() => setDialog(null)} />}
         {view.row.claimTaken && <div className="banner warn">{tr(M.claimTaken, { by: view.row.claimTaken, model: view.row.model ?? '' })}</div>}
         {moved.length > 0 && (
           <div className="banner info" data-dialect-restart>
@@ -849,33 +907,151 @@ function DialectTextRow({ id, entry, problem, view, file, expanded, onToggle, ch
 // The file's actions
 // ---------------------------------------------------------------------------
 
-async function duplicate(view: DialectFileView): Promise<void> {
-  const label = await prompt({ title: tr(M.duplicateTitle, { name: view.row.name }), message: tr(M.duplicateMessage), fieldLabel: tr(M.importName), initial: tr(M.copyLabel, { name: view.row.name }), validate: labelProblem, confirmLabel: tr(M.create) })
-  if (label === null) return
-  const r = await call('dialects:duplicate', view.row.path, label.trim()).catch((e: unknown) => notify('error', tr(M.failed, { name: view.row.name }), String((e as Error)?.message ?? e)))
-  if (!r) return
-  if (isRefusal(r)) return notify('error', tr(M.failed, { name: view.row.name }), refusalLines(r).join('\n'))
-  set({ selectedDialect: r.path })
-  reloadDialects()
-}
+/** The dialog a CLI folder's file is made or retargeted in (HI-2523): New Model File, Duplicate, or Set Model. */
+type FileDialog = { kind: 'new'; folder: string } | { kind: 'duplicate'; view: DialectFileView } | { kind: 'setModel'; view: DialectFileView }
 
-async function promote(view: DialectFileView): Promise<void> {
-  const claimed = view.claims.map((c) => c.model)
-  const model = await prompt({
-    title: tr(M.promoteTitle, { name: view.row.name }),
-    message: tr(M.promoteMessage),
-    fieldLabel: tr(M.promoteField),
-    initial: claimed[0] ?? '',
-    list: view.claims.map((c) => `${c.model} · ${c.path}`), // i18n-ignore: a model ID and a file's path
-    listOnly: true,
-    validate: (v) => (v.trim() ? null : tr(M.promoteField)),
-    confirmLabel: tr(M.promoteButton)
-  })
-  if (model === null) return
-  const r = await call('dialects:promote', view.row.path, model.trim()).catch((e: unknown) => notify('error', tr(M.failed, { name: view.row.name }), String((e as Error)?.message ?? e)))
-  if (!r) return
-  if (isRefusal(r)) return notify('error', tr(M.failed, { name: view.row.name }), refusalLines(r).join('\n'))
-  reloadDialects()
+/**
+ * New Model File, Duplicate and Set Model (HI-2523): a name (not for Set Model) and a model ID. The model is free text
+ * first (Darren's decision): the models agents of the CLI have run, and those the folder's files claim, are suggestions
+ * only. What was typed is normalised only where the CLI recognises it (dialectModelOf), and the notes under it never
+ * block: the ID it is saved as, the file that has the model now (it becomes a test copy), a model no agent has run, an
+ * alias Combwork can't resolve. Main checks everything again under the folder's lock.
+ */
+function DialectFileDialog({ dialog, onClose }: { dialog: FileDialog; onClose: () => void }) {
+  const folder = dialog.kind === 'new' ? dialog.folder : (dialog.view.row.folder ?? '')
+  const cli = isKnownProvider(folder) ? (folder as ProviderId) : null
+  const info = useStore((s) => (cli ? s.providers[cli] : undefined))
+  const [name, setName] = useState(dialog.kind === 'duplicate' ? tr(M.copyLabel, { name: dialog.view.row.name }) : '')
+  const [model, setModel] = useState(dialog.kind === 'setModel' ? (dialog.view.row.model ?? '') : '')
+  const [rows, setRows] = useState<DialectRow[]>(NO_ROWS)
+  const [seen, setSeen] = useState<string[]>([])
+  const action = useBusy()
+  useEffect(() => {
+    let live = true
+    void call('dialects:list')
+      .then((r) => live && setRows(r))
+      .catch(() => {})
+    void call('dialects:models', folder)
+      .then((r) => live && setSeen(r))
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [folder])
+
+  const self = dialog.kind === 'setModel' ? dialog.view.row.path : null
+  const inFolder = rows.filter((r) => r.folder === folder)
+  const label = name.trim()
+  const labelP = dialog.kind === 'setModel' ? null : dialectLabelProblem(label)
+  const nameP = dialog.kind === 'setModel' ? null : labelP ? nameProblemText(labelP, label) : inFolder.some((r) => r.path.toLowerCase() === `${folder}/${label}.json`.toLowerCase()) ? tr(M.nameInFolder, { name: label }) : null
+  const typed = model.trim()
+  const dm = typed && cli ? dialectModelOf(cli, info, typed) : { model: typed, normalised: false, unresolvedAlias: false }
+  const modelBad = typed ? dialectModelProblem(typed) : dialog.kind === 'setModel' ? 'empty' : null
+  const modelP = modelBad ? tr(modelBad === 'empty' ? M.modelEmpty : M.modelControl) : null
+  const same = (a: string, b: string): boolean => a.trim().toLowerCase() === b.trim().toLowerCase()
+  const claimer = dm.model && !modelBad ? inFolder.find((r) => r.model && r.path !== self && !r.claimTaken && same(r.model, dm.model)) : undefined
+  const suggestions = [...seen, ...inFolder.flatMap((r) => (r.model && r.path !== self ? [r.model] : []))].filter((m, i, all) => all.findIndex((x) => same(x, m)) === i)
+  const problem = nameP ?? modelP
+  const title =
+    dialog.kind === 'new' ? tr(M.newTitle, { cli: folderName(folder) }) : dialog.kind === 'duplicate' ? tr(M.duplicateTitle, { name: dialog.view.row.name }) : tr(M.promoteTitle, { name: dialog.view.row.name })
+  const message = dialog.kind === 'new' ? tr(M.newMessage) : dialog.kind === 'duplicate' ? tr(M.duplicateMessage) : tr(M.promoteMessage)
+
+  const submit = async (): Promise<void> => {
+    if (problem) return
+    const done = await action.run('save', async (): Promise<{ path?: string; from: string | null }> => {
+      const r: { path?: string; from: string | null } | DialectRefusal = dialog.kind === 'setModel' ? await call('dialects:promote', dialog.view.row.path, dm.model) : await call('dialects:create', folder, label, dm.model, dialog.kind === 'duplicate' ? dialog.view.row.path : null)
+      if (isRefusal(r)) throw new Error(refusalLines(r).join('\n'))
+      return r
+    })
+    if (!done) return
+    const r = done.value
+    const path = r.path ?? self ?? ''
+    if (r.from) notify('info', tr(M.claimMoved, { name: dialog.kind === 'setModel' ? dialog.view.row.name : label, model: dm.model, from: r.from }))
+    set({ selectedDialect: path })
+    reloadDialects()
+    onClose()
+  }
+  const enter = (e: React.KeyboardEvent): void => void (e.key === 'Enter' && submit())
+  const listId = `dialect-models-${folder}`
+  return (
+    <Modal
+      title={title}
+      icon={dialog.kind === 'setModel' ? 'pass' : dialog.kind === 'duplicate' ? 'copy' : 'add'}
+      onClose={onClose}
+      busy={!!action.busy}
+      error={action.error}
+      footer={
+        <>
+          <button className="btn subtle" onClick={onClose}>
+            {tr(M.cancel)}
+          </button>
+          <BusyButton className="primary" disabled={!!problem} busy={action.busy === 'save'} busyLabel={tr(M.saving)} onClick={() => void submit()}>
+            {tr(dialog.kind === 'setModel' ? M.promoteButton : M.create)}
+          </BusyButton>
+        </>
+      }
+    >
+      <div className="dialect-file-dialog" data-dialect-dialog={dialog.kind}>
+        <p className="hint">{message}</p>
+        <div className="agent-form">
+          {dialog.kind !== 'setModel' && (
+            <>
+              <label htmlFor="dialect-file-name">{tr(M.importName)}</label>
+              <input id="dialect-file-name" className="input" data-dialect-name value={name} maxLength={DIALECT_LABEL_MAX + 20} autoFocus onChange={(e) => setName(e.target.value)} onKeyDown={enter} />
+              {nameP && label && (
+                <div className="field-error span2" data-note="name">
+                  {nameP}
+                </div>
+              )}
+            </>
+          )}
+          <label htmlFor="dialect-file-model">{tr(M.promoteField)}</label>
+          <input
+            id="dialect-file-model"
+            className="input"
+            data-dialect-model
+            value={model}
+            placeholder={dialog.kind === 'setModel' ? undefined : tr(M.modelOptional)}
+            list={listId}
+            autoFocus={dialog.kind === 'setModel'}
+            spellCheck={false}
+            onChange={(e) => setModel(e.target.value)}
+            onKeyDown={enter}
+          />
+          <datalist id={listId}>
+            {suggestions.map((m) => (
+              <option key={m} value={m} />
+            ))}
+          </datalist>
+          {modelP && (typed || dialog.kind === 'setModel') && (
+            <div className="field-error span2" data-note="model">
+              {modelP}
+            </div>
+          )}
+          {!modelBad && typed && dm.unresolvedAlias && (
+            <div className="hint span2 warn" data-note="unresolved">
+              {tr(M.unresolvedAlias, { model: typed })}
+            </div>
+          )}
+          {!modelBad && typed && dm.normalised && (
+            <div className="hint span2" data-note="savedAs">
+              {tr(M.savedAs, { model: dm.model })}
+            </div>
+          )}
+          {claimer && (
+            <div className="hint span2 warn" data-note="claimed">
+              {tr(M.claimedBy, { name: claimer.name })}
+            </div>
+          )}
+          {!modelBad && typed && !dm.unresolvedAlias && !seen.some((m) => same(m, dm.model)) && (
+            <div className="hint span2" data-note="notSeen">
+              {tr(M.notSeen)}
+            </div>
+          )}
+        </div>
+      </div>
+    </Modal>
+  )
 }
 
 async function exportFile(view: DialectFileView): Promise<void> {

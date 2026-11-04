@@ -186,6 +186,11 @@
   "main.connections.notFound": {
     "placeholders": {}
   },
+  "main.connections.tagTooLong": {
+    "placeholders": {
+      "max": "number"
+    }
+  },
   "main.finished.inProject": {
     "placeholders": {
       "n": "plural",

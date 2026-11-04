@@ -668,6 +668,20 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A list row's description kept to one line, its full text on hover (OneLineDesc, HI-2527). */
+.one-line-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Its text a Tab stop while cut: the ring goes round the line, as the text runs on past its "…". */
+.one-line-desc:has(:focus-visible) {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+.one-line-desc :focus-visible {
+  outline: none;
+}
 .pane-header .actions {
   margin-left: auto;
   display: flex;
@@ -4797,7 +4811,8 @@ h2.section#unused-worktrees {
 }
 .account-main {
   flex: 1 1 360px;
-  min-width: 220px;
+  /* Never wider than a narrow card (HI-2528: Settings beside both panels in a small window is ~260px). */
+  min-width: min(220px, 100%);
 }
 .account-name {
   font-weight: 600;
@@ -4895,55 +4910,221 @@ h2.section#unused-worktrees {
   align-self: stretch;
   border: 1px solid var(--border);
   border-radius: 6px;
+  container: account-card / inline-size;
 }
 .account-block > .account-row {
   border: 0;
   border-bottom: 1px solid var(--border);
   border-radius: 6px 6px 0 0;
 }
+/* An account's card (HI-2528, Darren's approved mockup v2): the same fields in the same place on every card. */
+.account-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 2px 16px;
+  margin-top: 6px;
+}
+.account-fact {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.account-fact-label {
+  font-size: 11px;
+  color: var(--fg-faint);
+}
+.account-fact-value {
+  overflow-wrap: anywhere;
+}
+.account-fact .account-state {
+  margin-top: 0;
+  flex-wrap: wrap;
+}
+.account-expiry {
+  display: block;
+  font-size: 12px;
+}
+.account-expiry.expired {
+  color: var(--warning);
+}
+.account-off-tag {
+  font-weight: normal;
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  color: var(--fg-muted);
+}
+.account-block.off-here .connection-list {
+  opacity: 0.7;
+}
+/* Its plan limits (HI-2528): a small bar each, its share, and when it resets. */
+.account-usage {
+  display: grid;
+  grid-template-columns: max-content minmax(60px, 160px) max-content minmax(0, 1fr);
+  gap: 3px 10px;
+  align-items: center;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.account-usage-row {
+  display: contents;
+}
+.account-usage-label {
+  color: var(--fg-muted);
+}
+.account-usage-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border-subtle);
+  overflow: hidden;
+}
+.account-usage-bar > i {
+  display: block;
+  height: 100%;
+  background: var(--success);
+}
+.account-usage-bar.high > i {
+  background: var(--warning);
+}
+.account-usage-bar.full > i {
+  background: var(--error);
+}
+.account-usage-pct {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.account-usage-reset {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-usage-none {
+  margin-top: 6px;
+  font-size: 12px;
+}
+@container account-card (max-width: 420px) {
+  .account-usage {
+    grid-template-columns: max-content minmax(40px, 1fr) max-content;
+  }
+  .account-usage-reset {
+    grid-column: 1 / -1;
+    margin-top: -2px;
+  }
+}
+/* Its connections, a small table inside the card (HI-2528; Darren 21:40: kept where they are, broken up as a table). */
 .connection-list {
   container: connection-list / inline-size;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 4px 10px 6px 38px;
+  padding: 4px 12px 12px;
+  background: var(--bg-sidebar);
+  border-radius: 0 0 6px 6px;
 }
-/* Each row is its own grid: a users column sized apart from its text keeps the split the same in every row, so the
-   columns line up (HI-2158). It fills to 150px before the fr columns grow, and gives way to 80px in a narrow pane. */
+/* Each row is the same grid, so the columns line up: order, name, tag, five values, who uses it, its buttons. */
 .connection-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1.2fr) minmax(160px, 2fr) minmax(80px, 150px) auto;
-  gap: 10px;
+  grid-template-columns: 44px minmax(84px, 1.2fr) minmax(72px, 1.1fr) minmax(56px, 0.9fr) minmax(54px, 0.6fr) minmax(54px, 0.6fr) minmax(56px, 0.9fr) minmax(44px, 0.6fr) minmax(60px, 0.8fr) 76px;
+  gap: 6px;
   align-items: center;
-  min-height: 26px;
+  min-height: 28px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 12px;
 }
-/* A list narrower than those minimums (Settings beside the sidebar in a small window, HI-2163): the summary goes under
-   the name, the users column stays 80px, none sized by its text, so the rows stay inside the card and lined up. A
-   narrow window has its own layout (below). */
-@media (min-width: 701px) {
-  @container connection-list (max-width: 439px) {
-    .connection-row {
-      grid-template-columns: minmax(0, 1fr) 80px auto;
-      grid-template-areas: 'name users more' 'summary summary more';
-      row-gap: 0;
-      padding: 2px 0;
-    }
-    .connection-row > .connection-name {
-      grid-area: name;
-    }
-    .connection-row > .connection-summary {
-      grid-area: summary;
-    }
-    .connection-row > .connection-users {
-      grid-area: users;
-    }
-    .connection-row > :last-child {
-      grid-area: more;
-    }
-  }
+.connection-row:last-of-type {
+  border-bottom: 0;
 }
-.connection-row:hover {
+.connection-head {
+  min-height: 24px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-faint);
+  border-bottom: 1px solid var(--border);
+}
+.connection-row:not(.connection-head):hover {
   background: var(--bg-hover);
+}
+.connection-cell {
+  overflow-wrap: anywhere;
+}
+/* No cell grows past its column (HR1 on HI-2528: a long tag painted over Model). */
+.connection-row > * {
+  min-width: 0;
+}
+.connection-tag-cell .connection-tag {
+  max-width: 100%;
+}
+.connection-tag-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.connection-cell.cli-own {
+  color: var(--fg-faint);
+  font-style: italic;
+}
+/* Each value's column name, for screen readers (the heading row is hidden from them). */
+.connection-cell-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.connection-order,
+.connection-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+.connection-actions {
+  justify-content: flex-end;
+}
+.connection-order .icon-btn {
+  width: 20px;
+}
+.connection-summary {
+  display: none;
+}
+/* A card narrower than the table (Settings beside the sidebar, a small window): each connection on two lines, its name,
+   tag, who uses it and its buttons, then its values in a line. */
+@container connection-list (max-width: 660px) {
+  .connection-head {
+    display: none;
+  }
+  .connection-row {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-areas: 'order name actions' 'order tag tag' 'order summary summary' 'order users users';
+    row-gap: 0;
+    padding: 3px 0;
+  }
+  .connection-row > .connection-order {
+    grid-area: order;
+  }
+  .connection-row > .connection-name {
+    grid-area: name;
+  }
+  .connection-row > .connection-users {
+    grid-area: users;
+    text-align: left;
+  }
+  .connection-row > .connection-actions {
+    grid-area: actions;
+  }
+  .connection-row > .connection-summary {
+    display: block;
+    grid-area: summary;
+  }
+  .connection-row > .connection-cell {
+    display: none;
+  }
+  /* Its tag, when it has one, under its name. */
+  .connection-row > .connection-tag-cell:not(.faint) {
+    display: block;
+    grid-area: tag;
+  }
 }
 .connection-name {
   font-weight: 600;
@@ -4963,6 +5144,22 @@ h2.section#unused-worktrees {
   border: 1px solid var(--border);
   color: var(--fg-muted);
 }
+/* A connection's tag (HI-2530): beside its name, like First, with a tag icon. */
+.connection-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+  font-weight: normal;
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--fg);
+}
+.connection-tag .codicon {
+  font-size: 11px;
+}
 .connection-summary,
 .connection-users {
   font-size: 12px;
@@ -4975,17 +5172,10 @@ h2.section#unused-worktrees {
   color: var(--warning);
   margin-left: 4px;
 }
+/* More room under it than before (HI-2528, Darren 21:40). */
 .connection-add {
   align-self: flex-start;
-  margin-top: 2px;
-}
-@media (max-width: 700px) {
-  .connection-row {
-    grid-template-columns: 1fr auto;
-  }
-  .connection-users {
-    text-align: left;
-  }
+  margin: 10px 0 2px;
 }
 /* Its handle: drag in the one order of accounts, or Alt+Up/Down. */
 .account-handle {
@@ -5041,7 +5231,8 @@ h2.section#unused-worktrees {
   to { transform: rotate(360deg); }
 }
 .empty-state {
-  padding: 40px;
+  /* HI-2533: its sides give way in a narrow pane (6% of it, 16 px at least), as wide ones keep 40 px. */
+  padding: 40px clamp(16px, 6%, 40px);
   text-align: center;
   color: var(--fg-muted);
 }
@@ -5088,6 +5279,13 @@ h2.section#unused-worktrees {
 /* ---------- Files tab ---------- */
 .split-list.files-list {
   width: 360px;
+}
+/* HI-2533: in a narrow pane (a 900 px window with the sidebar open) the list gives way, leaving 280 px beside it, so the
+   empty state there reads as text, not a thin column (it had 76 px for Files' hint, 116 px for Skills'), while the list
+   keeps room for its names. */
+.split-list:is(.files-list, .skills-list) {
+  min-width: 200px;
+  max-width: calc(100% - 280px);
 }
 .files-filter {
   display: flex;
@@ -7452,8 +7650,12 @@ button.agent-place:hover {
   border-radius: 4px;
   font-size: 0.9em;
 }
+/* New Session and Resume wrap, centred, when the pane is narrower than both (HI-2536: German's "Neue Sitzung" and the
+   split "Fortsetzen" made a sideways scrollbar under each pane at 900 px); the split button stays whole. */
 .pane-placeholder .btns {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
   margin-top: 8px;
 }
@@ -12018,6 +12220,11 @@ textarea.input.task-blocked-input {
 }
 .perf-scenarios td:first-child {
   white-space: nowrap;
+}
+/* A card's name keeps a readable width in a narrow window (HI-2534): the table scrolls in its .table-wrap rather than
+   squeezing the title to a word a line. */
+.table td.perf-name {
+  min-width: 16em;
 }
 .perf-detail-body p {
   margin: 0 0 6px;

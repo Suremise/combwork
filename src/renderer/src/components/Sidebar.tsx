@@ -10,9 +10,9 @@ import { hooksMissingText, shownMergeSlot, shownStatusMessage } from '@shared/ru
 import * as actions from '../actions'
 import { call } from '../api'
 import { commandKeybinding, runCommand } from '../commands'
-import { get, notify, projectKeyOf, projectStarting, projectState, startingLabel, prompt, set, setProjectTab, toggleCompactSidebar, useStore } from '../store'
+import { get, leaveSettingsForSidePanel, notify, projectKeyOf, projectStarting, projectState, startingLabel, prompt, set, setProjectTab, toggleCompactSidebar, useStore } from '../store'
 import { cx, formatKeybinding } from '../util'
-import { Icon, IconButton, InfoTip, LoadFailed, OneLineTitle, SearchInput, StaleNote, StatusDot, STATUS_TEXT, Switch, Tooltip, useContextMenu, type MenuEntry } from './ui'
+import { Icon, IconButton, InfoTip, LoadFailed, OneLineDesc, OneLineTitle, SearchInput, StaleNote, StatusDot, STATUS_TEXT, Switch, Tooltip, useContextMenu, type MenuEntry } from './ui'
 import { addSkill, deleteSkill, DeliveredSwitch, HiveSkillsWarning, restoreBundled, SKILL_LEVEL_TIP, skillDescription, SkillRow } from './Skills'
 import { DialectsPanel } from './Dialects'
 import { TemplatesPanel } from './Templates'
@@ -136,10 +136,10 @@ const M = {
   noServers: msg({ id: 'assistant.sidebar.noServers', defaultMessage: 'No MCP servers yet. Create one with +, or add one from a .json definition or a .zip of a server folder.', description: 'The MCP sidebar with no servers. + is the add button.' }),
   deleteServer: msg({ id: 'assistant.sidebar.deleteServer', defaultMessage: 'Delete server', description: "A trash button beside an MCP server of the workspace: deletes it." }),
   builtIn: msg({ id: 'assistant.sidebar.builtIn', defaultMessage: 'Built-in', description: "The MCP sidebar: the section of Hive's own server." }),
-  hiveServerDesc: msg({ id: 'assistant.sidebar.hiveServerDesc', defaultMessage: 'Combwork tools for agents: projects, shared notes, handovers, notifications', description: "Under the built-in hive server: what it gives agents." }),
+  hiveServerDesc: msg({ id: 'assistant.sidebar.hiveServerDesc', defaultMessage: 'Combwork tools for agents: projects, shared notes, handovers, notifications', description: "Under the built-in combwork server: what it gives agents." }),
   hiveServerTip: msg({ id: 'assistant.sidebar.hiveServerTip', defaultMessage: 'Controlled in Settings → Agent API', description: "Tooltip on the built-in server's On or Off." }),
-  on: msg({ id: 'assistant.sidebar.on', defaultMessage: 'On', description: 'A badge: the built-in hive server is on.' }),
-  off: msg({ id: 'assistant.sidebar.off', defaultMessage: 'Off', description: 'A badge: the built-in hive server is off.' })
+  on: msg({ id: 'assistant.sidebar.on', defaultMessage: 'On', description: 'A badge: the built-in combwork server is on.' }),
+  off: msg({ id: 'assistant.sidebar.off', defaultMessage: 'Off', description: 'A badge: the built-in combwork server is off.' })
 }
 
 const bold = (c: React.ReactNode[]): React.ReactNode => <strong>{c}</strong>
@@ -181,7 +181,8 @@ export function Sidebar() {
   }
 
   return (
-    <div className={cx('sidebar', compact && 'compact')} style={{ width: compact ? RAIL_WIDTH : width }}>
+    // Captured, so the row's own click runs after Settings has stepped aside (HI-2525); the resizer is the panel's edge.
+    <div className={cx('sidebar', compact && 'compact')} style={{ width: compact ? RAIL_WIDTH : width }} onClickCapture={(e) => !(e.target as HTMLElement).closest('.sidebar-resizer') && leaveSettingsForSidePanel()}>
       {view === 'projects' && (compact ? <ProjectsRail /> : <ProjectsPanel />)}
       {view === 'overview' && <WorkspaceOverviewPanel />}
       {view === 'activity' && <WorkspaceActivityPanel />}
@@ -876,14 +877,8 @@ function McpPanel() {
                     </Tooltip>
                   )}
                 </div>
-                <div className="desc" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {actions.mcpErrorText(m) ?? m.def?.description ?? m.def?.command ?? m.def?.url}
-                </div>
-                {!m.error && (
-                  <div className="desc mcp-where" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {actions.mcpWhereText(m, workspace.projects)}
-                  </div>
-                )}
+                <OneLineDesc text={actions.mcpErrorText(m) ?? m.def?.description ?? m.def?.command ?? m.def?.url} />
+                {!m.error && <OneLineDesc className="mcp-where" text={actions.mcpWhereText(m, workspace.projects)} />}
               </div>
               <div className="row-actions" onClick={(e) => e.stopPropagation()}>
                 <IconButton icon="trash" title={tr(M.deleteServer)} onClick={() => void actions.deleteMcpServer(m)} />

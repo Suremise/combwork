@@ -184,7 +184,7 @@
   "agents.mcp.loading": "正在加载…",
   "agents.mcp.noneAdded": "{where, select, workspace {此工作区没有 MCP 服务器：它不会获得任何服务器。} other {此项目没有添加 MCP 服务器：它不会获得任何服务器。}}",
   "agents.mcp.notAdded": "{where, select, workspace {不在此工作区中} other {未添加到此项目}}",
-  "agents.mcp.noteAdded": "内置的 hive 服务器始终提供。之后添加到项目的服务器，只有选择“全部”时才会提供给它。",
+  "agents.mcp.noteAdded": "内置的 combwork 服务器始终提供。之后添加到项目的服务器，只有选择“全部”时才会提供给它。",
   "agents.mcp.only": "仅限以下",
   "agents.merge.blocked": "{why, select, waiting {{agent} 正在等你回复。等它结束后再合并。} background {{agent} 正在等待它启动的后台任务。等它结束后再合并。} watching {{agent} 正在等待卡片变化（卡片监视），变化后会继续。等它结束后再合并，或先取消其监视。} signin {{agent} 在任务进行中因登录过期而停止。请重新登录，并先让它完成。} other {{agent} 正在工作。等它结束后再合并。}}",
   "agents.merge.commits": "{n, plural, other {# 个提交}}尚未合并到 {into}",

@@ -236,6 +236,7 @@ const R = {
   releasedWriter: agentMsg({ id: 'reply.release.releasedWriter', text: "Released {slot} in {project}: {agent}'s ended run no longer holds it{ended, select, yes {, its listed processes ended first} other {}}.", note: "cw_release_slot release of a writer's slot." }),
   context200k: agentMsg({ id: 'reply.connection.context200k', text: '200K', note: "A connection's value: the 200K context window." }),
   connectionArgs: agentMsg({ id: 'reply.connection.args', text: 'args {args}', note: "A connection's extra arguments for its CLI." }),
+  connectionTag: agentMsg({ id: 'reply.connection.tag', text: 'tag {tag}', note: "A connection's free-text tag (HI-2530), which a usage move matches by." }),
   cliDefaults: agentMsg({ id: 'reply.connection.cliDefaults', text: "the CLI's defaults", note: 'A connection with no values of its own.' }),
   connectionRow: agentMsg({ id: 'reply.connection.row', text: '{name} (id {id}) on {account}, {cli}: {values}{unusable, select, yes {. Not usable here: its account is off} other {}}', note: 'cw_connection list (HI-2108): a connection, its account and CLI, its values, and whether it is usable here.' }),
   unknownCli: agentMsg({ id: 'reply.connection.unknownCli', text: 'unknown CLI', note: "A connection whose CLI isn't known." }),
@@ -977,7 +978,7 @@ export interface WaitChange {
  * card, where it is now, who changed it, the latest comment's author and first line), or no change; with `since` for the
  * next wait. Short: the full comment is cw_read_task with latestComment.
  */
-type WaitReply = { done?: string; unsubmitted?: UnsubmittedCard[]; idle?: number; watching?: string; limitAt?: string; already?: WaitChange; usageAlready?: string[]; changes?: WaitChange[]; timedOut?: boolean; since?: string; events?: string[]; replaced?: string; cards?: LaneWatchCards; agents?: LaneWatchAgents; lanesLeft?: string[]; names?: Record<string, string> }
+type WaitReply = { done?: string; unsubmitted?: UnsubmittedCard[]; idle?: number; watching?: string; limitAt?: string; already?: WaitChange; usageAlready?: string[]; lanesAlready?: string[]; changes?: WaitChange[]; timedOut?: boolean; since?: string; events?: string[]; replaced?: string; cards?: LaneWatchCards; agents?: LaneWatchAgents; lanesLeft?: string[]; names?: Record<string, string> }
 
 /**
  * HI-1987: a card or agent watch that replaces a lane watch while its lanes run says what it drops, and how to keep them
@@ -1018,6 +1019,8 @@ function waitText(r: WaitReply): string {
   if (r.watching) return `${say(R.waitWatching, { watching: r.watching, step: first ?? say(R.waitEndTurn, { limit }) })}${lanesLeftText(r.lanesLeft)}`
   if (r.already) return `${say(R.already, { what: line(r.already) })}${r.unsubmitted?.length ? ` ${unsubmittedText(r.unsubmitted)}` : ''}${lanesLeftText(r.lanesLeft)}`
   // A usage watch whose account is there already (HI-2195): no watch started, the one before it ended.
+  // A lane watch naming a lane that has ended (HI-2521): no watch started, the one before it ended.
+  if (r.lanesAlready) return `${say(R.already, { what: r.lanesAlready.join('; ') })}${r.replaced ? ` ${say(R.waitEnded, { watch: lowerWaiting(r.replaced) })}` : ''}`
   if (r.usageAlready) return `${say(R.already, { what: r.usageAlready.join('; ') })}${r.replaced ? ` ${say(R.waitEnded, { watch: lowerWaiting(r.replaced) })}` : ''}${lanesLeftText(r.lanesLeft)}`
   const since = r.since ? `\n${say(R.since, { since: r.since })}` : ''
   if (r.timedOut || !r.changes?.length) return `${say(R.waitNoChange)}${since}`
@@ -1386,11 +1389,12 @@ export interface ConnectionPublic {
   context200k?: boolean
   mode?: string
   extraArgs?: string
+  tag?: string
   usable?: false
 }
 
 /** A connection's values, short: "opus · high · 200K · plan", or "the CLI's defaults". */
-const connectionValuesText = (c: ConnectionPublic): string => [c.model, c.effort, c.context200k ? say(R.context200k) : '', c.mode, c.extraArgs ? say(R.connectionArgs, { args: c.extraArgs }) : ''].filter(Boolean).join(' · ') || say(R.cliDefaults)
+const connectionValuesText = (c: ConnectionPublic): string => [c.model, c.effort, c.context200k ? say(R.context200k) : '', c.mode, c.extraArgs ? say(R.connectionArgs, { args: c.extraArgs }) : '', c.tag ? say(R.connectionTag, { tag: c.tag }) : ''].filter(Boolean).join(' · ') || say(R.cliDefaults)
 
 /**
  * cw_connection list (HI-2108): one row per connection, by account, those not usable here marked; then the accounts with

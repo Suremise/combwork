@@ -7,7 +7,7 @@ import type { AgentDef, AgentInfo, AppConfig, Account, Connection, ConnectionDef
 import { HIVE_DIR } from '../shared/defaults'
 import { readKeptJson, withFileLock } from './fsutil'
 import { baseValues, cliDefaults, connectionFor, COPILOT_ACCOUNT, homeAccount, seamAccountId, type AccountStore } from '../shared/connectionDefaults'
-import { acceptable, accountState, baseConnection, connectionsOn, launchValues, movedInGroup, resolveAgentConnection, type AgentConnection, type ConnectionPatch, type ConnectionRow, type ConnectionTrust, type ConnectionUser, movedConnection, topOfOrder, valuesOf, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
+import { acceptable, accountState, baseConnection, cleanTag, connectionsOn, TAG_MAX, launchValues, movedInGroup, resolveAgentConnection, type AgentConnection, type ConnectionPatch, type ConnectionRow, type ConnectionTrust, type ConnectionUser, movedConnection, topOfOrder, valuesOf, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
 import { ASSISTANT_NAME } from '../shared/assistant'
 import { profileFolder } from '../shared/appName'
 import { localProfileInUse } from './profileFolders'
@@ -585,6 +585,15 @@ function savedValues(a: Account, now: LaunchValues, patch: ConnectionPatch): Lau
   return out
 }
 
+const TAG_TOO_LONG = msg({ id: 'main.connections.tagTooLong', defaultMessage: 'A tag can be at most {max, number} characters.', description: "An error saving a connection (HI-2530): its tag, a short free-text label the user gives it (\"Builders\"), is too long. {max} is the most it can be." })
+
+/** A connection's tag as saved (HI-2530), from what it had and a patch: trimmed, '' or null none, refused when too long. */
+function savedTag(now: string | undefined, patch: ConnectionPatch): { tag?: string } {
+  const tag = patch.tag === undefined ? now : cleanTag(patch.tag)
+  if (tag && tag.length > TAG_MAX) throw hiveError(TAG_TOO_LONG, { max: TAG_MAX }, { kind: 'invalid' })
+  return tag ? { tag } : {}
+}
+
 function assertNameFree(a: Account, name: string, except?: string): string {
   const n = name.trim()
   if (!n) throw hiveError(NO_CONNECTION_NAME, undefined, { kind: 'invalid' })
@@ -602,7 +611,7 @@ export function addConnection(accountId: string, input: ConnectionPatch & { name
   const a = accountById(accountId)
   if (!a) throw hiveError(NO_ACCOUNT, undefined, { kind: 'notFound' })
   const name = assertNameFree(a, input.name)
-  const made: Connection = { id: newConnectionId(), account: a.id, name, ...savedValues(a, {}, input) }
+  const made: Connection = { id: newConnectionId(), account: a.id, name, ...savedValues(a, {}, input), ...savedTag(undefined, input) }
   changeConnections((all) => {
     // After the account's last, so the base stays first.
     const last = all.map((x) => x.account).lastIndexOf(a.id)
@@ -616,7 +625,7 @@ export function addConnection(accountId: string, input: ConnectionPatch & { name
 export function updateConnection(id: string, patch: ConnectionPatch): Connection {
   const { c, a } = mustConnection(id)
   const name = patch.name === undefined ? c.name : assertNameFree(a, patch.name, id)
-  const next: Connection = { id, account: a.id, name, ...savedValues(a, c, patch) }
+  const next: Connection = { id, account: a.id, name, ...savedValues(a, c, patch), ...savedTag(c.tag, patch) }
   changeConnections((all) => {
     const i = all.findIndex((x) => x.id === id)
     if (i >= 0) all[i] = next
@@ -631,7 +640,7 @@ export function duplicateConnection(id: string): Connection {
   const taken = new Set(connectionsOn(a.id, allConnections()).map((x) => x.name.trim().toLowerCase()))
   let n = 2
   while (taken.has(`${c.name} (${n})`.toLowerCase())) n++
-  const made: Connection = { ...valuesOf(c), id: newConnectionId(), account: a.id, name: `${c.name} (${n})` }
+  const made: Connection = { ...valuesOf(c), ...(c.tag ? { tag: c.tag } : {}), id: newConnectionId(), account: a.id, name: `${c.name} (${n})` }
   changeConnections((all) => {
     const i = all.findIndex((x) => x.id === id)
     all.splice(i + 1, 0, made)
@@ -971,7 +980,9 @@ async function resolveTarget(p: { name: string; path: string }): Promise<Project
 
 const trustKey = (id: string, ws: string): string => `${id}|${ws.toLowerCase()}`
 
-type TrustAnswer = { pending: { project: string; folder: string }[]; unknown: boolean }
+/** A folder still to trust: its project, where it is asked, and whether it's a Git root (HI-2520: no inherited trust then). */
+type PendingTrust = { project: string; folder: string; git: boolean }
+type TrustAnswer = { pending: PendingTrust[]; unknown: boolean }
 type Projects = { name: string; path: string }[]
 
 /**
@@ -1066,7 +1077,7 @@ async function readTrustOnce(id: string, projects: Projects): Promise<TrustAnswe
   const askAt = (t: ProjectTarget, r: TrustReading): string | null => (r === false ? t.root : r && typeof r === 'object' ? r.at : null)
   return { pending: targets.flatMap((t, i) => {
     const at = askAt(t, got[i])
-    return at ? [{ project: t.project, folder: at }] : []
+    return at ? [{ project: t.project, folder: at, git: t.git }] : []
   }), unknown: got.some((x) => x === null) }
 }
 
@@ -1129,10 +1140,11 @@ export async function setUpPlace(id: string): Promise<ConnectionTrust['setUpIn']
 /**
  * Where Set Up asks a CLI's trust question next (HI-1871), from the resolved trust roots still pending (each a main
  * repository root, or a project without Git's own folder: never a worktree's path). For a CLI whose trust of a folder
- * covers the folders inside it (`trustInherits`: Claude Code), the workspace's own folder while it covers one of them:
- * one answer for all those inside it, their slots and copies (worktrees of them) and the Assistant's home. A root
- * outside it (a worktree project's main repository kept elsewhere: HR3's case) stays its own target, asked next.
- * Otherwise the first pending root (Codex: one per project; a trusted folder above a repository doesn't cover it).
+ * covers the plain folders inside it (`trustInherits`: Claude Code), the workspace's own folder while it covers a pending
+ * folder without Git: one answer for all of those and the Assistant's home. A Git root is never covered by a folder
+ * above it (HI-2520, measured with Claude Code 2.1.316–2.1.318), so each is asked at its own root, as is a root outside
+ * the workspace (a worktree project's main repository kept elsewhere: HR3's case). Otherwise the first pending root
+ * (Codex: one per project; a trusted folder above a repository doesn't cover it).
  */
 function setUpTarget(a: Account, pending: TrustAnswer['pending']): ConnectionTrust['setUpIn'] {
   return chooseSetUpTarget(!!providerDescriptor(a.provider).capabilities.connections?.trustInherits, workspace.path, pending)
@@ -1142,7 +1154,8 @@ function setUpTarget(a: Account, pending: TrustAnswer['pending']): ConnectionTru
 export function chooseSetUpTarget(inherits: boolean, ws: string | null | undefined, pending: TrustAnswer['pending']): ConnectionTrust['setUpIn'] {
   if (!pending.length) return undefined
   const inside = (folder: string): boolean => !!ws && (folder + sep).toLowerCase().startsWith((resolve(ws) + sep).toLowerCase())
-  if (ws && inherits && pending.some((p) => inside(p.folder))) return { folder: resolve(ws), workspace: true }
+  // Only a pending folder without Git: the workspace's trust covers no repository, so asking there again would loop.
+  if (ws && inherits && pending.some((p) => !p.git && inside(p.folder))) return { folder: resolve(ws), workspace: true }
   return { folder: pending[0].folder, project: pending[0].project }
 }
 
@@ -1209,7 +1222,7 @@ async function checkOnce(id: string): Promise<ConnectionObserved | null> {
     if (!exe) observed = { ...a.observed, at, loggedIn: null, error: `${adapter.descriptor.name} isn't installed` } // i18n-ignore: for the log
     else {
       const s = await slot(() => adapter.accountStatus!(exe, withoutAccountEnv(adapter, childEnv({ [homeEnv]: dir }))))
-      observed = s.ok ? { at, loggedIn: s.loggedIn, ...(s.loggedIn ? { email: s.email, orgId: s.orgId, plan: s.plan ?? null } : {}) } : { ...keptIdentity(a.observed), at, loggedIn: null, error: s.error }
+      observed = s.ok ? { at, loggedIn: s.loggedIn, ...(s.loggedIn ? { email: s.email, orgId: s.orgId, plan: s.plan ?? null, ...(s.loginExpiresAt ? { loginExpiresAt: s.loginExpiresAt } : {}) } : {}) } : { ...keptIdentity(a.observed), at, loggedIn: null, error: s.error }
     }
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code

@@ -7,12 +7,15 @@ import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { LANE_CARD_CHANGES, LANE_DEFAULT_EVENTS, MERGE_STALL_MS, blockNewsAt, keepAsked, laneHits, laneWakeLine, mergeStallReason, readLaneCards, readLaneCondition, readSavedLaneMark, type LaneMark, type LaneNow } from '../src/shared/laneWatch'
+import { LANE_CARD_CHANGES, LANE_DEFAULT_EVENTS, MERGE_STALL_MS, blockNewsAt, keepAsked, laneHits, laneLimitLine, laneWakeLine, mergeStallReason, readLaneCards, readLaneCondition, readSavedLaneMark, type LaneMark, type LaneNow } from '../src/shared/laneWatch'
 import { WAKE_MAX_BYTES, type CardChange } from '../src/shared/watch'
 import { taskWaitText } from '../src/shared/toolReplies'
 import { REVIEW_WAIT_STALL_MS } from '../src/shared/tasks'
 import { IDLE_WATCH_STALL_MS } from '../src/shared/idleWatch'
 import { tempDir } from './tempDir'
+import { putStoreDocs, storeDocs } from './storeDocs'
+import { tr } from '../src/shared/i18n'
+import { watchText } from '../src/shared/agentWatch'
 import { follow } from './followDoorbell'
 import { LANE_NEXT_STALL_MS, laneNextWaitReason, replyWaitReason, RETURN_STALL_MS, returnedWaitReason, setStallRuns, STALE_STALL_MS, staleWaitReason } from '../src/main/cardStall'
 import type { ProgressRun } from '../src/shared/types'
@@ -31,7 +34,7 @@ const card = (over: Partial<LaneMark['cards'][string]> = {}) => ({ c: 'doing' as
 describe('what a lane watch counts (#531)', () => {
   it('the condition: lane ids or "all", and events (default: all but passed and moved)', () => {
     expect(readLaneCondition({ lanes: ['all'] })).toEqual({ ids: 'all', events: LANE_DEFAULT_EVENTS })
-    expect(readLaneCondition({ lanes: ['lane-1a2b3c', 'lane-4d5e6f'], events: ['failed', 'passed'] })).toEqual({ ids: ['lane-1a2b3c', 'lane-4d5e6f'], events: ['failed', 'passed', 'paused-user'] })
+    expect(readLaneCondition({ lanes: ['lane-1a2b3c', 'lane-4d5e6f'], events: ['failed', 'passed'] })).toEqual({ ids: ['lane-1a2b3c', 'lane-4d5e6f'], events: ['failed', 'passed', 'paused-user', 'ended', 'abandoned'] })
     expect(readLaneCondition({ lanes: [] })).toMatch(/lanes must be/)
     expect(readLaneCondition({ lanes: ['a b'] })).toMatch(/lanes must be/)
     expect(readLaneCondition({ lanes: ['all'], events: ['merged'] })).toMatch(/events must be/)
@@ -1359,6 +1362,133 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await watches.evaluateWatches(w)
     await watches.settled()
     expect(watches.watchFor(home, 'assistant')?.label).toBe('Waiting on all running lanes')
+    await disposeWorkspaceService(w)
+  })
+
+  // HI-2521: WR1 watched its lane 2 s after it ended (merged), and sat watching it for its 6 h limit.
+  it('HI-2521: a watch naming a lane that has ended or been abandoned replies at once and starts none, ending the one before; one naming lanes counts their end whatever its events', async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const [a, b, c] = await newCards(w, 'b1', 3)
+    const ended = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)', name: 'screenshots' })).lane
+    await lanes.endLane(w, ended.id, { mergeCommit: '47a3d54c0ffee1234567890abcdef1234567890a' })
+    const abandoned = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r2', cards: [b], by: 'B2 (alpha)' })).lane
+    await lanes.endLane(w, abandoned.id, { abandoned: true })
+    // A watch it had before: ended by the answer, and said.
+    await watches.registerWatch(w, home, 'assistant', { cards: [c], changes: ['comment'] })
+    const r = await watches.registerLaneWatch(w, home, 'assistant', { ids: [ended.id, abandoned.id], events: ['failed'] })
+    expect(r).toEqual({ already: ['Lane B1 / R1 (screenshots): ended: merged at 47a3d54c0ffe', 'Lane B2 / R2: was abandoned'], replaced: `Waiting for #${c}` })
+    expect(watches.watchFor(home, 'assistant')).toBeNull()
+    // Through the Agent API's reply: "Already: …".
+    expect(taskWaitText({ lanesAlready: (r as { already: string[] }).already, replaced: (r as { replaced: string }).replaced })).toBe(`Already: Lane B1 / R1 (screenshots): ended: merged at 47a3d54c0ffe; Lane B2 / R2: was abandoned. Your watch (waiting for #${c}) has ended.`)
+    // A running lane watched for failures only: its end still wakes the watch, which has nothing left to watch.
+    const running = (await lanes.startLane(w, { project: 'alpha', builder: 'b3', reviewer: 'r1', cards: [c], by: 'B3 (alpha)' })).lane
+    st.status = 'watching'
+    const on = await watches.registerLaneWatch(w, home, 'assistant', { ids: [running.id], events: ['failed'] })
+    expect('watching' in on).toBe(true)
+    await lanes.endLane(w, running.id, { abandoned: true })
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toMatch(/^\[CW\] Lane B3 \/ R1: was abandoned\./)
+    await disposeWorkspaceService(w)
+  })
+
+  it('HI-2521 round 1 finding: a named-lane watch read back from before, saved counting only failed, is still woken by its lane ending; an "all" watch keeps its events', async () => {
+    expect(readLaneCondition({ lanes: ['lane-a'], events: ['failed'] })).toEqual({ ids: ['lane-a'], events: ['failed', 'paused-user', 'ended', 'abandoned'] })
+    expect(readLaneCondition({ lanes: ['all'], events: ['failed'] })).toEqual({ ids: 'all', events: ['failed', 'paused-user'] })
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const [a] = await newCards(w, 'b1', 1)
+    const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })).lane
+    st.status = 'watching'
+    await watches.registerLaneWatch(w, home, 'assistant', { ids: [l.id], events: ['failed'] })
+    // Saved as a build from before HI-2521 saved it: failed (and the question for the user) only.
+    const saved = storeDocs(w.path!, 'watches')
+    expect(saved).toHaveLength(1)
+    await putStoreDocs(w.path!, 'watches', [{ ...saved[0], lanes: { ids: [l.id], events: ['failed', 'paused-user'] } }])
+    watches.forgetWatches(w)
+    await vi.waitFor(() => expect(watches.watchFor(home, 'assistant')).not.toBeNull(), { timeout: HUNG_MS })
+    await lanes.endLane(w, l.id, { mergeCommit: '47a3d54c0ffee1234567890abcdef1234567890a' })
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toMatch(/^\[CW\] Lane B1 \/ R1: ended: merged at 47a3d54c0ffe\./)
+    await disposeWorkspaceService(w)
+  })
+
+  // HI-2522: Darren read WR1's "Waiting on lane lane-1d1c05" as a commit id; the lane is "combwork screenshots".
+  it("HI-2522: a watch on one lane is labelled by the lane's name (its builder's too when another lane has it, else its builder's lane), kept on disk; never its id", async () => {
+    const { w, alpha, home } = await open()
+    fake(alpha, home)
+    const [a, b, c] = await newCards(w, 'b1', 3)
+    const named = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)', name: 'combwork screenshots' })).lane
+    const label = async (id: string): Promise<string> => {
+      const r = await watches.registerLaneWatch(w, home, 'assistant', { ids: [id], events: ['failed'] })
+      return 'watching' in r ? r.watching.label : r.already.join('; ')
+    }
+    expect(await label(named.id)).toBe('Waiting on lane combwork screenshots')
+    expect(watches.watchFor(home, 'assistant')).toMatchObject({ lanes: [named.id], laneTitles: { [named.id]: { name: 'combwork screenshots', builder: 'B1' } } })
+    // Read back from disk: the same label.
+    watches.forgetWatches(w)
+    await vi.waitFor(() => expect(watches.watchFor(home, 'assistant')?.label).toBe('Waiting on lane combwork screenshots'), { timeout: HUNG_MS })
+    // Another lane with the same name: its builder is named too.
+    const twin = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r2', cards: [b], by: 'B2 (alpha)', name: 'Combwork screenshots' })).lane
+    expect(await label(named.id)).toBe("Waiting on B1's lane combwork screenshots")
+    // A lane with no name: its builder's lane.
+    const plain = (await lanes.startLane(w, { project: 'alpha', builder: 'b3', reviewer: 'r1', cards: [c], by: 'B3 (alpha)' })).lane
+    expect(await label(plain.id)).toBe("Waiting on B3's lane")
+    for (const l of [named, twin, plain]) expect(watches.watchFor(home, 'assistant')!.label).not.toContain(l.id)
+    // A wake line too long to tell in full names each lane by its name, never by its id.
+    const hit = { id: named.id, label: `B1 / R1 (combwork screenshots${' and more'.repeat(400)})`, short: 'combwork screenshots', parts: [{ n: a, event: 'blocked' as const, text: `#${a} is blocked` }] }
+    const short = laneWakeLine([hit])
+    expect(short).toMatch(/^\[CW\] Lane combwork screenshots: #\d+ is blocked\./)
+    expect(short).not.toContain(named.id)
+    await disposeWorkspaceService(w)
+  })
+
+  it('HI-2522 round 1 finding: a watch on named lanes saved before HI-2522 (no titles) is read back naming each lane, in its label, the window and its limit line; never an id', async () => {
+    const { w, alpha, home } = await open()
+    fake(alpha, home)
+    const [a] = await newCards(w, 'b1', 1)
+    const named = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)', name: 'combwork screenshots' })).lane
+    const readBack = async (id: string) => {
+      await watches.registerLaneWatch(w, home, 'assistant', { ids: [id], events: ['failed'] })
+      // Saved as a build from before HI-2522 saved it: no titles.
+      const saved = storeDocs(w.path!, 'watches')
+      const { laneTitles: _t, ...old } = saved[0] as Record<string, unknown>
+      await putStoreDocs(w.path!, 'watches', [old])
+      watches.forgetWatches(w)
+      await vi.waitFor(() => expect(watches.watchFor(home, 'assistant')).not.toBeNull(), { timeout: HUNG_MS })
+      return watches.watchFor(home, 'assistant')!
+    }
+    const was = await readBack(named.id)
+    expect(was.label).toBe('Waiting on lane combwork screenshots')
+    expect(watchText(was, tr, (l) => l.join(', '))).toBe('Waiting on lane combwork screenshots')
+    expect(laneLimitLine({ ids: [named.id], events: [] }, 90, [], [], was.laneTitles)).toMatch(/^\[CW\] Nothing to tell on lane combwork screenshots in 1\.5 h/)
+    // Kept: saved again with its titles at the next tick.
+    await watches.tick()
+    await vi.waitFor(() => expect((storeDocs(w.path!, 'watches')[0] as { laneTitles?: unknown }).laneTitles).toEqual({ [named.id]: { name: 'combwork screenshots', builder: 'B1' } }), { timeout: HUNG_MS })
+    await disposeWorkspaceService(w)
+  })
+
+  it('HI-2521: a lane ending while its watch is being set up (after its lanes were read) still wakes the watcher', async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const [a] = await newCards(w, 'b1', 1)
+    const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })).lane
+    watches.testHooks.afterLanesRead = async () => {
+      watches.testHooks.afterLanesRead = undefined
+      await lanes.endLane(w, l.id, { mergeCommit: '47a3d54c0ffee1234567890abcdef1234567890a' })
+    }
+    try {
+      st.status = 'watching'
+      const r = await watches.registerLaneWatch(w, home, 'assistant', { ids: [l.id], events: ['failed'] })
+      // Read while it ran: a watch starts, and its own check after setup tells the end (nothing else looks).
+      expect('watching' in r).toBe(true)
+    } finally {
+      watches.testHooks.afterLanesRead = undefined
+    }
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toMatch(/^\[CW\] Lane B1 \/ R1: ended: merged at 47a3d54c0ffe\./)
     await disposeWorkspaceService(w)
   })
 

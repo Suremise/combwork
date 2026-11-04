@@ -187,6 +187,11 @@
       "unusable": "select"
     }
   },
+  "reply.connection.tag": {
+    "placeholders": {
+      "tag": "plain"
+    }
+  },
   "reply.connection.unknownCli": {
     "placeholders": {}
   },

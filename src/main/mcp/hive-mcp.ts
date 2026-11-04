@@ -42,7 +42,7 @@ const T = {
   // Descriptions and arguments said as they are.
   'arg.card': agentMsg({ id: 'tool.arg.card', text: 'Its key ("HI-12").' }),
   'arg.agent': agentMsg({ id: 'tool.arg.agent', text: 'Its name or id; optional when the project has one agent.' }),
-  'arg.mcpServers': agentMsg({ id: 'tool.arg.mcpServers', text: 'The project\'s MCP servers it gets: [] none, ["*"] all (default). hive is always given.' }),
+  'arg.mcpServers': agentMsg({ id: 'tool.arg.mcpServers', text: 'The project\'s MCP servers it gets: [] none, ["*"] all (default). combwork is always given.' }),
   'arg.connection': agentMsg({ id: 'tool.arg.connection', text: 'Its connection, by id or name (cw_connection): its model, effort, mode and CLI. Default: the first usable here.' }),
   'arg.workflowRole': agentMsg({ id: 'tool.arg.workflowRole', text: 'Builds cards, reviews them, either (never its own), or generalist (never in a lane). Default: from its name.' }),
   'arg.override': agentMsg({ id: 'tool.arg.override', text: "Moves it past the rules the move skips: reason is the user's own why, never made up." }),
@@ -757,13 +757,14 @@ const tools: Tool[] = [
         effort: { type: 'string' },
         mode: { type: 'string', description: say(T['connection.arg.mode']) },
         context200k: { type: 'string', enum: ['on', 'off', ''] },
-        extraArgs: { type: 'string' }
+        extraArgs: { type: 'string' },
+        tag: { type: 'string' }
       },
       required: ['action']
     },
     run: async (a) => {
       if (a.action === 'list') return connectionListText((await api('GET', '/v1/connections')) as Parameters<typeof connectionListText>[0])
-      const body = Object.fromEntries(['account', 'name', 'model', 'effort', 'mode', 'context200k', 'extraArgs'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
+      const body = Object.fromEntries(['account', 'name', 'model', 'effort', 'mode', 'context200k', 'extraArgs', 'tag'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
       // agent-protocol: connectionChangedText's verb, which it words (shared/toolReplies.ts)
       if (a.action === 'add') return connectionChangedText('Made', (await api('POST', '/v1/connections', body)) as ConnectionPublic)
       if (a.action !== 'update') throw new Error(say(T['connection.error.action']))

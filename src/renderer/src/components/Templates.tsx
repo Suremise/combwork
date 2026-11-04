@@ -15,7 +15,7 @@ import { choose, confirm, get, notify, prompt, set, showView, useStore, type Tem
 import { cx, timeAgo } from '../util'
 import { clearEditorDraft, editorDraft, onEditorDrafts, setEditorDraft } from '../editorDrafts'
 import { PaneResizer, usePaneSize } from './Resizer'
-import { BusyButton, Icon, IconButton, InfoTip, LoadFailed, StaleNote, Tooltip, useBusy } from './ui'
+import { BusyButton, Icon, IconButton, InfoTip, LoadFailed, OneLineDesc, StaleNote, Tooltip, useBusy } from './ui'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { hasWorkflow, type TemplateWorkflows } from '@shared/workflow/templateOptions'
 import { TemplateWorkflowSection } from './TemplateWorkflowView'
@@ -384,9 +384,7 @@ function TemplateRow({ t, selected, onSelect, showScope }: { t: TemplateEntry; s
             </Tooltip>
           )}
         </div>
-        <div className="desc" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {shownProblem(t) ?? tr(M.rowDesc, { count: t.agents.length, layout: layoutText(t.layout) })}
-        </div>
+        <OneLineDesc text={shownProblem(t) ?? tr(M.rowDesc, { count: t.agents.length, layout: layoutText(t.layout) })} />
       </div>
     </div>
   )

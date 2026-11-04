@@ -191,11 +191,11 @@ module.exports = async function run(provider) {
       // Its delivery's id, from the line in its input (the message's reply waits for the line).
       const m = await lib.until(async () => (await doorbellIds(key)).find((x) => !earlier.has(x)), HUNG_MS, 300)
       check('put off: …it shows in its input', !!m && (await copies(key, m)) === 1, await screen(key))
-      await inv('advanced:set', 'hive.inbox.idleWakes', false)
+      await inv('advanced:set', 'cw.inbox.idleWakes', false)
       check('put off: idle wakes turned off, the doorbell is put off part-way', !!(await lib.until(() => since(/put off: It is no longer wanted/), HUNG_MS, 100)))
       check('put off: …what Hive typed is taken back whole', !!m && !!(await lib.until(async () => (await copies(key, m)) === 0, HUNG_MS, 300)), await screen(key))
       fs.rmSync(hold, { force: true })
-      await inv('advanced:set', 'hive.inbox.idleWakes', null)
+      await inv('advanced:set', 'cw.inbox.idleWakes', null)
       const outcome = await lib.until(() => wakeLines().slice(lines).find((l) => /was taken after \d+ ms|wasn't taken/.test(l)), HUNG_MS, 300)
       check('put off: idle wakes on again, the next doorbell is typed and taken', !!outcome && /was taken after/.test(outcome), wakeLines().slice(lines).join(' | '))
       const r = await left

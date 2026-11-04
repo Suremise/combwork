@@ -137,7 +137,7 @@ const check = (name, ok, extra = '') => {
     const readText = JSON.stringify(read.body)
     check("cw_console stays redacted while it's on", read.status === 200 && read.body?.events?.length === 1 && readText.includes('<text:') && !readText.includes(HELD) && !readText.includes(SHOWN), readText.slice(0, 400))
     const diagnostics = await inv('app:diagnostics', {})
-    check('Copy Diagnostics names the setting', diagnostics.includes('hive.console.showText'), diagnostics.split('\n').find((l) => l.includes('Advanced settings')) ?? '')
+    check('Copy Diagnostics names the setting', diagnostics.includes('cw.console.showText'), diagnostics.split('\n').find((l) => l.includes('Advanced settings')) ?? '')
 
     // --- Off again: the banner goes, and no text stays on screen.
     await toggle.click()

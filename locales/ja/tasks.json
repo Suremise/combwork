@@ -65,7 +65,7 @@
   "tasks.error.refsNotNumber": "{field}: 「{value}」はカード番号ではありません",
   "tasks.error.refsSelf": "{field}: カードは自分自身を参照できません",
   "tasks.error.repairNoProject": "{project}は現在、ワークスペースのプロジェクトではありません",
-  "tasks.error.reviewAgentsOnly": "カードをレビューできるのは、そのプロジェクトのエージェントだけです（自身のhiveツールを使います）。",
+  "tasks.error.reviewAgentsOnly": "カードをレビューできるのは、そのプロジェクトのエージェントだけです（自身のCombworkツールを使います）。",
   "tasks.error.reviewNotInReview": "{card}は「{column, select, hold {保留} todo {未着手} doing {進行中} passed {承認済み} done {完了} other {{column}}}」にあります。カードは「レビュー」でレビューします。さらに作業が必要なら、それはカードの作業です（doingに移動してください）。",
   "tasks.error.reviewOnItsOwn": "レビューは単独で開始してください。カードは担当エージェントのまま、今の場所に残ります。",
   "tasks.error.reviewSkipInReview": "{card}はレビュー中です。レビューを省略するかどうかは提出前に決めます。今レビューを越えて進めるには、ユーザーがカードを移動します（例外として、理由を添えて）。",

@@ -7,7 +7,7 @@ import { confirm, prompt, set, useStore } from '../store'
 import { cx } from '../util'
 import { chooseMode, modeDescription, modeName, useModes } from './Assistant'
 import { DocEditor } from './DocEditor'
-import { Icon, IconButton, Tooltip } from './ui'
+import { Icon, IconButton, OneLineDesc, Tooltip } from './ui'
 import { msg, tr } from '@shared/i18n'
 
 /**
@@ -100,9 +100,7 @@ export function ModeList() {
                 {p.id === inUse && p.bundled !== 'missing' && <span className="badge success">{tr(M.inUseBadge)}</span>}
                 {p.id === byDefault && <span className="badge">{tr(M.defaultBadge)}</span>}
               </div>
-              <div className="desc" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {p.bundled === 'missing' ? tr(M.shipsMissing) : modeDescription(p)}
-              </div>
+              <OneLineDesc text={p.bundled === 'missing' ? tr(M.shipsMissing) : modeDescription(p)} />
             </div>
             <div className="row-actions" onClick={(e) => e.stopPropagation()}>
               {p.bundled === 'missing' ? (

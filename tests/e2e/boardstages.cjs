@@ -299,10 +299,10 @@ const nothingToArchive = (dialog) => {
 
     // --- With the workflow rules not enforced, every category shows, the workspace's own cards' board too (HR2's round 1).
     const own = (await inv('tasks:create', { title: 'About the workspace', project: '' })).number
-    await inv('advanced:set', 'hive.workflow.enforce', false)
+    await inv('advanced:set', 'cw.workflow.enforce', false)
     await showBoard('Workspace')
     check('rules off, the Workspace board: all six categories', !!(await until(async () => (await columns()) === 'hold todo doing review passed done' && (await inColumn(own, 'todo')), HUNG_MS)), await columns())
-    await inv('advanced:set', 'hive.workflow.enforce', null)
+    await inv('advanced:set', 'cw.workflow.enforce', null)
     check('rules on again, the Workspace board: On Hold, Todo, Active and Done', !!(await until(async () => (await columns()) === 'hold todo doing done', HUNG_MS)), await columns())
 
     // --- A No review project alone: Review and Approved hidden.

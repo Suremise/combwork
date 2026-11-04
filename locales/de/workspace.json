@@ -180,7 +180,7 @@
   "workspace.mcpView.toolReadNote": "Eine gemeinsame Notiz lesen",
   "workspace.mcpView.toolSessionUsage": "Token-Nutzung, Cache und Komprimierungen einer Sitzung",
   "workspace.mcpView.toolWriteNote": "Eine gemeinsame Notiz anlegen, überschreiben oder ergänzen",
-  "workspace.mcpView.tryAsking": "Bitte einen Agenten zum Beispiel: *„Schreib mit den hive-Tools eine Übergabe für die nächste Sitzung.“*",
+  "workspace.mcpView.tryAsking": "Bitte einen Agenten zum Beispiel: *„Schreib mit den Combwork-Tools eine Übergabe für die nächste Sitzung.“*",
   "workspace.mcpView.whatItDoes": "Was es tut",
   "workspace.mcpView.whatItRuns": "Was ausgeführt wird",
   "workspace.move.branchesBanner": "{count, plural, one {Der Branch eines Agenten ist noch nach einem alten Ordner benannt; „Reparieren“ benennt ihn um.} other {Die Branches von # Agenten sind noch nach einem alten Ordner benannt; „Reparieren“ benennt sie um.}}",

@@ -195,7 +195,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     await lib.sendPrompt(invB, lib.ptyKey(beta, agents.Other.id), 'holduntil go-other', { submitted: async () => (await liveOther())?.status === 'working' })
     check('a second workspace, in a window of its own, has Other working', (await liveOther())?.status === 'working')
     // At the next start resumes have 10 s to be ready (Watcher won't be: below).
-    await c.inv('advanced:set', 'hive.restart.resumeReadySeconds', 10)
+    await c.inv('advanced:set', 'cw.restart.resumeReadySeconds', 10)
     const firstPid = c.pid
     const nonce = '6f1c8b2e-0a43-4d6e-9b5a-3c2d1e0f9a87'
     writeRequest(firstPid, nonce)
@@ -264,7 +264,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
 
     // --- 2. Ended from outside while an agent is starting: resumed once at the next start, nothing else twice.
     // Resumes have long enough again: Worker, held below, is still starting when Hive is ended.
-    await c.inv('advanced:set', 'hive.restart.resumeReadySeconds', 90)
+    await c.inv('advanced:set', 'cw.restart.resumeReadySeconds', 90)
     // Worker working again; a close for an install records it (and the lane's two); then it is held at its next resume.
     await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Worker.id), 'holduntil go-worker-2', { submitted: async () => (await c.live(agents.Worker.id))?.status === 'working' })
     writeRequest(c.pid, '8b3e0d4c-2c65-4f80-9d7c-5e4f3a2b1c09')
@@ -325,7 +325,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     check("Don't Resume resumes neither, and the record is gone", !!(await lib.until(() => !fs.existsSync(recordFile), HUNG_MS)) && !(await c.live(agents.Worker.id)) && !(await c.live(agents.Builder.id)))
 
     // --- 5. Resume agents after an update off: an install offers instead.
-    await c.inv('advanced:set', 'hive.restart.resumeAfterUpdate', false)
+    await c.inv('advanced:set', 'cw.restart.resumeAfterUpdate', false)
     await c.inv('session:start', alpha, { agentId: agents.Worker.id })
     await lib.until(async () => (await c.live(agents.Worker.id))?.status === 'ready', HUNG_MS, 300)
     await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Worker.id), 'holduntil go-worker-5', { submitted: async () => (await c.live(agents.Worker.id))?.status === 'working' })

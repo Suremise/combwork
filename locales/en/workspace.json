@@ -629,7 +629,7 @@
   },
   "workspace.mcpView.builtIn": {
     "defaultMessage": "Built-in Combwork MCP server",
-    "description": "The heading of the built-in hive server's page."
+    "description": "The heading of the built-in combwork server's page."
   },
   "workspace.mcpView.builtInText": {
     "defaultMessage": "Every session started from Combwork gets a <code>combwork</code> MCP server that connects to the Agent API{hasUrl, select, yes { at {url}} other {}}. Turn it off in Settings → Agent API.",
@@ -724,7 +724,7 @@
     "description": "What the built-in server's cw_write_shared_note tool does."
   },
   "workspace.mcpView.tryAsking": {
-    "defaultMessage": "Try asking an agent: *\"Write a handover for the next session using the hive tools.\"*",
+    "defaultMessage": "Try asking an agent: *\"Write a handover for the next session using the Combwork tools.\"*",
     "description": "The built-in server's page, under its tools (Markdown: keep the * around the example prompt)."
   },
   "workspace.mcpView.whatItDoes": {

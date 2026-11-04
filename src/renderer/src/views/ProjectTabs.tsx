@@ -32,7 +32,7 @@ import { LEFTOVERS_ROOT, LeftoversOption, LeftoversPage, useLeftovers } from '..
 import { useGitRead } from './GitTab'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { DataTable, useDateColumns, type DataColumn } from '../components/DataTable'
-import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, sentences, StaleNote, statusText, StatusDot, Tooltip } from '../components/ui'
+import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, SectionNav, sentences, StaleNote, statusText, StatusDot, Tooltip } from '../components/ui'
 import { cliReadyOf, ConnectionMark, connectionCli, connectionLine, firstReadyConnection, useConnections } from '../components/ConnectionChoice'
 import { connectionOf } from '@shared/connectionLabel'
 import { useConnectionsInUse } from '../connectionUsage'
@@ -267,7 +267,7 @@ const C = {
   definedByProject: msg({ id: 'project.mcp.definedByProject', defaultMessage: 'Defined by the project (disabled)', description: "Heading in a project's MCP tab: servers in the project's own agent config." }),
   copyToWorkspace: msg({ id: 'project.mcp.copy', defaultMessage: 'Copy to workspace', description: "Button: copies the project's own MCP server to the workspace." }),
   builtIn: msg({ id: 'project.mcp.builtIn', defaultMessage: 'Built-in', description: "Heading in a project's MCP tab: Hive's own server." }),
-  hiveDesc: msg({ id: 'project.mcp.hiveDesc', defaultMessage: 'Lets agents see other projects, read and write shared notes, create handovers and notify you.', description: "What Hive's own MCP server (hive) does." }),
+  hiveDesc: msg({ id: 'project.mcp.hiveDesc', defaultMessage: 'Lets agents see other projects, read and write shared notes, create handovers and notify you.', description: "What Combwork's own MCP server (combwork) does." }),
   onAll: msg({ id: 'project.mcp.onAll', defaultMessage: 'On for all sessions', description: "Badge on Hive's own MCP server when it is on." }),
   off: msg({ id: 'project.mcp.off', defaultMessage: 'Off', description: "Badge on Hive's own MCP server when it is off." })
 }
@@ -1484,7 +1484,7 @@ export function ProjectSkillsTab({ project }: { project: ProjectInfo }) {
 
   return (
     <div className="split">
-      <div className="split-list" style={{ width: listWidth }}>
+      <div className="split-list skills-list" style={{ width: listWidth }}>
         <PaneResizer paneKey="projectSkills" max={600} />
         <div className="pane-header" style={{ paddingLeft: 14 }}>
           {tr(C.skillsHeading)}
@@ -2057,20 +2057,14 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       </div>
       <HiveVcsNotice project={project} />
       <div className="settings-body">
-        <div className="settings-nav">
-          {sections.map((s) => (
-            <div
-              key={s.id}
-              className={cx('row', !q && section === s.id && 'selected')}
-              onClick={() => {
-                setSection(s.id)
-                setQuery('')
-              }}
-            >
-              {s.provider ? <ProviderIcon provider={s.provider} /> : <Icon name={s.icon} />} <span className={cx('label', s.provider && 'settings-sub')}>{shownText(s.text.label)}</span>
-            </div>
-          ))}
-        </div>
+        <SectionNav
+          items={sections.map((s) => ({ id: s.id, icon: s.provider ? <ProviderIcon provider={s.provider} /> : <Icon name={s.icon} />, label: shownText(s.text.label), sub: !!s.provider }))}
+          selected={!q ? section : null}
+          onSelect={(id) => {
+            setSection(id as typeof section)
+            setQuery('')
+          }}
+        />
         <div className="settings-content">
           {groups.length === 0 && <div className="empty-state">{tr(S.noMatch)}</div>}
           {groups.map((g) => (

@@ -422,7 +422,7 @@ function McpChoice({ value, offered, where, onChange }: { value: string[] | null
             ))}
           </div>
         ))}
-      <div className="faint">{tr(msg({ id: 'agents.mcp.noteAdded', defaultMessage: 'The built-in hive server is always given. A server added to the project later reaches it only with All.', description: "Under an agent's MCP servers (Agent Settings). hive is the built-in server's name: keep it. All is the first choice above (\"All of the project's\")." }))}</div>
+      <div className="faint">{tr(msg({ id: 'agents.mcp.noteAdded', defaultMessage: 'The built-in combwork server is always given. A server added to the project later reaches it only with All.', description: "Under an agent's MCP servers (Agent Settings). combwork is the built-in server's name: keep it. All is the first choice above (\"All of the project's\")." }))}</div>
     </div>
   )
 }

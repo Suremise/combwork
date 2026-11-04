@@ -205,7 +205,7 @@ its hive tool does, so a model trial gets the same fixture as a fake (#1545).
     ```powershell
     New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\hive-test\claude" | Out-Null; $env:CLAUDE_CONFIG_DIR="$env:LOCALAPPDATA\hive-test\claude"; claude
     ```
-    Then `/login` in it. It runs in Accept edits, with `mcp__hive`, `Bash`, `PowerShell`, `Skill` and `Monitor` (a
+    Then `/login` in it. It runs in Accept edits, with `mcp__combwork`, `Bash`, `PowerShell`, `Skill` and `Monitor` (a
     shell command whose output it follows, #613) allowed on the command line, so it never asks and never needs bypass
     mode.
   - **Codex** uses its test home (`%LOCALAPPDATA%\hive-test\codex`, signed in once as tests/e2e/README.md says), in
@@ -254,7 +254,7 @@ its hive tool does, so a model trial gets the same fixture as a fake (#1545).
   again after changing Hive's guidance, a skill or a tool's description, and compare.
 - **Progress** (#1457): run in a Hive agent's session, a run shows in that Hive's Progress panel with a step per trial,
   named with the results so far (`review-card · 11 ok, 1 failed`), and an estimate from the trials timed before (by
-  provider); under `hive-progress` it gives the wrapper's row those steps. `--no-progress` or `CW_PROGRESS=0` turns
+  provider); under `cw-progress` it gives the wrapper's row those steps. `--no-progress` or `CW_PROGRESS=0` turns
   it off.
 
 Bump `FIXTURES_VERSION` in `scenarios.cjs` when a scenario's setup or checks change.

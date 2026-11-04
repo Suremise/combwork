@@ -1599,8 +1599,8 @@ describe('HI-2063: Copy Diagnostics says the tool list a start', () => {
     const { toolListLine } = await import('../src/main/diagnostics')
     const row = { role: 'agent' as const, workflow: 'builder' as const, starts: 3, tools: 98, bytes: 63000.4, chars: 61234.2, descriptionChars: 30120, paramChars: 12004, schemaChars: 19110 }
     expect(toolListLine('Workspace 1', [row, { ...row, role: 'assistant', workflow: 'none', starts: 1, chars: 70000, descriptionChars: null, paramChars: null, schemaChars: null }, { ...row, workflow: 'unknown', chars: null }])).toBe(
-      '- Workspace 1 hive tool list (24 h): agents · builder: 98 tools, 61,234 chars a start (descriptions 30,120, parameters 12,004, schemas 19,110), 63,000 bytes, 3 starts; assistant · none: 98 tools, 70,000 chars a start (parts not measured), 63,000 bytes, 1 start; agents · unknown: 98 tools, characters not measured, 63,000 bytes, 3 starts'
+      '- Workspace 1 Combwork tool list (24 h): agents · builder: 98 tools, 61,234 chars a start (descriptions 30,120, parameters 12,004, schemas 19,110), 63,000 bytes, 3 starts; assistant · none: 98 tools, 70,000 chars a start (parts not measured), 63,000 bytes, 1 start; agents · unknown: 98 tools, characters not measured, 63,000 bytes, 3 starts'
     )
-    expect(toolListLine('Workspace 2', [])).toBe('- Workspace 2 hive tool list (24 h): none recorded')
+    expect(toolListLine('Workspace 2', [])).toBe('- Workspace 2 Combwork tool list (24 h): none recorded')
   })
 })

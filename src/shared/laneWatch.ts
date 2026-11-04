@@ -1,4 +1,4 @@
-import type { LaneState, LaneStatus, SessionStatus, StoredText, TaskCard, TaskColumn } from './types'
+import type { LaneState, LaneStatus, LaneTitle, SessionStatus, StoredText, TaskCard, TaskColumn } from './types'
 import { storedForAgents } from './taskHistory'
 import { laneStatusText } from './lanes'
 import { columnLabel } from './tasks'
@@ -31,8 +31,8 @@ const T = {
     text: 'Your lane watch has ended: read the cards named (cw_read_task), act on them, {asks, select, yes {tell the user what an agent waits for (cw_notify) and never answer it for them, } other {}}then watch the lanes again (cw_wait_for_tasks with lanes{keep, select, both {; your cards and agents stay unless you pass them, less the agents told here} cards {; your cards stay unless you pass cards} agents {; your agents stay unless you pass agents, less the agents told here} other {}}).',
     note: 'How a lane watch\'s wake ends: what to do. asks: yes when an agent waits for the user (#726, HI-1991); keep: what else the watch had beside its lanes, which stays when it is watched again (cards, agents (HI-1987), both or none).'
   }),
-  lane: agentMsg({ id: 'wake.lane.lane', text: 'Lane {lane}: {events}', note: 'A lane watch wake: one lane and what happened in it. lane: its label ("B1 / R1 (greetings)") or id; events: its events, "; " between.' }),
-  lanesChanged: agentMsg({ id: 'wake.lane.lanesChanged', text: '{n, plural, one {{n} lane changed} other {{n} lanes changed}}: {lanes}', note: 'A lane watch wake too long to tell in full: how many lanes changed, then each lane\'s id with its events by name ("l-1 (HI-12 failed, merge-due)").' }),
+  lane: agentMsg({ id: 'wake.lane.lane', text: 'Lane {lane}: {events}', note: 'A lane watch wake: one lane and what happened in it. lane: its label ("B1 / R1 (greetings)"), or shorter its name ("greetings", else "B1 / R1"; HI-2522); events: its events, "; " between.' }),
+  lanesChanged: agentMsg({ id: 'wake.lane.lanesChanged', text: '{n, plural, one {{n} lane changed} other {{n} lanes changed}}: {lanes}', note: 'A lane watch wake too long to tell in full: how many lanes changed, then each lane\'s name (HI-2522: else "B1 / R1") with its events by name ("greetings (HI-12 failed, merge-due)").' }),
   waitingNames: agentMsg({ id: 'wake.lane.waitingNames', text: 'waiting for the user: {agents}', note: 'A lane watch wake too long to tell in full: the agents waiting for the user, each "name (project)".' }),
   agentsChanged: agentMsg({ id: 'wake.lane.agentsChanged', text: 'agents changed: {agents}', note: 'A lane watch wake too long to tell in full: the agents it follows (HI-1987) that changed, each "name (project) event" (event: finished, waiting, stopped, error, untaken).' }),
   countLanes: agentMsg({ id: 'wake.lane.countLanes', text: '{n, plural, one {{n} lane changed} other {{n} lanes changed}}', note: 'A lane watch wake with only counts left: how many lanes changed.' }),
@@ -40,12 +40,13 @@ const T = {
   countWaits: agentMsg({ id: 'wake.lane.countWaits', text: '{n, plural, one {{n} agent is waiting for the user} other {{n} agents are waiting for the user}}', note: 'A lane watch wake with only counts left: how many agents wait for the user.' }),
   countAgents: agentMsg({ id: 'wake.lane.countAgents', text: '{n} of your agents changed', note: 'A lane watch wake with only counts left: how many of the agents it follows changed.' }),
   counted: agentMsg({ id: 'wake.lane.counted', text: '{what}: list them (cw_lane list, cw_list_projects, cw_agent_activity) and read their cards.', note: 'A lane watch wake with only counts left. what: the counts, ", " between ("2 lanes changed, 1 of your cards changed").' }),
-  label: agentMsg({ id: 'wake.lane.label', text: 'Waiting on {lanes, select, all {all running lanes} one {lane {lane}} other {{n} lanes}}{also, select, yes { and {list}} other {}}', note: 'A lane watch\'s label (a watching agent\'s status, the Agent API). lanes: all (every running lane), one (lane: its id) or some (n: how many); also: yes with the cards and agents beside them (list: "HI-12, HI-14, B2").' }),
+  label: agentMsg({ id: 'wake.lane.label', text: 'Waiting on {lanes, select, all {all running lanes} one {{lane}} other {{n} lanes}}{also, select, yes { and {list}} other {}}', note: 'A lane watch\'s label (a watching agent\'s status, the Agent API). lanes: all (every running lane), one (lane: as wake.lane.oneLane names it, HI-2522) or some (n: how many); also: yes with the cards and agents beside them (list: "HI-12, HI-14, B2").' }),
   limit: agentMsg({
     id: 'wake.lane.limit',
-    text: 'Nothing to tell on {lanes, select, all {the running lanes} one {lane {lane}} other {{n} lanes}}{also, select, yes { or {list}} other {}} in {hours, select, yes {{time} h} other {{time} min}}: your lane watch has ended. Check them (cw_lane list{agents, select, yes {, cw_agent_activity} other {}}), then watch again, or tell the user (cw_notify) if one seems stuck.',
-    note: 'Typed when a lane watch\'s limit passes with nothing to tell. lanes: all, one (lane: its id) or some (n: how many); also: yes with the cards and agents beside them (list); hours: yes when time is in hours ("1.5"), else minutes; agents: yes when it follows agents (HI-1987).'
+    text: 'Nothing to tell on {lanes, select, all {the running lanes} one {{lane}} other {{n} lanes}}{also, select, yes { or {list}} other {}} in {hours, select, yes {{time} h} other {{time} min}}: your lane watch has ended. Check them (cw_lane list{agents, select, yes {, cw_agent_activity} other {}}), then watch again, or tell the user (cw_notify) if one seems stuck.',
+    note: 'Typed when a lane watch\'s limit passes with nothing to tell. lanes: all, one (lane: as wake.lane.oneLane names it, HI-2522) or some (n: how many); also: yes with the cards and agents beside them (list); hours: yes when time is in hours ("1.5"), else minutes; agents: yes when it follows agents (HI-1987).'
   }),
+  oneLane: agentMsg({ id: 'wake.lane.oneLane', text: "{kind, select, named {lane {name}} both {{builder}'s lane {name}} builder {{builder}'s lane} other {a lane}}", note: "HI-2522: one lane as a lane watch's label and limit line name it, never by its lane-… id. kind: named (name: its name), both (another lane has that name: builder, its builder's name, too), builder (it has no name: its builder's lane), or none (a lane not known: a watch from before HI-2522 on a lane no longer listed)." }),
   badCards: agentMsg({ id: 'wake.lane.badCards', text: 'cards must be card numbers (no repeats), or [] for none', note: "A lane watch's refusal: its cards argument isn't a list of card numbers." }),
   tooManyCards: agentMsg({ id: 'wake.lane.tooManyCards', text: 'at most {max} cards', note: "A lane watch's refusal: too many cards beside its lanes. max: the most." }),
   badChanges: agentMsg({ id: 'wake.lane.badChanges', text: 'changes must be any of {changes}', note: 'A lane watch\'s refusal: its changes argument names none it knows. changes: those it takes ("comment, column, …").' }),
@@ -74,6 +75,13 @@ export type LaneEvent = (typeof LANE_EVENTS)[number]
 export const LANE_DEFAULT_EVENTS: LaneEvent[] = ['failed', 'blocked', 'unblocked', 'reblocked', 'stalled', 'merge-due', 'ended', 'abandoned', 'waiting', 'paused-user']
 /** What every lane watch counts, whatever its `events` (HI-1991): a question for the user is never filtered out. */
 export const LANE_ALWAYS_EVENTS: LaneEvent[] = ['paused-user']
+/**
+ * What a watch naming lanes always counts (HI-2521): their end. Once its lanes end it has nothing left to watch, so a
+ * watch that filtered the end out (a reviewer watching only for `failed`) would sit until its limit.
+ */
+export const LANE_END_EVENTS: LaneEvent[] = ['ended', 'abandoned']
+/** A lane watch's events with those it always counts (LANE_ALWAYS_EVENTS, and named lanes' end): as asked, read back or made. */
+export const withAlwaysEvents = (ids: LaneWatchCondition['ids'], events: readonly LaneEvent[]): LaneEvent[] => [...new Set([...events, ...LANE_ALWAYS_EVENTS, ...(ids === 'all' ? [] : LANE_END_EVENTS)])]
 /** Event names from before, still accepted (HI-1991): `paused` told only a lane paused for a merge. */
 const LANE_EVENT_ALIASES: Readonly<Record<string, LaneEvent>> = { paused: 'paused-merge' }
 /** What counts on the cards beside a lane watch's lanes by default (#726); a card becoming blocked always does. */
@@ -122,6 +130,8 @@ export interface LaneNow {
   id: string
   /** "B1 / R1 (greetings)". */
   label: string
+  /** HI-2522: its name, else "B1 / R1": a wake line too long names it so, never by its id. Left out: by its id. */
+  short?: string
   mark: LaneMark
   cards: { number: number; blocked: string | null; stalled: string | null; failedBy: string | null; passedBy: string | null; asked?: LaneAsked | null }[]
   /** Why its merge has stalled (#869), when it has. */
@@ -145,6 +155,7 @@ export interface LaneAsked {
 export interface LaneHit {
   id: string
   label: string
+  short?: string
   parts: { n: number | null; event: LaneEvent; text: string; detail?: string }[]
 }
 
@@ -264,7 +275,19 @@ export function laneHits(before: LaneMark | null | undefined, now: LaneNow, even
   // With its merge commit when the lane's end named one (#1270: from its cards' facts, never an agent's say-so).
   if (on.has('ended') && now.mark.state === 'ended' && before.state !== 'ended') parts.push({ n: null, event: 'ended', text: say(T.ended, { merged: now.mergeCommit ? 'yes' : 'no', commit: now.mergeCommit?.slice(0, 12) ?? '' }) })
   if (on.has('abandoned') && now.mark.state === 'abandoned' && before.state !== 'abandoned') parts.push({ n: null, event: 'abandoned', text: say(T.abandoned) })
-  return parts.length ? { id: now.id, label: now.label, parts } : null
+  return parts.length ? { id: now.id, label: now.label, ...(now.short ? { short: now.short } : {}), parts } : null
+}
+
+/**
+ * A lane that has ended or been abandoned, as a lane watch's reply tells it at once (HI-2521: WR1 watched a lane that
+ * had ended 2 s before, and sat watching it for its 6 h limit): "Lane B1 / R1 (greetings): ended: merged at …". Null
+ * while it runs.
+ */
+export function laneOverPart(now: Pick<LaneNow, 'label' | 'mark' | 'mergeCommit'>): string | null {
+  const s = now.mark.state
+  if (s !== 'ended' && s !== 'abandoned') return null
+  const events = s === 'ended' ? say(T.ended, { merged: now.mergeCommit ? 'yes' : 'no', commit: now.mergeCommit?.slice(0, 12) ?? '' }) : say(T.abandoned)
+  return say(T.lane, { lane: now.label, events })
 }
 
 /**
@@ -319,7 +342,7 @@ export interface LaneAgentHit {
  * The wake line for a lane watch's hits: each lane, then what happened in it, then the cards beside its lanes that
  * changed (#726, as a card watch tells them) and the agents waiting for the user (#726), one line within WAKE_MAX_BYTES.
  * `watching`: it has cards beside its lanes (the line says they stay). Details (blocked and stalled reasons, comments,
- * what an agent asks) give way first, then labels shorten to the lane's id, then each lane is only counted, the cards
+ * what an agent asks) give way first, then labels shorten to the lane's name (HI-2522; its id only for a lane from before), then each lane is only counted, the cards
  * named in a few words and the waiting agents by name.
  */
 export function laneWakeLine(hits: readonly LaneHit[], more: { cards?: readonly CardChange[]; waits?: readonly WaitHit[]; watching?: boolean; agents?: readonly LaneAgentHit[]; following?: boolean } = {}): string {
@@ -332,12 +355,12 @@ export function laneWakeLine(hits: readonly LaneHit[], more: { cards?: readonly 
   const join = (lanes: string[], cs: string[], ws: string[], as: string[]): string => [...lanes, cs.join('; '), ws.join('; '), as.join('; ')].filter(Boolean).join(' | ')
   for (const detail of [120, 50, 0]) {
     for (const short of [false, true]) {
-      const line = `${NOTICE_PREFIX}${join(hits.map((h) => say(T.lane, { lane: short ? h.id : h.label, events: h.parts.map((p) => part(p, detail)).join('; ') })), cards.map((c) => cardPart(c, detail)), waits.map((w) => waitPart(w, detail)), agents.map((a) => a.text(detail)))}.${TAIL}`
+      const line = `${NOTICE_PREFIX}${join(hits.map((h) => say(T.lane, { lane: short ? (h.short ?? h.id) : h.label, events: h.parts.map((p) => part(p, detail)).join('; ') })), cards.map((c) => cardPart(c, detail)), waits.map((w) => waitPart(w, detail)), agents.map((a) => a.text(detail)))}.${TAIL}`
       if (jsonBytes(line) <= WAKE_MAX_BYTES) return line
     }
   }
   // The events by name (failed, merge-due…): the names a watch's `events` takes.
-  const lanes = hits.length ? [say(T.lanesChanged, { n: hits.length, lanes: hits.map((h) => `${h.id} (${h.parts.map((p) => (p.n ? `${cardRef(p.n)} ${p.event}` : p.event)).join(', ')})`).join(', ') })] : []
+  const lanes = hits.length ? [say(T.lanesChanged, { n: hits.length, lanes: hits.map((h) => `${h.short ?? h.id} (${h.parts.map((p) => (p.n ? `${cardRef(p.n)} ${p.event}` : p.event)).join(', ')})`).join(', ') })] : []
   const counts = `${NOTICE_PREFIX}${join(lanes, cards.map(brief), waits.length ? [say(T.waitingNames, { agents: waits.map((w) => `${w.name} (${w.project})`).join(', ') })] : [], agents.length ? [say(T.agentsChanged, { agents: agents.map((a) => `${a.agent.name} (${a.agent.project}) ${a.event}`).join(', ') })] : [])}`
   if (jsonBytes(counts + `.${TAIL}`) <= WAKE_MAX_BYTES) return `${counts}.${TAIL}`
   const what = [hits.length ? say(T.countLanes, { n: hits.length }) : '', cards.length ? say(T.countCards, { n: String(cards.length) }) : '', waits.length ? say(T.countWaits, { n: waits.length }) : '', agents.length ? say(T.countAgents, { n: String(agents.length) }) : ''].filter(Boolean).join(', ')
@@ -347,18 +370,42 @@ export function laneWakeLine(hits: readonly LaneHit[], more: { cards?: readonly 
 const cardList = (cards: readonly number[]): string => cards.map((n) => `${cardRef(n)}`).join(', ')
 
 /** A lane watch's lanes, for its messages: all, one (by its id) or how many. */
-const lanesOf = (cond: LaneWatchCondition): { lanes: string; lane: string; n: string } =>
-  cond.ids === 'all' ? { lanes: 'all', lane: '', n: '' } : cond.ids.length === 1 ? { lanes: 'one', lane: cond.ids[0], n: '1' } : { lanes: 'some', lane: '', n: String(cond.ids.length) }
+const lanesOf = (cond: LaneWatchCondition, titles?: Readonly<Record<string, LaneTitle>>): { lanes: string; lane: string; n: string } =>
+  cond.ids === 'all' ? { lanes: 'all', lane: '', n: '' } : cond.ids.length === 1 ? { lanes: 'one', lane: say(T.oneLane, laneTitleArgs(cond.ids[0], titles?.[cond.ids[0]])), n: '1' } : { lanes: 'some', lane: '', n: String(cond.ids.length) }
+
+/**
+ * How a lane is named in a watch's label (HI-2522), as wake.lane.oneLane and the window's panes.watch.oneLane take it:
+ * by its name (its builder's too when another lane has it), else as its builder's lane; one not known (a watch from
+ * before HI-2522 on a lane no longer listed) as "a lane", never by its id (round 1 finding).
+ */
+export const laneTitleArgs = (id: string, t: LaneTitle | null | undefined): { kind: 'named' | 'both' | 'builder' | 'none'; name: string; builder: string } =>
+  !t ? { kind: 'none', name: '', builder: '' } : t.name ? { kind: t.twin ? 'both' : 'named', name: t.name, builder: t.builder } : { kind: 'builder', name: '', builder: t.builder }
+
+/**
+ * Each lane's title (HI-2522) from the lanes in the watcher's view: its name and builder, and whether another lane there
+ * has the same name.
+ */
+export function laneTitlesOf(ids: readonly string[], lanes: readonly { id: string; name: string | null; builder: { name: string } }[]): Record<string, LaneTitle> {
+  const out: Record<string, LaneTitle> = {}
+  for (const id of ids) {
+    const l = lanes.find((x) => x.id === id)
+    if (!l) continue
+    const name = l.name?.trim() || null
+    const twin = !!name && lanes.some((x) => x.id !== id && x.name?.trim().toLowerCase() === name.toLowerCase())
+    out[id] = { name, builder: l.builder.name, ...(twin ? { twin: true as const } : {}) }
+  }
+  return out
+}
 
 /** A lane watch's label (its status, the pane): "Waiting on all running lanes", "Waiting on 3 lanes", with its cards (#726) "… and #720". */
-export const laneWatchLabel = (cond: LaneWatchCondition, cards: readonly number[] = [], agents: readonly Pick<WatchedAgent, 'name'>[] = []): string =>
-  say(T.label, { ...lanesOf(cond), also: cards.length || agents.length ? 'yes' : 'no', list: [...(cards.length ? [cardList(cards)] : []), ...agents.map((a) => a.name)].join(', ') })
+export const laneWatchLabel = (cond: LaneWatchCondition, cards: readonly number[] = [], agents: readonly Pick<WatchedAgent, 'name'>[] = [], titles?: Readonly<Record<string, LaneTitle>>): string =>
+  say(T.label, { ...lanesOf(cond, titles), also: cards.length || agents.length ? 'yes' : 'no', list: [...(cards.length ? [cardList(cards)] : []), ...agents.map((a) => a.name)].join(', ') })
 
 /** The line typed when a lane watch's limit passes with nothing to tell. */
-export function laneLimitLine(cond: LaneWatchCondition, minutes: number, cards: readonly number[] = [], agents: readonly Pick<WatchedAgent, 'name'>[] = []): string {
+export function laneLimitLine(cond: LaneWatchCondition, minutes: number, cards: readonly number[] = [], agents: readonly Pick<WatchedAgent, 'name'>[] = [], titles?: Readonly<Record<string, LaneTitle>>): string {
   const also = [...(cards.length ? [cardList(cards)] : []), ...agents.map((a) => a.name)]
   const hours = minutes >= 60
-  return NOTICE_PREFIX + say(T.limit, { ...lanesOf(cond), also: also.length ? 'yes' : 'no', list: also.join(', '), hours: hours ? 'yes' : 'no', time: String(hours ? Math.round((minutes / 60) * 10) / 10 : minutes), agents: agents.length ? 'yes' : 'no' })
+  return NOTICE_PREFIX + say(T.limit, { ...lanesOf(cond, titles), also: also.length ? 'yes' : 'no', list: also.join(', '), hours: hours ? 'yes' : 'no', time: String(hours ? Math.round((minutes / 60) * 10) / 10 : minutes), agents: agents.length ? 'yes' : 'no' })
 }
 
 /** What became of a lane watch's cards beside its lanes (#726): those it has now, kept from the last lane watch, the ones they replace, and kept ones left out (done or gone). */
@@ -409,10 +456,11 @@ export function readLaneCondition(args: { lanes?: unknown; events?: unknown }): 
   else if (Array.isArray(l) && l.length && l.length <= LANE_WATCH_MAX && l.every((x) => typeof x === 'string' && /^[\w-]{1,64}$/.test(x)) && new Set(l).size === l.length) ids = l as string[]
   else return say(T.badLanes, { max: String(LANE_WATCH_MAX) })
   const e = Array.isArray(args.events) ? args.events.map((x) => (typeof x === 'string' && Object.hasOwn(LANE_EVENT_ALIASES, x) ? LANE_EVENT_ALIASES[x] : x)) : args.events
-  if (e === undefined) return { ids, events: [...LANE_DEFAULT_EVENTS] }
+  if (e === undefined) return { ids, events: withAlwaysEvents(ids, LANE_DEFAULT_EVENTS) }
   if (!Array.isArray(e) || !e.length || e.some((x) => !LANE_EVENTS.includes(x as LaneEvent))) return say(T.badEvents, { events: LANE_EVENTS.join(', ') })
-  // A question for the user always counts (HI-1991), whatever was asked for.
-  return { ids, events: [...new Set([...(e as LaneEvent[]), ...LANE_ALWAYS_EVENTS])] }
+  // A question for the user always counts (HI-1991), whatever was asked for; so does named lanes' end (HI-2521), in a
+  // watch read back from before too.
+  return { ids, events: withAlwaysEvents(ids, e as LaneEvent[]) }
 }
 
 /** A saved lane watch condition, checked (null: not one Hive would have made). */

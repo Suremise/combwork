@@ -137,7 +137,7 @@ const check = (name, ok, extra = '') => {
     check("an ended launch's token is refused", old.status === 401 && firstToken !== nowToken, JSON.stringify(old))
 
     // --- 3. Never connected: the bound (3 s here) lets the doorbell through.
-    await inv('advanced:set', 'hive.mcp.connectSeconds', 3)
+    await inv('advanced:set', 'cw.mcp.connectSeconds', 3)
     await inv('session:stop', alpha, builder.id)
     check('the builder stops again', !!(await until(async () => !(await live(builder.id)), HUNG_MS)))
     hold()

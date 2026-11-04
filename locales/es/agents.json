@@ -184,7 +184,7 @@
   "agents.mcp.loading": "Cargando…",
   "agents.mcp.noneAdded": "{where, select, workspace {Este espacio de trabajo no tiene servidores MCP: no recibe ninguno.} other {No hay servidores MCP agregados a este proyecto: no recibe ninguno.}}",
   "agents.mcp.notAdded": "{where, select, workspace {no está en este espacio de trabajo} other {no está agregado a este proyecto}}",
-  "agents.mcp.noteAdded": "El servidor integrado hive se da siempre. Un servidor agregado al proyecto más adelante solo le llega con Todos.",
+  "agents.mcp.noteAdded": "El servidor integrado Combwork se da siempre. Un servidor agregado al proyecto más adelante solo le llega con Todos.",
   "agents.mcp.only": "Solo estos",
   "agents.merge.blocked": "{why, select, waiting {El agente {agent} está esperando tu respuesta. Fusiona cuando haya terminado.} background {El agente {agent} está esperando tareas en segundo plano que inició. Fusiona cuando haya terminado.} watching {El agente {agent} está esperando a que cambien unas tarjetas (una vigilancia de tarjetas) y seguirá cuando cambien. Fusiona cuando haya terminado o cancela primero su vigilancia.} signin {El agente {agent} se detuvo a mitad de una tarea cuando caducó su sesión. Vuelve a iniciar sesión y deja que termine primero.} other {El agente {agent} está trabajando. Fusiona cuando haya terminado.}}",
   "agents.merge.commits": "{n, plural, one {# commit no fusionado} many {# commits no fusionados} other {# commits no fusionados}} en {into}",

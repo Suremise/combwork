@@ -180,7 +180,7 @@
   "workspace.mcpView.toolReadNote": "读取共享笔记",
   "workspace.mcpView.toolSessionUsage": "会话的 Token 用量、缓存和压缩次数",
   "workspace.mcpView.toolWriteNote": "创建、覆盖或追加共享笔记",
-  "workspace.mcpView.tryAsking": "试着对智能体说：*“用 hive 工具为下一个会话写一份交接说明。”*",
+  "workspace.mcpView.tryAsking": "试着对智能体说：*“用 Combwork 工具为下一个会话写一份交接说明。”*",
   "workspace.mcpView.whatItDoes": "作用",
   "workspace.mcpView.whatItRuns": "运行的命令",
   "workspace.move.branchesBanner": "{count, plural, other {# 个智能体的分支仍以旧文件夹命名；“修复”会为其重命名。}}",

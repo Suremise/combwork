@@ -35,7 +35,7 @@ export function unknownIn(kind: 'hook' | 'statusline', body: unknown, known: { e
   return { event, fields }
 }
 
-/** The flight recorder's triggers, as their Settings → Advanced values name them (`hive.recorder.<trigger>`). */
+/** The flight recorder's triggers, as their Settings → Advanced values name them (`cw.recorder.<trigger>`). */
 export const FLIGHT_TRIGGERS = ['safeguard', 'unknown', 'version', 'stalled', 'pattern'] as const
 export type FlightTrigger = (typeof FLIGHT_TRIGGERS)[number]
 

@@ -180,7 +180,7 @@ export const API = {
     noneNamed: agentMsg({ id: 'api.connection.noneNamed', text: 'No connection named "{name}", and none has that id.' }),
     noneNamedUsable: agentMsg({ id: 'api.connection.noneNamedUsable', text: 'No connection named "{name}" is usable in this workspace, and none has that id. cw_connection lists them.' }),
     noneNamedUsableShort: agentMsg({ id: 'api.connection.noneNamedUsableShort', text: 'No connection named "{name}" is usable in this workspace, and none has that id.' }),
-    nothingToChange: agentMsg({ id: 'api.connection.nothingToChange', text: 'Nothing to change: give name, model, effort, mode, context200k or extraArgs.' }),
+    nothingToChange: agentMsg({ id: 'api.connection.nothingToChange', text: 'Nothing to change: give name, model, effort, mode, context200k, extraArgs or tag.' }),
     oldFields: agentMsg({ id: 'api.connection.oldFields', text: 'An agent no longer takes {fields}: it runs on a connection, which holds its model, effort, context and mode, and its CLI follows from it. Pass connection (its id or name). {on} cw_connection lists every one, and makes one when the user agrees.' }),
     severalAccounts: agentMsg({ id: 'api.connection.severalAccounts', text: 'Several accounts are named "{name}": use its id ({ids}).' }),
     severalNamed: agentMsg({ id: 'api.connection.severalNamed', text: 'Several connections are named "{name}": use its id ({ids}).' })
@@ -240,7 +240,7 @@ export const API = {
     queueResumed: agentMsg({ id: 'api.done.queueResumed', text: '{resumed, select, yes {Resumed the merge queue for {target} in {project}} other {The merge queue for {target} in {project} is still paused ({hasReason, select, yes {{reason}} other {paused}})}}' }),
     reordered: agentMsg({ id: 'api.done.reordered', text: 'Put {cards} at the top of {column}' }),
     slotReleased: agentMsg({ id: 'api.done.slotReleased', text: 'Released {slot} in {project}{kind, select, carried {: no longer kept for {agent}} other { from {agent}\'s ended run{ended, select, yes {, its listed processes ended first} other {}}}}' }),
-    startedAgent: agentMsg({ id: 'api.done.startedAgent', text: '{resumed, select, yes {Resumed} other {Started}} {agent} in {project}' }),
+    startedAgent: agentMsg({ id: 'api.done.startedAgent', text: "{resumed, select, yes {Resumed} other {Started}} {agent} in {project}{fresh, select, renamed { in a new conversation: its last one is from before Combwork renamed the tools agents use, so it can't continue (it stays in Sessions to read)} moved { in a new conversation: its last one ran in a folder that moved with .hive to .combwork, so it can't continue (it stays in Sessions to read)} other {}}", note: 'fresh (HI-2540): a resume asked for started a new conversation instead, and why (renamed, moved); none: it resumed or started as asked.' }),
     stoppedAgent: agentMsg({ id: 'api.done.stoppedAgent', text: 'Stopped {agent} in {project}' }),
     teamPaused: agentMsg({ id: 'api.done.teamPaused', text: 'Paused the team ({pause})' }),
     teamResumed: agentMsg({ id: 'api.done.teamResumed', text: '{was, select, yes {Resumed the team} other {The team was not paused}}' }),
@@ -319,10 +319,10 @@ export const API = {
     unknown: agentMsg({ id: 'api.lane.unknown', text: 'No lane {lane}' })
   },
   mcp: {
-    connectedOnlyBridge: agentMsg({ id: 'api.mcp.connectedOnlyBridge', text: 'Only the hive MCP bridge says it has connected, with an agent\'s or the Assistant\'s token' }),
+    connectedOnlyBridge: agentMsg({ id: 'api.mcp.connectedOnlyBridge', text: 'Only the combwork MCP bridge says it has connected, with an agent\'s or the Assistant\'s token' }),
     earlierLaunch: agentMsg({ id: 'api.mcp.earlierLaunch', text: 'That is an earlier launch\'s token' }),
     reportMax: agentMsg({ id: 'api.mcp.reportMax', text: 'At most {max} calls in one report' }),
-    reportOnlyBridge: agentMsg({ id: 'api.mcp.reportOnlyBridge', text: 'Only the hive MCP bridge reports its calls, with an agent\'s or the Assistant\'s token' })
+    reportOnlyBridge: agentMsg({ id: 'api.mcp.reportOnlyBridge', text: 'Only the combwork MCP bridge reports its calls, with an agent\'s or the Assistant\'s token' })
   },
   mergeSlot: {
     moveName: agentMsg({ id: 'api.mergeSlot.moveName', text: 'merge slot', note: 'The refused move\'s name, in the workflow\'s refusal of a Hive-merged card\'s merge slot.' }),

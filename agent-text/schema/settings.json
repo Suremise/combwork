@@ -26,6 +26,12 @@
   "settings.advanced.claude-code.accounts.loggedInField.title": {
     "placeholders": {}
   },
+  "settings.advanced.claude-code.accounts.loginExpiresField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.accounts.loginExpiresField.title": {
+    "placeholders": {}
+  },
   "settings.advanced.claude-code.accounts.loginFiles.desc": {
     "placeholders": {}
   },
@@ -1892,6 +1898,12 @@
   "settings.agent.tool.projectSetting": {
     "placeholders": {
       "id": "plain"
+    }
+  },
+  "settings.agent.tool.renamed": {
+    "placeholders": {
+      "id": "plain",
+      "now": "plain"
     }
   },
   "settings.agent.tool.restart.assistant": {

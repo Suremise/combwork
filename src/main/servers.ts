@@ -416,7 +416,7 @@ export function apiEnv(projectPath: string, agentId: string): Record<string, str
   const token = agentToken(projectPath, agentId)
   if (!info.running || !info.url || !token) return {}
   // How long hive-progress waits for the API's answers (HI-1892: Settings → Advanced, its reply time).
-  return { CW_API_URL: info.url, CW_API_TOKEN_FILE: agentTokenFile(projectPath, agentId),CW_PROGRESS_REPLY_SECONDS: String(advanced.number('hive.progress.replySeconds')) }
+  return { CW_API_URL: info.url, CW_API_TOKEN_FILE: agentTokenFile(projectPath, agentId),CW_PROGRESS_REPLY_SECONDS: String(advanced.number('cw.progress.replySeconds')) }
 }
 
 /** An open workspace by its folder path or its name. A name two open workspaces share is refused (409): use the path. */
@@ -747,7 +747,7 @@ function route(method: string, path: string, handler: Handler): void {
 }
 
 /** The Agent API's contract version: goes up when a route or field changes in a way a client would notice. */
-export const API_VERSION = 12
+export const API_VERSION = 13
 
 /** Who Hive takes a request's caller for, and what it may reach (GET /v1/status). */
 async function callerInfo(): Promise<Record<string, unknown>> {
@@ -1189,7 +1189,7 @@ const connectionsHere = (ws: WorkspaceService): Connection[] => usableConnection
 
 /** A connection's values as the Agent API shows them (HI-2108): only those set (each absent: the CLI decides); its extra arguments to `wide` callers only. */
 function connectionValues(c: Connection, wide: boolean): Record<string, unknown> {
-  return { ...(c.model ? { model: c.model } : {}), ...(c.effort ? { effort: c.effort } : {}), ...(c.use200kContext ? { context200k: true } : {}), ...(c.permissionMode ? { mode: c.permissionMode } : {}), ...(wide && c.extraArgs ? { extraArgs: c.extraArgs } : {}) }
+  return { ...(c.model ? { model: c.model } : {}), ...(c.effort ? { effort: c.effort } : {}), ...(c.use200kContext ? { context200k: true } : {}), ...(c.permissionMode ? { mode: c.permissionMode } : {}), ...(wide && c.extraArgs ? { extraArgs: c.extraArgs } : {}), ...(c.tag ? { tag: c.tag } : {}) }
 }
 
 /** A connection as the Agent API lists it (HI-2108): its id, name, account (its name and CLI), its values, and `usable: false` where it can't be used here. */
@@ -1317,6 +1317,8 @@ export function connectionValuesArg(body: any): ConnectionPatch {
   if (body?.effort !== undefined) out.effort = text(body.effort) as EffortLevel | null
   if (body?.mode !== undefined) out.permissionMode = text(body.mode) as PermissionMode | null
   if (body?.extraArgs !== undefined) out.extraArgs = text(body.extraArgs)
+  // Its tag (HI-2530): free text, "" or null for none; its length is checked as Settings' save does.
+  if (body?.tag !== undefined) out.tag = text(body.tag)
   const c = body?.context200k
   if (c !== undefined) {
     if (c === true || c === 'on') out.use200kContext = true
@@ -1486,7 +1488,8 @@ route('POST', '/v1/projects/:name/agents/:agent/start', async ({ params, body })
     }
     const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
     const st = prompt ? await startOnTask(p, agentId, a.name, prompt, (line) => sessions.start(p, { agentId, resumeId, prompt: line, allowed: guard })) : await sessions.start(p, { agentId, resumeId, allowed: guard })
-    return { done: [API.done.startedAgent, { agent: a.name, project: basename(p), resumed: resumeId ? 'yes' : 'no' }], said: prompt ? ` on: ${clip(prompt.replace(/\s+/g, ' '), 80)}` : undefined, result: st, ...(st?.runId ? { started: { project: basename(p), agentId, run: st.runId } } : {}) }
+    // A resume that started a new conversation says so, and why (HI-2540).
+    return { done: [API.done.startedAgent, { agent: a.name, project: basename(p), resumed: resumeId && !st?.startedFresh ? 'yes' : 'no', fresh: st?.startedFresh ?? 'none' }], said: prompt ? ` on: ${clip(prompt.replace(/\s+/g, ' '), 80)}` : undefined, result: st, ...(st?.runId ? { started: { project: basename(p), agentId, run: st.runId } } : {}) }
   })
 })
 
@@ -1616,7 +1619,7 @@ function callerSender(): DeliverySender {
 }
 
 /** Starts an agent on a task (#649): a task delivery its launch carries as its prompt, received once its CLI takes it. */
-const startOnTask = (p: string, agentId: string, agentName: string, prompt: string, start: (line: string) => Promise<LiveSessionState>): Promise<LiveSessionState> =>
+const startOnTask = <T extends LiveSessionState>(p: string, agentId: string, agentName: string, prompt: string, start: (line: string) => Promise<T>): Promise<T> =>
   launchWith(p, { agentId, agentName, kind: 'task', from: callerSender(), body: prompt }, start).then((x) => x.launched)
 
 // The Assistant's journal (#1031): its tools (cw_journal_*) only, only while it is on (Settings → Assistant → Journal).
@@ -3444,7 +3447,9 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     const r = await registerLaneWatch(ws, who.projectPath, who.agentId, lc, limit, { ...extra, ...(laneAgents ? { agents: { agents: laneAgents, ignoreBackground: false } } : {}) }).catch((e: Error) => {
       throw e instanceof HttpError ? e : httpFrom(/^(No such lane|Unknown task)/.test(e.message) ? 404 : /^(You can't watch yourself|Not a project)/.test(e.message) ? 400 : 409, e)
     })
-    return { watching: await withUsage(r.watching.label), limitAt: r.watching.limitAt, events: lc.events, ...(r.replaced ? { replaced: r.replaced } : {}), ...(r.cards ? { cards: r.cards, ...withNames([...r.cards.now, ...(r.cards.replaced ?? []), ...(r.cards.dropped ?? [])]) } : {}), ...(r.agents ? { agents: r.agents } : {}) }
+    // HI-2521: a named lane that has already ended is the answer at once; no watch started, so no usage beside it.
+    if ('already' in r) return { lanesAlready: r.already, ...(r.replaced ? { replaced: r.replaced } : {}) }
+    return { watching: await withUsage(r.watching.label), limitAt: r.watching.limitAt, events: lc.events,...(r.replaced ? { replaced: r.replaced } : {}), ...(r.cards ? { cards: r.cards, ...withNames([...r.cards.now, ...(r.cards.replaced ?? []), ...(r.cards.dropped ?? [])]) } : {}), ...(r.agents ? { agents: r.agents } : {}) }
   }
   if (body?.agents !== undefined) throw new HttpError(400, say(API.watch.agentsWithLanes))
   const cond = readCondition(body ?? {})
@@ -4379,7 +4384,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<voi
     m.authenticated = true
     m.skip = true
     // agent-protocol: the app's name
-    return send(res, 200, { ok: true, app: 'Hive', version: app.getVersion() })
+    return send(res, 200, { ok: true, app: 'Combwork', version: app.getVersion() })
   }
   const bearer = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '')
   const ownWorkspace = bearer ? assistant.assistantForToken(bearer) : null
@@ -4422,7 +4427,7 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
   if (url.pathname === '/v1/health') {
     m.skip = true
     // agent-protocol: the app's name
-    return send(res, 200, { ok: true, app: 'Hive', version: app.getVersion() })
+    return send(res, 200, { ok: true, app: 'Combwork', version: app.getVersion() })
   }
 
   // A viewer changes nothing: whatever the route (a wait that holds a watch, a report), only a GET is served. Refused

@@ -91,7 +91,7 @@ async function agentWithWork(inv, project, name) {
     check('…both merged', git(alpha, 'show', 'HEAD:One.txt') === 'One' && git(alpha, 'show', 'other:Two.txt') === 'Two')
 
     // 2. With B's wait cut to 1 s, B gives up while A holds the lock: nothing changed, A named.
-    await b.inv('advanced:set', 'hive.merge.lockWaitSeconds', 1)
+    await b.inv('advanced:set', 'cw.merge.lockWaitSeconds', 1)
     fs.writeFileSync(path.join(one.worktree.path, 'One.txt'), 'One again')
     git(one.worktree.path, 'commit', '-qam', 'One again')
     fs.writeFileSync(path.join(two.worktree.path, 'Two.txt'), 'Two again')

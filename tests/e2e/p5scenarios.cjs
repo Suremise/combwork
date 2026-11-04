@@ -173,7 +173,7 @@ const slash = (p) => p.replace(/\\/g, '/')
     fs.rmSync(hook)
 
     // --- S47 (c): a stand-in signer that waits as a pinentry would: paused "signing waits for you" within the bound.
-    await inv('advanced:set', 'hive.queue.signSeconds', 5)
+    await inv('advanced:set', 'cw.queue.signSeconds', 5)
     const pidFile = path.join(fx.tools, 'signer.pid')
     const waiter = path.join(fx.tools, 'wait.js')
     fs.writeFileSync(waiter, `require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(() => {}, 1000)\n`)
@@ -209,7 +209,7 @@ const slash = (p) => p.replace(/\\/g, '/')
     lib.git(fx.alpha, ['config', '--unset', 'commit.gpgsign'])
     await tab.card('main').locator('[data-action="resume"]').click()
     check('…signing off and the queue resumed: merged', await done(n), JSON.stringify(await h.kinds(n)))
-    await inv('advanced:set', 'hive.queue.signSeconds', null)
+    await inv('advanced:set', 'cw.queue.signSeconds', null)
 
     // --- S57(e): the user records a decision on the card while its merge checks run: no advance, back to review.
     q.steer(fx, 'wait')

@@ -206,7 +206,7 @@ export const AREAS = [
   // A card's attachment read through Hive (HI-1751).
   { paths: ['tests/e2e/attachread.cjs'], suites: ['attachread'] },
   // Accounts (HI-980): the store, its checks and watches, Settings → Accounts, and the fake's sign-in.
-  { paths: ['src/main/accounts.ts', 'src/shared/accounts.ts', 'src/renderer/src/components/AccountsSettings.tsx', 'tests/e2e/accounts.cjs'], suites: ['accounts', 'connections', 'connections-codex', 'connections-server'] },
+  { paths: ['src/main/accounts.ts', 'src/shared/accounts.ts', 'src/renderer/src/components/AccountsSettings.tsx', 'src/renderer/src/components/accountCard.ts', 'tests/e2e/accounts.cjs'], suites: ['accounts', 'connections', 'connections-codex', 'connections-server', 'usagemove'] },
   // Server connections (HI-1772): the key store and its masking, the server's form, models and launch variables.
   { paths: ['src/main/serverConnections.ts', 'src/main/serverMarks.ts', 'src/main/keyStore.ts', 'src/main/keyMatcher.ts', 'src/main/keyCoverage.ts', 'src/shared/serverConnection.ts', 'src/renderer/src/components/ServerConnections.tsx', 'tests/e2e/connections-server.cjs'], suites: ['connections-server'] },
   // Launching on a connection (HI-1755): the launch step, the switch at a safe point, the seam, the Connection choice.
@@ -452,6 +452,12 @@ export const AREAS = [
   { paths: ['src/main/recentWorkspaces.ts'], suites: ['recent', 'windows'] },
   { paths: ['src/renderer/src/components/Resizer.tsx'], suites: ['resize', 'progress'] },
   { paths: ['src/renderer/src/components/Sidebar.tsx'], suites: ['agentstable', 'cardchip', 'rail', 'windows', 'contrast', 'panelroom'] },
+  // Side-panel lists' one-line descriptions and their tooltips (HI-2527).
+  { paths: ['tests/e2e/onelinedesc.cjs', 'src/renderer/src/components/Modes.tsx', 'src/renderer/src/components/Skills.tsx', 'src/renderer/src/components/Templates.tsx', 'src/renderer/src/components/Dialects.tsx', 'src/renderer/src/components/AssistantView.tsx', 'src/renderer/src/components/McpCatalog.tsx'], suites: ['onelinedesc'] },
+  // Settings' and Project Settings' section lists: cut names' tooltips (HI-2531).
+  { paths: ['tests/e2e/settingsnav.cjs', 'src/renderer/src/views/SettingsView.tsx', 'src/renderer/src/views/ProjectTabs.tsx', 'src/renderer/src/components/ui.tsx'], suites: ['settingsnav'] },
+  // Leaving Settings for a view (HI-2525): the activity bar, the side panel, shortcuts, and what is half typed.
+  { paths: ['tests/e2e/settingsleave.cjs', 'src/renderer/src/components/Sidebar.tsx', 'src/renderer/src/components/Shell.tsx', 'src/renderer/src/views/SettingsView.tsx', 'src/renderer/src/App.tsx'], suites: ['settingsleave'] },
   // Room for the work beside the side panels (HI-1737).
   { paths: ['src/renderer/src/layoutRoom.ts'], suites: ['panelroom', 'presetstep', 'rail'] },
   // The session toolbar (#975): Panes | Tiles, the summary chip, + Add ▾.
@@ -498,6 +504,7 @@ export const AREAS = [
   { paths: ['src/main/loginItem.ts'], suites: ['packaged'] },
   { paths: ['src/shared/instructions.ts'], suites: ['skilldelivery'] },
   { paths: ['src/shared/resumeAll.ts'], suites: ['resumeall', 'signin'] },
+  { paths: ['src/shared/sessionFresh.ts', 'src/renderer/src/freshResume.ts'], suites: ['freshresume'] },
   { paths: ['src/shared/projectTabs.ts'], suites: ['tabstrip', 'startall', 'gitview'] },
   { paths: ['src/shared/startAll.ts'], suites: ['startall', 'removeall'] },
   { paths: ['src/shared/startFailure.ts'], suites: ['startfail'] },
@@ -565,7 +572,7 @@ export const AREAS = [
   { paths: ['src/main/dialects/', 'tests/e2e/dialectlaunch.cjs'], suites: ['dialectlaunch', 'agentguidance', 'dialectsview'] },
   // The Dialects view (HI-2444): its list, a file's texts and layers, Save's checks, the JSON tab, the file actions,
   // Agent Settings' Dialect.
-  { paths: ['src/renderer/src/components/Dialects.tsx', 'src/shared/dialects.ts', 'tests/e2e/dialectsview.cjs'], suites: ['dialectsview'] },
+  { paths: ['src/renderer/src/components/Dialects.tsx', 'src/renderer/src/components/dialectOnTip.ts', 'src/shared/dialects.ts', 'tests/e2e/dialectsview.cjs'], suites: ['dialectsview'] },
   // Bundled into the Docs view (About's licence pages, Release Notes, the Agent API reference).
   { paths: ['docs/', 'CHANGELOG.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'scripts/licenses.mjs', 'scripts/licenseText.mjs', 'scripts/thirdPartyNotices.mjs', 'scripts/notices/'], suites: ['about'] },
   // The i18n screenshot route (#769): its case files (each area's, found by name), the translations it shows (every

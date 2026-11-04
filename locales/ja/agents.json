@@ -184,7 +184,7 @@
   "agents.mcp.loading": "読み込み中…",
   "agents.mcp.noneAdded": "{where, select, workspace {このワークスペースにはMCPサーバーがありません。何も渡されません。} other {このプロジェクトに追加されたMCPサーバーはありません。何も渡されません。}}",
   "agents.mcp.notAdded": "{where, select, workspace {このワークスペースにない} other {このプロジェクトに追加されていない}}",
-  "agents.mcp.noteAdded": "組み込みのhiveサーバーは常に渡されます。あとでプロジェクトに追加したサーバーは、「すべて」のときだけ渡されます。",
+  "agents.mcp.noteAdded": "組み込みのcombworkサーバーは常に渡されます。あとでプロジェクトに追加したサーバーは、「すべて」のときだけ渡されます。",
   "agents.mcp.only": "選択したもののみ",
   "agents.merge.blocked": "{why, select, waiting {{agent}は応答を待っています。終わってからマージしてください。} background {{agent}は自分で開始したバックグラウンドタスクを待っています。終わってからマージしてください。} watching {{agent}はカードの変化を待っていて（カードの監視）、変化があれば作業を続けます。終わってからマージするか、先に監視を取り消してください。} signin {{agent}はサインインの期限が切れ、作業の途中で止まりました。サインインし直し、先に作業を終わらせてください。} other {{agent}は作業中です。終わってからマージしてください。}}",
   "agents.merge.commits": "{into}に未マージのコミット{n, plural, other {#件}}",

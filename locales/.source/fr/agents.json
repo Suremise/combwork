@@ -188,7 +188,7 @@
   "agents.mcp.loading": "Loading…",
   "agents.mcp.noneAdded": "{where, select, workspace {This workspace has no MCP servers: it gets none.} other {No MCP servers are added to this project: it gets none.}}",
   "agents.mcp.notAdded": "{where, select, workspace {not in this workspace} other {not added to this project}}",
-  "agents.mcp.noteAdded": "The built-in hive server is always given. A server added to the project later reaches it only with All.",
+  "agents.mcp.noteAdded": "The built-in combwork server is always given. A server added to the project later reaches it only with All.",
   "agents.mcp.only": "Only these",
   "agents.merge.blocked": "{why, select, waiting {{agent} is waiting for your answer. Merge once it has finished.} background {{agent} is waiting on background tasks it started. Merge once it has finished.} watching {{agent} is waiting for cards to change (a card watch) and carries on when they do. Merge once it has finished, or cancel its watch first.} signin {{agent} stopped in the middle of a task when its sign-in expired. Sign in again and let it finish first.} other {{agent} is working. Merge once it has finished.}}",
   "agents.merge.commits": "{n, plural, one {# commit} other {# commits}} not merged into {into}",

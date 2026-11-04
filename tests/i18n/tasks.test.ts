@@ -294,7 +294,7 @@ describe("the board's refusals: English for agents as before, the window's langu
       [await caught(run(() => tasks.reorderTasks('todo', [], assistant))), 'cards: list the card numbers in the order wanted.', 400, null],
       [await caught(run(() => tasks.updateTask(archived.number, { title: 'x' }, assistant))), `#${archived.number} is archived. Only the user can bring it back.`, 403, null],
       [await caught(run(() => tasks.commentTask(todo.number, ' ', user))), 'The comment is empty.', 400, null],
-      [await caught(run(() => tasks.updateTask(todo.number, { review: 'start' }, user))), "Only an agent of the card's project reviews it, through its own hive tools.", 403, 'Nur ein Agent des Projekts prüft die Karte.'],
+      [await caught(run(() => tasks.updateTask(todo.number, { review: 'start' }, user))), "Only an agent of the card's project reviews it, through its own Combwork tools.", 403, 'Nur ein Agent des Projekts prüft die Karte.'],
       [await caught(run(() => tasks.updateTask(todo.number, { review: 'start' }, agent))), `#${todo.number} is in Todo. A card is reviewed in Review; if it needs more work, that is work on it (move it to doing).`, 400, null],
       [await caught(run(() => tasks.updateTask(todo.number, { review: 'passed' }, agent))), `You aren't reviewing #${todo.number} now: its review ended (the card moved, or your session ended) or never started. Start one with review "start" if it is in Review.`, 400, null],
       [await caught(run(() => tasks.editDecision(todo.number, 'x', 'y', assistant))), "Only the user changes or removes a card's decisions.", 403, null],

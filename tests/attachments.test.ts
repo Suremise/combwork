@@ -206,15 +206,24 @@ describe.runIf(process.platform === 'win32')('attachments on disk', () => {
 
   for (const where of ['session folder', 'attachments folder', '.combwork folder'] as const) {
     it(`never writes an attachment through a linked ${where}`, async () => {
-      if (where === '.combwork folder') rmSync(join(proj, '.combwork'), { recursive: true, force: true })
+      // HI-2430: the project's making (beforeEach) scheduled a refresh of its own (the root watcher, 250 ms on), which sets
+      // the project up (ensureProject) when it finds no project.json. Under load it can still be under way here, its
+      // writes into .combwork in flight: removing the folder under them, or one made again before the link, fails the case.
+      // So the folder is replaced only once no refresh is waiting or running.
+      if (where === '.combwork folder') {
+        await run(() => w.refreshesSettled())
+        rmSync(join(proj, '.combwork'), { recursive: true, force: true })
+      }
       const at = where === 'session folder' ? join(proj, '.combwork', 'attachments', sid) : where === 'attachments folder' ? join(proj, '.combwork', 'attachments') : join(proj, '.combwork')
       const away = linkAway(at)
       running()
       await expect(run(() => sessions.attach(proj, [write(join(outside, `ext-${n}.log`))], 'a1'))).rejects.toThrow(/link or not a folder/)
       // HI-2085: through a linked .combwork folder, Hive's own setup of the new project (its sessions and archive folders, its
-      // project.json) can land there too: the refresh the folder's making scheduled may run after the link, at any point
-      // in the case. Only that is let be; an attachment, or anything else, fails it.
-      const setup = /^(sessions|archive)$|^project\.json(\.bak|\.[\w-]+\.tmp)?$/
+      // project.json and its .bak) can land there too: a refresh the watcher scheduled late may run after the link. Only
+      // that is let be; an attachment, or anything else, fails it. Listed once that refresh has finished (HI-2430): one
+      // still writing has temp files there (project.json.bak's, project.json.bak.<pid>-<n>.tmp, matched nothing here).
+      await run(() => w.refreshesSettled())
+      const setup = /^(sessions|archive)$|^project\.json(\.bak)?$/
       const left = readdirSync(away, { recursive: true }).map(String)
       expect(where === '.combwork folder' ? left.filter((p) => !setup.test(p)) : left).toEqual([])
     })

@@ -194,7 +194,7 @@ function replies(): { name: string; text: string }[] {
   add('releasable none', R.releasableText({ project: 'alpha', carried: [], held: [] }))
   add('released carried', R.slotReleasedText({ project: 'alpha', kind: 'carried', slot: 'slot-a', agent: 'Coder' }))
   add('released writer', R.slotReleasedText({ project: 'alpha', kind: 'writer', slot: 'slot-a', agent: 'Coder', ended: true }))
-  const conn: R.ConnectionPublic = { id: 'x', name: 'Opus', account: 'acc', cli: 'claude-code', model: 'opus', effort: 'high', context200k: true, mode: 'plan', extraArgs: 'x' }
+  const conn: R.ConnectionPublic = { id: 'x', name: 'Opus', account: 'acc', cli: 'claude-code', model: 'opus', effort: 'high', context200k: true, mode: 'plan', extraArgs: 'x', tag: 'Builders' }
   const usage: R.AccountUsagePublic[] = [{ account: 'acc', limits: [{ label: '5h', usedPercent: 40, resetsAt: '2026-10-18T12:00:00Z' }, { label: '5h', usedPercent: 40, resetsAt: null }], move: { percent: 90, limit: 'weekly', to: 'Sonnet' } }, { account: 'acc', limits: [], move: { percent: 90, limit: 'fiveHour', to: 'Sonnet' } }, { account: 'acc', limits: [], move: { percent: 90, limit: 'any', to: 'Sonnet' } }]
   add('connections', R.connectionListText({ connections: [conn, { id: 'x', name: 'Opus', account: 'acc', cli: null, usable: false }], accounts: [{ id: 'x', name: 'Work', cli: 'codex', on: false }, { id: 'x', name: 'Work2', cli: 'codex' }], usage }))
   add('connections none', R.connectionListText({ connections: [], accounts: [] }))

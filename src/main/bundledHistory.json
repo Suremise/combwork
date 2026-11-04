@@ -123,7 +123,8 @@
       "cfae75dda271182b"
     ],
     "generalist": [
-      "f985d471d38d2ad3"
+      "f985d471d38d2ad3",
+      "c6f6437bb076a5c4"
     ],
     "handover": [
       "60ac1268a067e829",
@@ -264,7 +265,8 @@
     ],
     "use-cw-api": [
       "d306d59457643720",
-      "25c5b8c3a1d0190b"
+      "25c5b8c3a1d0190b",
+      "a66e6adb57744631"
     ],
     "use-hive-api": [
       "c0281b780bf4d213",

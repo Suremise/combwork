@@ -291,6 +291,22 @@ const check = (name, ok, extra = '') => {
   await lib.sleep(800)
   const overflow = await page.locator('.performance-page:visible').evaluate((el) => el.scrollWidth - el.clientWidth)
   check('narrow: the page itself has no sideways scroll', overflow <= 1, String(overflow))
+  // A route stays on one line (HI-2534): its table scrolls sideways rather than breaking "/v1/tasks/:n" into fragments.
+  let routeLines = []
+  const routesOnOneLine = async () => {
+    routeLines = await perfTable('Route')
+      .locator('tbody td:first-child')
+      .evaluateAll((tds) =>
+        tds.map((td) => {
+          const r = document.createRange()
+          r.selectNodeContents(td)
+          return new Set([...r.getClientRects()].map((x) => Math.round(x.top))).size
+        })
+      )
+      .catch(() => [])
+    return routeLines.length > 0 && routeLines.every((n) => n === 1)
+  }
+  check('narrow: each route is on one line', !!(await until(routesOnOneLine, HUNG_MS)), JSON.stringify(routeLines))
   await shot('narrow-light')
   await inv('settings:update', { appearance: { theme: 'dark' } })
   await lib.sleep(800)
