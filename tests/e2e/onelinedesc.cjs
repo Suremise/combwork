@@ -25,12 +25,17 @@ const HUNG_MS = 10000
     await lib.until(async () => (await page.locator('.project-row').count()) === 1, HUNG_MS)
 
     // The side panel at its narrowest (200 px), dragged by its edge: descriptions are cut there.
-    const edge = await page.locator('.sidebar-resizer').boundingBox()
-    await page.mouse.move(edge.x + edge.width / 2, edge.y + 300)
-    await page.mouse.down()
-    for (let x = edge.x; x > edge.x - 120; x -= 10) await page.mouse.move(x, edge.y + 300)
-    await page.mouse.up()
-    const width = await page.locator('.sidebar').evaluate((e) => Math.round(e.getBoundingClientRect().width))
+    const sidebarWidth = () => page.locator('.sidebar').evaluate((e) => Math.round(e.getBoundingClientRect().width))
+    // A drag made while the window still lays itself out can miss: dragged again until the panel is narrowest.
+    await lib.until(async () => {
+      const edge = await page.locator('.sidebar-resizer').boundingBox()
+      await page.mouse.move(edge.x + edge.width / 2, edge.y + 300)
+      await page.mouse.down()
+      for (let x = edge.x; x > edge.x - 120; x -= 10) await page.mouse.move(x, edge.y + 300)
+      await page.mouse.up()
+      return (await sidebarWidth()) === 200
+    }, HUNG_MS, 500)
+    const width = await sidebarWidth()
     check('the side panel is at its narrowest', width === 200, `${width}`)
 
     const lists = [
@@ -58,7 +63,26 @@ const HUNG_MS = 10000
         await page.screenshot({ path: path.join(scratch, `onelinedesc-${l.name.toLowerCase()}-tip.png`) })
         shot = true
       }
+      // The keyboard (HR1's round 1): Tab from the row's name reaches its cut description, which shows the same tooltip;
+      // Tab on hides it, and Escape hides one shown.
+      await page.mouse.move(5, 5)
+      await lib.until(async () => (await page.locator('.tip:visible').count()) === 0, HUNG_MS)
+      await page.locator(l.rows).nth(i).locator('.label').first().click()
+      await page.keyboard.press('Tab')
+      const focused = await lib.until(() => descs.nth(i).evaluate((e) => e.contains(document.activeElement) && document.activeElement !== e && document.activeElement.matches(':focus-visible')), HUNG_MS)
+      check(`${l.name}: Tab from the row reaches its cut description`, !!focused, await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 120)))
+      const tipText = () => page.locator('.tip:visible').last().innerText({ timeout: 1000 }).catch(() => '')
+      check(`${l.name}: …and its full text shows in the tooltip`, !!(await lib.until(async () => (await tipText()) === full, HUNG_MS)), await tipText())
+      if (l.name === 'Modes') await page.screenshot({ path: path.join(scratch, 'onelinedesc-keyboard-tip.png') })
+      await page.keyboard.press('Escape')
+      check(`${l.name}: Escape hides it`, !!(await lib.until(async () => (await tipText()) !== full, HUNG_MS)))
+      await page.keyboard.press('Shift+Tab')
+      await page.keyboard.press('Tab')
+      await lib.until(async () => (await tipText()) === full, HUNG_MS)
+      await page.keyboard.press('Tab')
+      check(`${l.name}: Tab on hides it`, !!(await lib.until(async () => (await tipText()) !== full && !(await descs.nth(i).evaluate((e) => e.contains(document.activeElement))), HUNG_MS)))
       const j = all.findIndex((d) => !d.cut && d.text)
+      if (j >= 0) check(`${l.name}: one that fits is no Tab stop`, (await descs.nth(j).locator('[tabindex]').count()) === 0)
       if (j >= 0) {
         await page.mouse.move(5, 5)
         await descs.nth(j).hover()
