@@ -1884,13 +1884,6 @@
   "settings.agent.tool.restart.sessions": {
     "placeholders": {}
   },
-  "settings.agent.tool.reverted": {
-    "placeholders": {
-      "path": "plain",
-      "inProject": "select",
-      "project": "plain"
-    }
-  },
   "settings.agent.tool.switchRefused": {
     "placeholders": {
       "error": "plain"
