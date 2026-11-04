@@ -24,7 +24,7 @@ vi.mock('../src/main/events', async (orig) => ({
 
 const base = tempDir('combworkmove-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
-const { MOVED_FILE, MOVE_LOCK_FILE, PLAN_FILE, MARK_FILE, finishMove, moveFolders, moveTestHooks, movedFolders, movedPath } = await import('../src/main/combworkMove')
+const { MOVED_FILE, MOVE_LOCK_FILE, MARK_FILE, finishMove, moveFolders, moveTestHooks, movedFolders, movedPath } = await import('../src/main/combworkMove')
 const { dataFolder } = await import('../src/main/hiveFolder')
 
 const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs')
@@ -63,6 +63,15 @@ function workspace10(): string {
   write(join(ws, 'alpha', '.hive', 'attachments', 'cards', '1', 'shot.png'), 'png')
   write(join(ws, 'alpha', 'src.txt'), 'code')
   return ws
+}
+
+/** Whether the rewrites finished for the map as the folders show it now (its hash recorded). */
+const doneFor = (ws: string): boolean => {
+  try {
+    return typeof JSON.parse(readFileSync(join(ws, '.combwork', MOVED_FILE), 'utf8')).hash === 'string'
+  } catch {
+    return false
+  }
 }
 
 const late = (ws: string) => ({ boardFile: join(ws, '.combwork', 'hive.db'), relocateFolders: async () => true })
@@ -125,7 +134,7 @@ describe('a 1.0 workspace', () => {
     db.close()
     expect(readFileSync(join(ws, '.combwork', 'shared', 'handovers', 'h.md'), 'utf8')).toBe(`Logs in ${ws}\\alpha\\.combwork\\attachments\\cards\\1\\shot.png\n`)
     // The plan is gone; the map and the lock's file stay.
-    expect(existsSync(join(ws, '.combwork', PLAN_FILE))).toBe(false)
+    expect(doneFor(ws)).toBe(true)
     expect(existsSync(join(ws, MOVE_LOCK_FILE))).toBe(true)
     const moves = await movedFolders(ws)
     expect(moves.map((m) => m.from).sort()).toEqual([join(ws, '.combwork', 'assistant', '.hive'), join(ws, '.hive'), join(ws, '.hive', 'assistant', '.hive'), join(ws, 'alpha', '.hive')].sort())
@@ -192,7 +201,7 @@ describe('refused, nothing lost', () => {
 })
 
 describe('an interrupted move', () => {
-  for (const at of ['planned', 'renamed:workspace', 'renamed:project', 'phase:notes', 'phase:cards'])
+  for (const at of ['marked:workspace', 'renamed:workspace', 'marked:assistant', 'renamed:assistant', 'marked:project', 'renamed:project', 'phase:notes', 'phase:cards', 'phase:folders'])
     it(`stopped at ${at}: the next open finishes it, once`, async () => {
       const ws = workspace10()
       moveTestHooks.after = (step) => {
@@ -206,7 +215,7 @@ describe('an interrupted move', () => {
       expect(cardText(ws).d).toContain(`${ws}\\alpha\\.combwork\\attachments`)
       expect(cardText(ws).d).not.toContain('.combwork\\.combwork')
       expect(readFileSync(join(ws, '.combwork', 'shared', 'handovers', 'h.md'), 'utf8')).toContain(`${ws}\\alpha\\.combwork\\`)
-      expect(existsSync(join(ws, '.combwork', PLAN_FILE))).toBe(false)
+      expect(doneFor(ws)).toBe(true)
     })
 
   it('a .hive made again after our rename is left as it is; the moved folder keeps its mapping and finishes', async () => {
@@ -226,6 +235,76 @@ describe('an interrupted move', () => {
     expect(existsSync(join(ws, 'alpha', '.combwork', 'attachments', 'cards', '1', 'shot.png'))).toBe(true)
     expect(cardText(ws).d).toContain(`${ws}\\alpha\\.combwork\\attachments`)
     expect((await movedFolders(ws)).some((m) => m.from.toLowerCase() === join(ws, 'alpha', '.hive').toLowerCase())).toBe(true)
+  })
+})
+
+describe("HR1's round 1: the map is what the folders show (s65)", () => {
+  it('a stop right after the native rename: the map already has it, and old links resolve, before any reopen', async () => {
+    const ws = workspace10()
+    moveTestHooks.after = (step) => {
+      if (step === 'renamed:project') throw new Error('stopped')
+    }
+    await expect(openMove(ws)).rejects.toThrow('stopped')
+    delete moveTestHooks.after
+    const note = join(ws, 'alpha', '.hive', 'attachments', 'cards', '1', 'shot.png')
+    expect(await movedPath(ws, note)).toBe(join(ws, 'alpha', '.combwork', 'attachments', 'cards', '1', 'shot.png'))
+    expect(await movedPath(ws, join(ws, '.hive', 'shared', 'plan.md'))).toBe(join(ws, '.combwork', 'shared', 'plan.md'))
+    await openMove(ws)
+    expect(cardText(ws).d).toContain(`${ws}\\alpha\\.combwork\\attachments`)
+  })
+
+  for (const at of ['phase:notes', 'phase:cards'])
+    it(`a host that appears after ${at}: everything runs again, and its references are rewritten`, async () => {
+      const ws = workspace10()
+      write(join(ws, '.hive', 'shared', 'beta.md'), `Beta keeps ${ws}\\beta\\.hive\\attachments\\b.png\n`)
+      moveTestHooks.after = (step) => {
+        if (step === at) throw new Error('stopped')
+      }
+      await expect(openMove(ws)).rejects.toThrow('stopped')
+      delete moveTestHooks.after
+      json(join(ws, 'beta', '.hive', 'project.json'), { id: 'p-beta' })
+      await openMove(ws)
+      expect(existsSync(join(ws, 'beta', '.combwork', 'project.json'))).toBe(true)
+      expect(readFileSync(join(ws, '.combwork', 'shared', 'beta.md'), 'utf8')).toBe(`Beta keeps ${ws}\\beta\\.combwork\\attachments\\b.png\n`)
+      expect(doneFor(ws)).toBe(true)
+    })
+
+  it("a host that appears after the move finished: the hash changes, so the rewrites run again for it", async () => {
+    const ws = workspace10()
+    write(join(ws, '.hive', 'shared', 'gamma.md'), `See ${ws}\\gamma\\.hive\\x.md\n`)
+    await openMove(ws)
+    json(join(ws, 'gamma', '.hive', 'project.json'), { id: 'p-gamma' })
+    await openMove(ws)
+    expect(readFileSync(join(ws, '.combwork', 'shared', 'gamma.md'), 'utf8')).toBe(`See ${ws}\\gamma\\.combwork\\x.md\n`)
+  })
+
+  it("both at the workspace, the Assistant's inner .hive under .combwork: the inner one moves; the old outer tree is never mapped", async () => {
+    const ws = join(base, `bothws${++n}`)
+    json(join(ws, '.hive', 'workspace.json'), { old: true })
+    write(join(ws, '.hive', 'assistant', '.hive', 'project.json'), '{"old":true}')
+    json(join(ws, '.combwork', 'workspace.json'), { version: 1 })
+    json(join(ws, '.combwork', 'assistant', '.hive', 'project.json'), { agents: [] })
+    await moveFolders(ws)
+    expect(existsSync(join(ws, '.combwork', 'assistant', '.combwork', 'project.json'))).toBe(true)
+    expect(readFileSync(join(ws, '.hive', 'assistant', '.hive', 'project.json'), 'utf8')).toBe('{"old":true}')
+    expect(await movedPath(ws, join(ws, '.hive', 'assistant', '.hive', 'x.png'))).toBeNull()
+    expect(await movedPath(ws, join(ws, '.combwork', 'assistant', '.hive', 'x.png'))).toBe(join(ws, '.combwork', 'assistant', '.combwork', 'x.png'))
+  })
+
+  it('a .hive made again after the rename, holding a workspace and a file named like an old plan: byte for byte untouched through recovery and finish', async () => {
+    const ws = workspace10()
+    moveTestHooks.after = (step) => {
+      if (step === 'renamed:workspace') throw new Error('stopped')
+    }
+    await expect(openMove(ws)).rejects.toThrow('stopped')
+    delete moveTestHooks.after
+    const files: Record<string, string> = { 'workspace.json': '{"recreated":true}', 'combwork-move.json': '{"id":"theirs"}', 'combwork-move.json.bak': '{"id":"theirs-bak"}', 'combwork-moved.json': '{"theirs":1}' }
+    for (const [f, t] of Object.entries(files)) write(join(ws, '.hive', f), t)
+    await openMove(ws)
+    expect(Object.fromEntries(readdirSync(join(ws, '.hive')).map((f) => [f, readFileSync(join(ws, '.hive', f), 'utf8')]))).toEqual(files)
+    expect(existsSync(join(ws, 'alpha', '.combwork', 'project.json'))).toBe(true)
+    expect(doneFor(ws)).toBe(true)
+    expect(told.toasts.some((t) => t.title.includes(ws) && /both/.test(t.title))).toBe(true)
   })
 })
 
@@ -328,8 +407,8 @@ m.moveFolders(ws).then((r) => appendFileSync(out, 'moved ' + r.moved + '\\n'), (
     expect(existsSync(join(ws, 'alpha', '.combwork', 'project.json'))).toBe(true)
     expect(existsSync(join(ws, '.hive'))).toBe(false)
     expect(cardText(ws).d).toContain(`${ws}\\alpha\\.combwork\\attachments`)
-    // One plan from start to end: the dead one's, its marks kept.
-    expect(readFileSync(join(ws, 'alpha', '.combwork', MARK_FILE), 'utf8')).toBe(readFileSync(join(ws, '.combwork', MARK_FILE), 'utf8'))
+    // Every moved folder carries its marker: the dead one's and the taker's.
+    for (const d of [join(ws, '.combwork'), join(ws, 'alpha', '.combwork'), join(ws, '.combwork', 'assistant', '.combwork')]) expect(existsSync(join(d, MARK_FILE)), d).toBe(true)
   })
 
   it('both paused after seeing it unclaimed, released together: exactly one moves it, the other writes nothing', async () => {
@@ -349,9 +428,9 @@ m.moveFolders(ws).then((r) => appendFileSync(out, 'moved ' + r.moved + '\\n'), (
     expect(ends.filter((e) => e === 'moved 3')).toHaveLength(1)
     expect(ends.filter((e) => e !== 'moved 3').every((e) => e === 'moved 0' || e.startsWith('refused Another Combwork is moving'))).toBe(true)
     // One plan's id in every moved host, and the map once each.
-    const ids = new Set([join(ws, '.combwork'), join(ws, 'alpha', '.combwork'), join(ws, '.combwork', 'assistant', '.combwork')].map((d) => readFileSync(join(d, MARK_FILE), 'utf8')))
+    const ids = new Set([join(ws, '.combwork'), join(ws, 'alpha', '.combwork'), join(ws, '.combwork', 'assistant', '.combwork')].map((d) => JSON.parse(readFileSync(join(d, MARK_FILE), 'utf8')).id))
     expect(ids.size).toBe(1)
-    const moved = JSON.parse(readFileSync(join(ws, '.combwork', MOVED_FILE), 'utf8')) as { moves: { from: string }[] }
-    expect(new Set(moved.moves.map((m) => m.from.toLowerCase())).size).toBe(moved.moves.length)
+    const moves = await movedFolders(ws)
+    expect(moves.map((m) => m.from).sort()).toEqual([join(ws, '.combwork', 'assistant', '.hive'), join(ws, '.hive'), join(ws, '.hive', 'assistant', '.hive'), join(ws, 'alpha', '.hive')].sort())
   })
 })

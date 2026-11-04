@@ -1,0 +1,192 @@
+// HI-2462: HR1's round-1 probes, kept as regressions against the derived map (s65). Each keeps its invariant; only the
+// plumbing the new shape removed is adapted (a plan file is now just a file named like one).
+// 1. A native rename that completes, then a crash before anything else is written: the move is in the map, old paths resolve.
+// 2. A both-present workspace whose current Assistant's inner .hive moves: the old outer tree is never mapped.
+// 3. A recreated .hive holding a file named like the old plan: untouched through recovery and finish.
+// 4. A host found after the notes phase finished: its references are repaired.
+// 5. A card edited by another connection between the rewrite's read and its write: never overwritten (here the edit is
+//    tried at that moment, refused as the batch holds the write, and lands as written once it commits).
+// Plus HR1's approval of s65: a project that arrives once the move has finished (the old hash unchanged before its rename)
+// is still moved; a marker that isn't Combwork's, or sits in a linked folder, isn't a move.
+import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'fs'
+import { join } from 'path'
+import { DatabaseSync } from 'node:sqlite'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import * as electron from 'electron'
+import { tempDir } from './tempDir'
+
+const crash = vi.hoisted(() => ({ from: '' }))
+vi.mock('fs/promises', async (orig) => {
+  const fs = await orig<typeof import('fs/promises')>()
+  return {
+    ...fs,
+    rename: async (...args: Parameters<typeof fs.rename>) => {
+      await fs.rename(...args)
+      if (crash.from && String(args[0]).toLowerCase() === crash.from.toLowerCase()) {
+        crash.from = ''
+        throw new Error('crash immediately after native rename')
+      }
+    }
+  }
+})
+
+const base = tempDir('hi2462-probes-')
+;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
+const { MARK_FILE, MOVED_FILE, deriveMoves, finishMove, moveFolders, movedFolders, movedPath, moveTestHooks } = await import('../src/main/combworkMove')
+const { cardsTestHooks, rewriteCards } = await import('../src/main/hiveMoveWorker')
+
+const json = (p: string, v: unknown): void => {
+  mkdirSync(join(p, '..'), { recursive: true })
+  writeFileSync(p, JSON.stringify(v))
+}
+const board = (file: string): void => {
+  const db = new DatabaseSync(file)
+  db.exec('CREATE TABLE cards(number INTEGER PRIMARY KEY, description TEXT); CREATE TABLE card_comments(card INTEGER, ord INTEGER, text TEXT); CREATE TABLE card_context(card INTEGER, ord INTEGER, ref TEXT)')
+  db.close()
+}
+afterEach(() => {
+  crash.from = ''
+  delete moveTestHooks.after
+  delete cardsTestHooks.inBatch
+})
+
+describe("HR1's round-1 probes against the derived map", () => {
+  it('1. a native rename completed before anything else was written still gives the map', async () => {
+    const ws = join(base, 'crash')
+    json(join(ws, '.hive', 'workspace.json'), { version: 1 })
+    json(join(ws, '.hive', 'shared', 'note.md'), { kept: true })
+    crash.from = join(ws, '.hive')
+    await expect(moveFolders(ws)).rejects.toThrow(/immediately after native rename/)
+    expect(existsSync(join(ws, '.combwork', 'workspace.json'))).toBe(true)
+    expect(existsSync(join(ws, '.hive'))).toBe(false)
+    expect(await movedPath(ws, join(ws, '.hive', 'shared', 'note.md'))).toBe(join(ws, '.combwork', 'shared', 'note.md'))
+    await moveFolders(ws)
+    expect(await movedPath(ws, join(ws, '.hive', 'shared', 'note.md'))).toBe(join(ws, '.combwork', 'shared', 'note.md'))
+  })
+
+  it("2. moving the current Assistant's inner folder doesn't map an unmoved old workspace tree", async () => {
+    const ws = join(base, 'both')
+    json(join(ws, '.hive', 'workspace.json'), { which: 'old' })
+    json(join(ws, '.combwork', 'workspace.json'), { which: 'new' })
+    json(join(ws, '.combwork', 'assistant', '.hive', 'project.json'), { agents: [] })
+    await moveFolders(ws)
+    expect(await movedPath(ws, join(ws, '.hive', 'assistant', '.hive', 'attachments', 'old.png'))).toBeNull()
+    expect(readFileSync(join(ws, '.hive', 'workspace.json'), 'utf8')).toBe(JSON.stringify({ which: 'old' }))
+    expect((await movedFolders(ws)).map((m) => m.from)).toEqual([join(ws, '.combwork', 'assistant', '.hive')])
+  })
+
+  it("3. a recreated .hive's file named like the old plan stays as it is", async () => {
+    const ws = join(base, 'recreated')
+    json(join(ws, '.hive', 'workspace.json'), { version: 1 })
+    moveTestHooks.after = (step) => {
+      if (step === 'renamed:workspace') throw new Error('crash after the rename')
+    }
+    await expect(moveFolders(ws)).rejects.toThrow(/after the rename/)
+    delete moveTestHooks.after
+    json(join(ws, '.hive', 'workspace.json'), { which: 'recreated' })
+    const plan = join(ws, '.hive', 'combwork-move.json')
+    json(plan, { owner: 'recreated-data-must-stay' })
+    json(`${plan}.bak`, { owner: 'its backup' })
+    const kept = [readFileSync(plan, 'utf8'), readFileSync(`${plan}.bak`, 'utf8')]
+    const dbfile = join(ws, '.combwork', 'hive.db')
+    board(dbfile)
+    const r = await moveFolders(ws)
+    if (r.late) await finishMove(ws, { boardFile: dbfile, relocateFolders: async () => true })
+    expect([readFileSync(plan, 'utf8'), readFileSync(`${plan}.bak`, 'utf8')]).toEqual(kept)
+    expect(JSON.parse(readFileSync(join(ws, '.hive', 'workspace.json'), 'utf8'))).toEqual({ which: 'recreated' })
+  })
+
+  it('4. a host found after the notes phase finished gets its references repaired', async () => {
+    const ws = join(base, 'late-during-recovery')
+    const old = join(ws, 'beta', '.hive', 'attachments', 'x.png')
+    json(join(ws, '.hive', 'workspace.json'), { version: 1 })
+    mkdirSync(join(ws, '.hive', 'shared'), { recursive: true })
+    writeFileSync(join(ws, '.hive', 'shared', 'note.md'), `Evidence ${old}`)
+    moveTestHooks.after = (step) => {
+      if (step === 'phase:notes') throw new Error('stop after notes')
+    }
+    await expect(moveFolders(ws)).rejects.toThrow(/stop after notes/)
+    delete moveTestHooks.after
+    json(join(ws, 'beta', '.hive', 'project.json'), { id: 'p-beta' })
+    await moveFolders(ws)
+    expect(await movedPath(ws, old)).toBe(join(ws, 'beta', '.combwork', 'attachments', 'x.png'))
+    expect(readFileSync(join(ws, '.combwork', 'shared', 'note.md'), 'utf8')).toBe(`Evidence ${join(ws, 'beta', '.combwork', 'attachments', 'x.png')}`)
+  })
+
+  it("5. a card edit at the moment between the rewrite's read and its write isn't overwritten", () => {
+    const file = join(tempDir('hi2462-worker-'), 'hive.db')
+    board(file)
+    const db = new DatabaseSync(file)
+    db.prepare('INSERT INTO cards VALUES(1, ?)').run('Evidence D:/ws/.hive/shared/a.md')
+    const other = new DatabaseSync(file, { timeout: 0 })
+    let tried: string | null = null
+    cardsTestHooks.inBatch = () => {
+      if (tried !== null) return
+      try {
+        other.prepare('UPDATE cards SET description = ? WHERE number = 1').run('a concurrent user edit')
+        tried = 'written'
+      } catch (e) {
+        tried = (e as Error).message
+      }
+    }
+    try {
+      expect(rewriteCards({ file, moves: [{ from: 'D:/ws/.hive', to: 'D:/ws/.combwork' }], workspaceMoved: true })).toMatchObject({ ok: true })
+      // The edit couldn't slip in between the batch's read and its write…
+      expect(tried).toMatch(/locked|busy/i)
+      // …and the user's write, made again once the batch committed, is what stays.
+      other.prepare('UPDATE cards SET description = ? WHERE number = 1').run('a concurrent user edit')
+      expect(db.prepare('SELECT description FROM cards WHERE number = 1').get()).toMatchObject({ description: 'a concurrent user edit' })
+    } finally {
+      other.close()
+      db.close()
+    }
+  })
+})
+
+describe("HR1's approval of s65", () => {
+  it('a project arriving after the move finished (the old hash unchanged before its rename) still moves', async () => {
+    const ws = join(base, 'finished-then-late')
+    json(join(ws, '.hive', 'workspace.json'), { version: 1 })
+    const dbfile = join(ws, '.hive', 'hive.db')
+    board(dbfile)
+    const first = await moveFolders(ws)
+    if (first.late) await finishMove(ws, { boardFile: join(ws, '.combwork', 'hive.db'), relocateFolders: async () => true })
+    const hashBefore = JSON.parse(readFileSync(join(ws, '.combwork', MOVED_FILE), 'utf8')).hash
+    json(join(ws, 'late', '.hive', 'project.json'), { id: 'p-late' })
+    // The late project contributes nothing to the map until it has moved: the recorded hash still matches the map.
+    expect((await deriveMoves(ws)).length).toBe(1)
+    const r = await moveFolders(ws, { only: join(ws, 'late') })
+    expect(r.moved).toBe(1)
+    expect(existsSync(join(ws, 'late', '.combwork', 'project.json'))).toBe(true)
+    if (r.late) await finishMove(ws, { boardFile: join(ws, '.combwork', 'hive.db'), relocateFolders: async () => true })
+    expect(JSON.parse(readFileSync(join(ws, '.combwork', MOVED_FILE), 'utf8')).hash).not.toBe(hashBefore)
+  })
+
+  it("a stop right after the marker is written into the old .hive: the next open renames it", async () => {
+    const ws = join(base, 'marked-only')
+    json(join(ws, '.hive', 'workspace.json'), { version: 1 })
+    moveTestHooks.after = (step) => {
+      if (step === 'marked:workspace') throw new Error('stopped')
+    }
+    await expect(moveFolders(ws)).rejects.toThrow('stopped')
+    delete moveTestHooks.after
+    expect(existsSync(join(ws, '.hive', MARK_FILE))).toBe(true)
+    expect(await deriveMoves(ws)).toEqual([])
+    await moveFolders(ws)
+    expect(existsSync(join(ws, '.combwork', 'workspace.json'))).toBe(true)
+    expect((await deriveMoves(ws)).map((m) => m.from)).toEqual([join(ws, '.hive')])
+  })
+
+  it("a marker that isn't Combwork's, or a .combwork that is a link, isn't a move", async () => {
+    const ws = join(base, 'fake-marks')
+    json(join(ws, '.combwork', 'workspace.json'), { version: 1 })
+    writeFileSync(join(ws, '.combwork', MARK_FILE), 'not a marker')
+    json(join(ws, 'alpha', '.combwork', 'project.json'), {})
+    json(join(ws, 'alpha', '.combwork', MARK_FILE), { kind: 'project', id: 'p-alpha' })
+    const elsewhere = join(base, 'elsewhere-combwork')
+    json(join(elsewhere, MARK_FILE), { kind: 'combwork-move', version: 1, id: 'x', from: '.hive' })
+    mkdirSync(join(ws, 'beta'), { recursive: true })
+    symlinkSync(elsewhere, join(ws, 'beta', '.combwork'), 'junction')
+    expect(await deriveMoves(ws)).toEqual([])
+  })
+})

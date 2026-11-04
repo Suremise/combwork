@@ -1,6 +1,6 @@
-import { existsSync, readdirSync, statSync } from 'original-fs'
+import { existsSync, lstatSync, readFileSync } from 'original-fs'
 import { lstat, mkdir, readFile, readdir, rename, writeFile } from 'original-fs/promises'
-import { randomUUID } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import { join, resolve } from 'path'
 import { Worker } from 'worker_threads'
 import { HIVE_DIR } from '../shared/defaults'
@@ -20,74 +20,53 @@ import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 import type { CardsAnswer, CardsRewrite } from './hiveMoveWorker'
 
 /**
- * The move of a workspace's `.hive` folders to `.combwork` (HI-2462, SPEC §4.3; the design is the card's, HI-2462/s21).
- * Each host (the workspace, its Assistant's home inside it, each project folder the workspace lists) has one folder of
- * Combwork's; from 1.1 it is `.combwork`. When a workspace opens, before anything reads it, each host's `.hive` of ours
- * (one holding project.json, workspace.json or hive.db) is renamed: one atomic rename, never a copy, so nothing is
- * half-moved or lost.
+ * The move of a workspace's `.hive` folders to `.combwork` (HI-2462, SPEC §4.1.1; the design is the card's: HI-2462/s21,
+ * and s65 for its state). Each host (the workspace, its Assistant's home inside it, each project folder the workspace
+ * lists) has one folder of Combwork's; from 1.1 it is `.combwork`. When a workspace opens, before anything reads it,
+ * each host's `.hive` of ours (one holding project.json, workspace.json or hive.db) is renamed: one atomic rename, never
+ * a copy, so nothing is half-moved or lost.
  *
- * - **Ownership**: the whole move holds a lock across processes (repoLockCore's row, by token, pid and process start, in
+ * - **Ownership**: the move holds a lock across processes (repoLockCore's row, by token, pid and process start, in
  *   `<workspace>\.combwork-move.lock`, outside every folder that moves, kept for good), and refuses while another
  *   process's presence marker is fresh. The workspace's folder is renamed first: a Hive holding its board open makes
  *   that fail before any project is touched.
- * - **Durable**: the plan (`combwork-move.json`) is written before the first rename, in the tree in use (`.hive` while it
- *   is ours and alone, moving with it; else `.combwork`), and each host gets this plan's id (`combwork-move-id`) in its
- *   folder before its rename, so a later open tells our move from anyone else's. Each phase after the renames is
- *   recorded done only once it worked; a phase that fails leaves the plan and refuses the open, which tries again next
- *   time.
- * - **Never moved**: another tool's `.hive`, a `.hive` beside a `.combwork` (both: `.combwork` is used, `.hive` left as it
- *   is, a warning), a linked `.hive`, a host whose real place is outside the workspace.
- * - **The map** (`combwork-moved.json`, kept for good): only the folders that really moved. Stored paths, links and a
- *   conversation's folder are translated through it alone (shared/hiveFolderMove.ts).
+ * - **State is on disk, never recorded beside it** (s65): before a host's `.hive` is renamed, a marker
+ *   (`combwork-move-id`) is written in it, so it moves with the folder. A host has moved exactly when its `.combwork`
+ *   holds the marker; the map of moves is derived from that on every open (deriveMoves), the Assistant's old outer path
+ *   only from a workspace that moved. A crash anywhere leaves nothing to reconstruct.
+ * - **The rewrites are keyed to the map**: when `combwork-moved.json` doesn't hold the hash of the map now, every phase
+ *   runs again over all of it (each is idempotent), and the hash is written once the last has worked.
+ * - **Never moved**: another tool's `.hive`, a `.hive` beside a `.combwork` with no marker (both: `.combwork` is used,
+ *   `.hive` left as it is, a warning), a linked `.hive`, a host whose real place is outside the workspace. Stored paths,
+ *   links and a conversation's folder are translated through the map alone (shared/hiveFolderMove.ts).
  */
 
 const log = createLogger('hiveMove')
 
 /** The lock's file, in the workspace folder itself: the one place that doesn't move. */
 export const MOVE_LOCK_FILE = '.combwork-move.lock'
-/** The plan while the move isn't finished. */
-export const PLAN_FILE = 'combwork-move.json'
-/** The folders that really moved: kept for good, for the paths stored before. */
+/** The map the rewrites last finished for (its hash and its moves), in the workspace's tree in use. */
 export const MOVED_FILE = 'combwork-moved.json'
-/** The id of the plan that moved a host's folder, written into it before its rename. */
+/** The marker of a host's folder that Combwork moved, written into it before its rename. */
 export const MARK_FILE = 'combwork-move-id'
 
 export type { HostKind }
 /**
  * - `planned`: our `.hive`, alone: to move.
- * - `moved`: this plan's id is in its `.combwork` (a `.hive` made again beside it is someone else's, left as it is).
- * - `both`: our `.hive` beside a `.combwork` this plan didn't make: `.combwork` is used, `.hive` stays as it is.
- * - `foreign`: a `.hive` that isn't ours (no project.json, workspace.json or hive.db): never touched.
+ * - `moved`: its `.combwork` holds the marker (a `.hive` beside it was made again afterwards: left as it is).
+ * - `both`: our `.hive` beside a `.combwork` with no marker: `.combwork` is used, `.hive` stays as it is.
  * - `link`: a linked `.hive`, or a host outside the workspace: never moved.
- * - `current`: `.combwork` alone (fresh, or moved by hand or by another plan), or nothing.
+ * - `current`: `.combwork` alone with no marker (fresh), another tool's `.hive`, or nothing.
  */
-export type HostState = 'planned' | 'moved' | 'both' | 'foreign' | 'link' | 'current'
-
-export interface PlanHost {
-  host: string
-  kind: HostKind
-  state: HostState
-}
+export type HostState = 'planned' | 'moved' | 'both' | 'link' | 'current'
 
 export type Phase = 'excludes' | 'worktrees' | 'notes' | 'cards' | 'folders'
 /** The phases that need nothing of the workspace's services: run before the open goes on. */
 const EARLY: Phase[] = ['excludes', 'worktrees', 'notes']
-/** Those that need its board and project services: run once they're up (finishMove). */
-const LATE: Phase[] = ['cards', 'folders']
-
-export interface MovePlan {
-  version: 1
-  id: string
-  startedAt: string
-  hosts: PlanHost[]
-  /** The moves this plan made (old → new folder), for its phases. */
-  moves: FolderMove[]
-  /** The phases still to do. */
-  pending: Phase[]
-}
 
 interface MovedFile {
-  version: 1
+  version: 2
+  hash: string
   moves: FolderMove[]
 }
 
@@ -126,91 +105,93 @@ async function plainFolder(host: string, dir: string): Promise<boolean> {
   return realPath(dir).toLowerCase() === join(realPath(host), LEGACY_HIVE_DIR).toLowerCase()
 }
 
-const markOf = async (dir: string): Promise<string | null> => (await readFile(join(dir, MARK_FILE), 'utf8').catch(() => '')).trim() || null
+/** The marker's content: what makes it Combwork's, not a file that happens to have its name. */
+const MARK_KIND = 'combwork-move'
 
-/** What a host's folders are, judged against a plan (its id) or none. */
-export async function classify(ws: string, host: string, kind: HostKind, planId: string | null): Promise<HostState> {
+/** The marker written into a host's `.hive` just before it is renamed. */
+const markText = (id: string): string => JSON.stringify({ kind: MARK_KIND, version: 1, id, from: LEGACY_HIVE_DIR, at: new Date().toISOString() })
+
+/**
+ * Whether a host's `.combwork` is one Combwork moved there from its `.hive` (s65, HR1's approval): the folder is the
+ * host's own (a real folder at its place, not a link) and holds Combwork's marker, as Combwork writes it.
+ */
+function movedHost(host: string): boolean {
+  const dir = current(host)
+  try {
+    const st = lstatSync(dir)
+    if (st.isSymbolicLink() || !st.isDirectory() || realPath(dir).toLowerCase() !== join(realPath(host), HIVE_DIR).toLowerCase()) return false
+    const m = JSON.parse(readFileSync(join(dir, MARK_FILE), 'utf8')) as { kind?: unknown; version?: unknown; id?: unknown }
+    return m.kind === MARK_KIND && m.version === 1 && typeof m.id === 'string' && m.id.length > 0
+  } catch {
+    return false
+  }
+}
+
+/** What a host's folders are now. */
+export async function classify(ws: string, host: string, kind: HostKind): Promise<HostState> {
   const oldDir = legacy(host)
   const newDir = current(host)
   const hasOld = existsSync(oldDir)
   const hasNew = existsSync(newDir)
-  if (hasNew && planId && (await markOf(newDir)) === planId) return 'moved'
+  if (hasNew && movedHost(host)) return 'moved'
   if (!hasOld) return 'current'
   // The workspace's own folder is the workspace; a project or the Assistant's home must really be inside it.
   if (kind !== 'workspace' && !under(realPath(host), realPath(ws))) return 'link'
   if (!(await plainFolder(host, oldDir))) return 'link'
-  const kindOurs = ours(oldDir, kind)
-  if (!kindOurs) return 'current'
+  if (!ours(oldDir, kind)) return 'current'
   return hasNew ? 'both' : 'planned'
 }
 
-/** The hosts the workspace has: itself, its Assistant's home, and every folder it lists as a project (hidden ones too). */
-export function hostsOf(ws: string, assistantHome: string): { host: string; kind: HostKind }[] {
-  const out: { host: string; kind: HostKind }[] = [{ host: ws, kind: 'workspace' }, { host: assistantHome, kind: 'assistant' }]
-  let names: string[] = []
-  try {
-    names = readdirSync(ws, { withFileTypes: true })
-      .filter((e) => e.isDirectory() && !e.name.startsWith('.') && !e.name.startsWith('$'))
-      .map((e) => e.name)
-  } catch {
-    // Not readable: the open says so.
-  }
-  for (const n of names) out.push({ host: join(ws, n), kind: 'project' })
+/** The hosts the workspace has: itself, its Assistant's home (in its tree in use), and every folder it lists as a project (hidden ones too). */
+export async function hostsOf(ws: string): Promise<{ host: string; kind: HostKind }[]> {
+  const out: { host: string; kind: HostKind }[] = [{ host: ws, kind: 'workspace' }, { host: join(treeOf(ws), ASSISTANT_DIR), kind: 'assistant' }]
+  const entries = await readdir(ws, { withFileTypes: true }).catch(() => null)
+  for (const e of entries ?? []) if (e.isDirectory() && !e.name.startsWith('.') && !e.name.startsWith('$')) out.push({ host: join(ws, e.name), kind: 'project' })
   return out
 }
-
-/** The Assistant's home in a workspace, wherever its outer folder is now. */
-const assistantOf = (ws: string): string => join(existsSync(current(ws)) || !existsSync(legacy(ws)) ? current(ws) : legacy(ws), ASSISTANT_DIR)
 
 /** The workspace's tree in use: `.combwork` once there, else its own `.hive`, else `.combwork` (to be made). */
 export const treeOf = (ws: string): string => dataFolder(ws, 'workspace')
 
-/** Every move recorded for a workspace (the kept map, and a plan still under way), by its lowercased path. */
-const movedCache = new Map<string, { at: number; stamp: string; moves: FolderMove[] }>()
-
-const stampOf = (f: string): string => {
-  try {
-    const s = statSync(f)
-    return `${s.mtimeMs}:${s.size}`
-  } catch {
-    return '-'
+/**
+ * The moves a workspace's folders show now (s65): each host whose `.combwork` holds the marker. The Assistant's home's
+ * own old path (`<ws>\.combwork\assistant\.hive`) when it is marked, and its path under the workspace's old folder
+ * (`<ws>\.hive\assistant\.hive`) only when the workspace's own folder is marked too: an old outer tree left beside a
+ * `.combwork` is never anyone's. Empty when nothing moved.
+ */
+export async function deriveMoves(ws: string): Promise<FolderMove[]> {
+  ws = resolve(ws)
+  const out: FolderMove[] = []
+  const wsMoved = movedHost(ws)
+  for (const h of await hostsOf(ws)) {
+    if (h.kind === 'assistant') {
+      const home = join(current(ws), ASSISTANT_DIR)
+      if (!movedHost(home)) continue
+      out.push({ from: legacy(home), to: current(home) })
+      if (wsMoved) out.push({ from: join(legacy(ws), ASSISTANT_DIR, LEGACY_HIVE_DIR), to: current(home) })
+    } else if (movedHost(h.host)) out.push({ from: legacy(h.host), to: current(h.host) })
   }
+  return out
 }
 
-/** The folders that moved in a workspace: what stored paths into them are translated through. Empty when none did. */
-export async function movedFolders(ws: string): Promise<FolderMove[]> {
-  const tree = treeOf(ws)
-  const files = [join(tree, MOVED_FILE), join(tree, PLAN_FILE)]
-  const stamp = files.map(stampOf).join('|')
-  const key = lower(ws)
-  const kept = movedCache.get(key)
-  if (kept && kept.stamp === stamp) return kept.moves
-  const moved = await readKeptJson<Partial<MovedFile>>(files[0], {})
-  const plan = await readKeptJson<Partial<MovePlan>>(files[1], {})
-  const all = [...(Array.isArray(moved.moves) ? moved.moves : []), ...(Array.isArray(plan.moves) ? plan.moves : [])].filter((m): m is FolderMove => !!m && typeof m.from === 'string' && typeof m.to === 'string')
-  const seen = new Set<string>()
-  const moves = all.filter((m) => !seen.has(m.from.toLowerCase()) && !!seen.add(m.from.toLowerCase()))
-  movedCache.set(key, { at: Date.now(), stamp, moves })
-  if (movedCache.size > 50) movedCache.delete(movedCache.keys().next().value!)
-  return moves
+/** A map's hash: its moves sorted, lower case. */
+export const mapHash = (moves: readonly FolderMove[]): string =>
+  createHash('sha1')
+    .update(JSON.stringify(moves.map((m) => [m.from.toLowerCase(), m.to.toLowerCase()]).sort()))
+    .digest('hex')
+
+/** The hash of the map the rewrites last finished for, or null. */
+async function doneHash(ws: string): Promise<string | null> {
+  const f = await readKeptJson<Partial<MovedFile>>(join(treeOf(ws), MOVED_FILE), {})
+  return typeof f.hash === 'string' ? f.hash : null
 }
+
+/** The folders that moved in a workspace, as its folders show now: what stored paths into them are translated through. */
+export const movedFolders = (ws: string): Promise<FolderMove[]> => deriveMoves(ws)
 
 /** Where a path stored before the move is now, through its workspace's map; null when it didn't move. */
 export async function movedPath(ws: string, p: string): Promise<string | null> {
   return movedPathOf(p, await movedFolders(ws))
-}
-
-/** The moves a host's rename makes: its folder, and for the workspace the Assistant's inner one inside it too. */
-function movesOf(ws: string, host: string, kind: HostKind): FolderMove[] {
-  if (kind === 'assistant') {
-    const inner = join(ASSISTANT_DIR, LEGACY_HIVE_DIR)
-    // The home's old path, under either outer folder (the workspace's may have moved first).
-    return [
-      { from: join(legacy(ws), inner), to: join(current(ws), ASSISTANT_DIR, HIVE_DIR) },
-      { from: join(current(ws), inner), to: join(current(ws), ASSISTANT_DIR, HIVE_DIR) }
-    ]
-  }
-  return [{ from: legacy(host), to: current(host) }]
 }
 
 /** Windows refuses to rename a folder with a file in it open: these say so. */
@@ -261,13 +242,6 @@ function inTurn<T>(ws: string, fn: () => Promise<T>): Promise<T> {
   return run
 }
 
-/** Whether anything is left to move: a plan under way, or a host with our `.hive` alone. */
-async function anyToMove(ws: string, hosts: { host: string; kind: HostKind }[]): Promise<boolean> {
-  if (existsSync(join(legacy(ws), PLAN_FILE)) || existsSync(join(current(ws), PLAN_FILE))) return true
-  for (const h of hosts) if ((await classify(ws, h.host, h.kind, null)) === 'planned') return true
-  return false
-}
-
 const warned = new Set<string>()
 
 /** Says once per run of the app for each host that it has both folders, or a linked one. */
@@ -284,55 +258,43 @@ function warn(host: string, state: HostState): void {
   }
 }
 
+/** A `.hive` made again beside a moved `.combwork` (an older Hive opened it since): said once, left as it is. */
+async function warnRecreated(ws: string, hosts: { host: string; kind: HostKind }[]): Promise<void> {
+  for (const h of hosts) if (movedHost(h.host) && existsSync(legacy(h.host)) && (await plainFolder(h.host, legacy(h.host)).catch(() => false)) && ours(legacy(h.host), h.kind)) warn(h.host, 'both')
+}
+
+const lockBusy = (h: { profile: string }): HiveError => hiveError(M.busy, { profile: h.profile }, { kind: 'conflict' })
+
 /**
- * Moves a workspace's folders, before anything reads them (WorkspaceService.opened): the whole move, or what is left
- * of an earlier one. `only`: a single host (a project that came into the open workspace later, ensureProject).
- * Throws a HiveError (translated, naming the folder) when it can't, nothing of that host changed.
+ * Moves a workspace's folders, before anything reads them (WorkspaceService's open, inside its claim): every host with
+ * our `.hive` alone, then the early phases when the map isn't the one they last finished for. `only`: a single host (a
+ * project that came into the open workspace later, ensureProject). Throws a HiveError (translated, naming the folder)
+ * when it can't, nothing of that host changed.
  */
 export function moveFolders(ws: string, o: MoveOptions & { only?: string } = {}): Promise<MoveOutcome> {
   return inTurn(ws, () => moveNow(resolve(ws), o))
 }
 
 async function moveNow(ws: string, o: MoveOptions & { only?: string }): Promise<MoveOutcome> {
-  const all = hostsOf(ws, assistantOf(ws))
+  const all = await hostsOf(ws)
   const hosts = o.only ? all.filter((h) => lower(h.host) === lower(o.only!)) : all
+  let planned = 0
   for (const h of hosts) {
-    const s = await classify(ws, h.host, h.kind, null)
+    const s = await classify(ws, h.host, h.kind)
     if (s === 'both' || s === 'link') warn(h.host, s)
+    if (s === 'planned') planned++
   }
-  if (!(await anyToMove(ws, hosts))) return { late: false, moved: 0 }
+  await warnRecreated(ws, hosts)
+  // Nothing to rename, and the rewrites finished for the map as it is: no lock, nothing written.
+  if (!planned) {
+    const moves = await deriveMoves(ws)
+    if (!moves.length || (await doneHash(ws)) === mapHash(moves)) return { late: false, moved: 0 }
+  }
   await moveTestHooks.looked?.()
   const stop = (): void => {
     if (o.signal?.aborted || (o.stillOurs && !o.stillOurs())) throw hiveError(M.closed, undefined, { kind: 'conflict' })
   }
-  return withNamedLock(ws, MOVE_LOCK_FILE, () => movedUnderLock(ws, hosts, o, stop), { waitMs: 0, busy: (h) => hiveError(M.busy, { profile: h.profile }, { kind: 'conflict' }) })
-}
-
-/** Reads the plan under way, wherever it is now (it moves with the workspace's folder). */
-async function planNow(ws: string): Promise<{ plan: MovePlan; file: string } | null> {
-  for (const dir of [current(ws), legacy(ws)]) {
-    const file = join(dir, PLAN_FILE)
-    if (!existsSync(file)) continue
-    const plan = await readKeptJson<MovePlan | null>(file, null, { unsettled: 'throw' })
-    if (plan && plan.version === 1 && typeof plan.id === 'string' && Array.isArray(plan.hosts)) return { plan, file }
-  }
-  return null
-}
-
-async function savePlan(ws: string, plan: MovePlan): Promise<void> {
-  const tree = treeOf(ws)
-  await mkdir(tree, { recursive: true })
-  await writeKeptJson(join(tree, PLAN_FILE), plan)
-}
-
-/** Adds moves to the kept map (in the tree in use). */
-async function recordMoves(ws: string, moves: FolderMove[]): Promise<void> {
-  if (!moves.length) return
-  const file = join(treeOf(ws), MOVED_FILE)
-  const had = await readKeptJson<Partial<MovedFile>>(file, {}, { unsettled: 'throw' })
-  const list = Array.isArray(had.moves) ? [...had.moves] : []
-  for (const m of moves) if (!list.some((x) => x.from.toLowerCase() === m.from.toLowerCase())) list.push(m)
-  await writeKeptJson(file, { version: 1, moves: list } satisfies MovedFile)
+  return withNamedLock(ws, MOVE_LOCK_FILE, () => movedUnderLock(ws, o, stop), { waitMs: 0, busy: lockBusy })
 }
 
 /**
@@ -351,13 +313,13 @@ export async function excludeMoveLock(ws: string): Promise<void> {
     const text = await readFile(f, 'utf8').catch(() => '')
     if (text.split(/\r?\n/).some((l) => l.trim() === line)) return
     await mkdir(join(gd, 'info'), { recursive: true })
-    await writeTextAtomic(f, `${text}${text && !text.endsWith('\n') ? '\n' : ''}# Combwork's folder move lock (added by Combwork)\n${line}\n`)
+    await writeTextAtomic(f, `${text}${text && !text.endsWith('\n') ? '\n' : ''}# Combwork's folder move lock (added by Combwork)\n${line}\n`) // i18n-ignore: a line in git's exclude file, which stays English
   } catch (e) {
     log.warn("keeping the folder move's lock file out of git", e)
   }
 }
 
-async function movedUnderLock(ws: string, hosts: { host: string; kind: HostKind }[], o: MoveOptions & { only?: string }, stop: () => void): Promise<MoveOutcome> {
+async function movedUnderLock(ws: string, o: MoveOptions & { only?: string }, stop: () => void): Promise<MoveOutcome> {
   stop()
   await excludeMoveLock(ws)
   // Inside the lock, everything is looked at again: another process may have moved it meanwhile.
@@ -365,91 +327,50 @@ async function movedUnderLock(ws: string, hosts: { host: string; kind: HostKind 
     const others = othersPresentByProcess(dir)
     if (others.length) throw hiveError(M.otherOpen, { profile: others[0].profile }, { kind: 'conflict' })
   }
-  const found = await planNow(ws)
-  const plan: MovePlan = found?.plan ?? { version: 1, id: randomUUID(), startedAt: new Date().toISOString(), hosts: [], moves: [], pending: [...EARLY, ...LATE] }
-  // A late host joins a finished plan's map as a plan of its own; its phases are its own. The Assistant's home is one
-  // host wherever it is: it follows its outer folder (inside the workspace's, which may have moved since the plan).
-  const key = (h: { host: string; kind: HostKind }): string => (h.kind === 'assistant' ? 'assistant' : lower(h.host))
-  for (const h of plan.hosts) if (h.kind === 'assistant') h.host = assistantOf(ws)
-  const byHost = new Map(plan.hosts.map((h) => [key(h), h]))
-  const now = o.only ? hosts : hostsOf(ws, assistantOf(ws))
-  for (const h of now) {
-    if (byHost.has(key(h))) continue
-    const ph: PlanHost = { host: h.host, kind: h.kind, state: 'current' }
-    plan.hosts.push(ph)
-    byHost.set(key(h), ph)
-  }
-  // Every host of the plan judged again, as it is now, against this plan.
-  for (const h of plan.hosts) h.state = await classify(ws, h.host, h.kind, plan.id)
-  const toMove = plan.hosts.filter((h) => h.state === 'planned')
-  if (!toMove.length && !found) return { late: false, moved: 0 }
-  // The plan and each host's mark before the first rename: a crash after any rename is recovered from them.
-  for (const h of toMove) await writeFile(join(legacy(h.host), MARK_FILE), plan.id, 'utf8')
-  await savePlan(ws, plan)
-  await moveTestHooks.after?.('planned')
-  stop()
+  const id = randomUUID()
   // The workspace first: a Hive with its board open fails it here, before any project is touched; then its Assistant's
-  // home (inside it), then the projects.
-  const order = (k: HostKind): number => (k === 'workspace' ? 0 : k === 'assistant' ? 1 : 2)
+  // home (inside the workspace's folder, so looked at after it moved), then the projects.
   let moved = 0
-  for (const h of [...toMove].sort((a, b) => order(a.kind) - order(b.kind))) {
-    stop()
-    // The Assistant's home's path follows the workspace's folder, moved just now.
-    const host = h.kind === 'assistant' ? assistantOf(ws) : h.host
-    h.host = host
-    if ((await classify(ws, host, h.kind, plan.id)) !== 'planned') continue
-    try {
-      await renameFolder(legacy(host), current(host))
-    } catch (e) {
-      if (isLocked(e)) throw hiveError(M.locked, { folder: legacy(host) }, { kind: 'conflict' })
-      throw e
+  for (const kind of ['workspace', 'assistant', 'project'] as const) {
+    for (const h of (await hostsOf(ws)).filter((x) => x.kind === kind && (!o.only || lower(x.host) === lower(o.only)))) {
+      stop()
+      if ((await classify(ws, h.host, h.kind)) !== 'planned') continue
+      // The marker first, inside the folder that moves: from the rename on, the folder says it moved.
+      await writeFile(join(legacy(h.host), MARK_FILE), markText(id), 'utf8')
+      await moveTestHooks.after?.(`marked:${kind}`)
+      try {
+        await renameFolder(legacy(h.host), current(h.host))
+      } catch (e) {
+        if (isLocked(e)) throw hiveError(M.locked, { folder: legacy(h.host) }, { kind: 'conflict' })
+        throw e
+      }
+      moved++
+      log.info(`Moved ${userText(legacy(h.host))} to .combwork`)
+      await moveTestHooks.after?.(`renamed:${kind}`)
     }
-    h.state = 'moved'
-    moved++
-    const ms = movesOf(ws, host, h.kind)
-    plan.moves.push(...ms.filter((m) => !plan.moves.some((x) => x.from.toLowerCase() === m.from.toLowerCase())))
-    await savePlan(ws, plan)
-    await recordMoves(ws, ms)
-    log.info(`Moved ${userText(legacy(host))} to .combwork`)
-    await moveTestHooks.after?.(`renamed:${h.kind}`)
   }
-  // Earlier phases, those that need nothing else.
+  const moves = await deriveMoves(ws)
+  if (!moves.length || (await doneHash(ws)) === mapHash(moves)) return { late: false, moved }
   for (const phase of EARLY) {
-    if (!plan.pending.includes(phase)) continue
     stop()
     try {
-      await runEarly(ws, plan, phase)
+      await runEarly(ws, moves, phase)
     } catch (e) {
       log.warn(`the folder move's ${phase}`, e)
       throw hiveError(M.phase, { what: M.what[phase], error: errorText(e) }, { kind: 'conflict' })
     }
-    plan.pending = plan.pending.filter((p) => p !== phase)
-    await savePlan(ws, plan)
     await moveTestHooks.after?.(`phase:${phase}`)
   }
-  const late = plan.pending.some((p) => LATE.includes(p))
-  if (!late) await finished(ws)
-  return { late, moved }
+  return { late: true, moved }
 }
 
-/** The plan is done: its file goes; the map stays. */
-async function finished(ws: string): Promise<void> {
-  for (const dir of [current(ws), legacy(ws)]) {
-    const f = join(dir, PLAN_FILE)
-    if (!existsSync(f)) continue
-    const { rm } = await import('original-fs/promises')
-    await rm(f, { force: true })
-    await rm(`${f}.bak`, { force: true })
-  }
-  log.info(`The move of ${userText(ws)}'s folders to .combwork has finished`)
-}
+/** The moved projects in a map: hosts whose own folder moved (not the workspace's, nor the Assistant's home). */
+const movedProjects = async (ws: string): Promise<string[]> => (await hostsOf(ws)).filter((h) => h.kind === 'project' && movedHost(h.host)).map((h) => h.host)
 
-const movedProjects = (plan: MovePlan): PlanHost[] => plan.hosts.filter((h) => h.state === 'moved' && h.kind === 'project')
-
-async function runEarly(ws: string, plan: MovePlan, phase: Phase): Promise<void> {
-  if (phase === 'excludes') for (const h of movedProjects(plan)) await moveExcludeLine(h.host)
-  else if (phase === 'worktrees') for (const h of movedProjects(plan)) await repairWorktrees(h.host, plan.moves)
-  else if (phase === 'notes') await rewriteNotes(join(current(ws), 'shared'), plan.moves)
+async function runEarly(ws: string, moves: FolderMove[], phase: Phase): Promise<void> {
+  if (phase === 'excludes') for (const p of await movedProjects(ws)) await moveExcludeLine(p)
+  else if (phase === 'worktrees') for (const p of await movedProjects(ws)) await repairWorktrees(p, moves)
+  else if (phase === 'notes') await rewriteNotes(join(current(ws), 'shared'), moves)
 }
 
 /** Hive's exclude line for a moved project's old folder, in its repository's info/exclude, for the new one. */
@@ -553,45 +474,44 @@ export interface LateServices {
 
 /**
  * The phases that need the board and the project services, once they are up (the open's, after the projects' ids):
- * the cards' paths, then the agents' folders that were inside a moved folder. One that fails refuses the open; the
- * next open tries again from the plan.
+ * the cards' paths, then the agents' folders that were inside a moved folder; then the map's hash is recorded, so the
+ * next open does nothing for it. One that fails refuses the open; the next open does them all again (each idempotent).
  */
 export function finishMove(ws: string, svc: LateServices, o: MoveOptions = {}): Promise<void> {
   return inTurn(ws, () => {
     const stop = (): void => {
       if (o.signal?.aborted || (o.stillOurs && !o.stillOurs())) throw hiveError(M.closed, undefined, { kind: 'conflict' })
     }
-    return withNamedLock(ws, MOVE_LOCK_FILE, () => finishUnderLock(resolve(ws), svc, stop), { waitMs: 0, busy: (h) => hiveError(M.busy, { profile: h.profile }, { kind: 'conflict' }) })
+    return withNamedLock(ws, MOVE_LOCK_FILE, () => finishUnderLock(resolve(ws), svc, stop), { waitMs: 0, busy: lockBusy })
   })
 }
 
 async function finishUnderLock(ws: string, svc: LateServices, stop: () => void): Promise<void> {
-  const found = await planNow(ws)
-  if (!found) return
-  const plan = found.plan
-  for (const phase of LATE) {
-    if (!plan.pending.includes(phase)) continue
+  const moves = await deriveMoves(ws)
+  const hash = mapHash(moves)
+  if (!moves.length || (await doneHash(ws)) === hash) return
+  let deferred = false
+  for (const phase of ['cards', 'folders'] as const) {
     stop()
     try {
       if (phase === 'cards') {
-        const workspaceMoved = plan.hosts.some((h) => h.kind === 'workspace' && h.state === 'moved')
-        const a = await rewriteCardsOffMain({ file: svc.boardFile, moves: plan.moves, workspaceMoved })
+        const a = await rewriteCardsOffMain({ file: svc.boardFile, moves, workspaceMoved: movedHost(ws) })
         if (!a.ok) throw new Error(a.error)
-        // A board still to be upgraded: its cards are rewritten at a later open.
-        if (a.deferred) continue
-        log.info(`The folder move rewrote ${a.changed} card texts`)
+        // A board still to be upgraded: its cards are rewritten at a later open, and the hash waits for that.
+        if (a.deferred) deferred = true
+        else log.info(`The folder move rewrote ${a.changed} card texts`)
       } else {
-        for (const h of movedProjects(plan)) if (!(await svc.relocateFolders(h.host, plan.moves))) throw new Error(`a folder of ${h.host} is in use`) // i18n-ignore: the error's detail
+        for (const p of await movedProjects(ws)) if (!(await svc.relocateFolders(p, moves))) throw new Error(`a folder of ${p} is in use`) // i18n-ignore: the error's detail
       }
     } catch (e) {
       log.warn(`the folder move's ${phase}`, e)
       throw e instanceof HiveError ? e : hiveError(M.phase, { what: M.what[phase], error: errorText(e) }, { kind: 'conflict' })
     }
-    plan.pending = plan.pending.filter((p) => p !== phase)
-    await savePlan(ws, plan)
     await moveTestHooks.after?.(`phase:${phase}`)
   }
-  if (!plan.pending.length) await finished(ws)
+  if (deferred) return
+  await writeKeptJson(join(treeOf(ws), MOVED_FILE), { version: 2, hash, moves } satisfies MovedFile)
+  log.info(`The move of ${userText(ws)}'s folders to .combwork has finished`)
 }
 
 /**

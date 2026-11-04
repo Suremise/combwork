@@ -20,6 +20,9 @@ export interface CardsRewrite {
 
 export type CardsAnswer = { ok: true; changed: number; deferred: boolean } | { ok: false; error: string }
 
+/** Test hooks (in-process runs only): before a batch's transaction, and inside it once its rows are read. */
+export const cardsTestHooks: { beforeBatch?: () => void; inBatch?: () => void } = {}
+
 /** Rows written in one transaction: short, so main's own writes never wait long behind it. */
 const BATCH = 200
 
@@ -36,13 +39,26 @@ export function rewriteCards(job: CardsRewrite): CardsAnswer {
       return job.workspaceMoved ? movedContextRef(r) : r
     }
     let changed = 0
-    // Each table by its key, in key order, a batch at a time: a write between batches can't make one be missed.
+    // Each table by its key, in key order, a batch at a time: a write between batches can't make one be missed. Each batch
+    // is read, rewritten and committed in one write transaction (HR1's round 1): a user's edit committed before it is read
+    // with its new text, which keeps it; one after it waits for the commit and lands as written. Never a row read outside.
     const run = (select: string, update: string, keyCols: string[], col: string, f: (s: string) => string): void => {
       let after: unknown[] | null = null
       for (;;) {
-        const rows = (after ? db.prepare(`${select} AND (${keyCols.join(', ')}) > (${keyCols.map(() => '?').join(', ')}) ORDER BY ${keyCols.join(', ')} LIMIT ${BATCH}`).all(...(after as never[])) : db.prepare(`${select} ORDER BY ${keyCols.join(', ')} LIMIT ${BATCH}`).all()) as Record<string, unknown>[] // i18n-ignore: SQL
-        if (!rows.length) return
+        cardsTestHooks.beforeBatch?.()
         db.exec('BEGIN IMMEDIATE')
+        let rows: Record<string, unknown>[]
+        try {
+          rows = (after ? db.prepare(`${select} AND (${keyCols.join(', ')}) > (${keyCols.map(() => '?').join(', ')}) ORDER BY ${keyCols.join(', ')} LIMIT ${BATCH}`).all(...(after as never[])) : db.prepare(`${select} ORDER BY ${keyCols.join(', ')} LIMIT ${BATCH}`).all()) as Record<string, unknown>[] // i18n-ignore: SQL
+          cardsTestHooks.inBatch?.()
+        } catch (e) {
+          if (db.isTransaction) db.exec('ROLLBACK')
+          throw e
+        }
+        if (!rows.length) {
+          db.exec('COMMIT')
+          return
+        }
         try {
           const up = db.prepare(update)
           for (const r of rows) {

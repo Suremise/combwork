@@ -1314,7 +1314,7 @@ export class WorkspaceService {
   async ensureProject(projectPath: string): Promise<void> {
     // A project that came into the open workspace with a `.hive` of its own (copied in, restored): moved first (HI-2462),
     // so a fresh `.combwork` never strands its settings. The open's own move did every project there was then.
-    if (this.path && !this.isAssistantHome(projectPath) && (await classify(this.path, projectPath, 'project', null)) === 'planned') {
+    if (this.path && !this.isAssistantHome(projectPath) && (await classify(this.path, projectPath, 'project')) === 'planned') {
       const moved = await moveFolders(this.path, { only: projectPath })
       if (moved.late) await this.finishFolderMove()
     }
