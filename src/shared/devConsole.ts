@@ -27,7 +27,7 @@ export interface ConsoleSource {
   /** Stable for an agent across its launches: `session:<project path, lower case>#<agent id>`; `hive:<workspace path, lower case>`. */
   id: string
   kind: ConsoleSourceKind
-  /** "hive · HB6", "Hive Assistant", "Hive". */
+  /** "hive · HB6", "Assistant", "Combwork". */
   label: string
   workspacePath: string
   projectPath?: string

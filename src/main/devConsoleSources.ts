@@ -2,6 +2,7 @@ import type { AgentInfo, ProjectInfo } from '../shared/types'
 import { hiveName, safeWord, type ConsoleSource } from '../shared/devConsole'
 import { maskText } from '../shared/redact'
 import { ASSISTANT_NAME } from '../shared/assistant'
+import { APP_NAME } from '../shared/appName'
 import { devConsole, hiveSourceId, sessionSourceId } from './devConsole'
 import { onHiveEvent } from './events'
 import { publicRun } from './apiEvents'
@@ -22,7 +23,7 @@ export function consoleSources(ws: WorkspaceService): ConsoleSource[] {
   const rows = info.projects.flatMap((p) => p.agents.map((a) => row(p, a, 'session')))
   if (info.assistant) rows.push(...info.assistant.agents.map((a) => row(info.assistant!, a, 'assistant')))
   const hive = hiveSourceId(wsPath)
-  rows.push({ id: hive, kind: 'hive', label: 'Hive', workspacePath: wsPath, capturing: devConsole.capturing(hive), events: devConsole.count(hive) }) // i18n-ignore: the app's name, as the source of Hive's own events
+  rows.push({ id: hive, kind: 'hive', label: APP_NAME, workspacePath: wsPath, capturing: devConsole.capturing(hive), events: devConsole.count(hive) }) // the app's name (HI-2511), as the source of its own events
   return rows
 }
 

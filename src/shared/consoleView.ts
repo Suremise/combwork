@@ -4,10 +4,11 @@
  */
 import { jsonBytes, type ConsoleEvent, type ConsoleSource } from './devConsole'
 import { msg, tr } from './i18n'
+import { APP_NAME } from './appName'
 
 const M = {
-  assistant: msg({ id: 'console.assistant', defaultMessage: 'Assistant', description: "The developer console's source picker: the Hive Assistant's session as a source. Hive's name stays as it is." }),
-  withCount: msg({ id: 'console.sourceCount', defaultMessage: '{name} ({n, number})', description: "The developer console's source picker: a source ({name}: an agent, the Assistant or Hive) with how many events it has captured." })
+  assistant: msg({ id: 'console.assistant', defaultMessage: 'Assistant', description: "The developer console's source picker: the Assistant's session as a source." }),
+  withCount: msg({ id: 'console.sourceCount', defaultMessage: '{name} ({n, number})', description: "The developer console's source picker: a source ({name}: an agent, the Assistant or Combwork itself) with how many events it has captured." })
 }
 
 /** The most events the window keeps for its source (the ring holds 500; a long watch keeps more, still bounded). */
@@ -92,7 +93,7 @@ export interface SourceGroup {
   sources: ConsoleSource[]
 }
 
-/** The source picker's groups: Hive and its Assistant first, then each project's agents, by name. */
+/** The source picker's groups: Combwork and its Assistant first, then each project's agents, by name. */
 export function sourceGroups(sources: readonly ConsoleSource[]): SourceGroup[] {
   const byName = (a: string, b: string): number => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true })
   const own = sources.filter((s) => s.kind !== 'session').sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'hive' ? -1 : 1))
@@ -103,7 +104,7 @@ export function sourceGroups(sources: readonly ConsoleSource[]): SourceGroup[] {
     projects.set(name, [...(projects.get(name) ?? []), s])
   }
   return [
-    ...(own.length ? [{ label: 'Hive', sources: own }] : []), // i18n-ignore: the app's name, as the picker's group of Hive's own sources
+    ...(own.length ? [{ label: APP_NAME, sources: own }] : []), // the app's name (HI-2511), as the picker's group of its own sources
     ...[...projects.entries()].sort(([a], [b]) => byName(a, b)).map(([label, list]) => ({ label, sources: list.sort((a, b) => byName(a.agent ?? a.label, b.agent ?? b.label)) }))
   ]
 }
