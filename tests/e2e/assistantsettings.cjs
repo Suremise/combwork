@@ -224,24 +224,26 @@ const check = (name, ok, extra = '') => {
   check("…and the user's write stays", (await alphaCfg()).compactSuggestTokens === 410000, String((await alphaCfg()).compactSuggestTokens))
   check('…listed as not done: its session ended', /session that asked for this ended/.test((await inv('assistant:actions')).filter((a) => !a.ok).at(-1)?.error ?? ''), JSON.stringify((await inv('assistant:actions')).at(-1)))
 
-  // Revert while the user's newer edit holds the lock: it sees that edit and refuses, keeping it.
+  // HI-2481: Undo waits behind the user's newer edit, checks it under the lock and keeps it.
   await inv('settings:update', { assistant: { changeSettings: true } })
+  const beforeUndoRace = new Set((await inv('assistant:changes')).flatMap((g) => g.changes.map((c) => c.id)))
   check('it changes the project setting again', await say('hive hive_update_setting {"id":"project.compactSuggestTokens","value":300000,"project":"alpha"}'))
-  const latest = (await inv('assistant:actions')).filter((a) => a.setting?.id === 'project.compactSuggestTokens').at(-1)
-  check('…410000 → 300000, listed for Revert', latest?.setting?.oldText === '410000' && latest?.setting?.newText === '300000', JSON.stringify(latest?.setting))
+  const latest = (await inv('assistant:changes')).flatMap((g) => g.changes).find((c) => !beforeUndoRace.has(c.id) && c.kind === 'setting' && c.project === 'alpha')
+  check('…listed for Undo', !!latest, JSON.stringify(latest))
   await holdNextWrite()
   await userWrite(450000)
-  await held()
+  check("the user's newer edit holds the lock", !!(await held()))
+  await watchLockQueue()
   await page.evaluate((id) => {
-    window.__revert = window.hive.invoke('assistant:revertSetting', id).then(() => 'reverted', (e) => e.message)
+    window.__undo = window.hive.invoke('assistant:undo', { change: id })
   }, latest.id)
-  await lib.sleep(500) // on purpose: the Revert waits for the lock behind the user's write
+  check("Undo waits behind the user's write", await queuedForLock())
   await release()
-  const reverted = await page.evaluate(() => window.__revert)
-  check('Revert after a newer edit is refused, saying it changed since', /has changed since/.test(reverted), reverted)
+  const [undone] = await page.evaluate(() => window.__undo)
+  check('Undo after a newer edit skips it, saying it changed since', undone.undone.length === 0 && undone.skipped.some((s) => s.field === 'value' && s.why === 'changed'), JSON.stringify(undone))
   check("…and the user's newer edit stays", (await alphaCfg()).compactSuggestTokens === 450000, String((await alphaCfg()).compactSuggestTokens))
 
-  // --- A table: the board's column colours, changed and reverted.
+  // --- A table: the board's column colours, changed and undone.
   check('it changes a column colour', await say('hive hive_update_setting {"id":"board.colors","value":{"doing":"#ff0000"}}'))
   check('…Doing is red, the others as they were', (await settings()).board.colors.doing === '#ff0000' && (await settings()).board.colors.todo !== '#ff0000')
   const colours = panel.locator('.assistant-action', { hasText: 'Column colours' }).first()

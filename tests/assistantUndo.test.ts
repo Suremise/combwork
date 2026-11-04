@@ -441,9 +441,36 @@ describe('undo checks at the write (#1282 round 1)', async () => {
     await lanes.endLane(w, lane.lane.id, { abandoned: true })
   })
 
+  // HI-2481: the retired Revert tests now exercise the panel's Undo path.
+  it.each([true, false])('Undo of a price edit restores overrides, preserving removed models (reset: %s)', async (reset) => {
+    const was = structuredClone(config.settings.providers)
+    const own = { 'custom-model': { input: 1, cachedInput: 0.1, output: 5 } }
+    const e = entryOf('claude-code.prices')
+    try {
+      config.setProviderPrices('claude-code', own, ['old-removed'])
+      const group = newMessage()
+      await asAssistant('change the prices', async () => {
+        const r = await applySetting(e, reset ? null : {}, null)
+        await changes.noteChange(w, { kind: 'setting', target: e.id, fields: [
+          { field: 'value', old: r.old, new: r.new },
+          ...(r.removed ? [{ field: 'removed', old: r.removed.old, new: r.removed.new }] : [])
+        ] })
+      }, 'setting')
+      expect(config.settings.providers['claude-code'].prices).toEqual({})
+      expect(tools.removedPrices('claude-code')).toEqual(reset ? [] : ['old-removed'])
+      const [r] = await userUndo(w, { group })
+      expect(r.skipped).toEqual([])
+      expect(r.undone.sort()).toEqual(reset ? ['removed', 'value'] : ['value'])
+      expect(config.settings.providers['claude-code'].prices).toEqual(own)
+      expect(tools.removedPrices('claude-code')).toEqual(['old-removed'])
+    } finally {
+      config.settings.providers = was
+    }
+  })
+
   it("a price table's removed models the user changed since are kept; its prices still go back", async () => {
     const e = entryOf('claude-code.prices')
-    config.setProviderPrices('claude-code', {}, ['old-removed'])
+    config.setProviderPrices('claude-code', { 'custom-model': { input: 1, cachedInput: 0.1, output: 5 } }, ['old-removed'])
     const group = newMessage()
     await asAssistant(
       'reset the prices',
@@ -457,6 +484,8 @@ describe('undo checks at the write (#1282 round 1)', async () => {
     const [r] = await userUndo(w, { group })
     expect(tools.removedPrices('claude-code')).toEqual(['user-removed'])
     expect(r.skipped).toContainEqual({ field: 'removed', why: 'changed' })
+    expect(r.undone).toEqual(['value'])
+    expect(config.settings.providers['claude-code'].prices).toEqual({ 'custom-model': { input: 1, cachedInput: 0.1, output: 5 } })
     config.setProviderPrices('claude-code', null as never, [])
   })
 

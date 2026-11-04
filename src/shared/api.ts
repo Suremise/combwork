@@ -885,7 +885,6 @@ export interface HiveRequests {
   /** A question of the Assistant's, its panel hidden in this window (HI-2320): told once as a notification that needs you; whether it was told now. */
   'assistant:tellQuestion': (id: string) => boolean
   /** Revert on a setting the Assistant changed (its activity list): sets it back, and lists that too (#186). */
-  'assistant:revertSetting': (actionId: string) => void
   /** The Assistant's changes kept for undo (#1282), by the user's message they came from, newest first (7 days). */
   'assistant:changes': () => AssistantChangeGroup[]
   /** The user undoes one of the Assistant's changes, or a message's: what each put back, and what it left and why. */

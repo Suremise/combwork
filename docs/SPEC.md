@@ -5602,7 +5602,7 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
 with its refusals and every text that states it; `MAX_CHANGE_BATCH` (100 cards per call) stays. In its place, **undo**,
 built on the fact log and the Assistant's activity list:
 - **What:** card edits (labels, column, blocked, title, description, links, agent), cards it created (archived on
-  undo), lane records, agent settings and Hive settings (settings already have Revert).
+  undo), lane records, agent settings and Hive settings.
 - **Not:** prompts and messages sent, and work an agent did after it was started; undo can stop an agent it started.
   The panel says so.
 - **Changed since:** if the user or an agent changed the same thing afterwards, undo skips it and says so; it never
