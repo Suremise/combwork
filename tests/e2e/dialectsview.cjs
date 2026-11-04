@@ -4,8 +4,9 @@
 // each layer's value; outdated overrides flagged with the current Default (or none, for an id this Hive no longer has);
 // Save checking the schema only, refused with reasons and the draft kept, from the Texts tab and from the JSON tab (an
 // invalid JSON never saving an older draft); a change on disk while editing refused (changedOnDisk) and Keep My Changes;
-// Duplicate (no model), Use for a model (Promote), Revert to shipped, Export, Import (through its token), Delete (the
-// user's own files only); "restart to apply" only for a dialect change, never a skill-only one; Agent Settings' Dialect
+// Duplicate (no model), Set Model (Promote; HI-2523), New Model File on a CLI's group with a model typed (never seen)
+// and without, Duplicate with a model taking the claim in one step (the agent on Auto gets it at its restart: HI-2523),
+// Revert to shipped, Export, Import (through its token), Delete (the user's own files only); "restart to apply" only for a dialect change, never a skill-only one; Agent Settings' Dialect
 // picking a file. Screenshots in light and dark. Runs the fake Claude Code (no model catalogue: FAKE_CLAUDE_MODELS=fail).
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -227,15 +228,34 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
   check('a save from a base that is not the file on disk is refused (changedOnDisk), under the write lock', saveNow?.refused === 'changedOnDisk' && read(TEST_COPY).includes('OUTSIDE3'), JSON.stringify(saveNow))
   await pane.locator('[data-dialect-discard]').click().catch(() => undefined)
 
-  // --- Duplicate (no model), Use for a model (Promote), on/off.
+  // --- Duplicate (no model), Set Model (HI-2523: Use for a Model before), on/off.
+  // The New Model File, Duplicate and Set Model dialog (HI-2523): its fields, its notes, its main button.
+  const fileDialog = page.locator('.dialog').last()
+  const fill = async ({ name, model } = {}) => {
+    await fileDialog.locator('[data-dialect-dialog]').waitFor({ timeout: HUNG_MS })
+    if (name !== undefined) await fileDialog.locator('[data-dialect-name]').fill(name)
+    if (model !== undefined) await fileDialog.locator('[data-dialect-model]').fill(model)
+  }
+  const note = (n) => fileDialog.locator(`[data-note="${n}"]`)
+  const noteText = (n) => note(n).innerText({ timeout: 1000 }).catch(() => '')
+  const create = async () => {
+    await fileDialog.locator('.btn.primary').click()
+    await until(async () => (await page.locator('[data-dialect-dialog]').count()) === 0, HUNG_MS)
+  }
   await row('claude-code/Opus 5.5.json').click()
   await page.locator('.dialect-detail[data-dialect-file="claude-code/Opus 5.5.json"] [data-dialect-duplicate]').click()
-  await answer('Opus 5.5 v2')
+  await fill()
+  check("Duplicate's dialog offers the copy's name, and no model", (await fileDialog.locator('[data-dialect-name]').inputValue()) === 'Opus 5.5 copy' && (await fileDialog.locator('[data-dialect-model]').inputValue()) === '')
+  await fill({ name: 'Opus 5.5 v2' })
+  await create()
   check('Duplicate makes a test copy beside it, with no model', !!(await until(() => fs.existsSync(path.join(dialects, 'claude-code', 'Opus 5.5 v2.json')), HUNG_MS)) && !('model' in JSON.parse(read('claude-code/Opus 5.5 v2.json'))))
   await row('claude-code/Opus 5.5 v2.json').click()
   await page.locator('.dialect-detail[data-dialect-file="claude-code/Opus 5.5 v2.json"] [data-dialect-promote]').click()
-  await answer('claude-opus-5-5')
-  check('Use for a model moves the claim onto the copy; the file that had it becomes a test copy', !!(await until(() => JSON.parse(read('claude-code/Opus 5.5 v2.json')).model === 'claude-opus-5-5', HUNG_MS)) && !('model' in JSON.parse(read('claude-code/Opus 5.5.json'))))
+  await fill({ model: 'claude-opus-5-5[1m]' })
+  check('Set Model says the ID a form the CLI knows saves as, and the file that has the model, before saving', !!(await until(async () => (await noteText('savedAs')).includes('claude-opus-5-5,') && (await noteText('claimed')).includes('Opus 5.5'), HUNG_MS)), `${await noteText('savedAs')} | ${await noteText('claimed')}`)
+  await shot('set-model', fileDialog)
+  await create()
+  check('Set Model moves the claim onto the copy; the file that had it becomes a test copy', !!(await until(() => JSON.parse(read('claude-code/Opus 5.5 v2.json')).model === 'claude-opus-5-5', HUNG_MS)) && !('model' in JSON.parse(read('claude-code/Opus 5.5.json'))))
   // Clara launched on the file that had the model: its page says her chain moved (she gets the promoted one at restart).
   await row('claude-code/Opus 5.5.json').click()
   check('…and Clara, on Auto, shows "restart to apply" on the file she launched on: her chain moved', !!(await until(async () => /Clara/.test(await page.locator('.dialect-detail[data-dialect-file="claude-code/Opus 5.5.json"] [data-dialect-restart]').innerText().catch(() => '')), HUNG_MS)), await page.locator('.dialect-detail').innerText().catch(() => ''))
@@ -284,6 +304,30 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
   const exported = await inv('dialects:export', TEST_COPY)
   check('Export writes the file as it is where chosen', exported === exportTo && fs.readFileSync(exportTo, 'utf8') === read(TEST_COPY))
 
+  // --- New Model File (HI-2523): on a CLI's group, an empty file for a model typed, even one no agent has run.
+  const newOn = (cli) => page.locator(`[data-action="dialect-new:${cli}"]`)
+  check('each CLI group has New Model File; the Workspace and API groups have none', (await newOn('claude-code').count()) === 1 && (await newOn('codex').count()) === 1 && (await newOn('copilot').count()) === 1 && (await page.locator('[data-action="dialect-new:api"]').count()) === 0)
+  await newOn('claude-code').click()
+  await fill({ name: 'opus 5.5', model: 'qwen3:32b' })
+  check('…a name the folder has (in any case) is flagged, and Create is off', !!(await until(async () => /already in this folder/.test(await noteText('name')), HUNG_MS)) && (await fileDialog.locator('.btn.primary').isDisabled()))
+  await fill({ name: 'Qwen local' })
+  check('…a model no agent has run is said, and kept as typed (no "saved as")', !!(await until(async () => (await note('notSeen').count()) === 1, HUNG_MS)) && (await note('savedAs').count()) === 0 && (await note('name').count()) === 0)
+  await shot('new-model-file', fileDialog)
+  await create()
+  check('New Model File makes an empty file claiming the model as typed', !!(await until(() => fs.existsSync(path.join(dialects, 'claude-code', 'Qwen local.json')), HUNG_MS)) && JSON.stringify(JSON.parse(read('claude-code/Qwen local.json'))) === JSON.stringify({ name: 'Qwen local', model: 'qwen3:32b', texts: {} }), read('claude-code/Qwen local.json'))
+  check("…listed as Yours, with its model's line", !!(await until(async () => /Yours/.test(await row('claude-code/Qwen local.json').innerText().catch(() => '')) && /qwen3:32b/.test(await row('claude-code/Qwen local.json').locator('.desc').innerText().catch(() => '')), HUNG_MS)))
+  await newOn('codex').click()
+  await fill({ name: 'Blank' })
+  await create()
+  check('New Model File without a model is a test copy', !!(await until(() => fs.existsSync(path.join(dialects, 'codex', 'Blank.json')), HUNG_MS)) && !('model' in JSON.parse(read('codex/Blank.json'))) && !!(await until(async () => /Test copy/.test(await row('codex/Blank.json').locator('.desc').innerText().catch(() => '')), HUNG_MS)))
+  // Duplicate with a model: the copy takes Opus 5.5's model in one step; Clara, on Auto, gets it at her restart.
+  await row('claude-code/Opus 5.5.json').click()
+  await page.locator('.dialect-detail[data-dialect-file="claude-code/Opus 5.5.json"] [data-dialect-duplicate]').click()
+  await fill({ name: 'Opus 5.5 tuned', model: 'claude-opus-5-5' })
+  check('…Duplicate with a model says the file that has it becomes a test copy', !!(await until(async () => (await noteText('claimed')).includes('Opus 5.5'), HUNG_MS)))
+  await create()
+  check('Duplicate with a model makes the copy that model\'s file, and the file that had it a test copy', !!(await until(() => fs.existsSync(path.join(dialects, 'claude-code', 'Opus 5.5 tuned.json')) && JSON.parse(read('claude-code/Opus 5.5 tuned.json')).model === 'claude-opus-5-5', HUNG_MS)) && !('model' in JSON.parse(read('claude-code/Opus 5.5.json'))))
+
   // --- "restart to apply" is the dialect's only: a skill-only edit doesn't blame the dialect.
   await inv('session:stop', proj, clara.id)
   await until(async () => !(await live(clara.id)), HUNG_MS)
@@ -291,6 +335,7 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
   await ready(clara.id)
   const usage = async () => (await inv('dialects:usage')).find((u) => u.agentId === clara.id)
   check('restarted, Clara no longer needs a restart for her dialect', !!(await until(async () => (await usage())?.moved === false, HUNG_MS)))
+  check('…and, on Auto running claude-opus-5-5, she runs on the duplicate that took the model: its row counts her', !!(await until(async () => (await row('claude-code/Opus 5.5 tuned.json').locator('[data-users]').getAttribute('data-users').catch(() => null)) === '1', HUNG_MS)) && (await row('claude-code/Opus 5.5.json').locator('[data-users]').count()) === 0)
   const skill = path.join(ws, '.combwork', 'skills', 'work-on-card', 'SKILL.md')
   fs.appendFileSync(skill, '\nA change.\n')
   const restartForSkill = !!(await until(async () => (await inv('workspace:refresh')).projects.find((p) => p.name === 'alpha').agents.find((a) => a.id === clara.id)?.restartNeeded, HUNG_MS))

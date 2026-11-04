@@ -55,6 +55,34 @@ export type DialectRefusal =
   | { refused: 'changedOnDisk'; disk: string }
   /** The Workspace file, a CLI file and a shipped file can't be deleted (Revert puts a shipped one back). */
   | { refused: 'protected' }
+  /** The name can't be a dialect file's (HI-2523): why, as `dialectLabelProblem` says. */
+  | { refused: 'name'; problem: DialectLabelProblem }
+  /** The model ID can't be a dialect file's (HI-2523): empty, or with a control character or a line break. */
+  | { refused: 'model'; problem: 'empty' | 'control' }
+  /** Only the user's own model files and test copies take Set Model: not shipped files, nor the CLI, API or Workspace files. */
+  | { refused: 'notYours' }
+
+/** Why a name can't be a dialect file's (HI-2523), or null when it can. */
+export type DialectLabelProblem = 'empty' | 'chars' | 'dot' | 'end' | 'reserved' | 'cli' | 'long'
+
+/** The longest name a dialect file takes, in characters (its path stays well inside Windows' limit). */
+export const DIALECT_LABEL_MAX = 100
+
+/**
+ * Why a name can't be a dialect file's in a CLI folder (HI-2523), or null when it can: a file name Windows takes and
+ * shows as typed (none of \ / : * ? " < > | or a control character; no leading dot; no trailing dot or space; not a
+ * device name such as CON or COM1, with or without an extension), not "cli" (the CLI's own file), at most
+ * DIALECT_LABEL_MAX characters. A name already in the folder is checked where the folder is read.
+ */
+export function dialectLabelProblem(label: string): DialectLabelProblem | null {
+  if (!label.trim()) return 'empty'
+  if (/[\\/:*?"<>|\x00-\x1f]/.test(label)) return 'chars'
+  if (label.startsWith('.')) return 'dot'
+  if (/[. ]$/.test(label) || label.startsWith(' ')) return 'end'
+  if (/^(con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³])(\..*)?$/i.test(label)) return 'reserved'
+  if (label.toLowerCase() === 'cli') return 'cli'
+  return label.length > DIALECT_LABEL_MAX ? 'long' : null
+}
 
 /** A text of the catalogue: the code's English (the Default), the note beside it, its area and its placeholders. */
 export interface DialectCatalogueText {

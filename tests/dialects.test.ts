@@ -109,14 +109,14 @@ describe('model IDs', () => {
 
   it('are the real ID: an alias through the CLI’s catalogue, else unknown; never the friendly name', () => {
     const info = { catalog: { source: 'cli' as const, version: null, at: '', models: [{ value: 'opus', label: 'Opus', resolved: 'claude-opus-5-5' }] }, defaultModel: 'claude-sonnet-5-5' }
-    expect(dialectModelId(info, 'opus')).toBe('claude-opus-5-5')
-    expect(dialectModelId(info, 'claude-haiku-5-5')).toBe('claude-haiku-5-5')
+    expect(dialectModelId('claude-code', info, 'opus')).toBe('claude-opus-5-5')
+    expect(dialectModelId('claude-code', info, 'claude-haiku-5-5')).toBe('claude-haiku-5-5')
     // The CLI's default, when Hive knows it.
-    expect(dialectModelId(info, '')).toBe('claude-sonnet-5-5')
+    expect(dialectModelId('claude-code', info, '')).toBe('claude-sonnet-5-5')
     // An alias the catalogue doesn't resolve, and no choice with no known default: unknown.
-    expect(dialectModelId(null, 'sonnet')).toBeNull()
-    expect(dialectModelId(null, 'opus[1m]')).toBeNull()
-    expect(dialectModelId(null, null)).toBeNull()
+    expect(dialectModelId('claude-code', null, 'sonnet')).toBeNull()
+    expect(dialectModelId('claude-code', null, 'opus[1m]')).toBeNull()
+    expect(dialectModelId('claude-code', null, null)).toBeNull()
   })
 })
 

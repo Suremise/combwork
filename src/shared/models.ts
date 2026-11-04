@@ -264,18 +264,78 @@ export const observedEffortKey = modelKey
  */
 export const baseModelId = modelKey
 
-/** A bare alias ("opus", "opus[1m]", "default"): a word, not a model ID, which always has a version in it. */
-const BARE_ALIAS = /^[a-z]+(\[[^\]]*\])?$/i
+/** A model choice without a "[…]" suffix, in lower case: how an alias is compared ("opus[1m]" → "opus"). */
+const aliasKey = (m: string): string => m.trim().toLowerCase().replace(/\[[^\]]*\]$/, '')
+
+/**
+ * Whether a model choice is one of the CLI's aliases that Hive can't resolve now (HI-2523): a word the CLI resolves
+ * itself (its descriptor's `modelAliases`, or an alias its catalogue lists) with no model ID the catalogue gives for it.
+ * Such a launch's model is unknown for dialects. Any other word ("gemma") is a model ID of its own.
+ */
+export function isUnresolvedAlias(provider: ProviderId, info: Info, model: string): boolean {
+  const k = aliasKey(model)
+  if (!k) return false
+  const known = (providerDescriptor(provider).capabilities.modelAliases ?? []).some((a) => aliasKey(a) === k) || !!info?.catalog?.models.some((m) => m.resolved && aliasKey(m.value) === k)
+  if (!known) return false
+  const m = catalogModel(info, model)
+  return !(m?.resolved && aliasKey(m.value) === k)
+}
 
 /**
  * The real model ID a launch runs, which picks its dialect's model file (dialects, HI-2439): the choice (else the CLI's
  * default, when Hive knows it) with an alias resolved through the CLI's catalogue ("opus" → "claude-opus-5-5"), a full
- * ID as it is. Null when Hive can't name it: no choice and no known default, or an alias the catalogue doesn't resolve
- * (the launch record says "model unknown"). Never the friendly name: names are for display.
+ * ID as it is. Null when Hive can't name it: no choice and no known default, or an alias of the CLI the catalogue
+ * doesn't resolve (`isUnresolvedAlias`; the launch record says "model unknown"). A word that isn't one of the CLI's
+ * aliases ("gemma") is a model ID like any other (HI-2523). Never the friendly name: names are for display.
  */
-export function dialectModelId(info: Info, chosen: string | null | undefined): string | null {
+export function dialectModelId(provider: ProviderId, info: Info, chosen: string | null | undefined): string | null {
   const model = (chosen?.trim() || info?.defaultModel?.trim()) ?? ''
   if (!model) return null
-  const id = resolvedModel(info, model).trim()
-  return id && !BARE_ALIAS.test(id) ? id : null
+  if (isUnresolvedAlias(provider, info, model)) return null
+  const m = catalogModel(info, model)
+  const id = (m?.resolved && aliasKey(m.value) === aliasKey(model) ? m.resolved : resolvedModel(info, model)).trim()
+  return id || null
+}
+
+/** A model ID for a dialect file, as the dialog saves it (HI-2523), and what Hive made of what was typed. */
+export interface DialectModel {
+  /** What the file claims: the typed ID, trimmed, unless the CLI recognises it (below). */
+  model: string
+  /** The typed text was a recognised alias or form, and `model` differs from it ("Saved as claude-opus-5-5"). */
+  normalised: boolean
+  /** One of the CLI's aliases Hive can't resolve now: agents running it show as model unknown, so it wouldn't match. */
+  unresolvedAlias: boolean
+}
+
+/**
+ * The model a dialect file claims for what was typed in its dialog (HI-2523; Darren's decision: free text first). Only
+ * what the CLI recognises is normalised, by the matcher's rules: an alias its catalogue resolves becomes that ID, and an
+ * ID its catalogue or its descriptor's models list (matched without case, a "[…]" suffix or a snapshot date) becomes
+ * that entry's ID without the suffix or date. Anything else is kept exactly as typed, apart from surrounding
+ * whitespace: "qwen3:32b", "hf.co/org/custom-20261104", "gemma".
+ */
+export function dialectModelOf(provider: ProviderId, info: Info, typed: string): DialectModel {
+  const t = typed.trim()
+  const unresolvedAlias = isUnresolvedAlias(provider, info, t)
+  const strip = (id: string): string => id.trim().replace(/\[[^\]]*\]$/, '').replace(/-\d{8}$/, '')
+  let model = t
+  if (t && !unresolvedAlias) {
+    const m = catalogModel(info, t)
+    if (m?.resolved && aliasKey(m.value) === aliasKey(t)) model = strip(m.resolved)
+    else if (m) model = strip(m.resolved && modelKey(m.resolved) === modelKey(t) ? m.resolved : m.value)
+    else {
+      const k = modelKey(t)
+      const fallback = providerDescriptor(provider)
+        .modelGroups.flatMap((g) => g.models)
+        .find((o) => modelKey(o.value) === k && !(providerDescriptor(provider).capabilities.modelAliases ?? []).some((a) => aliasKey(a) === aliasKey(o.value)))
+      if (fallback) model = strip(fallback.value)
+    }
+  }
+  return { model, normalised: model !== t, unresolvedAlias }
+}
+
+/** Why a typed model ID can't be a dialect file's (HI-2523): empty, or with a control character or a line break. */
+export function dialectModelProblem(model: string): 'empty' | 'control' | null {
+  if (!model.trim()) return 'empty'
+  return /[\x00-\x1f\x7f]/.test(model.trim()) ? 'control' : null // i18n-ignore: a pattern
 }

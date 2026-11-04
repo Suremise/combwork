@@ -19,7 +19,8 @@ import { createLogger, userText } from '../logger'
 import type { DialectChain } from '../../shared/agentText'
 import { API_FOLDER, CLI_FILE, checkTexts, dialectFileText, parseDialectFile, STATE_FILE, textProblem, WORKSPACE_FILE, type DialectFile, type DialectSchema } from './format'
 import type { DialectFolder, DialectSet, LoadedDialect } from './chain'
-import type { DialectRefusal } from '../../shared/dialects'
+import { dialectLabelProblem, type DialectRefusal } from '../../shared/dialects'
+import { dialectModelProblem } from '../../shared/models'
 
 const log = createLogger('dialects')
 
@@ -258,60 +259,96 @@ export async function readDialect(dir: string, path: string): Promise<DialectFil
 }
 
 /**
- * Duplicates a file of a CLI folder as a test copy beside it (no `model`), under a new label: its texts as they are,
- * outdated ones too (a copy changes nothing), for an A/B test on one agent.
+ * Writes a file of a CLI folder that claims `model` (or none), taking the claim off every other file of the folder that
+ * has it first: each keeps its texts and becomes a test copy, as a backup, so the folder never has two. Called under
+ * the folder's lock.
+ *
+ * All or nothing (HR1, HI-2439 r1): every file's new text is made before any is written, and a write that fails puts
+ * back the files already changed as they were, so a failed change never leaves the model unclaimed. It throws then.
  */
-export async function duplicateDialect(dir: string, from: string, label: string): Promise<{ path: string } | DialectRefusal> {
-  const src = placeOf(from)
-  if (!src || src.kind !== 'folder') return { refused: 'path' }
-  const path = `${src.folder}/${label}.json`
-  const place = placeOf(path)
-  if (!place || place.kind !== 'folder' || place.cli) return { refused: 'path' }
-  return withFileLock(lockOf(dir, place), async () => {
-    const file = await readDialect(dir, from)
-    if (!file) return { refused: 'missing', path: from }
-    if ((await jsonFiles(join(dir, src.folder))).some((n) => n.toLowerCase() === `${label}.json`.toLowerCase())) return { refused: 'nameTaken', path }
-    await writeTextAtomic(join(dir, src.folder, `${label}.json`), dialectFileText({ name: label, texts: file.texts }))
-    return { path }
-  })
+async function writeClaiming(dir: string, folder: string, path: string, file: DialectFile, what: string): Promise<{ from: string | null }> {
+  const model = file.model
+  const others = model === undefined ? [] : (await claimsIn(dir, folder)).filter((c) => c.path.toLowerCase() !== path.toLowerCase() && sameModel(c.model, model))
+  // Each write, old owners first, with what to put back: made in full before anything changes.
+  const writes = [
+    ...others.map((o) => {
+      const { model: _dropped, ...rest } = o.file
+      return { at: join(dir, ...o.path.split('/')), text: dialectFileText(rest), was: o.raw }
+    }),
+    { at: join(dir, ...path.split('/')), text: dialectFileText(file), was: null }
+  ]
+  const done: (typeof writes)[number][] = []
+  try {
+    for (const w of writes) {
+      await writeTextAtomic(w.at, w.text)
+      done.push(w)
+    }
+  } catch (e) {
+    for (const w of done.reverse()) if (w.was !== null) await writeTextAtomic(w.at, w.was).catch((err) => log.warn(`${what} of ${userText(path)} failed, and ${userText(w.at)} couldn't be put back as it was`, err))
+    throw e
+  }
+  if (model !== undefined) log.info(`${what}: the dialect file ${userText(path)} claims ${userText(model)}${others.length ? ` (from ${others.map((o) => userText(o.path)).join(', ')})` : ''}`)
+  return { from: others[0]?.path ?? null }
 }
 
 /**
- * Promote ("Use for <model>"): moves a model's claim onto a test copy. The file that had it keeps its texts and becomes
- * a test copy, as a backup. The claim is taken off the old file before it is put on the new one, so the folder never
- * has two. Agents on Auto pick it up at their next launch.
- *
- * All or nothing (HR1, HI-2439 r1): every file's new text is made before any is written, and a write that fails puts
- * back the files already changed as they were, so a failed Promote never leaves the model unclaimed. It throws then.
+ * A new file of a CLI folder (HI-2523): New Model File (empty, so it inherits every text) or Duplicate (`from`, a model
+ * file or test copy of the same folder: its texts as they are, outdated ones too, since a copy changes nothing). With a
+ * `model` it is that model's file at once, the file that had the model becoming a test copy (as Set Model does); without
+ * one it is a test copy, which only agents whose Dialect setting names it use. Refused with why: a folder that isn't a
+ * CLI's (`isCli`), a name `dialectLabelProblem` refuses or one the folder has (in any case), a model ID that is empty or
+ * has a control character, a `from` of another folder or gone. Checked under the folder's lock.
  */
-export async function promoteDialect(dir: string, path: string, model: string): Promise<{ from: string | null } | DialectRefusal> {
+export async function createDialect(dir: string, folder: string, label: string, opts: { model?: string; from?: string; isCli: (folder: string) => boolean }): Promise<{ path: string; from: string | null } | DialectRefusal> {
+  if (folder === API_FOLDER || !FOLDER.test(folder) || !opts.isCli(folder)) return { refused: 'path' }
+  const name = label.trim()
+  const problem = dialectLabelProblem(name)
+  if (problem) return { refused: 'name', problem }
+  const model = opts.model?.trim() || undefined
+  if (opts.model !== undefined && opts.model.trim()) {
+    const bad = dialectModelProblem(opts.model)
+    if (bad) return { refused: 'model', problem: bad }
+  }
+  const path = `${folder}/${name}.json`
+  const place = placeOf(path)
+  if (!place || place.kind !== 'folder' || place.cli) return { refused: 'path' }
+  const src = opts.from === undefined ? null : placeOf(opts.from)
+  if (opts.from !== undefined && (!src || src.kind !== 'folder' || src.cli || src.folder !== folder)) return { refused: 'path' }
+  return withFileLock(lockOf(dir, place), async () => {
+    const source = opts.from === undefined ? { name, texts: {} } : await readDialect(dir, opts.from)
+    if (!source) return { refused: 'missing', path: opts.from! }
+    if ((await jsonFiles(join(dir, folder))).some((n) => n.toLowerCase() === `${name}.json`.toLowerCase())) return { refused: 'nameTaken', path }
+    const file: DialectFile = { name, texts: source.texts, ...(model !== undefined ? { model } : {}) }
+    const r = await writeClaiming(dir, folder, path, file, opts.from === undefined ? 'New Model File' : 'Duplicate') // i18n-ignore: log text
+    return { path, from: r.from }
+  })
+}
+
+/** Duplicates a file of a CLI folder as a test copy beside it (no `model`), under a new label: createDialect's Duplicate. */
+export async function duplicateDialect(dir: string, from: string, label: string): Promise<{ path: string } | DialectRefusal> {
+  const src = placeOf(from)
+  if (!src || src.kind !== 'folder') return { refused: 'path' }
+  const r = await createDialect(dir, src.folder, label, { from, isCli: () => true })
+  return 'refused' in r ? r : { path: r.path }
+}
+
+/**
+ * Set Model (HI-2523; Promote, "Use for <model>", before it): moves a model's claim onto a model file or test copy. The
+ * file that had it keeps its texts and becomes a test copy, as a backup. The claim is taken off the old file before it
+ * is put on this one, so the folder never has two. Agents on Auto pick it up at their next launch. `shipped` (the ids
+ * Hive ships): a shipped file is refused (`notYours`): only the user's own files are retargeted. All or nothing, as
+ * writeClaiming says.
+ */
+export async function promoteDialect(dir: string, path: string, model: string, opts: { shipped?: ReadonlySet<string> } = {}): Promise<{ from: string | null } | DialectRefusal> {
   const place = placeOf(path)
   if (!place || !mayHaveModel(place) || place.kind !== 'folder') return { refused: 'path' }
-  if (!model.trim()) return { refused: 'path' }
+  const bad = dialectModelProblem(model)
+  if (bad) return { refused: 'model', problem: bad }
+  if (opts.shipped && [...opts.shipped].some((id) => `${id}.json`.toLowerCase() === path.toLowerCase())) return { refused: 'notYours' }
   return withFileLock(lockOf(dir, place), async () => {
     const file = await readDialect(dir, path)
     if (!file) return { refused: 'missing', path }
-    const others = (await claimsIn(dir, place.folder)).filter((c) => c.path.toLowerCase() !== path.toLowerCase() && sameModel(c.model, model))
-    // Each write, old owners first, with what to put back: made in full before anything changes.
-    const writes = [
-      ...others.map((o) => {
-        const { model: _dropped, ...rest } = o.file
-        return { at: join(dir, ...o.path.split('/')), text: dialectFileText(rest), was: o.raw }
-      }),
-      { at: join(dir, ...path.split('/')), text: dialectFileText({ ...file, model: model.trim() }), was: null }
-    ]
-    const done: (typeof writes)[number][] = []
-    try {
-      for (const w of writes) {
-        await writeTextAtomic(w.at, w.text)
-        done.push(w)
-      }
-    } catch (e) {
-      for (const w of done.reverse()) if (w.was !== null) await writeTextAtomic(w.at, w.was).catch((err) => log.warn(`Promote of ${userText(path)} failed, and ${userText(w.at)} couldn't be put back as it was`, err))
-      throw e
-    }
-    log.info(`Promoted the dialect file ${userText(path)} for ${userText(model)}${others.length ? ` (from ${others.map((o) => userText(o.path)).join(', ')})` : ''}`)
-    return { from: others[0]?.path ?? null }
+    return writeClaiming(dir, place.folder, path, { ...file, model: model.trim() }, 'Set Model') // i18n-ignore: log text
   })
 }
 

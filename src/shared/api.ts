@@ -803,10 +803,15 @@ export interface HiveRequests {
   /** Saves a file (the form's draft, or the JSON tab's text), checked; `base`: the text on disk the draft started from. */
   'dialects:save': (path: string, draft: { file: DialectFile } | { raw: string }, base: string) => DialectRefusal | null
   'dialects:setOn': (path: string, on: boolean) => void
-  /** A test copy beside a file of a CLI folder, under a new label (no model). */
-  'dialects:duplicate': (path: string, label: string) => { path: string } | DialectRefusal
-  /** Moves the model's claim onto a test copy; the file that had it becomes a test copy. */
+  /**
+   * A new file in a CLI's folder under a label (HI-2523): empty (New Model File), or `from`'s texts (Duplicate). With a
+   * model ('' for none: a test copy) it claims it, and `from` in the reply is the file that had it (now a test copy).
+   */
+  'dialects:create': (folder: string, label: string, model: string, from: string | null) => { path: string; from: string | null } | DialectRefusal
+  /** Set Model (HI-2523): moves the model's claim onto one of the user's model files or test copies; the file that had it becomes a test copy. */
   'dialects:promote': (path: string, model: string) => { from: string | null } | DialectRefusal
+  /** The model IDs agents of this CLI have run in the workspace, newest first (HI-2523: the model field's suggestions). */
+  'dialects:models': (cli: string) => string[]
   /** Puts back a shipped file as this Hive ships it. */
   'dialects:revert': (path: string) => void
   /** Moves a file the user made to the Recycle Bin (the Workspace, CLI and shipped files are refused). */

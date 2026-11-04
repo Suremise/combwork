@@ -77,7 +77,7 @@ import type { AdvancedState } from '../shared/advanced'
 import { switchMode } from './assistantMode'
 import * as modes from './modes'
 import { bundledIds, restoreBundled, syncBundled } from './bundled'
-import { API_FOLDER, agentTextSchema, deleteDialect, dialectsDir, duplicateDialect, importDialect, placeOf, promoteDialect, saveDialect, saveDialectRaw, setDialectOn } from './dialects'
+import { API_FOLDER, agentTextSchema, createDialect, deleteDialect, dialectsDir, importDialect, placeOf, promoteDialect, saveDialect, saveDialectRaw, setDialectOn } from './dialects'
 import { dialectCatalogue, dialectChoices, dialectFileView, forgetPicks, listDialects, pickOfToken, rememberPick, spendPick } from './dialects/view'
 import type { DialectFile } from '../shared/dialects'
 import { trash } from './trash'
@@ -1218,16 +1218,17 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       await setDialectOn(dialectsDir(workspace.hiveDir), String(path), on === true)
       dialectsChanged()
     },
-    'dialects:duplicate': async (path, label) => {
-      const r = await duplicateDialect(dialectsDir(workspace.hiveDir), String(path), String(label).trim())
-      if ('path' in r) dialectsChanged()
+    'dialects:create': async (folder, label, model, from) => {
+      const r = await createDialect(dialectsDir(workspace.hiveDir), String(folder), String(label), { model: String(model ?? ''), ...(from ? { from: String(from) } : {}), isCli: (f) => isKnownProvider(f) })
+      if (!('refused' in r)) dialectsChanged()
       return r
     },
     'dialects:promote': async (path, model) => {
-      const r = await promoteDialect(dialectsDir(workspace.hiveDir), String(path), String(model))
+      const r = await promoteDialect(dialectsDir(workspace.hiveDir), String(path), String(model), { shipped: new Set(await bundledIds('dialects')) })
       if ('from' in r) dialectsChanged()
       return r
     },
+    'dialects:models': (cli) => (isKnownProvider(String(cli)) ? sessions.dialectModelsSeen(String(cli) as ProviderId) : []),
     'dialects:revert': async (path) => {
       const id = String(path).replace(/\.json$/i, '')
       if (!placeOf(String(path)) || !(await bundledIds('dialects')).some((x) => x.toLowerCase() === id.toLowerCase())) throw hiveError(M.notDialect, { path: String(path) }, { kind: 'invalid' })

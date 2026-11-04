@@ -3,13 +3,25 @@
     "defaultMessage": "Can't be read",
     "description": "A warning badge on a dialect file in the Dialects view: it isn't JSON or a dialect file's shape, so it adds nothing. Glossary: dialect."
   },
+  "dialects.cancel": {
+    "defaultMessage": "Cancel",
+    "description": "The New Model File, Duplicate and Set Model dialogs' button: closes the dialog, changing nothing."
+  },
   "dialects.changedOutside": {
     "defaultMessage": "This file changed outside Combwork while you were editing it.",
     "description": "A banner in the Dialects view: the dialect file changed on disk (an editor, git, another window) while it has unsaved changes here."
   },
+  "dialects.claimMoved": {
+    "defaultMessage": "{name} has model {model} now: {from} became a test copy.",
+    "description": "A notice after a dialect file took a model another file had (HI-2523). {name} is the file, {model} the model ID, {from} the file that had it. Glossary: test copy."
+  },
   "dialects.claimTaken": {
     "defaultMessage": "Another file of this folder, {by}, claims model {model} first: Auto never picks this one.",
     "description": "A warning on a dialect file whose model another file of the same CLI folder claims too (made outside Hive): {by} is that file, {model} the model ID. Glossary: dialect."
+  },
+  "dialects.claimedBy": {
+    "defaultMessage": "{name} already has this model: it becomes a test copy.",
+    "description": "Under the Model ID field of a dialect file's dialog (HI-2523): another file of the folder ({name}) claims the model; saving moves the claim, and that file keeps its texts as a test copy. Glossary: test copy."
   },
   "dialects.copyLabel": {
     "defaultMessage": "{name} copy",
@@ -21,7 +33,7 @@
   },
   "dialects.create": {
     "defaultMessage": "Create",
-    "description": "The Duplicate and Import dialogs' button."
+    "description": "The New Model File, Duplicate and Import dialogs' button."
   },
   "dialects.defaultNow": {
     "defaultMessage": "The Default now: {text}",
@@ -48,8 +60,8 @@
     "description": "A button of a dialect file in the Dialects view: makes a test copy of it beside it (no model), to try on one agent. Glossary: test copy."
   },
   "dialects.duplicateMessage": {
-    "defaultMessage": "The copy has the same texts and no model, so no agent uses it until its Dialect setting picks it (Agent Settings). Use for a model makes it the one Auto picks.",
-    "description": "The Duplicate dialog of a dialect file. \"Use for a model\" names the Promote button. Glossary: dialect, test copy."
+    "defaultMessage": "The copy has the same texts. With a model, agents on Auto running it get the copy from their next launch. Without one it's a test copy, which an agent uses only when its Dialect setting picks it (Agent Settings).",
+    "description": "The Duplicate dialog of a dialect file (HI-2523): what the copy is, with a model ID typed or without. Glossary: dialect, test copy."
   },
   "dialects.duplicateTitle": {
     "defaultMessage": "Duplicate {name}",
@@ -199,9 +211,57 @@
     "defaultMessage": "Loading…",
     "description": "The Dialects view while it reads the dialect files."
   },
+  "dialects.modelControl": {
+    "defaultMessage": "A model ID has no control characters or line breaks.",
+    "description": "A dialect file's dialog (HI-2523): the Model ID typed has a control character or a line break."
+  },
+  "dialects.modelEmpty": {
+    "defaultMessage": "Enter a model ID.",
+    "description": "The Set Model dialog of a dialect file (HI-2523): the Model ID field is empty."
+  },
+  "dialects.modelOptional": {
+    "defaultMessage": "None: a test copy",
+    "description": "The placeholder of the New Model File and Duplicate dialogs' Model ID field (HI-2523): left empty, the file is a test copy. Glossary: test copy."
+  },
+  "dialects.nameCli": {
+    "defaultMessage": "\"cli\" is the name of the CLI's own file: choose another.",
+    "description": "A dialect file's dialog (HI-2523): the name \"cli\" is taken by the CLI's own dialect file (cli.json). Keep \"cli\" as it is."
+  },
+  "dialects.nameEmpty": {
+    "defaultMessage": "Enter a name.",
+    "description": "A dialect file's dialog (HI-2523): the Name field is empty."
+  },
+  "dialects.nameEnd": {
+    "defaultMessage": "A name can't end with a dot or a space.",
+    "description": "A dialect file's dialog (HI-2523): Windows doesn't keep a trailing dot or space in a file name."
+  },
+  "dialects.nameInFolder": {
+    "defaultMessage": "{name} is already in this folder: choose another name.",
+    "description": "A dialect file's dialog (HI-2523): a file of that name ({name}) is already in the CLI's folder (names are compared without case)."
+  },
+  "dialects.nameLong": {
+    "defaultMessage": "At most {max, number} characters.",
+    "description": "A dialect file's dialog (HI-2523): the name is too long; {max} is the limit."
+  },
   "dialects.nameProblem": {
     "defaultMessage": "A name with no / \\ : * ? \" < > |, not starting with a dot.",
-    "description": "The Import and Duplicate dialogs: the name has a character Windows refuses in a file name, or starts with a dot. Keep the characters."
+    "description": "The Import, New Model File and Duplicate dialogs: the name has a character Windows refuses in a file name, or starts with a dot. Keep the characters."
+  },
+  "dialects.nameReserved": {
+    "defaultMessage": "{name} is a name Windows keeps for itself, as it does CON, NUL and COM1.",
+    "description": "A dialect file's dialog (HI-2523): the name ({name}) is a Windows device name, which can't be a file's. Keep CON, NUL and COM1 as they are."
+  },
+  "dialects.newMessage": {
+    "defaultMessage": "An empty file: it inherits every text until you change one in it. With a model, agents on Auto running it get this file from their next launch. Without one it's a test copy, which an agent uses only when its Dialect setting picks it.",
+    "description": "The New Model File dialog (HI-2523): what the new file is, with a model ID typed or without. Glossary: dialect, test copy."
+  },
+  "dialects.newModel": {
+    "defaultMessage": "New Model File…",
+    "description": "A button on a CLI's group in the Dialects view (HI-2523): makes an empty dialect file for a model of that CLI. Glossary: dialect."
+  },
+  "dialects.newTitle": {
+    "defaultMessage": "New Model File for {cli}",
+    "description": "Title of the New Model File dialog (HI-2523). {cli} is the CLI (\"Codex\"). Glossary: dialect."
   },
   "dialects.noDefault": {
     "defaultMessage": "No current Default: this text was removed or renamed in this Combwork.",
@@ -222,6 +282,10 @@
   "dialects.none": {
     "defaultMessage": "—",
     "description": "A layer with no text of its own in a text's expanded view (Dialects view). A dash: keep it short."
+  },
+  "dialects.notSeen": {
+    "defaultMessage": "No agent has run this model yet.",
+    "description": "Under the Model ID field of a dialect file's dialog (HI-2523): no agent of the workspace has run that model ID. Information only: the file can be made for it anyway."
   },
   "dialects.note": {
     "defaultMessage": "Note",
@@ -280,24 +344,24 @@
     "description": "Why a dialect override is outdated or refused: its text ({id}) isn't valid message syntax; {detail} is the parser's English error."
   },
   "dialects.promote": {
-    "defaultMessage": "Use for a Model…",
-    "description": "A button of a test copy in the Dialects view: makes it the file Auto picks for a model ID (the file that had it becomes a test copy). Glossary: test copy."
+    "defaultMessage": "Set Model…",
+    "description": "A button of the user's own dialect files (a test copy, a model file they made or imported) in the Dialects view (HI-2523): sets the model ID the file is for, which Auto picks it for (a file that had that model becomes a test copy). Glossary: dialect, test copy."
   },
   "dialects.promoteButton": {
-    "defaultMessage": "Use for This Model",
-    "description": "The Promote dialog's button."
+    "defaultMessage": "Set Model",
+    "description": "The Set Model dialog's button (HI-2523)."
   },
   "dialects.promoteField": {
     "defaultMessage": "Model ID",
-    "description": "The Promote dialog's field: the real model ID (\"claude-opus-5-5\")."
+    "description": "The Model ID field of the New Model File, Duplicate and Set Model dialogs (HI-2523): the model ID the file is for (\"claude-opus-5-5\", \"qwen3:32b\"), typed or picked from those agents have run."
   },
   "dialects.promoteMessage": {
     "defaultMessage": "Agents on Auto running this model ID get this file from their next launch. A file that had the model keeps its texts, as a test copy.",
-    "description": "The Promote dialog of a test copy (Dialects view). Glossary: dialect, test copy."
+    "description": "The Set Model dialog of a dialect file (Dialects view). Glossary: dialect, test copy."
   },
   "dialects.promoteTitle": {
-    "defaultMessage": "Use {name} for a model",
-    "description": "Title of the Promote dialog of a test copy. {name} is the file. Glossary: dialect."
+    "defaultMessage": "Set Model of {name}",
+    "description": "Title of the Set Model dialog of a dialect file (HI-2523). {name} is the file. Glossary: dialect."
   },
   "dialects.refresh": {
     "defaultMessage": "Refresh",
@@ -326,6 +390,10 @@
   "dialects.refused.nameTaken": {
     "defaultMessage": "{path} is already there: choose another name.",
     "description": "A dialect file's import or copy refused: a file of that name ({path}) exists. Glossary: dialect."
+  },
+  "dialects.refused.notYours": {
+    "defaultMessage": "Only your own model files and test copies take Set Model: not a shipped file, nor the CLI, API or Workspace files.",
+    "description": "A dialect file's Set Model refused (HI-2523): the file is one Combwork ships, or a CLI's, the API's or the Workspace file. Glossary: dialect, test copy."
   },
   "dialects.refused.path": {
     "defaultMessage": "That isn't a dialect file's place.",
@@ -370,6 +438,10 @@
   "dialects.saved": {
     "defaultMessage": "{name} saved: it applies at each agent's next launch.",
     "description": "A notice after saving a dialect file. {name} is the file. Glossary: dialect."
+  },
+  "dialects.savedAs": {
+    "defaultMessage": "Saved as {model}, the ID agents run it as.",
+    "description": "Under the Model ID field of a dialect file's dialog (HI-2523): what was typed is an alias or a form of a model ID the CLI knows, saved as its real ID ({model})."
   },
   "dialects.saving": {
     "defaultMessage": "Saving…",
@@ -438,6 +510,10 @@
   "dialects.title": {
     "defaultMessage": "Dialects",
     "description": "Title of the Dialects view (HI-2444): the wording Hive gives agents, tuned per model and CLI. Glossary: dialect."
+  },
+  "dialects.unresolvedAlias": {
+    "defaultMessage": "{model} is an alias Combwork can't resolve now: agents running it show as model unknown, so this file wouldn't match. Type the model's ID.",
+    "description": "Under the Model ID field of a dialect file's dialog (HI-2523): the text typed ({model}: \"opus\") is one of the CLI's aliases, and its catalogue doesn't say which model it stands for."
   },
   "dialects.updateBadge": {
     "defaultMessage": "Update available",

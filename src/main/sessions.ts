@@ -2610,6 +2610,23 @@ class SessionManager {
     )
   }
 
+  /**
+   * The model IDs Combwork has seen a CLI run (HI-2523: the Dialects view's suggestions for a model file), each once: the
+   * real model IDs its running sessions launched with (what their dialect matched by), then its connections' models (a
+   * connection's chosen model, a server connection's listed or typed ones). Only a convenience: the dialog takes any ID
+   * typed, and Combwork curates no list (Darren's decision on HI-2523).
+   */
+  dialectModelsSeen(cli: ProviderId): string[] {
+    const seen: string[] = []
+    for (const l of this.live.values()) if (l.dialect?.input.cli === cli && l.dialect.input.modelId) seen.push(l.dialect.input.modelId)
+    const accounts = allAccounts().filter((a) => a.provider === cli)
+    for (const c of allConnections()) if (c.model && accounts.some((a) => a.id === c.account)) seen.push(c.model)
+    for (const a of accounts) for (const m of a.server?.models ?? []) seen.push(m.id)
+    const out: string[] = []
+    for (const m of seen.map((x) => x.trim())) if (m && !out.some((o) => o.toLowerCase() === m.toLowerCase())) out.push(m)
+    return out
+  }
+
   /** The chain a running session speaks (the resolver's session scope): null for the Default, or one not running. */
   pinnedChain(projectPath: string, agentId: string): ResolvedChain | null {
     const d = this.live.get(liveId(projectPath, agentId))?.dialect
@@ -2662,7 +2679,7 @@ class SessionManager {
     // Its dialect chain, pinned for this launch (HI-2443): from its CLI, the real model ID it runs and its Dialect
     // setting as saved now, before any text of this launch is said. Files that can't be read: the Default.
     const pick = pickOf(((await workspaceOf(projectPath).savedAgent(projectPath, agent.id)) ?? agent).dialect)
-    l.dialect = (await this.launchDialect(projectPath, { cli: adapter.id, modelId: dialectModelId(info, chosenModel), pick }).catch((e) => {
+    l.dialect = (await this.launchDialect(projectPath, { cli: adapter.id, modelId: dialectModelId(adapter.id, info, chosenModel), pick }).catch((e) => {
       log.warn(`${userText(this.label(state))}: its dialect couldn't be resolved, so it speaks the Default`, e)
       return null
     })) ?? undefined
