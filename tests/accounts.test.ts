@@ -497,20 +497,20 @@ describe("whether a connection trusts a workspace's folders (HI-1870)", () => {
     return dir
   }
   const t = (root: string | null, short = false) => ({ root, git: true, short })
-  const plain = (root: string) => ({ root, git: false, short: false })
+  const plainT = (root: string) => ({ root, git: false, short: false })
 
   it("Claude Code: the recorded entry's folder and the plain folders inside it; not another case, not an 8.3 path (unknown)", async () => {
     // The recorded entry (C:/work/alpha), and the entry Claude Code writes itself for a subfolder it ran in (false).
     const j = JSON.parse(readFileSync(TRUST, 'utf8'))
     j.projects['C:/work/alpha/child'] = { hasTrustDialogAccepted: false }
     const dir = trustHome('claude', JSON.stringify(j))
-    expect(await trustsOf(dir, [t('C:\\work\\alpha'), plain('C:\\work\\alpha\\child'), t('C:\\work\\beta'), t('C:\\WORK\\ALPHA'), t('C:\\work\\alpha', true), t(null)])).toEqual([true, true, false, false, null, null])
+    expect(await trustsOf(dir, [t('C:\\work\\alpha'), plainT('C:\\work\\alpha\\child'), t('C:\\work\\beta'), t('C:\\WORK\\ALPHA'), t('C:\\work\\alpha', true), t(null)])).toEqual([true, true, false, false, null, null])
   })
 
   it('Claude Code: a Git root under a trusted folder is not trusted; a plain folder there is (HI-2520, measured with 2.1.316–2.1.318)', async () => {
     // Darren's Anthropic-1: D:/Development/HIVE trusted, its repositories cli and apiary never trusted themselves.
     const dir = trustHome('ancestor', JSON.stringify({ projects: { 'D:/Development/HIVE': { hasTrustDialogAccepted: true }, 'D:/Development/HIVE/hive': { hasTrustDialogAccepted: true }, 'D:/Development/HIVE/scratch': { hasTrustDialogAccepted: false } } }))
-    expect(await trustsOf(dir, [t('D:\\Development\\HIVE\\cli'), t('D:\\Development\\HIVE\\apiary'), t('D:\\Development\\HIVE\\hive'), plain('D:\\Development\\HIVE\\scratch'), plain('D:\\Development\\HIVE\\notes\\deep')])).toEqual([false, false, true, true, true])
+    expect(await trustsOf(dir, [t('D:\\Development\\HIVE\\cli'), t('D:\\Development\\HIVE\\apiary'), t('D:\\Development\\HIVE\\hive'), plainT('D:\\Development\\HIVE\\scratch'), plainT('D:\\Development\\HIVE\\notes\\deep')])).toEqual([false, false, true, true, true])
   })
 
   it("Claude Code: no .claude.json yet is untrusted; one it can't read is unknown", async () => {
