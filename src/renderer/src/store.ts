@@ -1155,7 +1155,19 @@ export function selectedProjectInfo() {
   return s.workspace?.projects.find((p) => p.path === s.selectedProject) ?? null
 }
 
+/**
+ * Before Settings leaves the main area (HI-2525): a field of it that has the keyboard loses it first, so its blur saves
+ * what was typed. A click takes the keyboard by itself; a shortcut or a menu doesn't, and Settings would unmount the
+ * field without its blur.
+ */
+function settleSettingsField(to: Activity): void {
+  if (get().activity !== 'settings' || to === 'settings') return
+  const el = document.activeElement
+  if (el instanceof HTMLElement && el.closest('.settings')) el.blur()
+}
+
 export function setActivity(a: Activity): void {
+  settleSettingsField(a)
   navigations++
   set((s) => ({
     activity: a,
@@ -1323,6 +1335,7 @@ export function flashPane(key: string): void {
 
 /** Shows a sidebar view without toggling it (setActivity hides the sidebar when that view is already shown). */
 export function showView(a: Exclude<Activity, 'docs' | 'settings'>): void {
+  settleSettingsField(a)
   navigations++
   set({ activity: a, lastSideActivity: a, sidebarVisible: true })
 }
