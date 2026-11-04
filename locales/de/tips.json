@@ -21,6 +21,8 @@
   "tips.agentStates.title": "Agenten auf einen Blick",
   "tips.agentWorkflowRole.text": "„Rolle im Workflow“ in den Agent-Einstellungen sagt, ob ein Agent Karten bearbeitet, reviewt oder beides. Danach bietet „Lane starten“ Bearbeiter und Reviewer an.",
   "tips.agentWorkflowRole.title": "Bearbeiter und Reviewer",
+  "tips.agentsTempFolder.text": "Agenten schreiben bei der Arbeit Skripte und andere temporäre Dateien in den Temp-Ordner von Windows. Setze Einstellungen → Erweitert → Temp-Ordner der Agenten auf einen eigenen Ordner, etwa einen, den du vom Virenscan ausnimmst, und jeder Agent bekommt stattdessen dort einen Ordner.",
+  "tips.agentsTempFolder.title": "Temporäre Dateien der Agenten aus dem Windows-Temp heraushalten",
   "tips.allKeysToCli.text": "Im Bereich eines Agenten nehmen Combworks Tastenkürzel ihre Tasten. Schalte Einstellungen → Erweitert → Alle Tasten gehen an die CLI ein, um stattdessen jede Taste an die CLI zu senden, außer der der Befehlspalette (Alle Befehle anzeigen), damit jeder Befehl erreichbar bleibt.",
   "tips.allKeysToCli.title": "Gib jede Taste an die CLI des Agenten",
   "tips.alwaysOnTop.text": "Die Pinnadel in der Titelleiste (oder Strg+Alt+O) hält das Fenster über deinen anderen Apps, sodass darunter ein Testlauf oder ein Emulator arbeiten kann. Jedes Fenster hat eine eigene, gespeichert für seinen Arbeitsbereich.",

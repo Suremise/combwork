@@ -135,7 +135,8 @@ import { metricsHandle, recordLaunch } from './metrics'
 import { headerOf } from './revisions'
 import { utf8Bytes } from '../shared/metrics'
 import { cardNamesOf, scopeOfHost } from './projectKeys'
-import { inWorkspace, workspace, workspaceFor, workspaceOf, WorkspaceService, type SessionsFile } from './workspace'
+import { inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, WorkspaceService, type SessionsFile } from './workspace'
+import { agentTempSetting, prepareAgentTemp, protectedFolders, withAgentTemp } from './agentTemp'
 import { ServerMarks } from './serverMarks'
 import { usageHistory, type StoredUsage } from './usageHistory'
 import { journalSettingsOf } from './journalService'
@@ -2684,6 +2685,12 @@ class SessionManager {
     // Its side of the workflow for its metrics (HI-2049), once: its part in the running lanes now, else its own role.
     l.workflow = workspace.isAssistantHome(projectPath) ? 'none' : launchWorkflow(agentWorkflowRole(agent), await this.laneParts(projectPath, agent.id).catch(() => []))
     times?.mark('guidance')
+    // Agents' temp folder (HI-2496): its own folder there, made, when the setting has one (none: the system Temp, as
+    // before). Never in a project, slot or Combwork's own folders, of any open workspace: one that is stops the launch.
+    const assistantHost = workspace.isAssistantHome(projectPath)
+    const tempSetting = agentTempSetting(workspaceOf(projectPath))
+    const tempDir = tempSetting ? await prepareAgentTemp({ setting: tempSetting, host: projectPath, agentId: agent.id, assistant: assistantHost, protect: [...(await protectedFolders(openWorkspaces())), projectPath, cwd] }) : null
+    times?.mark('tempDir')
     const ctx = {
       projectPath,
       agentId: agent.id,
@@ -2720,7 +2727,9 @@ class SessionManager {
       ...(conn ? { connectionHome: conn.folder } : {}),
       // On a connection, without the variables its CLI would read as a login in its place (HI-1757).
       // A server connection's own variables (HI-1772: its server, models and key) after those left out, for this launch only.
-      env: withBinOnPath(withServerEnv(conn?.server?.env, withoutAccountEnv(conn ? adapter : null, childEnv({
+      tempDir,
+      // Its temp folder's variables last, over the account's and server's (HI-2496): none set, the environment as before.
+      env: withAgentTemp(withBinOnPath(withServerEnv(conn?.server?.env, withoutAccountEnv(conn ? adapter : null, childEnv({
         CW_HOOK_TOKEN: hookAuth.token,
         CW_PROJECT: basename(projectPath),
         CW_PROJECT_PATH: projectPath,
@@ -2737,7 +2746,7 @@ class SessionManager {
         ...(conn ? { [conn.homeEnv]: conn.folder } : {}),
         // Not for the Assistant: it reaches the API through its hive tools, with its own token.
         ...(workspace.isAssistantHome(projectPath) ? {} : this.apiEnv(projectPath, agent.id))
-      }))), this.binDir)
+      }))), this.binDir), tempDir)
     }
     const delivered = await adapter.prepareLaunch(ctx)
     times?.mark('prepareLaunch')

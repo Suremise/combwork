@@ -212,6 +212,21 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     await foldersHive.fill('')
     await foldersHive.press('Enter')
 
+    // --- Agents' temp folder (HI-2496): one folder, empty by default; two refused, saying it takes one; emptied, the default.
+    const temp = row('hive.agents.tempFolder')
+    const tempHive = temp.getByLabel("Hive: Agents' temp folder", { exact: true })
+    check("Agents' temp folder is listed, empty, with what it does", (await tempHive.inputValue()) === '' && /instead of Windows' Temp folder/.test(await temp.innerText()), await temp.innerText())
+    await tempHive.fill('%LOCALAPPDATA%\\hive-test\\agent-tmp')
+    await tempHive.press('Enter')
+    check('…a folder goes in advanced.json, its variable kept', !!(await lib.until(() => JSON.stringify(readFile().values['hive.agents.tempFolder']) === JSON.stringify(['%LOCALAPPDATA%\\hive-test\\agent-tmp']), HUNG_MS)), JSON.stringify(readFile().values['hive.agents.tempFolder']))
+    await temp.screenshot({ path: path.join(lib.WORK, 'advanced-tempfolder.png') })
+    await tempHive.fill('D:\\a; E:\\b')
+    await tempHive.press('Enter')
+    check("…two folders are refused, saying it takes one folder's full path", !!(await lib.until(async () => /takes one folder's full path/.test(await temp.innerText()), HUNG_MS)) && JSON.stringify(readFile().values['hive.agents.tempFolder']) === JSON.stringify(['%LOCALAPPDATA%\\hive-test\\agent-tmp']), await temp.innerText())
+    await tempHive.fill('')
+    await tempHive.press('Enter')
+    check('…emptied, it goes from advanced.json: the system Temp', !!(await lib.until(() => !('hive.agents.tempFolder' in readFile().values), HUNG_MS)), JSON.stringify(readFile().values))
+
     // Agents per project and its note moved to Version Control → Workflow (HI-2001): maxagents and agents24.
     check('Agents per project is no longer listed', (await page.locator('.advanced-row[data-advanced="hive.agents.perProject"]').count()) === 0)
 

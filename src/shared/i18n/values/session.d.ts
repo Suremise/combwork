@@ -179,6 +179,9 @@ interface HiveMessageValues {
   'session.start.slotChanged': { slot: string | number; agent: string | number }
   'session.start.slotSetup': { slot: string | number; agent: string | number }
   'session.start.subSession': { kind: string | number; provider: string | number }
+  'session.start.tempInside': { folder: string | number; inside: string | number }
+  'session.start.tempNotMade': { folder: string | number; why: string | number }
+  'session.start.tempUnset': { folder: string | number }
   'session.start.turnedOff': { provider: string | number; agent: string | number }
   'session.start.worktreeMissing': { agent: string | number; folder: string | number }
   'session.state.countIdle': { n: number }

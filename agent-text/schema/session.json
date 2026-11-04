@@ -468,6 +468,23 @@
       "provider": "plain"
     }
   },
+  "session.start.tempInside": {
+    "placeholders": {
+      "folder": "plain",
+      "inside": "plain"
+    }
+  },
+  "session.start.tempNotMade": {
+    "placeholders": {
+      "folder": "plain",
+      "why": "plain"
+    }
+  },
+  "session.start.tempUnset": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
   "session.start.turnedOff": {
     "placeholders": {
       "provider": "plain",

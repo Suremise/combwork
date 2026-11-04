@@ -831,6 +831,11 @@
       "title": "plain"
     }
   },
+  "settings.advanced.error.folder": {
+    "placeholders": {
+      "title": "plain"
+    }
+  },
   "settings.advanced.error.folders": {
     "placeholders": {
       "title": "plain",
@@ -874,6 +879,12 @@
     "placeholders": {}
   },
   "settings.advanced.hive.accounts.usageMoves.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.agents.tempFolder.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.hive.agents.tempFolder.title": {
     "placeholders": {}
   },
   "settings.advanced.hive.assistant.startView.desc": {
@@ -1423,6 +1434,9 @@
   "settings.advanced.takes.field": {
     "placeholders": {}
   },
+  "settings.advanced.takes.folder": {
+    "placeholders": {}
+  },
   "settings.advanced.takes.folders": {
     "placeholders": {}
   },
@@ -1711,6 +1725,11 @@
     }
   },
   "settings.agent.sensitive.agentApi": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "settings.agent.sensitive.agentTempFolder": {
     "placeholders": {
       "path": "plain"
     }

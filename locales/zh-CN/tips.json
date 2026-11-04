@@ -21,6 +21,8 @@
   "tips.agentStates.title": "一眼看清你的智能体",
   "tips.agentWorkflowRole.text": "每个智能体设置中的“工作流程中的角色”决定它是处理卡片、评审卡片还是两者均可。“启动通道”会据此列出构建者和评审者。",
   "tips.agentWorkflowRole.title": "构建者与评审者",
+  "tips.agentsTempFolder.text": "智能体工作时会把脚本和其他临时文件写入 Windows 的 Temp 文件夹。在“设置”→“高级”→“智能体临时文件夹”中指定一个你自己的文件夹（例如已排除在杀毒扫描之外的文件夹），每个智能体就会改为在那里获得一个文件夹。",
+  "tips.agentsTempFolder.title": "让智能体的临时文件不进 Windows 的 Temp",
   "tips.allKeysToCli.text": "在智能体的窗格中，Combwork 的快捷键会接收其按键。开启“设置”→“高级”→“所有按键都交给 CLI”，即可把所有按键都发给 CLI，命令面板（显示所有命令）的按键除外，以便每个命令都还能触达。",
   "tips.allKeysToCli.title": "把所有按键交给智能体的 CLI",
   "tips.alwaysOnTop.text": "标题栏中的图钉（或 Ctrl+Alt+O）让窗口保持在其他应用之上，测试运行或模拟器可以在下面继续工作。每个窗口各有一个图钉，并按工作区记住。",

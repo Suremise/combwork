@@ -1209,6 +1209,14 @@ export class WorkspaceService {
     return false
   }
 
+  /**
+   * Every agent folder this workspace knows outside its projects' own (lower-cased): their slots and retired homes as
+   * last read, 0.9 worktrees and worktrees noted unused, wherever they are (HI-2496: Agents' temp folder stays out of them).
+   */
+  knownRoots(): string[] {
+    return [...this.roots.keys(), ...this.unusedRoots.keys()]
+  }
+
   /** The project a worktree belongs to, or the project itself. */
   projectForRoot(p: string): string | null {
     if (this.isProjectPath(p)) return resolve(p)
