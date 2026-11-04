@@ -65,6 +65,7 @@ const cardColumns = (withProject: boolean): DataColumn<CardCost>[] => [
   {
     key: 'card',
     header: tr(M.card),
+    className: 'perf-name',
     cell: (c) => (
       <span className="perf-card-title">
         {cardLabelOf(get(), c.number)} {c.title}

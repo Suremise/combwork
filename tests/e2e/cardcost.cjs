@@ -171,6 +171,18 @@ const plain = (s) => (s ?? '').replace(/ /g, ' ')
   // Its title is in a field (innerText leaves it out): the card's own cost line says it is this one.
   check('a row opens its card', !!(await until(async () => (await dialog.count()) === 1 && (await line.count()) === 1 && (await dialog.locator('input').first().inputValue().catch(() => '')) === 'Cost per card', HUNG_MS)))
   await page.keyboard.press('Escape')
+  // At 900 px the card's name keeps a readable width (HI-2534): the table scrolls sideways rather than squeezing the
+  // title to a word a line.
+  await lib.fitWindow(app, page, { width: 900, height: 860 })
+  const titleCell = cardRow.locator('td').first()
+  const titleWidth = async () => (await titleCell.boundingBox())?.width ?? 0
+  check('narrow: the card column keeps its width', !!(await until(async () => (await titleWidth()) >= 180, HUNG_MS)), String(await titleWidth()))
+  for (const theme of ['light', 'dark']) {
+    await inv('settings:update', { appearance: { theme } })
+    await until(async () => (await page.locator(`html[data-theme="${theme}"]`).count()) === 1, HUNG_MS)
+    await cards.scrollIntoViewIfNeeded()
+    await page.screenshot({ path: path.join(shots, `performance-900-${theme}.png`) })
+  }
 
   for (const a of [b, r]) await inv('session:stop', alpha, a.id).catch(() => undefined)
   await app.close()
