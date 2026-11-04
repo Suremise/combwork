@@ -3324,7 +3324,7 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    fails here (#187). Team's merge checks always install clean.
    **Built [#1349]:** the runner (`queueChecks.ts`) runs each G9 check's configured command (OP-24) one after another
    in the queue's worktree, stopping at the first that isn't green, hidden, with a session command's environment (never
-   `ELECTRON_RUN_AS_NODE` or a session's `HIVE_*`), and ends its whole tree at a time limit (Advanced
+   `ELECTRON_RUN_AS_NODE` or a session's `CW_*`), and ends its whole tree at a time limit (Advanced
    `hive.queue.checkMinutes`, 90 minutes). Each check is a progress run of `source: 'hive'` ("Combwork (merge queue)"),
    titled "AM-12 · typecheck · a3f2c1d", with its output in a bounded log (its first 2 MB and last 64 KB). The queue
    brackets each one and writes `CheckRan` at the **result** revision: green only if it exited 0 **and** counted (§16.13:
@@ -4196,7 +4196,7 @@ Whether a conversation may resume there is its **hold** (none: it may):
     Assistant's `cw_release_slot` (`list`, `release`) tells it to get the user's agreement before a writer's release;
     the scenario `assistant-release-slot` has it release a slot whose Hive crashed once the user agrees.
 - **Its environment:** `CW_SLOT` and `CW_SLOT_PORT_BASE` (#1429's `slotEnv`) while it runs in a slot; like every
-  `HIVE_*`, never inherited.
+  `CW_*`, never inherited.
 - **Refused, with offers:** the window says why and offers **Read Transcript** (the Sessions tab, on it) and **Start
   Fresh with a Handover** (Hand Over to… for its agent; the new conversation starts where the agent works now).
 - **Resume All and startup** use `canResumeNow` only: the rest are left and listed after them ("B1 — resume by hand",

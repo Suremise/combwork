@@ -94,7 +94,7 @@ was started, or the suite fails, naming the lines. The Sandbox checks run with t
 Nor does a test ever start the installed app (`%LOCALAPPDATA%\Programs\Combwork`, or 1.0's `Programs\Hive`): `lib.cjs` refuses it and any exe
 outside this checkout, the test folders, the main checkout's `dist\win-unpacked`, `HIVE_E2E_HIVE09` and `HIVE_EXE`. And
 children of the run context get no `%APPDATA%\Combwork\bin` or `Combwork-Dev\bin` (nor 1.0's `Hive\bin`, `Hive-Dev\bin`) on their PATH (an agent session has them):
-those `hive-progress` shims run the installed exe. A `hive-progress` run seen in a process list is itself
+those `cw-progress` shims run the installed exe. A `cw-progress` run seen in a process list is itself
 `Programs\Combwork\Combwork.exe` (1.0's `Programs\Hive\Hive.exe`; as Node, no window), not the app.
 
 **Several at once.** Suites run four at a time (`--jobs N` for another number; `--jobs 1` runs them one after
@@ -140,13 +140,13 @@ a run uses of its own comes from one place, `runContext.cjs` (with `lanes.mjs` f
 for the build), and the e2e runner, `lib.cjs` and the scenario harness all take it from there.
 
 - **Environments are built from an allowlist.** A suite (from the runner), a test copy of Hive (`lib.hiveEnv({
-  HIVE_USER_DATA, … })`, which `lib.launch()` uses) and a child that is part of Hive, such as the hive MCP server or the
-  `hive-progress` wrapper (`lib.childEnv({ … })`), get Windows' own variables, the user's folders and the network's
+  HIVE_USER_DATA, … })`, which `lib.launch()` uses) and a child that is part of Hive, such as the combwork MCP server or the
+  `cw-progress` wrapper (`lib.childEnv({ … })`), get Windows' own variables, the user's folders and the network's
   proxy and certificates (`ALLOW`), plus what the context sets: the profile, quiet and tips off, the suite's folder
   (`HIVE_E2E_DIR`) and port (`HIVE_E2E_PORT`, which a test Hive gets as `HIVE_API_PORT`), the CLI test homes a suite
-  names. Nothing else of the parent's: not an agent session's `HIVE_*` variables or an outer `hive-progress`'s
-  `HIVE_PROGRESS_*`, not `NO_COLOR`/`FORCE_COLOR`, `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS`, `CLAUDE_*` or `ANTHROPIC_*`
-  (the real tier uses the CLIs' own sign-in) or `GIT_*`. So a run started from an agent's shell inside `hive-progress`
+  names. Nothing else of the parent's: not an agent session's `CW_*` variables or an outer `cw-progress`'s
+  `CW_PROGRESS_*`, not `NO_COLOR`/`FORCE_COLOR`, `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS`, `CLAUDE_*` or `ANTHROPIC_*`
+  (the real tier uses the CLIs' own sign-in) or `GIT_*`. So a run started from an agent's shell inside `cw-progress`
   behaves as one started from a plain one, and there is no strip list to keep growing.
 - **Test settings are passed on by name** (`PASS_ENV`, each with what it is for): `HIVE_TEST_CODEX_HOME`,
   `HIVE_TEST_CLAUDE_HOME`, `HIVE_TEST_QUIET` (`0` shows the copies), `HIVE_TEST_PROGRESS_TIMINGS`,
@@ -190,7 +190,7 @@ for the build), and the e2e runner, `lib.cjs` and the scenario harness all take 
   another runner's build`) and find it fresh. A runner that only checks waits too, so it never reads half a build. A
   lock whose runner is gone is broken; a failed build lets go of it. Worktrees don't wait for each other.
 
-`isolation` checks what a suite, a test Hive, a child and the `hive-progress` wrapper get, with an agent shell's
+`isolation` checks what a suite, a test Hive, a child and the `cw-progress` wrapper get, with an agent shell's
 variables put into the suite's own environment. **`npm run e2e:concurrency`** (`concurrency.mjs`, `--repeat N`) starts
 four runs at once with both builds stale: an e2e runner and a scenario run in this worktree, two e2e runners in a
 second worktree it makes for the check (a git worktree of `HEAD` with the uncommitted changes, sharing `node_modules`
@@ -362,11 +362,11 @@ suite, so an e2e suite or scenario must never load a `.ts` helper from `tests/` 
 **Progress in Hive.** Run from an agent's session in Hive, the runner shows in that Hive's Progress panel: **e2e: N
 suites**, a step per suite, and the time left from how long each suite took before (kept in
 `%LOCALAPPDATA%\hive-test\progress-timings.json`). `npm test` does the same, a step per test file. It reports to the
-Hive that launched the agent, never to the test copies the suites start (the session's `HIVE_*` variables aren't
+Hive that launched the agent, never to the test copies the suites start (the session's `CW_*` variables aren't
 passed to them), and it never changes the output or the results. Turn it off with `--no-progress` (e2e) or
 `CW_PROGRESS=0` (both). The reporting is all in `tests/progressReport.mts`.
 
-`packaged-progress` checks the `hive-progress` wrapper as installed (`dist/win-unpacked`), against a stand-in for the
+`packaged-progress` checks the `cw-progress` wrapper as installed (`dist/win-unpacked`), against a stand-in for the
 Agent API; `HIVE_PROGRESS_CHECK_DEV=1 node tests/e2e/packaged-progress.cjs` checks the dev build's copy.
 
 ### Contract tests: what a CLI sends Hive
@@ -719,7 +719,7 @@ card is Done.
 
 Start from an existing suite and use `lib.cjs`:
 - `hiveEnv({ HIVE_USER_DATA, … })` as the environment of every test Hive it starts (or `launch()`), `childEnv({ … })`
-  for a child that is part of Hive (the hive MCP server, `hive-progress`); never `process.env` (Run context, above);
+  for a child that is part of Hive (the combwork MCP server, `cw-progress`); never `process.env` (Run context, above);
 - `port(<default>)` for its Agent API port (never a fixed number, so it can run beside others); add it to an area in
   `affected.mjs` and to `suites.mjs` (sorted), with `serial: '<why>'` if it can't run beside others;
 - `until(fn, ms)` to wait for what you expect to see, never a fixed `sleep()` and then a check, nor a single read just

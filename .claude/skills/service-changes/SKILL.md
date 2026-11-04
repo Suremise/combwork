@@ -1,11 +1,11 @@
 ---
 name: service-changes
-description: Hive's rules for risky changes to its main process - workspaces and windows, project scope and access checks, locking, storage and clean-up, cancellation, transcripts and bounded resources. Use when developing or reviewing Hive and a change touches src/main services, the Agent API or hive tools, files under .combwork, or anything several windows, agents or processes can do at once.
+description: Hive's rules for risky changes to its main process - workspaces and windows, project scope and access checks, locking, storage and clean-up, cancellation, transcripts and bounded resources. Use when developing or reviewing Hive and a change touches src/main services, the Agent API or cw_ tools, files under .combwork, or anything several windows, agents or processes can do at once.
 ---
 
 # Changing Hive's services
 
-The workspace's shared note `conventions/engineering-quality.md` (`hive_read_shared_note`) applies to every change, and [ARCHITECTURE.md](../../../docs/ARCHITECTURE.md) says where things live. Read the parts of this list your change touches. Each item is something that has gone wrong before.
+The workspace's shared note `conventions/engineering-quality.md` (`cw_read_shared_note`) applies to every change, and [ARCHITECTURE.md](../../../docs/ARCHITECTURE.md) says where things live. Read the parts of this list your change touches. Each item is something that has gone wrong before.
 
 ## Workspaces and windows
 
