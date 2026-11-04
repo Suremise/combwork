@@ -176,7 +176,7 @@
   "tips.connections.title": "Ejecuta agentes con distintos inicios de sesión",
   "tips.consoleRecording.text": "En la consola de desarrollador, Grabar escribe en un archivo lo que la CLI de un agente envía a Combwork, con los datos sensibles ocultos salvo que marques el texto para esa grabación, y Copiar diagnóstico puede adjuntarlo a un informe de error.",
   "tips.consoleRecording.title": "Graba lo que envía una CLI",
-  "tips.consoleText.text": "Configuración → Avanzado → Consola de desarrollador: mostrar el texto de prompts, respuestas y comandos los muestra en la consola de desarrollador, bajo un banner que lo indica, y marca el texto para las grabaciones nuevas. Los tokens y los inicios de sesión siguen ocultos, y hive_console de los agentes sigue ocultando los datos sensibles.",
+  "tips.consoleText.text": "Configuración → Avanzado → Consola de desarrollador: mostrar el texto de prompts, respuestas y comandos los muestra en la consola de desarrollador, bajo un banner que lo indica, y marca el texto para las grabaciones nuevas. Los tokens y los inicios de sesión siguen ocultos, y cw_console de los agentes sigue ocultando los datos sensibles.",
   "tips.consoleText.title": "Ve el texto en la consola de desarrollador",
   "tips.copilot.text": "Los agentes pueden usar la CLI de GitHub Copilot, incluido Copilot Free. Configuración de proveedores la instala y dice con qué cuenta tiene la sesión iniciada: su propio inicio de sesión o el de la CLI de GitHub.",
   "tips.copilot.title": "Ejecuta agentes con GitHub Copilot",

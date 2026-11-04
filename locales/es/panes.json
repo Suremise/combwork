@@ -129,7 +129,7 @@
   "panes.messages.notDeliveredDetail": "No está inactivo, o estás escribiendo en su terminal. Sus mensajes se quedan en su bandeja de entrada: vuelve a intentarlo cuando esté inactivo.",
   "panes.messages.overdue": "{n, plural, one {# atrasado} many {# atrasados} other {# atrasados}}",
   "panes.messages.overdueTip": "{n, plural, one {Una entrega no se confirmó a tiempo: el agente no ha dicho que actuara en consecuencia.} many {# entregas no se confirmaron a tiempo: el agente no ha dicho que actuara en consecuencia.} other {# entregas no se confirmaron a tiempo: el agente no ha dicho que actuara en consecuencia.}}",
-  "panes.messages.tip": "{n, plural, one {Un mensaje} many {# mensajes} other {# mensajes}} para el agente {agent} que todavía no ha obtenido ni confirmado: se le ofrece como su siguiente línea cuando esté inactivo, o puede leerse con hive_inbox.",
+  "panes.messages.tip": "{n, plural, one {Un mensaje} many {# mensajes} other {# mensajes}} para el agente {agent} que todavía no ha obtenido ni confirmado: se le ofrece como su siguiente línea cuando esté inactivo, o puede leerse con cw_inbox.",
   "panes.messages.tipNoWakes": "{n, plural, one {Un mensaje} many {# mensajes} other {# mensajes}} para el agente {agent} que todavía no ha obtenido ni confirmado",
   "panes.messages.unread": "{n, plural, one {# sin leer} many {# sin leer} other {# sin leer}}",
   "panes.pages.agentsTip": "{button, select, none {Página {page}} other {{button} (página {page})}}: {agents}{added, select, yes {, con un agente que agregó el Asistente} other {}}{key, select, none {} other { ({key} para la página siguiente)}}",

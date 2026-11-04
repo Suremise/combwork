@@ -612,7 +612,7 @@ export function AgentSettingsDialog() {
         return confirm({
           title: tr(msg({ id: 'agents.switch.title', defaultMessage: 'Switch {agent} to {cli}?', description: "Title of the confirmation before an agent ({agent}) changes provider ({cli}: the new CLI's name)." }), { agent: agent.name, cli: providerDescriptor(cli).name }),
           message: tr(msg({ id: 'agents.switch.message', defaultMessage: "Its conversations stay in the Sessions tab, but {cli} can't resume {was} conversations, so {agent} starts fresh next time.", description: "The confirmation before an agent ({agent}) changes provider: the new CLI ({cli}) can't resume the old one's ({was}) conversations." }), { agent: agent.name, cli: providerDescriptor(cli).name, was: providerDescriptor(current).name }),
-          detail: tr(msg({ id: 'agents.switch.detail', defaultMessage: 'To carry the work over, ask the agent for a handover before switching (Combwork MCP: hive_create_handover), then ask the new agent to read it.', description: 'Under the confirmation before an agent changes provider. hive_create_handover is a tool name: keep it.' })),
+          detail: tr(msg({ id: 'agents.switch.detail', defaultMessage: 'To carry the work over, ask the agent for a handover before switching (Combwork MCP: cw_create_handover), then ask the new agent to read it.', description: 'Under the confirmation before an agent changes provider. cw_create_handover is a tool name: keep it.' })),
           confirmLabel: tr(msg({ id: 'agents.switch.confirm', defaultMessage: 'Switch', description: "Button: changes the agent's provider. Keep it short." }))
         })
       }}
@@ -688,7 +688,7 @@ export function TemplateAgentDialog() {
 
 /**
  * Hands one agent's work to another, of any provider. Conversations can't move between providers,
- * so the source writes a handover (Hive's hive_create_handover tool) and the target reads it. The agent
+ * so the source writes a handover (Hive's cw_create_handover tool) and the target reads it. The agent
  * itself can be the target: it carries on in a new conversation (a long transcript made short again).
  */
 export function HandOverDialog() {

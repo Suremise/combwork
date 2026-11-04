@@ -79,7 +79,7 @@ describe('hook tokens per launch (#345)', () => {
     // Synthetic secrets: a workspace MCP server's env and header, and the env of a user's --settings.
     const SECRETS = ['SYNTHETIC-MCP-ENV-SECRET', 'SYNTHETIC-MCP-HEADER-SECRET', 'SYNTHETIC-SETTINGS-ENV-SECRET']
     const mcpServers = {
-      hive: { command: 'node', args: ['hive-mcp.js'], env: { HIVE_API_TOKEN_FILE: join(userData, 'agent-api', 'x.json') } },
+      combwork: { command: 'node', args: ['cw-mcp.js'], env: { CW_API_TOKEN_FILE: join(userData, 'agent-api', 'x.json') } },
       third: { command: 'node', args: ['server.js'], env: { API_KEY: SECRETS[0] } },
       remote: { type: 'http', url: 'https://mcp.example/x', headers: { Authorization: `Bearer ${SECRETS[1]}` } }
     }
@@ -91,7 +91,7 @@ describe('hook tokens per launch (#345)', () => {
         resume: false, name: '', skills: [{ name: 'demo', sourcePath: skill }], mcpServers,
         model: null, effort: null, permissionMode: null, extraArgs: adapter === claudeCode ? ['--settings', JSON.stringify({ env: { MY_API_KEY: SECRETS[2] } })] : [],
         hookUrl: `http://127.0.0.1:9/hook?run=${runId}`, hookAuthFile: auth.file, privateDir: auth.dir, guidance: 'Guidance.',
-        env: { HIVE_HOOK_TOKEN: auth.token }, allowBackgroundSessions: false, use200kContext: false
+        env: { CW_HOOK_TOKEN: auth.token }, allowBackgroundSessions: false, use200kContext: false
       }
       await adapter.prepareLaunch(ctx as never)
       const cmd = adapter.buildCommand(ctx.executable, ctx as never)

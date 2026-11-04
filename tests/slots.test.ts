@@ -194,7 +194,7 @@ function world(o: { setup?: string; builders?: number } = {}): World {
 }
 
 /** The setup command the tests use: writes the slot's environment into warm/env.txt (git-ignored). */
-const WRITE_ENV = `node -e "require('fs').mkdirSync('warm',{recursive:true});require('fs').writeFileSync('warm/env.txt',process.env.HIVE_SLOT+' '+process.env.HIVE_SLOT_PORT_BASE)"`
+const WRITE_ENV = `node -e "require('fs').mkdirSync('warm',{recursive:true});require('fs').writeFileSync('warm/env.txt',process.env.CW_SLOT+' '+process.env.CW_SLOT_PORT_BASE)"`
 
 const listed = (w: World): string[] =>
   sh(w.project, 'worktree', 'list', '--porcelain')
@@ -734,7 +734,7 @@ describe('the pool (#1429)', { timeout: 60_000 }, () => {
     mkdirSync(join(root, 'queue-0123456789ab-1f'))
     expect(nextSlotName(new Set(['slot-a']), root)).toBe('slot-c')
     expect(nextSlotName(new Set(), root)).toBe('slot-a')
-    expect(slotEnv({ name: 'slot-c', portBase: 41020 })).toEqual({ HIVE_SLOT: 'slot-c', HIVE_SLOT_PORT_BASE: '41020' })
+    expect(slotEnv({ name: 'slot-c', portBase: 41020 })).toEqual({ CW_SLOT: 'slot-c', CW_SLOT_PORT_BASE: '41020' })
   })
 
   it('a slot gone from disk is recreated when next lent, and marked gone while leased', async () => {
@@ -934,7 +934,7 @@ describe('guarded clean-up (#1429)', { timeout: 90_000 }, () => {
     expect(await w.pool.remove('slot-a')).toMatchObject({ why: 'archiveFailed', error: 'exited with code 2' })
     expect(existsSync(folder)).toBe(true)
     expect(w.store.slot('slot-a')?.state).toBe('ready')
-    w.opts.archive = `node -e "require('fs').writeFileSync(${JSON.stringify(join(tempDir('slots-archive-'), 'ran.txt')).replace(/"/g, "'")}, process.env.HIVE_SLOT)"`
+    w.opts.archive = `node -e "require('fs').writeFileSync(${JSON.stringify(join(tempDir('slots-archive-'), 'ran.txt')).replace(/"/g, "'")}, process.env.CW_SLOT)"`
     expect(await w.pool.remove('slot-a')).toBeNull()
     expect(w.runs.filter((r) => r.what === 'archive').map((r) => r.ok)).toEqual([false, true])
     expect(existsSync(folder)).toBe(false)

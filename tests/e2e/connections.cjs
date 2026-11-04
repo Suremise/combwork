@@ -107,12 +107,12 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     await inv('agents:update', alpha, 'a-two', { connection: max2.id })
     await inv('session:start', alpha, { agentId: 'a-one' })
     await inv('session:start', alpha, { agentId: 'a-two' })
-    check('One launches on the default connection, Max 1', !!(await lib.until(async () => launchedIn(max1.id).some((l) => l.env.HIVE_AGENT === 'One'), HUNG_MS)))
-    check('…Two on its own, Max 2, at the same time', !!(await lib.until(async () => launchedIn(max2.id).some((l) => l.env.HIVE_AGENT === 'Two'), HUNG_MS)))
+    check('One launches on the default connection, Max 1', !!(await lib.until(async () => launchedIn(max1.id).some((l) => l.env.CW_AGENT === 'One'), HUNG_MS)))
+    check('…Two on its own, Max 2, at the same time', !!(await lib.until(async () => launchedIn(max2.id).some((l) => l.env.CW_AGENT === 'Two'), HUNG_MS)))
     check('…each with its connection’s folder as its home', launchedIn(max1.id).every((l) => l.env.CLAUDE_CONFIG_DIR === path.join(accountsRoot, max1.id)))
     // Its auto memory by its real path (HI-1899): the connection's projects folder is a junction to the CLI home's, and
     // the launch names exactly that project's memory folder there, allowing nothing more.
-    const oneLaunch = launchedIn(max1.id).find((l) => l.env.HIVE_AGENT === 'One')
+    const oneLaunch = launchedIn(max1.id).find((l) => l.env.CW_AGENT === 'One')
     const oneSettings = oneLaunch?.opts['--settings'] ? JSON.parse(fs.readFileSync(oneLaunch.opts['--settings'], 'utf8')) : {}
     const linkedProjects = fs.realpathSync(path.join(accountsRoot, max1.id, 'projects'))
     const memoryDir = path.join(linkedProjects, alpha.replace(/[^a-zA-Z0-9]/g, '-'), 'memory')
@@ -145,7 +145,7 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     await inv2('connections:setOn', max2.id, true)
     await inv2('connections:setOn', max1.id, false)
     await inv2('session:start', beta, { agentId: 'b-one' })
-    check('the second window’s agent runs on its own workspace’s connection, Max 2', !!(await lib.until(async () => launchedIn(max2.id).some((l) => l.env.HIVE_AGENT === 'Beta One'), HUNG_MS)))
+    check('the second window’s agent runs on its own workspace’s connection, Max 2', !!(await lib.until(async () => launchedIn(max2.id).some((l) => l.env.CW_AGENT === 'Beta One'), HUNG_MS)))
     check('…while the first window’s agents keep theirs', (await live('a-one'))?.launchedConnection?.id === max1.id)
     await inv2('session:stop', beta, 'b-one')
     await p2.close()
@@ -167,7 +167,7 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     const order = async () => (await inv('connections:list')).connections.filter((c) => c.provider === 'claude-code').map((c) => c.id)
     const usedHere = async () => (await inv('connections:list')).workspace['claude-code']?.default
     const onHere = async () => (await inv('connections:list')).workspace['claude-code']?.on ?? []
-    const oneLaunches = (id) => launchedIn(id).filter((l) => l.env.HIVE_AGENT === 'One').length
+    const oneLaunches = (id) => launchedIn(id).filter((l) => l.env.CW_AGENT === 'One').length
     const relaunchOne = async () => {
       await inv('session:stop', alpha, 'a-one')
       await lib.until(async () => !(await live('a-one')), HUNG_MS)

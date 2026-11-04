@@ -249,9 +249,9 @@ function stateOf(a: ActivityAgent): ActivityState {
 
 /**
  * Whether a process is the agent's own plumbing, not something it runs (HI-1743): its CLI and the terminal hosting it
- * (Stop's tracking marks them), and Hive's tool server for it (hive-mcp.js), always there and saying nothing.
+ * (Stop's tracking marks them), and Combwork's tool server for it (cw-mcp.js; hive-mcp.js before HI-2463), always there and saying nothing.
  */
-export const ownProcess = (p: ActivityProcess, cli: ReadonlySet<number>): boolean => cli.has(p.pid) || /\bhive-mcp\.js\b/i.test(p.command ?? p.label)
+export const ownProcess = (p: ActivityProcess, cli: ReadonlySet<number>): boolean => cli.has(p.pid) || /\b(?:cw|hive)-mcp\.js\b/i.test(p.command ?? p.label)
 
 /** Whether something the agent started runs: a process of its launch that isn't its own plumbing, or a background task. */
 function running(id: string, now: ActivityNow): boolean {

@@ -141,6 +141,8 @@
   "session.purge.reading": "O Combwork está lendo a transcrição dela (uma exportação ou uma pesquisa). Tente de novo em instantes.",
   "session.purge.running": "Ela está em execução.",
   "session.purge.unread": "O Combwork não conseguiu registrar o que a sessão usou, então ela é mantida.",
+  "session.renamedFresh.body": "{n, plural, one {# conversa começou} other {# conversas começaram}} do zero: o Combwork renomeou as ferramentas que os agentes usam, então uma conversa de antes não pode continuar. As anteriores ficam em Sessões para ler.",
+  "session.renamedFresh.title": "Os agentes começaram novas conversas",
   "session.restartMode.didntStop": "O agente {agent} não parou a tempo, então não foi reiniciado no novo modo. Tente de novo quando ele tiver parado.",
   "session.setup.failed": "O comando de preparação terminou com o código {code}. A saída está no terminal do agente. Corrija e inicie o agente de novo, ou inicie-o sem a preparação.",
   "session.setup.failedTitle": "{project} · {agent}: falha na preparação",

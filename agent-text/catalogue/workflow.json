@@ -54,6 +54,14 @@
     "note": "Why workflow options cannot be saved: “Slots are brought up to date before each card” (G15) was set while everyone works in the project folder (glossary 2.5: slot).",
     "audience": "both"
   },
+  "workflow.focused.programMissing": {
+    "text": "Combwork couldn't find the program this command starts: {command}",
+    "note": "The focused-test picker's diagnostics: its command's program isn't found. command: the command as written."
+  },
+  "workflow.focused.resultsUnread": {
+    "text": "Combwork couldn't take its results: {why}.",
+    "note": "A check's output: the focused tests' runner wrote results that couldn't be read. why: what was wrong with them."
+  },
   "workflow.forYou.decidedAfterMerge": {
     "text": "{card} was decided after it merged: does it need a follow-up?",
     "note": "A For you request (Decide): a decision was recorded on the card while its work was being merged, so the merged work didn't see it. {card} is a card key like AM-12.",
@@ -765,8 +773,8 @@
     "audience": "both"
   },
   "workflow.refused.move.doingNobody.next": {
-    "text": "{reader, select, you {Choose nobody on it, an agent on it, or an agent started on it.} other {Ask the user which they want: nobody on it (move it again with override and their reason), an agent on it (agent), or an agent started on it (hive_start_task).}}",
-    "note": "The next step after the Assistant's move into Active was refused for leaving nobody on the card: the user chooses nobody on it, an agent given the card, or an agent started on it. override, agent and hive_start_task are names of a call's fields and a tool: keep them as they are. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences.",
+    "text": "{reader, select, you {Choose nobody on it, an agent on it, or an agent started on it.} other {Ask the user which they want: nobody on it (move it again with override and their reason), an agent on it (agent), or an agent started on it (cw_start_task).}}",
+    "note": "The next step after the Assistant's move into Active was refused for leaving nobody on the card: the user chooses nobody on it, an agent given the card, or an agent started on it. override, agent and cw_start_task are names of a call's fields and a tool: keep them as they are. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences.",
     "audience": "both"
   },
   "workflow.refused.move.needsOverride.change": {
@@ -880,7 +888,7 @@
     "audience": "both"
   },
   "workflow.refused.review.headMoved.next": {
-    "text": "A commit you asked for: ask its builder to submit {head} as a follow-up (hive_request_builder), which keeps it in Review with no round counted, then start your review again. Otherwise give a failing verdict saying so (hive_verdict, pass: false), and its builder submits it as the next round.",
+    "text": "A commit you asked for: ask its builder to submit {head} as a follow-up (cw_request_builder), which keeps it in Review with no round counted, then start your review again. Otherwise give a failing verdict saying so (cw_verdict, pass: false), and its builder submits it as the next round.",
     "note": "The next step after a pass refused because the branch moved on (HI-1763, HI-1832): a commit the reviewer asked for is submitted by the builder as a follow-up (the card stays in Review, no round counted) and reviewed again; any other is failed so the builder submits it as a new round. {head} is a commit's short hash; keep the tool names and the argument as they are.",
     "audience": "both"
   },
@@ -1000,8 +1008,8 @@
     "audience": "both"
   },
   "workflow.refused.submit.empty.next": {
-    "text": "{changes, select, yes {Commit the card's work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing.} none {Its folder has no changes either. A card that needs none (it only runs or checks something, or its work is already there) is no-code: ask for that with hive_ask_user (action noCode), or hive_ask_assistant where it's already decided. Otherwise make its change, commit it and submit again.} other {Commit the card's work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. A card that needs no change is no-code: ask for that with hive_ask_user (action noCode).}}",
-    "note": "The next step after a refused submit for review with nothing committed (HI-2227, HI-2257). {changes} (select): yes when the card's folder has uncommitted changes (an agent doing the card commits them; one asked only to submit it asks the user first), none when it has none (a card needing no change is made no-code by the user, asked with the tools named), other when unknown. hive_ask_user, hive_ask_assistant and noCode are names of tools and an option: keep them as they are; translate each branch's whole sentences.",
+    "text": "{changes, select, yes {Commit the card's work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing.} none {Its folder has no changes either. A card that needs none (it only runs or checks something, or its work is already there) is no-code: ask for that with cw_ask_user (action noCode), or cw_ask_assistant where it's already decided. Otherwise make its change, commit it and submit again.} other {Commit the card's work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. A card that needs no change is no-code: ask for that with cw_ask_user (action noCode).}}",
+    "note": "The next step after a refused submit for review with nothing committed (HI-2227, HI-2257). {changes} (select): yes when the card's folder has uncommitted changes (an agent doing the card commits them; one asked only to submit it asks the user first), none when it has none (a card needing no change is made no-code by the user, asked with the tools named), other when unknown. cw_ask_user, cw_ask_assistant and noCode are names of tools and an option: keep them as they are; translate each branch's whole sentences.",
     "audience": "both"
   },
   "workflow.refused.submit.focusedChosen.change": {

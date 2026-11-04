@@ -15,24 +15,24 @@ export interface ProgressTarget {
 }
 
 /**
- * The Hive this process can report to, or null: outside Hive, without the Agent API, turned off with HIVE_PROGRESS=0,
- * or inside a command hive-progress runs (HIVE_PROGRESS_WRAPPED=1), whose run is the wrapper's: a report of its own
+ * The Hive this process can report to, or null: outside Hive, without the Agent API, turned off with CW_PROGRESS=0,
+ * or inside a command hive-progress runs (CW_PROGRESS_WRAPPED=1), whose run is the wrapper's: a report of its own
  * would be a second row (it prints step lines instead, `wrappedLines`). The token is the agent's own, from the file Hive
- * keeps it in (HIVE_API_TOKEN_FILE), never from HIVE_API_TOKEN (HI-2262: sessions no longer get it).
+ * keeps it in (CW_API_TOKEN_FILE), never from HIVE_API_TOKEN (HI-2262: sessions no longer get it).
  */
 export function progressTarget(env: Record<string, string | undefined> = process.env): ProgressTarget | null {
-  if (env.HIVE_PROGRESS === '0' || env.HIVE_PROGRESS_WRAPPED === '1') return null
-  const url = env.HIVE_API_URL?.replace(/\/+$/, '')
+  if (env.CW_PROGRESS === '0' || env.CW_PROGRESS_WRAPPED === '1') return null
+  const url = env.CW_API_URL?.replace(/\/+$/, '')
   if (!url) return null
   let token = ''
-  if (env.HIVE_API_TOKEN_FILE) {
+  if (env.CW_API_TOKEN_FILE) {
     try {
-      token = String(JSON.parse(readFileSync(env.HIVE_API_TOKEN_FILE, 'utf8')).token ?? '')
+      token = String(JSON.parse(readFileSync(env.CW_API_TOKEN_FILE, 'utf8')).token ?? '')
     } catch {
       token = ''
     }
   }
-  return token ? { url, token, workspace: env.HIVE_WORKSPACE ?? '' } : null
+  return token ? { url, token, workspace: env.CW_WORKSPACE ?? '' } : null
 }
 
 /**
@@ -40,7 +40,7 @@ export function progressTarget(env: Record<string, string | undefined> = process
  * instead of reporting a run of its own. Undefined otherwise.
  */
 export function wrappedLines(env: Record<string, string | undefined> = process.env): ((line: string) => void) | undefined {
-  return env.HIVE_PROGRESS_WRAPPED === '1' && env.HIVE_PROGRESS !== '0' ? (line) => void process.stdout.write(`${line}\n`) : undefined
+  return env.CW_PROGRESS_WRAPPED === '1' && env.CW_PROGRESS !== '0' ? (line) => void process.stdout.write(`${line}\n`) : undefined
 }
 
 // The API's terms (#136): `step` counts the steps finished (0 at the start, `total` at the end) and `stepName` names the
@@ -170,7 +170,7 @@ export class ProgressRun {
     this.lines = target ? undefined : opts.lines
     if (this.lines && total !== undefined) this.line(step ?? 0, start.stepName, total)
     // agent-protocol: a step line the wrapper parses (stepLine), never shown
-    if (this.lines && start.waiting) this.lines(`##hive-progress wait=${clip(start.waiting, MAX_TITLE)}`)
+    if (this.lines && start.waiting) this.lines(`##cw-progress wait=${clip(start.waiting, MAX_TITLE)}`)
   }
 
   /** A step line: `step` counts the steps finished (the API's terms); the line names the one starting, from 1. */
@@ -179,7 +179,7 @@ export class ProgressRun {
     if (starting === this.lineStep && name === undefined && total === undefined) return
     this.lineStep = starting
     // agent-protocol: a step line the wrapper parses (stepLine), never shown
-    this.lines!(`##hive-progress step=${starting}${total !== undefined ? ` total=${total}` : ''}${name ? ` name=${clip(name, MAX_TITLE)}` : ''}`)
+    this.lines!(`##cw-progress step=${starting}${total !== undefined ? ` total=${total}` : ''}${name ? ` name=${clip(name, MAX_TITLE)}` : ''}`)
   }
 
   /** Whether it is being reported (Hive took the start). */
@@ -195,7 +195,7 @@ export class ProgressRun {
     }
     if (this.lines && !this.finished) {
       // agent-protocol: a step line the wrapper parses (stepLine), never shown
-      if (u.waiting !== undefined) this.lines(`##hive-progress wait=${clip(u.waiting, MAX_TITLE)}`.trimEnd())
+      if (u.waiting !== undefined) this.lines(`##cw-progress wait=${clip(u.waiting, MAX_TITLE)}`.trimEnd())
       const step = count(u.step, this.maxStep)
       if (step !== undefined || u.stepName !== undefined || total !== undefined) this.line(step ?? Math.max(0, this.lineStep - 1), u.stepName, total)
       return
@@ -241,7 +241,7 @@ export class ProgressRun {
    */
   async finish(ok: boolean, summary?: string, finishWaitMs = 3000, more: ProgressFinishMore = {}, retry?: number): Promise<unknown> {
     // agent-protocol: a step line the wrapper parses (stepLine), never shown
-    if (this.lines && more.logPath && !this.finished) this.lines(`##hive-progress log=${clip(more.logPath, MAX_LOG_PATH)}`)
+    if (this.lines && more.logPath && !this.finished) this.lines(`##cw-progress log=${clip(more.logPath, MAX_LOG_PATH)}`)
     if (!this.target || this.finished) return null
     this.finished = true
     if (this.timer) clearTimeout(this.timer)

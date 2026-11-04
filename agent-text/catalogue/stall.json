@@ -40,11 +40,11 @@
     "note": "A lane deadlocked: its reviewer waits for a card before this one in the lane, while its builder waits for this card's verdict. waited: a duration (stall.duration.*)."
   },
   "stall.loop.designWait": {
-    "text": "{builder} posted a design on {card} for its reviewer to check and has waited {waited}: nobody has answered it, and it hasn't gone ahead as posted (hive_loop_step proceed).",
+    "text": "{builder} posted a design on {card} for its reviewer to check and has waited {waited}: nobody has answered it, and it hasn't gone ahead as posted (cw_loop_step proceed).",
     "note": "#1382: the builder posted a design for its reviewer to check before building; nobody answered, and it didn't go ahead once its wait was over. waited: a duration (stall.duration.*)."
   },
   "stall.loop.followUpWait": {
-    "text": "{builder} posted a follow-up on {card} for its reviewer to check and has waited {waited}: nobody has answered it (hive_loop_step ok or gaps).",
+    "text": "{builder} posted a follow-up on {card} for its reviewer to check and has waited {waited}: nobody has answered it (cw_loop_step ok or gaps).",
     "note": "#1467: the builder posted a follow-up for its reviewer to check, and nobody answered. waited: a duration (stall.duration.*)."
   },
   "stall.loop.notWatching": {
@@ -52,7 +52,7 @@
     "note": "#376: the agent looping on the card ended its turn with no card watch, so nothing wakes it."
   },
   "stall.loop.wakeUntaken": {
-    "text": "{agent} hasn't taken the wake Hive typed for {card}: it waits in its prompt.",
+    "text": "{agent} hasn't taken the wake Combwork typed for {card}: it waits in its prompt.",
     "note": "#777: the agent watched the card, and its wake waits untaken in its prompt (its CLI didn't take the line)."
   },
   "stall.review.noVerdict": {

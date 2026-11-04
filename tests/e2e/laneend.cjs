@@ -2,7 +2,7 @@
 // 1. B1's lane is lent slot-a and B1 starts in it; B1 is mid-turn when the lane ends: its session goes on, and Hive
 //    waits ("waiting: it is in a turn"), its slot still B1's.
 // 2. The turn ends: B1 is told at its Stop (the drain) that the lane is finished, with its card, reads it with
-//    hive_inbox, and its turn ends. Then Hive types /exit, and B1's CLI exits by itself (code 0): no pty kill for it.
+//    cw_inbox, and its turn ends. Then Hive types /exit, and B1's CLI exits by itself (code 0): no pty kill for it.
 // 3. Only then is slot-a free (no writer, no lease).
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -45,7 +45,7 @@ const transcripts = () => {
   lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   const env = lib.fakeClaude(userData, home, [alpha, ws, slotA])
-  // B1 follows Hive's notices as a model does: hive_inbox, then the ack.
+  // B1 follows Hive's notices as a model does: cw_inbox, then the ack.
   fs.writeFileSync(path.join(home, 'fake-follow-notices.txt'), '')
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -87,7 +87,7 @@ const transcripts = () => {
 
     // --- 2. The turn ends: B1 reads the lane's note at its Stop, then Hive types /exit and B1's CLI exits by itself.
     fs.writeFileSync(path.join(home, 'lane-go'), '')
-    check('B1 read that the lane is finished, with its card, with hive_inbox', !!(await until(() => transcripts().includes(`Lane Gentle end is finished: ${key1} not merged`), HUNG_MS)), key1)
+    check('B1 read that the lane is finished, with its card, with cw_inbox', !!(await until(() => transcripts().includes(`Lane Gentle end is finished: ${key1} not merged`), HUNG_MS)), key1)
     check('…its session ended', !!(await until(async () => !(await live(b1.id)), HUNG_MS)))
     const after = log().slice(since)
     const runKey = `#${b1.id}`

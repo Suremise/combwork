@@ -23,7 +23,7 @@ const user = { kind: 'user' } as const
 const as = (agentId: string, name: string) => ({ kind: 'agent', name: `${name} (alpha)`, self: { project: 'alpha', agentId }, scope: 'alpha' }) as const
 const reviewer = as('r1', 'Reviewer')
 const third = as('t1', 'Third')
-const STOPPED = 'Hive: Review by Reviewer stopped: its session ended'
+const STOPPED = 'Combwork: Review by Reviewer stopped: its session ended'
 
 /** Holds a promise until `release()`: the moment a test closes or switches the workspace in. */
 function gate(): { held: Promise<void>; release: () => void } {

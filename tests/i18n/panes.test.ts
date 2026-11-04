@@ -93,6 +93,6 @@ describe('the panes area', () => {
     expect(unknownStateText(silent, NOW)).toBe('Silent 23 min · state unknown')
     expect(safeguardText(notes[1], label)).toBe('A safety classifier stopped a response at 15:12 (3 this session). Its CLI asks what to do about it.')
     expect(agentPart({ name: 'B6', project: 'hive' }, 'stopped', { status: 'stopped' } as never)).toBe('B6 (hive) stopped')
-    expect(agentLimitLine({ agents: [{ name: 'B6', project: 'hive', id: 'x' }] } as never, 30)).toMatch(/^\[Hive\] B6 is still working after 30 min/)
+    expect(agentLimitLine({ agents: [{ name: 'B6', project: 'hive', id: 'x' }] } as never, 30)).toMatch(/^\[CW\] B6 is still working after 30 min/)
   })
 })

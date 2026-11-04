@@ -31,6 +31,12 @@ export const DEFAULT_API_PORT = 47821
  */
 export const RETIRED_PERSONAS: Record<string, string> = { overseer: 'coordinator', orchestrator: 'coordinator', reviewer: 'qa-triager' }
 
+/**
+ * Bundled skills shipped under another name now (HI-2463: what agents see says Combwork): a workspace copy of the old
+ * one that is a version Combwork shipped, never changed, goes when the new one is added; one the user changed stays.
+ */
+export const RETIRED_SKILLS: Record<string, string> = { 'use-hive-api': 'use-cw-api' }
+
 export const DEFAULT_SETTINGS: AppSettings = {
   keybindings: {},
   commands: { list: [], onQuit: { run: [] } },

@@ -32,7 +32,7 @@ describe('titleNudge', () => {
   it('keeps a long agent title and suggests a shorter one, on a line of its own in the reply', () => {
     const nudge = titleNudge(long, agent)
     // Its file name is named too (HI-2061), on the same line.
-    expect(nudge).toBe('Titles over 80 characters are cut in git and on the board: consider a shorter one (the detail belongs in the description). A title says the outcome or the problem in words: retitle it without "updater.ts" (hive_update_task with title), keeping it in the description.')
+    expect(nudge).toBe('Titles over 80 characters are cut in git and on the board: consider a shorter one (the detail belongs in the description). A title says the outcome or the problem in words: retitle it without "updater.ts" (cw_update_task with title), keeping it in the description.')
     expect(titleNudge(long, { kind: 'assistant' })).toBe(nudge)
     const created = createdText(change(nudge))
     expect(created.split('\n')).toEqual([`AL-7 created in Todo (1st of 1) for alpha: ${long}`, nudge])
@@ -53,7 +53,7 @@ describe('titleNudge', () => {
 
   // HI-2061: what belongs in the description, named in the title, gets the same kind of line, whatever its length.
   it('names the paths, file names, cards and measurements a short title has', () => {
-    expect(titleNudge('Fix src/main/foo.ts timeout of 300 s', agent)).toBe('A title says the outcome or the problem in words: retitle it without "src/main/foo.ts" and "300 s" (hive_update_task with title), keeping them in the description.')
+    expect(titleNudge('Fix src/main/foo.ts timeout of 300 s', agent)).toBe('A title says the outcome or the problem in words: retitle it without "src/main/foo.ts" and "300 s" (cw_update_task with title), keeping them in the description.')
     expect(titleDetails('Follow-up of HI-2012 and #1662: AGENTS.md says it twice', ['HI'])).toEqual(['HI-2012', '#1662', 'AGENTS.md'])
     expect(titleDetails('Logs fill C:\\Users\\x\\AppData past 20 MB, at 95 % CPU', [])).toEqual(['C:\\Users\\x\\AppData', '20 MB', '95 %'])
     expect(titleDetails('Read `package.json` (and tests/e2e/lib.cjs), in 250ms', [])).toEqual(['package.json', 'tests/e2e/lib.cjs', '250ms'])
@@ -81,7 +81,7 @@ describe('titleNudge', () => {
 
   it("names them with the length's own line off (0), which turns off only the length's", async () => {
     await advanced.set(CARD_TITLE_NUDGE, 0)
-    expect(titleNudge('Fix src/main/foo.ts', agent)).toBe('A title says the outcome or the problem in words: retitle it without "src/main/foo.ts" (hive_update_task with title), keeping it in the description.')
+    expect(titleNudge('Fix src/main/foo.ts', agent)).toBe('A title says the outcome or the problem in words: retitle it without "src/main/foo.ts" (cw_update_task with title), keeping it in the description.')
   })
 
   it('follows the advanced setting: its limit in the line, and none at 0', async () => {
@@ -91,6 +91,6 @@ describe('titleNudge', () => {
     await advanced.set(CARD_TITLE_NUDGE, 0)
     expect(titleNudge('x'.repeat(150), agent)).toBeNull()
     // Its file name is still named (HI-2061): only the length's line is off.
-    expect(titleNudge(long, agent)).toBe('A title says the outcome or the problem in words: retitle it without "updater.ts" (hive_update_task with title), keeping it in the description.')
+    expect(titleNudge(long, agent)).toBe('A title says the outcome or the problem in words: retitle it without "updater.ts" (cw_update_task with title), keeping it in the description.')
   })
 })

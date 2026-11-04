@@ -71,8 +71,8 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
 
   it('Claude Code with bracketed paste on gets the line as one paste, between Ctrl+U and Enter', async () => {
     await running(claudeCode, '\x1b[?2004h> ')
-    await sessions.sendPrompt(p, id, '[Hive] #12 is in Review:\n  a comment')
-    expect(writes).toEqual([...CLEARED, '\x1b[200~[Hive] #12 is in Review: a comment\x1b[201~', '\r'])
+    await sessions.sendPrompt(p, id, '[CW] #12 is in Review:\n  a comment')
+    expect(writes).toEqual([...CLEARED, '\x1b[200~[CW] #12 is in Review: a comment\x1b[201~', '\r'])
   })
 
   it("the line's control characters are left out of the paste: nothing in it can end it or press a key", async () => {
@@ -91,22 +91,22 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
 
   it('typed in pieces when the CLI has bracketed paste off (turned off again too)', async () => {
     await running(claudeCode, '\x1b[?2004h\x1b[?2004l')
-    await sessions.sendPrompt(p, id, '[Hive] #12 is in Review: a comment that is long enough for several pieces')
+    await sessions.sendPrompt(p, id, '[CW] #12 is in Review: a comment that is long enough for several pieces')
     expect(writes.length).toBeGreaterThan(3)
-    expect(typedText()).toBe('[Hive] #12 is in Review: a comment that is long enough for several pieces')
+    expect(typedText()).toBe('[CW] #12 is in Review: a comment that is long enough for several pieces')
   })
 
   it('typed in pieces into a CLI without the capability, even with bracketed paste on (Codex)', async () => {
     echo.to = await running(codex, '\x1b[?2004h')
-    await sessions.sendPrompt(p, id, '[Hive] #12 is in Review: a comment that is long enough for several pieces')
+    await sessions.sendPrompt(p, id, '[CW] #12 is in Review: a comment that is long enough for several pieces')
     expect(writes.some((w) => w.includes('\x1b[200~'))).toBe(false)
-    expect(typedText()).toBe('[Hive] #12 is in Review: a comment that is long enough for several pieces')
+    expect(typedText()).toBe('[CW] #12 is in Review: a comment that is long enough for several pieces')
   })
 
   it('Copilot with bracketed paste on gets the line as one paste too (#600)', async () => {
     await running(copilot, '\x1b[?2004h')
-    await sessions.sendPrompt(p, id, '[Hive] New in your inbox: 1 message (m4). Call hive_inbox to read it, act on it, then ack it.')
-    expect(writes).toEqual(['\x15', '\x1b[200~[Hive] New in your inbox: 1 message (m4). Call hive_inbox to read it, act on it, then ack it.\x1b[201~', '\r'])
+    await sessions.sendPrompt(p, id, '[CW] New in your inbox: 1 message (m4). Call cw_inbox to read it, act on it, then ack it.')
+    expect(writes).toEqual(['\x15', '\x1b[200~[CW] New in your inbox: 1 message (m4). Call cw_inbox to read it, act on it, then ack it.\x1b[201~', '\r'])
   })
 
   describe("Settings → Advanced's switches for what Hive types (#1286)", () => {
@@ -402,7 +402,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
     // row, never what Hive needs, so none is pressed.
     it('a line with wide characters stopped part-way in Claude Code is taken back whole, and the next prompt goes alone', async () => {
       const wide = `${'界'.repeat(500)} 👩‍💻 ${'supercalifragilisticexpialidocious-and-more '.repeat(3)}${'é'.normalize('NFD')} end`
-      for (const line of [wide, '[Hive] New in your inbox: 1 card event (LE-191) (m315). Call hive_inbox to read it. (Your watch is still on, waiting for LE-191: do what this asks, then end your turn, and Hive wakes you when it changes.)']) {
+      for (const line of [wide, '[CW] New in your inbox: 1 card event (LE-191) (m315). Call cw_inbox to read it. (Your watch is still on, waiting for LE-191: do what this asks, then end your turn, and Hive wakes you when it changes.)']) {
         writes.length = 0
         await running(claudeCode, '\x1b[?2004h')
         // Refused once the line is in (as a wake no longer wanted is), never before.
@@ -528,7 +528,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
         // A rule shared as one box's bottom and the next one's top: the last box is the bottom one, not a span from the
         // stray rule above down to its top rule (which then matched no box of its own).
         const rule = '─'.repeat(60)
-        const shown = `${rule}\n❯ \n\n> [Hive] New in your inbox: 1 task (m2). Call hive_inbox to read it.\n\n${claudeBox()}`
+        const shown = `${rule}\n❯ \n\n> [CW] New in your inbox: 1 task (m2). Call cw_inbox to read it.\n\n${claudeBox()}`
         expect(claudeCode.promptText!(shown)).toBe('')
         expect(claudeCode.promptText!(`${rule}\n❯ \n\n> an old prompt\n\n${claudeBox('a draft')}`)).toBe('a draft')
       })
@@ -555,7 +555,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
   })
 
   describe("Codex: Enter once the line is drawn (#600: a busy Codex drops an Enter it reads with the line)", () => {
-    const line = '[Hive] New in your inbox: 1 message (m4). Call hive_inbox to read it, act on it, then ack it.'
+    const line = '[CW] New in your inbox: 1 message (m4). Call cw_inbox to read it, act on it, then ack it.'
 
     it('no Enter while the line isn’t drawn; Enter once it is', async () => {
       const screen = await running(codex, '\x1b[?2004h› ')
@@ -573,7 +573,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
     })
 
     it("an earlier doorbell with the same end on screen doesn't count as drawn", async () => {
-      const screen = await running(codex, '› [Hive] New in your inbox: 1 message (m3). Call hive_inbox to read it, act on it, then ack it.\r\n› ')
+      const screen = await running(codex, '› [CW] New in your inbox: 1 message (m3). Call cw_inbox to read it, act on it, then ack it.\r\n› ')
       vi.useFakeTimers()
       const sent = sessions.sendPrompt(p, id, line)
       await vi.advanceTimersByTimeAsync(2000)

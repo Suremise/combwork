@@ -1,23 +1,23 @@
 {
   "lane.args.cardsMax": {
     "text": "at most {max} cards in a lane",
-    "note": "hive_lane start's refusal: too many cards."
+    "note": "cw_lane start's refusal: too many cards."
   },
   "lane.args.cardsNone": {
     "text": "cards must be the card numbers, in order (at least one)",
-    "note": "hive_lane start's refusal of its cards argument: none given, or not a list."
+    "note": "cw_lane start's refusal of its cards argument: none given, or not a list."
   },
   "lane.args.cardsNumbers": {
     "text": "cards must be card numbers",
-    "note": "hive_lane start's refusal: a card in cards isn't a whole card number."
+    "note": "cw_lane start's refusal: a card in cards isn't a whole card number."
   },
   "lane.args.cardsRepeat": {
     "text": "cards must not repeat",
-    "note": "hive_lane start's refusal: a card is named twice."
+    "note": "cw_lane start's refusal: a card is named twice."
   },
   "lane.args.numberRange": {
     "text": "{what} must be from 1 to {max}",
-    "note": "hive_lane start's refusal of rounds or waitMinutes ({what}, the argument's name) out of range."
+    "note": "cw_lane start's refusal of rounds or waitMinutes ({what}, the argument's name) out of range."
   },
   "lane.card.blocked": {
     "text": "(blocked)",
@@ -37,15 +37,15 @@
   },
   "lane.change.joined": {
     "text": "Joined the lane: {line}",
-    "note": "hive_lane join's reply; {line} is the lane's line."
+    "note": "cw_lane join's reply; {line} is the lane's line."
   },
   "lane.change.started": {
     "text": "Lane started: {line}",
-    "note": "hive_lane start's reply for a new lane; {line} is the lane's line."
+    "note": "cw_lane start's reply for a new lane; {line} is the lane's line."
   },
   "lane.change.updated": {
     "text": "Lane updated: {line}",
-    "note": "hive_lane start's reply for the builder's running lane, changed; {line} is the lane's line."
+    "note": "cw_lane start's reply for the builder's running lane, changed; {line} is the lane's line."
   },
   "lane.column.doing": {
     "text": "Doing",
@@ -81,15 +81,15 @@
   },
   "lane.end.abandoned": {
     "text": "Lane abandoned: {line}",
-    "note": "hive_lane end's reply for an abandoned lane; {line} is the lane's line."
+    "note": "cw_lane end's reply for an abandoned lane; {line} is the lane's line."
   },
   "lane.end.ended": {
     "text": "Lane ended: {line}",
-    "note": "hive_lane end's reply; {line} is the lane's line."
+    "note": "cw_lane end's reply; {line} is the lane's line."
   },
   "lane.join.first": {
     "text": "{builder} hadn't registered it yet: its own start updates it.",
-    "note": "hive_lane join's note: the reviewer joined first, starting the lane from its cards; the builder's own start updates it."
+    "note": "cw_lane join's note: the reviewer joined first, starting the lane from its cards; the builder's own start updates it."
   },
   "lane.journal.fact": {
     "text": "Lane {named, select, yes {\"{name}\" } other {}}{state, select, started {started} ended {ended} merged {ended, merged at {commit}} other {abandoned}}: {who}, {cards}",
@@ -121,54 +121,54 @@
   },
   "lane.list.none": {
     "text": "No lanes.",
-    "note": "hive_lane list with all: there are no lanes."
+    "note": "cw_lane list with all: there are no lanes."
   },
   "lane.list.noneListed": {
     "text": "No lanes running or recently ended.",
-    "note": "hive_lane list: no lane is running or ended recently (an ended lane stays listed an hour)."
+    "note": "cw_lane list: no lane is running or ended recently (an ended lane stays listed an hour)."
   },
   "lane.next.afterQueue": {
     "text": "Next: {card}, once {n, plural, one {it is} other {they are}} Done.",
-    "note": "hive_lane next, after its passed cards' places in the merge queue (#1354): the next card waits for them to be Done (one card at a time); {n} is how many."
+    "note": "cw_lane next, after its passed cards' places in the merge queue (#1354): the next card waits for them to be Done (one card at a time); {n} is how many."
   },
   "lane.next.allDone": {
     "text": "Every card of the lane is Done or past review: nothing to start. The lane ends by itself once all are Done.",
-    "note": "hive_lane next, with no card left to start."
+    "note": "cw_lane next, with no card left to start."
   },
   "lane.next.carryOn": {
     "text": "Carry on with {card}{also}.",
-    "note": "hive_lane next: the card in flight (Doing or Review) to carry on; {card} is its key and title; {also} is \" (why the lane waits)\" or nothing."
+    "note": "cw_lane next: the card in flight (Doing or Review) to carry on; {card} is its key and title; {also} is \" (why the lane waits)\" or nothing."
   },
   "lane.next.carryOnIn": {
     "text": "Carry on with {card} in {slot}{also}.",
-    "note": "hive_lane next: the card in flight to carry on, in the slot its lane builds in (#1438); {also} as in lane.next.carryOn."
+    "note": "cw_lane next: the card in flight to carry on, in the slot its lane builds in (#1438); {also} as in lane.next.carryOn."
   },
   "lane.next.nothingElse": {
     "text": "Nothing else to start: the lane ends by itself once all are Done.",
-    "note": "hive_lane next, after its passed cards' places in the merge queue (#1354): no card is left to start."
+    "note": "cw_lane next, after its passed cards' places in the merge queue (#1354): no card is left to start."
   },
   "lane.next.start": {
     "text": "Next: {card}. Start it.",
-    "note": "hive_lane next: the card to start next; {card} is its key and title."
+    "note": "cw_lane next: the card to start next; {card} is its key and title."
   },
   "lane.next.startIn": {
-    "text": "Next: {card}. Start it: it is built in {slot}, on a new branch Hive makes there.",
-    "note": "hive_lane next: the card to start next, built in the lane's slot (#1438), where Hive makes its line as it starts."
+    "text": "Next: {card}. Start it: it is built in {slot}, on a new branch Combwork makes there.",
+    "note": "cw_lane next: the card to start next, built in the lane's slot (#1438), where Hive makes its line as it starts."
   },
   "lane.next.waits": {
     "text": "The lane waits: {why}. Start nothing new meanwhile.",
-    "note": "hive_lane next, for a paused lane (#1270): why it waits."
+    "note": "cw_lane next, for a paused lane (#1270): why it waits."
   },
   "lane.refused.allDone": {
     "text": "{cards} {n, plural, one {is} other {are}} already Done: no lane started.",
-    "note": "hive_lane start refused: every card of its list is already Done; {n} is how many."
+    "note": "cw_lane start refused: every card of its list is already Done; {n} is how many."
   },
   "lane.refused.applyNow.changedMeanwhile": {
-    "text": "{card} was put back in Todo (its work stays on its branch), but the lane's list changed meanwhile: this list wasn't applied. hive_lane list shows it now.",
+    "text": "{card} was put back in Todo (its work stays on its branch), but the lane's list changed meanwhile: this list wasn't applied. cw_lane list shows it now.",
     "note": "A reorder applied now (HI-1995): its card was put back, then the lane's list changed before this one was saved."
   },
   "lane.refused.applyNow.endedMeanwhile": {
-    "text": "{card} was put back in Todo (its work stays on its branch), but the lane was ended meanwhile: its list wasn't changed and nothing was started. hive_lane list shows the lanes.",
+    "text": "{card} was put back in Todo (its work stays on its branch), but the lane was ended meanwhile: its list wasn't changed and nothing was started. cw_lane list shows the lanes.",
     "note": "A reorder applied now (HI-1995): its card was put back, then the lane ended before its list was saved."
   },
   "lane.refused.applyNow.inATurn": {
@@ -189,83 +189,83 @@
   },
   "lane.refused.end.abandon": {
     "text": "Only the user or the Assistant abandons a lane: tell the user if it should stop",
-    "note": "hive_lane end with abandoned refused (#1270, §16.8.2): an agent never abandons its lane."
+    "note": "cw_lane end with abandoned refused (#1270, §16.8.2): an agent never abandons its lane."
   },
   "lane.refused.end.movedOn": {
     "text": "Its cards moved on meanwhile: read the lane again",
-    "note": "hive_lane end refused: the lane's cards moved between its read and its save (a card reopened)."
+    "note": "cw_lane end refused: the lane's cards moved between its read and its save (a card reopened)."
   },
   "lane.refused.end.notDone": {
     "text": "The lane ends by itself once all its cards are Done: {cards} not yet",
-    "note": "hive_lane end refused (#1270): an agent's lane ends by itself once all its cards are Done; {cards} are those not Done yet."
+    "note": "cw_lane end refused (#1270): an agent's lane ends by itself once all its cards are Done; {cards} are those not Done yet."
   },
   "lane.refused.end.notOurs": {
     "text": "Only a lane's builder or reviewer ends it (or the user, or the Assistant)",
-    "note": "hive_lane end refused: a project agent that isn't the lane's builder or reviewer."
+    "note": "cw_lane end refused: a project agent that isn't the lane's builder or reviewer."
   },
   "lane.refused.generalist": {
     "text": "{agent} is a generalist: it takes no side in the workflow, so it is never a lane's builder or reviewer. Choose a builder, a reviewer or an either-role agent.",
-    "note": "hive_lane's refusal (HI-686): a generalist agent is never a lane's builder or reviewer."
+    "note": "cw_lane's refusal (HI-686): a generalist agent is never a lane's builder or reviewer."
   },
   "lane.refused.joinNoLane": {
     "text": "{builder} has no lane running yet: give the cards too, and the lane starts with you as its reviewer",
-    "note": "hive_lane join refused: the builder has no running lane, and no cards were given to start one."
+    "note": "cw_lane join refused: the builder has no running lane, and no cards were given to start one."
   },
   "lane.refused.joinPool": {
-    "text": "{builder}'s lane is reviewed by the reviewer pool: there is nothing to join. Hive gives you its cards when it assigns them to you.",
-    "note": "hive_lane join refused (#1443): a lane reviewed by the pool has nobody to join it."
+    "text": "{builder}'s lane is reviewed by the reviewer pool: there is nothing to join. Combwork gives you its cards when it assigns them to you.",
+    "note": "cw_lane join refused (#1443): a lane reviewed by the pool has nobody to join it."
   },
   "lane.refused.keptChanging": {
     "text": "The lane kept changing: try again",
-    "note": "hive_lane start refused: the lane's cards kept moving between its read and its save."
+    "note": "cw_lane start refused: the lane's cards kept moving between its read and its save."
   },
   "lane.refused.next.abandoned": {
     "text": "Your lane {lane} was abandoned: don't start it again; ask the user if there is more to do.",
-    "note": "hive_lane next, for an agent whose lane was just abandoned (HI-2273)."
+    "note": "cw_lane next, for an agent whose lane was just abandoned (HI-2273)."
   },
   "lane.refused.next.ended": {
     "text": "Your lane {lane} has ended: all its cards are Done. Nothing more on it: don't start it again; end your turn unless you have other work.",
-    "note": "hive_lane next, for an agent whose lane just ended (HI-2273): never \"start one\", which invited a builder to start it again."
+    "note": "cw_lane next, for an agent whose lane just ended (HI-2273): never \"start one\", which invited a builder to start it again."
   },
   "lane.refused.next.none": {
-    "text": "No running lane of yours: start one with hive_lane start, or ask the user",
-    "note": "hive_lane next, for an agent with no running lane."
+    "text": "No running lane of yours: start one with cw_lane start, or ask the user",
+    "note": "cw_lane next, for an agent with no running lane."
   },
   "lane.refused.noLaneToPlace": {
-    "text": "{builder} has no running lane in {project}: the card was made but not placed. Start one with hive_lane start (its key is in this reply), or pass lane as '{ builder, reviewer }' to start one as you create a card.",
-    "note": "hive_create_task's lane refused (HI-2167): the builder named has no running lane to place the card on. '{ builder, reviewer }' is quoted ICU: it shows as { builder, reviewer }."
+    "text": "{builder} has no running lane in {project}: the card was made but not placed. Start one with cw_lane start (its key is in this reply), or pass lane as '{ builder, reviewer }' to start one as you create a card.",
+    "note": "cw_create_task's lane refused (HI-2167): the builder named has no running lane to place the card on. '{ builder, reviewer }' is quoted ICU: it shows as { builder, reviewer }."
   },
   "lane.refused.poolReviewer": {
     "text": "A lane reviewed by the pool has no reviewer of its own",
-    "note": "hive_lane start refused: a reviewer named for a lane reviewed by the pool (#1443)."
+    "note": "cw_lane start refused: a reviewer named for a lane reviewed by the pool (#1443)."
   },
   "lane.refused.selfReview": {
     "text": "A lane's builder can't be its reviewer",
-    "note": "hive_lane start or join refused: the same agent named as builder and reviewer."
+    "note": "cw_lane start or join refused: the same agent named as builder and reviewer."
   },
   "lane.refused.unknownBuilder": {
     "text": "Unknown agent: the builder must be an agent of the project",
-    "note": "hive_lane start refused: its builder isn't an agent of the project."
+    "note": "cw_lane start refused: its builder isn't an agent of the project."
   },
   "lane.refused.unknownPair": {
     "text": "Unknown agent: the builder and reviewer must be agents of the project",
-    "note": "hive_lane join refused: its builder or reviewer isn't an agent of the project."
+    "note": "cw_lane join refused: its builder or reviewer isn't an agent of the project."
   },
   "lane.refused.unknownReviewer": {
     "text": "Unknown agent: the reviewer must be an agent of the project",
-    "note": "hive_lane start refused: its reviewer isn't an agent of the project."
+    "note": "cw_lane start refused: its reviewer isn't an agent of the project."
   },
   "lane.refused.unknownReviewer.has": {
     "text": "No agent \"{name}\" in {project}; this lane's reviewer is {reviewer}: leave reviewer out to keep it.",
-    "note": "hive_lane start refused (HI-2273): it names a reviewer that is no agent of the project, and the builder's running lane has its reviewer."
+    "note": "cw_lane start refused (HI-2273): it names a reviewer that is no agent of the project, and the builder's running lane has its reviewer."
   },
   "lane.refused.unknownReviewer.none": {
     "text": "No agent \"{name}\" in {project}; this lane has no reviewer yet: leave reviewer out, or name an agent of {project}.",
-    "note": "hive_lane start refused (HI-2273): it names a reviewer that is no agent of the project, and the lane has none yet."
+    "note": "cw_lane start refused (HI-2273): it names a reviewer that is no agent of the project, and the lane has none yet."
   },
   "lane.refused.unknownReviewer.pool": {
     "text": "No agent \"{name}\" in {project}; this lane is reviewed by the project's reviewer pool: leave reviewer out.",
-    "note": "hive_lane start refused (HI-2273): it names a reviewer that is no agent of the project, and the lane is reviewed by the pool."
+    "note": "cw_lane start refused (HI-2273): it names a reviewer that is no agent of the project, and the lane is reviewed by the pool."
   },
   "lane.reorder.itsBranch": {
     "text": "its branch",
@@ -277,23 +277,23 @@
   },
   "lane.start.applied": {
     "text": "Applied now: {card} is back in Todo (its work stays on {line}); the lane's cards are now in this order, and {builder} is told.",
-    "note": "hive_lane start's note for a reorder applied now (HI-1995); {line} is the card's branch (or lane.reorder.itsBranch)."
+    "note": "cw_lane start's note for a reorder applied now (HI-1995); {line} is the card's branch (or lane.reorder.itsBranch)."
   },
   "lane.start.carried": {
     "text": "{builder}'s lane {lane} had just ended (all merged): started a new lane with its {what, select, brief {brief} name {name} other {brief and name}}; pass brief to change it.",
-    "note": "hive_lane start's note (HI-2097, HI-2104): a list change raced its lane's end, so a new lane started with the ended one's brief, name, or both ({what})."
+    "note": "cw_lane start's note (HI-2097, HI-2104): a list change raced its lane's end, so a new lane started with the ended one's brief, name, or both ({what})."
   },
   "lane.start.leftOut": {
     "text": "{cards} {n, plural, one {is} other {are}} already Done: left out.",
-    "note": "hive_lane start's note (HI-2097): cards already Done, left out of a new lane; {n} is how many."
+    "note": "cw_lane start's note (HI-2097): cards already Done, left out of a new lane; {n} is how many."
   },
   "lane.start.queued": {
     "text": "The list change is queued: it applies once {card} is Done, and you are told then.",
-    "note": "hive_lane start's note (#1270): a list change while a card is in flight waits for that card ({card}) to be Done."
+    "note": "cw_lane start's note (#1270): a list change while a card is in flight waits for that card ({card}) to be Done."
   },
   "lane.start.stays": {
-    "text": "{cards} {n, plural, one {stays} other {stay}} on the lane, after the cards you listed: a builder's own hive_lane start adds or reorders cards, never takes one off (the Assistant or the user does).",
-    "note": "hive_lane start's note (HI-2169): a builder's own start left cards of its lane out, and they are kept after its list; {n} is how many."
+    "text": "{cards} {n, plural, one {stays} other {stay}} on the lane, after the cards you listed: a builder's own cw_lane start adds or reorders cards, never takes one off (the Assistant or the user does).",
+    "note": "cw_lane start's note (HI-2169): a builder's own start left cards of its lane out, and they are kept after its list; {n} is how many."
   },
   "lane.state.abandoned": {
     "text": "abandoned",
@@ -360,7 +360,7 @@
     "note": "An agent owed a new conversation for its lane (HI-2034) wasn't free within the wait: no more automatic tries until the user retries it."
   },
   "lane.status.fresh.uncertain": {
-    "text": "{agent}'s new conversation didn't start (Hive closed as it started): retry it from the lane's row, or end the lane",
+    "text": "{agent}'s new conversation didn't start (Combwork closed as it started): retry it from the lane's row, or end the lane",
     "note": "An agent owed a new conversation (HI-2034) was being launched when Hive closed: never launched again by itself."
   },
   "lane.status.fresh.waits": {
@@ -440,15 +440,15 @@
     "note": "A lane's next card isn't started yet (HI-2029): Hive's last start of it on the builder failed."
   },
   "lane.status.start.queued": {
-    "text": "{card} waits to start: a line of Hive's is on its way to {agent}",
+    "text": "{card} waits to start: a line of Combwork's is on its way to {agent}",
     "note": "A lane's next card isn't started yet (HI-2029): a line Hive types is on its way to the builder."
   },
   "lane.status.start.refused": {
-    "text": "{card} waits to start: its start was refused for now; Hive tries again",
+    "text": "{card} waits to start: its start was refused for now; Combwork tries again",
     "note": "A lane's next card isn't started yet (HI-2029): Hive's start of it was refused for now, and is tried again."
   },
   "lane.status.start.refusedHeld": {
-    "text": "{card} waits to start: its start was refused for now, {slot} still in use ({held, select, session {{heldBy}'s session is still in it} left {{heldBy}'s last run left {program}{more, plural, =0 {} other { and # more}} running in it} lastRun {{heldBy}'s last run there isn't known to have ended} broker {a process still has a file or folder in it open: Windows Sandbox's broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}); Hive tries again",
+    "text": "{card} waits to start: its start was refused for now, {slot} still in use ({held, select, session {{heldBy}'s session is still in it} left {{heldBy}'s last run left {program}{more, plural, =0 {} other { and # more}} running in it} lastRun {{heldBy}'s last run there isn't known to have ended} broker {a process still has a file or folder in it open: Windows Sandbox's broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}); Combwork tries again",
     "note": "A lane's next card isn't started yet (HI-2468): Hive's start of it was refused because its slot {slot} is still in use: a session of the agent {heldBy} still runs in it; left, the agent {heldBy}'s last run left programs running in it ({program}: the first one's name, such as node; {more}: how many more); lastRun, that run isn't known to have ended; or (broker) a process holds it, and Windows Sandbox's broker ({broker}: its process name) has the slot as its current folder, idle: yes, no Sandbox runs; no, one does; other, not known; or (other) a process holds it. Hive tries the start again."
   },
   "lane.status.start.watching": {
@@ -472,11 +472,11 @@
     "note": "The workspace's lanes.json from before #1018 couldn't be read to move it in (Windows holding it, no permission); {error} is the system's error. The next open tries again."
   },
   "lane.tell.listChanged": {
-    "text": "Your lane's card list changed, as queued: its cards are now {cards}. hive_lane next names your next card.",
+    "text": "Your lane's card list changed, as queued: its cards are now {cards}. cw_lane next names your next card.",
     "note": "Delivered to a lane's builder once a queued change of its card list applies (#1270); {cards} is the list, in order."
   },
   "lane.tell.reordered": {
-    "text": "Your lane was reordered now by {by}: {card} is back in Todo (its work stays on {line}): stop working on it. Its cards are now {cards}. hive_lane next names your next card.",
+    "text": "Your lane was reordered now by {by}: {card} is back in Todo (its work stays on {line}): stop working on it. Its cards are now {cards}. cw_lane next names your next card.",
     "note": "Delivered to a lane's builder after a reorder applied now (HI-1995) put its card in flight back; {by} is who reordered it, {line} its branch (or lane.reorder.itsBranch)."
   },
   "lane.wait.hours": {
@@ -488,16 +488,16 @@
     "note": "A lane's wait in minutes (\"90 min\")."
   },
   "lane.warn.fresh": {
-    "text": "Warning: {items}: is it the card you meant? To put a new card on a lane, create it with hive_create_task's lane, never by its guessed key.",
-    "note": "hive_lane start's safety net (HI-2167): a card in its list may be a guessed key; {items} are lane.warn.freshItem's."
+    "text": "Warning: {items}: is it the card you meant? To put a new card on a lane, create it with cw_create_task's lane, never by its guessed key.",
+    "note": "cw_lane start's safety net (HI-2167): a card in its list may be a guessed key; {items} are lane.warn.freshItem's."
   },
   "lane.warn.freshItem": {
     "text": "{card} was created {ago} s ago by {who}",
     "note": "One card of a start's list made by someone else since the caller's turn began (HI-2167); {ago} in seconds. Joined with \"; \" into lane.warn.fresh's {items}."
   },
   "lane.warn.shared": {
-    "text": "Warning: {items}. A card belongs to one lane: ask the Assistant or the user to take it out of one of them (a builder's own hive_lane start never takes a card off its lane).",
-    "note": "hive_lane start's warning (HI-1821, HI-2169): cards on two lanes; {items} are lane.warn.sharedItem's."
+    "text": "Warning: {items}. A card belongs to one lane: ask the Assistant or the user to take it out of one of them (a builder's own cw_lane start never takes a card off its lane).",
+    "note": "cw_lane start's warning (HI-1821, HI-2169): cards on two lanes; {items} are lane.warn.sharedItem's."
   },
   "lane.warn.sharedItem": {
     "text": "{card} is also in {builder}'s lane ({lane})",

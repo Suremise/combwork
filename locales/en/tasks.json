@@ -120,8 +120,8 @@
     "description": "An error: an agent or the Assistant tried to change or remove a decision on a card; only the user does that (they only record them)."
   },
   "tasks.error.doingNobodyNew": {
-    "defaultMessage": "A card made in Active needs an agent on it (agent). Ask the user which they want: an agent on it, an agent started on it (make it in Todo, then hive_start_task), or nobody on it (make it in Todo, then move it with override and their reason).",
-    "description": "An error said to the Hive Assistant (HI-2062): it made a card straight into the Active stage with no agent on it. agent, override and hive_start_task are names of a call's fields and a tool: keep them as they are. Active and Todo are stage names."
+    "defaultMessage": "A card made in Active needs an agent on it (agent). Ask the user which they want: an agent on it, an agent started on it (make it in Todo, then cw_start_task), or nobody on it (make it in Todo, then move it with override and their reason).",
+    "description": "An error said to the Hive Assistant (HI-2062): it made a card straight into the Active stage with no agent on it. agent, override and cw_start_task are names of a call's fields and a tool: keep them as they are. Active and Todo are stage names."
   },
   "tasks.error.emptyComment": {
     "defaultMessage": "The comment is empty.",
@@ -136,12 +136,12 @@
     "description": "An error: a failed review also tried to move card {card} (its key, such as HI-12) somewhere other than Doing; a failed card goes back to Doing, to the agent that built it. \"column\" is the name of the call's field: keep it as it is."
   },
   "tasks.error.holdCard": {
-    "defaultMessage": "Only the user or the Assistant puts cards On Hold. Where the user has decided to park {card}, ask the Assistant (hive_ask_assistant); otherwise ask the user.",
-    "description": "An error: an agent tried to move card {card} (its key, such as HI-12) On Hold (a board column), which only the user or the Assistant may do (HI-2227): a decision already made goes to the Assistant, hive_ask_assistant (a tool name: keep it as it is), else the user is asked."
+    "defaultMessage": "Only the user or the Assistant puts cards On Hold. Where the user has decided to park {card}, ask the Assistant (cw_ask_assistant); otherwise ask the user.",
+    "description": "An error: an agent tried to move card {card} (its key, such as HI-12) On Hold (a board column), which only the user or the Assistant may do (HI-2227): a decision already made goes to the Assistant, cw_ask_assistant (a tool name: keep it as it is), else the user is asked."
   },
   "tasks.error.holdNew": {
-    "defaultMessage": "Only the user or the Assistant puts cards On Hold. Add it to Todo; where the user has decided to park it, ask the Assistant (hive_ask_assistant), otherwise ask the user.",
-    "description": "An error: an agent tried to add a card On Hold (a board column), which only the user or the Assistant may do (HI-2227): add it to Todo, then a decision already made goes to the Assistant, hive_ask_assistant (a tool name: keep it as it is), else the user is asked."
+    "defaultMessage": "Only the user or the Assistant puts cards On Hold. Add it to Todo; where the user has decided to park it, ask the Assistant (cw_ask_assistant), otherwise ask the user.",
+    "description": "An error: an agent tried to add a card On Hold (a board column), which only the user or the Assistant may do (HI-2227): add it to Todo, then a decision already made goes to the Assistant, cw_ask_assistant (a tool name: keep it as it is), else the user is asked."
   },
   "tasks.error.inDoingWith": {
     "defaultMessage": "{card} is in {active} with agent {agent}, who is working on it: newer work is in progress, so another agent can't move it to {stage}. Leave it where it is; agent {agent} moves it to {review} when done, and the user can move it.",

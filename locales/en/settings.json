@@ -1488,7 +1488,7 @@
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in characters (\"80 characters\"): the length of a card title an agent writes past which Hive suggests a shorter one."
   },
   "settings.advanced.hive.console.showText.desc": {
-    "defaultMessage": "Show the text in the developer console: prompts, replies, commands and tools' arguments, under a banner saying it is unredacted, and start each recording with its text box ticked. Tokens, API keys and sign-in details stay masked whatever this says; agents' hive_console stays redacted, and a recording with text is never attached to Copy Diagnostics.",
+    "defaultMessage": "Show the text in the developer console: prompts, replies, commands and tools' arguments, under a banner saying it is unredacted, and start each recording with its text box ticked. Tokens, API keys and sign-in details stay masked whatever this says; agents' cw_console stays redacted, and a recording with text is never attached to Copy Diagnostics.",
     "description": "What the advanced setting \"Developer console: show prompt, reply and command text\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
   },
   "settings.advanced.hive.console.showText.title": {
@@ -2080,7 +2080,7 @@
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in days (\"14 days\"). The usage history is the record Hive keeps of what each session used."
   },
   "settings.advanced.hive.wait.agentsMaxSeconds.desc": {
-    "defaultMessage": "The longest hive_wait_for_agents waits for agents to finish before it answers. Kept a minute below Codex's hive tool timeout, as card waits are.",
+    "defaultMessage": "The longest cw_wait_for_agents waits for agents to finish before it answers. Kept a minute below Codex's hive tool timeout, as card waits are.",
     "description": "What the advanced setting \"Agent waits: longest\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
   },
   "settings.advanced.hive.wait.agentsMaxSeconds.title": {
@@ -2088,7 +2088,7 @@
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
   "settings.advanced.hive.wait.cardMaxSeconds.desc": {
-    "defaultMessage": "The longest an agent's hive_wait_for_tasks call (without wake) waits before it answers. It has to stay under the CLIs' own tool timeouts, so Combwork keeps it a minute below Codex's hive tool timeout whatever is set here.",
+    "defaultMessage": "The longest an agent's cw_wait_for_tasks call (without wake) waits before it answers. It has to stay under the CLIs' own tool timeouts, so Combwork keeps it a minute below Codex's hive tool timeout whatever is set here.",
     "description": "What the advanced setting \"Card waits: longest\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
   },
   "settings.advanced.hive.wait.cardMaxSeconds.title": {
@@ -2496,8 +2496,8 @@
     "description": "What the setting \"Access token\" does, under its title (Settings → Agent API)."
   },
   "settings.agentApi.token.tip": {
-    "defaultMessage": "Stored in %APPDATA%\\Combwork\\agent-api.json, for your own scripts. Agents never get it: each session gets a token of its own, in the file that HIVE_API_TOKEN_FILE names.",
-    "description": "The info tip of the setting \"Access token\" (Settings → Agent API): more on what it does and when it applies. HIVE_API_TOKEN_FILE is an environment variable name: keep it as it is."
+    "defaultMessage": "Stored in %APPDATA%\\Combwork\\agent-api.json, for your own scripts. Agents never get it: each session gets a token of its own, in the file that CW_API_TOKEN_FILE names.",
+    "description": "The info tip of the setting \"Access token\" (Settings → Agent API): more on what it does and when it applies. CW_API_TOKEN_FILE is an environment variable name: keep it as it is."
   },
   "settings.agentApi.token.title": {
     "defaultMessage": "Access token",

@@ -61,7 +61,7 @@ describe('what counts as a change', () => {
       return { ...cardChange(n, card, ['verdict' as const]), about: wakeAbout(card, ['verdict'], 'a2') }
     }
     expect(wakeLines([change(217, 'passed'), change(119, 'failed')])).toBe(
-      `[Hive] #217 (Claudette's card) is in Review: Codex (hive) passed it (latest comment by Codex (hive): "Round 1: PASSED"); #119 (Claudette's card) is in Review: Codex (hive) failed it (latest comment by Codex (hive): "Round 1: FAILED"). Your card watch has ended: carry on (hive_read_task with latestComment on each card for its comment in full).`
+      `[CW] #217 (Claudette's card) is in Review: Codex (hive) passed it (latest comment by Codex (hive): "Round 1: PASSED"); #119 (Claudette's card) is in Review: Codex (hive) failed it (latest comment by Codex (hive): "Round 1: FAILED"). Your card watch has ended: carry on (cw_read_task with latestComment on each card for its comment in full).`
     )
     // One change: the single line as before.
     expect(wakeLines([change(217, 'passed')])).toBe(wakeLine(change(217, 'passed')))
@@ -74,7 +74,7 @@ describe('what counts as a change', () => {
     const many = wakeLines(Array.from({ length: 20 }, (_, i) => change(100 + i, i % 2 ? 'passed' : 'failed')))
     expect(Buffer.byteLength(JSON.stringify(many))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
     for (let n = 100; n < 120; n++) expect(many).toContain(`#${n} in Review, ${n % 2 ? 'passed' : 'failed'}`)
-    expect(many).toMatch(/Details were left out to fit: read each card \(hive_read_task\) before you carry on\.$/)
+    expect(many).toMatch(/Details were left out to fit: read each card \(cw_read_task\) before you carry on\.$/)
     expect(many).not.toMatch(/\n|more watched card/)
   })
 
@@ -207,7 +207,7 @@ describe('what counts as a change', () => {
     expect(hearsHandoffs({ changes: ['column'], column: 'review' })).toBe(false)
     // The wake line says so, with the request's words as the latest comment; the short form too.
     const line = wakeLine({ ...cardChange(7, decided, ['request', 'decision']), about: wakeAbout(decided, ['request', 'decision'], 'a1') })
-    expect(line).toBe('[Hive] #7 is in Review (its reviewer asks you something; a new decision from the user: read its decisions); latest comment by R (alpha): "Which commit?". Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).')
+    expect(line).toBe('[CW] #7 is in Review (its reviewer asks you something; a new decision from the user: read its decisions); latest comment by R (alpha): "Which commit?". Your card watch has ended: carry on (cw_read_task with latestComment for the comment in full).')
     expect(brief(cardChange(7, decided, ['request']))).toBe('#7 in Review, a request')
   })
 
@@ -270,9 +270,9 @@ describe('what counts as a change', () => {
     expect(movedIntoSince(returned, 'review', at(5))).toBe(false)
     expect(movedIntoSince({ ...returned, column: 'doing' }, 'doing', at(3))).toBe(false)
     const line = (card: TaskCard, changes: Parameters<typeof wakeAbout>[1]) => wakeLine({ ...cardChange(7, card, changes), about: wakeAbout(card, changes, 'r1') })
-    expect(line(returned, ['column'])).toMatch(/^\[Hive\] #7 \(Claudette's card\) was returned for review \(round 2\)\. Your card watch has ended/)
+    expect(line(returned, ['column'])).toMatch(/^\[CW\] #7 \(Claudette's card\) was returned for review \(round 2\)\. Your card watch has ended/)
     // Moved to Doing and back since: an ordinary arrival.
-    expect(line(review([...returned.history, h(6, 'Moved to Doing'), h(7, 'Moved to Review')]), ['column'])).toMatch(/^\[Hive\] #7 \(Claudette's card\) is in Review\. /)
+    expect(line(review([...returned.history, h(6, 'Moved to Doing'), h(7, 'Moved to Review')]), ['column'])).toMatch(/^\[CW\] #7 \(Claudette's card\) is in Review\. /)
     // A comment alone isn't the return.
     expect(line(returned, ['comment'])).toMatch(/is in Review/)
   })
@@ -311,19 +311,19 @@ describe('what counts as a change', () => {
 
   it("HI-2087: a card the merge queue returned: the line leads with the return and its reason, never the review's pass; alone or with others", () => {
     const c = cardOf({ column: 'doing', comments: [{ at: at(5), by: 'HR1 (hive)', text: 'Round 2: PASSED — no findings' }] })
-    const back = '#7 came back from the merge queue: a conflict with main in src/main/bundledHistory.json. Merge main into your worktree, resolve the conflict, commit and submit again (hive_submit).'
+    const back = '#7 came back from the merge queue: a conflict with main in src/main/bundledHistory.json. Merge main into your worktree, resolve the conflict, commit and submit again (cw_submit).'
     const returned = { ...cardChange(7, c, ['column']), about: { owner: null, verdict: null, queueReturn: back } }
     const line = wakeLine(returned)
-    expect(line).toBe(`[Hive] ${back.slice(0, -1)}. Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).`)
+    expect(line).toBe(`[CW] ${back.slice(0, -1)}. Your card watch has ended: carry on (cw_read_task with latestComment for the comment in full).`)
     expect(line).not.toMatch(/PASSED|latest comment by/)
     expect(Buffer.byteLength(JSON.stringify(line))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
     // With another card: still its reason first.
     const other = cardChange(8, cardOf({ column: 'review' }), ['column'])
-    expect(wakeLines([returned, other])).toMatch(/^\[Hive\] #7 came back from the merge queue: a conflict with main in src\/main\/bundledHistory\.json[.;]/)
+    expect(wakeLines([returned, other])).toMatch(/^\[CW\] #7 came back from the merge queue: a conflict with main in src\/main\/bundledHistory\.json[.;]/)
     // The queue's own wake (a loop wake's note, HB2's on HI-2046): the return first too, not the column and the pass.
     const passed = { ...cardChange(7, c, ['column']), about: { owner: null, verdict: { passed: true, by: 'HR1 (hive)' } } }
     const note = loopWakeLine(passed, 'note', back)
-    expect(note).toBe(`[Hive] ${back.slice(0, -1)}. This is your card in its loop: carry on (hive_read_task with latestComment for the comment in full).`)
+    expect(note).toBe(`[CW] ${back.slice(0, -1)}. This is your card in its loop: carry on (cw_read_task with latestComment for the comment in full).`)
     // Within the wake's bytes (HR3's round 1 finding 2), whatever the return carries: output in another script (three
     // bytes a character), paths with quotes and backslashes (escaped in JSON). The card, why and what to do stay whole.
     const failed = { entry: 'HI-7/e1', revision: 'a', target: 'main', reason: 'checks' as const, transient: false, check: 'typecheck', logPath: 'C:\\logs\\"quoted"\\check.log', log: `型エラー: "x" \\ y ${'型'.repeat(150)}\n`.repeat(20) }
@@ -331,10 +331,10 @@ describe('what counts as a change', () => {
     for (const l of [wakeLine({ ...returned, about: { owner: null, verdict: null, queueReturn: big } }), loopWakeLine(passed, 'note', big)]) {
       expect(Buffer.byteLength(JSON.stringify(l))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
       expect(l).not.toMatch(/\n/)
-      expect(l).toMatch(/^\[Hive\] HI-7 came back from the merge queue: the merge check typecheck failed on the merged result\. .*… Fix it in your worktree, commit and submit again \(hive_submit\)\. (Your card watch has ended|This is your card in its loop)/)
+      expect(l).toMatch(/^\[CW\] HI-7 came back from the merge queue: the merge check typecheck failed on the merged result\. .*… Fix it in your worktree, commit and submit again \(cw_submit\)\. (Your card watch has ended|This is your card in its loop)/)
     }
     // Another note of Hive's (a stale pass) is quoted after where the card is, as before.
-    expect(loopWakeLine(passed, 'note', '#7: its pass is stale')).toMatch(/^\[Hive\] #7 is in Doing: HR1 \(hive\) passed it; latest comment by HR1 \(hive\): "Round 2: PASSED — no findings"\. Hive: "#7: its pass is stale"/)
+    expect(loopWakeLine(passed, 'note', '#7: its pass is stale')).toMatch(/^\[CW\] #7 is in Doing: HR1 \(hive\) passed it; latest comment by HR1 \(hive\): "Round 2: PASSED — no findings"\. Combwork: "#7: its pass is stale"/)
   })
 
   it("HI-2143: a card submitted again after the merge queue returned it: its reviewer's line leads with the return and the files resolved, never its own pass", () => {
@@ -345,42 +345,42 @@ describe('what counts as a change', () => {
     expect(again).toBe('HI-2122 is back in Review after the merge queue returned it (a conflict with 1.0.0 in src/main/projectAgents.ts (1 conflict, line 447), tests/providerDetect.test.ts (2 conflicts, lines 78 and 89)); HB1 resolved it and submitted it again: review the resolution')
     const change = { ...cardChange(7, c, ['column']), about: { ...wakeAbout(c, ['column'], 'r1'), resubmitted: again } }
     // Its own watch's line, and Hive's loop wake for it.
-    expect(wakeLine(change)).toBe(`[Hive] ${again}. Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).`)
-    expect(loopWakeLine(change, 'review')).toBe(`[Hive] ${again}. You review this card in its loop: carry on with it (hive_read_task with latestComment for the comment in full).`)
-    expect(wakeLines([change, cardChange(8, cardOf({ number: 8, column: 'doing' }), ['column'])])).toMatch(/^\[Hive\] HI-2122 is back in Review after the merge queue returned it \(a conflict with 1\.0\.0 in src\/main\/projectAgents\.ts/)
+    expect(wakeLine(change)).toBe(`[CW] ${again}. Your card watch has ended: carry on (cw_read_task with latestComment for the comment in full).`)
+    expect(loopWakeLine(change, 'review')).toBe(`[CW] ${again}. You review this card in its loop: carry on with it (cw_read_task with latestComment for the comment in full).`)
+    expect(wakeLines([change, cardChange(8, cardOf({ number: 8, column: 'doing' }), ['column'])])).toMatch(/^\[CW\] HI-2122 is back in Review after the merge queue returned it \(a conflict with 1\.0\.0 in src\/main\/projectAgents\.ts/)
     // A merge check that failed: what changed, not a resolution; many files: within the line, one line.
     expect(resubmittedText('HI-9', { entry: 'e', revision: 'a', target: 'main', reason: 'checks', transient: false, check: 'typecheck' }, 'HB1')).toBe('HI-9 is back in Review after the merge queue returned it (the merge check typecheck failed on the merged result); HB1 changed it and submitted it again: review what changed')
     const many = resubmittedText('HI-9', { ...conflict, files: Array.from({ length: 40 }, (_, i) => `src/${'深'.repeat(30)}/f${i}.ts`), conflicts: undefined } as never, 'HB1')
     const l = loopWakeLine({ ...change, about: { ...change.about, resubmitted: many } }, 'review')
     expect(Buffer.byteLength(JSON.stringify(l))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
     expect(l).not.toMatch(/\n/)
-    expect(l).toMatch(/^\[Hive\] HI-9 is back in Review after the merge queue returned it \(a conflict with 1\.0\.0 in .* and \d+ more\); HB1 resolved it/)
+    expect(l).toMatch(/^\[CW\] HI-9 is back in Review after the merge queue returned it \(a conflict with 1\.0\.0 in .* and \d+ more\); HB1 resolved it/)
   })
 
   it('the wake line is one short line with the card, its column and the latest comment; the reply is lean', () => {
     const c = cardOf({ column: 'review', comments: [{ at: at(5), by: 'Codex (hive)', text: '\n  Review round 2: FAILED — two findings\n1. …' }] })
     const line = wakeLine(cardChange(7, c, ['column']), 1)
     expect(line).not.toMatch(/\n/)
-    expect(line).toMatch(/^\[Hive\] #7 is in Review; latest comment by Codex \(hive\): "Review round 2: FAILED — two findings" \(and 1 more watched card changed\)/)
+    expect(line).toMatch(/^\[CW\] #7 is in Review; latest comment by Codex \(hive\): "Review round 2: FAILED — two findings" \(and 1 more watched card changed\)/)
     expect(wakeLine(cardChange(7, null, 'gone'))).toMatch(/#7 is gone from your board \(archived, deleted or moved to another project\)/)
     // Archived (one card, or a batch, #351): said so, and that only the user brings it back.
-    expect(wakeLine(cardChange(7, cardOf({ archived: true }), 'gone'))).toMatch(/^\[Hive\] #7 was archived \(off the board: only the user brings it back\)\. Your card watch has ended/)
+    expect(wakeLine(cardChange(7, cardOf({ archived: true }), 'gone'))).toMatch(/^\[CW\] #7 was archived \(off the board: only the user brings it back\)\. Your card watch has ended/)
     expect(taskWaitText({ changes: [{ number: 7, column: 'gone', changes: 'gone', by: null, comment: null, archived: true }] })).toBe('#7 was archived')
     expect(limitLine({ cards: [7, 8], changes: [] }, 120)).toMatch(/No change on #7, #8 in 2 h/)
     // HI-2295: a card in Review is said to be there; only the others ask the agent to tell the user.
-    expect(limitLine({ cards: [7], changes: [] }, 30)).toBe('[Hive] No change on #7 in 30 min: your card watch has ended. Tell the user (hive_notify) and ask what to do.')
-    expect(limitLine({ cards: [7], changes: [] }, 30, [], [{ number: 7, state: 'reviewing', reviewer: 'CR1 (cli)' }])).toBe("[Hive] No change on #7 in 30 min: your card watch has ended. #7 is in Review, being reviewed by CR1 (cli). Watch #7 again for its verdict (in a card loop, Hive wakes you with it); don't tell the user about it.")
+    expect(limitLine({ cards: [7], changes: [] }, 30)).toBe('[CW] No change on #7 in 30 min: your card watch has ended. Tell the user (cw_notify) and ask what to do.')
+    expect(limitLine({ cards: [7], changes: [] }, 30, [], [{ number: 7, state: 'reviewing', reviewer: 'CR1 (cli)' }])).toBe("[CW] No change on #7 in 30 min: your card watch has ended. #7 is in Review, being reviewed by CR1 (cli). Watch #7 again for its verdict (in a card loop, Combwork wakes you with it); don't tell the user about it.")
     expect(limitLine({ cards: [7], changes: [] }, 30, [], [{ number: 7, state: 'pool' }])).toMatch(/#7 is in Review, waiting for the reviewer pool to give it to a reviewer\. Watch #7 again/)
     expect(limitLine({ cards: [7], changes: [] }, 30, [], [{ number: 7, state: 'assigned', reviewer: 'CR2' }])).toMatch(/the reviewer pool gave it to CR2, who hasn't started yet\. Watch #7/)
-    expect(limitLine({ cards: [7], changes: [] }, 30, [], [{ number: 7, state: 'review' }])).not.toMatch(/tell the user \(hive_notify\)/)
+    expect(limitLine({ cards: [7], changes: [] }, 30, [], [{ number: 7, state: 'review' }])).not.toMatch(/tell the user \(cw_notify\)/)
     // HI-2381: a card waiting on another agent's card in progress, and that card, are watched again quietly.
-    expect(limitLine({ cards: [8, 10], changes: [] }, 30, [], [{ number: 10, state: 'waits', on: [8] }, { number: 8, state: 'working', reviewer: 'CB1 (cli)' }])).toBe("[Hive] No change on #8, #10 in 30 min: your card watch has ended. #10 waits on #8; #8 is in Doing with CB1 (cli). Watch #10, #8 again: another agent's work is going on; don't tell the user about them.")
-    expect(limitLine({ cards: [10, 11], changes: [] }, 30, [], [{ number: 10, state: 'waits', on: [8] }])).toMatch(/#10 waits on #8\. Watch #10 again: another agent's work is going on; don't tell the user about it; for the rest, tell the user \(hive_notify\) and ask what to do\.$/)
+    expect(limitLine({ cards: [8, 10], changes: [] }, 30, [], [{ number: 10, state: 'waits', on: [8] }, { number: 8, state: 'working', reviewer: 'CB1 (cli)' }])).toBe("[CW] No change on #8, #10 in 30 min: your card watch has ended. #10 waits on #8; #8 is in Doing with CB1 (cli). Watch #10, #8 again: another agent's work is going on; don't tell the user about them.")
+    expect(limitLine({ cards: [10, 11], changes: [] }, 30, [], [{ number: 10, state: 'waits', on: [8] }])).toMatch(/#10 waits on #8\. Watch #10 again: another agent's work is going on; don't tell the user about it; for the rest, tell the user \(cw_notify\) and ask what to do\.$/)
     // Mixed: the card in Review, and the rest told as before.
-    expect(limitLine({ cards: [7, 8], changes: [] }, 30, [], [{ number: 7, state: 'pool' }])).toMatch(/don't tell the user about it; for the rest, tell the user \(hive_notify\) and ask what to do\.$/)
+    expect(limitLine({ cards: [7, 8], changes: [] }, 30, [], [{ number: 7, state: 'pool' }])).toMatch(/don't tell the user about it; for the rest, tell the user \(cw_notify\) and ask what to do\.$/)
     // With a card that left the watch: dropped first, as before.
-    expect(limitLine({ cards: [7, 8], changes: [] }, 30, [{ number: 9, why: 'done', detail: null }])).toMatch(/^\[Hive\] #9 is in Done \(your watch on it ended\)\. No change on #7, #8 in 30 min: your card watch has ended\. Drop the first from your list; for the rest, tell the user \(hive_notify\) and ask what to do\.$/)
-    expect(limitLine({ cards: [7], changes: [] }, 30, [{ number: 9, why: 'done', detail: null }], [{ number: 7, state: 'review' }])).toMatch(/Drop the first from your list; watch #7 again for its verdict \(in a card loop, Hive wakes you with it\); don't tell the user about it\.$/)
+    expect(limitLine({ cards: [7, 8], changes: [] }, 30, [{ number: 9, why: 'done', detail: null }])).toMatch(/^\[CW\] #9 is in Done \(your watch on it ended\)\. No change on #7, #8 in 30 min: your card watch has ended\. Drop the first from your list; for the rest, tell the user \(cw_notify\) and ask what to do\.$/)
+    expect(limitLine({ cards: [7], changes: [] }, 30, [{ number: 9, why: 'done', detail: null }], [{ number: 7, state: 'review' }])).toMatch(/Drop the first from your list; watch #7 again for its verdict \(in a card loop, Combwork wakes you with it\); don't tell the user about it\.$/)
     // Many cards with long names still fit, shortened.
     const many = Array.from({ length: 20 }, (_, i) => i + 100)
     const long = limitLine({ cards: many, changes: [] }, 30, [], many.map((number) => ({ number, state: 'reviewing' as const, reviewer: 'R'.repeat(60) })))
@@ -398,19 +398,19 @@ describe('what counts as a change', () => {
     const line = (card: TaskCard | null, changes: Parameters<typeof wakeAbout>[1], watcher: string) => wakeLine({ ...cardChange(7, card, changes), about: wakeAbout(card, changes, watcher) })
     // Another agent's card (a dependency) moved to Passed: whose it is, who passed it, and that Passed isn't merged (Done is).
     const dep = cardOf({ agent: 'a1', agentName: 'Claude', column: 'passed', comments: comment, history: [{ at: at(1), by: 'Claude (hive)', what: 'Moved to Review' }, passed, { ...passed, what: 'Moved to Passed' }] })
-    expect(line(dep, ['column'], 'a2')).toMatch(/^\[Hive\] #7 \(Claude's card\) is in Passed: Codex \(hive\) passed it \(Passed isn't merged\); latest comment by Codex \(hive\): "Round 3: PASSED"\. Your card watch has ended/)
+    expect(line(dep, ['column'], 'a2')).toMatch(/^\[CW\] #7 \(Claude's card\) is in Passed: Codex \(hive\) passed it \(Passed isn't merged\); latest comment by Codex \(hive\): "Round 3: PASSED"\. Your card watch has ended/)
     // Moved to Passed by hand, with no review: no verdict to name, still not merged.
-    expect(line(cardOf({ agent: 'a1', agentName: 'Claude', column: 'passed' }), ['column'], 'a2')).toMatch(/^\[Hive\] #7 \(Claude's card\) is in Passed \(Passed isn't merged\)\. /)
+    expect(line(cardOf({ agent: 'a1', agentName: 'Claude', column: 'passed' }), ['column'], 'a2')).toMatch(/^\[CW\] #7 \(Claude's card\) is in Passed \(Passed isn't merged\)\. /)
     // The watcher's own card: short as before, with the verdict when that is what changed.
-    expect(line(dep, ['verdict', 'column'], 'a1')).toMatch(/^\[Hive\] #7 is in Passed: Codex \(hive\) passed it; latest comment/)
+    expect(line(dep, ['verdict', 'column'], 'a1')).toMatch(/^\[CW\] #7 is in Passed: Codex \(hive\) passed it; latest comment/)
     const failed = cardOf({ agent: 'a1', column: 'review', history: [{ at: at(2), by: 'Codex (hive)', what: 'Review passed' }, { at: at(9), by: 'Codex (hive)', what: 'Review failed' }] })
-    expect(line(failed, ['verdict'], 'a1')).toMatch(/^\[Hive\] #7 is in Review: Codex \(hive\) failed it\. /)
+    expect(line(failed, ['verdict'], 'a1')).toMatch(/^\[CW\] #7 is in Review: Codex \(hive\) failed it\. /)
     // A move with no verdict among the changes names none; a reviewer waiting for the builder's card hears whose it is.
-    expect(line(cardOf({ agent: 'a1', agentName: 'Claude', column: 'review' }), ['column'], 'r1')).toMatch(/^\[Hive\] #7 \(Claude's card\) is in Review\. /)
-    expect(line(failed, ['column'], 'a1')).toMatch(/^\[Hive\] #7 is in Review\. /)
+    expect(line(cardOf({ agent: 'a1', agentName: 'Claude', column: 'review' }), ['column'], 'r1')).toMatch(/^\[CW\] #7 \(Claude's card\) is in Review\. /)
+    expect(line(failed, ['column'], 'a1')).toMatch(/^\[CW\] #7 is in Review\. /)
     // A card without an agent, or gone: nothing about whose it is.
-    expect(line(cardOf({ agent: null, column: 'passed' }), ['column'], 'a2')).toMatch(/^\[Hive\] #7 is in Passed\. /)
-    expect(line(null, 'gone', 'a2')).toMatch(/^\[Hive\] #7 is gone from your board/)
+    expect(line(cardOf({ agent: null, column: 'passed' }), ['column'], 'a2')).toMatch(/^\[CW\] #7 is in Passed\. /)
+    expect(line(null, 'gone', 'a2')).toMatch(/^\[CW\] #7 is gone from your board/)
     // Still one line, short.
     expect(line(dep, ['column'], 'a2')).not.toMatch(/\n/)
     expect(line(dep, ['column'], 'a2').length).toBeLessThan(260)
@@ -425,7 +425,7 @@ describe('what counts as a change', () => {
     expect(line(dep([h(1, 'Moved to Review', 'Claude (hive)'), h(2, 'Review passed'), h(2, 'Moved to Passed')]), ['column'])).toMatch(/is in Passed: Codex \(hive\) passed it/)
     // Passed, reopened (back to Doing), more work, then moved to Passed by hand with no new review: no verdict is named.
     const reopened = dep([h(1, 'Moved to Review', 'Claude (hive)'), h(2, 'Review passed', 'Old reviewer (hive)'), h(3, 'Moved to Passed'), h(4, 'Moved to Doing', 'You'), h(5, 'Moved to Passed', 'You')])
-    expect(line(reopened, ['column'])).toMatch(/^\[Hive\] #7 \(Claude's card\) is in Passed \(Passed isn't merged\)\. /)
+    expect(line(reopened, ['column'])).toMatch(/^\[CW\] #7 \(Claude's card\) is in Passed \(Passed isn't merged\)\. /)
     expect(line(reopened, ['column'])).not.toMatch(/passed it/)
     // Reviewed again since (in Review once more), or given to another agent: the old verdict doesn't carry over.
     expect(line(dep([h(2, 'Review passed'), h(3, 'Moved to the top of Review', 'You'), h(4, 'Moved to Passed', 'You')]), ['column'])).not.toMatch(/passed it/)
@@ -456,12 +456,12 @@ describe('what counts as a change', () => {
       // Within the saved limit as it is, so nothing is cut from the end.
       expect(bytes(line)).toBeLessThanOrEqual(WAKE_MAX_BYTES)
       expect(line).not.toMatch(/\n|\t/)
-      expect(line).toMatch(/^\[Hive\] #7 \(.{1,40}'s card\) is in Passed: .{1,40} passed it \(Passed isn't merged\); latest comment by .{1,40}: "/u)
-      expect(line).toMatch(/…" \(and 2 more watched cards changed\)\. Your card watch has ended: carry on \(hive_read_task with latestComment for the comment in full\)\.$/)
+      expect(line).toMatch(/^\[CW\] #7 \(.{1,40}'s card\) is in Passed: .{1,40} passed it \(Passed isn't merged\); latest comment by .{1,40}: "/u)
+      expect(line).toMatch(/…" \(and 2 more watched cards changed\)\. Your card watch has ended: carry on \(cw_read_task with latestComment for the comment in full\)\.$/)
     }
     // Whitespace in a name becomes single spaces, trimmed.
     const spaced = cardOf({ agent: 'a1', agentName: '  Spaced\n\tout   name  ', column: 'review' })
-    expect(wakeLine({ ...cardChange(7, spaced, ['column']), about: wakeAbout(spaced, ['column'], 'a2') })).toMatch(/^\[Hive\] #7 \(Spaced out name's card\) is in Review\. /)
+    expect(wakeLine({ ...cardChange(7, spaced, ['column']), about: wakeAbout(spaced, ['column'], 'a2') })).toMatch(/^\[CW\] #7 \(Spaced out name's card\) is in Review\. /)
     // A short comment is kept whole.
     const short = cardOf({ comments: [{ at: at(1), by: 'Codex (hive)', text: 'Round 1: PASSED' }] })
     expect(wakeLine(cardChange(7, short, ['comment']))).toContain('latest comment by Codex (hive): "Round 1: PASSED". ')
@@ -549,7 +549,7 @@ describe('watches (main/watches.ts)', async () => {
   }
   /**
    * Stand-in sessions: an agent's status, whether the user is typing, what Hive typed, the prompts its CLI took, and what
-   * it read (#650: it follows Hive's doorbell with hive_inbox, as a model does: a wake is received, and its watch ends,
+   * it read (#650: it follows Hive's doorbell with cw_inbox, as a model does: a wake is received, and its watch ends,
    * once it is read).
    */
   const fake = (alpha: string) => {
@@ -618,12 +618,12 @@ describe('watches (main/watches.ts)', async () => {
       release()
       await evaluating
       await vi.waitFor(() => expect(st.typed).toHaveLength(1), { timeout: HUNG_MS })
-      expect(st.typed[0]).toMatch(/^\[Hive\] New in your inbox: 1 message and 1 card event \(#\d+\) \(m1, m2\)\. /)
+      expect(st.typed[0]).toMatch(/^\[CW\] New in your inbox: 1 message and 1 card event \(#\d+\) \(m1, m2\)\. /)
       // Counted from just before its Enter (the user's prompt already in), so its lost Enter is pressed again; taken
       // then, the agent reads both (#650: received then, not when taken), the message first, and the watch ends.
       await vi.waitFor(() => expect(cli.enters).toBe(1), { timeout: HUNG_MS })
       await vi.waitFor(() => expect(writer.confirmsInFlight()).toBe(0), { timeout: HUNG_MS })
-      expect(toldOf((await deliveries.readInbox(alpha, 'a1')).items)).toMatch(/^hello \[Hive\] #\d+ /)
+      expect(toldOf((await deliveries.readInbox(alpha, 'a1')).items)).toMatch(/^hello \[CW\] #\d+ /)
       await watches.settled()
       expect((await deliveries.deliveriesOf(alpha, 'a1')).map((r) => `${r.id} ${r.state} ${r.receivedVia ?? ''}`)).toEqual(['m1 received inbox', 'm2 received inbox'])
       expect(watches.watchFor(alpha, 'a1')).toBeNull()
@@ -693,7 +693,7 @@ describe('watches (main/watches.ts)', async () => {
       expect(cli.enters).toBe(2)
       // Still not taken: marked once, with the line (#430); the next wake waits while it is, then goes in.
       expect(marks).toHaveLength(1)
-      expect(marks[0]).toMatch(/^\[Hive\] New in your inbox: 1 card event \(#\d+\) \(m\d+\)\. Call hive_inbox to read it\.$/)
+      expect(marks[0]).toMatch(/^\[CW\] New in your inbox: 1 card event \(#\d+\) \(m\d+\)\. Call cw_inbox to read it\.$/)
       untaken = true
       st.status = 'watching'
       await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['comment'] })
@@ -804,7 +804,7 @@ describe('watches (main/watches.ts)', async () => {
     await inWorkspace(w, () => tasks.commentTask(c.number, 'Round 1: FAILED\nDetails', { kind: 'agent', name: 'Codex (hive)' }))
     await evaluated(w)
     expect(st.typed).toHaveLength(1)
-    expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] #${c.number} is in Doing; latest comment by Codex \\(hive\\): "Round 1: FAILED"`))
+    expect(st.told[0]).toMatch(new RegExp(`^\\[CW\\] #${c.number} is in Doing; latest comment by Codex \\(hive\\): "Round 1: FAILED"`))
     expect(watches.watchFor(alpha, 'a1')).toBeNull()
     // Once: another change wakes nothing.
     await inWorkspace(w, () => tasks.commentTask(c.number, 'again', user))
@@ -829,7 +829,7 @@ describe('watches (main/watches.ts)', async () => {
     expect(r).toMatchObject({ watching: { label: expect.any(String) } })
     await evaluated(w)
     expect(st.typed).toHaveLength(1)
-    expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] #${c.number} is in Doing; latest comment by Reviewer \\(alpha\\): "Round 1: FAILED"`))
+    expect(st.told[0]).toMatch(new RegExp(`^\\[CW\\] #${c.number} is in Doing; latest comment by Reviewer \\(alpha\\): "Round 1: FAILED"`))
     // Without it, the same watch starts from the card as it is now: nothing to tell.
     await watches.registerWatch(w, alpha, 'a1', cond(), 360)
     await evaluated(w)
@@ -999,7 +999,7 @@ describe('watches (main/watches.ts)', async () => {
     await watches.tick(Date.now() + 31 * 60_000)
     await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
     expect(st.told[0]).toMatch(/No change on #\d+ in 30 min: your card watch has ended\. #\d+ is in Review, waiting for its reviewer\. Watch #\d+ again for its verdict/)
-    expect(st.told[0]).not.toMatch(/tell the user \(hive_notify\)/)
+    expect(st.told[0]).not.toMatch(/tell the user \(cw_notify\)/)
     // Being reviewed: named.
     await writeCard(w, c.number, { ...readCard(w, c.number), review: { agent: 'a2', agentName: 'Reviewer', since: new Date().toISOString() }, updatedAt: new Date().toISOString() })
     st.status = 'watching'
@@ -1007,14 +1007,14 @@ describe('watches (main/watches.ts)', async () => {
     await watches.tick(Date.now() + 31 * 60_000)
     await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
     expect(st.told[1]).toMatch(/#\d+ is in Review, being reviewed by Reviewer\./)
-    expect(st.told[1]).not.toMatch(/tell the user \(hive_notify\)/)
+    expect(st.told[1]).not.toMatch(/tell the user \(cw_notify\)/)
     // Back in Doing: the line as before.
     await writeCard(w, c.number, { ...readCard(w, c.number), column: 'doing', review: undefined, updatedAt: new Date().toISOString() })
     st.status = 'watching'
     await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['verdict'] }, 30)
     await watches.tick(Date.now() + 31 * 60_000)
     await vi.waitFor(() => expect(st.told).toHaveLength(3), { timeout: HUNG_MS })
-    expect(st.told[2]).toMatch(/your card watch has ended\. Tell the user \(hive_notify\) and ask what to do\.$/)
+    expect(st.told[2]).toMatch(/your card watch has ended\. Tell the user \(cw_notify\) and ask what to do\.$/)
     await disposeWorkspaceService(w)
   })
 
@@ -1034,7 +1034,7 @@ describe('watches (main/watches.ts)', async () => {
     await watches.tick(Date.now() + 31 * 60_000)
     await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
     expect(st.told[0]).toMatch(/#\d+ is in Review, waiting for its reviewer\. Watch #\d+ again for its verdict/)
-    expect(st.told[0]).not.toMatch(/tell the user \(hive_notify\)/)
+    expect(st.told[0]).not.toMatch(/tell the user \(cw_notify\)/)
     // A reviewer starts while the line is held: named.
     await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['verdict'] }, 30)
     st.status = 'working'
@@ -1052,7 +1052,7 @@ describe('watches (main/watches.ts)', async () => {
     st.status = 'watching'
     await watches.tick(Date.now() + 31 * 60_000)
     await vi.waitFor(() => expect(st.told).toHaveLength(3), { timeout: HUNG_MS })
-    expect(st.told[2]).toMatch(/your card watch has ended\. Tell the user \(hive_notify\) and ask what to do\.$/)
+    expect(st.told[2]).toMatch(/your card watch has ended\. Tell the user \(cw_notify\) and ask what to do\.$/)
     expect(st.told[2]).not.toMatch(/in Review/)
     await disposeWorkspaceService(w)
   })
@@ -1159,7 +1159,7 @@ describe('watches (main/watches.ts)', async () => {
     await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'review' }, builder, { comment: 'Fixed both findings' }))
     await evaluated(w)
     expect(st.typed).toHaveLength(1)
-    expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] #${c.number} \\(Reviewer's card\\) was returned for review \\(round 2\\); latest comment by Reviewer \\(alpha\\): "Fixed both findings"\\. Your card watch has ended`))
+    expect(st.told[0]).toMatch(new RegExp(`^\\[CW\\] #${c.number} \\(Reviewer's card\\) was returned for review \\(round 2\\); latest comment by Reviewer \\(alpha\\): "Fixed both findings"\\. Your card watch has ended`))
     await disposeWorkspaceService(w)
   })
 
@@ -1201,7 +1201,7 @@ describe('watches (main/watches.ts)', async () => {
         vi.useRealTimers()
         watches.testHooks.settleMs = 0
       }
-      expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] #${a} is in Review: Reviewer \\(alpha\\) passed it \\(latest comment by Reviewer \\(alpha\\): "Round 1: PASSED"\\); #${b} is in Doing: Reviewer \\(alpha\\) failed it \\(latest comment by Reviewer \\(alpha\\): "Round 1: FAILED"\\)\\. Your card watch has ended`))
+      expect(st.told[0]).toMatch(new RegExp(`^\\[CW\\] #${a} is in Review: Reviewer \\(alpha\\) passed it \\(latest comment by Reviewer \\(alpha\\): "Round 1: PASSED"\\); #${b} is in Doing: Reviewer \\(alpha\\) failed it \\(latest comment by Reviewer \\(alpha\\): "Round 1: FAILED"\\)\\. Your card watch has ended`))
       await disposeWorkspaceService(w)
     })
 
@@ -1221,7 +1221,7 @@ describe('watches (main/watches.ts)', async () => {
       const r = await watches.registerWatch(w, alpha, 'a1', { cards: [b], ...verdictOrDone })
       expect('watching' in r).toBe(true)
       await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
-      expect(st.told[1]).toMatch(new RegExp(`^\\[Hive\\] #${b} is in Doing: Reviewer \\(alpha\\) failed it`))
+      expect(st.told[1]).toMatch(new RegExp(`^\\[CW\\] #${b} is in Doing: Reviewer \\(alpha\\) failed it`))
       // After that wake, the builder's own work (a comment in Doing, where the failure sent it, and a move back to Review)
       // isn't news to its next watch…
       st.status = 'watching'
@@ -1261,7 +1261,7 @@ describe('watches (main/watches.ts)', async () => {
         ;(globalThis as { Date: DateConstructor }).Date = RealDate
       }
       await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
-      expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] #${b} is in Doing: Reviewer \\(alpha\\) failed it`))
+      expect(st.told[0]).toMatch(new RegExp(`^\\[CW\\] #${b} is in Doing: Reviewer \\(alpha\\) failed it`))
       // One change, one time: its lines share it, so its move is known as its own.
       const card = await inWorkspace(w, () => tasks.getTask(b, w))
       const failed = card.history.findLast((h) => h.what.startsWith('Review failed'))!
@@ -1337,7 +1337,7 @@ describe('watches (main/watches.ts)', async () => {
       st.status = 'watching'
       await watches.registerWatch(w, alpha, 'a1', { cards: [b], changes: ['agent'] })
       await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
-      expect(st.told[1]).toMatch(new RegExp(`^\\[Hive\\] #${b} \\(Reviewer's card\\) is in Review`))
+      expect(st.told[1]).toMatch(new RegExp(`^\\[CW\\] #${b} \\(Reviewer's card\\) is in Review`))
       // Archived between watches: told as gone.
       await inWorkspace(w, () => tasks.archiveTask(c, true))
       st.status = 'watching'
@@ -1573,7 +1573,7 @@ describe('watches (main/watches.ts)', async () => {
       await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'done' }, user))
       await evaluated(w)
       await vi.waitFor(() => expect(st.told).toHaveLength(before + 1), { timeout: HUNG_MS })
-      expect(st.told.at(-1)).toMatch(new RegExp(`^\\[Hive\\] #${c.number} is in Done \\(your watch on it ended\\)`))
+      expect(st.told.at(-1)).toMatch(new RegExp(`^\\[CW\\] #${c.number} is in Done \\(your watch on it ended\\)`))
       await vi.waitFor(() => expect(watches.watchFor(alpha, 'a1')).toBeNull(), { timeout: HUNG_MS })
     }
     // Saved before HI-2153 on a card already Done, waiting for a column change that never comes (HR2 on HI-2148).
@@ -1594,7 +1594,7 @@ describe('watches (main/watches.ts)', async () => {
       await evaluated(w)
       expect(st.told).toHaveLength(before + 1)
     }, { timeout: HUNG_MS })
-    expect(st.told.at(-1)).toMatch(new RegExp(`^\\[Hive\\] #${c.number} is in Done \\(your watch on it ended\\)`))
+    expect(st.told.at(-1)).toMatch(new RegExp(`^\\[CW\\] #${c.number} is in Done \\(your watch on it ended\\)`))
     await vi.waitFor(() => expect(watches.watchFor(alpha, 'a1')).toBeNull(), { timeout: HUNG_MS })
     await disposeWorkspaceService(w)
   })
@@ -1807,9 +1807,9 @@ describe('watches (main/watches.ts)', async () => {
       st.status = 'watching'
       await vi.waitFor(() => expect(watches.watchFor(alpha, 'a1')).not.toBeNull(), { timeout: HUNG_MS })
       await watches.settled()
-      expect((await deliveries.deliveriesOf(alpha, 'a1')).map((r) => `${r.state}: ${r.detail}`)).toEqual(['uncertain: may not have reached it: Hive stopped while offering it'])
+      expect((await deliveries.deliveriesOf(alpha, 'a1')).map((r) => `${r.state}: ${r.detail}`)).toEqual(['uncertain: may not have reached it: Combwork stopped while offering it'])
       await deliveries.offerAllForTests()
-      expect(st.typed).toEqual([st.typed[0], `${st.typed[0]} (m1 again: Hive restarted while offering it, so it may repeat.)`])
+      expect(st.typed).toEqual([st.typed[0], `${st.typed[0]} (m1 again: Combwork restarted while offering it, so it may repeat.)`])
       await watches.settled()
       expect((await deliveries.deliveriesOf(alpha, 'a1')).map((r) => r.state)).toEqual(['received'])
       expect(watches.watchFor(alpha, 'a1')).toBeNull()
@@ -1929,16 +1929,35 @@ describe('watches (main/watches.ts)', async () => {
     await watches.settled()
     // The file as a build from before #649 left it, typing when Hive stopped.
     const data = savedOf(path)
-    data[0].fired = { line: `[Hive] #${c.number} has news. Your card watch has ended: carry on.`, at: new Date().toISOString(), cards: [c.number], sending: new Date().toISOString() }
+    data[0].fired = { line: `[CW] #${c.number} has news. Your card watch has ended: carry on.`, at: new Date().toISOString(), cards: [c.number], sending: new Date().toISOString() }
     await putSaved(path, data)
     watches.forgetWatches(w)
     // Read back (as its agent's state asks for it), handed over and typed.
     watches.watchFor(alpha, 'a1')
     await vi.waitFor(() => expect(st.typed).toHaveLength(1), { timeout: HUNG_MS })
     await watches.settled()
-    expect(st.typed[0]).toMatch(/ \(m1 again: Hive restarted while typing it, so it may repeat\.\)$/)
+    expect(st.typed[0]).toMatch(/ \(m1 again: Combwork restarted while typing it, so it may repeat\.\)$/)
     // Received (its agent read it): the watch ends.
     expect(watches.watchFor(alpha, 'a1')).toBeNull()
+    await disposeWorkspaceService(w)
+  })
+
+  it('a wake fired before HI-2463 ("[Hive] ", hive_ tools) is read back and handed over with the current names (HI-2463)', async () => {
+    const { w, path, alpha } = await open()
+    const st = fake(alpha)
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'Renamed', project: 'alpha' }, user))
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['comment'] })
+    await watches.settled()
+    // As an older build left it: fired, not handed over yet, in its own words.
+    const data = savedOf(path)
+    data[0].fired = { line: `[Hive] #${c.number} has news. Read it (hive_read_task), then watch again (hive_wait_for_tasks); hive-progress for long runs.`, at: new Date().toISOString(), cards: [c.number] }
+    await putSaved(path, data)
+    watches.forgetWatches(w)
+    watches.watchFor(alpha, 'a1')
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    await watches.settled()
+    expect(st.typed[0]).toMatch(/^\[CW\] New in your inbox: /)
+    expect(st.told[0]).toBe(`[CW] #${c.number} has news. Read it (cw_read_task), then watch again (cw_wait_for_tasks); cw-progress for long runs.`)
     await disposeWorkspaceService(w)
   })
 
@@ -2450,7 +2469,7 @@ describe('watches (main/watches.ts)', async () => {
 
   it("the watches file's size, measured watch by watch as its limit is checked (#321), is its text's exactly", () => {
     const one = { id: 'a1b2c3', projectPath: 'C:\\ws\\alpha', agentId: 'a1', cond: { cards: [1, 2], changes: ['comment'] }, marks: { 1: { column: 'doing', comment: 0, verdict: 0, agent: '', archived: false } }, since: '2026-10-08T00:00:00.000Z', limitMinutes: 120, limitAt: '2026-10-08T02:00:00.000Z' }
-    const odd = { ...one, id: 'ffff00', agentId: 'b🐝', fired: { line: '[Hive] "quoted" ünïcødé\nline', at: '2026-10-08T01:00:00.000Z', cards: [], sending: '2026-10-08T01:00:01.000Z' }, released: [{ number: 3, why: 'blocked', detail: null }] }
+    const odd = { ...one, id: 'ffff00', agentId: 'b🐝', fired: { line: '[CW] "quoted" ünïcødé\nline', at: '2026-10-08T01:00:00.000Z', cards: [], sending: '2026-10-08T01:00:01.000Z' }, released: [{ number: 3, why: 'blocked', detail: null }] }
     const text = (ws: object[], invalid: unknown[]) => Buffer.byteLength(JSON.stringify({ version: 1, watches: ws, ...(invalid.length ? { invalid } : {}) }, null, 2) + '\n')
     for (const ws of [[], [one], [one, odd], Array.from({ length: 30 }, (_, i) => ({ ...odd, id: `w${i}` }))])
       for (const invalid of [[], [{ junk: true }, 'text', 42]]) expect(watches.savedFileBytes(ws, invalid), `${ws.length} watches, ${invalid.length} invalid`).toBe(text(ws, invalid))
@@ -2483,14 +2502,14 @@ describe('watches (main/watches.ts)', async () => {
 describe("the lanes-running tail of the Assistant's wake", () => {
   const bytes = (x: string) => Buffer.byteLength(JSON.stringify(x))
   it('is added once, after the line', () => {
-    const line = '[Hive] #1 is in Doing. Your card watch has ended: carry on.'
+    const line = '[CW] #1 is in Doing. Your card watch has ended: carry on.'
     expect(withLanesTail(line)).toBe(line + lanesRunningTail())
     expect(withLanesTail(withLanesTail(line))).toBe(line + lanesRunningTail())
     // #726: a card outside the lanes goes in the same watch.
-    expect(lanesRunningTail()).toMatch(/one lane watch, with any card outside them as cards \(hive_wait_for_tasks with lanes \["all"\], cards, wake; run-lanes\)/)
+    expect(lanesRunningTail()).toMatch(/one lane watch, with any card outside them as cards \(cw_wait_for_tasks with lanes \["all"\], cards, wake; run-lanes\)/)
   })
   it('a long line is cut to make room: the tail is always whole, and the line fits', () => {
-    const out = withLanesTail('[Hive] ' + 'x'.repeat(2000))
+    const out = withLanesTail('[CW] ' + 'x'.repeat(2000))
     expect(out.endsWith('…' + lanesRunningTail())).toBe(true)
     expect(bytes(out)).toBeLessThanOrEqual(WAKE_MAX_BYTES)
   })

@@ -118,7 +118,7 @@ const renamable = (dir) => {
     const c3 = await create('Retry three')
     const c4 = await create('Retry four')
     const workspaceToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
-    /** A lane recorded through the Agent API, as the Assistant's hive_lane start records one. */
+    /** A lane recorded through the Agent API, as the Assistant's cw_lane start records one. */
     const apiLane = async (cards) => {
       const res = await fetch(`http://127.0.0.1:${PORT}/v1/lanes`, { method: 'POST', headers: { Authorization: `Bearer ${workspaceToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ project: 'alpha', builder: 'B1', reviewer: 'R1', cards }) })
       return { status: res.status, body: await res.json().catch(() => null) }

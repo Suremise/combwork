@@ -16,11 +16,11 @@
     "note": "Claude Code's permission mode auto: its name, as agents and the Agent API read it (the window has its own message)."
   },
   "mode.claude.autoMaybe": {
-    "text": "Claude Code may not offer Auto with {model}. If it doesn't, it runs in Manual (asking before edits and commands), and Hive shows that mode.",
+    "text": "Claude Code may not offer Auto with {model}. If it doesn't, it runs in Manual (asking before edits and commands), and Combwork shows that mode.",
     "note": "Without Claude Code's word on this model (model: its name), the guess from 2.1.286: Haiku doesn't run in Auto. Auto and Manual are the modes' names."
   },
   "mode.claude.autoUnsupported": {
-    "text": "Claude Code doesn't offer Auto with {model}: it runs in Manual instead (asking before edits and commands), and Hive shows that mode.",
+    "text": "Claude Code doesn't offer Auto with {model}: it runs in Manual instead (asking before edits and commands), and Combwork shows that mode.",
     "note": "Claude Code said it won't run this model (model: its name) in Auto (its initialize reply, #129). Auto and Manual are the modes' names."
   },
   "mode.claude.bypassPermissions.desc": {

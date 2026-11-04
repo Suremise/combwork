@@ -1,5 +1,5 @@
 // A doorbell only once the hive tools are there (#865): a resumed Claude Code is ready at its SessionStart before its
-// hive MCP server has connected, and a doorbell then is a turn that can't call hive_inbox. The launch's hive server
+// hive MCP server has connected, and a doorbell then is a turn that can't call cw_inbox. The launch's hive server
 // tells Hive when the CLI has connected it (POST /v1/launch/connected, with the launch's own token); until then Hive
 // types no line into the session, at most Settings → Advanced → "hive tools: wait to connect" from when it became ready.
 // On fake Claude Code (fake-claude/), which connects the real hive server as it starts, or holds it back while
@@ -67,13 +67,13 @@ const check = (name, ok, extra = '') => {
     const assistantNow = async () => (await inv('session:live')).find((s) => s.agentId === 'assistant')?.status
     check('the Assistant starts', !!(await until(async () => ['ready', 'finished'].includes(await assistantNow()), HUNG_MS)), await assistantNow())
     const asAssistant = (method, route, body) => call(method, route, body, JSON.parse(fs.readFileSync(asTokenFile, 'utf8')).token)
-    // Hive's doorbells in the builder's conversation (#650: a prompt "[Hive] New in your inbox: …", read with hive_inbox).
+    // Hive's doorbells in the builder's conversation (#650: a prompt "[CW] New in your inbox: …", read with cw_inbox).
     let sessionId = ''
     const bells = () => {
       const dir = path.join(claudeHome, 'projects')
       const f = fs.existsSync(dir) ? fs.readdirSync(dir).map((d) => path.join(dir, d, `${sessionId}.jsonl`)).find((x) => fs.existsSync(x)) : null
       if (!f) return []
-      return fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((e) => e.type === 'user' && typeof e.message?.content === 'string' && e.message.content.startsWith('[Hive] New in your inbox')).map((e) => e.message.content)
+      return fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((e) => e.type === 'user' && typeof e.message?.content === 'string' && e.message.content.startsWith('[CW] New in your inbox')).map((e) => e.message.content)
     }
     const delivery = (id) => deliveriesOf(alpha).find((d) => d.id === id) ?? null
     const hold = () => fs.writeFileSync(path.join(claudeHome, 'fake-mcp-hold-Builder'), '')

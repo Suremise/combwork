@@ -86,7 +86,7 @@ describe('the start context in the hook replies (#1065)', () => {
     sessions.inboxNotice = null
     sessions.startContext = async (_state, source) => {
       given.push(source)
-      return `[Hive] view (${source})`
+      return `[CW] view (${source})`
     }
   })
   afterAll(async () => {
@@ -100,12 +100,12 @@ describe('the start context in the hook replies (#1065)', () => {
     const replies = await replay(agent(codex), codexHooks.hooks)
     const named = codexHooks.hooks.map((b, i) => [b.hook_event_name, replies[i]?.hookSpecificOutput ? (replies[i]!.hookSpecificOutput as { additionalContext: string }).additionalContext : null])
     expect(named).toEqual([
-      ['SessionStart', '[Hive] view (startup)'],
+      ['SessionStart', '[CW] view (startup)'],
       ['UserPromptSubmit', null],
       ['PreCompact', null],
       ['PostCompact', null],
-      ['SessionStart', '[Hive] view (resume)'],
-      ['SessionStart', '[Hive] view (compact)'],
+      ['SessionStart', '[CW] view (resume)'],
+      ['SessionStart', '[CW] view (compact)'],
       ['UserPromptSubmit', null]
     ])
   })
@@ -116,10 +116,10 @@ describe('the start context in the hook replies (#1065)', () => {
     const replies = await replay(st, copilotHooks.hooks)
     expect(copilotHooks.hooks.map((b, i) => [b.hook_event_name, replies[i]])).toEqual([
       ['UserPromptSubmit', null],
-      ['SessionStart', { additionalContext: '[Hive] view (new)' }],
+      ['SessionStart', { additionalContext: '[CW] view (new)' }],
       ['Stop', null],
       ['PreCompact', null],
-      ['UserPromptSubmit', { additionalContext: '[Hive] view (compact)' }],
+      ['UserPromptSubmit', { additionalContext: '[CW] view (compact)' }],
       ['Stop', null],
       ['SessionEnd', null]
     ])

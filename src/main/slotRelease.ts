@@ -1,5 +1,5 @@
 /**
- * Release Slot for the Agent API and the Assistant's hive_release_slot (#1561): the two releases the window offers in an
+ * Release Slot for the Agent API and the Assistant's cw_release_slot (#1561): the two releases the window offers in an
  * agent's ⋯, by slot name. A carried slot (#1441: an agent's adopted worktree, kept for it under a carried lease) stops
  * being kept for it; a held writer (#1506: a run that is over still holding the slot, its processes not known to have
  * ended) is cleared once the caller confirms the slot and run it was shown, ending the processes Hive lists first when

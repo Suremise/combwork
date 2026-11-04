@@ -129,7 +129,7 @@
   "panes.messages.notDeliveredDetail": "アイドルではないか、ターミナルで入力中です。メッセージは受信箱に残ります。アイドルになってからもう一度試してください。",
   "panes.messages.overdue": "{n, plural, other {期限切れ#件}}",
   "panes.messages.overdueTip": "{n, plural, other {#件の配信が期限内に確認されませんでした：エージェントはまだ対応したと伝えていません。}}",
-  "panes.messages.tip": "{agent}宛ての{n, plural, other {#件のメッセージ}}が、まだ取得・確認されていません。アイドルになると次の行として提示されます。hive_inboxでも読めます。",
+  "panes.messages.tip": "{agent}宛ての{n, plural, other {#件のメッセージ}}が、まだ取得・確認されていません。アイドルになると次の行として提示されます。cw_inboxでも読めます。",
   "panes.messages.tipNoWakes": "{agent}宛ての{n, plural, other {#件のメッセージ}}が、まだ取得・確認されていません",
   "panes.messages.unread": "{n, plural, other {未読#件}}",
   "panes.pages.agentsTip": "{button, select, none {ページ{page}} other {{button}（ページ{page}）}}：{agents}{added, select, yes {、アシスタントが追加したエージェントあり} other {}}{key, select, none {} other {（次のページは{key}）}}",

@@ -74,7 +74,7 @@ const PROVIDERS = {
   // it never asks, and needs no bypass mode (which Claude Code asks to accept once). One value after `=`: the option
   // takes a list, and as separate words it also took the first task Hive passes last, so an agent started on a card sat
   // idle (#498).
-  'claude-code': { provider: 'claude-code', executable: '', mode: 'acceptEdits', extraArgs: '--allowedTools=mcp__hive,Bash,PowerShell,Skill,Monitor' },
+  'claude-code': { provider: 'claude-code', executable: '', mode: 'acceptEdits', extraArgs: '--allowedTools=mcp__combwork,Bash,PowerShell,Skill,Monitor' },
   codex: { provider: 'codex', executable: '', mode: 'full-access' },
   // The real Copilot CLI, offline against the scripted stand-in model (tests/e2e/fake-copilot-api.cjs), in a home of the
   // run's own: a fake as far as cost and sign-in go (no credits, none), Copilot's own tools and hooks for the rest.
@@ -205,12 +205,12 @@ function observeTranscript(items, skillNames, skillRefs = new Map()) {
       }
     }
   }
-  // Names of hive tools in the transcript: a direct call (mcp__hive__x, hive.x, Hive's "hive · x"), or one written in a
-  // Codex script (tools.mcp__hive__x(...)), which may or may not have run: a script whose calls were read from its
+  // Names of hive tools in the transcript: a direct call (mcp__combwork__x, combwork.x, Combwork's "combwork · x"), or one written in a
+  // Codex script (tools.mcp__combwork__x(...)), which may or may not have run: a script whose calls were read from its
   // rollout (HI-2235) is a `script` item, its calls tools of their own.
-  const hiveName = (name) => /(?:^|[_.\s])(hive_[a-z]+(?:_[a-z]+)*)$/.exec(name)?.[1]
+  const hiveName = (name) => /(?:^|[_.\s])(cw_[a-z]+(?:_[a-z]+)*)$/.exec(name)?.[1]
   const scripts = items.filter((x) => x.kind === 'script').map((x) => ({ name: x.tool.name, input: String(x.tool.input ?? '') }))
-  const hiveMentions = [...tools, ...scripts].flatMap((t) => (hiveName(t.name) ? [hiveName(t.name)] : [...t.input.matchAll(/\btools\.(?:mcp__hive__)?(hive_[a-z]+(?:_[a-z]+)*)\s*\(/g)].map((m) => m[1])))
+  const hiveMentions = [...tools, ...scripts].flatMap((t) => (hiveName(t.name) ? [hiveName(t.name)] : [...t.input.matchAll(/\btools\.(?:mcp__combwork__)?(cw_[a-z]+(?:_[a-z]+)*)\s*\(/g)].map((m) => m[1])))
   const replies = items.filter((x) => x.kind === 'assistant').map((x) => x.text)
   return { tools, skillsRead, skillRefsRead, hiveMentions, finalReply: replies.at(-1) ?? '', replies }
 }
@@ -683,11 +683,11 @@ async function runScenario(sc, providerKey, opts = {}) {
         if (!['ready', 'finished', 'working'].includes((await up())?.status)) throw new Error(`setup: the Assistant didn't get ready (${(await up())?.status ?? 'not running'})`)
       },
       /**
-       * Leaves one of alpha's agents ('coder') a message as the Assistant does (#650): hive_message_agent through the real
+       * Leaves one of alpha's agents ('coder') a message as the Assistant does (#650): cw_message_agent through the real
        * hive MCP server with the Assistant's own token (the Assistant started first if it isn't); `extra`: more of the tool's
        * arguments (#652: `card`). Its reply's text.
        */
-      assistantMessage: async (key, text, extra = {}) => ctx.assistantTool('hive_message_agent', { project: 'alpha', agent: ctx.agents[key].name, text, ...extra }),
+      assistantMessage: async (key, text, extra = {}) => ctx.assistantTool('cw_message_agent', { project: 'alpha', agent: ctx.agents[key].name, text, ...extra }),
       /**
        * Calls a hive tool as the Assistant does: through the real hive MCP server with the Assistant's own token (the
        * Assistant started first if it isn't), its journal's tools offered (#1032). The reply's text.
@@ -695,9 +695,9 @@ async function runScenario(sc, providerKey, opts = {}) {
       assistantTool: async (name, args) => {
         await ctx.startAssistant()
         const tokenFile = path.join(userData, 'assistant-api', `${require('crypto').createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`)
-        const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
+        const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
           input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
-          env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${port}`, HIVE_WORKSPACE: ws, HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'agents', HIVE_JOURNAL: '1', HIVE_API_TOKEN_FILE: tokenFile, HIVE_API_TOKEN: '', HIVE_PROJECT: '' }),
+          env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${port}`, CW_WORKSPACE: ws, HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'agents', HIVE_JOURNAL: '1', CW_API_TOKEN_FILE: tokenFile, HIVE_API_TOKEN: '', CW_PROJECT: '' }),
           timeout: 60000
         }).toString()
         return JSON.parse(out.split('\n')[0]).result?.content?.[0]?.text ?? ''
@@ -881,7 +881,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     // does nothing on a line it has no script for) is typed its steps once that turn is over.
     let hiveLine = null
     if (byHive && !endedAtLaunch) {
-      const lineOf = async () => (await conversation()).find((x) => x.kind === 'user' && String(x.text ?? '').startsWith('[Hive]'))?.text ?? null
+      const lineOf = async () => (await conversation()).find((x) => x.kind === 'user' && String(x.text ?? '').startsWith('[CW]'))?.text ?? null
       await lib.until(async () => !!(hiveLine = await lineOf()) && (!p.fake || ['ready', 'finished'].includes((await live())?.status)), 60000)
       if (!hiveLine) {
         result.error = "Hive's line never reached the session under test"
@@ -1014,13 +1014,13 @@ async function runScenario(sc, providerKey, opts = {}) {
     const states = await ctx.statesSeen(statesFrom).catch(() => [])
     observed.turnWatch = states.length ? (states.findLast((x) => x.status === 'watching')?.watch ?? null) : observed.status === 'watching' ? observed.watch : null
     // What Hive woke it with (#402), in order: a line it typed in, or (#650: its doorbell) what the session's next
-    // hive_inbox call read, the inbox's own items after the doorbell. Codex calls hive tools from its code tool (Script):
-    // its read is the hive_inbox call the script made (HI-2235); with the script's calls unknown, the doorbell's line.
+    // cw_inbox call read, the inbox's own items after the doorbell. Codex calls hive tools from its code tool (Script):
+    // its read is the cw_inbox call the script made (HI-2235); with the script's calls unknown, the doorbell's line.
     observed.wakeLines = code.items.flatMap((x, i) => {
       const line = String(x.kind === 'user' ? (x.text ?? '') : '').trim()
-      if (!line.startsWith('[Hive]')) return []
-      if (!line.startsWith('[Hive] New in your inbox: ')) return [line.slice(0, 1000)]
-      const read = code.items.slice(i + 1).find((y) => y.kind === 'tool' && /hive_inbox/.test(y.tool.name))
+      if (!line.startsWith('[CW]')) return []
+      if (!line.startsWith('[CW] New in your inbox: ')) return [line.slice(0, 1000)]
+      const read = code.items.slice(i + 1).find((y) => y.kind === 'tool' && /cw_inbox/.test(y.tool.name))
       return [String(read?.tool.result ?? line).trim().slice(0, 1000)]
     })
     observed.guidance = result.guidance
@@ -1033,7 +1033,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     observed.slotLog = readMcpLog(slotLog)
     // Any Agent API token (the workspace's, or an agent's for this launch) in what the session printed or said.
     // Every one this Hive issued (its record, knownTokens), each launch's hook token among them (HI-2262, Darren's
-    // decision: HIVE_HOOK_TOKEN stays in the session's environment, so a listing of it would print that), those of
+    // decision: CW_HOOK_TOKEN stays in the session's environment, so a listing of it would print that), those of
     // launches long ended too.
     const known = knownTokens(tokenLog, apiToken)
     const tokens = known.map((t) => t.token)

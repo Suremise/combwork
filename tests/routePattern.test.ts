@@ -14,7 +14,7 @@ describe('routePattern', () => {
     expect(params('/v1/tasks/:n', '/v1/tasks/12/start')).toBeNull()
   })
 
-  it('takes an empty agent: the call that names none (hive_agent_activity with no agent)', () => {
+  it('takes an empty agent: the call that names none (cw_agent_activity with no agent)', () => {
     expect(params('/v1/projects/:name/agents/:agent/activity', '/v1/projects/alpha/agents//activity')).toEqual(['alpha', ''])
     expect(params('/v1/projects/:name/agents/:agent/activity', '/v1/projects/alpha/agents/B1/activity')).toEqual(['alpha', 'B1'])
     expect(params('/v1/projects/:name/agents/:agent', '/v1/projects/alpha/agents/')).toEqual(['alpha', ''])

@@ -36,7 +36,7 @@ const check = (name, ok, extra = '') => {
   const archiveLog = path.join(fx.tools, 'archive.log')
   const exitFile = path.join(fx.tools, 'archive-exit.txt')
   const archive = path.join(fx.tools, 'archive.js')
-  fs.writeFileSync(archive, ["const fs = require('fs')", `fs.appendFileSync(${JSON.stringify(archiveLog)}, process.env.HIVE_SLOT + ' ' + fs.existsSync('.git') + '\\n')`, `process.exit(Number(fs.readFileSync(${JSON.stringify(exitFile)}, 'utf8')))`, ''].join('\n'))
+  fs.writeFileSync(archive, ["const fs = require('fs')", `fs.appendFileSync(${JSON.stringify(archiveLog)}, process.env.CW_SLOT + ' ' + fs.existsSync('.git') + '\\n')`, `process.exit(Number(fs.readFileSync(${JSON.stringify(exitFile)}, 'utf8')))`, ''].join('\n'))
   const archived = () => (fs.existsSync(archiveLog) ? fs.readFileSync(archiveLog, 'utf8').trim().split('\n').filter(Boolean) : [])
   const h = await q.startHive(fx, { port: PORT, keepOptions: true })
   try {

@@ -9,7 +9,7 @@ describe('the tool list’s size and its parts', () => {
   const DESC = 'Add a card, "quoted"\nover two lines — café 🐝'
   const list = [
     {
-      name: 'hive_create_task',
+      name: 'cw_create_task',
       description: DESC,
       inputSchema: {
         type: 'object',
@@ -22,7 +22,7 @@ describe('the tool list’s size and its parts', () => {
         required: ['description']
       }
     },
-    { name: 'hive_inbox', description: 'What Hive has for you', inputSchema: { type: 'object', properties: {} } },
+    { name: 'cw_inbox', description: 'What Hive has for you', inputSchema: { type: 'object', properties: {} } },
     { name: 'no_description', inputSchema: { type: 'object' } }
   ]
 

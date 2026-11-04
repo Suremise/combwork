@@ -2,7 +2,7 @@
 // format and its one check (the schema's), the chain (Model file → CLI → Workspace → Default, and API → Workspace →
 // Default with no session), model ID matching (exact, then the base ID; aliases through models.ts; "model unknown"),
 // one file per model in a CLI folder (save refused, import as a test copy, Promote), outdated overrides falling
-// through, a session's resolved texts in a HIVE_DIALECT_FILE, and the bundled sync of dialect files.
+// through, a session's resolved texts in a CW_DIALECT_FILE, and the bundled sync of dialect files.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -402,13 +402,13 @@ describe('a session’s resolved texts for hive-mcp.js', () => {
   const dir = tempDir('hive-dialects-launch-')
   afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
-  it('go in a HIVE_DIALECT_FILE the process loader reads', async () => {
+  it('go in a CW_DIALECT_FILE the process loader reads', async () => {
     write(dir, 'ws/claude-code/cli.json', file({ 'a.named': 'At {project}.' }))
     const chain = await resolveSessionChain(join(dir, 'ws'), { cli: 'claude-code', modelId: 'claude-opus-5-5' }, SCHEMA)
     const launch = join(dir, 'launch')
     mkdirSync(launch)
     const { file: f, env } = await writeDialectFile(launch, chain)
-    expect(env).toEqual({ HIVE_DIALECT_FILE: f, HIVE_DIALECT: chain.hash })
+    expect(env).toEqual({ CW_DIALECT_FILE: f, CW_DIALECT: chain.hash })
     expect(chainFromFile(readFileSync(f, 'utf8'))).toEqual({ texts: { 'a.named': 'At {project}.' }, files: ['claude-code/cli.json'], hash: chain.hash })
   })
 })

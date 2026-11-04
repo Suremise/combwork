@@ -136,22 +136,22 @@ const check = (name, ok, extra = '') => {
       for (const l of lines.map((x) => JSON.parse(x)).reverse()) {
         const f = l.opts?.['--mcp-config']
         const servers = f && fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')).mcpServers : null
-        if (agentId === 'assistant' ? l.cwd?.toLowerCase() === ws.toLowerCase() : servers?.hive?.env?.HIVE_AGENT_ID === agentId) return servers
+        if (agentId === 'assistant' ? l.cwd?.toLowerCase() === ws.toLowerCase() : servers?.combwork?.env?.HIVE_AGENT_ID === agentId) return servers
       }
       return null
     }
     const a = await lib.until(() => launched('assistant'), 30000)
     const b = await lib.until(() => launched(agent.id), 30000)
     const c = await lib.until(() => launched(otherAgent.id), 30000)
-    check("the Assistant's launch has notes and the hive server, not sandbox", !!a?.notes && !!a?.hive && !a?.sandbox && !a?.extra, JSON.stringify(Object.keys(a ?? {})))
-    check("demo's agent has sandbox and the hive server, not notes or extra", !!b?.sandbox && !!b?.hive && !b?.notes && !b?.extra, JSON.stringify(Object.keys(b ?? {})))
+    check("the Assistant's launch has notes and the hive server, not sandbox", !!a?.notes && !!a?.combwork && !a?.sandbox && !a?.extra, JSON.stringify(Object.keys(a ?? {})))
+    check("demo's agent has sandbox and the hive server, not notes or extra", !!b?.sandbox && !!b?.combwork && !b?.notes && !b?.extra, JSON.stringify(Object.keys(b ?? {})))
     check("…without Hive's own fields (its tags)", !('tags' in (c?.notes ?? { tags: 1 })) && !('description' in (c?.notes ?? {})), JSON.stringify(c?.notes))
 
     // --- The Agent API: where each is added for the workspace's token; only its own project's for an agent's.
     const of = (body, n) => body?.find((m) => m.name === n)
     const wide = await api('/v1/mcp', apiToken)
     check('GET /v1/mcp says where notes is added', wide.status === 200 && JSON.stringify(of(wide.body, 'notes')?.added) === JSON.stringify({ projects: ['other'], assistant: true }) && JSON.stringify(of(wide.body, 'extra')?.added) === JSON.stringify({ projects: [], assistant: false }) && !('globallyEnabled' in (of(wide.body, 'notes') ?? {})), JSON.stringify(wide))
-    const tokenOf = (servers) => JSON.parse(fs.readFileSync(servers.hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token
+    const tokenOf = (servers) => JSON.parse(fs.readFileSync(servers.combwork.env.CW_API_TOKEN_FILE, 'utf8')).token
     const demoView = await api('/v1/mcp', tokenOf(b))
     check("demo's agent hears only about demo: sandbox added, notes not, no projects or Assistant", demoView.status === 200 && of(demoView.body, 'sandbox')?.added === true && of(demoView.body, 'notes')?.added === false && demoView.body.every((m) => typeof m.added === 'boolean' && !('assistant' in m) && !('projects' in m)) && !JSON.stringify(demoView.body).includes('other'), JSON.stringify(demoView))
     const otherView = await api('/v1/mcp', tokenOf(c))

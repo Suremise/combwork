@@ -25,6 +25,16 @@ describe("a session's environment", () => {
     for (const k of ['CLAUDECODE', 'ELECTRON_RUN_AS_NODE', 'CHROME_CRASHPAD_PIPE_NAME']) expect(env[k], k).toBeUndefined()
   })
 
+  it('drops inherited CW_ variables too (HI-2463: the public names), so a session gets only those Combwork gives it now', () => {
+    // A session started from a shell inside another Combwork or Hive session inherits that one's identity under both names.
+    set({ CW_API_TOKEN_FILE: 'C:/other/token.json', CW_AGENT: 'HB9', CW_SLOT: 'slot-z', HIVE_API_URL: 'http://127.0.0.1:1', HIVE_AGENT: 'HB8', CWD_LIKE: 'kept', CWX: 'kept' })
+    const env = childEnv({ CW_AGENT: 'HB2', CW_API_URL: 'http://127.0.0.1:47822' })
+    expect(Object.keys(env).filter((k) => k.startsWith('CW_')).sort()).toEqual(['CW_AGENT', 'CW_API_URL'])
+    expect([env.CW_AGENT, env.CW_API_URL]).toEqual(['HB2', 'http://127.0.0.1:47822'])
+    expect(Object.keys(env).filter((k) => k.startsWith('HIVE_'))).toEqual([])
+    expect([env.CWD_LIKE, env.CWX]).toEqual(['kept', 'kept'])
+  })
+
   it('keeps a name added to the list, and only that one; what the session is given wins', () => {
     set({ HIVE_KEPT_FOR_TEST: 'yes', HIVE_API_TOKEN: 'secret' })
     SESSION_SETTINGS.add('HIVE_KEPT_FOR_TEST')

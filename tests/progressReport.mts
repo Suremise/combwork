@@ -2,7 +2,7 @@
 // runner (tests/e2e/run.mjs) one step per suite, the scenarios runner (tests/scenarios/run.mjs) one per trial, the unit tests (a Vitest reporter, vitest.config.ts) one per file, each
 // with an estimate from how long they took before (kept under %LOCALAPPDATA%\hive-test, never in the repo). Only when the
 // Hive variables are set and Hive answers; never changes a result. Run under hive-progress, they print step lines for its
-// run instead of reporting their own (one row). Off with --no-progress (e2e) or HIVE_PROGRESS=0. To remove it: delete this
+// run instead of reporting their own (one row). Off with --no-progress (e2e) or CW_PROGRESS=0. To remove it: delete this
 // file and its two hooks.
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'

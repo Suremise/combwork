@@ -102,7 +102,7 @@ export function parseGhStatus(stdout: string): GhStatus | null {
  */
 export function copilotCheckEnv(base: NodeJS.ProcessEnv = process.env): Record<string, string> {
   const env: Record<string, string> = {}
-  for (const [k, v] of Object.entries(base)) if (v !== undefined && k !== 'ELECTRON_RUN_AS_NODE' && k !== 'CHROME_CRASHPAD_PIPE_NAME' && !k.startsWith('HIVE_')) env[k] = v
+  for (const [k, v] of Object.entries(base)) if (v !== undefined && k !== 'ELECTRON_RUN_AS_NODE' && k !== 'CHROME_CRASHPAD_PIPE_NAME' && !k.startsWith('HIVE_') && !k.startsWith('CW_')) env[k] = v
   return copilotEnv(env)
 }
 

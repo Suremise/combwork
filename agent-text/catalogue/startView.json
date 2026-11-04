@@ -20,7 +20,7 @@
     "note": "A week with journal entries but no digest. week: \"2026-W41\"."
   },
   "startView.foot": {
-    "text": "More with hive_journal_recall (small first; hive_journal_entry for one in full): the journal skill says how.",
+    "text": "More with cw_journal_recall (small first; cw_journal_entry for one in full): the journal skill says how.",
     "note": "The state view's last line (#1032): the view is a snapshot within a budget, and recall is how to get more."
   },
   "startView.head": {
@@ -44,39 +44,39 @@
     "note": "A running lane. at: paused (paused on card), card (working on card) or other; state: the lane's state (active, waiting…)."
   },
   "startView.more.active": {
-    "text": "{n} more: hive_list_tasks",
+    "text": "{n} more: cw_list_tasks",
     "note": "In place of the section's lines that don't fit. n: how many."
   },
   "startView.more.agents": {
-    "text": "{n} more: hive_list_projects",
+    "text": "{n} more: cw_list_projects",
     "note": "In place of the section's lines that don't fit. n: how many."
   },
   "startView.more.board": {
-    "text": "{n} more: hive_list_tasks",
+    "text": "{n} more: cw_list_tasks",
     "note": "In place of the section's lines that don't fit. n: how many."
   },
   "startView.more.decisions": {
-    "text": "{n} more: hive_journal_recall kinds decision, plan",
+    "text": "{n} more: cw_journal_recall kinds decision, plan",
     "note": "In place of the section's lines that don't fit. n: how many."
   },
   "startView.more.hold": {
-    "text": "{n} more On Hold: hive_list_tasks column hold",
+    "text": "{n} more On Hold: cw_list_tasks column hold",
     "note": "In place of the Waiting on the user lines that don't fit, when all of them are On Hold cards (#1078). n: how many."
   },
   "startView.more.incidents": {
-    "text": "{n} more: hive_journal_recall kinds incident",
+    "text": "{n} more: cw_journal_recall kinds incident",
     "note": "In place of the section's lines that don't fit. n: how many."
   },
   "startView.more.lanes": {
-    "text": "{n} more: hive_lane list",
+    "text": "{n} more: cw_lane list",
     "note": "In place of the section's lines that don't fit. n: how many."
   },
   "startView.more.onCards": {
-    "text": "{n} more: hive_journal_recall with link card",
+    "text": "{n} more: cw_journal_recall with link card",
     "note": "In place of the section's lines that don't fit. n: how many."
   },
   "startView.more.waiting": {
-    "text": "{n} more: hive_list_tasks and hive_list_projects",
+    "text": "{n} more: cw_list_tasks and cw_list_projects",
     "note": "In place of the Waiting on the user lines that don't fit (#1078). n: how many."
   },
   "startView.section.active": {

@@ -1,6 +1,6 @@
 // When a CLI's safety classifier stops an agent's response (#606): a stop and a model switch after it (Claude Code's
 // fallback, by itself) are noted on the agent (its pane's shield with the model it runs on now, Hive's notice, a note on
-// its Doing card, hive_agent_activity's safeguard field: names only, never what was stopped); and Claude Code's prompt
+// its Doing card, cw_agent_activity's safeguard field: names only, never what was stopped); and Claude Code's prompt
 // about a stop after its turn's Stop (HB3's, 11 Oct) waits for the user saying why, with its last tool calls, stays
 // waiting through the idle notice while it shows, and once answered is idle after the stop, ready for a nudge, taking a
 // task again (HB3 showed "Claude needs your permission" for half an hour). Stops seconds apart each count; Performance
@@ -98,7 +98,7 @@ const check = (name, ok, extra = '') => {
     }, HUNG_MS)
     const g = switched?.safeguard
     // The tool calls before it: its own, and its inbox read (#650: its task came by doorbell).
-    check('the stop and the switch are noted, with the tool calls before it', g?.stops === 1 && g.switched.from === 'claude-fake' && g.model === 'claude-fake' && g.tools.filter((x) => x !== 'mcp__hive__hive_inbox').join() === 'Edit,Bash' && g.tools.includes('mcp__hive__hive_inbox'), JSON.stringify(g))
+    check('the stop and the switch are noted, with the tool calls before it', g?.stops === 1 && g.switched.from === 'claude-fake' && g.model === 'claude-fake' && g.tools.filter((x) => x !== 'mcp__combwork__cw_inbox').join() === 'Edit,Bash' && g.tools.includes('mcp__combwork__cw_inbox'), JSON.stringify(g))
     const mark = await until(async () => {
       const t = await page.locator('.safeguard-mark').first().innerText().catch(() => '')
       return /4\.8/.test(t) && t
@@ -118,7 +118,7 @@ const check = (name, ok, extra = '') => {
     check('its Doing card gets a note from Hive', !!comment && /"by":"Hive"/.test(JSON.stringify(comment)), JSON.stringify(comment))
     const activity = await api('GET', '/v1/projects/alpha/agents/Tester/activity')
     const field = activity.body?.safeguard
-    check('hive_agent_activity has the safeguard field', field?.switchedTo === 'claude-opus-4-8' && field.stops === 1 && field.toolsBefore?.includes('Bash'), JSON.stringify(field))
+    check('cw_agent_activity has the safeguard field', field?.switchedTo === 'claude-opus-4-8' && field.stops === 1 && field.toolsBefore?.includes('Bash'), JSON.stringify(field))
     check('with names only, never what was stopped', !/stopped by a safety classifier|echo probe/.test(JSON.stringify(field ?? {})))
     const finished = await until(async () => (await live(alpha, id))?.status === 'finished', HUNG_MS)
     check('it finishes that task', !!finished)

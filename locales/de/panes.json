@@ -129,7 +129,7 @@
   "panes.messages.notDeliveredDetail": "Der Agent ist nicht untätig, oder du tippst gerade in seinem Terminal. Seine Nachrichten bleiben in seinem Posteingang: Versuche es noch einmal, sobald er untätig ist.",
   "panes.messages.overdue": "{n, plural, one {# überfällig} other {# überfällig}}",
   "panes.messages.overdueTip": "{n, plural, one {Eine Zustellung wurde nicht rechtzeitig bestätigt: Der Agent hat nicht gemeldet, dass er darauf reagiert hat.} other {# Zustellungen wurden nicht rechtzeitig bestätigt: Der Agent hat nicht gemeldet, dass er darauf reagiert hat.}}",
-  "panes.messages.tip": "{n, plural, one {Eine Nachricht} other {# Nachrichten}} für {agent}, noch nicht abgerufen oder bestätigt: Combwork bietet sie als nächste Zeile an, sobald der Agent untätig ist, oder der Agent liest sie mit hive_inbox.",
+  "panes.messages.tip": "{n, plural, one {Eine Nachricht} other {# Nachrichten}} für {agent}, noch nicht abgerufen oder bestätigt: Combwork bietet sie als nächste Zeile an, sobald der Agent untätig ist, oder der Agent liest sie mit cw_inbox.",
   "panes.messages.tipNoWakes": "{n, plural, one {Eine Nachricht} other {# Nachrichten}} für {agent}, noch nicht abgerufen oder bestätigt",
   "panes.messages.unread": "{n, plural, one {# ungelesen} other {# ungelesen}}",
   "panes.pages.agentsTip": "{button, select, none {Seite {page}} other {{button} (Seite {page})}}: {agents}{added, select, yes {, mit einem vom Assistenten hinzugefügten Agenten} other {}}{key, select, none {} other { ({key} für die nächste Seite)}}",

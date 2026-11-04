@@ -100,7 +100,7 @@ const OWN = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown 
     const serverOf = async (id) => {
       const sessionId = (await live(id))?.sessionId
       const launch = await until(() => claudeLaunches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-      return launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
+      return launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
     }
     /** One call to that server, as the CLI makes it: its reply's result. */
     const mcp = (server, method, params) => {
@@ -115,7 +115,7 @@ const OWN = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown 
     /** A Claude Code agent's launch skills (its launch plugin, in the project's .hive). */
     const pluginSkill = (id, name) => readOr(path.join(alpha, '.hive', `launch-${id}`, 'plugin', 'skills', name, 'SKILL.md'))
     /** Codex's and Copilot's copies in a folder. */
-    const copy = (folder, name) => readOr(path.join(folder, '.agents', 'skills', `hive-${name}`, 'SKILL.md'))
+    const copy = (folder, name) => readOr(path.join(folder, '.agents', 'skills', `cw-${name}`, 'SKILL.md'))
     const delivered = []
 
     // --- 1. Claude Code: B1 starts its card from the project folder; Hive gives it the card in the slot.
@@ -124,7 +124,7 @@ const OWN = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown 
     await inv('session:start', alpha, { agentId: b1.id })
     const first = await ready(b1.id)
     check('B1 runs in the project folder', same(first?.cwd, alpha), JSON.stringify(first))
-    const started = tool(await serverOf(b1.id), 'hive_start_card', { card: `#${n1}` })
+    const started = tool(await serverOf(b1.id), 'cw_start_card', { card: `#${n1}` })
     const slotA = (started.text.match(/folder: ([^;\n]+)/) ?? [])[1]?.trim()
     check("B1's start reply names its slot's folder and line, and says it continues there", !started.isError && !!slotA && /line: hive\//.test(started.text) && /You'll continue in slot-\w+, on hive\//.test(started.text), started.text)
     const inSlot = await until(async () => {
@@ -143,7 +143,7 @@ const OWN = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown 
     // B1's work in the slot, submitted, for R1's review.
     fs.writeFileSync(path.join(slotA, 'greet.js'), "module.exports = (name) => 'Hello, ' + name\n")
     lib.git(slotA, ['-c', 'user.name=B1', '-c', 'user.email=b1@example.com', 'commit', '-qam', 'Greeting comma'])
-    const submitted = tool(b1Server, 'hive_submit', { card: `#${n1}`, summary: 'Round 1 ready: greet has its comma.' })
+    const submitted = tool(b1Server, 'cw_submit', { card: `#${n1}`, summary: 'Round 1 ready: greet has its comma.' })
     check("B1 submits its card from the slot", !submitted.isError && !!(await until(async () => (await inv('tasks:list')).find((c) => c.number === n1)?.column === 'review', HUNG_MS)), submitted.text)
 
     // --- 2. R1, a reviewer in the project folder: the review-copy lines, and a start review naming the copy's folder.
@@ -154,7 +154,7 @@ const OWN = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown 
     const review1 = pluginSkill(r1.id, 'review-agent-work')
     check("R1's review-agent-work has the review-copy line", COPY_LINE.test(review1), review1.slice(0, 200))
     const r1Server = await serverOf(r1.id)
-    const reviewing = tool(r1Server, 'hive_start_review', { card: `#${n1}` })
+    const reviewing = tool(r1Server, 'cw_start_review', { card: `#${n1}` })
     const copyAt = (reviewing.text.match(/Review in (.+?) at [0-9a-f]{7,}/) ?? [])[1]
     check("R1's start review reply names the review copy's folder, not B1's slot", !reviewing.isError && !!copyAt && /copies/i.test(copyAt) && !same(copyAt, slotA) && fs.existsSync(copyAt), reviewing.text)
     check("…and the files to review by name (never [object Object])", /files: M greet\.js/.test(reviewing.text), reviewing.text)

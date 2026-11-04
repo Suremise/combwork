@@ -30,7 +30,7 @@ import { inWorkspace, openWorkspaces, workspaceOf } from './workspace'
  * agents resumed only if Settings → Sessions says so. Nothing is stopped unless the user says so.
  */
 const log = createLogger('lastRun')
-const HIVE = { kind: 'hive', name: 'Hive' } as const // i18n-ignore: the product's name, as a delivery's sender
+const HIVE = { kind: 'hive', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 
 /** What the last run left, found at this start: null when it quit normally (or this is the first run). */
 export interface UnexpectedClose {
@@ -312,18 +312,18 @@ export async function resumeAfterClose(): Promise<ResumeReport> {
 const A = {
   assistant: agentMsg({
     id: 'restart.closed.assistant',
-    text: "Hive closed unexpectedly: last seen {lastSeen}. {agentCount, plural, =0 {No agents were running.} other {{agentCount} agent(s) were running: {agents}. {resumed}}}{still, plural, =0 {} other { {still} process(es) the agents started are still running; the user can stop them from Hive's notice.}} Check for card loops and lanes that stalled and tell the user; don't restart or stop anything yourself.",
+    text: "Combwork closed unexpectedly: last seen {lastSeen}. {agentCount, plural, =0 {No agents were running.} other {{agentCount} agent(s) were running: {agents}. {resumed}}}{still, plural, =0 {} other { {still} process(es) the agents started are still running; the user can stop them from Combwork's notice.}} Check for card loops and lanes that stalled and tell the user; don't restart or stop anything yourself.",
     note: "The line the Assistant finds in its inbox after an unexpected close (#987, #1031). agents: each running agent as \"name (project)\", joined by commas; resumed: restart.closed.resumed or restart.closed.nothingResumed; still: the processes the agents had started that still run. It doesn't act itself: the user decides."
   }),
   resumed: agentMsg({
     id: 'restart.closed.resumed',
-    text: "Hive resumed {resumed} of them (the user's setting){failed, plural, =0 {} other {; {failed} couldn't resume}}{held, plural, =0 {} other {; {held} left stopped (their slots are free, to resume by hand, or hold other work)}}.",
+    text: "Combwork resumed {resumed} of them (the user's setting){failed, plural, =0 {} other {; {failed} couldn't resume}}{held, plural, =0 {} other {; {held} left stopped (their slots are free, to resume by hand, or hold other work)}}.",
     note: 'With Settings → Sessions → Resume agents after an unexpected close on: how many were resumed, failed, and left stopped (#1434: their slots free, or holding other work).'
   }),
   nothingResumed: agentMsg({ id: 'restart.closed.nothingResumed', text: 'Nothing was resumed: the user decides.', note: 'With Settings → Sessions → Resume agents after an unexpected close off (the default): the notice offers Resume All.' }),
   fact: agentMsg({
     id: 'restart.closed.fact',
-    text: 'Hive closed unexpectedly (last seen {lastSeen}); {agentCount} agent(s) of this workspace were running',
+    text: 'Combwork closed unexpectedly (last seen {lastSeen}); {agentCount} agent(s) of this workspace were running',
     note: "The journal's fact of an unexpected close (#1031): stored, so always the Default's."
   })
 }

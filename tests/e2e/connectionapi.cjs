@@ -5,7 +5,7 @@
 // connection name or id (two sharing a name: 409; unknown: 404; one whose account is off here: 409), provider, model,
 // effort, mode and context200k refused naming the connections to use (decision D), an unrelated change keeping it and
 // null giving its CLI's first usable one; a card started on a new agent takes connection the same way, provider refused
-// (HI-2121); hive_connection makes and changes a connection only with Change settings on;
+// (HI-2121); cw_connection makes and changes a connection only with Change settings on;
 // the status shows the chosen connection and the account it runs on, with the connection on it the run launched with
 // (HI-2406: two on one account told apart). The fake Claude Code signs in, no browser.
 const lib = require('./lib.cjs')
@@ -103,8 +103,8 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     await inv('session:start', alpha, { agentId: 'a-one' })
     const sessionId = await lib.until(async () => (await live(alpha, 'a-one'))?.sessionId, HUNG_MS)
     const launch = await lib.until(() => lines(path.join(accountsRoot, max1.id, 'fake-launches.jsonl')).find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-    const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
-    const agentToken = hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+    const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+    const agentToken = hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     check("One's own Agent API token found", !!agentToken)
     const mine = await api('GET', '/v1/connections?details=true', null, agentToken)
     const ids = claude(mine.body?.connections).map((c) => c.id).sort()
@@ -155,7 +155,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const projectAgent = await api('POST', '/v1/projects/alpha/agents', { name: 'Sneaky', connection: 'Max 1' }, agentToken)
     check('a project agent may not add agents (403), connection or not', projectAgent.status === 403, JSON.stringify(projectAgent))
 
-    // --- hive_start_task on a new agent (HI-2121): connection as hive_add_agent takes it; provider refused (decision D).
+    // --- cw_start_task on a new agent (HI-2121): connection as cw_add_agent takes it; provider refused (decision D).
     const card = (await api('POST', '/v1/tasks', { title: 'Started by connection', project: 'alpha' })).body?.number
     const column = async () => (await api('GET', `/v1/tasks/${card}`)).body?.column
     const oldStart = await asAssistant('POST', `/v1/tasks/${card}/start`, { name: 'Bystart', provider: 'claude-code' })
@@ -167,7 +167,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const started = await asAssistant('POST', `/v1/tasks/${card}/start`, { name: 'Bystart', connection: 'max 2', reply: 'short' })
     const starter = (await api('GET', '/v1/projects/alpha')).body?.agents?.find((a) => a.name === 'Bystart')
     check('…by connection name: a new agent on Max 2, its CLI Claude Code, the card in Doing', started.status === 200 && started.body?.added === true && starter?.connection?.id === c2 && starter?.provider === 'claude-code' && (await column()) === 'doing', JSON.stringify({ status: started.status, body: started.body?.error ?? starter }))
-    // --- hive_connection (HI-2108): the Assistant makes and changes a connection, only with Change settings on.
+    // --- cw_connection (HI-2108): the Assistant makes and changes a connection, only with Change settings on.
     const before = (await inv('connections:list')).connectionRows.length
     const shut = await asAssistant('POST', '/v1/connections', { account: 'Max 2', name: 'Max 2 · High', effort: 'high' })
     check('making a connection with Change settings off: 403, nothing made', shut.status === 403 && /Change settings is off/.test(shut.body?.error ?? '') && (await inv('connections:list')).connectionRows.length === before, JSON.stringify(shut))

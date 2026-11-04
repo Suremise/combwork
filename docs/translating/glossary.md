@@ -21,7 +21,7 @@ phrase for it once, in your style page, and use it everywhere.
 | Agent API | The name of Combwork's local HTTP API. |
 | ICU, JSON, Markdown, CSV, PDF, URL, CLI | Formats and abbreviations. |
 | File names, folders, paths and commands | `AGENTS.md`, `.hive/tasks`, `npm run e2e`, `--lang`, `Ctrl+Shift+J`. |
-| Tool names | `hive_inbox`, `hive_update_task`: agents call them by these names. |
+| Tool names | `cw_inbox`, `cw_update_task`: agents call them by these names. |
 | Skill names | `work-on-card`, `card-loop`, `merge-ready`: they are identifiers. |
 | `#12`, `m178` | Card numbers and message ids, as written. |
 

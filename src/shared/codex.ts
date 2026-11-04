@@ -181,7 +181,7 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
   installNote:
     'The installer runs `irm https://chatgpt.com/codex/install.ps1 | iex` in PowerShell and installs to `%LOCALAPPDATA%\\Programs\\OpenAI\\Codex`. After installing, sign in with your ChatGPT account (Plus, Pro, Business or Enterprise) or an API key, then set up its Windows sandbox once. If the CLI is installed somewhere else, set its path in Settings → Codex.', // i18n-ignore: English, as main's notices use it (text has the window's)
   extensionNote:
-    "You have the Codex extension for VS Code (or a similar editor). Hive doesn't use it — the extension's built-in copy moves with every extension update. Install the CLI; your extension keeps working as before.", // i18n-ignore: English, as main's notices use it (text has the window's)
+    "You have the Codex extension for VS Code (or a similar editor). Combwork doesn't use it — the extension's built-in copy moves with every extension update. Install the CLI; your extension keeps working as before.", // i18n-ignore: English, as main's notices use it (text has the window's)
   signInHelp: 'Sign in again in Help → Provider Setup → Codex → Sign in (or run codex login in a terminal).', // i18n-ignore: English for main's notices (text has the window's)
   safeguardHelp: 'Codex sends a request it flags to another model, or stops the turn. For security work, OpenAI’s Trusted Access for Cyber program lifts that.', // i18n-ignore: English, the same as its message (text has it: a card comment stores the message, #866)
   text: {

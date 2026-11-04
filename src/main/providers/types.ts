@@ -65,7 +65,7 @@ export interface LaunchContext {
   hookUrl: string
   /**
    * The file holding this launch's hook Authorization header, for hook commands (`curl -H @<file>`): in Hive's user
-   * data, never the project, so no generated file holds the token (#345). HTTP hooks read `HIVE_HOOK_TOKEN` instead.
+   * data, never the project, so no generated file holds the token (#345). HTTP hooks read `CW_HOOK_TOKEN` instead.
    */
   hookAuthFile: string
   /**

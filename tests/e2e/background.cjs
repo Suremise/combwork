@@ -1,5 +1,5 @@
 // An agent waiting on a background task it started: shown as background (not finished), waited for by
-// hive_wait_for_agents, refused new tasks, and finished once the task's notification has run its turn. #726: a message
+// cw_wait_for_agents, refused new tasks, and finished once the task's notification has run its turn. #726: a message
 // still reaches it while its own background task runs (a timer it set), within seconds. The agent runs the fake Claude
 // Code (fake-claude/), so nothing signs in or spends tokens. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.

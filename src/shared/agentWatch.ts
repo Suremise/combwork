@@ -1,5 +1,5 @@
 /**
- * Waiting on agents (#416): an agent watch (hive_wait_for_agents with wake) follows agents, not cards, through the same
+ * Waiting on agents (#416): an agent watch (cw_wait_for_agents with wake) follows agents, not cards, through the same
  * watches as card watches (main/watches.ts). It fires when a watched agent's turn ends, it waits for the user, or it
  * stops; its line names every agent that did. Pure, so the watches, the Agent API and tests share it.
  */
@@ -14,7 +14,7 @@ import { agentMsg, say } from './agentText'
 import { NOTICE_PREFIX } from './doorbell'
 
 const T = {
-  label: agentMsg({ id: 'wake.agent.label', text: 'Waiting for {agents} to finish', note: 'An agent watch\'s label (#416): a watching agent\'s status, what hive_agent_activity and the Agent API read. agents: the names, ", " between.' }),
+  label: agentMsg({ id: 'wake.agent.label', text: 'Waiting for {agents} to finish', note: 'An agent watch\'s label (#416): a watching agent\'s status, what cw_agent_activity and the Agent API read. agents: the names, ", " between.' }),
   again: agentMsg({ id: 'wake.agent.again', text: '{what} (working again now)', note: 'An agent watch wake: a watched agent did something (what: that part), and is working again since.' }),
   stopped: agentMsg({ id: 'wake.agent.stopped', text: '{name} ({project}) {already, select, yes {is stopped} other {stopped}}', note: 'An agent watch wake: a watched agent stopped. already: yes when it was stopped as the watch began (an answer at once).' }),
   error: agentMsg({ id: 'wake.agent.error', text: '{name} ({project}) is in error{quote}', note: 'An agent watch wake: a watched agent is in error. quote: its status message, quoted after a colon, or nothing.' }),
@@ -28,13 +28,13 @@ const T = {
   }),
   nowWaiting: agentMsg({ id: 'wake.agent.nowWaiting', text: 'now waiting', note: 'Put in place of the "Waiting" a watching agent\'s watch label starts with, in an agent watch wake: "B6 (alpha) finished (now waiting for HI-12 → Review)".' }),
   replied: agentMsg({ id: 'wake.agent.replied', text: '{user} replied to {agent}{where}{quote}', note: 'A wake (#418): what the user sent an agent from its pane. user: the user\'s name (#426); agent: its name; where: " (alpha)", its project, or nothing; quote: the reply\'s start, quoted after a colon, or nothing.' }),
-  line: agentMsg({ id: 'wake.agent.line', text: '{changes}. Your agent watch has ended: carry on (hive_agent_activity for more).', note: 'An agent watch wake (#416): what each watched agent did ("; " between), then what to do.' }),
+  line: agentMsg({ id: 'wake.agent.line', text: '{changes}. Your agent watch has ended: carry on (cw_agent_activity for more).', note: 'An agent watch wake (#416): what each watched agent did ("; " between), then what to do.' }),
   repliedTo: agentMsg({ id: 'wake.agent.repliedTo', text: '{user} replied to {agents}', note: 'An agent watch wake too long to tell in full: the user (user: their name) replied to these agents (by name, else counted).' }),
   changed: agentMsg({ id: 'wake.agent.changed', text: '{agents} changed', note: 'An agent watch wake too long to tell in full: these agents changed (by name, else counted).' }),
   counted: agentMsg({ id: 'wake.agent.counted', text: '{n, plural, one {{n} watched agent} other {{n} watched agents}}', note: 'An agent watch wake too long to name the agents: how many.' }),
   limit: agentMsg({
     id: 'wake.agent.limit',
-    text: '{agents} {n, plural, one {is} other {are}} still working after {hours, select, yes {{time} h} other {{time} min}}: your agent watch has ended. Check on {n, plural, one {it} other {them}} (hive_agent_activity) and watch again, or tell the user (hive_notify) if {n, plural, one {it seems} other {one seems}} stuck.',
+    text: '{agents} {n, plural, one {is} other {are}} still working after {hours, select, yes {{time} h} other {{time} min}}: your agent watch has ended. Check on {n, plural, one {it} other {them}} (cw_agent_activity) and watch again, or tell the user (cw_notify) if {n, plural, one {it seems} other {one seems}} stuck.',
     note: 'Typed when an agent watch\'s limit passes with every agent still working. agents: their names, ", " between; n: how many; hours: yes when time is in hours ("1.5"), else minutes.'
   })
 }
@@ -54,7 +54,7 @@ export interface WatchedAgent {
 /** What an agent watch waits for: its agents, and whether background tasks the agent started still count as working. */
 export interface AgentWatchCondition {
   agents: WatchedAgent[]
-  /** True: the end of its turn is enough, also with background tasks still running (hive_wait_for_agents' ignoreBackground). */
+  /** True: the end of its turn is enough, also with background tasks still running (cw_wait_for_agents' ignoreBackground). */
   ignoreBackground: boolean
 }
 
@@ -93,7 +93,7 @@ export const agentMarkOf = (now: AgentNow, seq: number): AgentMark => ({ runId: 
 /** What happened to a watched agent: its turn ended, it waits for the user, it stopped, or it is in error. */
 export type AgentEvent = 'finished' | 'untaken' | 'waiting' | 'stopped' | 'error'
 
-/** Whether an agent counts as working: a watch waits on it (as hive_wait_for_agents does without wake). */
+/** Whether an agent counts as working: a watch waits on it (as cw_wait_for_agents does without wake). */
 export function agentBusy(now: AgentNow, ignoreBackground: boolean): boolean {
   return now.pending || now.status === 'working' || now.status === 'starting' || (now.status === 'background' && !ignoreBackground)
 }

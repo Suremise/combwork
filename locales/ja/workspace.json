@@ -157,7 +157,7 @@
   "workspace.folder.home": "{hasAgent, select, yes {{agent}の旧フォルダー} other {レビュアーの旧フォルダー}}",
   "workspace.folder.slot": "{carried, select, yes {{name}（引き継ぎ、{agent}）} other {{hasAgent, select, yes {{hasCards, select, yes {{name}（{agent}、{cards}）} other {{name}（{agent}）}}} other {{hasCards, select, yes {{name}（{cards}）} other {{name}}}}}}}",
   "workspace.mcpView.builtIn": "Combwork組み込みのMCPサーバー",
-  "workspace.mcpView.builtInText": "Combworkから起動したすべてのセッションに、Agent API{hasUrl, select, yes {（{url}）} other {}}に接続する<code>hive</code> MCPサーバーが付きます。オフにするには「設定」→「Agent API」を開いてください。",
+  "workspace.mcpView.builtInText": "Combworkから起動したすべてのセッションに、Agent API{hasUrl, select, yes {（{url}）} other {}}に接続する<code>combwork</code> MCPサーバーが付きます。オフにするには「設定」→「Agent API」を開いてください。",
   "workspace.mcpView.deleteServer": "サーバーを削除",
   "workspace.mcpView.dir": "`.hive/mcp`に保存したサーバーのコードを指すには{variable}を使います。",
   "workspace.mcpView.format": "**形式** — 1ファイルに1サーバー。Claude Codeの.mcp.json形式（ほかのプロバイダー向けにはCombworkが変換します）に、任意で`description`を加えます：",

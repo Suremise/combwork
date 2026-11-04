@@ -72,7 +72,7 @@ describe('messages left for agents (#530, #647)', async () => {
     const them = ids.includes(',') ? 'them' : 'it'
     // Anything to ack (not only card events): act on it, then ack (#1530).
     const ack = /\b(message|task|answer|handover)s?\b/.test(what) ? `, act on ${them}, then ack ${them}` : ''
-    return `[Hive] New in your inbox: ${what} (${ids}). Call hive_inbox to read ${them}${ack}.${tail}`
+    return `[CW] New in your inbox: ${what} (${ids}). Call cw_inbox to read ${them}${ack}.${tail}`
   }
   beforeEach(async () => {
     // Each test its own project, so ids start at m1.
@@ -84,7 +84,7 @@ describe('messages left for agents (#530, #647)', async () => {
   it('a watching agent is typed into at once, with its id, and told its watch carries on', async () => {
     Object.assign(st, { status: 'watching', watch: { label: 'Waiting for #506 → Review' } })
     expect(await leave('Review #506 when it returns, then #509.')).toEqual({ id: 'm1', fate: 'typed', queued: 0 })
-    expect(st.typed).toEqual([bell('1 message', 'm1', ' (Your watch is still on, waiting for #506 → Review: do what this asks, then end your turn, and Hive wakes you when it changes.)')])
+    expect(st.typed).toEqual([bell('1 message', 'm1', ' (Your watch is still on, waiting for #506 → Review: do what this asks, then end your turn, and Combwork wakes you when it changes.)')])
     expect(await states()).toEqual(['m1 offered'])
     // Offered, not received: the pane still shows it until the agent fetches or acks it.
     expect(st.shown?.unread.map((m) => `${m.id} ${m.state}`)).toEqual(['m1 offered'])
@@ -119,7 +119,7 @@ describe('messages left for agents (#530, #647)', async () => {
     expect(st.typed).toHaveLength(2)
   })
 
-  it('received only once the agent reads it (#650), never because its doorbell was typed or its CLI took it; acked through hive_inbox once read, never from its id alone', async () => {
+  it('received only once the agent reads it (#650), never because its doorbell was typed or its CLI took it; acked through cw_inbox once read, never from its id alone', async () => {
     const cli = { count: 0 }
     Object.assign(sessions, { promptsTaken: () => ({ runId: 'r1', count: cli.count }), holdForConfirm: () => () => undefined })
     writer.testHooks.takeMs = 5000
@@ -156,7 +156,7 @@ describe('messages left for agents (#530, #647)', async () => {
     }
   })
 
-  // #1531 (#1346 item 7: 80 inbox calls, a read and an ack for each wake): hive_inbox's opt-in combined form acks, then
+  // #1531 (#1346 item 7: 80 inbox calls, a read and an ack for each wake): cw_inbox's opt-in combined form acks, then
   // reads, in one call; ack only and read only are as they were, and nothing is acked by being read.
   it('ack then read in one call: the ack by its own rules, then what is new, received and never acked; ack only lists and receives nothing', async () => {
     st.status = 'working'
@@ -183,7 +183,7 @@ describe('messages left for agents (#530, #647)', async () => {
     // Read only: as before.
     expect(await deliveries.readInbox(alpha, 'b1')).toEqual({ items: [], unacked: ['m3'] })
     // The ack line of each form: one not read yet is read first alone, and read by the same call when combined.
-    expect(ackText(['m1'], [], ['m3'])).toBe('Acked m1. Not read yet: m3: read it with hive_inbox first.')
+    expect(ackText(['m1'], [], ['m3'])).toBe('Acked m1. Not read yet: m3: read it with cw_inbox first.')
     expect(ackText(['m1'], ['m9'], ['m3'], true)).toBe('Acked m1. Not read before: m3, not acked: ack it once you have acted on it. Not in your inbox: m9.')
   })
 
@@ -211,7 +211,7 @@ describe('messages left for agents (#530, #647)', async () => {
       expect(st.typed).toEqual([])
       expect(await states()).toEqual(['m1 queued'])
       // Nor can a wake be made while nothing can be saved: nothing is typed, and the message still waits.
-      await expect(wake('[Hive] #3 is in Review.')).rejects.toThrow(/couldn't save the deliveries/)
+      await expect(wake('[CW] #3 is in Review.')).rejects.toThrow(/couldn't save the deliveries/)
       expect(st.typed).toEqual([])
       expect(await states()).toEqual(['m1 queued'])
     } finally {
@@ -227,7 +227,7 @@ describe('messages left for agents (#530, #647)', async () => {
     })
     try {
       st.status = 'finished'
-      const typing = wake('[Hive] #4 is in Review.')
+      const typing = wake('[CW] #4 is in Review.')
       await vi.waitFor(() => expect(saving).toBe(true), { timeout: HUNG_MS })
       expect(st.typed).toEqual([])
       release()
@@ -243,7 +243,7 @@ describe('messages left for agents (#530, #647)', async () => {
     await leave('Use the revised review scope.')
     // The agent's turn ends and a wake (a loop wake's card event) is due before the queue is tried: one line, the message first.
     st.status = 'finished'
-    expect(await wake("[Hive] #2 (B1's card) is in Review. You review this card in its loop: carry on with it.")).toBe(true)
+    expect(await wake("[CW] #2 (B1's card) is in Review. You review this card in its loop: carry on with it.")).toBe(true)
     expect(st.typed).toEqual([bell('1 message and 1 card event', 'm1, m2')])
     expect(await states()).toEqual(['m1 offered', 'm2 offered'])
     st.status = 'finished'
@@ -254,7 +254,7 @@ describe('messages left for agents (#530, #647)', async () => {
     await leave('Never mind.')
     st.status = 'finished'
     st.during = () => messages.cancelMessages(alpha, 'b1', 'the user')
-    expect(await wake('[Hive] #3 is in Review.')).toBe(false)
+    expect(await wake('[CW] #3 is in Review.')).toBe(false)
     st.during = null
     await deliveries.offerNow(alpha, 'b1')
     await vi.waitFor(() => expect(st.typed.at(-1)).toBe(bell('1 card event', 'm4')), { timeout: HUNG_MS })
@@ -266,7 +266,7 @@ describe('messages left for agents (#530, #647)', async () => {
     st.during = () => {
       st.status = 'working'
     }
-    expect(await wake('[Hive] #4 is in Review.')).toBe(false)
+    expect(await wake('[CW] #4 is in Review.')).toBe(false)
     st.during = null
     await vi.waitFor(async () => expect((await states()).slice(4)).toEqual(['m5 queued', 'm6 queued']), { timeout: HUNG_MS })
     st.status = 'finished'
@@ -320,7 +320,7 @@ describe('messages left for agents (#530, #647)', async () => {
     await leave('Also gone.')
     why = "the Assistant's session that left it ended"
     st.status = 'finished'
-    expect(await wake('[Hive] #4 is in Review.')).toBe(true)
+    expect(await wake('[CW] #4 is in Review.')).toBe(true)
     expect(st.typed).toEqual([bell('1 card event', 'm3')])
     await vi.waitFor(async () => expect((await states())[1]).toBe("m2 refused: the Assistant's session that left it ended"), { timeout: HUNG_MS })
     // Revoked while it is being typed at once: stopped before Enter, and refused.
@@ -369,7 +369,7 @@ describe('messages left for agents (#530, #647)', async () => {
       st.status = 'working'
       await leave('In a line with a wake, revoked before the retry.')
       st.status = 'finished'
-      expect(await wake('[Hive] #5 is in Review.')).toBe(true)
+      expect(await wake('[CW] #5 is in Review.')).toBe(true)
       expect(st.typed.at(-1)).toBe(bell('1 message and 1 card event', 'm2, m3'))
       why = "the Assistant's session that left it ended"
       await vi.waitFor(() => expect(cli.enters).toBe(2), { timeout: HUNG_MS })
@@ -605,7 +605,7 @@ describe('messages left for agents (#530, #647)', async () => {
     try {
       st.status = 'working'
       await leave('In a slow save.')
-      await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[Hive] #6 is in Review.' })
+      await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[CW] #6 is in Review.' })
       // The offer's save of "offered" is held; meanwhile the user's own prompt is taken and its turn ends.
       const held = new Promise<void>((r) => (release = r))
       let holding = false

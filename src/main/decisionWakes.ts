@@ -69,13 +69,13 @@ const T = {
   nothingNew: agentMsg({ id: 'inbox.decisionEnded.nothingNew', text: 'nothing new to tell', note: 'Why a line of new decisions was cancelled just before it was given: the agent has read them meanwhile, or its watch tells them.' }),
   line: agentMsg({
     id: 'wake.decision.line',
-    text: '{cards} from the user: read {one, select, yes {it} other {them}} (hive_read_task) {reviewer, select, yes {before your next verdict on {n, plural, one {it} other {them}}.} other {and carry on from where you asked.}}',
+    text: '{cards} from the user: read {one, select, yes {it} other {them}} (cw_read_task) {reviewer, select, yes {before your next verdict on {n, plural, one {it} other {them}}.} other {and carry on from where you asked.}}',
     note: '#401: the line after "[Hive] " given to an agent waiting for the user (or a decision wake, #1266) when the user\'s decisions were recorded on its cards. cards: each card\'s decisions (notice.decision.card), joined by ", "; one: yes for a single decision on one card; reviewer: yes when the agent only reviews those cards (HI-2261: told to carry on, a reviewer that had asked nothing made the decided change itself); n: how many cards.'
   })
 }
 
 /**
- * The line: "[Hive] #392 has 4 new decisions from the user: read them (hive_read_task) and carry on." `reviewing`: the
+ * The line: "[Hive] #392 has 4 new decisions from the user: read them (cw_read_task) and carry on." `reviewing`: the
  * cards the agent only reviews (another agent's: a loop's wake to its reviewer). When they are all of them, the line asks
  * for a read before its next verdict (HI-2261: told to "carry on from where you asked", a reviewer that had asked nothing
  * made the decided change itself), never to carry on.

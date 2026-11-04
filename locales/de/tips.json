@@ -176,7 +176,7 @@
   "tips.connections.title": "Agenten mit verschiedenen Anmeldungen ausführen",
   "tips.consoleRecording.text": "In der Entwicklerkonsole schreibt „Aufzeichnen“ in eine Datei, was die CLI eines Agenten an Combwork sendet, geschwärzt, außer du hakst für diese Aufzeichnung Text an. „Diagnosedaten kopieren“ kann sie an einen Fehlerbericht anhängen.",
   "tips.consoleRecording.title": "Aufzeichnen, was eine CLI sendet",
-  "tips.consoleText.text": "Einstellungen → Erweitert → „Entwicklerkonsole: Prompt-, Antwort- und Befehlstext anzeigen“ zeigt diese Texte in der Entwicklerkonsole, unter einem Banner, das darauf hinweist, und hakt Text für neue Aufzeichnungen an. Tokens und Anmeldungen bleiben maskiert, und hive_console der Agenten bleibt geschwärzt.",
+  "tips.consoleText.text": "Einstellungen → Erweitert → „Entwicklerkonsole: Prompt-, Antwort- und Befehlstext anzeigen“ zeigt diese Texte in der Entwicklerkonsole, unter einem Banner, das darauf hinweist, und hakt Text für neue Aufzeichnungen an. Tokens und Anmeldungen bleiben maskiert, und cw_console der Agenten bleibt geschwärzt.",
   "tips.consoleText.title": "Den Text in der Entwicklerkonsole sehen",
   "tips.copilot.text": "Agenten können die GitHub Copilot CLI verwenden, auch mit Copilot Free. Die Anbieter-Einrichtung installiert sie und zeigt, als wer sie angemeldet ist: mit eigener Anmeldung oder über die GitHub CLI.",
   "tips.copilot.title": "Agenten mit GitHub Copilot betreiben",

@@ -438,15 +438,15 @@ export function parseEvents(text: string, sessionId: string, title: string | nul
 /** How the Sessions tab shows Copilot's tools: Claude Code's names where they do the same. */
 const TOOL_NAMES: Record<string, string> = {
   powershell: 'PowerShell',
-  bash: 'Bash', // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
-  view: 'Read', // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
-  edit: 'Edit', // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
-  create: 'Write', // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
-  grep: 'Grep', // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
-  glob: 'Glob', // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
+  bash: 'Bash', // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
+  view: 'Read', // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
+  edit: 'Edit', // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
+  create: 'Write', // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
+  grep: 'Grep', // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
+  glob: 'Glob', // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
   web_fetch: 'WebFetch',
-  ask_user: 'Question', // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
-  task: 'Agent' // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
+  ask_user: 'Question', // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
+  task: 'Agent' // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
 }
 
 /** One line describing a tool call, e.g. the command's description or the file it edits. */

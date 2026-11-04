@@ -65,7 +65,7 @@ export const carryWorkspaceRuns = (fromPlaces: readonly string[], toPlace: strin
 
 /** The runner's script, outside the asar (electron-builder.yml unpacks it). */
 function runnerScript(): string {
-  const p = join(__dirname, 'hive-close-runner.js')
+  const p = join(__dirname, 'cw-close-runner.js')
   return app.isPackaged ? p.replace(`app.asar${sep}`, `app.asar.unpacked${sep}`) : p
 }
 

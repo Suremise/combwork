@@ -2,7 +2,7 @@
 // read HI-1702's evidence: the document tools refuse .hive, and it rightly didn't go round Hive to the files). A fake
 // Claude Code builder (B1) attaches a probe, its results (over a page long, a character of several bytes at the page's
 // end) and a screenshot to its card, and submits; a fake Codex reviewer (R1) and a fake Claude Code one (E1, either) each
-// start a review, which leases each a review copy, and call hive_read_attachment through their launch's own hive MCP
+// start a review, which leases each a review copy, and call cw_read_attachment through their launch's own hive MCP
 // server: the probe whole, the results in pages from the offset each reply names (from 0 to its size), the screenshot by
 // its path. An agent of another project (X in beta) asking for the same card is told there is no such card. Dev build,
 // throwaway profile, workspace, CLAUDE_CONFIG_DIR and CODEX_HOME.
@@ -86,8 +86,8 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
       const sid = (await live(alpha, b1.id))?.sessionId
       return lines(path.join(claudeHome, 'fake-launches.jsonl')).findLast((l) => l.sessionId === sid && l.opts['--mcp-config'])
     }, HUNG_MS)
-    const hiveEnv = JSON.parse(fs.readFileSync(b1Launch.opts['--mcp-config'], 'utf8')).mcpServers.hive.env
-    const tb1 = JSON.parse(fs.readFileSync(hiveEnv.HIVE_API_TOKEN_FILE, 'utf8')).token
+    const hiveEnv = JSON.parse(fs.readFileSync(b1Launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork.env
+    const tb1 = JSON.parse(fs.readFileSync(hiveEnv.CW_API_TOKEN_FILE, 'utf8')).token
     const call = async (method, p, body) => {
       const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${tb1}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
       return { status: res.status, body: await res.json().catch(() => null) }
@@ -114,11 +114,11 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
     const replies = async (p, id) => {
       const s = await live(p, id)
       const items = s?.sessionId ? ((await inv('transcript:read', p, s.sessionId).catch(() => null))?.items ?? []) : []
-      return items.filter((i) => i.kind === 'tool' && i.tool.name.endsWith('hive_read_attachment')).map((i) => i.tool.result ?? '')
+      return items.filter((i) => i.kind === 'tool' && i.tool.name.endsWith('cw_read_attachment')).map((i) => i.tool.result ?? '')
     }
     const ask = async (p, id, args) => {
       const before = (await replies(p, id)).length
-      const sent = await lib.sendPrompt(inv, lib.ptyKey(p, id), `hive hive_read_attachment ${JSON.stringify(args)}`, { submitted: async () => (await replies(p, id)).length > before })
+      const sent = await lib.sendPrompt(inv, lib.ptyKey(p, id), `hive cw_read_attachment ${JSON.stringify(args)}`, { submitted: async () => (await replies(p, id)).length > before })
       return sent ? (await until(async () => (await replies(p, id))[before], HUNG_MS)) ?? null : null
     }
     const body = (reply) => reply.slice(reply.indexOf('\n\n') + 2)
@@ -153,7 +153,7 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
       const run = (await live(alpha, r1.id))?.runId
       const launch = await until(() => lines(path.join(codexHome, 'fake-launches.jsonl')).findLast((l) => l.args.some((y) => run && y.includes(run))), HUNG_MS)
       const { fromCodexTable } = require('./fake-bridge.cjs')
-      return JSON.parse(fs.readFileSync(fromCodexTable(launch.args.find((y) => y.startsWith('mcp_servers.hive=')).slice('mcp_servers.hive='.length)).env.HIVE_API_TOKEN_FILE, 'utf8')).token
+      return JSON.parse(fs.readFileSync(fromCodexTable(launch.args.find((y) => y.startsWith('mcp_servers.combwork=')).slice('mcp_servers.combwork='.length)).env.CW_API_TOKEN_FILE, 'utf8')).token
     }
     const startReview = async (token, n) => {
       const res = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${n}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ review: 'start', reply: 'short' }) })
@@ -174,7 +174,7 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
     const e1Token = JSON.parse(fs.readFileSync(JSON.parse(fs.readFileSync((await until(async () => {
       const sid = (await live(alpha, e1.id))?.sessionId
       return lines(path.join(claudeHome, 'fake-launches.jsonl')).findLast((l) => l.sessionId === sid && l.opts['--mcp-config'])
-    }, HUNG_MS)).opts['--mcp-config'], 'utf8')).mcpServers.hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token
+    }, HUNG_MS)).opts['--mcp-config'], 'utf8')).mcpServers.combwork.env.CW_API_TOKEN_FILE, 'utf8')).token
     const rc = await startReview(e1Token, c)
     check(`E1 (Claude Code) starts its review of ${keys[c]} in a review copy`, rc.status === 200 && !!inCopy(rc), JSON.stringify(rc.body))
     const p2 = await ask(alpha, e1.id, { card: c, name: 'probe.cjs' })

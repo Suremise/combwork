@@ -1,6 +1,6 @@
 {
   "prose|return|, then {}": 1,
-  "prose|return|First hand {} over: {}; hive_submit{} with followUp: true{}": 1,
+  "prose|return|First hand {} over: {}; cw_submit{} with followUp: true{}": 1,
   "prose|return|at least": 1,
   "prose|return|{}'s line has {} since its submission ({})": 1,
   "prose|return|{}{} commit{}": 1,

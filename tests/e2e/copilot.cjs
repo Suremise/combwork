@@ -133,7 +133,7 @@ const check = (name, ok, extra = '') => {
     // A workspace skill, through Copilot's skill tool: Hive's copy in .agents/skills (shared with Codex).
     await send(a.id, 'skill work-on-card then say Read it.', ['working', 'finished'])
     check('A: the skill turn finishes', !!(await reach(a.id, ['finished'])), await status(a.id))
-    check("Hive's copy of the skill is in .agents/skills", fs.existsSync(path.join(proj, '.agents', 'skills', 'hive-work-on-card', 'SKILL.md')))
+    check("Hive's copy of the skill is in .agents/skills", fs.existsSync(path.join(proj, '.agents', 'skills', 'cw-work-on-card', 'SKILL.md')))
 
     // An edit of a.ts: PreToolUse claims it, then Copilot's permission dialog (Notification permission_prompt): waiting.
     await send(a.id, 'edit a.ts probe probed')
@@ -159,15 +159,15 @@ const check = (name, ok, extra = '') => {
 
     // B: a hive tool, with no prompt in any mode (--allow-tool=hive, #468): it reaches Hive's Agent API.
     check('B: starts in Accept edits, Copilot’s default', (await live(b.id))?.permissionMode === 'accept-edits', (await live(b.id))?.permissionMode)
-    await send(b.id, 'hive hive_list_projects then say Listed.', ['working', 'waiting'])
+    await send(b.id, 'hive cw_list_projects then say Listed.', ['working', 'waiting'])
     const hiveTurn = await timeline(b.id)
     check('B: a hive tool runs without asking, and the turn finishes', hiveTurn.finished && !hiveTurn.asked, hiveTurn.seen.join(' → '))
     check('B: …no tool dialog on its screen', !/Do you want to use this tool\?/.test(await screen(b.id)))
     const listed = fs.readFileSync(apiLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
-    check('Copilot offered the hive tools, named hive-<tool>', listed.some((r) => (r.tools ?? []).includes('hive-hive_list_projects')), JSON.stringify(listed[0]?.tools ?? []))
+    check('Copilot offered the hive tools, named hive-<tool>', listed.some((r) => (r.tools ?? []).includes('combwork-cw_list_projects')), JSON.stringify(listed[0]?.tools ?? []))
     check("Hive's guidance reached Copilot's system prompt (the hive server's instructions)", listed.some((r) => /use the hive tools/i.test(r.system ?? '')))
     const bScreen = await screen(b.id)
-    check('B: the hive tool ran, and not refused', /hive_list_projects/.test(bScreen) && !/✗\s*hive_list_projects/.test(bScreen), bScreen.split('\n').filter((l) => /hive_list_projects/.test(l)).join(' | '))
+    check('B: the hive tool ran, and not refused', /cw_list_projects/.test(bScreen) && !/✗\s*cw_list_projects/.test(bScreen), bScreen.split('\n').filter((l) => /cw_list_projects/.test(l)).join(' | '))
 
     // B: Accept edits approves an edit in its folder (--allow-tool=write(<folder>/**)), and a new file in it.
     await send(b.id, 'edit README.md demo edited-by-b then write notes.txt from B then say Edited.', ['working', 'waiting'])

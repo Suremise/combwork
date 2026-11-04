@@ -317,7 +317,7 @@ describe('the pickers: the CLI is the source, the editable fallback otherwise', 
   })
 
   it("Auto's caveat follows what Claude Code says about the model, else the shipped guess", () => {
-    expect(modeCaveat('claude-code', 'auto', 'haiku', { supportsAuto: false, label: 'Haiku 4.5' })).toBe("Claude Code doesn't offer Auto with Haiku 4.5: it runs in Manual instead (asking before edits and commands), and Hive shows that mode.")
+    expect(modeCaveat('claude-code', 'auto', 'haiku', { supportsAuto: false, label: 'Haiku 4.5' })).toBe("Claude Code doesn't offer Auto with Haiku 4.5: it runs in Manual instead (asking before edits and commands), and Combwork shows that mode.")
     expect(modeCaveat('claude-code', 'auto', 'haiku', { supportsAuto: true })).toBeNull()
     expect(modeCaveat('claude-code', 'auto', 'claude-newmodel', { supportsAuto: false, label: 'New 1' })).toMatch(/Auto with New 1/)
     expect(modeCaveat('claude-code', 'auto', 'haiku')).toMatch(/may not offer Auto with Haiku/)

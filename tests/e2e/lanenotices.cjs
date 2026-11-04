@@ -79,7 +79,7 @@ const check = (name, ok, extra = '') => {
     const newCard = async (title) => (await inv('tasks:create', { title, project: 'alpha', agent: builder.id, column: 'doing' })).number
     const a = await newCard('Greeting says Hi')
     const b = await newCard('Greeting trims the name')
-    await say(builder.id, `hive hive_lane ${JSON.stringify({ action: 'start', cards: [a, b], reviewer: 'Reviewer', name: 'greetings' })}`)
+    await say(builder.id, `hive cw_lane ${JSON.stringify({ action: 'start', cards: [a, b], reviewer: 'Reviewer', name: 'greetings' })}`)
     check('the lane is running', !!(await until(async () => (await inv('lanes:list')).some((l) => l.state === 'active' && l.cards.length === 2), HUNG_MS)), JSON.stringify(await inv('lanes:list')))
 
     // A plain move into Review: no notice.

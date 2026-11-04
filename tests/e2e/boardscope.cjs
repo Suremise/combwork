@@ -82,13 +82,13 @@ const until = async (fn, ms = 10000) => {
   const LAUNCH_RECORD_MS = 20000
   const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), LAUNCH_RECORD_MS)
   const mcpServers = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers : {}
-  check('the agent launched with the hive MCP server', !!mcpServers.hive, JSON.stringify({ sessionId, launch: !!launch, servers: Object.keys(mcpServers), api: await inv('api:info').then((i) => ({ enabled: i.enabled, running: i.running, url: i.url, error: i.error })) }))
-  if (!mcpServers.hive) throw new Error('no hive server in the launch: the rest needs its token')
-  const mcpEnv = mcpServers.hive.env
-  const agentToken = JSON.parse(fs.readFileSync(mcpEnv.HIVE_API_TOKEN_FILE, 'utf8')).token
+  check('the agent launched with the hive MCP server', !!mcpServers.combwork, JSON.stringify({ sessionId, launch: !!launch, servers: Object.keys(mcpServers), api: await inv('api:info').then((i) => ({ enabled: i.enabled, running: i.running, url: i.url, error: i.error })) }))
+  if (!mcpServers.combwork) throw new Error('no hive server in the launch: the rest needs its token')
+  const mcpEnv = mcpServers.combwork.env
+  const agentToken = JSON.parse(fs.readFileSync(mcpEnv.CW_API_TOKEN_FILE, 'utf8')).token
   const workspaceToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
   check('the agent has a token of its own', !!agentToken && agentToken !== workspaceToken)
-  check("its environment names its token's file, not the token (HI-2262)", launch.token === agentToken && !('HIVE_API_TOKEN' in launch.env) && launch.env.HIVE_API_TOKEN_FILE === mcpEnv.HIVE_API_TOKEN_FILE, JSON.stringify(launch.env))
+  check("its environment names its token's file, not the token (HI-2262)", launch.token === agentToken && !('HIVE_API_TOKEN' in launch.env) && launch.env.CW_API_TOKEN_FILE === mcpEnv.CW_API_TOKEN_FILE, JSON.stringify(launch.env))
   const call = async (token, method, p, body) => {
     const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
     return { status: res.status, body: await res.json().catch(() => null) }

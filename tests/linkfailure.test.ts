@@ -73,7 +73,7 @@ describe('a link Hive is refused', () => {
     writeFileSync(join(src, 'SKILL.md'), 'v1')
     const sync = (ctx: unknown) => syncAgentsSkills(ctx as never, 'Codex')
     await sync({ cwd, skills: [{ name: 'codex-skill', sourcePath: src }] })
-    const copy = join(cwd, '.agents', 'skills', 'hive-codex-skill')
+    const copy = join(cwd, '.agents', 'skills', 'cw-codex-skill')
     const v1 = await contentHash(copy)
     // The skill gains a link Hive can't make, and a new SKILL.md.
     writeFileSync(join(src, 'SKILL.md'), 'v2')
@@ -81,11 +81,11 @@ describe('a link Hive is refused', () => {
     const out = await sync({ cwd, skills: [{ name: 'codex-skill', sourcePath: src }] })
     expect(out['codex-skill']).toEqual({ revision: v1, problem: expect.stringContaining('denied-ref'), lasting: true })
     expect(readFileSync(join(copy, 'SKILL.md'), 'utf8')).toBe('v1')
-    expect(readdirSync(join(cwd, '.agents', 'skills'))).toEqual(['hive-codex-skill'])
+    expect(readdirSync(join(cwd, '.agents', 'skills'))).toEqual(['cw-codex-skill'])
     // A skill it never had: nothing rather than a copy missing part of it.
     const other = skill('codex-new')
     const first = await sync({ cwd, skills: [{ name: 'codex-skill', sourcePath: src }, { name: 'codex-new', sourcePath: other }] })
     expect(first['codex-new']).toMatchObject({ revision: null, lasting: true })
-    expect(existsSync(join(cwd, '.agents', 'skills', 'hive-codex-new'))).toBe(false)
+    expect(existsSync(join(cwd, '.agents', 'skills', 'cw-codex-new'))).toBe(false)
   })
 })

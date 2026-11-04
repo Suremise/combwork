@@ -37,6 +37,12 @@
       "card": "plain"
     }
   },
+  "notice.mode.chosen": {
+    "placeholders": {
+      "name": "plain",
+      "summary": "plain"
+    }
+  },
   "notice.orphan.process": {
     "placeholders": {
       "pid": "plain",

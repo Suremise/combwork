@@ -28,7 +28,7 @@
     "note": "The Assistant's change refused at the moment it was to be made: the session that asked was restarted or ended while it waited."
   },
   "control.tokenNote": {
-    "text": "The Hive Assistant's Agent API token for one workspace. Hive replaces it each time the Assistant starts.",
+    "text": "The Assistant's Agent API token for one workspace. Combwork replaces it each time the Assistant starts.",
     "note": "The note beside the Assistant's token in its file, for whoever opens it."
   },
   "control.turnedDown": {

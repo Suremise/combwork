@@ -52,7 +52,7 @@
     "note": "Why the focused-test picker couldn't choose, when it gave no reason."
   },
   "runtime.review.runYourself": {
-    "text": "{tests}: the merge queue doesn't run these (a real CLI or the installed app); each counts from your run at this revision, hive-progress --check \"{check}\" --card <card> -- <its command>",
+    "text": "{tests}: the merge queue doesn't run these (a real CLI or the installed app); each counts from your run at this revision, cw-progress --check \"{check}\" --card <card> -- <its command>",
     "note": "G20 (HI-1367): start review's runYourself: focused tests the merge queue won't run, which count only from the reviewer's own run. {tests}: their ids. {check}: the check's name pattern (focused:<test>)."
   },
   "runtime.start.blocked": {
@@ -60,11 +60,11 @@
     "note": "A start's warning: the card is blocked. {why}: the block's reason, in its author's words."
   },
   "runtime.start.laneStarted": {
-    "text": "Hive started {card} for you, as your lane's next card: carry on with it.",
+    "text": "Combwork started {card} for you, as your lane's next card: carry on with it.",
     "note": "HI-2092: a lane's builder starting the card Hive had already started for it: its start's warning."
   },
   "runtime.start.slotMove": {
-    "text": "You'll continue in {slot}, on {line}: Hive makes the line there from {target}, then gives you {card} there (a new conversation unless you already work there; your old one is kept). End your turn now.",
+    "text": "You'll continue in {slot}, on {line}: Combwork makes the line there from {target}, then gives you {card} there (a new conversation unless you already work there; your old one is kept). End your turn now.",
     "note": "A start given a slot (#1438): the card's line is made there and the card given to the agent there, so it ends its turn now."
   },
   "runtime.start.slotWait": {
@@ -84,7 +84,7 @@
     "note": "A submit's warning (HI-2339): files changed in the project that are neither its paths nor its agents' edits."
   },
   "runtime.wake.aheadInLane": {
-    "text": "{card} is in Review ahead of {cards}, earlier in its lane, which nobody has started: Hive moved it before them in the lane. Review {card} now; the lane goes on to {next} after it",
+    "text": "{card} is in Review ahead of {cards}, earlier in its lane, which nobody has started: Combwork moved it before them in the lane. Review {card} now; the lane goes on to {next} after it",
     "note": "The reviewer's wake for a card submitted ahead of its lane's unstarted cards. {cards}: their keys. {next}: the first of them."
   },
   "runtime.wake.answered": {
@@ -129,10 +129,10 @@
   },
   "runtime.wake.focusedSkip": {
     "text": "{card}: its reviewer {merge, select, yes {accepted} other {declined}} the focused tests its merge skipped ({why})",
-    "note": "The builder's wake for its reviewer's hive_focused_skip. {merge}: yes when it accepted. {why}: the reviewer's reason."
+    "note": "The builder's wake for its reviewer's cw_focused_skip. {merge}: yes when it accepted. {why}: the reviewer's reason."
   },
   "runtime.wake.followUp": {
-    "text": "{card}: follow-up submitted for review at {revision} (submission {submission}). Start your review again (hive_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused",
+    "text": "{card}: follow-up submitted for review at {revision} (submission {submission}). Start your review again (cw_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused",
     "note": "HI-1832: the reviewer's wake for a follow-up (the card stays in Review, so no arrival wakes it). {revision}: short. {submission}: its number."
   },
   "runtime.wake.inReview": {
@@ -140,7 +140,7 @@
     "note": "The reviewer's wake for a card's arrival in Review."
   },
   "runtime.wake.laneListChanged": {
-    "text": "Your lane's card list changed, as queued: its cards are now {cards}. hive_lane next names your next card.",
+    "text": "Your lane's card list changed, as queued: its cards are now {cards}. cw_lane next names your next card.",
     "note": "A lane's builder's wake when its queued list applied. {cards}: the keys, in order."
   },
   "runtime.wake.newDecision": {

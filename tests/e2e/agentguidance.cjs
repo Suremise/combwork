@@ -101,7 +101,7 @@ function packagesRequired(entry) {
 }
 
 ;(async () => {
-  for (const script of ['hive-mcp.js', 'hive-progress.js']) {
+  for (const script of ['cw-mcp.js', 'cw-progress.js']) {
     const r = packagesRequired(path.join(lib.ROOT, 'out', 'main', script))
     check(`${script} and the chunks it loads require only Node's built-ins (agent text's formatter bundled in)`, r.files > 1 && r.packages.length === 0, JSON.stringify(r))
   }
@@ -135,7 +135,7 @@ function packagesRequired(entry) {
       await inv('session:start', alpha, { agentId: def.id })
       await lib.until(async () => launches().length > before && (await live())?.status === 'ready', HUNG_MS)
       const file = launches().at(-1).opts['--mcp-config']
-      const server = JSON.parse(fs.readFileSync(file, 'utf8')).mcpServers.hive
+      const server = JSON.parse(fs.readFileSync(file, 'utf8')).mcpServers.combwork
       await inv('session:stop', alpha, def.id)
       await lib.until(async () => !(await live()), HUNG_MS)
       return server
@@ -145,7 +145,7 @@ function packagesRequired(entry) {
     const on = await hiveServer()
     check('the launch has the hive server', !!on?.command, JSON.stringify(on))
     const withGuidance = await initialize(on)
-    check("on: the hive server answers with Hive's guidance as its instructions", typeof withGuidance?.instructions === 'string' && /hive_inbox|Hive/.test(withGuidance.instructions), JSON.stringify(withGuidance).slice(0, 300))
+    check("on: the hive server answers with Hive's guidance as its instructions", typeof withGuidance?.instructions === 'string' && /cw_inbox|Hive/.test(withGuidance.instructions), JSON.stringify(withGuidance).slice(0, 300))
 
     // ---- The canary dialect (HI-2065): the same server given a dialect file with every catalogue text in markers. Its
     // instructions must come through the catalogue whole: a word outside the markers bypassed it.
@@ -154,20 +154,20 @@ function packagesRequired(entry) {
     const { canaryTexts, canaryProblems } = require('../../src/shared/agentText/canary.ts')
     const dialectFile = path.join(lib.probeDir('agentguidance-canary'), 'dialect.json')
     fs.writeFileSync(dialectFile, JSON.stringify({ texts: canaryTexts(catalogue), files: ['canary'], hash: 'canary' }))
-    const canary = await initialize({ ...on, env: { ...on.env, HIVE_DIALECT_FILE: dialectFile, HIVE_DIALECT: 'canary' } })
+    const canary = await initialize({ ...on, env: { ...on.env, CW_DIALECT_FILE: dialectFile, CW_DIALECT: 'canary' } })
     const problems = typeof canary?.instructions === 'string' ? canaryProblems(canary.instructions, new Set(Object.keys(catalogue)), ['alpha']) : ['no instructions']
     check("canary: the server reads the dialect file, and every word of its instructions is the catalogue's", problems.length === 0 && canary.instructions.includes('⟦contract.agent.host⟧'), `${problems.join('; ')} | ${String(canary?.instructions).slice(0, 300)}`)
 
     // Its tool lists (HI-2434), for each role, Control level and switch, and the errors its own code gives: every
     // description and error word the catalogue's. Nothing here needs Hive: the lists and these errors come before any call.
     const ids = new Set(Object.keys(catalogue))
-    const canaryEnv = { ...on.env, HIVE_DIALECT_FILE: dialectFile, HIVE_DIALECT: 'canary' }
-    const assistant = (control) => ({ HIVE_ROLE: 'assistant', HIVE_PROJECT: '', HIVE_ASSISTANT_CONTROL: control, HIVE_ASSISTANT_SETTINGS: '1', HIVE_JOURNAL: '1', HIVE_DEV_CONSOLE: '1' })
+    const canaryEnv = { ...on.env, CW_DIALECT_FILE: dialectFile, CW_DIALECT: 'canary' }
+    const assistant = (control) => ({ HIVE_ROLE: 'assistant', CW_PROJECT: '', HIVE_ASSISTANT_CONTROL: control, HIVE_ASSISTANT_SETTINGS: '1', HIVE_JOURNAL: '1', HIVE_DEV_CONSOLE: '1' })
     const roles = [
-      ['agent', { HIVE_DEV_CONSOLE: '1' }, [['hive_lane', { action: 'nope' }], ['hive_merge_slot', { action: 'nope' }], ['hive_queue', { action: 'pause' }], ['hive_nope', {}]]],
+      ['agent', { HIVE_DEV_CONSOLE: '1' }, [['cw_lane', { action: 'nope' }], ['cw_merge_slot', { action: 'nope' }], ['cw_queue', { action: 'pause' }], ['cw_nope', {}]]],
       ['assistant at Look and advise', assistant('look'), []],
       ['assistant at Agents', assistant('agents'), []],
-      ['assistant at Projects', assistant('projects'), [['hive_team', { action: 'nope' }], ['hive_connection', { action: 'nope' }], ['hive_release_slot', { action: 'nope', project: 'alpha' }], ['hive_template', { action: 'nope', project: 'alpha' }]]]
+      ['assistant at Projects', assistant('projects'), [['cw_team', { action: 'nope' }], ['cw_connection', { action: 'nope' }], ['cw_release_slot', { action: 'nope', project: 'alpha' }], ['cw_template', { action: 'nope', project: 'alpha' }]]]
     ]
     for (const [role, roleEnv, calls] of roles) {
       const [listed, ...answers] = await requests({ ...on, env: { ...canaryEnv, ...roleEnv } }, [{ method: 'tools/list', params: {} }, ...calls.map(([name, args]) => ({ method: 'tools/call', params: { name, arguments: args } }))])

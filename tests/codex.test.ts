@@ -268,7 +268,7 @@ describe('Codex: when a person must act', () => {
     process.env.CODEX_HOME = home
     try {
       const { codex } = await import('../src/main/providers/codex/adapter')
-      const mcpServers = { hive: { command: 'node', args: ['hive-mcp.js'] }, gh: { command: 'npx', args: ['-y', 'gh-mcp'] }, api: { url: 'https://mcp.example.com' } }
+      const mcpServers = { combwork: { command: 'node', args: ['cw-mcp.js'] }, gh: { command: 'npx', args: ['-y', 'gh-mcp'] }, api: { url: 'https://mcp.example.com' } }
       const ctx = {
         projectPath: home, agentId: 'a-1', executable: 'C:\\bin\\codex.exe', cwd: home, workspacePath: home, runId: 'r', sessionId: '',
         resume: false, name: '', skills: [], mcpServers, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: 'C:/hive/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false
@@ -276,7 +276,7 @@ describe('Codex: when a person must act', () => {
       const server = (args: string[], name: string) => args.find((a) => a.startsWith(`mcp_servers.${name}=`))
       for (const permissionMode of [null, 'read-only', 'ask', 'approve-for-me', 'full-access']) {
         const { args } = codex.buildCommand(ctx.executable, { ...ctx, permissionMode })
-        expect(server(args, 'hive'), String(permissionMode)).toContain('default_tools_approval_mode="approve"')
+        expect(server(args, 'combwork'), String(permissionMode)).toContain('default_tools_approval_mode="approve"')
         expect(server(args, 'gh'), String(permissionMode)).toMatch(/^mcp_servers\.gh=\{command="npx"/)
         expect(server(args, 'gh'), String(permissionMode)).not.toContain('default_tools_approval_mode')
         expect(server(args, 'api'), String(permissionMode)).toMatch(/^mcp_servers\.api=\{url="https:\/\/mcp\.example\.com"/)
@@ -393,8 +393,8 @@ describe("a Codex code-mode script's calls (HI-2240)", () => {
       line({ type: 'response_item', payload: { type: 'function_call', name: 'exec_command', call_id: 'direct', arguments: '{"cmd":"ls"}' } }),
       done({ type: 'CommandExecution', id: 'direct', command: ['pwsh', '-Command', 'ls'], status: 'completed', exit_code: 0, aggregated_output: '' }),
       // A failed MCP call, and one that isn't a call at all.
-      exec('s2', 'text(await tools.mcp__hive__hive_read_task({number: 1}))'),
-      done({ type: 'McpToolCall', id: 'exec-2', server: 'hive', tool: 'hive_read_task', arguments: { number: 1 }, status: 'failed', error: { message: 'No such card' } }),
+      exec('s2', 'text(await tools.mcp__combwork__cw_read_task({number: 1}))'),
+      done({ type: 'McpToolCall', id: 'exec-2', server: 'combwork', tool: 'cw_read_task', arguments: { number: 1 }, status: 'failed', error: { message: 'No such card' } }),
       done({ type: 'AgentMessage', id: 'm1', content: [] }),
       // Recorded with no start time, while a script runs (none of these has ended): that script's.
       done({ type: 'CommandExecution', id: 'exec-3', command: ['pwsh', '-Command', 'npm test'], status: 'failed', exit_code: 1, aggregated_output: 'failed' })
@@ -403,10 +403,10 @@ describe("a Codex code-mode script's calls (HI-2240)", () => {
     expect(edit).toMatchObject({ name: 'Edit', summary: 'a.txt', calls: [expect.objectContaining({ name: 'Edit', summary: 'a.txt' })] })
     expect(direct).toMatchObject({ name: 'Shell' })
     expect(direct.calls).toBeUndefined()
-    expect(script.calls).toEqual([expect.objectContaining({ name: 'hive · hive_read_task', result: 'No such card', isError: true }), expect.objectContaining({ name: 'Shell', input: 'npm test', isError: true })])
+    expect(script.calls).toEqual([expect.objectContaining({ name: 'combwork · cw_read_task', result: 'No such card', isError: true }), expect.objectContaining({ name: 'Shell', input: 'npm test', isError: true })])
   })
 
-  it("hive_agent_activity's recent tools are the calls a script made, in order; any other tool is itself", async () => {
+  it("cw_agent_activity's recent tools are the calls a script made, in order; any other tool is itself", async () => {
     const { callsMade } = await import('../src/shared/activity')
     expect(parsed(fixture()).flatMap(callsMade).map((t) => [t.name, t.summary])).toEqual([['Shell', 'echo hello'], ['Edit', 'notes.txt'], ['probe · echo', 'hi']])
     const plain = { toolUseId: 'x', name: 'Shell', summary: 'ls', input: 'ls', result: '', isError: false, images: [] }
@@ -508,14 +508,14 @@ describe('Codex skill copies', () => {
     const { syncAgentsSkills } = await import('../src/main/providers/common')
     const sync = (list: { name: string; sourcePath: string }[]) => syncAgentsSkills({ cwd, skills: list } as never, 'Codex')
     await sync([{ name: 'deploy', sourcePath: src }])
-    expect(readFileSync(join(skills, 'hive-deploy', 'SKILL.md'), 'utf8')).toBe('# deploy v1')
-    expect(existsSync(join(skills, 'hive-deploy', '.hive-copy'))).toBe(true)
+    expect(readFileSync(join(skills, 'cw-deploy', 'SKILL.md'), 'utf8')).toBe('# deploy v1')
+    expect(existsSync(join(skills, 'cw-deploy', '.hive-copy'))).toBe(true)
     writeFileSync(join(src, 'SKILL.md'), '# deploy v2')
     await sync([{ name: 'deploy', sourcePath: src }])
-    expect(readFileSync(join(skills, 'hive-deploy', 'SKILL.md'), 'utf8')).toBe('# deploy v2')
+    expect(readFileSync(join(skills, 'cw-deploy', 'SKILL.md'), 'utf8')).toBe('# deploy v2')
     // Disabled: Hive's copy goes, the user's folder stays.
     await sync([])
-    expect(existsSync(join(skills, 'hive-deploy'))).toBe(false)
+    expect(existsSync(join(skills, 'cw-deploy'))).toBe(false)
     expect(existsSync(join(skills, 'hive-mine', 'SKILL.md'))).toBe(true)
   })
 })

@@ -1,4 +1,4 @@
-// A notification an agent or the Assistant sends with a target (HI-1961, hive_notify's `target`) opens what it is about
+// A notification an agent or the Assistant sends with a target (HI-1961, cw_notify's `target`) opens what it is about
 // on click: one naming HB4 shows HB4's pane, one naming a card opens its dialog, from the toast and from its row in the
 // Notifications panel; one naming an agent removed since says so. The Agent API refuses a target naming both, an agent
 // or a card that isn't there, or an agent without its project (a script has no project of its own). Screenshots of

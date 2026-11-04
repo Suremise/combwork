@@ -1152,14 +1152,14 @@ describe("each run's own log folder (logs.mjs)", () => {
     // In the suite itself: the runner set both.
     expect(logsRootFor('W', { HIVE_E2E_PORT: '48302', E2E_RUN_SUITE: 'progressreport', E2E_RUN_PORT: '48302' })).toBe(join('W', 'logs', 'nested'))
     // In an agent's shell in the Hive the suite started: Hive dropped the HIVE_ variables, E2E_RUN_* remain.
-    const inSession = { E2E_RUN_SUITE: 'progressreport', E2E_RUN_PORT: '48302', HIVE_API_URL: undefined }
+    const inSession = { E2E_RUN_SUITE: 'progressreport', E2E_RUN_PORT: '48302', CW_API_URL: undefined }
     expect(parentSuite(inSession)).toEqual({ name: 'progressreport', port: 48302 })
     expect(logsRootFor('W', inSession)).toBe(join('W', 'logs', 'nested'))
     expect(portBase(inSession)).toBe(49302)
     // A suite run on its own, one at a time: no port, still inside a suite.
     expect(portBase({ E2E_RUN_SUITE: 'progressreport' }, 47940)).toBe(48940)
     // An agent session in a real Hive (no suite): neither.
-    expect(parentSuite({ HIVE_API_URL: 'http://127.0.0.1:47821' })).toBeNull()
+    expect(parentSuite({ CW_API_URL: 'http://127.0.0.1:47821' })).toBeNull()
   })
 })
 
@@ -1981,12 +1981,12 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     CLAUDE_CONFIG_DIR: 'C:\\mine\\claude',
     ANTHROPIC_API_KEY: 'k',
     GIT_DIR: 'C:\\repo\\.git',
-    HIVE_API_URL: 'http://127.0.0.1:47821',
+    CW_API_URL: 'http://127.0.0.1:47821',
     HIVE_API_TOKEN: 'secret',
-    HIVE_PROJECT: 'hive',
-    HIVE_PROGRESS_WRAPPED: '1',
-    HIVE_PROGRESS_RUN_AS_NODE: '1',
-    HIVE_PROGRESS_DATA: 'C:\\progress',
+    CW_PROJECT: 'hive',
+    CW_PROGRESS_WRAPPED: '1',
+    CW_PROGRESS_RUN_AS_NODE: '1',
+    CW_PROGRESS_DATA: 'C:\\progress',
     HIVE_E2E_NATIVE: '1',
     HIVE_TEST_SLOW_IPC: 'tasks:list=9000',
     HIVE_TEST_CODEX_HOME: 'C:\\codex-test',
@@ -2024,7 +2024,7 @@ describe('the run context: what a test starts gets only the allowlist and its ow
   it("a suite's environment: the allowlist, the test settings passed on by name, and its run context; nothing else", () => {
     const env = ctx.suiteEnv({ name: 'board', port: 47961, work: 'C:\\lanes\\1', runDir: 'C:\\lanes\\1' }, parent)
     expect(env).toMatchObject({ Path: parent.Path, SystemRoot: 'C:\\Windows', https_proxy: 'http://proxy:8080', HIVE_TEST_CODEX_HOME: 'C:\\codex-test', HIVE_E2E_DIR: 'C:\\lanes\\1', HIVE_E2E_PORT: '47961', HIVE_API_PORT: '47961', E2E_RUN_SUITE: 'board', E2E_RUN_DIR: 'C:\\lanes\\1', E2E_RUN_PORT: '47961' })
-    for (const k of ['NO_COLOR', 'FORCE_COLOR', 'ELECTRON_RUN_AS_NODE', 'NODE_OPTIONS', 'CLAUDE_CONFIG_DIR', 'ANTHROPIC_API_KEY', 'GIT_DIR', 'HIVE_API_URL', 'HIVE_API_TOKEN', 'HIVE_PROJECT', 'HIVE_PROGRESS_WRAPPED', 'HIVE_PROGRESS_RUN_AS_NODE', 'HIVE_PROGRESS_DATA', 'HIVE_E2E_NATIVE', 'HIVE_TEST_SLOW_IPC']) expect(has(env, k), k).toBe(false)
+    for (const k of ['NO_COLOR', 'FORCE_COLOR', 'ELECTRON_RUN_AS_NODE', 'NODE_OPTIONS', 'CLAUDE_CONFIG_DIR', 'ANTHROPIC_API_KEY', 'GIT_DIR', 'CW_API_URL', 'HIVE_API_TOKEN', 'CW_PROJECT', 'CW_PROGRESS_WRAPPED', 'CW_PROGRESS_RUN_AS_NODE', 'CW_PROGRESS_DATA', 'HIVE_E2E_NATIVE', 'HIVE_TEST_SLOW_IPC']) expect(has(env, k), k).toBe(false)
     // Without a port (a serial suite of a runner inside a suite): none inherited from the runner that started this one.
     const nested = ctx.suiteEnv({ name: 'about', runDir: 'C:\\lanes\\0\\nested' }, parent)
     for (const k of ['HIVE_E2E_PORT', 'HIVE_API_PORT', 'E2E_RUN_PORT', 'HIVE_E2E_DIR']) expect(has(nested, k), k).toBe(false)
@@ -2167,8 +2167,8 @@ describe('the run context: what a test starts gets only the allowlist and its ow
 
   it('every variable Hive sets for its sessions and its hive-progress wrapper is left out (#202)', () => {
     const src = ['src/main/progressReporters/wrapper.ts', 'src/main/progressReporters/shims.ts', 'src/main/ptyHost.ts', 'src/main/sessions.ts'].map((f) => readFileSync(join(root, f), 'utf8')).join('\n')
-    const sessionVars = [...new Set([...src.matchAll(/\b(HIVE_[A-Z0-9_]+|ELECTRON_RUN_AS_NODE|NO_COLOR|FORCE_COLOR)\b/g)].map((m) => m[1]))]
-    expect(sessionVars).toEqual(expect.arrayContaining(['HIVE_PROGRESS_WRAPPED', 'HIVE_PROGRESS_RUN_AS_NODE', 'HIVE_PROGRESS_DATA', 'HIVE_HOOK_TOKEN', 'HIVE_PROJECT']))
+    const sessionVars = [...new Set([...src.matchAll(/\b((?:HIVE|CW)_[A-Z0-9_]+|ELECTRON_RUN_AS_NODE|NO_COLOR|FORCE_COLOR)\b/g)].map((m) => m[1]))]
+    expect(sessionVars).toEqual(expect.arrayContaining(['CW_PROGRESS_WRAPPED', 'CW_PROGRESS_RUN_AS_NODE', 'CW_PROGRESS_DATA', 'CW_HOOK_TOKEN', 'CW_PROJECT']))
     const everywhere = Object.fromEntries(sessionVars.map((n) => [n, 'set']))
     const suite = ctx.suiteEnv({ name: 'x', runDir: 'C:\\w' }, everywhere)
     const hive = ctx.hiveEnv({ HIVE_USER_DATA: 'C:\\p' }, everywhere)
@@ -2180,13 +2180,13 @@ describe('the run context: what a test starts gets only the allowlist and its ow
       expect(has(child, n), `child: ${n}`).toBe(false)
     }
     // And no Hive session variable is ever allowlisted or passed on.
-    for (const n of [...ctx.ALLOW, ...Object.keys(ctx.PASS_ENV)]) expect(/^(HIVE_API|HIVE_PROGRESS_(WRAPPED|RUN_AS_NODE|DATA)$|HIVE_PROJECT|HIVE_WORKSPACE|HIVE_AGENT|ELECTRON|CLAUDE|ANTHROPIC|NO_COLOR|FORCE_COLOR)/.test(n), n).toBe(false)
+    for (const n of [...ctx.ALLOW, ...Object.keys(ctx.PASS_ENV)]) expect(/^(HIVE_API|HIVE_PROGRESS_(WRAPPED|RUN_AS_NODE|DATA)$|CW_|ELECTRON|CLAUDE|ANTHROPIC|NO_COLOR|FORCE_COLOR)/.test(n), n).toBe(false)
   })
 
   it("a test Hive's environment: quiet, tips off, the suite's port and the carried run variables, then the suite's own", () => {
     const env = ctx.hiveEnv({ HIVE_USER_DATA: 'C:\\profile', CLAUDE_CONFIG_DIR: 'C:\\test-claude', HIVE_TEST_SLOW_IPC: undefined }, parent)
     expect(env).toMatchObject({ HIVE_USER_DATA: 'C:\\profile', HIVE_TEST_QUIET: '1', HIVE_TEST_TIPS: 'off', HIVE_API_PORT: '47950', E2E_RUN_SUITE: 'progressreport', E2E_RUN_DIR: 'C:\\lanes\\0', E2E_RUN_PORT: '47950', CLAUDE_CONFIG_DIR: 'C:\\test-claude', Path: parent.Path })
-    for (const k of ['NO_COLOR', 'ELECTRON_RUN_AS_NODE', 'HIVE_API_TOKEN', 'HIVE_PROGRESS_WRAPPED', 'HIVE_TEST_SLOW_IPC', 'HIVE_E2E_NATIVE', 'HIVE_TEST_CODEX_HOME', 'ANTHROPIC_API_KEY']) expect(has(env, k), k).toBe(false)
+    for (const k of ['NO_COLOR', 'ELECTRON_RUN_AS_NODE', 'HIVE_API_TOKEN', 'CW_PROGRESS_WRAPPED', 'HIVE_TEST_SLOW_IPC', 'HIVE_E2E_NATIVE', 'HIVE_TEST_CODEX_HOME', 'ANTHROPIC_API_KEY']) expect(has(env, k), k).toBe(false)
     // HIVE_TEST_QUIET=0 for the run shows the copies; a suite's own setting wins.
     expect(ctx.hiveEnv({}, { ...parent, HIVE_TEST_QUIET: '0' }).HIVE_TEST_QUIET).toBe('0')
     expect(ctx.hiveEnv({ HIVE_TEST_QUIET: '0' }, parent).HIVE_TEST_QUIET).toBe('0')
@@ -2200,8 +2200,8 @@ describe('the run context: what a test starts gets only the allowlist and its ow
   })
 
   it("a child that is part of Hive gets the allowlist and what it is given; nothing is passed that wasn't allowed", () => {
-    const env = ctx.childEnv({ HIVE_API_URL: 'http://127.0.0.1:1', ELECTRON_RUN_AS_NODE: '1' }, parent)
-    expect(Object.keys(env).sort()).toEqual(['ELECTRON_RUN_AS_NODE', 'HIVE_API_URL', 'LOCALAPPDATA', 'Path', 'SystemRoot', 'USERPROFILE', 'https_proxy'])
+    const env = ctx.childEnv({ CW_API_URL: 'http://127.0.0.1:1', ELECTRON_RUN_AS_NODE: '1' }, parent)
+    expect(Object.keys(env).sort()).toEqual(['CW_API_URL', 'ELECTRON_RUN_AS_NODE', 'LOCALAPPDATA', 'Path', 'SystemRoot', 'USERPROFILE', 'https_proxy'])
     expect(Object.keys(ctx.baseEnv(parent)).every((k) => ctx.ALLOW.includes(k.toUpperCase()))).toBe(true)
   })
 
@@ -2611,9 +2611,9 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
 
   it("a holder left over by a session that ended is named so in the wait line, and nothing is stopped (#1008)", async () => {
     // The claim records the agent's launch the run was started in, from its shell's variables.
-    const session = { HIVE_PROJECT: 'hive', HIVE_AGENT: 'HB2', HIVE_RUN_ID: 'run-old', HIVE_WORKSPACE: 'D:/ws' }
+    const session = { CW_PROJECT: 'hive', CW_AGENT: 'HB2', CW_RUN_ID: 'run-old', CW_WORKSPACE: 'D:/ws' }
     expect(runOwner(session)).toEqual({ project: 'hive', agent: 'HB2', run: 'run-old', workspace: 'D:/ws' })
-    expect([runOwner({}), runOwner({ HIVE_PROJECT: 'hive', HIVE_AGENT: 'HB2' })]).toEqual([undefined, undefined])
+    expect([runOwner({}), runOwner({ CW_PROJECT: 'hive', CW_AGENT: 'HB2' })]).toEqual([undefined, undefined])
     const dir2 = newPool()
     expect(await ask(dir2, 101, { what: 'e2e: 196 suites', root: 'D:/wt/hb2', session: runOwner(session) })).toEqual({ slot: 0 })
     const claim = JSON.parse(readFileSync(join(dir2, 'slot-0.json'), 'utf8'))
@@ -2629,7 +2629,7 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
     // The session's token in its file (HI-2262: sessions never get HIVE_API_TOKEN).
     const tokenFile = join(tmp, 'launch-token.json')
     writeFileSync(tokenFile, JSON.stringify({ token: 't' }))
-    const env = { HIVE_API_URL: 'http://127.0.0.1:47821/', HIVE_API_TOKEN_FILE: tokenFile, HIVE_PROJECT: 'web', HIVE_AGENT: 'W1', HIVE_RUN_ID: 'run-new' }
+    const env = { CW_API_URL: 'http://127.0.0.1:47821/', CW_API_TOKEN_FILE: tokenFile, CW_PROJECT: 'web', CW_AGENT: 'W1', CW_RUN_ID: 'run-new' }
     expect(await launchEnded(claim.owner, env, { fetch: api(false) })).toBe(true)
     expect(asked[0]).toEqual({ url: 'http://127.0.0.1:47821/v1/projects/hive/agents/HB2/launches/run-old', workspace: 'D%3A%2Fws' })
     expect(await launchEnded(claim.owner, env, { fetch: api(true) })).toBe(false)
@@ -2779,7 +2779,7 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
     // The token from its file, as hive-progress reads it (HI-2262: never HIVE_API_TOKEN).
     const sessionToken = join(tmp, 'session-token.json')
     writeFileSync(sessionToken, JSON.stringify({ token: 'tok' }))
-    const session = { HIVE_API_URL: 'http://127.0.0.1:1/', HIVE_API_TOKEN_FILE: sessionToken, HIVE_PROJECT: 'hive', HIVE_AGENT: 'HB4', HIVE_WORKSPACE: 'D:/ws' }
+    const session = { CW_API_URL: 'http://127.0.0.1:1/', CW_API_TOKEN_FILE: sessionToken, CW_PROJECT: 'hive', CW_AGENT: 'HB4', CW_WORKSPACE: 'D:/ws' }
     const calls: { url: string; init: RequestInit }[] = []
     const answer = (body: unknown, ok = true) =>
       (async (url: string, init: RequestInit) => {
@@ -2800,10 +2800,10 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
     expect(await holdsMergeSlot(session, { fetch: refused })).toBe(false)
     // Not a Hive agent's session: Hive isn't asked.
     const asked = calls.length
-    for (const k of ['HIVE_API_URL', 'HIVE_PROJECT', 'HIVE_AGENT', 'HIVE_API_TOKEN_FILE']) expect(await holdsMergeSlot({ ...session, [k]: '' }, { fetch: answer(holder('HB4')) }), k).toBe(false)
+    for (const k of ['CW_API_URL', 'CW_PROJECT', 'CW_AGENT', 'CW_API_TOKEN_FILE']) expect(await holdsMergeSlot({ ...session, [k]: '' }, { fetch: answer(holder('HB4')) }), k).toBe(false)
     expect(calls.length).toBe(asked)
     // HIVE_API_TOKEN alone is no session's (HI-2262): Hive isn't asked; beside the file, the file's is sent.
-    expect(await holdsMergeSlot({ ...session, HIVE_API_TOKEN_FILE: '', HIVE_API_TOKEN: 'tok' }, { fetch: answer(holder('HB4')) })).toBe(false)
+    expect(await holdsMergeSlot({ ...session, CW_API_TOKEN_FILE: '', HIVE_API_TOKEN: 'tok' }, { fetch: answer(holder('HB4')) })).toBe(false)
     expect(calls.length).toBe(asked)
     expect(await holdsMergeSlot({ ...session, HIVE_API_TOKEN: 'other' }, { fetch: answer(holder('HB4')) })).toBe(true)
     expect(calls.at(-1)!.init.headers).toMatchObject({ Authorization: 'Bearer tok' })

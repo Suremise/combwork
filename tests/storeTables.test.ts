@@ -86,7 +86,7 @@ const WATCH = {
   waitSeq: 4,
   on: { '1220': 'agent' },
   watcherName: 'HB6 (hive)',
-  fired: { line: '[Hive] …', at: '2026-10-20T15:00:00.000Z', cards: [1220], delivery: 'm12' }
+  fired: { line: '[CW] …', at: '2026-10-20T15:00:00.000Z', cards: [1220], delivery: 'm12' }
 }
 /** A bucket with a project named like Object's own properties, as the store keeps them (maps with no prototype). */
 const bucket = (start: number) => {

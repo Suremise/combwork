@@ -40,16 +40,16 @@
     "note": "An agent watch begun (#416): the card watch it replaced."
   },
   "reply.agentWatch.watching": {
-    "text": "{watching}. End your turn now: Hive types a line into this session when one finishes, waits for the user or stops, or at {limit} if none does. Nothing runs meanwhile.",
+    "text": "{watching}. End your turn now: Combwork types a line into this session when one finishes, waits for the user or stops, or at {limit} if none does. Nothing runs meanwhile.",
     "note": "An agent watch begun (#416): end the turn, and what wakes it."
   },
   "reply.ask.assistant": {
-    "text": "{card}: asked the Hive Assistant ({delivery} in its inbox). Its answer comes to your inbox.",
-    "note": "hive_ask_assistant (HI-1866): the request's id in the Assistant's inbox ({delivery}, m41)."
+    "text": "{card}: asked the Assistant ({delivery} in its inbox). Its answer comes to your inbox.",
+    "note": "cw_ask_assistant (HI-1866): the request's id in the Assistant's inbox ({delivery}, m41)."
   },
   "reply.ask.assistantNone": {
-    "text": "{card}: your request is on the card, but the Hive Assistant couldn't be given it; the user is told. Ask the user instead (hive_ask_user).",
-    "note": "hive_ask_assistant (HI-1866) when the request couldn't be delivered to the Assistant. {card} is the card's key."
+    "text": "{card}: your request is on the card, but the Assistant couldn't be given it; the user is told. Ask the user instead (cw_ask_user).",
+    "note": "cw_ask_assistant (HI-1866) when the request couldn't be delivered to the Assistant. {card} is the card's key."
   },
   "reply.attachment.bytes": {
     "text": "{n, number} bytes",
@@ -57,15 +57,15 @@
   },
   "reply.attachment.file": {
     "text": "{name}: {kind, select, binary {not text} pdf {a PDF} other {an image}} ({size}). Open it with your own file reading: {path}",
-    "note": "hive_read_attachment (HI-1751) for an image, a PDF or a binary file: its path, for the CLI's own reading."
+    "note": "cw_read_attachment (HI-1751) for an image, a PDF or a binary file: its path, for the CLI's own reading."
   },
   "reply.attachment.range": {
     "text": "bytes {from, number}–{to, number} of {size}",
-    "note": "hive_read_attachment: which bytes of the file this page is."
+    "note": "cw_read_attachment: which bytes of the file this page is."
   },
   "reply.attachment.text": {
     "text": "{name} ({where}{hasNext, select, yes {; more from offset {next}} other {}})",
-    "note": "hive_read_attachment: which bytes this is, and the byte offset the next page starts at (to pass back as offset); the text follows as it is."
+    "note": "cw_read_attachment: which bytes this is, and the byte offset the next page starts at (to pass back as offset); the text follows as it is."
   },
   "reply.batch.changed": {
     "text": "{n, plural, one {{n} card} other {{n} cards}} changed:",
@@ -100,12 +100,12 @@
     "note": "Where a card is now: its column's name and its place in it (an ordinal such as 51st, of how many)."
   },
   "reply.checks.hint": {
-    "text": "before review: run one with hive-progress --check <name> --card \"{card}\" {isolated, select, yes {(--isolated: in a check copy at the card's revision; work-on-card)} other {(work-on-card)}}",
+    "text": "before review: run one with cw-progress --check <name> --card \"{card}\" {isolated, select, yes {(--isolated: in a check copy at the card's revision; work-on-card)} other {(work-on-card)}}",
     "note": "A code card's checks before review (HI-2276): how to run one, with <name> left for the agent to fill (a configured name is never quoted into a command, HR1's rounds 1 and 2). {card} is the card's key; isolated: its platform can make a check copy."
   },
   "reply.connection.accountBare": {
     "text": "Account {name} (id {id}), {cli}: no connections{off, select, yes {, off here} other {}}",
-    "note": "hive_connection list: an account with no connections."
+    "note": "cw_connection list: an account with no connections."
   },
   "reply.connection.args": {
     "text": "args {args}",
@@ -113,7 +113,7 @@
   },
   "reply.connection.changed": {
     "text": "{verb, select, Changed {Changed} other {Made}} {name} (id {id}) on {account}: {values}.{verb, select, Changed { Running agents on it take it when restarted.} other {}}",
-    "note": "hive_connection add or update (HI-2108): what it is now."
+    "note": "cw_connection add or update (HI-2108): what it is now."
   },
   "reply.connection.cliDefaults": {
     "text": "the CLI's defaults",
@@ -125,11 +125,11 @@
   },
   "reply.connection.none": {
     "text": "No connections: the user adds an account in Settings → Accounts & Connections.",
-    "note": "hive_connection list with none."
+    "note": "cw_connection list with none."
   },
   "reply.connection.row": {
     "text": "{name} (id {id}) on {account}, {cli}: {values}{unusable, select, yes {. Not usable here: its account is off} other {}}",
-    "note": "hive_connection list (HI-2108): a connection, its account and CLI, its values, and whether it is usable here."
+    "note": "cw_connection list (HI-2108): a connection, its account and CLI, its values, and whether it is usable here."
   },
   "reply.connection.unknownCli": {
     "text": "unknown CLI",
@@ -145,14 +145,14 @@
   },
   "reply.console.more": {
     "text": "Sources {from}–{to} of {total}: offset={to} for more.",
-    "note": "hive_console sources, one page: which, and the offset for more."
+    "note": "cw_console sources, one page: which, and the offset for more."
   },
   "reply.console.newer": {
     "text": "{n} more after these.",
     "note": "A read of events: how many more after these."
   },
   "reply.console.next": {
-    "text": "Next: since={newest}. seq=[n] gives an event's raw payload and what Hive made of it.",
+    "text": "Next: since={newest}. seq=[n] gives an event's raw payload and what Combwork made of it.",
     "note": "A read of events: the since for the next one, and how to read one in full."
   },
   "reply.console.noEvents": {
@@ -161,10 +161,10 @@
   },
   "reply.console.none": {
     "text": "No developer console sources you can read.",
-    "note": "hive_console (#636) with no sources."
+    "note": "cw_console (#636) with no sources."
   },
   "reply.console.notCaptured": {
-    "text": "not captured: the developer console isn't open on it (Hive captures only while the user has it open), so there is nothing to read.",
+    "text": "not captured: the developer console isn't open on it (Combwork captures only while the user has it open), so there is nothing to read.",
     "note": "A read of a source no open console captures: there is nothing to read, and why."
   },
   "reply.console.older": {
@@ -173,39 +173,39 @@
   },
   "reply.console.row": {
     "text": "{label}{hasProvider, select, yes { ({provider})} other {}}: {capturing, select, yes {captured, {events} events} other {not captured}} [{args}]",
-    "note": "A developer console source: its label, its provider, whether an open console captures it, and the arguments hive_console takes for it."
+    "note": "A developer console source: its label, its provider, whether an open console captures it, and the arguments cw_console takes for it."
   },
   "reply.doc.noHeadings": {
     "text": "{path} ({size} characters) has no headings: read it whole.",
-    "note": "hive_doc_outline (#817) for a document with no headings."
+    "note": "cw_doc_outline (#817) for a document with no headings."
   },
   "reply.doc.outline": {
     "text": "{path}: {n} headings, {size} characters. [slug] and size per section (subsections included):",
-    "note": "hive_doc_outline's first line (#817); a line per heading follows, with its slug in brackets."
+    "note": "cw_doc_outline's first line (#817); a line per heading follows, with its slug in brackets."
   },
   "reply.doc.outlineMore": {
     "text": "… {n} more: depth={depth} lists fewer.",
-    "note": "hive_doc_outline cut at 200 headings: how many more, and the depth that lists fewer."
+    "note": "cw_doc_outline cut at 200 headings: how many more, and the depth that lists fewer."
   },
   "reply.doc.outlineRead": {
-    "text": "hive_read_section reads one as #<slug>.",
-    "note": "hive_doc_outline's last line."
+    "text": "cw_read_section reads one as #<slug>.",
+    "note": "cw_doc_outline's last line."
   },
   "reply.doc.section": {
     "text": "{path}#{slug} ({size, number} characters)",
-    "note": "hive_read_section: where the section is and its size; its text follows as it is."
+    "note": "cw_read_section: where the section is and its size; its text follows as it is."
   },
   "reply.doc.sectionLong": {
     "text": "{head}: long, so here is its text before its subsections, then their outline.",
-    "note": "hive_read_section for a long section: its own text, then its subsections' outline."
+    "note": "cw_read_section for a long section: its own text, then its subsections' outline."
   },
   "reply.doc.sectionRead": {
-    "text": "hive_read_section reads one of them as #<slug>, or this whole section with full=true.",
-    "note": "hive_read_section's last line for a long section."
+    "text": "cw_read_section reads one of them as #<slug>, or this whole section with full=true.",
+    "note": "cw_read_section's last line for a long section."
   },
   "reply.doc.whole": {
     "text": "{path} ({size, number} characters)",
-    "note": "hive_read_section with no heading (#818): the whole document and its size."
+    "note": "cw_read_section with no heading (#818): the whole document and its size."
   },
   "reply.intent.done": {
     "text": "done",
@@ -220,7 +220,7 @@
     "note": "A journal entry that digests others."
   },
   "reply.journal.head": {
-    "text": "#{id} {kind}{hasProject, select, yes { · {project}} other {}}, {at}{byHive, select, yes {, by Hive} other {}}, importance {importance}{changed, select, yes {, changed {updatedAt}} other {}}",
+    "text": "#{id} {kind}{hasProject, select, yes { · {project}} other {}}, {at}{byHive, select, yes {, by Combwork} other {}}, importance {importance}{changed, select, yes {, changed {updatedAt}} other {}}",
     "note": "A journal entry in full: its id, kind, project, when, who recorded it, its importance and when it changed."
   },
   "reply.journal.links": {
@@ -228,7 +228,7 @@
     "note": "A journal entry's links (type and ref)."
   },
   "reply.journal.mark.byHive": {
-    "text": "by Hive",
+    "text": "by Combwork",
     "note": "A journal entry's mark: Hive recorded it."
   },
   "reply.journal.mark.detail": {
@@ -249,11 +249,11 @@
   },
   "reply.journal.noMatch": {
     "text": "No entries match \"{query}\".",
-    "note": "hive_journal_recall with a query nothing matches (#1031)."
+    "note": "cw_journal_recall with a query nothing matches (#1031)."
   },
   "reply.journal.none": {
     "text": "No entries.",
-    "note": "hive_journal_recall with no entries."
+    "note": "cw_journal_recall with no entries."
   },
   "reply.journal.supersededBy": {
     "text": "Superseded by #{id}.",
@@ -277,7 +277,7 @@
   },
   "reply.list.column": {
     "text": "{archived, select, yes {Archived, last in {column} ({n}):} other {{column} ({n}, top first):}}",
-    "note": "A column's heading in hive_list_tasks: its name and how many cards it has (top first: a column's order is its priority)."
+    "note": "A column's heading in cw_list_tasks: its name and how many cards it has (top first: a column's order is its priority)."
   },
   "reply.list.more": {
     "text": "{items} and {n} more",
@@ -285,11 +285,11 @@
   },
   "reply.list.noArchived": {
     "text": "No archived cards.",
-    "note": "hive_list_tasks with archived when there are none."
+    "note": "cw_list_tasks with archived when there are none."
   },
   "reply.list.noCards": {
     "text": "No cards.",
-    "note": "hive_list_tasks when there are none."
+    "note": "cw_list_tasks when there are none."
   },
   "reply.list.none": {
     "text": "none",
@@ -301,31 +301,31 @@
   },
   "reply.list.page": {
     "text": "Cards {from}–{to} of {n}.",
-    "note": "hive_list_tasks from an offset: which cards this page has."
+    "note": "cw_list_tasks from an offset: which cards this page has."
   },
   "reply.list.past": {
     "text": "There are {n} cards: offset {offset} is past the last.",
-    "note": "hive_list_tasks's offset past the last card."
+    "note": "cw_list_tasks's offset past the last card."
   },
   "reply.list.read": {
-    "text": "hive_read_task gives a card in full.",
-    "note": "hive_list_tasks's last line."
+    "text": "cw_read_task gives a card in full.",
+    "note": "cw_list_tasks's last line."
   },
   "reply.list.rest": {
     "text": "…and {n} more: offset {next} carries on.",
-    "note": "hive_list_tasks cut at 200 rows: how many more, and the offset that carries on."
+    "note": "cw_list_tasks cut at 200 rows: how many more, and the offset that carries on."
   },
   "reply.message.inbox": {
-    "text": "it waits in its inbox until it reads it with hive_inbox (the user can Deliver Now)",
-    "note": "hive_message_agent with no carrying-on switch on: the message waits in its inbox."
+    "text": "it waits in its inbox until it reads it with cw_inbox (the user can Deliver Now)",
+    "note": "cw_message_agent with no carrying-on switch on: the message waits in its inbox."
   },
   "reply.message.queued": {
-    "text": "Queued for {who} ({id}{tied}, {status}): {how}; {queued} waiting. hive_agent_activity says when it is received and acked.",
-    "note": "hive_message_agent's reply for a message queued (#1497)."
+    "text": "Queued for {who} ({id}{tied}, {status}): {how}; {queued} waiting. cw_agent_activity says when it is received and acked.",
+    "note": "cw_message_agent's reply for a message queued (#1497)."
   },
   "reply.message.tells": {
-    "text": "Hive tells it {ways}",
-    "note": "hive_message_agent (#1497): how Hive tells the agent of the message (joined with reply.list.or)."
+    "text": "Combwork tells it {ways}",
+    "note": "cw_message_agent (#1497): how Hive tells the agent of the message (joined with reply.list.or)."
   },
   "reply.message.tells.checkpoints": {
     "text": "at its next tool call",
@@ -348,11 +348,11 @@
     "note": "What comes next on a card under its rules (#1530): the intent tools it can take (joined with reply.list.or). An agent follows it rather than infer the step from a column."
   },
   "reply.next.merge": {
-    "text": "Next: its builder merges it, then reports the merge (hive_report_merge).",
+    "text": "Next: its builder merges it, then reports the merge (cw_report_merge).",
     "note": "What comes next on a card (#1530): its builder merges it."
   },
   "reply.next.queue": {
-    "text": "Next: Hive's merge queue merges it.",
+    "text": "Next: Combwork's merge queue merges it.",
     "note": "What comes next on a card (#1530): Hive's merge queue merges it."
   },
   "reply.next.review": {
@@ -377,19 +377,19 @@
   },
   "reply.notes.none": {
     "text": "No shared notes yet.",
-    "note": "hive_list_shared_notes when there are none."
+    "note": "cw_list_shared_notes when there are none."
   },
   "reply.notes.read": {
-    "text": "hive_read_shared_note reads one.",
-    "note": "hive_list_shared_notes's last line."
+    "text": "cw_read_shared_note reads one.",
+    "note": "cw_list_shared_notes's last line."
   },
   "reply.notify.opens": {
     "text": "Notification shown; a click opens {opens}.",
-    "note": "hive_notify (HI-1961): what a click on the notification opens (an agent or a card)."
+    "note": "cw_notify (HI-1961): what a click on the notification opens (an agent or a card)."
   },
   "reply.notify.shown": {
     "text": "Notification shown.",
-    "note": "hive_notify: the notification was shown."
+    "note": "cw_notify: the notification was shown."
   },
   "reply.progress": {
     "text": "{title}{steps}{state, select, stopped {, stopped reporting} eta {, about {left} left} other {}}",
@@ -401,7 +401,7 @@
   },
   "reply.project.head": {
     "text": "{name} ({active, select, yes {on} other {off}}{hasBranch, select, yes {, {branch}} other {}})",
-    "note": "A project row (hive_list_projects): its name (with its workspace when there are several), on or off, and its branch."
+    "note": "A project row (cw_list_projects): its name (with its workspace when there are several), on or off, and its branch."
   },
   "reply.project.noAgents": {
     "text": "{head}: no agents",
@@ -409,11 +409,11 @@
   },
   "reply.project.none": {
     "text": "No projects.",
-    "note": "hive_list_projects when there are none."
+    "note": "cw_list_projects when there are none."
   },
   "reply.project.read": {
-    "text": "hive_project_status gives one project in full (its agents' ids and sessions, its settings).",
-    "note": "hive_list_projects's last line."
+    "text": "cw_project_status gives one project in full (its agents' ids and sessions, its settings).",
+    "note": "cw_list_projects's last line."
   },
   "reply.queue.cancelled": {
     "text": "{key} cancelled ({reason})",
@@ -429,19 +429,19 @@
   },
   "reply.queue.head": {
     "text": "Merge queue for {target} in {project}: {state}.",
-    "note": "hive_queue list's line for a target's queue."
+    "note": "cw_queue list's line for a target's queue."
   },
   "reply.queue.how": {
     "text": "to {purpose}, in the {place, select, project {project folder} other {target's folder}}: {command}",
     "note": "A merge queue stopped part way (#1351): a command that settles it, what for and where to run it. Joined by \"; \", its first letter made a capital."
   },
   "reply.queue.merged": {
-    "text": "{key} merged ({result}{outside, select, yes {, outside Hive} other {}})",
+    "text": "{key} merged ({result}{outside, select, yes {, outside Combwork} other {}})",
     "note": "A recent outcome of the merge queue: merged, at which commit."
   },
   "reply.queue.none": {
     "text": "No merge queue in {project}: no card has been queued, and none is paused.",
-    "note": "hive_queue list with no queue."
+    "note": "cw_queue list with no queue."
   },
   "reply.queue.paused": {
     "text": "paused ({reason}{by, select, user {, by the user} assistant {, by the Assistant} other {}}{hasCard, select, yes {, at {card}} other {}}{hasFiles, select, yes {: {files}} other {}})",
@@ -485,38 +485,38 @@
   },
   "reply.release.carried": {
     "text": "{slot}: kept for {agent} (kind carried).",
-    "note": "hive_release_slot list: a slot kept for an agent (kind is what release takes)."
+    "note": "cw_release_slot list: a slot kept for an agent (kind is what release takes)."
   },
   "reply.release.held": {
-    "text": "{slot}: held by {agent}'s ended run {run}, its Hive {hive} (kind writer, confirm '{'\"slot\":\"{slot}\",\"run\":\"{run}\"'}').",
-    "note": "hive_release_slot list: a slot held by an ended run, and the confirm release takes (JSON: keep it as it is)."
+    "text": "{slot}: held by {agent}'s ended run {run}, its Combwork {hive} (kind writer, confirm '{'\"slot\":\"{slot}\",\"run\":\"{run}\"'}').",
+    "note": "cw_release_slot list: a slot held by an ended run, and the confirm release takes (JSON: keep it as it is)."
   },
   "reply.release.none": {
     "text": "Nothing to release in {project}: no slot is kept for an agent, and no ended run holds one.",
-    "note": "hive_release_slot list (#1561) with nothing to release."
+    "note": "cw_release_slot list (#1561) with nothing to release."
   },
   "reply.release.processes": {
     "text": "Its run left running: {processes} (end: true ends them first).",
-    "note": "hive_release_slot list: a held writer's processes still running."
+    "note": "cw_release_slot list: a held writer's processes still running."
   },
   "reply.release.releasedCarried": {
     "text": "Released {slot} in {project}: no longer kept for {agent}; its folder and branch stay.",
-    "note": "hive_release_slot release of a carried slot."
+    "note": "cw_release_slot release of a carried slot."
   },
   "reply.release.releasedWriter": {
     "text": "Released {slot} in {project}: {agent}'s ended run no longer holds it{ended, select, yes {, its listed processes ended first} other {}}.",
-    "note": "hive_release_slot release of a writer's slot."
+    "note": "cw_release_slot release of a writer's slot."
   },
   "reply.release.unknown": {
-    "text": "Hive doesn't know which of its processes still run.",
-    "note": "hive_release_slot list: a held writer's processes are not known."
+    "text": "Combwork doesn't know which of its processes still run.",
+    "note": "cw_release_slot list: a held writer's processes are not known."
   },
   "reply.reorder": {
     "text": "{column} now starts {cards}{more, select, yes {; its other {rest, plural, one {{rest} card} other {{rest} cards}} keep their order below} other {}}.",
     "note": "A reorder (reply: short): the cards now at the top of the column, and how many others keep their order."
   },
   "reply.reorder.laneOrder": {
-    "text": "{cards} {one, select, yes {is} other {are}} on {builder}'s lane ({lane}), which keeps its own order and takes {one, select, yes {it} other {them}} in that order. To change it: hive_lane start with its cards in the new order (applyNow: true to apply it now).",
+    "text": "{cards} {one, select, yes {is} other {are}} on {builder}'s lane ({lane}), which keeps its own order and takes {one, select, yes {it} other {them}} in that order. To change it: cw_lane start with its cards in the new order (applyNow: true to apply it now).",
     "note": "HI-2267: put back or reordered on the board, a lane's card is still where its lane's own list has it. The Assistant, calling the tools without a skill, reordered the column and was told nothing of it."
   },
   "reply.row.after": {
@@ -529,7 +529,7 @@
   },
   "reply.row.blocked": {
     "text": "blocked: {why}",
-    "note": "A card row (hive_list_tasks): why it is blocked."
+    "note": "A card row (cw_list_tasks): why it is blocked."
   },
   "reply.row.comments": {
     "text": "{n, plural, one {{n} comment} other {{n} comments}}",
@@ -549,59 +549,59 @@
   },
   "reply.setting.changed": {
     "text": "Changed {path}{hasProject, select, yes { in {project}} other {}} ({id}): {old} → {new}. {hasRestart, select, yes {It applies {restart}.} other {It applies now.}} The user can undo it in your panel's list.",
-    "note": "hive_update_setting's reply: what changed, old → new, and when it applies."
+    "note": "cw_update_setting's reply: what changed, old → new, and when it applies."
   },
   "reply.setting.docs": {
     "text": "User guide: \"{docs}\".",
-    "note": "hive_read_setting: the user guide's section on it."
+    "note": "cw_read_setting: the user guide's section on it."
   },
   "reply.setting.head": {
     "text": "{title} ({id}){hasProject, select, yes { in {project}} other {}}: {value}{isDefault, select, yes { (the default)} other { (default {def})}}",
-    "note": "hive_read_setting's first line: the setting, its project, its value and its default."
+    "note": "cw_read_setting's first line: the setting, its project, its value and its default."
   },
   "reply.setting.helps": {
     "text": "When it helps: {helps}",
-    "note": "hive_read_setting: when the setting helps."
+    "note": "cw_read_setting: when the setting helps."
   },
   "reply.setting.inherit": {
     "text": "Set to inherit:",
-    "note": "hive_list_settings (HI-1712): those set to inherit come last, under this line."
+    "note": "cw_list_settings (HI-1712): those set to inherit come last, under this line."
   },
   "reply.setting.more": {
     "text": "… {n} more: offset {next} carries on.",
-    "note": "hive_list_settings cut at 200: how many more, and the offset that carries on."
+    "note": "cw_list_settings cut at 200: how many more, and the offset that carries on."
   },
   "reply.setting.noMatch": {
     "text": "No setting matches \"{query}\".",
-    "note": "hive_list_settings with a query nothing matches."
+    "note": "cw_list_settings with a query nothing matches."
   },
   "reply.setting.none": {
     "text": "No settings.",
-    "note": "hive_list_settings with none."
+    "note": "cw_list_settings with none."
   },
   "reply.setting.readOnly": {
     "text": "Read-only to you: {why}",
-    "note": "hive_read_setting: the Assistant can't change it, and why."
+    "note": "cw_read_setting: the Assistant can't change it, and why."
   },
   "reply.setting.restart": {
     "text": "A change applies {restart}.",
-    "note": "hive_read_setting: when a change applies."
+    "note": "cw_read_setting: when a change applies."
   },
   "reply.setting.row": {
     "text": "{id} = {value}{hasDefault, select, yes { (default {def})} other {}}{readOnly, select, yes { [read-only]} other {}}",
-    "note": "A setting in hive_list_settings: its id, its value, its default when it differs, and whether it is read-only to the Assistant."
+    "note": "A setting in cw_list_settings: its id, its value, its default when it differs, and whether it is read-only to the Assistant."
   },
   "reply.setting.same": {
     "text": "{path}{hasProject, select, yes { ({project})} other {}} was already {value}: nothing changed.",
-    "note": "hive_update_setting when the value was already so."
+    "note": "cw_update_setting when the value was already so."
   },
   "reply.setting.shownAs": {
     "text": "The user sees it as: {shownAs}.",
-    "note": "hive_read_setting (#767): where the user sees it, in the language Hive shows them."
+    "note": "cw_read_setting (#767): where the user sees it, in the language Hive shows them."
   },
   "reply.setting.where": {
     "text": "Where: {path}. Takes {takes}.",
-    "note": "hive_read_setting: where the user finds it, and what it takes."
+    "note": "cw_read_setting: where the user finds it, and what it takes."
   },
   "reply.size.thousands": {
     "text": "{n}k",
@@ -612,8 +612,8 @@
     "note": "Who a Hive skill is for."
   },
   "reply.skill.level.hive": {
-    "text": "Hive",
-    "note": "Where a skill comes from in hive_list_skills: Hive's own."
+    "text": "Combwork",
+    "note": "Where a skill comes from in cw_list_skills: Hive's own."
   },
   "reply.skill.level.local": {
     "text": "local",
@@ -629,7 +629,7 @@
   },
   "reply.skill.line": {
     "text": "{name} ({where}): {description}",
-    "note": "A skill in hive_list_skills: its name, where it comes from and who it is for, and what it is for."
+    "note": "A skill in cw_list_skills: its name, where it comes from and who it is for, and what it is for."
   },
   "reply.skill.noDescription": {
     "text": "no description",
@@ -641,7 +641,7 @@
   },
   "reply.skill.none": {
     "text": "No skills.",
-    "note": "hive_list_skills when there are none."
+    "note": "cw_list_skills when there are none."
   },
   "reply.slot.free": {
     "text": "it is free",
@@ -692,28 +692,28 @@
     "note": "A release of a slot not held (#586): the ones the agent does hold or wait for."
   },
   "reply.team.hive": {
-    "text": "Hive",
+    "text": "Combwork",
     "note": "What still runs that isn't an agent's: Hive's own."
   },
   "reply.team.more": {
     "text": "…and {n} more.",
-    "note": "hive_team cut at 200 rows."
+    "note": "cw_team cut at 200 rows."
   },
   "reply.team.notPaused": {
     "text": "The team is not paused.",
-    "note": "hive_team (HI-2081): not paused."
+    "note": "cw_team (HI-2081): not paused."
   },
   "reply.team.parked": {
     "text": "The team is paused (by {by}) and parked.",
-    "note": "hive_team: paused and parked."
+    "note": "cw_team: paused and parked."
   },
   "reply.team.paused": {
     "text": "The team is paused (by {by}), not parked yet: {n} still running or unchecked.",
-    "note": "hive_team: paused, not parked yet."
+    "note": "cw_team: paused, not parked yet."
   },
   "reply.team.safe": {
     "text": "Safe to install: {safe, select, yes {yes} other {no}}.",
-    "note": "hive_team: whether it is safe to install an update now."
+    "note": "cw_team: whether it is safe to install an update now."
   },
   "reply.team.theUser": {
     "text": "the user",
@@ -721,31 +721,31 @@
   },
   "reply.team.unchecked": {
     "text": "(can't be checked)",
-    "note": "hive_team: what still runs whose state is unknown."
+    "note": "cw_team: what still runs whose state is unknown."
   },
   "reply.template.applied": {
-    "text": "Connections in {project}: {changed}.{restart}{skipped}{undo, select, yes { hive_undo can put them back.} other {}}",
-    "note": "hive_template apply (HI-2109): who got which connection, who to restart, who was skipped."
+    "text": "Connections in {project}: {changed}.{restart}{skipped}{undo, select, yes { cw_undo can put them back.} other {}}",
+    "note": "cw_template apply (HI-2109): who got which connection, who to restart, who was skipped."
   },
   "reply.template.appliedNone": {
     "text": "no agent changed (each already on it)",
-    "note": "hive_template apply (HI-2109) that changed no agent."
+    "note": "cw_template apply (HI-2109) that changed no agent."
   },
   "reply.template.appliedRestart": {
     "text": "Running on the old one until restarted: {agents}.",
-    "note": "hive_template apply: agents that keep the old connection until restarted."
+    "note": "cw_template apply: agents that keep the old connection until restarted."
   },
   "reply.template.appliedSkipped": {
     "text": "Skipped: {agents}.",
-    "note": "hive_template apply: agents skipped, each with why."
+    "note": "cw_template apply: agents skipped, each with why."
   },
   "reply.template.blocked": {
     "text": "Can't load yet: {why}",
-    "note": "hive_template plan: what stops the load."
+    "note": "cw_template plan: what stops the load."
   },
   "reply.template.loaded": {
-    "text": "Loaded \"{name}\" into {project}: removed {removed}; created {created}{renamed}.{on}{workflow} hive_undo can put the agents and options back.",
-    "note": "hive_template load (HI-1502): what was loaded, names given, and its workflow saved or why not."
+    "text": "Loaded \"{name}\" into {project}: removed {removed}; created {created}{renamed}.{on}{workflow} cw_undo can put the agents and options back.",
+    "note": "cw_template load (HI-1502): what was loaded, names given, and its workflow saved or why not."
   },
   "reply.template.noAgents": {
     "text": "no agents",
@@ -757,35 +757,35 @@
   },
   "reply.template.none": {
     "text": "No templates for {project}.",
-    "note": "hive_template list (HI-1502) with none."
+    "note": "cw_template list (HI-1502) with none."
   },
   "reply.template.on": {
     "text": "On: {connections}.",
-    "note": "hive_template load: the connections its agents got."
+    "note": "cw_template load: the connections its agents got."
   },
   "reply.template.options": {
     "text": "Connections here: {connections}.",
-    "note": "hive_template plan: the connections the agents can take."
+    "note": "cw_template plan: the connections the agents can take."
   },
   "reply.template.planAgent": {
     "text": "{name}{renamed, select, yes { ({template})} other {}} {role}{paired, select, yes { with {pairedWith}} other {}} on {connection}",
-    "note": "hive_template plan: an agent it would create, its template's name, its role, who it pairs with and its connection."
+    "note": "cw_template plan: an agent it would create, its template's name, its role, who it pairs with and its connection."
   },
   "reply.template.planHead": {
     "text": "\"{name}\" into {project}: removes {remove}; creates {create}.",
-    "note": "hive_template plan (HI-1502): what loading would do."
+    "note": "cw_template plan (HI-1502): what loading would do."
   },
   "reply.template.renamed": {
     "text": "{template} named {name}",
-    "note": "hive_template load: an agent given another name than its template's."
+    "note": "cw_template load: an agent given another name than its template's."
   },
   "reply.template.row": {
     "text": "{name} (scope {scope}{hasFrom, select, yes {, from {from}} other {}}, file {file}): {agents} agents{hasWorkflow, select, yes {, workflow for {workflow}} other {}}{hasProblem, select, yes {. Can't be used: {problem}} other {}}",
-    "note": "hive_template list: a template, what load needs to name it (scope, from and file), its agents and workflow, and why it can't be used."
+    "note": "cw_template list: a template, what load needs to name it (scope, from and file), its agents and workflow, and why it can't be used."
   },
   "reply.template.taken": {
     "text": "Taken: {names}.",
-    "note": "hive_template plan: names taken, each with a free one."
+    "note": "cw_template plan: names taken, each with a free one."
   },
   "reply.template.takenOne": {
     "text": "{name} ({project}'s): try \"{suggestion}\"",
@@ -829,51 +829,51 @@
   },
   "reply.undo.before": {
     "text": "{name}: undone before.",
-    "note": "hive_undo: this change had been undone before. {name} is its card or what it was."
+    "note": "cw_undo: this change had been undone before. {name} is its card or what it was."
   },
   "reply.undo.field": {
     "text": "{field} left ({why}{hasError, select, yes {: {error}} other {}})",
-    "note": "hive_undo: a field left as it is, why (reply.undo.skipped.*) and the error if one was given."
+    "note": "cw_undo: a field left as it is, why (reply.undo.skipped.*) and the error if one was given."
   },
   "reply.undo.final": {
     "text": "{name}: can't be undone: {final}",
-    "note": "hive_undo: this change can't be undone, and why."
+    "note": "cw_undo: this change can't be undone, and why."
   },
   "reply.undo.group": {
     "text": "{group} (your message at {at}): {n, plural, one {{n} change} other {{n} changes}}, {left} to undo{hasCards, select, yes {; cards {cards}} other {}}",
-    "note": "A message's line in hive_undo's list (#1282): its group id, when, how many changes and how many are left to undo, and its cards."
+    "note": "A message's line in cw_undo's list (#1282): its group id, when, how many changes and how many are left to undo, and its cards."
   },
   "reply.undo.head": {
     "text": "Undid {done} of {n, plural, one {{n} change} other {{n} changes}} in full.",
-    "note": "hive_undo's reply (#1282): how many changes were undone in full, of how many."
+    "note": "cw_undo's reply (#1282): how many changes were undone in full, of how many."
   },
   "reply.undo.listMore": {
     "text": "and {n} more: undo the group to undo them all.",
-    "note": "hive_undo's list of a message's changes, cut at 40: how many more."
+    "note": "cw_undo's list of a message's changes, cut at 40: how many more."
   },
   "reply.undo.markFinal": {
     "text": "[can't be undone: {why}]",
-    "note": "A mark after one of the Assistant's changes in hive_undo's list (#1282): it can't be undone, and why."
+    "note": "A mark after one of the Assistant's changes in cw_undo's list (#1282): it can't be undone, and why."
   },
   "reply.undo.markUndone": {
     "text": "[undone]",
-    "note": "A mark after one of the Assistant's changes in hive_undo's list (#1282): it has been undone."
+    "note": "A mark after one of the Assistant's changes in cw_undo's list (#1282): it has been undone."
   },
   "reply.undo.more": {
     "text": "and {n} more left as they were.",
-    "note": "hive_undo's notes, cut at 40: how many more were left."
+    "note": "cw_undo's notes, cut at 40: how many more were left."
   },
   "reply.undo.none": {
     "text": "No changes of yours are kept (they are kept 7 days).",
-    "note": "hive_undo's list when none of the Assistant's changes is kept (#1282)."
+    "note": "cw_undo's list when none of the Assistant's changes is kept (#1282)."
   },
   "reply.undo.noneForGroup": {
     "text": "No changes of yours are kept for message {group}.",
-    "note": "hive_undo's list for one message (#1282) when none is kept. {group} is the message's group id."
+    "note": "cw_undo's list for one message (#1282) when none is kept. {group} is the message's group id."
   },
   "reply.undo.partial": {
     "text": "{name}: {putBack, select, yes {{undone} put back; } other {}}{skipped}.",
-    "note": "hive_undo: what of this change was put back, and each field left (reply.undo.field, joined by \", \")."
+    "note": "cw_undo: what of this change was put back, and each field left (reply.undo.field, joined by \", \")."
   },
   "reply.undo.skipped.changed": {
     "text": "changed since",
@@ -897,7 +897,7 @@
   },
   "reply.usage.line": {
     "text": "Usage of {account}: {usage}",
-    "note": "hive_connection list's line for an account's usage (joined by \"; \")."
+    "note": "cw_connection list's line for an account's usage (joined by \"; \")."
   },
   "reply.usage.move": {
     "text": "moves its agents to {to} at {percent}% of {limit, select, weekly {the weekly limit} fiveHour {the 5-hour limit} other {either limit}}",
@@ -921,18 +921,18 @@
   },
   "reply.wait.comment": {
     "text": "{change}; latest comment by {by}: \"{line}\"",
-    "note": "A watched card's change, with its latest comment's author and first line (hive_read_task with latestComment gives it all)."
+    "note": "A watched card's change, with its latest comment's author and first line (cw_read_task with latestComment gives it all)."
   },
   "reply.wait.dropped": {
     "text": "{cards} left it (done or gone).",
     "note": "A lane watch: cards that left it."
   },
   "reply.wait.endTurn": {
-    "text": "End your turn now: Hive types a line into this session when it changes, or at {limit} if nothing does.",
+    "text": "End your turn now: Combwork types a line into this session when it changes, or at {limit} if nothing does.",
     "note": "A card watch begun: end the turn, and what wakes it."
   },
   "reply.wait.endTurnThen": {
-    "text": "end your turn: Hive types a line into this session when it changes, or at {limit} if nothing does.",
+    "text": "end your turn: Combwork types a line into this session when it changes, or at {limit} if nothing does.",
     "note": "HI-2245: after handing a card over first, what to do then."
   },
   "reply.wait.ended": {
@@ -944,7 +944,7 @@
     "note": "A watched card that is gone."
   },
   "reply.wait.idle": {
-    "text": "{watching}. {idle} Hive types a line into this session when it changes, or at {limit} if nothing does.",
+    "text": "{watching}. {idle} Combwork types a line into this session when it changes, or at {limit} if nothing does.",
     "note": "HI-2285: a lane's builder watching only its own card with nothing waiting on it carries on rather than end the turn."
   },
   "reply.wait.inLanes": {
@@ -960,11 +960,11 @@
     "note": "A lane watch (#726): the cards beside its lanes it kept from the last lane watch."
   },
   "reply.wait.lane": {
-    "text": "{watching}{events}. End your turn now: Hive types a line into this session on a lane event{hasAlso, select, yes { or {also}} other {}}, or at {limit} if none comes.",
+    "text": "{watching}{events}. End your turn now: Combwork types a line into this session on a lane event{hasAlso, select, yes { or {also}} other {}}, or at {limit} if none comes.",
     "note": "A lane watch begun (#531): what it watches (and its events, when they aren't the default), and what wakes it."
   },
   "reply.wait.lanesLeft": {
-    "text": "This replaces your lane watch: {n, plural, one {1 running lane ({lanes}) is} other {{n} running lanes ({lanes}) are}} no longer followed. To follow them as well, watch them with this instead: hive_wait_for_tasks with lanes, and agents or cards.",
+    "text": "This replaces your lane watch: {n, plural, one {1 running lane ({lanes}) is} other {{n} running lanes ({lanes}) are}} no longer followed. To follow them as well, watch them with this instead: cw_wait_for_tasks with lanes, and agents or cards.",
     "note": "HI-1987: a card or agent watch that replaces a lane watch while its lanes run says what it drops, and how to keep them."
   },
   "reply.wait.moved": {

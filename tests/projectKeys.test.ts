@@ -426,7 +426,7 @@ describe('wakes, the inbox and replies name cards by key (round 1, finding 3)', 
     const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'hive' }, user))
     const name = 'HI-1'
     const named = <T>(fn: () => T): T => keys.withCardNames(w, fn)
-    expect(named(() => wakeLine(cardChange(c.number, c, ['column'])))).toContain(`[Hive] ${name} is in Todo`)
+    expect(named(() => wakeLine(cardChange(c.number, c, ['column'])))).toContain(`[CW] ${name} is in Todo`)
     expect(named(() => limitLine({ cards: [c.number], changes: ['column'] }, 60))).toContain(`No change on ${name}`)
     expect(named(() => releasedLine([{ number: c.number, why: 'reassigned', detail: 'B1' }]))).toContain(`${name} was reassigned`)
     expect(named(() => inboxText([{ ids: ['m1'], from: 'Hive', card: c.number, text: 'changed', at: '', state: 'received' } as never], []))).toContain(`· ${name}:`)
@@ -436,7 +436,7 @@ describe('wakes, the inbox and replies name cards by key (round 1, finding 3)', 
     // The work of the workspace's window (HI-1661: its errors, notices and history lines) names it by key too.
     expect(inWorkspace(w, () => cardRef(c.number))).toBe('HI-1')
     // Outside any workspace (the hive MCP server without names): its number, the only name it knows.
-    expect(wakeLine(cardChange(c.number, c, ['column']))).toContain(`[Hive] #${c.number} is in Todo`)
+    expect(wakeLine(cardChange(c.number, c, ['column']))).toContain(`[CW] #${c.number} is in Todo`)
     // A text the hive MCP server words gets the names with its JSON.
     const row = named(() => taskRow({ ...c, agent: null, stalled: null, blockedBy: [c.number] } as never))
     expect(taskRowText(row)).toContain(`after ${name}`)

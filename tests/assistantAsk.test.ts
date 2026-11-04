@@ -1,4 +1,4 @@
-// An agent's request for the Hive Assistant on a card (HI-1866, main/assistantAsk.ts, `hive_ask_assistant`): written as
+// An agent's request for the Hive Assistant on a card (HI-1866, main/assistantAsk.ts, `cw_ask_assistant`): written as
 // the agent's comment with a history line, and given to the Assistant as a delivery from that agent quoting it whole.
 // Refused before anything is written: another project's card, a card archived or in Done, the Assistant unable to act
 // (Settings → Assistant → Control below changing cards), an agent-less caller, a text past a comment's limit. One that
@@ -100,7 +100,7 @@ describe("an agent's request for the Assistant (HI-1866)", () => {
     await nothingWritten()
     // Control at Look and advise: the Assistant can't change cards.
     assistant().control = 'look'
-    await expect(ask(w, card, 'Park it')).rejects.toSatisfy((e: unknown) => e instanceof AskRefused && e.status === 409 && /Ask the user instead \(hive_ask_user\)/.test(e.message))
+    await expect(ask(w, card, 'Park it')).rejects.toSatisfy((e: unknown) => e instanceof AskRefused && e.status === 409 && /Ask the user instead \(cw_ask_user\)/.test(e.message))
     await nothingWritten()
     assistant().control = 'projects'
     // An actor that isn't a project's agent.
@@ -111,7 +111,7 @@ describe("an agent's request for the Assistant (HI-1866)", () => {
     // In Done, and archived.
     await inWorkspace(w, () => tasks.updateTask(card, { column: 'done' }, user))
     const done = await read(w, card)
-    await expect(ask(w, card, 'Park it')).rejects.toSatisfy((e: unknown) => e instanceof AskRefused && /is in Done/.test(e.message) && /More work on it that the user asked for: move it back with hive_update_task \(column: doing\)\. Separate follow-up work goes on a new card/.test(e.message))
+    await expect(ask(w, card, 'Park it')).rejects.toSatisfy((e: unknown) => e instanceof AskRefused && /is in Done/.test(e.message) && /More work on it that the user asked for: move it back with cw_update_task \(column: doing\)\. Separate follow-up work goes on a new card/.test(e.message))
     expect((await read(w, card)).comments).toEqual(done.comments)
     const second = (await inWorkspace(w, () => tasks.createTask({ title: 'Old', project: 'alpha' }, user))).number
     await inWorkspace(w, () => tasks.archiveTask(second, true))

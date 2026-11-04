@@ -220,7 +220,7 @@ describe('the settings catalog', () => {
     expect(settingChangeTexts(entry('board.colors'), colours, { ...colours, doing: '#ff0000' })).toEqual({ oldText: `doing: ${colours.doing}`, newText: 'doing: #ff0000' })
     expect(settingChangeTexts(entry('claude-code.prices'), { a: { input: 1, cachedInput: 0, output: 2 } }, { a: { input: 1, cachedInput: 0, output: 3 } })).toEqual({ oldText: 'a: {"input":1,"cachedInput":0,"output":2}', newText: 'a: {"input":1,"cachedInput":0,"output":3}' })
     expect(settingChangeTexts(entry('claude-code.prices'), {}, { m: { input: 1, cachedInput: 0, output: 2 } }).oldText).toBe('m: (none)')
-    expect(settingChangeTexts(entry('codex.effortFallback'), [], [{ value: 'low', label: 'Low' }, { value: 'high', label: 'High' }])).toEqual({ oldText: "(Hive's list)", newText: 'low, high' })
+    expect(settingChangeTexts(entry('codex.effortFallback'), [], [{ value: 'low', label: 'Low' }, { value: 'high', label: 'High' }])).toEqual({ oldText: "(Combwork's list)", newText: 'low, high' })
     expect(settingChangeTexts(entry('sessions.transcriptWarnMB'), 20, 50)).toEqual({ oldText: '20', newText: '50' })
   })
 
@@ -241,7 +241,7 @@ describe('the settings catalog', () => {
     // Only the order: the order shows.
     expect(settingChangeTexts(entry('codex.modelFallback'), models, [models[1], models[0]])).toEqual({ oldText: 'gpt-7, gpt-6', newText: 'gpt-6, gpt-7' })
     // Back to Hive's list: the whole list.
-    expect(settingChangeTexts(entry('codex.modelFallback'), models, [])).toEqual({ oldText: 'gpt-7, gpt-6', newText: "(Hive's list)" })
+    expect(settingChangeTexts(entry('codex.modelFallback'), models, [])).toEqual({ oldText: 'gpt-7, gpt-6', newText: "(Combwork's list)" })
     // Bounded as the other tables are.
     const long = Array.from({ length: 40 }, (_, i) => ({ value: `model-${i}`, label: `A long label for model ${i}` }))
     const texts = settingChangeTexts(entry('codex.modelFallback'), long, long.map((m) => ({ ...m, label: `${m.label}!` })))

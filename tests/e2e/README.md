@@ -195,7 +195,7 @@ variables put into the suite's own environment. **`npm run e2e:concurrency`** (`
 four runs at once with both builds stale: an e2e runner and a scenario run in this worktree, two e2e runners in a
 second worktree it makes for the check (a git worktree of `HEAD` with the uncommitted changes, sharing `node_modules`
 through a junction, removed afterwards), one in each worktree with an agent shell's environment (`NO_COLOR`,
-`HIVE_PROGRESS_WRAPPED`, a token…) and one with a plain one. It checks that every run passes in a lane, folders, ports
+`CW_PROGRESS_WRAPPED`, a token…) and one with a plain one. It checks that every run passes in a lane, folders, ports
 and logs folder of its own, and that each worktree is built once and stamped. After that (alone with `--lane-wait`),
 an e2e run and a scenario run wait for a lane of a pool of their own (`HIVE_TEST_LANES_DIR`) while a source file is
 added: both must build and test the changed source, and the record name it (#735); meanwhile it holds machine lanes 0 and 1 with a suite folder in each, which their housekeeping as they end must leave (#1133). Run it after changing the runner,
@@ -244,7 +244,7 @@ building and takes the slot only for a stale build (`ensureBuildWithSlot`). A su
 `E2E_RUN_SLOTS`) gives CPU credit. **On the side slot**, an e2e run runs at most two suites at once (`SIDE_E2E_JOBS`),
 whatever `--jobs` says: four beside two heavy runs took the machine near full load.
 **A pre-merge run goes first** (#558): one started in the session of the agent that holds its project's merge slot
-(the runner asks Hive's Agent API, with the session's `HIVE_API_URL`, token, `HIVE_PROJECT` and `HIVE_AGENT`, at its
+(the runner asks Hive's Agent API, with the session's `CW_API_URL`, token, `CW_PROJECT` and `CW_AGENT`, at its
 first look and every 30 s while it waits), or one with `--pre-merge` (either runner; for a merge's checks started
 outside an agent's session). It takes the next free slot before runs that asked earlier for other reasons, behind only
 pre-merge runs that asked before it, and says `…, pre-merge, next in line: held by …`; it never stops a run that holds a
@@ -255,7 +255,7 @@ process id, and `first` for a pre-merge run, under the same claims lock as lanes
 place in the queue, expires at once (its process is gone).
 **A run left over** (#1008): a run started in an agent's session that ended since (Hive closed under it, the agent
 stopped or restarted) keeps going, and keeps its slot, while its process lives. Its slot records the agent's launch
-(`owner`: `HIVE_PROJECT`, `HIVE_AGENT`, `HIVE_RUN_ID`, `HIVE_WORKSPACE`), and a waiting run asks Hive's Agent API whether
+(`owner`: `CW_PROJECT`, `CW_AGENT`, `CW_RUN_ID`, `CW_WORKSPACE`), and a waiting run asks Hive's Agent API whether
 that launch still runs (`GET /v1/projects/{name}/agents/{agent}/launches/{run}`, at its first look and every 30 s): the
 wait line, and the Progress panel, then name it `held by e2e: 196 suites in <worktree>, left over from a session that
 ended (process 39788, 41 min)`. A run starting in the same worktree says so too (`Still running in this worktree, left
@@ -364,7 +364,7 @@ suites**, a step per suite, and the time left from how long each suite took befo
 `%LOCALAPPDATA%\hive-test\progress-timings.json`). `npm test` does the same, a step per test file. It reports to the
 Hive that launched the agent, never to the test copies the suites start (the session's `HIVE_*` variables aren't
 passed to them), and it never changes the output or the results. Turn it off with `--no-progress` (e2e) or
-`HIVE_PROGRESS=0` (both). The reporting is all in `tests/progressReport.mts`.
+`CW_PROGRESS=0` (both). The reporting is all in `tests/progressReport.mts`.
 
 `packaged-progress` checks the `hive-progress` wrapper as installed (`dist/win-unpacked`), against a stand-in for the
 Agent API; `HIVE_PROGRESS_CHECK_DEV=1 node tests/e2e/packaged-progress.cjs` checks the dev build's copy.

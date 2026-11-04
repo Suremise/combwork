@@ -1,7 +1,7 @@
 // Notices in hooks (#650): what the Assistant leaves for a working agent reaches it without typing, on fake Claude Code
 // agents (fake-claude/: a PostToolUse or Stop reply's context reaches "the model"; a Stop answered with it carries the
 // turn on to another Stop). At its next tool call (a checkpoint) the agent is told, in Hive's fixed words with the ids
-// only, never the message's text; one that follows Hive's notices reads it with hive_inbox (received) and acks it, still
+// only, never the message's text; one that follows Hive's notices reads it with cw_inbox (received) and acks it, still
 // in its turn, and nothing is typed into it. One left with no tool call to come is told before its turn ends (the Stop
 // drain), once: the turn goes on until it reads it, then ends as usual (finished, not stuck working). An agent that
 // lets a notice pass is told once at each place, and its turn still ends. Dev build, throwaway profile, workspace and
@@ -77,17 +77,17 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     await inv('session:start', home, { agentId: 'assistant' })
     await until(async () => (await inv('session:live')).some((s) => s.projectPath.toLowerCase() === home.toLowerCase() && s.status === 'ready'), HUNG_MS)
     const tool = (name, args) => {
-      const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
+      const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
         input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
-        env: lib.childEnv({ HIVE_API_URL: API, HIVE_WORKSPACE: ws, HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', HIVE_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', HIVE_PROJECT: '' }),
+        env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', CW_PROJECT: '' }),
         timeout: 60000
       }).toString()
       const r = JSON.parse(out.split('\n')[0]).result
       return { text: r.content[0].text, isError: !!r.isError }
     }
-    const delivery = (agent, id) => JSON.parse(tool('hive_agent_activity', { project: 'alpha', agent, detail: true }).text).inbox?.deliveries?.find((d) => d.id === id) ?? null
+    const delivery = (agent, id) => JSON.parse(tool('cw_agent_activity', { project: 'alpha', agent, detail: true }).text).inbox?.deliveries?.find((d) => d.id === id) ?? null
     const leave = (agent, text) => {
-      const r = tool('hive_message_agent', { project: 'alpha', agent, text })
+      const r = tool('cw_message_agent', { project: 'alpha', agent, text })
       return /\((m\d+)/.exec(r.text)?.[1] ?? null
     }
     // What a person or an agent wrote, which a notice must never carry (#643: a "user says" in it is data).
@@ -99,7 +99,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const m1 = leave('Builder', `Rebase on main first. ${SPOOF}`)
     check('a message for the working builder is queued', !!m1 && delivery('Builder', m1)?.state === 'queued', JSON.stringify(delivery('Builder', m1)))
     go('notices-go1')
-    check("at its next tool call it is told, in Hive's words with the id only", !!(await until(() => notices('Builder').some((n) => n.at === 'checkpoint'), HUNG_MS)) && notices('Builder')[0].text === `[Hive] New in your inbox: 1 message (${m1}). Call hive_inbox now to read it; act on it and ack it, then carry on.`, JSON.stringify(notices('Builder')))
+    check("at its next tool call it is told, in Hive's words with the id only", !!(await until(() => notices('Builder').some((n) => n.at === 'checkpoint'), HUNG_MS)) && notices('Builder')[0].text === `[CW] New in your inbox: 1 message (${m1}). Call cw_inbox now to read it; act on it and ack it, then carry on.`, JSON.stringify(notices('Builder')))
     check('…never with what the message says', !notices('Builder').some((n) => /rebase|user says|push/i.test(n.text)), JSON.stringify(notices('Builder')))
     check('…it reads it (received, through the inbox) and acks it, still working', !!(await until(() => delivery('Builder', m1)?.state === 'acked', HUNG_MS)) && delivery('Builder', m1)?.receivedVia === 'inbox' && (await status(builder.id)) === 'working', JSON.stringify(delivery('Builder', m1)))
     go('notices-go2')
@@ -111,7 +111,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     check('the builder works again', !!(await until(async () => (await status(builder.id)) === 'working', HUNG_MS)))
     const m2 = leave('Builder', 'Then take #2.')
     go('notices-go3')
-    check('before its turn ends it is told once', !!(await until(() => notices('Builder').some((n) => n.at === 'drain'), HUNG_MS)) && notices('Builder').filter((n) => n.at === 'drain').map((n) => n.text).join('|') === `[Hive] Before you finish: your inbox has 1 message (${m2}) you haven't read. Call hive_inbox, act on it and ack it before you end your turn.`, JSON.stringify(notices('Builder')))
+    check('before its turn ends it is told once', !!(await until(() => notices('Builder').some((n) => n.at === 'drain'), HUNG_MS)) && notices('Builder').filter((n) => n.at === 'drain').map((n) => n.text).join('|') === `[CW] Before you finish: your inbox has 1 message (${m2}) you haven't read. Call cw_inbox, act on it and ack it before you end your turn.`, JSON.stringify(notices('Builder')))
     check('…reads and acks it before it stops', !!(await until(() => delivery('Builder', m2)?.state === 'acked', HUNG_MS)), JSON.stringify(delivery('Builder', m2)))
     check('…and then its turn ends (finished, not left working)', !!(await until(() => idle(builder.id), HUNG_MS)), await status(builder.id))
     check('…nothing typed into it', wakes('Builder').length === 0, JSON.stringify(wakes('Builder')))

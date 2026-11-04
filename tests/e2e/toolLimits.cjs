@@ -1,6 +1,6 @@
 // The hive tools' description limits (HI-2012), in one place: replysize checks every tool an agent and the Assistant are
 // given against them, so the descriptions don't grow back. A description says what the tool does and the rule a caller
-// can't guess; its cases, defaults and mechanics are in the use-hive-api skill's tools.md, read when needed.
+// can't guess; its cases, defaults and mechanics are in the use-cw-api skill's tools.md, read when needed.
 module.exports = {
   /** Characters in a tool's description. */
   description: 300,

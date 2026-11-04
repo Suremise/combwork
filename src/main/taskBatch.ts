@@ -1,4 +1,4 @@
-// A batch card change (hive_update_tasks, #417): the request, checked, and the Hive Assistant's turn for it. The Agent
+// A batch card change (cw_update_tasks, #417): the request, checked, and the Hive Assistant's turn for it. The Agent
 // API's route turns a refusal into its status; the rules live here, so the tests reach them without the API.
 import { COLUMN_CHOICES, isTaskColumn } from '../shared/tasks'
 import * as assistant from './assistantControl'
@@ -10,7 +10,7 @@ import { cardRef } from '../shared/projectKeys'
 import { agentMsg, inDefaultDialect, say } from '../shared/agentText'
 
 /** What a batch is called (HI-2450): said in the Assistant's scope in a refusal, in the Default where it is kept. */
-const BATCH_WHAT = agentMsg({ id: 'activity.batch.update', text: 'change {n} {count, plural, one {card} other {cards}} on the board', note: "What the Assistant's batch of card changes is called (hive_update_tasks), lower case: in a refusal (\"…don't let you {what}\") and its activity line. {n} is the number of cards as digits; {count} the same number, choosing the word." })
+const BATCH_WHAT = agentMsg({ id: 'activity.batch.update', text: 'change {n} {count, plural, one {card} other {cards}} on the board', note: "What the Assistant's batch of card changes is called (cw_update_tasks), lower case: in a refusal (\"…don't let you {what}\") and its activity line. {n} is the number of cards as digits; {count} the same number, choosing the word." })
 
 /**
  * The fields a batch takes besides its card numbers and reply. A title, comment, decision or link is one card's: a batch
@@ -21,7 +21,7 @@ const BATCH_FIELDS = ['numbers', 'column', 'position', 'blocked', 'labels', 'add
 /** The card numbers and the fields of a batch request, checked before anything changes or is counted. */
 export function batchRequest(body: any): { numbers: number[]; patch: tasks.BatchPatch } {
   const other = Object.keys(body ?? {}).filter((k) => !BATCH_FIELDS.includes(k))
-  if (other.length) throw new ChangeRefused(400, `A batch sets column, position, blocked, labels, addLabels, removeLabels or agent on its cards: ${other.join(', ')} goes on one card (hive_update_task).`)
+  if (other.length) throw new ChangeRefused(400, `A batch sets column, position, blocked, labels, addLabels, removeLabels or agent on its cards: ${other.join(', ')} goes on one card (cw_update_task).`)
   const numbers = tasks.batchNumbers(body?.numbers)
   const patch: tasks.BatchPatch = {}
   if (body.column !== undefined) {

@@ -104,7 +104,7 @@ export interface LaneRecord {
    */
   freshStart?: FreshStart[]
   /**
-   * The lane's brief for its builder (HI-1795: `hive_lane start`'s `brief`), kept with the lane (its row's `extra`).
+   * The lane's brief for its builder (HI-1795: `cw_lane start`'s `brief`), kept with the lane (its row's `extra`).
    * `text` null: cleared. `rev` goes up at each change of text and each clear, never reused. In slots, every placement
    * of the lane's cards carries the text as it is then; outside slots it is delivered once per rev, and `out` is the rev
    * whose delivery has been made (the intent recorded: one owed is made by the next look, a crash between kept).
@@ -405,7 +405,7 @@ export function stampWait(was: WaitStamp | undefined, status: LaneStatus | null,
 
 /**
  * What the hive tools say of lanes (dialects, HI-2435): a lane's line, its state and why it waits, and the replies of
- * hive_lane. Said where the text is sent (hive-mcp.js formats these replies in its own process, with its session's
+ * cw_lane. Said where the text is sent (hive-mcp.js formats these replies in its own process, with its session's
  * dialect); `{card}` is a card's key or number, `{agent}` an agent's name.
  */
 const L = {
@@ -433,16 +433,16 @@ const L = {
   teamPause: agentMsg({ id: 'lane.status.teamPause', text: 'paused: the team is pausing', note: "The workspace's team is paused (before an update, HI-2081): nothing of a lane moves until it resumes." }),
   preparing: agentMsg({ id: 'lane.status.preparing', text: 'waiting: preparing {slot}', note: "A lane's slot is being prepared (warming, its setup or an install, #1446); {slot} is its name." }),
   freshTimeout: agentMsg({ id: 'lane.status.fresh.timeout', text: "{agent}'s new conversation didn't start (it wasn't free in time): retry it from the lane's row, or end the lane", note: "An agent owed a new conversation for its lane (HI-2034) wasn't free within the wait: no more automatic tries until the user retries it." }),
-  freshUncertain: agentMsg({ id: 'lane.status.fresh.uncertain', text: "{agent}'s new conversation didn't start (Hive closed as it started): retry it from the lane's row, or end the lane", note: 'An agent owed a new conversation (HI-2034) was being launched when Hive closed: never launched again by itself.' }),
+  freshUncertain: agentMsg({ id: 'lane.status.fresh.uncertain', text: "{agent}'s new conversation didn't start (Combwork closed as it started): retry it from the lane's row, or end the lane", note: 'An agent owed a new conversation (HI-2034) was being launched when Hive closed: never launched again by itself.' }),
   freshFailed: agentMsg({ id: 'lane.status.fresh.failed', text: "{agent}'s new conversation didn't start ({why}): retry it from the lane's row, or end the lane", note: "An agent's new conversation for its lane (HI-2034) failed to launch; {why} is why, as recorded." }),
   freshFailedBare: agentMsg({ id: 'lane.status.fresh.failedBare', text: "{agent}'s new conversation didn't start (its start failed): retry it from the lane's row, or end the lane", note: "An agent's new conversation for its lane (HI-2034) failed to launch, with no reason recorded." }),
   freshWaits: agentMsg({ id: 'lane.status.fresh.waits', text: 'waiting: {agent} starts in a new conversation once it is free', note: 'An agent is owed a new conversation for its lane (HI-2034): Hive launches it once the agent is free.' }),
   startDependencies: agentMsg({ id: 'lane.status.start.dependencies', text: '{card} waits to start: it waits for {waitsFor} to merge', note: "A lane's next card waits for a card it depends on to be merged (HI-2129); {waitsFor} is that card's key." }),
   startWatching: agentMsg({ id: 'lane.status.start.watching', text: '{card} waits to start: {agent} is waiting on other work', note: "A lane's next card isn't started yet (HI-2029): its builder waits on a watch of other cards." }),
-  startQueued: agentMsg({ id: 'lane.status.start.queued', text: "{card} waits to start: a line of Hive's is on its way to {agent}", note: "A lane's next card isn't started yet (HI-2029): a line Hive types is on its way to the builder." }),
+  startQueued: agentMsg({ id: 'lane.status.start.queued', text: "{card} waits to start: a line of Combwork's is on its way to {agent}", note: "A lane's next card isn't started yet (HI-2029): a line Hive types is on its way to the builder." }),
   startFailed: agentMsg({ id: 'lane.status.start.failed', text: "{card} waits to start: {agent}'s last start failed", note: "A lane's next card isn't started yet (HI-2029): Hive's last start of it on the builder failed." }),
-  startRefusedHeld: agentMsg({ id: 'lane.status.start.refusedHeld', text: "{card} waits to start: its start was refused for now, {slot} still in use ({held, select, session {{heldBy}'s session is still in it} left {{heldBy}'s last run left {program}{more, plural, =0 {} other { and # more}} running in it} lastRun {{heldBy}'s last run there isn't known to have ended} broker {a process still has a file or folder in it open: Windows Sandbox's broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}); Hive tries again", note: "A lane's next card isn't started yet (HI-2468): Hive's start of it was refused because its slot {slot} is still in use: a session of the agent {heldBy} still runs in it; left, the agent {heldBy}'s last run left programs running in it ({program}: the first one's name, such as node; {more}: how many more); lastRun, that run isn't known to have ended; or (broker) a process holds it, and Windows Sandbox's broker ({broker}: its process name) has the slot as its current folder, idle: yes, no Sandbox runs; no, one does; other, not known; or (other) a process holds it. Hive tries the start again." }),
-  startRefused: agentMsg({ id: 'lane.status.start.refused', text: '{card} waits to start: its start was refused for now; Hive tries again', note: "A lane's next card isn't started yet (HI-2029): Hive's start of it was refused for now, and is tried again." }),
+  startRefusedHeld: agentMsg({ id: 'lane.status.start.refusedHeld', text: "{card} waits to start: its start was refused for now, {slot} still in use ({held, select, session {{heldBy}'s session is still in it} left {{heldBy}'s last run left {program}{more, plural, =0 {} other { and # more}} running in it} lastRun {{heldBy}'s last run there isn't known to have ended} broker {a process still has a file or folder in it open: Windows Sandbox's broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}); Combwork tries again", note: "A lane's next card isn't started yet (HI-2468): Hive's start of it was refused because its slot {slot} is still in use: a session of the agent {heldBy} still runs in it; left, the agent {heldBy}'s last run left programs running in it ({program}: the first one's name, such as node; {more}: how many more); lastRun, that run isn't known to have ended; or (broker) a process holds it, and Windows Sandbox's broker ({broker}: its process name) has the slot as its current folder, idle: yes, no Sandbox runs; no, one does; other, not known; or (other) a process holds it. Hive tries the start again." }),
+  startRefused: agentMsg({ id: 'lane.status.start.refused', text: '{card} waits to start: its start was refused for now; Combwork tries again', note: "A lane's next card isn't started yet (HI-2029): Hive's start of it was refused for now, and is tried again." }),
   startBusy: agentMsg({ id: 'lane.status.start.busy', text: '{card} waits to start: {agent} is in a turn', note: "A lane's next card isn't started yet (HI-2029): its builder is in a turn, or starting." }),
   column: {
     hold: agentMsg({ id: 'lane.column.hold', text: 'On Hold', note: "A card's column in a lane's line (a column name)." }),
@@ -471,28 +471,28 @@ const L = {
   ended: agentMsg({ id: 'lane.state.ended', text: 'ended', note: "An ended lane's state (every card Done)." }),
   endedMerged: agentMsg({ id: 'lane.state.endedMerged', text: 'ended (merged {commit})', note: "An ended lane's state, with its merge commit ({commit})." }),
   abandoned: agentMsg({ id: 'lane.state.abandoned', text: 'abandoned', note: "An abandoned lane's state (ended before its cards were Done)." }),
-  noLanes: agentMsg({ id: 'lane.list.none', text: 'No lanes.', note: 'hive_lane list with all: there are no lanes.' }),
-  noLanesListed: agentMsg({ id: 'lane.list.noneListed', text: 'No lanes running or recently ended.', note: 'hive_lane list: no lane is running or ended recently (an ended lane stays listed an hour).' }),
-  started: agentMsg({ id: 'lane.change.started', text: 'Lane started: {line}', note: "hive_lane start's reply for a new lane; {line} is the lane's line." }),
-  joined: agentMsg({ id: 'lane.change.joined', text: 'Joined the lane: {line}', note: "hive_lane join's reply; {line} is the lane's line." }),
-  updated: agentMsg({ id: 'lane.change.updated', text: 'Lane updated: {line}', note: "hive_lane start's reply for the builder's running lane, changed; {line} is the lane's line." }),
+  noLanes: agentMsg({ id: 'lane.list.none', text: 'No lanes.', note: 'cw_lane list with all: there are no lanes.' }),
+  noLanesListed: agentMsg({ id: 'lane.list.noneListed', text: 'No lanes running or recently ended.', note: 'cw_lane list: no lane is running or ended recently (an ended lane stays listed an hour).' }),
+  started: agentMsg({ id: 'lane.change.started', text: 'Lane started: {line}', note: "cw_lane start's reply for a new lane; {line} is the lane's line." }),
+  joined: agentMsg({ id: 'lane.change.joined', text: 'Joined the lane: {line}', note: "cw_lane join's reply; {line} is the lane's line." }),
+  updated: agentMsg({ id: 'lane.change.updated', text: 'Lane updated: {line}', note: "cw_lane start's reply for the builder's running lane, changed; {line} is the lane's line." }),
   earlierEnded: agentMsg({ id: 'lane.change.earlierEnded', text: 'Your earlier lane {id} ended.', note: "After a start's reply: the builder's earlier lane, sharing no card with the new list, ended (nothing of it left to do)." }),
   earlierAbandoned: agentMsg({ id: 'lane.change.earlierAbandoned', text: 'Your earlier lane {id} was abandoned.', note: "After a start's reply: the builder's earlier lane, sharing no card with the new list, was abandoned." }),
-  endEnded: agentMsg({ id: 'lane.end.ended', text: 'Lane ended: {line}', note: "hive_lane end's reply; {line} is the lane's line." }),
-  endAbandoned: agentMsg({ id: 'lane.end.abandoned', text: 'Lane abandoned: {line}', note: "hive_lane end's reply for an abandoned lane; {line} is the lane's line." }),
-  nextWaits: agentMsg({ id: 'lane.next.waits', text: 'The lane waits: {why}. Start nothing new meanwhile.', note: 'hive_lane next, for a paused lane (#1270): why it waits.' }),
-  nothingElse: agentMsg({ id: 'lane.next.nothingElse', text: 'Nothing else to start: the lane ends by itself once all are Done.', note: "hive_lane next, after its passed cards' places in the merge queue (#1354): no card is left to start." }),
-  allDone: agentMsg({ id: 'lane.next.allDone', text: 'Every card of the lane is Done or past review: nothing to start. The lane ends by itself once all are Done.', note: 'hive_lane next, with no card left to start.' }),
-  carryOn: agentMsg({ id: 'lane.next.carryOn', text: 'Carry on with {card}{also}.', note: 'hive_lane next: the card in flight (Doing or Review) to carry on; {card} is its key and title; {also} is " (why the lane waits)" or nothing.' }),
-  carryOnIn: agentMsg({ id: 'lane.next.carryOnIn', text: 'Carry on with {card} in {slot}{also}.', note: 'hive_lane next: the card in flight to carry on, in the slot its lane builds in (#1438); {also} as in lane.next.carryOn.' }),
-  afterQueue: agentMsg({ id: 'lane.next.afterQueue', text: 'Next: {card}, once {n, plural, one {it is} other {they are}} Done.', note: "hive_lane next, after its passed cards' places in the merge queue (#1354): the next card waits for them to be Done (one card at a time); {n} is how many." }),
-  start: agentMsg({ id: 'lane.next.start', text: 'Next: {card}. Start it.', note: 'hive_lane next: the card to start next; {card} is its key and title.' }),
-  startIn: agentMsg({ id: 'lane.next.startIn', text: 'Next: {card}. Start it: it is built in {slot}, on a new branch Hive makes there.', note: "hive_lane next: the card to start next, built in the lane's slot (#1438), where Hive makes its line as it starts." }),
-  cardsNone: agentMsg({ id: 'lane.args.cardsNone', text: 'cards must be the card numbers, in order (at least one)', note: "hive_lane start's refusal of its cards argument: none given, or not a list." }),
-  cardsMax: agentMsg({ id: 'lane.args.cardsMax', text: 'at most {max} cards in a lane', note: "hive_lane start's refusal: too many cards." }),
-  cardsNumbers: agentMsg({ id: 'lane.args.cardsNumbers', text: 'cards must be card numbers', note: "hive_lane start's refusal: a card in cards isn't a whole card number." }),
-  cardsRepeat: agentMsg({ id: 'lane.args.cardsRepeat', text: 'cards must not repeat', note: "hive_lane start's refusal: a card is named twice." }),
-  numberRange: agentMsg({ id: 'lane.args.numberRange', text: '{what} must be from 1 to {max}', note: "hive_lane start's refusal of rounds or waitMinutes ({what}, the argument's name) out of range." })
+  endEnded: agentMsg({ id: 'lane.end.ended', text: 'Lane ended: {line}', note: "cw_lane end's reply; {line} is the lane's line." }),
+  endAbandoned: agentMsg({ id: 'lane.end.abandoned', text: 'Lane abandoned: {line}', note: "cw_lane end's reply for an abandoned lane; {line} is the lane's line." }),
+  nextWaits: agentMsg({ id: 'lane.next.waits', text: 'The lane waits: {why}. Start nothing new meanwhile.', note: 'cw_lane next, for a paused lane (#1270): why it waits.' }),
+  nothingElse: agentMsg({ id: 'lane.next.nothingElse', text: 'Nothing else to start: the lane ends by itself once all are Done.', note: "cw_lane next, after its passed cards' places in the merge queue (#1354): no card is left to start." }),
+  allDone: agentMsg({ id: 'lane.next.allDone', text: 'Every card of the lane is Done or past review: nothing to start. The lane ends by itself once all are Done.', note: 'cw_lane next, with no card left to start.' }),
+  carryOn: agentMsg({ id: 'lane.next.carryOn', text: 'Carry on with {card}{also}.', note: 'cw_lane next: the card in flight (Doing or Review) to carry on; {card} is its key and title; {also} is " (why the lane waits)" or nothing.' }),
+  carryOnIn: agentMsg({ id: 'lane.next.carryOnIn', text: 'Carry on with {card} in {slot}{also}.', note: 'cw_lane next: the card in flight to carry on, in the slot its lane builds in (#1438); {also} as in lane.next.carryOn.' }),
+  afterQueue: agentMsg({ id: 'lane.next.afterQueue', text: 'Next: {card}, once {n, plural, one {it is} other {they are}} Done.', note: "cw_lane next, after its passed cards' places in the merge queue (#1354): the next card waits for them to be Done (one card at a time); {n} is how many." }),
+  start: agentMsg({ id: 'lane.next.start', text: 'Next: {card}. Start it.', note: 'cw_lane next: the card to start next; {card} is its key and title.' }),
+  startIn: agentMsg({ id: 'lane.next.startIn', text: 'Next: {card}. Start it: it is built in {slot}, on a new branch Combwork makes there.', note: "cw_lane next: the card to start next, built in the lane's slot (#1438), where Hive makes its line as it starts." }),
+  cardsNone: agentMsg({ id: 'lane.args.cardsNone', text: 'cards must be the card numbers, in order (at least one)', note: "cw_lane start's refusal of its cards argument: none given, or not a list." }),
+  cardsMax: agentMsg({ id: 'lane.args.cardsMax', text: 'at most {max} cards in a lane', note: "cw_lane start's refusal: too many cards." }),
+  cardsNumbers: agentMsg({ id: 'lane.args.cardsNumbers', text: 'cards must be card numbers', note: "cw_lane start's refusal: a card in cards isn't a whole card number." }),
+  cardsRepeat: agentMsg({ id: 'lane.args.cardsRepeat', text: 'cards must not repeat', note: "cw_lane start's refusal: a card is named twice." }),
+  numberRange: agentMsg({ id: 'lane.args.numberRange', text: '{what} must be from 1 to {max}', note: "cw_lane start's refusal of rounds or waitMinutes ({what}, the argument's name) out of range." })
 }
 
 /** Why a lane waits, in a few English words for the hive tools ("waiting: HI-11 not merged"). */
@@ -714,7 +714,7 @@ export function laneEndText(l: LaneInfo & { note?: string }): string {
 }
 
 /**
- * What hive_lane next says (#1270): the card to start or carry on, or why the lane waits, or that every card is Done.
+ * What cw_lane next says (#1270): the card to start or carry on, or why the lane waits, or that every card is Done.
  * `queue`: the lane's passed cards Hive merges, each with where it is in the merge queue (#1354): the lane takes one card
  * at a time, so the next waits for them to be Done.
  */

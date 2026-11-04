@@ -30,7 +30,7 @@ describe('the shared helpers', () => {
     expect(clip('abc', 4)).toEqual({ text: 'abc', truncated: false })
     const shown = withoutHiveAuth('curl -H @C:\\data\\auth-1.txt "http://127.0.0.1:5/hook?run=abc123&statusline" -H "Authorization: Bearer s3cret"', ['C:\\data\\auth-1.txt'])
     expect(shown).not.toMatch(/auth-1|abc123|s3cret/)
-    expect(withoutHiveAuth('Bearer $HIVE_HOOK_TOKEN')).toBe('Bearer $HIVE_HOOK_TOKEN')
+    expect(withoutHiveAuth('Bearer $CW_HOOK_TOKEN')).toBe('Bearer $CW_HOOK_TOKEN')
   })
 })
 

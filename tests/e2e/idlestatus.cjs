@@ -1,7 +1,7 @@
 // An idle agent stays idle through what Claude Code does by itself (#612): a compaction while idle (shown as
 // "Compacting the conversation…", then idle again) and a recap (no change); and an agent whose turn's end never reached
 // Hive (its Stop lost, as HB3's was) is idle again once Claude Code says it is waiting for input (its idle_prompt
-// notification), the log saying what Hive saw. Each time it takes a new task (hive_prompt_agent refused "is working"
+// notification), the log saying what Hive saw. Each time it takes a new task (cw_prompt_agent refused "is working"
 // before). The agent runs the fake Claude Code (fake-claude/), so nothing signs in or spends tokens. Dev build,
 // throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -75,7 +75,7 @@ const check = (name, ok, extra = '') => {
       return fs.existsSync(f) && fs.readFileSync(f, 'utf8').includes(text)
     })
   }
-  /** Gives it a task as hive_prompt_agent does, and waits for its turn to end. */
+  /** Gives it a task as cw_prompt_agent does, and waits for its turn to end. */
   const task = async (text) => {
     const given = await api('POST', '/v1/projects/alpha/agents/Tester/prompt', { text })
     if (given.status === 200) await api('POST', '/v1/agents/wait', { agents: [{ project: 'alpha', agent: 'Tester' }], timeoutSeconds: 30 })

@@ -20,7 +20,7 @@ async function until(ctx, ok, what) {
   if (!(await ctx.lib.until(async () => ok(await liveOf(ctx)), ctx.hungMs))) throw new Error(`${what}: ${JSON.stringify((await liveOf(ctx))?.status ?? null)}`)
 }
 
-/** A file in the fake Claude Code's home that it acts on (and removes), for One (its HIVE_AGENT). */
+/** A file in the fake Claude Code's home that it acts on (and removes), for One (its CW_AGENT). */
 const fakeFile = (ctx, name) => fs.writeFileSync(path.join(ctx.claudeHome, `${name}-${ctx.agents[0].name}`), '')
 
 /** The toasts gone (each closed, or timed out), and no dialog left open. */

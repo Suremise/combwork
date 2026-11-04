@@ -38,7 +38,7 @@
     "note": "What a write log's :reflog mark records, in the list of what changed while a check ran."
   },
   "progress.check.outsideHive": {
-    "text": "--check runs the project's command for {check}, which only Hive knows: run it in a session Hive started, with reporting on.",
+    "text": "--check runs the project's command for {check}, which only Combwork knows: run it in a session Combwork started, with reporting on.",
     "note": "#1220."
   },
   "progress.check.waiting": {
@@ -54,11 +54,11 @@
     "note": "#1435: the launcher wasn't put in its copy's job. why: Hive's reason, or the error."
   },
   "progress.isolated.notRunStatus": {
-    "text": "the check wasn't run: Hive answered {status}",
+    "text": "the check wasn't run: Combwork answered {status}",
     "note": "#1435: Hive answered with an error and no reason. status: its HTTP status."
   },
   "progress.isolated.notRunUnreachable": {
-    "text": "the check wasn't run: Hive couldn't be reached ({detail})",
+    "text": "the check wasn't run: Combwork couldn't be reached ({detail})",
     "note": "#1435. detail: the error's message."
   },
   "progress.revision.form": {
@@ -86,19 +86,19 @@
     "note": "A failed run's detail, stored with the run (the Default's words, whoever reads it)."
   },
   "progress.unanswered.answered": {
-    "text": "Hive couldn't be reached {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} (Hive answered {status, select, none {with an error} other {{status}}}), so nothing was run.",
+    "text": "Combwork couldn't be reached {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} (Combwork answered {status, select, none {with an error} other {{status}}}), so nothing was run.",
     "note": "HI-1892: Hive answered with no link (an older Hive without the call, an error). status: its HTTP status, or none."
   },
   "progress.unanswered.failed": {
-    "text": "Hive couldn't be reached {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} ({detail}), so nothing was run.",
+    "text": "Combwork couldn't be reached {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} ({detail}), so nothing was run.",
     "note": "HI-1892: the call failed some other way. detail: the error's message."
   },
   "progress.unanswered.refused": {
-    "text": "Hive couldn't be reached {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} (connection {refused, select, yes {refused} other {not allowed: {detail}}} at {url}), so nothing was run. Is Hive running? A sandbox that blocks local network access (Claude Code's Bash sandbox does) stops it too: run the command outside the sandbox.",
+    "text": "Combwork couldn't be reached {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} (connection {refused, select, yes {refused} other {not allowed: {detail}}} at {url}), so nothing was run. Is Combwork running? A sandbox that blocks local network access (Claude Code's Bash sandbox does) stops it too: run the command outside the sandbox.",
     "note": "HI-1892: nothing listens at Hive's address, or this process may not reach it. refused: yes for a refused connection, else detail is the error's code (EACCES, EPERM). url: Hive's address."
   },
   "progress.unanswered.slow": {
-    "text": "Hive is slow to answer: no reply {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} in {seconds} s{retried, select, yes {, asked {asked} times} other {}}, so nothing was run. Try again; Settings → Advanced → \"hive-progress: Hive's reply time\" gives it longer.",
+    "text": "Combwork is slow to answer: no reply {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} in {seconds} s{retried, select, yes {, asked {asked} times} other {}}, so nothing was run. Try again; Settings → Advanced → \"cw-progress: Combwork's reply time\" gives it longer.",
     "note": "HI-1892: Hive is there but busy. lend: yes for an isolated check's copy (#1435), else the check's command (check) was asked for. retried: yes when it was asked more than once (asked)."
   },
   "progress.uncounted.changed": {
@@ -114,7 +114,7 @@
     "note": "#1654."
   },
   "progress.uncounted.notCheck": {
-    "text": "not counted as check {check}: Hive didn't see the check's configured command run. Run it again with hive-progress --check {check}.",
+    "text": "not counted as check {check}: Combwork didn't see the check's configured command run. Run it again with cw-progress --check {check}.",
     "note": "#1654: what happened, then what to do, so an agent is not left running the same command again for a submit that keeps refusing."
   },
   "progress.uncounted.notContained": {
@@ -126,23 +126,23 @@
     "note": "#1654: a card on the None platform (#1233)."
   },
   "progress.unrecorded.endedBefore": {
-    "text": "Hive recorded check {check}, but its reply was lost, so how it counted isn't known.",
+    "text": "Combwork recorded check {check}, but its reply was lost, so how it counted isn't known.",
     "note": "HI-1892: a finish sent again found the first had arrived (its reply lost)."
   },
   "progress.unrecorded.noReply": {
-    "text": "Hive didn't confirm it recorded check {check} (no reply to its result, asked twice): if submitting says it hasn't passed, run it again.",
+    "text": "Combwork didn't confirm it recorded check {check} (no reply to its result, asked twice): if submitting says it hasn't passed, run it again.",
     "note": "HI-1892: the run's finish got no reply, sent twice."
   },
   "progress.unrecorded.noStart": {
-    "text": "Hive didn't take this run's report (no reply in time), so check {check} wasn't recorded: run it again.",
+    "text": "Combwork didn't take this run's report (no reply in time), so check {check} wasn't recorded: run it again.",
     "note": "HI-1892: Hive never took the run's start."
   },
   "progress.unrecorded.refused": {
-    "text": "Hive refused this run's result, so check {check} may not be recorded: run it again.",
+    "text": "Combwork refused this run's result, so check {check} may not be recorded: run it again.",
     "note": "HI-1892: Hive answered the finish with an error."
   },
   "progress.usage": {
-    "text": "Usage: hive-progress [--title <title>] [--card <card>] [--revision <commit>] -- <command> [args...]\n       hive-progress --check <name> [--isolated] [--title <title>] [--card <card>] [--revision <commit>]\n\nRuns the command, passing its output through and returning its exit code, and shows it in Hive's Progress panel\nwith the time it usually takes, and the card and revision it ran for.\n  --card <card>       the card it runs for (\"#1061\", quoted); without it, the card you are working on (yours in Doing)\n  --revision <commit> the commit it runs on: it must be what is checked out here, or nothing runs; without it,\n                      what is checked out when it starts\n  --check <name>      runs the project's command for that check (the project's options name it), not one of yours;\n                      focused:<test> (a card's focused test) runs your command after -- as that test's check\n  --isolated          with --check: runs it in a check copy of its own at the card's revision, which nothing else\n                      writes, so another agent's edits here can't spoil it (waits for a copy when none is free)\nA line the command prints like\n  ##hive-progress step=4 total=12 name=carddialog\nsays step 4 of 12 (carddialog) is starting, and isn't shown. The first total given is the run's: give it within the\nfirst 2 seconds for a bar with steps from the start, or later for one from then on.\n  ##hive-progress wait=a test slot (held by B4)\nsays the command waits (for a queue, a lock) and for what: no time left is shown meanwhile, and the wait doesn't count\nagainst the usual time; \"##hive-progress wait=\" says it waits no more. A command interrupted by Ctrl+C shows as\nstopped, and one whose hive-progress is killed as ended without a report. Outside Hive it just runs the command.\nHIVE_PROGRESS=0 turns reporting off.",
+    "text": "Usage: cw-progress [--title <title>] [--card <card>] [--revision <commit>] -- <command> [args...]\n       cw-progress --check <name> [--isolated] [--title <title>] [--card <card>] [--revision <commit>]\n\nRuns the command, passing its output through and returning its exit code, and shows it in Combwork's Progress panel\nwith the time it usually takes, and the card and revision it ran for.\n  --card <card>       the card it runs for (\"#1061\", quoted); without it, the card you are working on (yours in Doing)\n  --revision <commit> the commit it runs on: it must be what is checked out here, or nothing runs; without it,\n                      what is checked out when it starts\n  --check <name>      runs the project's command for that check (the project's options name it), not one of yours;\n                      focused:<test> (a card's focused test) runs your command after -- as that test's check\n  --isolated          with --check: runs it in a check copy of its own at the card's revision, which nothing else\n                      writes, so another agent's edits here can't spoil it (waits for a copy when none is free)\nA line the command prints like\n  ##cw-progress step=4 total=12 name=carddialog\nsays step 4 of 12 (carddialog) is starting, and isn't shown. The first total given is the run's: give it within the\nfirst 2 seconds for a bar with steps from the start, or later for one from then on.\n  ##cw-progress wait=a test slot (held by B4)\nsays the command waits (for a queue, a lock) and for what: no time left is shown meanwhile, and the wait doesn't count\nagainst the usual time; \"##cw-progress wait=\" says it waits no more. A command interrupted by Ctrl+C shows as\nstopped, and one whose cw-progress is killed as ended without a report. Outside Combwork it just runs the command.\nCW_PROGRESS=0 turns reporting off.",
     "note": "#1220 (--card, --revision, --check), #1435 (--isolated), HI-1367 (focused:<test>), #549 (wait=). Printed by --help and after a wrong option."
   }
 }

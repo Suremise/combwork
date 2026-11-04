@@ -128,7 +128,7 @@ const T = {
   stillInUse: agentMsg({ id: 'copy.isolated.stillInUse', text: 'a check copy ({copy} is still in use by {by})', note: 'What hive-progress --isolated waits for: a check copy, the one it would get still held. {by} says by what.' }),
   setupFailed: agentMsg({ id: 'copy.isolated.setupFailed', text: "{copy}'s setup failed ({error}), so nothing was run", note: "hive-progress --isolated's refusal: its check copy's setup failed." }),
   noLease: agentMsg({ id: 'copy.isolated.noLease', text: 'no check copy could be leased', note: "hive-progress --isolated's refusal: no check copy could be lent, for another reason." }),
-  noSupervisor: agentMsg({ id: 'copy.isolated.noSupervisor', text: "Hive's process supervisor isn't running, so an isolated check can't be run", note: "hive-progress --isolated's refusal: Hive can't run the check in a job of its own (#1435)." }),
+  noSupervisor: agentMsg({ id: 'copy.isolated.noSupervisor', text: "Combwork's process supervisor isn't running, so an isolated check can't be run", note: "hive-progress --isolated's refusal: Hive can't run the check in a job of its own (#1435)." }),
   noLease2: agentMsg({ id: 'copy.assign.noLease', text: 'no such check copy lease', note: "Why hive-progress's launcher wasn't put in its check copy's job: the lease it named isn't this agent's." }),
   notOwn: agentMsg({ id: 'copy.assign.notOwn', text: "that process isn't one of this agent's own", note: "Why hive-progress's launcher wasn't put in its check copy's job: the process isn't the agent's (HR1's #1435 round 1)." }),
   noLauncher: agentMsg({ id: 'copy.assign.noLauncher', text: "its check copy's job takes no launcher now", note: "Why hive-progress's launcher wasn't put in its check copy's job: it has one already, or no job." }),

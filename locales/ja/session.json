@@ -141,6 +141,8 @@
   "session.purge.reading": "Combworkがトランスクリプトを読み込んでいます（エクスポートまたは検索）。しばらくしてからもう一度お試しください。",
   "session.purge.running": "実行中です。",
   "session.purge.unread": "セッションの使用量を記録できなかったため、保持しました。",
+  "session.renamedFresh.body": "{n, plural, other {# 件の会話}}を新しく開始しました。Combwork がエージェントの使うツールの名前を変えたため、以前の会話は続けられません。以前の会話はセッション履歴に残っていて読めます。",
+  "session.renamedFresh.title": "エージェントが新しい会話を開始しました",
   "session.restartMode.didntStop": "{agent}が時間内に停止しなかったため、新しいモードで再起動しませんでした。停止してからもう一度お試しください。",
   "session.setup.failed": "セットアップコマンドが終了コード{code}で終了しました。出力はエージェントのターミナルにあります。修正してからエージェントをもう一度起動するか、セットアップなしで起動してください。",
   "session.setup.failedTitle": "{project} · {agent}：セットアップに失敗しました",

@@ -14,7 +14,8 @@ const log = createLogger('journal')
 
 // The windows showing a workspace's journal browser (#1033) follow its changes: its Assistant home is `<workspace>/.hive/assistant`.
 onJournalChange((home) => emit({ type: 'journal-changed', workspacePath: join(home, '..', '..') }))
-const HIVE = { kind: 'hive', name: 'Hive' } as const
+// agent-protocol: who a journal entry or delivery is from: Combwork's own name (HI-2463)
+const HIVE = { kind: 'hive', name: 'Combwork' } as const
 
 /**
  * The journal as a workspace has it (#1031): its settings (workspace.json `journal`, Settings → Assistant → Journal),

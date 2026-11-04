@@ -176,7 +176,7 @@
   "tips.connections.title": "Uruchamiaj agentów na różnych logowaniach",
   "tips.consoleRecording.text": "W konsoli deweloperskiej Nagrywaj zapisuje do pliku to, co CLI agenta wysyła do Combwork, z ukrytymi danymi, chyba że zaznaczysz tekst dla tego nagrania; Kopiuj diagnostykę może je dołączyć do zgłoszenia błędu.",
   "tips.consoleRecording.title": "Nagraj, co wysyła CLI",
-  "tips.consoleText.text": "Ustawienia → Zaawansowane → Konsola deweloperska: pokazuj tekst promptów, odpowiedzi i poleceń pokazuje je w konsoli deweloperskiej pod banerem, który o tym informuje, i zaznacza tekst w nowych nagraniach. Tokeny i dane logowania pozostają zamaskowane, a hive_console agentów nadal ukrywa dane.",
+  "tips.consoleText.text": "Ustawienia → Zaawansowane → Konsola deweloperska: pokazuj tekst promptów, odpowiedzi i poleceń pokazuje je w konsoli deweloperskiej pod banerem, który o tym informuje, i zaznacza tekst w nowych nagraniach. Tokeny i dane logowania pozostają zamaskowane, a cw_console agentów nadal ukrywa dane.",
   "tips.consoleText.title": "Zobacz tekst w konsoli deweloperskiej",
   "tips.copilot.text": "Agenci mogą używać GitHub Copilot CLI, także w planie Copilot Free. Konfiguracja dostawców instaluje go i pokazuje, jako kto jest zalogowany: własnym loginem czy przez GitHub CLI.",
   "tips.copilot.title": "Uruchamiaj agentów na GitHub Copilot",

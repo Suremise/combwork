@@ -154,8 +154,8 @@ const check = (name, ok, extra = '') => {
 
   // --- What it did: under the footer, the last 3, Show all scrolls inside the same height.
   // Newest first they are: a card, two setting changes, then three cards, each with Undo (#1283), under their message.
-  const task = (t) => `hive hive_create_task {"project":"alpha","title":"${t}"}`
-  check('it makes six changes in one turn', await say([task('First thing'), task('Second thing'), task('Third thing'), 'skill tune-settings', 'hive hive_update_setting {"id":"sessions.transcriptWarnMB","value":50}', 'hive hive_update_setting {"id":"sessions.transcriptWarnMB","value":60}', task('Sixth thing')].join(' then ')))
+  const task = (t) => `hive cw_create_task {"project":"alpha","title":"${t}"}`
+  check('it makes six changes in one turn', await say([task('First thing'), task('Second thing'), task('Third thing'), 'skill tune-settings', 'hive cw_update_setting {"id":"sessions.transcriptWarnMB","value":50}', 'hive cw_update_setting {"id":"sessions.transcriptWarnMB","value":60}', task('Sixth thing')].join(' then ')))
   const section = panel().locator('.assistant-actions')
   check('six changes: “Done by the Assistant (6)” at the watch line’s end, closed', !!(await lib.until(async () => /Done by the Assistant\s*\(6\)/i.test(await link.innerText().catch(() => '')), HUNG_MS)) && (await link.getAttribute('aria-expanded')) === 'false' && (await section.count()) === 0, await link.innerText().catch(() => ''))
   check('…with the Assistant’s crown', (await link.locator('.assistant-mark').count()) === 1)
@@ -231,14 +231,14 @@ const check = (name, ok, extra = '') => {
 
   // --- Hive's own question its action waits on (stopping a busy agent): waiting for your approval, until answered.
   // Its task is "work 60", spelled with a JSON escape so the fake Assistant doesn't take it as its own "work 60".
-  check('it adds an agent to alpha', await say('hive hive_add_agent {"project":"alpha","name":"Fixer","prompt":"w\\u006frk 60"}'))
+  check('it adds an agent to alpha', await say('hive cw_add_agent {"project":"alpha","name":"Fixer","prompt":"w\\u006frk 60"}'))
   const alpha = path.join(ws, 'alpha')
   const fixerLive = async () => (await inv('session:live')).find((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.agentName === 'Fixer')
   check('an agent of alpha is busy', !!(await lib.until(async () => (await fixerLive())?.status === 'working', 30000)))
   // Its mark in the workspace section says it works (#979), and its label says who and what.
   const fixerMark = panel().locator('.assistant-project[data-project="alpha"] .assistant-agent')
   check('…its mark in the workspace section is working', !!(await lib.until(async () => (await fixerMark.count()) === 1 && (await fixerMark.getAttribute('data-state')) === 'working' && ((await fixerMark.getAttribute('aria-label')) ?? '').startsWith('Fixer: '), 5000)), await fixerMark.getAttribute('aria-label').catch(() => 'no mark'))
-  const stopping = await type('hive hive_stop_agent {"project":"alpha","agent":"Fixer"}')
+  const stopping = await type('hive cw_stop_agent {"project":"alpha","agent":"Fixer"}')
   const card = panel().locator('.assistant-question', { hasText: 'Stop Fixer in alpha?' })
   check('stopping it asks the user on a card', !!(await lib.until(async () => (await card.count()) === 1, 15000)))
   check('…and the status line says the Assistant waits for your approval', !!(await lib.until(async () => (await statusText()) === 'Status: Waiting for your approval: Stop Fixer in alpha?' && (await tone()) === 'attention', 5000)), `${await statusText()} / ${await tone()}`)
@@ -252,7 +252,7 @@ const check = (name, ok, extra = '') => {
   if (fixer) await inv('session:stop', alpha, fixer.agentId)
 
   // --- A card watch: its cards as chips that open the card, and until when.
-  check('it watches two cards', await say('hive hive_wait_for_tasks {"cards":[1,2],"wake":true,"column":"review","limitMinutes":90}'))
+  check('it watches two cards', await say('hive cw_wait_for_tasks {"cards":[1,2],"wake":true,"column":"review","limitMinutes":90}'))
   // Its cards by key (#1221).
   const [L1, L2] = [await lib.cardLabel(inv, 1), await lib.cardLabel(inv, 2)]
   check('watching: “Status: Waiting for #1 #2 → Review (watch until …)” (chips side by side)', !!(await lib.until(async () => new RegExp(`^Status: Waiting for ${L1} ${L2} → Review \\(watch until \\d{1,2}:\\d{2}( [AP]M)?\\)$`).test(await statusText()) && (await tone()) === 'calm', 15000)), await statusText())
@@ -307,7 +307,7 @@ const check = (name, ok, extra = '') => {
   }
   await lib.until(async () => (await panel().locator('.assistant-header').count()) === 1, 5000)
   await panel().locator('.assistant-header').getByRole('button', { name: /Resume|Start/ }).first().click()
-  check('it adds a card after the restart', await say('hive hive_create_task {"project":"alpha","title":"After the restart"}'))
+  check('it adds a card after the restart', await say('hive cw_create_task {"project":"alpha","title":"After the restart"}'))
   const again = panel().locator('.assistant-done-link')
   check('after a restart, “Done by the Assistant” is still closed', !!(await lib.until(async () => (await again.count()) === 1, 10000)) && (await again.getAttribute('aria-expanded')) === 'false' && (await panel().locator('.assistant-action').count()) === 0)
   await again.press(' ')

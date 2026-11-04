@@ -293,7 +293,7 @@ describe('Purge', () => {
     setViewing(7, 'v2', p, cliHas)
     try {
       const { result } = await purgeWith(project)
-      expect(reasons(result)).toMatch(/open in Hive/)
+      expect(reasons(result)).toMatch(/open in Combwork/)
       expect([existsSync(active(last)), existsSync(attachments(last)), (await records()).some((r) => r.id === last)]).toEqual([true, true, true])
       expect([existsSync(active(cliHas)), existsSync(attachments(cliHas))]).toEqual([false, false])
     } finally {

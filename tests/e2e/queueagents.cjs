@@ -1,7 +1,7 @@
 // Agents under Hive merges (#1354, SPEC §16.9.3): a project set to "Hive merges" into `integration` (queueFixture.cjs),
 // fake Claude Code agents acting by their own tokens, the Assistant off. A builder whose card is approved and queued
 // tries to merge it itself:
-// - hive_report_merge (report-merge) and hive_merge_slot (claim naming the card): both refused (409, merge.hiveMerges)
+// - cw_report_merge (report-merge) and cw_merge_slot (claim naming the card): both refused (409, merge.hiveMerges)
 //   with where it is in the merge queue and where the rule is set; the card untouched;
 // - its card read says who merges it and where it is;
 // then the queue returns it for a conflict, and its wake names the files and the next step; the builder merges the
@@ -83,7 +83,7 @@ async function call(h, who, method, url, body) {
     }, HUNG_MS)
     check("its builder's wake says what came back and what to do", !!wake && wake.includes('a conflict with integration in a.txt') && wake.includes('Merge integration into your worktree'), String(wake))
     check("…and every line about it leads with the return, none with the review's pass (HI-2087)", seen.length > 0 && seen.every((i) => String(i.text).includes(`${key} came back from the merge queue`)) && !JSON.stringify(seen).includes('latest comment by'), JSON.stringify(seen))
-    const said = await until(async () => (await h.card(card.n))?.comments?.findLast((c) => c.by === 'Hive') ?? null, HUNG_MS)
+    const said = await until(async () => (await h.card(card.n))?.comments?.findLast((c) => c.by === 'Combwork') ?? null, HUNG_MS)
     check('…and Hive says so on the card (its latest comment): what came back, in English for agents and as a message for the window', !!said && String(said.text).startsWith(`${key} came back from the merge queue: a conflict with integration in a.txt`) && said.hiveText?.id === 'tasks.history.queueReturned', JSON.stringify(said))
     const after = await call(h, card.builder, 'GET', `/v1/tasks/${encodeURIComponent(key)}`)
     check('its card read now says it came back, and what to do', String(after.body?.merge).includes('came back from the merge queue'), JSON.stringify(after.body?.merge))

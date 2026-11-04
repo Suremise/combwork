@@ -120,7 +120,7 @@ describe('the scripts tell Hive of a build', () => {
   const ws = join(base, 'scripts-ws')
   const repo = join(ws, 'hive')
   const markers = (): string[] => (existsSync(join(ws, '.hive', 'builds')) ? readdirSync(join(ws, '.hive', 'builds')) : [])
-  const env = { HIVE_WORKSPACE: ws }
+  const env = { CW_WORKSPACE: ws }
   // The session's token in its file (HI-2262: never HIVE_API_TOKEN).
   const tokenFile = join(base, 'agent-token.json')
   writeFileSync(tokenFile, JSON.stringify({ token: 't' }))
@@ -134,11 +134,11 @@ describe('the scripts tell Hive of a build', () => {
   it('through the Agent API while Hive answers, leaving no marker', async () => {
     const sent: unknown[] = []
     const post = async (f: unknown, to: unknown) => (sent.push({ f, to }), { recorded: true })
-    expect(await script.recordBuild(input, { env: { ...env, HIVE_API_URL: 'http://127.0.0.1:1', HIVE_API_TOKEN_FILE: tokenFile }, post })).toBe("Build recorded in Hive's journal (baseline).")
+    expect(await script.recordBuild(input, { env: { ...env, CW_API_URL: 'http://127.0.0.1:1', CW_API_TOKEN_FILE: tokenFile }, post })).toBe("Build recorded in Hive's journal (baseline).")
     expect(sent).toEqual([{ f: fact, to: { url: 'http://127.0.0.1:1', token: 't', workspace: ws } }])
     expect(markers()).toEqual([])
     // Hive answered but didn't write it (the switch or the journal off): said, and no marker either.
-    expect(await script.recordBuild(input, { env: { ...env, HIVE_API_URL: 'http://127.0.0.1:1', HIVE_API_TOKEN_FILE: tokenFile }, post: async () => ({ recorded: false, reason: 'off.' }) })).toBe("Build not recorded in Hive's journal: off.")
+    expect(await script.recordBuild(input, { env: { ...env, CW_API_URL: 'http://127.0.0.1:1', CW_API_TOKEN_FILE: tokenFile }, post: async () => ({ recorded: false, reason: 'off.' }) })).toBe("Build not recorded in Hive's journal: off.")
     expect(markers()).toEqual([])
   })
 
@@ -146,7 +146,7 @@ describe('the scripts tell Hive of a build', () => {
     const sent: unknown[] = []
     const post = async (f: unknown, to: unknown) => (sent.push({ f, to }), { recorded: true })
     const was = new Set(markers())
-    expect(await script.recordBuild(input, { env: { ...env, HIVE_API_URL: 'http://127.0.0.1:1', HIVE_API_TOKEN: 't' }, post })).toMatch(/^Build left for Hive's journal/)
+    expect(await script.recordBuild(input, { env: { ...env, CW_API_URL: 'http://127.0.0.1:1', HIVE_API_TOKEN: 't' }, post })).toMatch(/^Build left for Hive's journal/)
     expect(sent).toEqual([])
     // Left as a marker, as with no API named; taken away again so the next test counts its own.
     const left = markers().filter((m) => !was.has(m))
@@ -155,7 +155,7 @@ describe('the scripts tell Hive of a build', () => {
   })
 
   it("by a marker when Hive can't be reached, or no API is named", async () => {
-    expect(await script.recordBuild(input, { env: { ...env, HIVE_API_URL: 'http://127.0.0.1:1', HIVE_API_TOKEN_FILE: tokenFile }, post: async () => null })).toMatch(/^Build left for Hive's journal \(baseline\)/)
+    expect(await script.recordBuild(input, { env: { ...env, CW_API_URL: 'http://127.0.0.1:1', CW_API_TOKEN_FILE: tokenFile }, post: async () => null })).toMatch(/^Build left for Hive's journal \(baseline\)/)
     expect(await script.recordBuild(input, { env })).toMatch(/^Build left for Hive's journal/)
     const left = markers()
     expect(left).toHaveLength(2)
@@ -186,7 +186,7 @@ describe('the scripts tell Hive of a build', () => {
     })
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     const url = `http://127.0.0.1:${(server.address() as { port: number }).port}`
-    const api = { ...env, HIVE_API_URL: url, HIVE_API_TOKEN_FILE: tokenFile }
+    const api = { ...env, CW_API_URL: url, CW_API_TOKEN_FILE: tokenFile }
     try {
       expect(await script.postBuild(fact, { url, token: 't', workspace: ws })).toBeNull()
       const before = markers().length
@@ -219,7 +219,7 @@ describe('the scripts tell Hive of a build', () => {
 
   it('says so when no workspace holds the checkout', async () => {
     const lone = tempDir('hive-build-facts-lone-')
-    expect(await script.recordBuild({ ...input, root: lone }, { env: {} })).toBe("Build not recorded in Hive's journal: no Hive workspace holds this checkout (HIVE_WORKSPACE names one).")
+    expect(await script.recordBuild({ ...input, root: lone }, { env: {} })).toBe("Build not recorded in Hive's journal: no Hive workspace holds this checkout (CW_WORKSPACE names one).")
   })
 })
 

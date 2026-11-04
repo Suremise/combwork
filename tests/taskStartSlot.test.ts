@@ -71,7 +71,7 @@ describe("a Start of a card started before in a slot, its builder stopped (HI-19
     expect([r.card.column, r.card.agent]).toEqual(['doing', 'b1'])
     expect(slot.asked).toBe(1)
     expect(launched).toHaveLength(1)
-    expect(launched[0].prompt).toMatch(new RegExp(`^\\[Hive\\] New in your inbox: 1 task \\(#${c.number}\\)`))
+    expect(launched[0].prompt).toMatch(new RegExp(`^\\[CW\\] New in your inbox: 1 task \\(#${c.number}\\)`))
     const task = await lastTask()
     expect(task?.card).toBe(c.number)
     expect(task?.body).toMatch(/It was in Review and is back in Doing for more work\.\n\nRun the model trials now\.$/)

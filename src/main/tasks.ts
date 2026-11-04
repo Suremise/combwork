@@ -91,7 +91,8 @@ const ERR = {
 export type TaskActor = { kind: 'user' } | { kind: 'assistant' } | { kind: 'agent'; name: string; self?: { project: string; agentId: string }; scope?: string }
 
 /** Hive itself starting a lane's next card on its builder (HI-1990, laneStarts.ts): its start goes through the card's rules. */
-export const HIVE_LANE_START: TaskActor = { kind: 'agent', name: 'Hive' } // i18n-ignore: who did it, as cards' history and agents name Hive
+// agent-protocol: who did it, as cards' history stores it: Combwork's own name (HI-2463)
+export const HIVE_LANE_START: TaskActor = { kind: 'agent', name: 'Combwork' } // i18n-ignore: who did it, as cards' history and agents name Hive
 
 /** The project an actor is confined to on the board (a project agent's own), or null for the whole workspace. */
 export const scopeOf = (a: TaskActor): string | null => (a.kind === 'agent' && a.scope !== undefined ? a.scope : null)
@@ -109,7 +110,8 @@ const selfIn = (actor: TaskActor, project: string): string | null =>
   actor.kind === 'agent' && actor.self && project && actor.self.project.toLowerCase() === project.toLowerCase() ? actor.self.agentId : null
 
 /** Who changed a card, as its history, comments and decisions store it: English, read by agents (the window words them, shared/taskHistory.ts BY_TEXT). */
-const BY = { you: 'You', assistant: 'Assistant', hive: 'Hive', repair: 'Repair' } as const // i18n-ignore: stored with cards in English, as agents read them
+// agent-protocol: who changed a card, as its history stores it (names, read back: recorder.ts)
+const BY = { you: 'You', assistant: 'Assistant', hive: 'Combwork', repair: 'Repair' } as const // i18n-ignore: stored with cards in English, as agents read them
 
 export const actorName = (a: TaskActor): string => (a.kind === 'user' ? BY.you : a.kind === 'assistant' ? BY.assistant : a.name)
 
@@ -1034,8 +1036,8 @@ function checkHold(column: TaskColumn, actor: TaskActor, n?: number): void {
   if (column !== 'hold' || actor.kind !== 'agent' || !actor.self) return
   throw new TaskPermissionError(
     n
-      ? withValues(msg({ id: 'tasks.error.holdCard', defaultMessage: 'Only the user or the Assistant puts cards On Hold. Where the user has decided to park {card}, ask the Assistant (hive_ask_assistant); otherwise ask the user.', description: 'An error: an agent tried to move card {card} (its key, such as HI-12) On Hold (a board column), which only the user or the Assistant may do (HI-2227): a decision already made goes to the Assistant, hive_ask_assistant (a tool name: keep it as it is), else the user is asked.' }), { card: cardRef(n) })
-      : msg({ id: 'tasks.error.holdNew', defaultMessage: 'Only the user or the Assistant puts cards On Hold. Add it to Todo; where the user has decided to park it, ask the Assistant (hive_ask_assistant), otherwise ask the user.', description: 'An error: an agent tried to add a card On Hold (a board column), which only the user or the Assistant may do (HI-2227): add it to Todo, then a decision already made goes to the Assistant, hive_ask_assistant (a tool name: keep it as it is), else the user is asked.' })
+      ? withValues(msg({ id: 'tasks.error.holdCard', defaultMessage: 'Only the user or the Assistant puts cards On Hold. Where the user has decided to park {card}, ask the Assistant (cw_ask_assistant); otherwise ask the user.', description: 'An error: an agent tried to move card {card} (its key, such as HI-12) On Hold (a board column), which only the user or the Assistant may do (HI-2227): a decision already made goes to the Assistant, cw_ask_assistant (a tool name: keep it as it is), else the user is asked.' }), { card: cardRef(n) })
+      : msg({ id: 'tasks.error.holdNew', defaultMessage: 'Only the user or the Assistant puts cards On Hold. Add it to Todo; where the user has decided to park it, ask the Assistant (cw_ask_assistant), otherwise ask the user.', description: 'An error: an agent tried to add a card On Hold (a board column), which only the user or the Assistant may do (HI-2227): add it to Todo, then a decision already made goes to the Assistant, cw_ask_assistant (a tool name: keep it as it is), else the user is asked.' })
   )
 }
 
@@ -1164,7 +1166,7 @@ export const loopStepNote = (step: string, said: string, until?: string, of?: st
 /**
  * Whether a comment counts as its reviewer's request to the builder (#1410): a plain comment (no move, no verdict) by
  * the reviewer of the card's running lane, on its card in Review that it hasn't started reviewing ("waiting for #12
- * first"), so its builder is woken as for hive_request_builder. Off with the project's loop wakes (Card loops → Wake
+ * first"), so its builder is woken as for cw_request_builder. Off with the project's loop wakes (Card loops → Wake
  * reviewers and builders). Read in the change, on the card as it is then.
  */
 async function laneReviewerAsks(ws: WorkspaceService, card: TaskCard, patch: TaskPatch, actor: TaskActor, said: StoredText[]): Promise<boolean> {
@@ -1203,7 +1205,7 @@ export const replyNote = (said: string): StoredText => storedText(HISTORY.builde
 
 /**
  * A comment's own history line in a card loop, whichever way it is written (a change with a comment, or a comment alone,
- * HI-2428: hive_update_task with only a comment is commentTask's, where neither was read, so on HI-2410 a pool
+ * HI-2428: cw_update_task with only a comment is commentTask's, where neither was read, so on HI-2410 a pool
  * reviewer's builder answered it twice and nobody was woken): a lane reviewer's request to its builder (#1410), or its
  * builder's reply to its reviewer (HI-2302). Null: only a comment.
  */
@@ -1351,7 +1353,7 @@ export async function createTask(...args: Parameters<typeof createTaskLocked>): 
 }
 
 /** The Assistant's card made in Doing with nobody on it (HI-2062): refused, naming the user's three choices. */
-export const DOING_NOBODY_NEW = msg({ id: 'tasks.error.doingNobodyNew', defaultMessage: 'A card made in Active needs an agent on it (agent). Ask the user which they want: an agent on it, an agent started on it (make it in Todo, then hive_start_task), or nobody on it (make it in Todo, then move it with override and their reason).', description: "An error said to the Hive Assistant (HI-2062): it made a card straight into the Active stage with no agent on it. agent, override and hive_start_task are names of a call's fields and a tool: keep them as they are. Active and Todo are stage names." })
+export const DOING_NOBODY_NEW = msg({ id: 'tasks.error.doingNobodyNew', defaultMessage: 'A card made in Active needs an agent on it (agent). Ask the user which they want: an agent on it, an agent started on it (make it in Todo, then cw_start_task), or nobody on it (make it in Todo, then move it with override and their reason).', description: "An error said to the Hive Assistant (HI-2062): it made a card straight into the Active stage with no agent on it. agent, override and cw_start_task are names of a call's fields and a tool: keep them as they are. Active and Todo are stage names." })
 
 async function createTaskLocked(
   input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; blocked?: string | null; blockedBy?: number[]; links?: number[]; context?: string[]; kind?: CardKind; skipReview?: string },
@@ -2460,7 +2462,7 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
 /** A batch changes at most this many cards (its reply names each one). */
 export const MAX_CHANGE_BATCH = 100
 
-/** The fields a batch sets on every card it names (hive_update_tasks): comments, decisions and titles stay on the single call. */
+/** The fields a batch sets on every card it names (cw_update_tasks): comments, decisions and titles stay on the single call. */
 export type BatchPatch = Pick<TaskPatch, 'column' | 'position' | 'blocked' | 'labels' | 'addLabels' | 'removeLabels' | 'agent' | 'override'>
 
 /** What a batch did with one card: its change's history lines, or why it was refused (the card left as it was). */
@@ -2485,7 +2487,7 @@ export function batchNumbers(numbers: unknown): number[] {
  * authorised against the card as it is then, with the same refusals and history lines as a single call. A refused card
  * (unknown, another project's, archived, in Doing with another agent, say) is left as it was and the others still apply:
  * each card is all or nothing, the batch is not. Its error is the one a missing card gets, so it reveals no more.
- * Position applies to each card in turn, so the last listed ends at the top (or bottom): hive_reorder_tasks sets an order.
+ * Position applies to each card in turn, so the last listed ends at the top (or bottom): cw_reorder_tasks sets an order.
  */
 export async function updateTasks(numbers: number[], patch: BatchPatch, actor: TaskActor, opts: { commit?: () => void } = {}): Promise<BatchItem[]> {
   checkOverride(patch, actor)
@@ -2519,7 +2521,7 @@ async function updateTasksUnbatched(numbers: number[], patch: BatchPatch, actor:
     } catch (e) {
       // The board's storage failing (a card's facts, SQLite) fails the batch whole: part of the card may be written.
       if (isStorageError(e)) throw e
-      // A refusal by the card's rules keeps its English lines, as hive_update_task's reply has them (HI-2238): the message
+      // A refusal by the card's rules keeps its English lines, as cw_update_task's reply has them (HI-2238): the message
       // with its stage's name, and the next step an agent would otherwise never see.
       const r = e instanceof WorkflowRefusedError ? e.refusal : null
       items.push({ number: n, card: null, said: [], error: r ? r.message : (e as Error).message, ...(r ? { refused: { rule: r.rule, next: r.next, ...(r.change ? { change: r.change } : {}) } } : {}) })

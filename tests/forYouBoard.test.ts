@@ -81,7 +81,7 @@ async function deliveredTo(w: WS, agent: string): Promise<string[]> {
   await loopWakes.settled()
   return (store.workspaceDb(w.path!).reader.prepare("SELECT body FROM deliveries WHERE agent_id = ? AND source = 'loop' ORDER BY seq").all(agent) as { body: string }[]).map((r) => r.body)
 }
-/** What an agent reads with hive_inbox (each delivery made again as it is handed out), once the actions have run. */
+/** What an agent reads with cw_inbox (each delivery made again as it is handed out), once the actions have run. */
 async function inboxOf(w: WS, agent: string) {
   await deliveredTo(w, agent)
   return (await deliveries.readInbox(join(w.path!, 'p'), agent)).items
@@ -579,7 +579,7 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
     expect(after.column).toBe('doing')
     const got = relayed(w)
     expect(got).toHaveLength(1)
-    expect(got[0].body).toBe(`This needs you: the user answered Builder (p)'s question on p-${card}. The question, whole: <<<Nothing to merge: Done?>>>. Their reply, whole: <<<Checks-only card, nothing to merge.>>>. (Both stay on the card: hive_read_task p-${card}.) Builder (p) can't move it to Done by itself. Do it only if the answer agrees, within any conditions it sets, with the answer as the reason (hive_update_task).`)
+    expect(got[0].body).toBe(`This needs you: the user answered Builder (p)'s question on p-${card}. The question, whole: <<<Nothing to merge: Done?>>>. Their reply, whole: <<<Checks-only card, nothing to merge.>>>. (Both stay on the card: cw_read_task p-${card}.) Builder (p) can't move it to Done by itself. Do it only if the answer agrees, within any conditions it sets, with the answer as the reason (cw_update_task).`)
     expect((await inboxOf(w, 'a1')).find((i) => i.kind === 'answer')?.text).toContain('Checks-only card, nothing to merge.')
   })
 
@@ -607,7 +607,7 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
     const after = await answer(w, card, forYou(w).items[0].request, { outcome: 'answered', reply: 'Yes, skip it.' })
     expect(after.column).toBe('doing')
     expect(facts(w, card).filter((f) => f.kind === 'ReviewSkipSet')).toEqual([])
-    expect(relayed(w).map((r) => r.body)).toEqual([`For you to check: the user answered Builder (p)'s question on p-${card}. The question, whole: <<<May we skip review for this checks-only change?>>>. Their reply, whole: <<<Yes, skip it.>>>. (Both stay on the card: hive_read_task p-${card}.) If it grants a change Builder (p) can't make itself (Done past its rules, no code, skipping its review), make it, within any conditions it sets, with the answer as the reason; otherwise nothing is needed.`])
+    expect(relayed(w).map((r) => r.body)).toEqual([`For you to check: the user answered Builder (p)'s question on p-${card}. The question, whole: <<<May we skip review for this checks-only change?>>>. Their reply, whole: <<<Yes, skip it.>>>. (Both stay on the card: cw_read_task p-${card}.) If it grants a change Builder (p) can't make itself (Done past its rules, no code, skipping its review), make it, within any conditions it sets, with the answer as the reason; otherwise nothing is needed.`])
     expect((await inboxOf(w, 'a1')).find((i) => i.kind === 'answer')?.text).toContain('Yes, skip it.')
   })
 
@@ -695,7 +695,7 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
     expect(body).toContain(`<<<${question}>>>`)
     expect(body).toContain(`<<<${reply}>>>`)
     expect(body).toContain('Do not move it to Done until I confirm the audit has passed.')
-    expect(body).toContain(`hive_read_task p-${card}`)
+    expect(body).toContain(`cw_read_task p-${card}`)
   })
 
   it('a code card passing review with nothing to merge (its change already in its target) is proposed no code; one with work to merge is not', async () => {

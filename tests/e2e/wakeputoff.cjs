@@ -92,7 +92,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
       return rows.join('\n')
     }
     /** The doorbell's copies on screen, wherever its rows were wrapped. */
-    const onScreen = async (a) => ((await screen(a)).replace(/\s+/g, '').match(/\[Hive\]Newinyourinbox/g) ?? []).length
+    const onScreen = async (a) => ((await screen(a)).replace(/\s+/g, '').match(/\[CW\]Newinyourinbox/g) ?? []).length
 
     await page.getByText('alpha', { exact: true }).first().click()
     const claude = { ...(await lib.addAgent(inv, alpha, { name: 'Claude' })), name: 'Claude', provider: 'claude-code' }
@@ -107,11 +107,11 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     // Not synchronous: leaving a message replies once its doorbell is typed, which the test holds meanwhile.
     const tool = (name, args) =>
       new Promise((resolve, reject) => {
-        const child = execFile(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], { env: lib.childEnv({ HIVE_API_URL: API, HIVE_WORKSPACE: ws, HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', HIVE_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', HIVE_PROJECT: '' }), timeout: 60000 }, (e, out) => (e ? reject(e) : resolve(JSON.parse(String(out).split('\n')[0]).result.content[0].text)))
+        const child = execFile(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', CW_PROJECT: '' }), timeout: 60000 }, (e, out) => (e ? reject(e) : resolve(JSON.parse(String(out).split('\n')[0]).result.content[0].text)))
         child.stdin.end(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n')
       })
-    const leave = async (a, text) => /\((m\d+)/.exec(await tool('hive_message_agent', { project: 'alpha', agent: a.name, text }))?.[1] ?? null
-    const delivery = async (a, id) => JSON.parse(await tool('hive_agent_activity', { project: 'alpha', agent: a.name, detail: true })).inbox?.deliveries?.find((d) => d.id === id) ?? null
+    const leave = async (a, text) => /\((m\d+)/.exec(await tool('cw_message_agent', { project: 'alpha', agent: a.name, text }))?.[1] ?? null
+    const delivery = async (a, id) => JSON.parse(await tool('cw_agent_activity', { project: 'alpha', agent: a.name, detail: true })).inbox?.deliveries?.find((d) => d.id === id) ?? null
 
     for (const a of [claude, codex]) {
       const key = lib.ptyKey(alpha, a.id)
@@ -137,7 +137,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
       await setSwitch('idleWakes', null)
       check(`${a.name}: idle wakes on again: the next wake is typed and sent`, !!(await until(() => wakes(a).length > before, HUNG_MS)), JSON.stringify(wakes(a).slice(before)))
       const sent = wakes(a).slice(before)
-      check(`${a.name}: …alone: one doorbell, nothing typed before it`, sent.length === 1 && sent[0].startsWith('[Hive] New in your inbox') && (sent[0].match(/\[Hive\]/g) ?? []).length === 1, JSON.stringify(sent))
+      check(`${a.name}: …alone: one doorbell, nothing typed before it`, sent.length === 1 && sent[0].startsWith('[CW] New in your inbox') && (sent[0].match(/\[CW\]/g) ?? []).length === 1, JSON.stringify(sent))
       check(`${a.name}: …it reads and acks the message`, !!(await until(async () => (await delivery(a, m))?.state === 'acked' && (await idle(a.id)), HUNG_MS)), JSON.stringify(await delivery(a, m)))
     }
 
@@ -162,7 +162,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     check('Claude: past the typing pause, the doorbell goes once the draft is cleared', !!(await until(() => wakes(claude).length > before, HUNG_MS)), JSON.stringify(wakes(claude).slice(before)))
     let sent = wakes(claude).slice(before)
     let taken = (await prompts()).slice(took)
-    check('Claude: …alone, with none of the draft before it: the one prompt it took is the doorbell', sent.length === 1 && taken.length === 1 && taken[0].startsWith('[Hive] New in your inbox') && !taken[0].includes('draft line'), JSON.stringify({ sent, taken }))
+    check('Claude: …alone, with none of the draft before it: the one prompt it took is the doorbell', sent.length === 1 && taken.length === 1 && taken[0].startsWith('[CW] New in your inbox') && !taken[0].includes('draft line'), JSON.stringify({ sent, taken }))
     check('Claude: …it reads and acks the message', !!(await until(async () => (await delivery(claude, m))?.state === 'acked' && (await idle(claude.id)), HUNG_MS)), JSON.stringify(await delivery(claude, m)))
 
     // Its input not read meanwhile (a busy CLI: fake-slow-input): a Ctrl+U it doesn't answer. Hive types nothing, puts the
@@ -183,7 +183,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     m = await leftHeld
     sent = wakes(claude).slice(before)
     taken = (await prompts()).slice(took)
-    check('Claude: …alone, with none of the draft before it: the one prompt it took is the doorbell', sent.length === 1 && taken.length === 1 && taken[0].startsWith('[Hive] New in your inbox') && !taken[0].includes('a draft typed'), JSON.stringify({ sent, taken }))
+    check('Claude: …alone, with none of the draft before it: the one prompt it took is the doorbell', sent.length === 1 && taken.length === 1 && taken[0].startsWith('[CW] New in your inbox') && !taken[0].includes('a draft typed'), JSON.stringify({ sent, taken }))
     check('Claude: …it reads and acks the message', !!(await until(async () => (await delivery(claude, m))?.state === 'acked' && (await idle(claude.id)), HUNG_MS)), JSON.stringify(await delivery(claude, m)))
   } catch (e) {
     check('no error', false, e.stack)

@@ -101,7 +101,7 @@ const check = (name, ok, extra = '') => {
     await page.screenshot({ path: path.join(lib.WORK, 'agents24-2-progress.png') })
 
     // Every working agent, no names: 23 (a watch took at most 20 before #562).
-    await say(watcher.id, `hive hive_wait_for_agents ${JSON.stringify({ wake: true })}`)
+    await say(watcher.id, `hive cw_wait_for_agents ${JSON.stringify({ wake: true })}`)
     check('the 24th watches every working agent', !!(await until(async () => (await live(watcher.id))?.status === 'watching', HUNG_MS)), (await live(watcher.id))?.status)
     const status = (await api('GET', '/v1/projects/crowd')).body?.agents?.find((a) => a.name === `W${N}`)
     check('…all 23 of them', status?.watching?.agents?.length === N - 1, JSON.stringify(status?.watching))
@@ -121,7 +121,7 @@ const check = (name, ok, extra = '') => {
 
     // --- The runs end: the watcher is woken, the agents' turns end and the panel's runs finish.
     fs.writeFileSync(release, '')
-    check('the watcher is woken as they finish', !!(await until(async () => wakes(`W${N}`).some((w) => /^\[Hive\] .*W\d+.* finished/.test(w)), 120000)), JSON.stringify(wakes(`W${N}`)))
+    check('the watcher is woken as they finish', !!(await until(async () => wakes(`W${N}`).some((w) => /^\[CW\] .*W\d+.* finished/.test(w)), 120000)), JSON.stringify(wakes(`W${N}`)))
     check('no run is left open', !!(await until(async () => (await openRuns()).length === 0, 120000)), String((await openRuns()).length))
     check('every worker is idle again', !!(await until(async () => (await lives()).filter((s) => ['ready', 'finished'].includes(s.status)).length >= N - 1, 120000)))
   } finally {

@@ -69,9 +69,9 @@ export interface ActivityTarget {
   lane?: string
   /** The column a card moved to, or the cards were put in order in. */
   column?: string
-  /** A setting's id in the settings catalog (hive_list_settings), never its value. */
+  /** A setting's id in the settings catalog (cw_list_settings), never its value. */
   settingId?: string
-  /** A connection's id (HI-2108: hive_connection), never its values. */
+  /** A connection's id (HI-2108: cw_connection), never its values. */
   connection?: string
 }
 
@@ -131,7 +131,7 @@ export const UNDO_FINAL_MSG = {
   message: agentMsg({ id: 'activity.undo.message', text: "A message that was sent can't be taken back.", note: "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it." }),
   comment: agentMsg({ id: 'activity.undo.comment', text: "A comment stays: undo doesn't take back what was said.", note: "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it." }),
   handOver: agentMsg({ id: 'activity.undo.handOver', text: "A hand-over can't be undone: the work went to the other agent.", note: "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it." }),
-  projectMade: agentMsg({ id: 'activity.undo.projectMade', text: "A project it made stays: remove it from Hive if it isn't wanted.", note: "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it." }),
+  projectMade: agentMsg({ id: 'activity.undo.projectMade', text: "A project it made stays: remove it from Combwork if it isn't wanted.", note: "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it." }),
   projectOpened: agentMsg({ id: 'activity.undo.projectOpened', text: "A project it opened stays open: close it if it isn't wanted.", note: "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it." }),
   projectClosed: agentMsg({ id: 'activity.undo.projectClosed', text: 'A project it closed stays closed: open it again if it is wanted.', note: "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it." }),
   agentAdded: agentMsg({ id: 'activity.undo.agentAdded', text: "An agent it added stays: remove it in the project's agents if it isn't wanted.", note: "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it." }),

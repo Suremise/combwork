@@ -5,7 +5,7 @@
 // runner and a scenario run, and in a second worktree (a git worktree of this one's HEAD with its uncommitted changes,
 // made for the check in this invocation's own folder and removed after unless --keep: tempWorktrees.mjs, #207, so two
 // checkers at once never remove each other's) two e2e runners. One run in each worktree is started with the
-// environment of an agent's shell inside an outer hive-progress (NO_COLOR, HIVE_PROGRESS_WRAPPED, a Hive Agent API
+// environment of an agent's shell inside an outer hive-progress (NO_COLOR, CW_PROGRESS_WRAPPED, a Hive Agent API
 // token…) and a shell's git and Node settings pointing elsewhere (GIT_DIR and GIT_WORK_TREE at a decoy repository,
 // NODE_OPTIONS loading a script that notes each Node process it starts in), the other with a plain one; the checker's
 // own environment points git at the decoy too, for its own setup (#208). Checked, each round: every run passes; each
@@ -67,12 +67,12 @@ const RUN = invocationDir()
 const AGENT_SHELL = {
   NO_COLOR: '1',
   FORCE_COLOR: '1',
-  HIVE_PROGRESS_WRAPPED: '1',
-  HIVE_PROGRESS_RUN_AS_NODE: '1',
-  HIVE_PROGRESS_DATA: join(RUN, 'leaked-progress'),
-  HIVE_API_URL: 'http://127.0.0.1:9',
+  CW_PROGRESS_WRAPPED: '1',
+  CW_PROGRESS_RUN_AS_NODE: '1',
+  CW_PROGRESS_DATA: join(RUN, 'leaked-progress'),
+  CW_API_URL: 'http://127.0.0.1:9',
   HIVE_API_TOKEN: 'leaked-token',
-  HIVE_PROJECT: 'hive',
+  CW_PROJECT: 'hive',
   CLAUDE_CONFIG_DIR: join(RUN, 'leaked-claude'),
   ELECTRON_RUN_AS_NODE: '1',
   HIVE_TEST_SLOW_IPC: 'tasks:list=1'
@@ -199,7 +199,7 @@ async function heavyRound(k, worktrees) {
   // The agent's token in its file, as a session has it (HI-2262: never HIVE_API_TOKEN).
   const tokenFile = join(RUN, 'agent-token.json')
   writeFileSync(tokenFile, JSON.stringify({ token: 'agent-token' }))
-  const env = { HIVE_TEST_HEAVY_DIR: pool, HIVE_TEST_HEAVY_SLOTS: '2', HIVE_TEST_SIDE_SLOTS: '0', HIVE_API_URL: `http://127.0.0.1:${api.address().port}`, HIVE_API_TOKEN_FILE: tokenFile }
+  const env = { HIVE_TEST_HEAVY_DIR: pool, HIVE_TEST_HEAVY_SLOTS: '2', HIVE_TEST_SIDE_SLOTS: '0', CW_API_URL: `http://127.0.0.1:${api.address().port}`, CW_API_TOKEN_FILE: tokenFile }
   const slots = () => (existsSync(pool) ? readdirSync(pool).filter((f) => /^slot-\d+\.json$/.test(f)).length : 0)
   const waiting = () => (existsSync(pool) ? readdirSync(pool).filter((f) => f.startsWith('wait-')).length : 0)
   // Heavy by repeating: two quick suites, twice.
@@ -257,8 +257,8 @@ async function heavyRound(k, worktrees) {
 
     // The merge slot holder's run goes first (#558). The only slot is this checker's; two runs wait for it, then the
     // run of the agent that holds the merge slot (HB, says the stand-in) asks last and takes it when it is let go.
-    const single = { ...env, HIVE_TEST_HEAVY_SLOTS: '1', HIVE_PROJECT: 'hive' }
-    const run = (i, agent, started) => start({ name: `${agent}, worktree ${i + 1}`, cwd: worktrees[i], script: 'tests/e2e/run.mjs', args, env: { ...single, HIVE_AGENT: agent }, started })
+    const single = { ...env, HIVE_TEST_HEAVY_SLOTS: '1', CW_PROJECT: 'hive' }
+    const run = (i, agent, started) => start({ name: `${agent}, worktree ${i + 1}`, cwd: worktrees[i], script: 'tests/e2e/run.mjs', args, env: { ...single, CW_AGENT: agent }, started })
     const slotFile = () => readdirSync(pool).find((f) => /^slot-\d+\.json$/.test(f))
     let gate = await trySlot(pool, { slots: 1, what: 'the checker', root })
     const earlier = [run(0, 'B1')]

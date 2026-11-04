@@ -116,7 +116,7 @@ const M = {
   notRecorded: msg({ id: 'performance.trend.notRecordedLegend', defaultMessage: 'Not recorded', description: 'Legend of the requests chart: the hatched bars, when Hive recorded nothing.' }),
   assistant: msg({ id: 'performance.who.assistant', defaultMessage: 'Assistant', description: "In a Performance table's Who column: the Hive Assistant's sessions." }),
   agents: msg({ id: 'performance.who.agents', defaultMessage: 'Agents', description: "In a Performance table's Who column: project agents' sessions." }),
-  tool: msg({ id: 'performance.tools.tool', defaultMessage: 'Tool', description: 'Column header of the Hive tools table: the tool\'s name (such as hive_read_task).' }),
+  tool: msg({ id: 'performance.tools.tool', defaultMessage: 'Tool', description: 'Column header of the Hive tools table: the tool\'s name (such as cw_read_task).' }),
   calls: msg({ id: 'performance.tools.calls', defaultMessage: 'Calls', description: 'Column header of the Hive tools table: how many times it was called.' }),
   chars: msg({ id: 'performance.tools.chars', defaultMessage: 'Characters', description: "Column header of the Hive tools table: its replies' characters." }),
   perCall: msg({ id: 'performance.tools.perCall', defaultMessage: 'Per call', description: "Column header of the Hive tools table: its replies' characters per call, on average." }),

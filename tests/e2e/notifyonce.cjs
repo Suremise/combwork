@@ -1,5 +1,5 @@
 // One notification system (HI-2320): each event is told exactly once, in one place, and is in the bell. While a Hive
-// window is focused, an agent finishing, an agent waiting for you, and an agent's warning or result (hive_notify) are
+// window is focused, an agent finishing, an agent waiting for you, and an agent's warning or result (cw_notify) are
 // each one entry: one pop-up, one bell row, no Windows notification. With Hive in the background, the agent's finish and
 // wait are one Windows notification and one quiet bell row, never a pop-up; Hive's own messages (a warning) wait as a
 // pop-up in the window, its clock paused. A focus change while finishes are being collected decides where their group
@@ -92,7 +92,7 @@ const check = (name, ok, extra = '') => {
     check('…the pop-up closes after its seconds, the bell keeps it', !!(await lib.until(async () => same(await told(finishTitle), { entries: ['popup'], windows: 0, bell: ['shown'], popups: 0 }), HUNG_MS)))
 
     for (const [level, title, kind] of [['warning', 'Disk nearly full', 'warning'], ['info', 'Build finished', 'result']]) {
-      check(`hive_notify ${level} accepted`, (await notifyApi({ title, level, source: alpha })) === 200)
+      check(`cw_notify ${level} accepted`, (await notifyApi({ title, level, source: alpha })) === 200)
       check(`focused, a ${kind}: one entry, one pop-up, one bell row of its kind, no Windows notification`, !!(await lib.until(async () => same(await told(title), { entries: ['popup'], windows: 0, bell: ['shown'], popups: 1 }), HUNG_MS)) && (await bell()).find((t) => t.title === title)?.kind === kind, JSON.stringify(await told(title)))
     }
 
@@ -117,7 +117,7 @@ const check = (name, ok, extra = '') => {
       const t = await told(finishTitle)
       return t.windows === 1 && t.entries.filter((r) => r === 'windows').length === 1 && t.bell.filter((b) => b === 'quiet').length === 1 && t.popups === 0
     }, HUNG_MS)), JSON.stringify(await told(finishTitle)))
-    check('hive_notify warning accepted in the background', (await notifyApi({ title: 'Hooks are quiet', level: 'warning', source: alpha })) === 200)
+    check('cw_notify warning accepted in the background', (await notifyApi({ title: 'Hooks are quiet', level: 'warning', source: alpha })) === 200)
     check('…Hive\'s own warning: a pop-up that waits in the window, no Windows notification', !!(await lib.until(async () => same(await told('Hooks are quiet'), { entries: ['popup'], windows: 0, bell: ['shown'], popups: 1 }), HUNG_MS)))
     await lib.sleep(3500) // A fixed wait on purpose: longer than its 2 s, to show it does NOT close while the window is in the background.
     check('…still there while the window is in the background', (await told('Hooks are quiet')).popups === 1)

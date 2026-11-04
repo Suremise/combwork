@@ -79,7 +79,7 @@ function seed(cards, secondKey) {
     await inv('tasks:update', second.number, { column: 'doing' })
     await inv('tasks:update', first.number, { column: 'done' })
     check("Hive's fact made the journal", !!(await lib.until(async () => (await inv('journal:status')).entries === 1, HUNG_MS)))
-    // The plan links its card by key (HI-1661: as hive_journal_write's link asks), the decision by number (written before).
+    // The plan links its card by key (HI-1661: as cw_journal_write's link asks), the decision by number (written before).
     seed([first.number, second.number], second.key)
 
     await page.locator('.activity-btn[aria-label="Hive Assistant"]').click()

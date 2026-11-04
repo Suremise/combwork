@@ -57,7 +57,7 @@ export function notifyRoute(n: Gates, kind: NotifyKind, focused: FocusedHive | n
   return { route: 'popup', why: `pop-up scope: ${n.bannerScope}` } // i18n-ignore: the log's reason (English)
 }
 
-/** A message's kind from its level, for those raised by level alone (the window's notify(), hive_notify, main's toast()). */
+/** A message's kind from its level, for those raised by level alone (the window's notify(), cw_notify, main's toast()). */
 export const kindOfLevel = (level: ToastLevel): NotifyKind => (level === 'warning' || level === 'error' ? 'warning' : 'result')
 
 /** An entry's kind: its own, else from its level. */

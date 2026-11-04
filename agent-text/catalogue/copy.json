@@ -88,7 +88,7 @@
     "note": "hive-progress --isolated's refusal: no check copy could be lent, for another reason."
   },
   "copy.isolated.noSupervisor": {
-    "text": "Hive's process supervisor isn't running, so an isolated check can't be run",
+    "text": "Combwork's process supervisor isn't running, so an isolated check can't be run",
     "note": "hive-progress --isolated's refusal: Hive can't run the check in a job of its own (#1435)."
   },
   "copy.isolated.notLeased": {
@@ -164,7 +164,7 @@
     "note": "Why a card in Review is stalled (HI-1764), in a lane watch and the Agent API's stalled: its reviewer is kept from reviewing. {minutes} is whole minutes."
   },
   "copy.review.waiting": {
-    "text": "Waiting for a review copy ({why}): Hive tells you when one is ready, with its folder. Meanwhile git can show the submission from where you are.",
+    "text": "Waiting for a review copy ({why}): Combwork tells you when one is ready, with its folder. Meanwhile git can show the submission from where you are.",
     "note": "Start review's reply while no review copy is free yet. {why} is why (copy.inUse.*, copy.refusal.*)."
   },
   "copy.review.workflowOff": {

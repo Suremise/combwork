@@ -1,5 +1,5 @@
 // HI-2285 on the real board (a temp hive.db and repository): the card a lane's builder watches alone, where nothing on it
-// waits on anyone, is the one hive_wait_for_tasks's reply nudges about (idleOwnWatchOf); a question open for the user,
+// waits on anyone, is the one cw_wait_for_tasks's reply nudges about (idleOwnWatchOf); a question open for the user,
 // the card in Review, a watch on more than it, or an agent that isn't the lane's builder: none.
 import { execFileSync } from 'child_process'
 import { mkdirSync, writeFileSync } from 'fs'

@@ -1415,7 +1415,7 @@
     "audience": "both"
   },
   "settings.advanced.hive.console.showText.desc": {
-    "text": "Show the text in the developer console: prompts, replies, commands and tools' arguments, under a banner saying it is unredacted, and start each recording with its text box ticked. Tokens, API keys and sign-in details stay masked whatever this says; agents' hive_console stays redacted, and a recording with text is never attached to Copy Diagnostics.",
+    "text": "Show the text in the developer console: prompts, replies, commands and tools' arguments, under a banner saying it is unredacted, and start each recording with its text box ticked. Tokens, API keys and sign-in details stay masked whatever this says; agents' cw_console stays redacted, and a recording with text is never attached to Copy Diagnostics.",
     "note": "What the advanced setting \"Developer console: show prompt, reply and command text\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
     "audience": "both"
   },
@@ -2155,7 +2155,7 @@
     "audience": "both"
   },
   "settings.advanced.hive.wait.agentsMaxSeconds.desc": {
-    "text": "The longest hive_wait_for_agents waits for agents to finish before it answers. Kept a minute below Codex's hive tool timeout, as card waits are.",
+    "text": "The longest cw_wait_for_agents waits for agents to finish before it answers. Kept a minute below Codex's hive tool timeout, as card waits are.",
     "note": "What the advanced setting \"Agent waits: longest\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
     "audience": "both"
   },
@@ -2165,7 +2165,7 @@
     "audience": "both"
   },
   "settings.advanced.hive.wait.cardMaxSeconds.desc": {
-    "text": "The longest an agent's hive_wait_for_tasks call (without wake) waits before it answers. It has to stay under the CLIs' own tool timeouts, so Combwork keeps it a minute below Codex's hive tool timeout whatever is set here.",
+    "text": "The longest an agent's cw_wait_for_tasks call (without wake) waits before it answers. It has to stay under the CLIs' own tool timeouts, so Combwork keeps it a minute below Codex's hive tool timeout whatever is set here.",
     "note": "What the advanced setting \"Card waits: longest\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
     "audience": "both"
   },
@@ -2342,7 +2342,7 @@
     "note": "A board colour for no column, or not a colour. #rrggbb is the colour's form; {columns} the columns' ids."
   },
   "settings.agent.error.colorsShape": {
-    "text": "{title} takes an object of column → colour, e.g. {example} (columns: {columns}), or null for Hive's.",
+    "text": "{title} takes an object of column → colour, e.g. {example} (columns: {columns}), or null for Combwork's.",
     "note": "Board colours given something other than an object. {example} is JSON and {columns} the columns' ids: code, as written."
   },
   "settings.agent.error.effort": {
@@ -2358,7 +2358,7 @@
     "note": "A fallback list's entry without a value or with a label that isn't text."
   },
   "settings.agent.error.fallbackShape": {
-    "text": "{title} takes a list of {shape}, or null for Hive's list.",
+    "text": "{title} takes a list of {shape}, or null for Combwork's list.",
     "note": "A provider's fallback list given something other than a list. {shape} is an entry's JSON fields: code, as written."
   },
   "settings.agent.error.isAction": {
@@ -2371,11 +2371,11 @@
   },
   "settings.agent.error.notSettable": {
     "text": "{title} isn't a value that can be set this way ({why}): change it in {path}.",
-    "note": "hive_update_setting on a setting with no value the tools set. {why} is settings.agent.error.isAction or why it is read-only; {path} where the user changes it."
+    "note": "cw_update_setting on a setting with no value the tools set. {why} is settings.agent.error.isAction or why it is read-only; {path} where the user changes it."
   },
   "settings.agent.error.notSettableHere": {
     "text": "{title} isn't a value the settings tools set: change it in {path}.",
-    "note": "hive_update_setting on a setting Settings edits with a control of its own that the tools don't set (Accounts & Connections, MCP catalogues, check commands…), neither an action nor read-only (HI-2470). {path} is where the user changes it."
+    "note": "cw_update_setting on a setting Settings edits with a control of its own that the tools don't set (Accounts & Connections, MCP catalogues, check commands…), neither an action nor read-only (HI-2470). {path} is where the user changes it."
   },
   "settings.agent.error.oneLine": {
     "text": "{title} takes one line of text (at most {most} characters).",
@@ -2386,7 +2386,7 @@
     "note": "A model's price missing a field or not a number. input, cachedInput, output and cacheWrite are JSON fields: keep them."
   },
   "settings.agent.error.pricesShape": {
-    "text": "{title} takes an object of model → {shape} in USD per million tokens, or null for Hive's prices.",
+    "text": "{title} takes an object of model → {shape} in USD per million tokens, or null for Combwork's prices.",
     "note": "A provider's prices given something other than an object. {shape} is the JSON fields of a price: code, as written."
   },
   "settings.agent.error.range": {
@@ -2407,135 +2407,135 @@
   },
   "settings.agent.helps.agents.backgroundTaskMinutes": {
     "text": "Agents' background tasks (long test runs) count as finished too soon, or a dev server keeps an agent waiting long after its work is done.",
-    "note": "When the setting agents.backgroundTaskMinutes is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting agents.backgroundTaskMinutes is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.agents.leftoverProcesses": {
     "text": "A folder can't be renamed or deleted (in use), or a port is taken, after its agents have stopped: processes they started are still running.",
-    "note": "When the setting agents.leftoverProcesses is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting agents.leftoverProcesses is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.appearance.terminalFontSize": {
     "text": "The agents' terminals are hard to read, or too little fits.",
-    "note": "When the setting appearance.terminalFontSize is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting appearance.terminalFontSize is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.appearance.uiFontSize": {
     "text": "Menus and panels are hard to read at the current size.",
-    "note": "When the setting appearance.uiFontSize is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting appearance.uiFontSize is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.assistant.compactSuggestTokens": {
     "text": "The Assistant's own conversation gets long and slow: a lower threshold suggests compacting it sooner.",
-    "note": "When the setting assistant.compactSuggestTokens is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting assistant.compactSuggestTokens is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.assistant.panelSide": {
     "text": "Windows notifications or other apps cover the right of the screen.",
-    "note": "When the setting assistant.panelSide is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting assistant.panelSide is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.board.archiveDoneDays": {
     "text": "The Done column has grown long with finished cards.",
-    "note": "When the setting board.archiveDoneDays is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting board.archiveDoneDays is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.general.confirmOnQuit": {
-    "text": "The user quits Hive and stops agents by mistake, or finds the question tiresome.",
-    "note": "When the setting general.confirmOnQuit is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "text": "The user quits Combwork and stops agents by mistake, or finds the question tiresome.",
+    "note": "When the setting general.confirmOnQuit is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.general.dateFormat": {
     "text": "Session names and lists show dates in a format the user finds unfamiliar.",
-    "note": "When the setting general.dateFormat is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting general.dateFormat is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.general.keepAwake": {
     "text": "Long runs stop when the PC sleeps (agents left working while the user is away).",
-    "note": "When the setting general.keepAwake is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting general.keepAwake is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.general.language": {
-    "text": "The user would rather use Hive in another language, or Hive shows a language they did not choose.",
-    "note": "When the setting general.language is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "text": "The user would rather use Combwork in another language, or Combwork shows a language they did not choose.",
+    "note": "When the setting general.language is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.general.progressCommands": {
     "text": "Agents' long commands don't show in the Progress panel, or the user wants them shown only on request.",
-    "note": "When the setting general.progressCommands is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting general.progressCommands is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.general.progressPanel": {
     "text": "Agents run long tests or builds and the user can't see how far along they are.",
-    "note": "When the setting general.progressPanel is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting general.progressPanel is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.general.showTips": {
-    "text": "The user finds the daily tip distracting, or wants to learn what Hive can do.",
-    "note": "When the setting general.showTips is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "text": "The user finds the daily tip distracting, or wants to learn what Combwork can do.",
+    "note": "When the setting general.showTips is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.notifications.chimeEnabled": {
     "text": "The chime distracts the user during focused work, or they miss agents finishing.",
-    "note": "When the setting notifications.chimeEnabled is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting notifications.chimeEnabled is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.notifications.desktopNotifications": {
     "text": "Too many notifications, or agents waiting for the user go unnoticed.",
-    "note": "When the setting notifications.desktopNotifications is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting notifications.desktopNotifications is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.notifications.flashOnWaiting": {
-    "text": "Agents wait for answers while Hive is in the background and nobody notices.",
-    "note": "When the setting notifications.flashOnWaiting is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "text": "Agents wait for answers while Combwork is in the background and nobody notices.",
+    "note": "When the setting notifications.flashOnWaiting is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.notifications.suggestFreshStart": {
     "text": "Long conversations get slower and cost more to carry on; a finished piece of work is the moment to start fresh.",
-    "note": "When the setting notifications.suggestFreshStart is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting notifications.suggestFreshStart is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.notifications.whileFocused": {
-    "text": "Banners interrupt the user while they work in Hive.",
-    "note": "When the setting notifications.whileFocused is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "text": "Banners interrupt the user while they work in Combwork.",
+    "note": "When the setting notifications.whileFocused is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.project.cardAttachmentCleanup": {
     "text": "A project's archived cards keep screenshots and logs that take a lot of disk space: fewer days removes them sooner.",
-    "note": "When the setting project.cardAttachmentCleanup is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting project.cardAttachmentCleanup is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.project.compactSuggestTokens": {
     "text": "One project's conversations run much longer than others'.",
-    "note": "When the setting project.compactSuggestTokens is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting project.compactSuggestTokens is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.project.slotCopy": {
     "text": "New slots and review copies of this project miss git-ignored files its builds need.",
-    "note": "When the setting project.slotCopy is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting project.slotCopy is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.project.transcriptWarnMB": {
     "text": "One project's conversations grow much bigger than others'.",
-    "note": "When the setting project.transcriptWarnMB is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting project.transcriptWarnMB is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.sessions.backupRetention": {
-    "text": "Hive's backups take a lot of disk space for sessions the CLI still has.",
-    "note": "When the setting sessions.backupRetention is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "text": "Combwork's backups take a lot of disk space for sessions the CLI still has.",
+    "note": "When the setting sessions.backupRetention is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.sessions.backupTranscripts": {
     "text": "Old conversations should stay readable after the CLI deletes its transcripts.",
-    "note": "When the setting sessions.backupTranscripts is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting sessions.backupTranscripts is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.sessions.compactSuggestTokens": {
     "text": "Agents work with big contexts for long stretches, so every message costs more: a lower threshold suggests compacting sooner.",
-    "note": "When the setting sessions.compactSuggestTokens is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting sessions.compactSuggestTokens is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.sessions.confirmStop": {
     "text": "Agents get stopped by mistake.",
-    "note": "When the setting sessions.confirmStop is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting sessions.confirmStop is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.sessions.defaultView": {
     "text": "The user runs many agents per project and wants new projects to open on Tiles, a small tile per agent.",
-    "note": "When the setting sessions.defaultView is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting sessions.defaultView is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.sessions.followTranscripts": {
     "text": "The user reads running sessions in the Sessions tab and wants new messages to appear as they come.",
-    "note": "When the setting sessions.followTranscripts is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting sessions.followTranscripts is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.sessions.resumeAfterUnexpectedClose": {
-    "text": "Hive closed unexpectedly and the user wants the agents that were running to carry on by themselves at the next start.",
-    "note": "When the setting sessions.resumeAfterUnexpectedClose is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "text": "Combwork closed unexpectedly and the user wants the agents that were running to carry on by themselves at the next start.",
+    "note": "When the setting sessions.resumeAfterUnexpectedClose is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.sessions.tileOrder": {
     "text": "The user watches many agents in the Tiles view and wants those waiting for them or stalled first, rather than in the panes order.",
-    "note": "When the setting sessions.tileOrder is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting sessions.tileOrder is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.sessions.transcriptWarnMB": {
     "text": "Agents' transcripts grow to tens of MB and typing or the CLI slows down: a lower value flags them sooner, for a handover to a new conversation.",
-    "note": "When the setting sessions.transcriptWarnMB is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting sessions.transcriptWarnMB is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.helps.workflow.git.slotCopy": {
     "text": "New slots and review copies miss git-ignored files such as .env, so agents' builds or tests fail there.",
-    "note": "When the setting workflow.git.slotCopy is worth suggesting: the signal the Assistant looks for (hive_read_setting, the tune-settings skill)."
+    "note": "When the setting workflow.git.slotCopy is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill)."
   },
   "settings.agent.option.automatic": {
     "text": "Automatic",
@@ -2550,7 +2550,7 @@
     "note": "Why the Assistant can't change a keyboard shortcut (#186). {path} is where the user changes them."
   },
   "settings.agent.sensitive.agentApi": {
-    "text": "The Agent API decides what other programs can do through Hive: only the user can change it, in {path}.",
+    "text": "The Agent API decides what other programs can do through Combwork: only the user can change it, in {path}.",
     "note": "Why the Assistant can't change an Agent API setting (#186). {path} is where the user changes it (Settings → …)."
   },
   "settings.agent.sensitive.assistantPermissions": {
@@ -2566,7 +2566,7 @@
     "note": "Why the Assistant can't change Card attachments: more folders (HI-2480): it would widen where it and agents may read files from. {path} is where the user changes it."
   },
   "settings.agent.sensitive.backgroundSessions": {
-    "text": "It lets sessions run out of Hive's reach (Hive can't see or stop them): only the user can change it, in {path}.",
+    "text": "It lets sessions run out of Combwork's reach (Combwork can't see or stop them): only the user can change it, in {path}.",
     "note": "Why the Assistant can't allow background sessions (#186). {path} is where the user changes it."
   },
   "settings.agent.sensitive.commands": {
@@ -2582,15 +2582,15 @@
     "note": "Why the Assistant can't change a permission mode setting (#186). {path} is where the user changes it."
   },
   "settings.agent.sensitive.prerelease": {
-    "text": "It decides which builds of Hive install: only the user can change it, in {path}.",
+    "text": "It decides which builds of Combwork install: only the user can change it, in {path}.",
     "note": "Why the Assistant can't choose pre-release builds (#186). {path} is where the user changes it."
   },
   "settings.agent.sensitive.whatRuns": {
-    "text": "It decides what Hive runs: a CLI and its arguments: only the user can change it, in {path}.",
+    "text": "It decides what Combwork runs: a CLI and its arguments: only the user can change it, in {path}.",
     "note": "Why the Assistant can't change a CLI's path or arguments (#186). {path} is where the user changes it."
   },
   "settings.agent.sensitive.worktreeSetup": {
-    "text": "It is a command Hive runs in every new worktree: only the user can change it, in {path}.",
+    "text": "It is a command Combwork runs in every new worktree: only the user can change it, in {path}.",
     "note": "Why the Assistant can't change a project's worktree setup command (#186). {path} is where the user changes it."
   },
   "settings.agent.takes.aValue": {
@@ -2626,7 +2626,7 @@
     "note": "What the workflow option identity takes. {shape} is the object's JSON form: code."
   },
   "settings.agent.takes.mergeChecks": {
-    "text": "a list of check names the merge queue runs on the merged result when Hive merges, e.g. [\"typecheck\", \"lint\"] (each with its command in project.workflow.commands)",
+    "text": "a list of check names the merge queue runs on the merged result when Combwork merges, e.g. [\"typecheck\", \"lint\"] (each with its command in project.workflow.commands)",
     "note": "What the workflow option mergeChecks takes. The JSON and project.workflow.commands (a setting's id) are code: keep them."
   },
   "settings.agent.takes.okBefore": {
@@ -2663,31 +2663,31 @@
   },
   "settings.agent.tool.more.advancedDesc": {
     "text": "Advanced settings.",
-    "note": "hive_list_settings: what the advanced settings left out are (#367)."
+    "note": "cw_list_settings: what the advanced settings left out are (#367)."
   },
   "settings.agent.tool.more.advancedTitle": {
     "text": "query \"advanced\" lists them",
-    "note": "hive_list_settings: the row that stands for the advanced settings left out of a plain listing (#367). query is the tool's argument."
+    "note": "cw_list_settings: the row that stands for the advanced settings left out of a plain listing (#367). query is the tool's argument."
   },
   "settings.agent.tool.more.value": {
     "text": "{n} more",
-    "note": "hive_list_settings: how many settings a summed-up row stands for. {n} is a number as written."
+    "note": "cw_list_settings: how many settings a summed-up row stands for. {n} is a number as written."
   },
   "settings.agent.tool.more.workflowDesc": {
-    "text": "Hive defaults and the workspace's (Settings → Version Control), per version control (inherit).",
-    "note": "hive_list_settings: what the workflow defaults left out are (#1422)."
+    "text": "Combwork defaults and the workspace's (Settings → Version Control), per version control (inherit).",
+    "note": "cw_list_settings: what the workflow defaults left out are (#1422)."
   },
   "settings.agent.tool.more.workflowTitle": {
     "text": "query \"workflow\" lists them",
-    "note": "hive_list_settings: the row that stands for the workflow defaults left out of a plain listing (#1422). query is the tool's argument."
+    "note": "cw_list_settings: the row that stands for the workflow defaults left out of a plain listing (#1422). query is the tool's argument."
   },
   "settings.agent.tool.noPlatform": {
-    "text": "{project} has no version control recorded yet: its workflow options can be set once Hive has detected it (reopen the project).",
+    "text": "{project} has no version control recorded yet: its workflow options can be set once Combwork has detected it (reopen the project).",
     "note": "A workflow option set on a project whose version control Hive hasn't detected yet. {project} is the project's folder name."
   },
   "settings.agent.tool.noSetting": {
-    "text": "No setting \"{id}\": hive_list_settings lists them (query narrows it).",
-    "note": "hive_read_setting or hive_update_setting naming no setting there is. {id} is the id as given."
+    "text": "No setting \"{id}\": cw_list_settings lists them (query narrows it).",
+    "note": "cw_read_setting or cw_update_setting naming no setting there is. {id} is the id as given."
   },
   "settings.agent.tool.optionsRefused": {
     "text": "These workflow options can't be saved: {problems} Change the other options first, or tell the user.",
@@ -2702,7 +2702,7 @@
     "note": "When a change applies: to the Assistant once it restarts (#676)."
   },
   "settings.agent.tool.restart.hive": {
-    "text": "when Hive restarts (Settings → Advanced offers Restart Hive)",
+    "text": "when Combwork restarts (Settings → Advanced offers Restart Combwork)",
     "note": "When a change applies: once Hive restarts (#676). Restart Hive is the name of the button."
   },
   "settings.agent.tool.restart.sessions": {
@@ -2718,11 +2718,11 @@
     "note": "Switching a project's version control refused (#1419). {error} is why, a sentence."
   },
   "settings.agent.tool.takes.advanced": {
-    "text": "{takes} null: {scope, select, workspace {Settings → Advanced's value} other {Hive's default}}.",
+    "text": "{takes} null: {scope, select, workspace {Settings → Advanced's value} other {Combwork's default}}.",
     "note": "What an advanced setting takes (#367): {takes} is what its value takes; null puts back Settings → Advanced's value (a workspace's own) or Hive's default."
   },
   "settings.agent.tool.takes.colors": {
-    "text": "an object of column → #rrggbb colour (only those it names change), or null for Hive's colours",
+    "text": "an object of column → #rrggbb colour (only those it names change), or null for Combwork's colours",
     "note": "What the board's colours take. #rrggbb is the colour's form."
   },
   "settings.agent.tool.takes.default": {
@@ -2730,7 +2730,7 @@
     "note": "A select setting's empty value, the default. \"\" is the value as written: keep it."
   },
   "settings.agent.tool.takes.fallback": {
-    "text": "the whole list: [{shape}], or null for Hive's list",
+    "text": "the whole list: [{shape}], or null for Combwork's list",
     "note": "What a provider's fallback list takes. {shape} is an entry's JSON fields: code, as written."
   },
   "settings.agent.tool.takes.nothing": {
@@ -2746,7 +2746,7 @@
     "note": "What a select setting takes. {choices} lists its values as written, the empty one as settings.agent.tool.takes.default."
   },
   "settings.agent.tool.takes.prices": {
-    "text": "the whole table: an object of model → {shape} (USD per million tokens), or null for Hive's prices",
+    "text": "the whole table: an object of model → {shape} (USD per million tokens), or null for Combwork's prices",
     "note": "What a provider's prices take. {shape} is a price's JSON fields: code, as written."
   },
   "settings.agent.tool.takes.slotCopy": {
@@ -2770,11 +2770,11 @@
     "note": "A text setting with no text."
   },
   "settings.agent.value.hiveList": {
-    "text": "(Hive's list)",
+    "text": "(Combwork's list)",
     "note": "A fallback list left empty: Hive's own list applies."
   },
   "settings.agent.value.hivePrice": {
-    "text": "Hive's price",
+    "text": "Combwork's price",
     "note": "A change to a provider's prices: a shipped model at Hive's own price (not removed)."
   },
   "settings.agent.value.none": {
@@ -2898,8 +2898,8 @@
     "audience": "both"
   },
   "settings.agentApi.token.tip": {
-    "text": "Stored in %APPDATA%\\Combwork\\agent-api.json, for your own scripts. Agents never get it: each session gets a token of its own, in the file that HIVE_API_TOKEN_FILE names.",
-    "note": "The info tip of the setting \"Access token\" (Settings → Agent API): more on what it does and when it applies. HIVE_API_TOKEN_FILE is an environment variable name: keep it as it is.",
+    "text": "Stored in %APPDATA%\\Combwork\\agent-api.json, for your own scripts. Agents never get it: each session gets a token of its own, in the file that CW_API_TOKEN_FILE names.",
+    "note": "The info tip of the setting \"Access token\" (Settings → Agent API): more on what it does and when it applies. CW_API_TOKEN_FILE is an environment variable name: keep it as it is.",
     "audience": "both"
   },
   "settings.agentApi.token.title": {

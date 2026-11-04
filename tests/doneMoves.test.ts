@@ -68,7 +68,7 @@ const row = (w: WS, card: number) => store.workspaceDb(w.path!).reader.prepare('
 const setRow = (w: WS, card: number, sql: string) => inWorkspace(w, () => store.boardWrite(w, async () => store.boardWriteOp(w, (db) => db.prepare(`UPDATE cards SET ${sql} WHERE number = ?`).run(card))))
 
 /**
- * HI-1151's start on rc.1: a card from before 1.0 (marked `pre_workflow`), started by its builder's hive_start_card (an
+ * HI-1151's start on rc.1: a card from before 1.0 (marked `pre_workflow`), started by its builder's cw_start_card (an
  * intent, so the runtime's write, not P3's recorder), then its builder's question (no change, how to close it?).
  */
 async function startedOld(w: WS): Promise<{ card: number; request: string }> {

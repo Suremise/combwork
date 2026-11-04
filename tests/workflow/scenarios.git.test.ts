@@ -871,7 +871,7 @@ describe('a pass covers only the revision submitted; a stale pass says so (HI-17
     moved(await e.wf.loopStep(card.key, R1, 'ok', 'Checked', { ...reviewer, design: (posted as { data?: Record<string, unknown> }).data?.design as string }))
     const r = refusedBy(await e.wf.verdict(card.key, R1, { pass: true, comment: 'good' }), 'review.headMoved')
     expect(r.message).toBe(`${card.key}'s line has moved since it was submitted: it was submitted at ${submitted.slice(0, 7)}, and its head is now ${now.slice(0, 7)}, a different change. A pass covers only the revision submitted.`)
-    expect(r.next).toBe(`A commit you asked for: ask its builder to submit ${now.slice(0, 7)} as a follow-up (hive_request_builder), which keeps it in Review with no round counted, then start your review again. Otherwise give a failing verdict saying so (hive_verdict, pass: false), and its builder submits it as the next round.`)
+    expect(r.next).toBe(`A commit you asked for: ask its builder to submit ${now.slice(0, 7)} as a follow-up (cw_request_builder), which keeps it in Review with no round counted, then start your review again. Otherwise give a failing verdict saying so (cw_verdict, pass: false), and its builder submits it as the next round.`)
     // Nothing silent: still in Review, no pass, no Stale, nothing queued.
     expect(e.wf.state(card)).toMatchObject({ stage: 'review', stale: null, verdicts: [] })
     expect(await e.queue().runOnce('main')).toBeNull()
@@ -906,7 +906,7 @@ describe('a pass covers only the revision submitted; a stale pass says so (HI-17
     const s = e.wf.state(card)
     expect(s).toMatchObject({ stage: 'approved', stale: { approved: passed, current: now, why: 'change' } })
     expect(s.staleSince).toBeTruthy()
-    expect(e.wakes.some((w) => w.agent === 'B1' && w.why === `${card.key}: its pass is stale: it is for ${passed.slice(0, 7)}, but its line is at ${now.slice(0, 7)} (changed since). Submit ${now.slice(0, 7)} for review (hive_submit). Or put its branch back at ${passed.slice(0, 7)}.`)).toBe(true)
+    expect(e.wakes.some((w) => w.agent === 'B1' && w.why === `${card.key}: its pass is stale: it is for ${passed.slice(0, 7)}, but its line is at ${now.slice(0, 7)} (changed since). Submit ${now.slice(0, 7)} for review (cw_submit). Or put its branch back at ${passed.slice(0, 7)}.`)).toBe(true)
     expect(e.wf.queueLineOf(card.key)).toContain(`Its pass is for ${passed.slice(0, 7)}, but its line is at ${now.slice(0, 7)}`)
     expect(refusedBy(await e.wf.reportMerge(card.key, B1), 'merge.hiveMerges').next).toBe(`Its pass is stale: its line changed since it passed review (it is at ${now.slice(0, 7)}). Submit it again for review; it is queued once it passes again.`)
     expect(await e.queue().runOnce('main')).toBeNull()

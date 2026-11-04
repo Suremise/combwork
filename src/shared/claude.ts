@@ -48,12 +48,12 @@ const M = {
   bypassPermissionsDescription: agentMsg({ id: 'mode.claude.bypassPermissions.desc', text: 'Never asks and allows everything — any edit, command or network call. Use only in disposable environments.', note: "What Claude Code's permission mode bypassPermissions does, as agents and the Agent API read it (the window has its own message)." }),
   autoUnsupported: agentMsg({
     id: 'mode.claude.autoUnsupported',
-    text: "Claude Code doesn't offer Auto with {model}: it runs in Manual instead (asking before edits and commands), and Hive shows that mode.",
+    text: "Claude Code doesn't offer Auto with {model}: it runs in Manual instead (asking before edits and commands), and Combwork shows that mode.",
     note: "Claude Code said it won't run this model (model: its name) in Auto (its initialize reply, #129). Auto and Manual are the modes' names."
   }),
   autoMaybe: agentMsg({
     id: 'mode.claude.autoMaybe',
-    text: "Claude Code may not offer Auto with {model}. If it doesn't, it runs in Manual (asking before edits and commands), and Hive shows that mode.",
+    text: "Claude Code may not offer Auto with {model}. If it doesn't, it runs in Manual (asking before edits and commands), and Combwork shows that mode.",
     note: "Without Claude Code's word on this model (model: its name), the guess from 2.1.286: Haiku doesn't run in Auto. Auto and Manual are the modes' names."
   })
 }
@@ -370,7 +370,7 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
   installNote:
     'The installer runs `irm https://claude.ai/install.ps1 | iex` in PowerShell and installs to `%USERPROFILE%\\.local\\bin`. After installing, sign in with your Claude account (Pro, Max, Team or Enterprise) or an Anthropic Console account. If the CLI is installed somewhere else, set its path in Settings → Claude Code.', // i18n-ignore: English, as main's notices use it (text has the window's)
   extensionNote:
-    "You have the Claude Code extension for VS Code (or a similar editor). Hive doesn't use it — the extension's built-in copy moves with every extension update and can't be updated on its own. Install the CLI; your extension keeps working as before.", // i18n-ignore: English, as main's notices use it (text has the window's)
+    "You have the Claude Code extension for VS Code (or a similar editor). Combwork doesn't use it — the extension's built-in copy moves with every extension update and can't be updated on its own. Install the CLI; your extension keeps working as before.", // i18n-ignore: English, as main's notices use it (text has the window's)
   signInHelp: 'Type /login in one of its agents’ terminals (that agent then carries on by itself), or use Help → Provider Setup → Claude Code → Sign in.', // i18n-ignore: English for main's notices (text has the window's)
   safeguardHelp: 'In its terminal: /feedback reports a false positive, /model switches back, and /config sets whether it switches models by itself when a message is flagged.', // i18n-ignore: English, the same as its message (text has it: a card comment stores the message, #866)
   text: {

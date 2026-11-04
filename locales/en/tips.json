@@ -708,7 +708,7 @@
     "description": "A tip's title."
   },
   "tips.consoleText.text": {
-    "defaultMessage": "Settings → Advanced → Developer console: show prompt, reply and command text shows them in the developer console, under a banner saying so, and ticks text for new recordings. Tokens and sign-ins stay masked, and agents' hive_console stays redacted.",
+    "defaultMessage": "Settings → Advanced → Developer console: show prompt, reply and command text shows them in the developer console, under a banner saying so, and ticks text for new recordings. Tokens and sign-ins stay masked, and agents' cw_console stays redacted.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.consoleText.title": {

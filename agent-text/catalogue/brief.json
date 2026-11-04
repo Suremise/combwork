@@ -1,10 +1,10 @@
 {
   "brief.lane.builder": {
-    "text": "You are the builder of a lane in {project} that the user started: use the card-loop skill as the builder{reviewer, select, agent {, with {reviewerName} as the reviewer} pool {, reviewed by the pool ({pool}): Hive gives each card you submit to a free reviewer of it, and its lane is registered already, so give hive_lane no reviewer} other {, with no reviewer}}; rounds: {rounds}.",
+    "text": "You are the builder of a lane in {project} that the user started: use the card-loop skill as the builder{reviewer, select, agent {, with {reviewerName} as the reviewer} pool {, reviewed by the pool ({pool}): Combwork gives each card you submit to a free reviewer of it, and its lane is registered already, so give cw_lane no reviewer} other {, with no reviewer}}; rounds: {rounds}.",
     "note": "#1280: the builder's brief's first line. reviewer: agent (reviewerName reviews), pool (#1443: the project's reviewer pool, its agents joined, or brief.lane.poolEmpty) or none."
   },
   "brief.lane.builderMoves": {
-    "text": "Ask Hive for your next card with hive_lane next. Move cards by what you did: hive_start_card, hive_submit with a summary, and hive_report_merge after a merge. A refused move says what to do next; do that. Questions for the user go through hive_ask_user, requests for the Hive Assistant through hive_ask_assistant, reports as comments on the card.",
+    "text": "Ask Combwork for your next card with cw_lane next. Move cards by what you did: cw_start_card, cw_submit with a summary, and cw_report_merge after a merge. A refused move says what to do next; do that. Questions for the user go through cw_ask_user, requests for the Assistant through cw_ask_assistant, reports as comments on the card.",
     "note": "How the builder moves cards and asks: the intents, and where questions go."
   },
   "brief.lane.cards": {
@@ -24,7 +24,7 @@
     "note": "#1280: the reviewer's brief's first line."
   },
   "brief.lane.reviewerMoves": {
-    "text": "Wait for each card in Review, then hive_start_review and hive_verdict on the revision it names. Questions for the builder go through hive_request_builder, for the user through hive_ask_user, for the Hive Assistant through hive_ask_assistant.",
+    "text": "Wait for each card in Review, then cw_start_review and cw_verdict on the revision it names. Questions for the builder go through cw_request_builder, for the user through cw_ask_user, for the Assistant through cw_ask_assistant.",
     "note": "How the reviewer reviews and asks."
   },
   "brief.lane.rules": {
@@ -32,7 +32,7 @@
     "note": "Above the project's rules (brief.rule.*), a line each."
   },
   "brief.lane.where": {
-    "text": "{place, select, slot {{builder} works in {slot}, a new branch per card (Hive makes each card's branch there from the target and gives the card to {builder} there)} folder {{builder} works in {folder}{hasBranch, select, yes { (branch {branch})} other {}}} other {{builder} works in the project folder}}{hasTarget, select, yes {; work goes to {target}} other {}}.",
+    "text": "{place, select, slot {{builder} works in {slot}, a new branch per card (Combwork makes each card's branch there from the target and gives the card to {builder} there)} folder {{builder} works in {folder}{hasBranch, select, yes { (branch {branch})} other {}}} other {{builder} works in the project folder}}{hasTarget, select, yes {; work goes to {target}} other {}}.",
     "note": "#1438: where the builder works: its slot (a new branch per card), its folder (and branch), or the project folder; and the target its work goes to."
   },
   "brief.record.brief": {
@@ -40,7 +40,7 @@
     "note": "A lane's brief as its builder reads it (with each card in slots, or delivered): who started the lane (from: the lane's startedBy), then the brief as it was written (text)."
   },
   "brief.record.byHive": {
-    "text": "{agent} is running, so Hive left it as it is: Hive gives it the lane's first card itself once it is free, so don't prompt it.",
+    "text": "{agent} is running, so Combwork left it as it is: Combwork gives it the lane's first card itself once it is free, so don't prompt it.",
     "note": "HI-2029: a running builder, the rules on: Hive gives it the lane's first card once it is free, so the caller is told not to prompt it (that would race Hive's start)."
   },
   "brief.record.cleared": {
@@ -48,7 +48,7 @@
     "note": "The lane change's reply: the lane's brief was cleared."
   },
   "brief.record.deferred": {
-    "text": "{agent} wasn't free: Hive gives it the lane in a new conversation once it is, so don't prompt it.",
+    "text": "{agent} wasn't free: Combwork gives it the lane in a new conversation once it is, so don't prompt it.",
     "note": "HI-2034: an agent not free yet is owed its new conversation, given once it is free."
   },
   "brief.record.delivered": {
@@ -80,7 +80,7 @@
     "note": "The stopped agents started with their brief (agents: their names, joined \"a and b\"); slot: the slot the builder works in, when the project has slots."
   },
   "brief.record.tell": {
-    "text": "{agents} {count, plural, one {is running, so Hive left it as it is: tell it about the lane.} other {are running, so Hive left them as they are: tell them about the lane.}}",
+    "text": "{agents} {count, plural, one {is running, so Combwork left it as it is: tell it about the lane.} other {are running, so Combwork left them as they are: tell them about the lane.}}",
     "note": "A running reviewer, or the builder with the rules off: left as they are, for the caller to tell. agents: their names, joined (\"a and b\")."
   },
   "brief.rule.finish.accept": {
@@ -88,7 +88,7 @@
     "note": "Finish: accepted where it is."
   },
   "brief.rule.finish.agentMerges": {
-    "text": "The builder merges each approved card (merge-ready), then reports it with hive_report_merge; Hive checks it is in.",
+    "text": "The builder merges each approved card (merge-ready), then reports it with cw_report_merge; Combwork checks it is in.",
     "note": "Finish: the builder merges."
   },
   "brief.rule.finish.committed": {
@@ -96,27 +96,27 @@
     "note": "Finish: committed is done."
   },
   "brief.rule.finish.hiveMerges": {
-    "text": "Hive merges each approved card.",
+    "text": "Combwork merges each approved card.",
     "note": "Finish: Hive merges."
   },
   "brief.rule.finish.notChecked": {
-    "text": "Hive does not check merges: report each one with hive_report_merge.",
+    "text": "Combwork does not check merges: report each one with cw_report_merge.",
     "note": "Finish: merges aren't checked."
   },
   "brief.rule.off": {
-    "text": "Workflow rules are off in this project: the cards move as you put them (hive_update_task).",
+    "text": "Workflow rules are off in this project: the cards move as you put them (cw_update_task).",
     "note": "The only rule while workflow rules are off."
   },
   "brief.rule.okBefore.every": {
-    "text": "Every card waits for the user's OK before it is merged (Hive asks them).",
+    "text": "Every card waits for the user's OK before it is merged (Combwork asks them).",
     "note": "The user's OK before every merge."
   },
   "brief.rule.okBefore.labels": {
-    "text": "Cards labelled {labels} wait for the user's OK before they are merged (Hive asks them).",
+    "text": "Cards labelled {labels} wait for the user's OK before they are merged (Combwork asks them).",
     "note": "The user's OK before merging cards with these labels, joined (\"ui and api\")."
   },
   "brief.rule.preChecks": {
-    "text": "Checks that pass before review: {checks}. Run each as `hive-progress --check <name> --card \"<key>\"` before submitting.",
+    "text": "Checks that pass before review: {checks}. Run each as `cw-progress --check <name> --card \"<key>\"` before submitting.",
     "note": "The checks the project runs before review, by name, joined (\"typecheck and lint\")."
   },
   "brief.rule.review.agent": {
@@ -140,7 +140,7 @@
     "note": "The lane change's reply: the lane's builder wasn't running, and starting it failed (error: why)."
   },
   "brief.start.builderPrompt": {
-    "text": "Use card-loop as the builder of lane {lane}: hive_lane next names your card.",
+    "text": "Use card-loop as the builder of lane {lane}: cw_lane next names your card.",
     "note": "HR2's HI-1900 round 1: a running lane updated while its builder isn't running starts it with one line naming its lane, as coordinate-agents had the Assistant do."
   },
   "brief.start.builderStarted": {
@@ -152,7 +152,7 @@
     "note": "Who started a lane from the window, as the lane records it: its brief says \"from the user\" to the builder. Stored, so the Default's."
   },
   "brief.start.firstCard": {
-    "text": "Hive started this card for you: it is your lane's first card. Use card-loop as its builder (hive_lane next names your cards).",
+    "text": "Combwork started this card for you: it is your lane's first card. Use card-loop as its builder (cw_lane next names your cards).",
     "note": "HI-2029: with the rules on, Hive starts a lane's first card on its builder itself. The note of the card's start prompt."
   },
   "brief.start.fromUser": {
@@ -160,7 +160,7 @@
     "note": "Who a lane's brief is from, as the delivery records it and its agent's inbox names its sender. Stored, so the Default's."
   },
   "brief.start.nextCard": {
-    "text": "Hive started this card for you: it is your lane's next card, after {card} went Done.",
+    "text": "Combwork started this card for you: it is your lane's next card, after {card} went Done.",
     "note": "Hive starts a lane's next card on its builder once the one before it is Done. The note of the card's start prompt."
   },
   "brief.start.notGiven": {

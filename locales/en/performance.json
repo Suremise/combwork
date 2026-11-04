@@ -1669,7 +1669,7 @@
   },
   "performance.tools.tool": {
     "defaultMessage": "Tool",
-    "description": "Column header of the Hive tools table: the tool's name (such as hive_read_task)."
+    "description": "Column header of the Hive tools table: the tool's name (such as cw_read_task)."
   },
   "performance.trend.detail": {
     "defaultMessage": "{requests, plural, one {# request} other {# requests}}{failed, plural, =0 {} other {, # failed{cancelled, plural, =0 {} other { ({cancelled, number} cancelled)}}}} · {toolCalls, plural, one {# tool call} other {# tool calls}} ({chars, number} characters) · {launches, plural, one {# launch} other {# launches}}{partial, select, yes { · recorded for {duration} of it} other {}}",

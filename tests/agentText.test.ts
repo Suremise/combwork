@@ -153,14 +153,14 @@ describe('say', () => {
 })
 
 describe("hive-mcp.js and hive-progress.js's dialect file", () => {
-  it('reads the overrides from HIVE_DIALECT_FILE, and speaks the Default without one or with one it cannot read', () => {
+  it('reads the overrides from CW_DIALECT_FILE, and speaks the Default without one or with one it cannot read', () => {
     const dir = tempDir('agent-text-dialect-')
     const file = join(dir, 'dialect.json')
     writeFileSync(file, JSON.stringify({ texts: { 'contract.docs.outline': 'Read big docs by section.', bad: 3 }, files: ['claude-code/cli.json'] }))
-    const loaded = loadProcessDialect({ HIVE_DIALECT_FILE: file, HIVE_DIALECT: 'abc123' })
+    const loaded = loadProcessDialect({ CW_DIALECT_FILE: file, CW_DIALECT: 'abc123' })
     expect(loaded).toEqual({ texts: { 'contract.docs.outline': 'Read big docs by section.' }, files: ['claude-code/cli.json'], hash: 'abc123' })
     expect(hiveInstructions('web').split('\n')[2]).toBe('Read big docs by section.')
-    expect(loadProcessDialect({ HIVE_DIALECT_FILE: join(dir, 'missing.json') })).toBeNull()
+    expect(loadProcessDialect({ CW_DIALECT_FILE: join(dir, 'missing.json') })).toBeNull()
     expect(hiveInstructions('web').split('\n')[2]).toMatch(/^Markdown over about 20 KB/)
     expect(loadProcessDialect({})).toBeNull()
     for (const raw of ['not json', '[]', '{"texts": []}', '{"files": []}']) expect(chainFromFile(raw), raw).toBeNull()
@@ -185,7 +185,7 @@ describe('the catalogue', () => {
 
 describe('the canary dialect over the session contract (card 1)', () => {
   const ids = new Set(Object.keys(catalogue))
-  const SKILLS = ['work-on-card', 'review-agent-work', 'card-loop', 'generalist', 'handover', 'pick-up', 'workspace-note', 'merge-ready', 'split-work', 'use-hive-api']
+  const SKILLS = ['work-on-card', 'review-agent-work', 'card-loop', 'generalist', 'handover', 'pick-up', 'workspace-note', 'merge-ready', 'split-work', 'use-cw-api']
   /** Every variant of the contract's text, each with the values a test passed in it (names, paths). */
   function contractTexts(): { name: string; text: string; values: string[] }[] {
     const out: { name: string; text: string; values: string[] }[] = []
@@ -228,7 +228,7 @@ describe('the canary dialect over the session contract (card 1)', () => {
 describe('the canary dialect over wakes, doorbells and the inbox (card 4, HI-2437)', () => {
   const ids = new Set(Object.keys(catalogue))
   /** Protocol, outside the catalogue: Hive's fixed prefixes, and the user's name when they set none. */
-  const PROTOCOL = ['[Hive]', 'New in your inbox:', 'User']
+  const PROTOCOL = ['[CW]', 'New in your inbox:', 'User']
   const NAMES = ['Codex', 'Claudette', 'Reviewer', 'Builder', 'Sam', 'Fix the parser', 'needs logs', 'Round one failed', 'design text', 'waiting on the API']
   type Said = { name: string; text: string; values?: string[] }
   const change = (n: number, over: Partial<CardChange> = {}): CardChange => ({ number: n, column: 'review', changes: ['column'], by: 'Codex', comment: null, ...over })
@@ -343,7 +343,7 @@ describe('the canary dialect over wakes, doorbells and the inbox (card 4, HI-243
 
   it('prints counts as the code did, with no thousands separators (no ICU #)', () => {
     const events = (n: number): NoticeItem[] => Array.from({ length: n }, (_, i) => ({ id: `m${i + 1}`, kind: 'card-event' }))
-    expect(inboxNotice('doorbell', events(1500))).toMatch(/^\[Hive\] New in your inbox: 1500 card events \(m1, /)
+    expect(inboxNotice('doorbell', events(1500))).toMatch(/^\[CW\] New in your inbox: 1500 card events \(m1, /)
     expect(unwatchedLanesNotice(Array.from({ length: 1200 }, () => '🐝'))).toContain('(1200 lanes)')
     expect(wakeLine(change(1), 1200)).toContain(' (and 1200 more watched cards changed)')
   })
@@ -351,18 +351,18 @@ describe('the canary dialect over wakes, doorbells and the inbox (card 4, HI-243
   it('says a wake in the dialect of the session it is for', () => {
     setChainResolver((scope) => (scope.kind === 'session' && scope.session.agentId === 'a2' ? chain({ 'wake.card.ended': '. Watch over.', 'doorbell.notice.doorbell': '{what}: read {n, plural, one {it} other {them}}.' }) : null))
     const line = (agentId: string): string => inDialectOf({ projectPath: 'C:/ws/p', agentId }, () => wakeLine(change(1)))
-    expect(line('a1')).toBe('[Hive] #1 is in Review. Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).')
-    expect(line('a2')).toBe('[Hive] #1 is in Review. Watch over.')
+    expect(line('a1')).toBe('[CW] #1 is in Review. Your card watch has ended: carry on (cw_read_task with latestComment for the comment in full).')
+    expect(line('a2')).toBe('[CW] #1 is in Review. Watch over.')
     // The doorbell's fixed opening stays, so isDoorbell still finds it.
     const bell = inDialectOf({ projectPath: 'C:/ws/p', agentId: 'a2' }, () => inboxNotice('doorbell', [{ id: 'm1', kind: 'task' }]))
-    expect(bell).toBe('[Hive] New in your inbox: 1 task (m1): read it.')
+    expect(bell).toBe('[CW] New in your inbox: 1 task (m1): read it.')
     expect(isDoorbell(bell)).toBe(true)
   })
 })
 
 describe("the canary dialect over the inbox's, lane, agent and usage watches' and Hive's notices' builders (card 4)", () => {
   const ids = new Set(Object.keys(catalogue))
-  const PROTOCOL = ['[Hive]', 'New in your inbox:', 'User']
+  const PROTOCOL = ['[CW]', 'New in your inbox:', 'User']
   const VALUES = ['HB1', 'HB2', 'alpha', 'Ship it', 'Yes', 'hello', 'Anthropic', 'greet', 'l-1', '1.0.0', '1.0.1', 'UTC', 'nope', 'x']
   const ms = Array.from({ length: 30 }, (_, i) => `m${i + 1}`)
   const record = (n: number, over: Partial<DeliveryRecord> = {}): DeliveryRecord => ({ id: `m${n}`, seq: n, agentId: 'a1', conversation: null, kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, card: 7, body: 'hello', state: 'offered', created: '2026-11-03T10:00:00.000Z', expires: '2026-11-04T10:00:00.000Z', ...over })

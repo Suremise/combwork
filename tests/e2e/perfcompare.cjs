@@ -124,7 +124,7 @@ const check = (name, ok, extra = '') => {
     // The Assistant's launch and its tool list: no workflow role (HI-2049).
     const guidance = [{ provider: 'claude-code', role: 'assistant', workflow: 'none', launches: 1, guidanceBytes: 4000, customBytes: 0, roleBytes: 500, modeBytes: 300, skillCatalogBytes: 200 }]
     const catalog = [{ role: 'assistant', workflow: 'none', starts: 1, tools: 40, toolsBytes: 20100, toolsChars: 20000, charStarts: 1 }]
-    const workspace = { api: [{ route: '/v1/tasks', method: 'GET', role: 'api', outcome: 'ok', count: requests, requestBytes: requests * 10, responseBytes: requests * 100 }], mcp: [{ tool: 'hive_list_tasks', role: 'assistant', mode: 'compact', outcome: 'ok', count: 2, chars }], guidance, catalog }
+    const workspace = { api: [{ route: '/v1/tasks', method: 'GET', role: 'api', outcome: 'ok', count: requests, requestBytes: requests * 10, responseBytes: requests * 100 }], mcp: [{ tool: 'cw_list_tasks', role: 'assistant', mode: 'compact', outcome: 'ok', count: 2, chars }], guidance, catalog }
     fs.writeFileSync(file, JSON.stringify({ schema: 'hive-metrics/1', app: { version: '0.0.0' }, exportedAt: to, report: { scope: { kind: 'workspace' }, from, to, filters: { own: true }, coverage: { observedMs: 3_600_000, rangeMs: 86_400_000 }, projects: {}, workspace } }))
     return file
   }

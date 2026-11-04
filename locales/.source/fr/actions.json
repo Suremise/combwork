@@ -61,7 +61,7 @@
   "actions.mcp.add": "Add",
   "actions.mcp.addFailed": "Could not add the server",
   "actions.mcp.addTitle": "Add MCP Server from File",
-  "actions.mcp.badName": "Use letters, numbers, \"-\" and \"_\". \"hive\" is reserved.",
+  "actions.mcp.badName": "Use letters, numbers, \"-\" and \"_\". \"combwork\" and \"hive\" are reserved.",
   "actions.mcp.copied": "Copied {names} to the workspace",
   "actions.mcp.copyFailed": "Could not copy MCP servers",
   "actions.mcp.deleteAdded": "{where}: deleting it removes it there too.",

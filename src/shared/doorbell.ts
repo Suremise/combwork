@@ -3,9 +3,10 @@
  * notice in a hook's reply while it works (a checkpoint, after a tool call), one before its turn ends (the Stop drain), or
  * a short line typed into an idle agent (the doorbell). Each is Hive's own fixed wording with counts by kind, card
  * numbers and delivery ids, never a delivery's body, a sender's name or anything a person or an agent wrote: those are
- * fetched with hive_inbox, labelled with their sender, as data. Codex takes hook context as developer messages, so this
+ * fetched with cw_inbox, labelled with their sender, as data. Codex takes hook context as developer messages, so this
  * text must stay code-owned. No imports beyond shared types: hive-mcp.js runs outside the app bundle.
  */
+import { currentToolName, TOOLS_SERVER } from './assistantTools'
 import type { DeliveryKind } from './deliveries'
 import { cardRef } from './projectKeys'
 import { agentList, agentMsg, say } from './agentText'
@@ -20,9 +21,27 @@ export interface NoticeItem {
   card?: number
 }
 
-/** Hive's notices begin with this, as its other lines do. */
-// agent-protocol: the fixed prefix of Hive's lines, which agents and code tell them by
-export const NOTICE_PREFIX = '[Hive] '
+/** Combwork's notices begin with this, as its other lines do ("[Hive] " before HI-2463: LEGACY_NOTICE_PREFIX). */
+// agent-protocol: the fixed prefix of Combwork's lines, which agents and code tell them by
+export const NOTICE_PREFIX = '[CW] '
+
+/** The prefix before HI-2463, still read from stored lines written then (a fired watch's pending line). */
+export const LEGACY_NOTICE_PREFIX = '[Hive] '
+
+/** A line's leading prefix as it is now ("[Hive] " written before HI-2463): nothing after it changes. */
+export const currentPrefix = (text: string): string => (text.startsWith(LEGACY_NOTICE_PREFIX) ? NOTICE_PREFIX + text.slice(LEGACY_NOTICE_PREFIX.length) : text)
+
+/**
+ * A line or message Combwork itself wrote before HI-2463, as it is said now: the prefix, its tools' names (hive_x →
+ * cw_x, mcp__hive__ → mcp__combwork__) and hive-progress → cw-progress. Only for Combwork's own pending protocol text
+ * (a fired watch's line, an unread inbox message from Combwork): never a user's or agent's words, nor stored history.
+ */
+export function currentProtocolText(text: string): string {
+  return currentPrefix(text)
+    .replace(/mcp__hive__hive_(\w+)/g, (_, t: string) => `mcp__${TOOLS_SERVER}__${currentToolName(`hive_${t}`)}`)
+    .replace(/\bhive_[a-z_]+\b/g, (t) => currentToolName(t))
+    .replace(/\bhive-progress\b/g, 'cw-progress')
+}
 /**
  * What the doorbell and the checkpoint's notice say first, after the prefix: fixed, outside the catalogue (dialects,
  * HI-2437), since code finds the doorbell by it (isDoorbell: a prompt typed into an idle agent), as does the session
@@ -44,22 +63,22 @@ const T = {
   idsMore: agentMsg({ id: 'doorbell.ids.more', text: '{ids} and {more} more', note: 'Delivery ids in a notice past the first 20: the first 20 ("m1, m2"), then how many more.' }),
   checkpoint: agentMsg({
     id: 'doorbell.notice.checkpoint',
-    text: '{what}. Call hive_inbox now to read {n, plural, one {it} other {them}}{ack, select, yes {; act on {n, plural, one {it} other {them}} and ack {n, plural, one {it} other {them}}} other {}}, then carry on.',
+    text: '{what}. Call cw_inbox now to read {n, plural, one {it} other {them}}{ack, select, yes {; act on {n, plural, one {it} other {them}} and ack {n, plural, one {it} other {them}}} other {}}, then carry on.',
     note: 'After the fixed "[Hive] New in your inbox: ", in a hook\'s reply after a tool call while the agent works. what: the counts by kind with their ids ("1 task (m12)"); n: how many; ack: yes when one needs acking (#903, #1530).'
   }),
   drain: agentMsg({
     id: 'doorbell.notice.drain',
-    text: 'Before you finish: your inbox has {what} you haven\'t read. Call hive_inbox{ack, select, yes {, act on {n, plural, one {it} other {them}} and ack {n, plural, one {it} other {them}}} other { and act on {n, plural, one {it} other {them}}}} before you end your turn.',
+    text: 'Before you finish: your inbox has {what} you haven\'t read. Call cw_inbox{ack, select, yes {, act on {n, plural, one {it} other {them}} and ack {n, plural, one {it} other {them}}} other { and act on {n, plural, one {it} other {them}}}} before you end your turn.',
     note: 'After "[Hive] ", as the agent\'s turn ends with its inbox unread (the Stop drain). what: the counts by kind with their ids; n: how many; ack: yes when one needs acking (#903, #1530).'
   }),
   doorbell: agentMsg({
     id: 'doorbell.notice.doorbell',
-    text: '{what}. Call hive_inbox to read {n, plural, one {it} other {them}}{ack, select, yes {, act on {n, plural, one {it} other {them}}, then ack {n, plural, one {it} other {them}}} other {}}.',
+    text: '{what}. Call cw_inbox to read {n, plural, one {it} other {them}}{ack, select, yes {, act on {n, plural, one {it} other {them}}, then ack {n, plural, one {it} other {them}}} other {}}.',
     note: 'The doorbell, after the fixed "[Hive] New in your inbox: ": one line typed into an idle agent as its prompt. what: the counts by kind with their ids ("1 task (m12)"); n: how many; ack: yes when one needs acking (#903, #1530).'
   }),
   lanes: agentMsg({
     id: 'doorbell.notice.lanesUnwatched',
-    text: 'Lanes are running ({shown}) and nothing will wake you about them: watch the lanes (hive_wait_for_tasks with lanes ["all"], wake) before you finish.',
+    text: 'Lanes are running ({shown}) and nothing will wake you about them: watch the lanes (cw_wait_for_tasks with lanes ["all"], wake) before you finish.',
     note: "After \"[Hive] \": the Assistant's notice as its turn ends with lanes running and no watch on them (HI-2069). shown: the builders' names (\"HB1, HB2 and 3 more\"), or how many lanes (lanesCount)."
   }),
   namesMore: agentMsg({ id: 'doorbell.lanes.namesMore', text: '{names} and {more} more', note: "The lanes' builders past the first 10, in the unwatched lanes notice: the first 10 (\"HB1, HB2\"), then how many more." }),

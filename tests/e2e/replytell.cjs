@@ -1,5 +1,5 @@
 // The user's replies to agents told to the Assistant (#418), on fake Claude Code sessions (fake-claude/): the Assistant
-// watches a card (hive_wait_for_tasks with wake); the user answers the card's agent by typing in its pane, and the
+// watches a card (cw_wait_for_tasks with wake); the user answers the card's agent by typing in its pane, and the
 // Assistant is woken once with the reply's first line. Not for keystrokes without Enter, nor for a line Hive types into
 // the agent, nor for a turn its CLI starts by itself after the user's Enter (HI-2410: a background task's end), nor with Settings → Assistant → Tell the Assistant when I reply to an agent off. Dev build, throwaway
 // profile, workspace and CLAUDE_CONFIG_DIR.
@@ -83,7 +83,7 @@ const check = (name, ok, extra = '') => {
   await inv('session:start', home, { agentId: 'assistant' })
   check('both start', !!(await until(async () => (await idle(alpha, builder.id)) && (await idle(home, 'assistant')), HUNG_MS)))
   const watchCard = async () => {
-    await type(home, 'assistant', `hive hive_wait_for_tasks {"cards":[${card}],"column":"review","wake":true}`)
+    await type(home, 'assistant', `hive cw_wait_for_tasks {"cards":[${card}],"column":"review","wake":true}`)
     return until(async () => (await live(home, 'assistant'))?.status === 'watching', 15000)
   }
 
@@ -97,11 +97,11 @@ const check = (name, ok, extra = '') => {
   check('the reply wakes the Assistant', !!(await until(async () => wakes().length >= 1, 20000)))
   await lib.sleep(2000) // A fixed wait on purpose: this checks that a second line does NOT come.
   const w1 = wakes()
-  check('…once, with the reply, the agent and the card', w1.length === 1 && w1[0].startsWith(`[Hive] User replied to Builder on ${named}: "C, the hive cell"`), JSON.stringify(w1))
+  check('…once, with the reply, the agent and the card', w1.length === 1 && w1[0].startsWith(`[CW] User replied to Builder on ${named}: "C, the hive cell"`), JSON.stringify(w1))
   await until(async () => (await idle(home, 'assistant')) && (await idle(alpha, builder.id)), 20000)
 
   // A line Hive types into Builder (a task the Assistant gives it, then watches its card) isn't the user's.
-  await type(home, 'assistant', `hive hive_prompt_agent {"project":"alpha","agent":"Builder","text":"work 2"} then hive hive_wait_for_tasks {"cards":[${card}],"column":"review","wake":true}`)
+  await type(home, 'assistant', `hive cw_prompt_agent {"project":"alpha","agent":"Builder","text":"work 2"} then hive cw_wait_for_tasks {"cards":[${card}],"column":"review","wake":true}`)
   check('the Assistant gives Builder a task, then watches its card', !!(await until(async () => (await live(alpha, builder.id))?.status === 'working', 15000)) && !!(await until(async () => (await live(home, 'assistant'))?.status === 'watching', 15000)))
   await until(() => idle(alpha, builder.id), 20000)
   await lib.sleep(2000) // A fixed wait on purpose: this checks that Hive's own line tells nothing.
@@ -118,17 +118,17 @@ const check = (name, ok, extra = '') => {
   // On again: told, naming the user as Settings → General → Your name says (#426).
   await inv('settings:update', { assistant: { tellReplies: true }, general: { userName: 'Darren' } })
   await type(alpha, builder.id, 'Ship it')
-  check('on again: the next reply is told, by the name in Settings', !!(await until(async () => wakes().length === 2 && wakes()[1].startsWith(`[Hive] Darren replied to Builder on ${named}: "Ship it"`), 20000)), JSON.stringify(wakes().slice(1)))
+  check('on again: the next reply is told, by the name in Settings', !!(await until(async () => wakes().length === 2 && wakes()[1].startsWith(`[CW] Darren replied to Builder on ${named}: "Ship it"`), 20000)), JSON.stringify(wakes().slice(1)))
 
   // #1099: the Assistant watches Builder while Builder is idle (answered at once: no watch starts) and ends its turn.
   // The user's reply to Builder still reaches it within seconds, as a wake of its own.
   await until(async () => (await idle(home, 'assistant')) && (await idle(alpha, builder.id)), HUNG_MS)
-  await type(home, 'assistant', `hive hive_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: 'Builder' }], wake: true })}`)
+  await type(home, 'assistant', `hive cw_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: 'Builder' }], wake: true })}`)
   check('an agent watch on idle Builder is answered at once', !!(await until(async () => (await idle(home, 'assistant')) && (await live(home, 'assistant'))?.status !== 'watching', HUNG_MS)))
   const before = wakes().length
   const t0 = Date.now()
   await type(alpha, builder.id, 'Go ahead and push')
-  const told = await until(() => wakes().slice(before).find((x) => x.startsWith('[Hive] Darren replied to Builder (alpha): "Go ahead and push"')), HUNG_MS)
+  const told = await until(() => wakes().slice(before).find((x) => x.startsWith('[CW] Darren replied to Builder (alpha): "Go ahead and push"')), HUNG_MS)
   check('the reply reaches the Assistant within seconds with no watch of its own (#1099)', !!told && Date.now() - t0 < 15000, JSON.stringify({ wakes: wakes().slice(before), ms: Date.now() - t0 }))
 
   // HI-2410: a turn Claude Code starts by itself (a background task's end, its prompt hook a <task-notification>) soon
@@ -136,7 +136,7 @@ const check = (name, ok, extra = '') => {
   await until(() => idle(alpha, builder.id), HUNG_MS)
   const b0 = wakes().length
   await type(alpha, builder.id, 'background 8')
-  check("the user's prompt that starts a background task is told", !!(await until(() => wakes().slice(b0).find((x) => x.startsWith('[Hive] Darren replied to Builder (alpha): "background 8"')), HUNG_MS)), JSON.stringify(wakes().slice(b0)))
+  check("the user's prompt that starts a background task is told", !!(await until(() => wakes().slice(b0).find((x) => x.startsWith('[CW] Darren replied to Builder (alpha): "background 8"')), HUNG_MS)), JSON.stringify(wakes().slice(b0)))
   // Its turn is over, the task runs on: the user's Enter, with nothing typed, before the task ends.
   check('Builder waits on its background task', !!(await until(async () => (await live(alpha, builder.id))?.status === 'background', HUNG_MS)), (await live(alpha, builder.id))?.status)
   await inv('pty:write', lib.ptyKey(alpha, builder.id), '\r')

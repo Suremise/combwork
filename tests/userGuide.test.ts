@@ -37,7 +37,7 @@ describe("the user guide's heading ids", () => {
     const shared = outline.filter((h) => h.sharedId).map((h) => `line ${h.line}: ${h.text} (${h.sharedId})`)
     expect(shared, 'an id two headings carry (a copied heading): give the new one its own').toEqual([])
     const without = outline.filter((h) => !h.fixed).map((h) => `line ${h.line}: ${h.text}`)
-    expect(without, 'a heading without an id: end it with <a id="its-slug"></a> (its slug as hive_doc_outline lists it, then never change the id)').toEqual([])
+    expect(without, 'a heading without an id: end it with <a id="its-slug"></a> (its slug as cw_doc_outline lists it, then never change the id)').toEqual([])
     expect(new Set(outline.map((h) => h.slug)).size).toBe(outline.length)
     for (const h of outline) expect(h.slug, h.text).toMatch(/^[a-z0-9][a-z0-9_-]*$/)
   })

@@ -114,11 +114,11 @@ module.exports = async function run(provider) {
     const screen = async (key) => ((await page.evaluate((k) => window.__hiveTerminalLines(k), key)) ?? []).join('\n')
     const paneCols = async (key) => (await page.evaluate((k) => window.__hiveTerminalState(k), key))?.cols
     /**
-     * The doorbells on its screen, each by its id, however its rows were wrapped: by its "(m4). Call hive_inbox" with
-     * whitespace dropped, and up to a few non-letters between "Call" and "hive_inbox", as the CLI can draw in a doorbell's
-     * first row where it wraps (HI-2387: Copilot's time and its border, "(m4). Call   19:34 ┃" / "hive_inbox …").
+     * The doorbells on its screen, each by its id, however its rows were wrapped: by its "(m4). Call cw_inbox" with
+     * whitespace dropped, and up to a few non-letters between "Call" and "cw_inbox", as the CLI can draw in a doorbell's
+     * first row where it wraps (HI-2387: Copilot's time and its border, "(m4). Call   19:34 ┃" / "cw_inbox …").
      */
-    const doorbellIds = async (key) => [...(await screen(key)).replace(/\s+/g, '').matchAll(/\((m\d+)\)\.Call[^A-Za-z]{0,16}hive_inbox/g)].map((x) => x[1])
+    const doorbellIds = async (key) => [...(await screen(key)).replace(/\s+/g, '').matchAll(/\((m\d+)\)\.Call[^A-Za-z]{0,16}cw_inbox/g)].map((x) => x[1])
     /** How many doorbells its screen shows for a message (`delivery`: one of them). */
     const copies = async (key, delivery) => (await doorbellIds(key)).filter((x) => x === delivery).length
     /** Hive has written the whole line into the agent: its Enter too (Woke), or, for Codex, waiting for it to be drawn. */

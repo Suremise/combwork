@@ -1,14 +1,14 @@
 // The Agent API on slots (#1451, SPEC §16.10.3): a Git project's slots lent through the test copies' `slots:test`
 // channel (as a card's or lane's start does), on the fake Claude Code, the Agent API on:
-// 1. hive_project_status: B1 lent slot-a for a card is in `slot-a`; B2, a 0.9 agent whose worktree is carried as hb2, is
+// 1. cw_project_status: B1 lent slot-a for a card is in `slot-a`; B2, a 0.9 agent whose worktree is carried as hb2, is
 //    in `hb2` on its own branch; R1, a reviewer, in `project`; no agent has a `worktree` any more.
 // 2. B1 running in the project folder when the lease came: its detail's `folder` (session: project) and `launchFolder`
 //    (lease: slot-a) differ; its doc reads read the project folder it works in. Started again, it runs in slot-a: its
 //    own reads read the slot's copy, `from=project` the project folder's.
 // 3. Adding an agent in a worktree is refused, saying why (`location`, `worktree`, `existingWorktree`, `branch`), by
 //    the Agent API (the Assistant's: only it adds agents) and the IPC, and so is a card's start on a new agent with
-//    `worktree: true`; an agent added plainly is in the project folder; hive_add_agent offers no worktree arguments, and
-//    its tools/call (and hive_start_task's) given them anyway is refused too, adding nothing and leaving the card as it was.
+//    `worktree: true`; an agent added plainly is in the project folder; cw_add_agent offers no worktree arguments, and
+//    its tools/call (and cw_start_task's) given them anyway is refused too, adding nothing and leaving the card as it was.
 // 4. Storage counts each slot on disk once: lent (to its agent), and still once its lease ends and it waits free.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 // Dev build only (#1578): B2 is a 0.9 worktree agent on purpose (agents:testLegacy), and B1's slot is lent through
@@ -69,8 +69,8 @@ const NOTE = (where) => `# Note\n\nThe ${where} copy.\n`
     const tokenOf = async (id) => {
       const sessionId = await until(async () => (await live(id))?.sessionId, HUNG_MS)
       const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     const status = async () => Object.fromEntries((await api('GET', '/v1/projects/alpha')).body.agents.map((a) => [a.name, a]))
     const activity = async (id) => (await api('GET', `/v1/projects/alpha/agents/${encodeURIComponent(id)}/activity`)).body
@@ -81,7 +81,7 @@ const NOTE = (where) => `# Note\n\nThe ${where} copy.\n`
     }
 
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1', workflowRole: 'builder' })
-    // HI-2258: a call naming no agent (hive_agent_activity's `agent` left out: `agents//activity`) is the sole agent's,
+    // HI-2258: a call naming no agent (cw_agent_activity's `agent` left out: `agents//activity`) is the sole agent's,
     // and with several it is refused saying "agent" is missing, never "No route".
     const sole = await api('GET', '/v1/projects/alpha/agents//activity')
     check("HI-2258: no agent named, alone: the sole agent's activity", sole.status === 200 && sole.body?.agent === 'B1', JSON.stringify(sole))
@@ -128,7 +128,7 @@ const NOTE = (where) => `# Note\n\nThe ${where} copy.\n`
     check("its own doc read reads slot-a's copy", /The slot copy/.test(await read(t2)), await read(t2))
     check('…from=project reads the project folder', /The project copy/.test(await read(t2, 'project')), await read(t2, 'project'))
     s = await status()
-    check('hive_project_status: B1 in slot-a, B2 in its carried hb2 on its branch, R1 in project', s.B1?.folder === 'slot-a' && s.B1.slot === 'slot-a' && s.B2?.folder === 'hb2' && s.B2.slot === 'hb2' && s.B2.branch === 'hive/hb2' && s.R1?.folder === 'project' && !s.R1.slot, JSON.stringify(s))
+    check('cw_project_status: B1 in slot-a, B2 in its carried hb2 on its branch, R1 in project', s.B1?.folder === 'slot-a' && s.B1.slot === 'slot-a' && s.B2?.folder === 'hb2' && s.B2.slot === 'hb2' && s.B2.branch === 'hive/hb2' && s.R1?.folder === 'project' && !s.R1.slot, JSON.stringify(s))
     const actB2 = await activity(b2.id)
     check("B2's detail: in hb2, carried", actB2?.folder?.at === 'hb2' && actB2.folder.why === 'carried' && !('launchFolder' in actB2) && actB2.branch === 'hive/hb2', JSON.stringify(actB2))
     check('B1 stopped again', await stop(b1.id))
@@ -162,18 +162,18 @@ const NOTE = (where) => `# Note\n\nThe ${where} copy.\n`
     const started = await api('POST', `/v1/tasks/${encodeURIComponent(`#${n}`)}/start`, { worktree: true })
     check("a card's start on a new agent with worktree: true is refused", started.status === 400 && /pinned to worktrees/.test(JSON.stringify(started.body)), JSON.stringify(started))
     // The hive tools as the Assistant calls them, given 0.9's worktree arguments anyway: passed on, so refused.
-    const mcp = (method, params) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) + '\n', env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${PORT}`, HIVE_WORKSPACE: ws, HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', HIVE_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', HIVE_PROJECT: '' }), timeout: 60000 }).toString().split('\n')[0]).result
+    const mcp = (method, params) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) + '\n', env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${PORT}`, CW_WORKSPACE: ws, HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', CW_PROJECT: '' }), timeout: 60000 }).toString().split('\n')[0]).result
     const call = (name, args) => {
       const r = mcp('tools/call', { name, arguments: args })
       return { text: r.content[0].text, isError: !!r.isError }
     }
     for (const args of [{ worktree: true, branch: 'legacy-wanted' }, { location: 'new-worktree' }, { existingWorktree: hb2 }, { base: 'main' }]) {
-      const r = call('hive_add_agent', { project: 'alpha', name: 'Unexpected MCP', ...args })
-      check(`hive_add_agent given ${Object.keys(args).join(', ')} is refused, saying why`, r.isError && /pinned to worktrees/.test(r.text), JSON.stringify(r))
+      const r = call('cw_add_agent', { project: 'alpha', name: 'Unexpected MCP', ...args })
+      check(`cw_add_agent given ${Object.keys(args).join(', ')} is refused, saying why`, r.isError && /pinned to worktrees/.test(r.text), JSON.stringify(r))
     }
     for (const args of [{ worktree: true }, { agent: 'B1', worktree: true }]) {
-      const r = call('hive_start_task', { number: n, ...args })
-      check(`hive_start_task given ${Object.keys(args).join(', ')} is refused, saying why`, r.isError && /pinned to worktrees/.test(r.text), JSON.stringify(r))
+      const r = call('cw_start_task', { number: n, ...args })
+      check(`cw_start_task given ${Object.keys(args).join(', ')} is refused, saying why`, r.isError && /pinned to worktrees/.test(r.text), JSON.stringify(r))
     }
     const cardNow = (await inv('tasks:list')).find((c) => c.number === n)
     check('…the card is left in Todo with no agent', cardNow?.column === 'todo' && !cardNow.agent, JSON.stringify(cardNow))
@@ -181,9 +181,9 @@ const NOTE = (where) => `# Note\n\nThe ${where} copy.\n`
     const added = await api('POST', '/v1/projects/alpha/agents', { name: 'B3', workflowRole: 'builder' }, asToken)
     const b3 = added.body?.project?.agents?.find((a) => a.name === 'B3')
     const tools = mcp('tools/list', {}).tools
-    const addTool = tools.find((t) => t.name === 'hive_add_agent')
-    const startTool = tools.find((t) => t.name === 'hive_start_task')
-    check('hive_add_agent and hive_start_task offer no worktree arguments', !!addTool && !!startTool && !['worktree', 'existingWorktree', 'branch', 'base'].some((k) => k in addTool.inputSchema.properties) && !('worktree' in startTool.inputSchema.properties) && !/worktree/i.test(addTool.description), JSON.stringify({ add: Object.keys(addTool?.inputSchema?.properties ?? {}), start: Object.keys(startTool?.inputSchema?.properties ?? {}) }))
+    const addTool = tools.find((t) => t.name === 'cw_add_agent')
+    const startTool = tools.find((t) => t.name === 'cw_start_task')
+    check('cw_add_agent and cw_start_task offer no worktree arguments', !!addTool && !!startTool && !['worktree', 'existingWorktree', 'branch', 'base'].some((k) => k in addTool.inputSchema.properties) && !('worktree' in startTool.inputSchema.properties) && !/worktree/i.test(addTool.description), JSON.stringify({ add: Object.keys(addTool?.inputSchema?.properties ?? {}), start: Object.keys(startTool?.inputSchema?.properties ?? {}) }))
     check('an agent added plainly is in the project folder', added.status === 200 && b3?.folder === 'project' && b3.workflowRole === 'builder' && !('worktree' in b3), JSON.stringify(added.body))
   } catch (e) {
     check('no exception', false, e?.stack ?? String(e))

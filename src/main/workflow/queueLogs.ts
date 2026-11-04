@@ -3,7 +3,7 @@
 // state it records (a pause saved or lifted, a merge owed its push, a push settled), and read with the queue's model;
 // with how long the queue took over an entry, from its card's facts.
 
-import { HIVE_RUNS } from '../progress'
+import { HIVE_RUNS, LEGACY_HIVE_RUNS } from '../progress'
 import type { Fact, FactData } from '../../shared/workflow/facts'
 import { QUEUE_LOG_MAX, type QueuePauseLogged } from '../../shared/workflow/queue'
 
@@ -74,7 +74,7 @@ export function entryTook(facts: Fact[], entry: string): number | null {
   const end = endOf(facts, entry)
   const req = facts.find((f) => f.kind === 'IntegrationRequested' && (f.data as FactData['IntegrationRequested']).entry === entry)
   if (!end || !req) return null
-  const queueCheck = (f: Fact): f is Fact<'CheckRan'> => f.kind === 'CheckRan' && (f.data as FactData['CheckRan']).by === HIVE_RUNS
+  const queueCheck = (f: Fact): f is Fact<'CheckRan'> => f.kind === 'CheckRan' && [HIVE_RUNS, LEGACY_HIVE_RUNS].includes((f.data as FactData['CheckRan']).by ?? '')
   let checks = facts.filter(queueCheck).filter((f) => f.data.entry === entry)
   if (!checks.length) {
     const overlaps = facts.some((o) => o.kind === 'IntegrationRequested' && o !== req && o.seq < end.seq && (endOf(facts, (o.data as FactData['IntegrationRequested']).entry)?.seq ?? Infinity) > req.seq)

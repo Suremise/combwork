@@ -93,7 +93,7 @@ function prepare() {
   cfg.settings.providers.codex.executablePath = path.join(__dirname, 'fake-codex', 'fake-codex.cmd')
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   // The repository's own identity (Team takes it as G12's) and its two checks from its scripts (Team's quick and tests),
-  // each the fixture's steered check; the slots' setup records each warming (HIVE_SLOT: which slot).
+  // each the fixture's steered check; the slots' setup records each warming (CW_SLOT: which slot).
   lib.git(alpha, ['config', 'user.name', fx.identity.name])
   lib.git(alpha, ['config', 'user.email', fx.identity.email])
   const tool = `node "${slash(path.join(fx.tools, 'check.js'))}"`
@@ -106,7 +106,7 @@ function prepare() {
     lib.git(p, ['config', 'user.name', fx.identity.name])
     lib.git(p, ['config', 'user.email', fx.identity.email])
   }
-  fs.writeFileSync(path.join(fx.tools, 'setup.js'), `require('fs').appendFileSync(${JSON.stringify(setupLog)}, (process.env.HIVE_SLOT || 'none') + '\\n')\n`)
+  fs.writeFileSync(path.join(fx.tools, 'setup.js'), `require('fs').appendFileSync(${JSON.stringify(setupLog)}, (process.env.CW_SLOT || 'none') + '\\n')\n`)
   // The fake Claude Code trusts the workspace, its projects and their worktrees folders (asks nothing).
   const slotFolders = (p) => ['slot-a', 'slot-b', 'slot-c', 'slot-d'].map((s) => path.join(trees(p), s))
   fs.writeFileSync(path.join(fx.claudeHome, 'fake-trusted.json'), JSON.stringify([fx.ws, alpha, beta, gamma, ...slotFolders(alpha), ...slotFolders(beta)].map((f) => f.toLowerCase())))
@@ -134,13 +134,13 @@ function helpers(h) {
     if (!s) return null
     if (a.provider === 'codex') {
       const l = await until(() => codexLaunches().findLast((x) => x.args.some((y) => y.includes(s.runId))), HUNG_MS)
-      const hive = l ? fromCodexTable(l.args.find((x) => x.startsWith('mcp_servers.hive=')).slice('mcp_servers.hive='.length)) : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+      const hive = l ? fromCodexTable(l.args.find((x) => x.startsWith('mcp_servers.combwork=')).slice('mcp_servers.combwork='.length)) : null
+      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     // The newest: a resumed conversation keeps its id, and an earlier launch's files are gone.
     const l = await until(() => claudeLaunches().findLast((x) => x.sessionId === s.sessionId && x.opts['--mcp-config'] && fs.existsSync(x.opts['--mcp-config'])), HUNG_MS)
-    const hive = l ? JSON.parse(fs.readFileSync(l.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
-    return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+    const hive = l ? JSON.parse(fs.readFileSync(l.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+    return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
   }
   /** An agent's intent on a card, its token read afresh each time (a restarted session has a new one). */
   const intent = async (p, a, n, name, body = {}) => {

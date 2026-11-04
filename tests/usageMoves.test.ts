@@ -497,11 +497,11 @@ describe('the usage watch and the listing', () => {
     expect(usageHits(watch, () => [weekly(97)], Date.now())).toEqual([])
     const hits = usageHits(watch, () => [weekly(98.04, '2026-11-02T09:00:00.000Z')], Date.parse('2026-11-01T00:00:00Z'))
     expect(hits).toEqual(['Anthropic-1: weekly 98% (resets 2026-11-02T09:00Z)'])
-    expect(usageWakeLine(hits)).toMatch(/^\[Hive\] Usage reached: Anthropic-1: weekly 98%/)
+    expect(usageWakeLine(hits)).toMatch(/^\[CW\] Usage reached: Anthropic-1: weekly 98%/)
     expect(readSavedUsage(watch)).toEqual(watch)
     expect(readSavedUsage([{ ...watch[0], percent: 0 }])).toBeNull()
   })
-  it("hive_connection list's line gives the limits and the move", () => {
+  it("cw_connection list's line gives the limits and the move", () => {
     expect(accountUsageText({ account: 'Anthropic-1', limits: [{ label: 'weekly', usedPercent: 95, resetsAt: '2026-11-02T09:00:00.000Z' }], move: { percent: 98, limit: 'weekly', to: 'Anthropic-2' } })).toBe('Usage of Anthropic-1: weekly 95% (resets 2026-11-02T09:00Z); moves its agents to Anthropic-2 at 98% of the weekly limit')
   })
 })

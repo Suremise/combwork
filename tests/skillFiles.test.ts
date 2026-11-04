@@ -63,7 +63,7 @@ describe("a skill's files for its page (listedSkillFiles)", () => {
       if (linked) expect(r.files.some((f) => f.startsWith('escape'))).toBe(false)
       // Not a listed skill: the workspace, the skills folder itself, a folder inside a skill, a project folder.
       for (const dir of [ws, w.skillsDir, join(skill, 'escape'), project, join(skill, '..', 'release-steps', '..')])
-        await expect(inWorkspace(w, () => listedSkillFiles(dir))).rejects.toThrow(/isn't a skill Hive lists/)
+        await expect(inWorkspace(w, () => listedSkillFiles(dir))).rejects.toThrow(/isn't a skill Combwork lists/)
     } finally {
       await disposeWorkspaceService(w)
     }

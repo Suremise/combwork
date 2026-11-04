@@ -231,7 +231,7 @@ describe("a lane's note", () => {
       { key: 'HI-1', merged: 'aaa9a0c3c180fc41a6298d7a19f17a1f9239b3f5' },
       { key: 'HI-2', merged: null }
     ])
-    expect(t).toBe("Lane Off main is finished: HI-1 merged at aaa9a0c3c180; HI-2 not merged. Your session ends once this turn does; Hive resumes it for your next lane. Close the lane's work in your reply, then end your turn.")
+    expect(t).toBe("Lane Off main is finished: HI-1 merged at aaa9a0c3c180; HI-2 not merged. Your session ends once this turn does; Combwork resumes it for your next lane. Close the lane's work in your reply, then end your turn.")
   })
 
   it('says an abandoned lane was abandoned', () => {

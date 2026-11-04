@@ -41,7 +41,7 @@ describe('cards in play for a loop agent (#376)', () => {
 
   it("an agent that did watch, whose wake waits untaken in its prompt, is stalled for that, not for ending its turn without a watch (#777)", () => {
     const agents = [{ name: 'AMR3', project: 'alpha', notWatching: [779], untaken: true }]
-    expect(notWatchingReason(card(779, { column: 'review' }), agents)).toBe("AMR3 hasn't taken the wake Hive typed for #779: it waits in its prompt.")
+    expect(notWatchingReason(card(779, { column: 'review' }), agents)).toBe("AMR3 hasn't taken the wake Combwork typed for #779: it waits in its prompt.")
     expect(notWatchingAgent(card(779, { column: 'review' }), agents)?.untaken).toBe(true)
     expect(notWatchingReason(card(779, { column: 'passed' }), agents)).toBeNull()
   })
@@ -363,7 +363,7 @@ describe('a design its builder posted in Doing that nobody checks (#1382)', () =
   it('stalled once the builder has only watched past its wait and a grace, naming it; not before', () => {
     expect(pendingDesign(doing())).toEqual(posted)
     expect(loopStepWaitReason(doing(), [hb5], bound, t0 + bound + LOOP_STEP_STALL_GRACE_MS - 1000)).toBeNull()
-    expect(loopStepWaitReason(doing(), [hb5], bound, t0 + bound + LOOP_STEP_STALL_GRACE_MS)).toBe("HB5 posted a design on #1305 for its reviewer to check and has waited 35 min: nobody has answered it, and it hasn't gone ahead as posted (hive_loop_step proceed).")
+    expect(loopStepWaitReason(doing(), [hb5], bound, t0 + bound + LOOP_STEP_STALL_GRACE_MS)).toBe("HB5 posted a design on #1305 for its reviewer to check and has waited 35 min: nobody has answered it, and it hasn't gone ahead as posted (cw_loop_step proceed).")
     expect(loopStepWaitReason(doing(), [hb5], bound, t0 + 6 * 3600_000)).toMatch(/has waited 6 h:/)
     // Its own bound: a project that waits two hours flags it later.
     expect(loopStepWaitReason(doing(), [hb5], 120 * 60_000, t0 + 60 * 60_000)).toBeNull()
@@ -409,7 +409,7 @@ describe('a follow-up its builder posted in Review or Passed that nobody checks 
     expect(pendingStep(passed())).toEqual({ entry: posted, step: 'followUp' })
     expect(pendingDesign(passed())).toBeNull()
     expect(loopStepWaitReason(passed(), [hb3], bound, t0 + REVIEW_WAIT_STALL_MS - 1000)).toBeNull()
-    expect(loopStepWaitReason(passed(), [hb3], bound, t0 + REVIEW_WAIT_STALL_MS)).toBe('HB3 posted a follow-up on #1419 for its reviewer to check and has waited 15 min: nobody has answered it (hive_loop_step ok or gaps).')
+    expect(loopStepWaitReason(passed(), [hb3], bound, t0 + REVIEW_WAIT_STALL_MS)).toBe('HB3 posted a follow-up on #1419 for its reviewer to check and has waited 15 min: nobody has answered it (cw_loop_step ok or gaps).')
     expect(loopStepWait(passed(), [hb3], bound, t0 + REVIEW_WAIT_STALL_MS)?.step).toBe('followUp')
     expect(loopStepWaitReason(passed([posted], { column: 'review' }), [hb3], bound, t0 + 5 * 3600_000)).toMatch(/has waited 5 h:/)
     // Counted from the follow-up, never its builder's watch.

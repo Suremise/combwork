@@ -47,7 +47,7 @@ describe("the events stream's lines, as broadcast says them", async () => {
 
   it("says each stream's line in its own workspace's API chain, for an event outside any request", () => {
     const lineFor = apiTextTestHooks.streamLines(event, open)
-    expect([titleIn(lineFor(streams.a)), titleIn(lineFor(streams.b)), titleIn(lineFor(streams.none))]).toEqual(['A CLOSED', 'B CLOSED', 'Hive has closed'])
+    expect([titleIn(lineFor(streams.a)), titleIn(lineFor(streams.b)), titleIn(lineFor(streams.none))]).toEqual(['A CLOSED', 'B CLOSED', 'Combwork has closed'])
   })
 
   it("…and for an event made inside another workspace's request, whose binding never leaks into another stream", () => {
@@ -55,16 +55,16 @@ describe("the events stream's lines, as broadcast says them", async () => {
       const lineFor = apiTextTestHooks.streamLines(event, open)
       return [titleIn(lineFor(streams.b)), titleIn(lineFor(streams.none)), titleIn(lineFor(streams.a))]
     })
-    expect(titles).toEqual(['B CLOSED', 'Hive has closed', 'A CLOSED'])
+    expect(titles).toEqual(['B CLOSED', 'Combwork has closed', 'A CLOSED'])
   })
 
   it("says a closed workspace's stream in the Default", () => {
     const lineFor = apiTextTestHooks.streamLines(event, new Set([A.toLowerCase()]))
-    expect([titleIn(lineFor(streams.a)), titleIn(lineFor(streams.b))]).toEqual(['A CLOSED', 'Hive has closed'])
+    expect([titleIn(lineFor(streams.a)), titleIn(lineFor(streams.b))]).toEqual(['A CLOSED', 'Combwork has closed'])
   })
 
   it('says an agent client in its session, never in a workspace a request bound', () => {
     const agentStream = { agent: AGENT, apiDir: null }
-    expect(inApiWorkspace(A, () => titleIn(apiTextTestHooks.streamLines(event, open)(agentStream)))).toBe('Hive has closed')
+    expect(inApiWorkspace(A, () => titleIn(apiTextTestHooks.streamLines(event, open)(agentStream)))).toBe('Combwork has closed')
   })
 })

@@ -104,7 +104,7 @@ describe('the turn ledger in a session', () => {
   it("isn't over at a Stop Hive answered with a continuation, only at the one it answered with nothing", async () => {
     const { st } = agent('cont')
     let drains = 1
-    sessions.inboxNotice = (_st, at) => (at === 'drain' && drains-- > 0 ? '[Hive] You have mail: call hive_inbox' : null)
+    sessions.inboxNotice = (_st, at) => (at === 'drain' && drains-- > 0 ? '[CW] You have mail: call cw_inbox' : null)
     await hook(st, { hook_event_name: 'UserPromptSubmit', turn_id: 't1', prompt: 'go' })
     await hook(st, { hook_event_name: 'Stop', turn_id: 't1', stop_hook_active: false, last_assistant_message: 'Done' })
     expect(st.status).toBe('working')
@@ -299,7 +299,7 @@ describe('the turn ledger in a session', () => {
       Object.assign(l, { adapter: Object.assign(Object.create(copilot), { noticeReply: (e: string, text: string) => (e === 'Stop' ? { decision: 'block', reason: text } : null) }) })
       const ev = (type: string, data: Record<string, unknown>, at: number) => JSON.stringify({ type, data, timestamp: new Date(at).toISOString() }) + '\n'
       if (continued) {
-        sessions.inboxNotice = (_st, at) => (at === 'drain' ? '[Hive] You have mail: call hive_inbox' : null)
+        sessions.inboxNotice = (_st, at) => (at === 'drain' ? '[CW] You have mail: call cw_inbox' : null)
         await hook(st, { hook_event_name: 'UserPromptSubmit', prompt: 'go' })
         await hook(st, { hook_event_name: 'Stop' })
         sessions.inboxNotice = null
@@ -444,7 +444,7 @@ describe('the turn ledger in a session', () => {
     await settled(st)
     expect([st.status, st.turn?.state]).toEqual(['working', 'running'])
     // Hive carries it on once (its Stop answered), then its final Stop never reaches Hive.
-    sessions.inboxNotice = (_st, at) => (at === 'drain' ? '[Hive] You have mail: call hive_inbox' : null)
+    sessions.inboxNotice = (_st, at) => (at === 'drain' ? '[CW] You have mail: call cw_inbox' : null)
     await hook(st, { hook_event_name: 'Stop' })
     sessions.inboxNotice = null
     appendFileSync(rollout, ev('hook.end', { hookType: 'agentStop' }, new Date(Date.now() + 5)))

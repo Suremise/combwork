@@ -1,3 +1,4 @@
+import { isReservedServerName } from '../shared/assistantTools'
 import { basename, dirname, extname, join } from 'path'
 import { mkdir, readdir, readFile, rm, stat, writeFile } from 'original-fs/promises'
 import { existsSync } from 'original-fs'
@@ -336,7 +337,7 @@ async function addedPlaces(): Promise<{ projects: Map<string, string[]>; assista
 }
 
 export function validMcpName(name: string): boolean {
-  return /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(name) && name !== 'hive'
+  return /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(name) && !isReservedServerName(name)
 }
 
 export async function createMcp(name: string): Promise<McpServerInfo> {
@@ -517,7 +518,7 @@ export function serverFromZip(data: Uint8Array): { def: McpServerDef; files: Map
 /** A name for a server from a file: letters, numbers, "-" and "_"; never "hive". */
 function serverName(raw: string): string {
   const n = raw.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^[-_]+|-+$/g, '').slice(0, 64)
-  return n && n.toLowerCase() !== 'hive' ? n : 'server'
+  return n && !isReservedServerName(n) ? n : 'server'
 }
 
 /** A definition's references to its zip's folder, moved to the name it is added as. */

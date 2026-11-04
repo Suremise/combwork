@@ -3,8 +3,8 @@
 // keeps its slots. A slot's setup, installs and archive command run as Hive's own runs, attributed to "Hive (slot
 // <name>)" in the Progress panel, each in the job its operation recorded on the slot, on Hive's process supervisor
 // (shared with agents' launches and the merge queue): with no supervisor nothing runs, and a job counts as settled only
-// once its processes are seen ended. Each run gets a session command's environment plus the slot's own (HIVE_SLOT,
-// HIVE_SLOT_PORT_BASE), its output in a bounded log in Hive's own folder. This process holds its pools' operations
+// once its processes are seen ended. Each run gets a session command's environment plus the slot's own (CW_SLOT,
+// CW_SLOT_PORT_BASE), its output in a bounded log in Hive's own folder. This process holds its pools' operations
 // (its pid and start: another Hive takes one over only once it is gone). A workspace closing ends its pools' commands
 // and awaits their operations. Every hour, each open workspace's pools with slots are tidied (Settings → Advanced,
 // Remove idle slots after a day).
@@ -130,13 +130,13 @@ export function sweepSealsOf(root: string, o: { once?: boolean } = {}): void {
 
 /** A slot run's errors (dialects, HI-2447): its end's error, kept on the slot by the pool (said in the Default there). */
 const T = {
-  noSupervisor: agentMsg({ id: 'slot.run.noSupervisor', text: "Hive's process supervisor isn't running, so it can't run a slot's commands", note: "A slot's or copy's setup error: Hive runs their commands in a job of its own, and can't now." }),
+  noSupervisor: agentMsg({ id: 'slot.run.noSupervisor', text: "Combwork's process supervisor isn't running, so it can't run a slot's commands", note: "A slot's or copy's setup error: Hive runs their commands in a job of its own, and can't now." }),
   noJob: agentMsg({ id: 'slot.run.noJob', text: "its job couldn't be made: {problem}", note: "A slot's or copy's setup error: the job its command runs in couldn't be made. {problem} is why." }),
   closed: agentMsg({ id: 'slot.run.closed', text: 'the workspace closed', note: "A slot's or copy's setup error: its workspace closed before its command ran." }),
   merged: agentMsg({ id: 'slot.laneEnd.merged', text: '{card} merged at {commit}', note: "A card in slot.laneEnd.note's list: merged, with its merge commit's first 12 characters." }),
   notMerged: agentMsg({ id: 'slot.laneEnd.notMerged', text: '{card} not merged', note: "A card in slot.laneEnd.note's list: not merged." }),
   more: agentMsg({ id: 'slot.laneEnd.more', text: 'and {count} more', note: "The end of slot.laneEnd.note's list, past its first 20 cards. {count} is digits." }),
-  laneEnd: agentMsg({ id: 'slot.laneEnd.note', text: "{abandoned, select, yes {Lane {lane} was abandoned} other {Lane {lane} is finished}}{listed, select, yes {: {list}} other {}}. Your session ends once this turn does; Hive resumes it for your next lane. Close the lane's work in your reply, then end your turn.", note: "The note a lane's builder is given as its lane ends (HI-1706): each card (slot.laneEnd.merged or notMerged, joined by \"; \"), and that its session ends with its turn. Cut at 2000 characters." })
+  laneEnd: agentMsg({ id: 'slot.laneEnd.note', text: "{abandoned, select, yes {Lane {lane} was abandoned} other {Lane {lane} is finished}}{listed, select, yes {: {list}} other {}}. Your session ends once this turn does; Combwork resumes it for your next lane. Close the lane's work in your reply, then end your turn.", note: "The note a lane's builder is given as its lane ends (HI-1706): each card (slot.laneEnd.merged or notMerged, joined by \"; \"), and that its session ends with its turn. Cut at 2000 characters." })
 }
 const sayStored = (m: AgentMsg, values?: AgentValues): string => inDefaultDialect(() => say(m, values))
 
@@ -682,7 +682,7 @@ function laneEnd(projectPath: string, lease: SlotLease, slotName: string, w: Slo
       return { key: cardKeyOf(ws, c.number)?.key ?? `#${c.number}`, merged }
     })
     const st = sessions.liveFor(projectPath, w.agent)
-    const r = await createDelivery(projectPath, { agentId: w.agent, agentName: st?.agentName, conversation: st?.sessionId || null, kind: 'control', from: { kind: 'hive', name: 'Hive' }, body: inDialectOf({ projectPath, agentId: w.agent }, () => laneEndNote(lane?.name ?? lease.lane ?? '', lease.why === 'laneAbandoned', cards)), source: LANE_END_SOURCE, ref: lease.id, forRun: w.run }) // i18n-ignore: the product's name, as a delivery's sender
+    const r = await createDelivery(projectPath, { agentId: w.agent, agentName: st?.agentName, conversation: st?.sessionId || null, kind: 'control', from: { kind: 'hive', name: 'Combwork' }, body: inDialectOf({ projectPath, agentId: w.agent }, () => laneEndNote(lane?.name ?? lease.lane ?? '', lease.why === 'laneAbandoned', cards)), source: LANE_END_SOURCE, ref: lease.id, forRun: w.run }) // i18n-ignore: the product's name, as a delivery's sender
     await offerNow(projectPath, w.agent)
     return r.id
   }

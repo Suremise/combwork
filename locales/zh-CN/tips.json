@@ -176,7 +176,7 @@
   "tips.connections.title": "让智能体使用不同的登录运行",
   "tips.consoleRecording.text": "在开发者控制台中，“录制”会把智能体的 CLI 发给 Combwork 的内容写入文件，除非你为该录制勾选“文本”，否则内容会脱敏；“复制诊断信息”可以把它附到错误报告中。",
   "tips.consoleRecording.title": "录制 CLI 发送的内容",
-  "tips.consoleText.text": "“设置”→“高级”→“开发者控制台：显示提示词、回复和命令文本”会在开发者控制台中显示这些文本，并显示一条说明此事的横幅，同时为新录制勾选“文本”。令牌和登录信息仍会遮盖，智能体的 hive_console 仍会脱敏。",
+  "tips.consoleText.text": "“设置”→“高级”→“开发者控制台：显示提示词、回复和命令文本”会在开发者控制台中显示这些文本，并显示一条说明此事的横幅，同时为新录制勾选“文本”。令牌和登录信息仍会遮盖，智能体的 cw_console 仍会脱敏。",
   "tips.consoleText.title": "在开发者控制台中查看文本",
   "tips.copilot.text": "智能体可以使用 GitHub Copilot CLI，包括 Copilot Free。“配置提供方”会安装它，并显示它以谁的身份登录：它自己的登录，或 GitHub CLI 的登录。",
   "tips.copilot.title": "用 GitHub Copilot 运行智能体",

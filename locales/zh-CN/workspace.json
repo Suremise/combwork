@@ -157,7 +157,7 @@
   "workspace.folder.home": "{hasAgent, select, yes {{agent} 的旧文件夹} other {评审者的旧文件夹}}",
   "workspace.folder.slot": "{carried, select, yes {{name}（为 {agent} 保留）} other {{hasAgent, select, yes {{hasCards, select, yes {{name}（{agent}，{cards}）} other {{name}（{agent}）}}} other {{hasCards, select, yes {{name}（{cards}）} other {{name}}}}}}}",
   "workspace.mcpView.builtIn": "内置 Combwork MCP 服务器",
-  "workspace.mcpView.builtInText": "从 Combwork 启动的每个会话都会获得一个 <code>hive</code> MCP 服务器，它连接到{hasUrl, select, yes {位于 {url} 的} other {}} Agent API。可在“设置”→“Agent API”中关闭它。",
+  "workspace.mcpView.builtInText": "从 Combwork 启动的每个会话都会获得一个 <code>combwork</code> MCP 服务器，它连接到{hasUrl, select, yes {位于 {url} 的} other {}} Agent API。可在“设置”→“Agent API”中关闭它。",
   "workspace.mcpView.deleteServer": "删除服务器",
   "workspace.mcpView.dir": "使用 {variable} 指向存放在 `.hive/mcp` 中的服务器代码。",
   "workspace.mcpView.format": "**格式**——每个文件一个服务器，采用 Claude Code 的 .mcp.json 格式（Combwork 会为其他提供方转换），另可加一个可选的 `description`：",

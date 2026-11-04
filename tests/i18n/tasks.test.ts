@@ -252,7 +252,7 @@ describe("a card's history: English as stored, its line as data for the window",
     await run(() => tasks.updateTask(c.number, { review: 'start' }, agent))
     await run(() => tasks.endReviews('alpha', 'a1', 'its session ended'))
     const last = (await run(() => tasks.getTask(c.number))).history.at(-1)!
-    expect(last).toMatchObject({ by: 'Hive', what: 'Review by Agent 1 stopped: its session ended', whatText: { id: 'tasks.history.reviewEnded', values: { agent: 'Agent 1', why: 'sessionEnded' } } })
+    expect(last).toMatchObject({ by: 'Combwork', what: 'Review by Agent 1 stopped: its session ended', whatText: { id: 'tasks.history.reviewEnded', values: { agent: 'Agent 1', why: 'sessionEnded' } } })
   })
 })
 
@@ -271,7 +271,7 @@ describe("the board's refusals: English for agents as before, the window's langu
       [await caught(run(() => tasks.updateTask(todo.number, { blocked: 'x'.repeat(1001) }, user))), 'The blocked reason is too long (at most 1,000 characters).', 400, 'Zu lang.'],
       [await caught(run(() => tasks.createTask({ title: 'x', column: 'nope' as never }, user))), 'Unknown column "nope": hold, todo, doing, review, passed or done.', 400, null],
       [await caught(run(() => tasks.createTask({ title: 'x', column: 'done' }, assistant))), 'Only the user puts cards in Done.', 403, 'Nur der Benutzer legt Karten in Erledigt an.'],
-      [await caught(run(() => tasks.createTask({ title: 'x', column: 'hold' }, agent))), 'Only the user or the Assistant puts cards On Hold. Add it to Todo; where the user has decided to park it, ask the Assistant (hive_ask_assistant), otherwise ask the user.', 403, null],
+      [await caught(run(() => tasks.createTask({ title: 'x', column: 'hold' }, agent))), 'Only the user or the Assistant puts cards On Hold. Add it to Todo; where the user has decided to park it, ask the Assistant (cw_ask_assistant), otherwise ask the user.', 403, null],
       [await caught(run(() => tasks.createTask({ title: 'x', project: 'beta' }, agent))), 'You can add cards only to your project (alpha).', 403, null],
       [await caught(run(() => tasks.createTask({ title: 'x', project: 'gamma' }, user))), 'Unknown project "gamma"', 404, null],
       [await caught(run(() => tasks.createTask({ title: 'x', agent: 'a1' }, user))), 'Choose a project before giving the task to an agent.', 400, 'Choose a project before giving the card to an agent.'],

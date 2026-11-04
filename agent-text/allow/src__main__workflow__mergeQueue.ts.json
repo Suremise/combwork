@@ -2,13 +2,12 @@
   "prose|call|isn't on top of the target": 1,
   "prose|call|isn't the same change as reviewed": 1,
   "prose|call|would land a merge commit (Rebase and fast-forward lands a linear history)": 1,
-  "prose|call|{}'s focused tests were skipped at its merge for their environment: {}. Decide whether it merges with them skipped (hive_focused_skip with request {}: merge true or false, and why); the user can override.": 1,
+  "prose|call|{}'s focused tests were skipped at its merge for their environment: {}. Decide whether it merges with them skipped (cw_focused_skip with request {}: merge true or false, and why); the user can override.": 1,
   "prose|prop:other|Skipped and not accepted: {}.": 1,
   "prose|prop:other|it wrote no results file": 1,
   "prose|prop:other|its results file is over {} bytes": 1,
   "prose|prop:other|{}: {} brought up to date with {} ({}) isn't the same change as reviewed: bring it up to date yourself and submit it again.": 1,
   "prose|prop:other|{}: {} rebased onto {} {}: rebase it onto the target yourself and submit it again.": 1,
   "prose|return|… ({} characters left out) …": 1,
-  "prose|var|Failed: {}.": 1,
-  "prose|var|Hive couldn't take its results: {}.": 1
+  "prose|var|Failed: {}.": 1
 }

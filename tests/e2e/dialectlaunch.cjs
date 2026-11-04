@@ -1,7 +1,7 @@
 // Dialects wired into sessions (HI-2443; plans/2026-11-03-dialects-design.md, sections 3 and 7, card 6b): each session's
 // chain is pinned at its launch, so an edit applies at its next launch and shows "restart to apply" meanwhile; an
 // agent's Dialect setting picks the file in its model slot (a test copy here, which Auto never picks); the launch record
-// shows the chain; hive-mcp.js gets the chain's texts through HIVE_DIALECT_FILE; the Agent API speaks each caller's
+// shows the chain; hive-mcp.js gets the chain's texts through CW_DIALECT_FILE; the Agent API speaks each caller's
 // chain (an agent's pinned one, the API chain for the workspace token, which follows the files), and with two windows
 // the workspace the request names, never the focused window's (HR1 on HI-2443); a launch with no dialect and a model
 // Hive can't name says "model unknown", and one it can name records nothing new. Runs the fake Claude Code (with no
@@ -136,7 +136,7 @@ function initialize(def) {
     return (await r.json().catch(() => ({}))).error ?? `(status ${r.status})`
   }
   const noRouteSaid = (token) => said(token)
-  const claudeLaunch = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).filter((l) => l.env?.HIVE_AGENT === 'Clara').at(-1)
+  const claudeLaunch = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).filter((l) => l.env?.CW_AGENT === 'Clara').at(-1)
   const codexTold = () => {
     const l = fs.readFileSync(path.join(codexHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((x) => JSON.parse(x)).filter((x) => x.agent === 'Cody').at(-1)
     const i = l?.args.findIndex((a) => a.startsWith('developer_instructions=')) ?? -1
@@ -166,9 +166,9 @@ function initialize(def) {
 
   // hive-mcp.js (Claude Code's contract comes from its instructions) and hive-progress get the chain's file.
   const launch = claudeLaunch()
-  const mcp = launch?.opts?.['--mcp-config'] ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers?.hive : null
-  const file = mcp?.env?.HIVE_DIALECT_FILE
-  check("Clara's hive server is given its chain's file, and its shell too (for hive-progress)", !!file && fs.existsSync(file) && launch.env?.HIVE_DIALECT_FILE === file && mcp.env.HIVE_DIALECT === d1?.hash, JSON.stringify({ file, env: launch?.env }))
+  const mcp = launch?.opts?.['--mcp-config'] ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers?.combwork : null
+  const file = mcp?.env?.CW_DIALECT_FILE
+  check("Clara's hive server is given its chain's file, and its shell too (for hive-progress)", !!file && fs.existsSync(file) && launch.env?.CW_DIALECT_FILE === file && mcp.env.CW_DIALECT === d1?.hash, JSON.stringify({ file, env: launch?.env }))
   const instructions = (await initialize(mcp))?.instructions ?? ''
   check('…which its hive server speaks: the contract opens with the test copy\'s line', instructions.startsWith('MODEL-HOST-1 alpha.'), instructions.slice(0, 160))
   check("Cody's contract (Hive's own developer_instructions) opens with the Workspace file's line", codexTold().startsWith('WS-HOST-1 alpha.'), codexTold().slice(0, 160))
@@ -190,7 +190,7 @@ function initialize(def) {
   const d2 = (await agentNow(clara.id))?.live?.launched?.dialect
   check('…on the edited chain: a new hash, and no restart needed', !!d2 && d2.hash !== d1.hash && !!(await until(async () => (await agentNow(clara.id))?.restartNeeded === false, HUNG_MS)), JSON.stringify(d2))
   const launch2 = claudeLaunch()
-  check('…and speaks it: its token, and its hive server\'s contract', (await noRouteSaid(launch2?.token)).startsWith('MODEL-ROUTE-2 GET') && ((await initialize(JSON.parse(fs.readFileSync(launch2.opts['--mcp-config'], 'utf8')).mcpServers.hive))?.instructions ?? '').startsWith('MODEL-HOST-2 alpha.'))
+  check('…and speaks it: its token, and its hive server\'s contract', (await noRouteSaid(launch2?.token)).startsWith('MODEL-ROUTE-2 GET') && ((await initialize(JSON.parse(fs.readFileSync(launch2.opts['--mcp-config'], 'utf8')).mcpServers.combwork))?.instructions ?? '').startsWith('MODEL-HOST-2 alpha.'))
 
   // --- Back to Auto: a change of the setting is a change of chain, applied at the next launch.
   await inv('agents:update', proj, clara.id, { dialect: null })
@@ -205,9 +205,9 @@ function initialize(def) {
   fs.writeFileSync(path.join(dialects, 'workspace.json'), JSON.stringify({ name: 'Workspace', texts: {} }, null, 2))
   check('Clara restarts with no file overriding anything', !!(await restart(clara.id)))
   const plain = claudeLaunch()
-  const plainMcp = JSON.parse(fs.readFileSync(plain.opts['--mcp-config'], 'utf8')).mcpServers.hive
+  const plainMcp = JSON.parse(fs.readFileSync(plain.opts['--mcp-config'], 'utf8')).mcpServers.combwork
   const d4 = (await agentNow(clara.id))?.live?.launched
-  check('…gets no dialect file, in its hive server or its shell', !plainMcp.env.HIVE_DIALECT_FILE && !plain.env?.HIVE_DIALECT_FILE, JSON.stringify(plain.env))
+  check('…gets no dialect file, in its hive server or its shell', !plainMcp.env.CW_DIALECT_FILE && !plain.env?.CW_DIALECT_FILE, JSON.stringify(plain.env))
   check('…and its launch record says only "model unknown" (Auto, no model chosen, none the CLI names: decision Q4)', JSON.stringify(d4?.dialect) === JSON.stringify({ modelUnknown: true }), JSON.stringify(d4))
   check('…and Hive\'s own English', (await noRouteSaid(plain.token)).startsWith('No route for GET'), await noRouteSaid(plain.token))
   // A model Hive can name: a launch with no dialect records nothing of one (as before dialects).

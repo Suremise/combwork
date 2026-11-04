@@ -743,7 +743,7 @@ describe("a pool lane's design step (HI-2310): given out by the pool, its answer
     await pass(e)
     expect(designReviewer(e.store.facts(a.id), () => true)).toBe('R2')
     expect(state.calls).toEqual(['typed to R2'])
-    expect(state.deliveries.at(-1)?.body).toMatch(new RegExp(`posted a design for a check \\(${id}\\).*hive_loop_step`))
+    expect(state.deliveries.at(-1)?.body).toMatch(new RegExp(`posted a design for a check \\(${id}\\).*cw_loop_step`))
     // Checking the design, R2 isn't free for a card in Review meanwhile.
     const other = e.wf.createCard({ title: 'Other' })
     lane(e, 'L2', [other.id], 'B2', null)

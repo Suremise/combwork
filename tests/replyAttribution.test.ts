@@ -67,7 +67,7 @@ describe("Hive's own line isn't the user's reply (HI-2218)", () => {
     const e = running()
     // The user answers something in the pane (the agent's startup, say): their Enter.
     sessions.noteUserInput(pty, '\r')
-    const line = '[Hive] New in your inbox: 1 task (m672)'
+    const line = '[CW] New in your inbox: 1 task (m672)'
     let reportedWhileDelivering = false
     // Its CLI takes Hive's line at its Enter, while sendPrompt's confirm still waits (`typed` not recorded yet).
     onEnter.fn = () => {
@@ -94,7 +94,7 @@ describe("Hive's own line isn't the user's reply (HI-2218)", () => {
     e.launchTask = true
     // The user answers its trust screen with Enter (the reported case: a new sign-in's home), then its CLI takes the task.
     sessions.noteUserInput(pty, '\r')
-    prompted(e, '[Hive] New in your inbox: 1 task (m672)')
+    prompted(e, '[CW] New in your inbox: 1 task (m672)')
     expect(replies, "the launch task is told as nobody's reply").toEqual([])
     // The user then sends a prompt of their own: told.
     sessions.noteUserInput(pty, 'Blue\r')

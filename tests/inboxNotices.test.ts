@@ -29,9 +29,9 @@ describe("Hive's notice wording (#650)", () => {
     expect(noticeCounts([{ id: 'm1', kind: 'rebrief' }])).toBe('1 message')
     expect(noticeCounts([{ id: 'm3', kind: 'card-event', card: 14 }, { id: 'm1', kind: 'rebrief' }, { id: 'm2', kind: 'card-event', card: 12 }, { id: 'm4', kind: 'control' }])).toBe('1 message, 2 card events (#12, #14) and 1 notice')
     const items = [{ id: 'm4', kind: 'rebrief' as const }, { id: 'm7', kind: 'card-event' as const, card: 607 }]
-    expect(inboxNotice('checkpoint', items)).toBe('[Hive] New in your inbox: 1 message and 1 card event (#607) (m4, m7). Call hive_inbox now to read them; act on them and ack them, then carry on.')
-    expect(inboxNotice('drain', items.slice(0, 1))).toBe("[Hive] Before you finish: your inbox has 1 message (m4) you haven't read. Call hive_inbox, act on it and ack it before you end your turn.")
-    expect(inboxNotice('doorbell', items.slice(1))).toBe('[Hive] New in your inbox: 1 card event (#607) (m7). Call hive_inbox to read it.')
+    expect(inboxNotice('checkpoint', items)).toBe('[CW] New in your inbox: 1 message and 1 card event (#607) (m4, m7). Call cw_inbox now to read them; act on them and ack them, then carry on.')
+    expect(inboxNotice('drain', items.slice(0, 1))).toBe("[CW] Before you finish: your inbox has 1 message (m4) you haven't read. Call cw_inbox, act on it and ack it before you end your turn.")
+    expect(inboxNotice('doorbell', items.slice(1))).toBe('[CW] New in your inbox: 1 card event (#607) (m7). Call cw_inbox to read it.')
     expect(inboxNotice('doorbell', [])).toBe('')
   })
 
@@ -124,12 +124,12 @@ describe('notices in the hook replies (#650)', () => {
     expect(await hook(st, tool('p1', 'c1'))).toBeNull()
     const m = await leave(st)
     const told = context(await hook(st, tool('p1', 'c2')))
-    expect(told).toBe(`[Hive] New in your inbox: 1 message (${m.id}). Call hive_inbox now to read it; act on it and ack it, then carry on.`)
+    expect(told).toBe(`[CW] New in your inbox: 1 message (${m.id}). Call cw_inbox now to read it; act on it and ack it, then carry on.`)
     expect(told).not.toContain('force')
     // Told once: the next tool call says nothing more until something new comes.
     expect(await hook(st, tool('p1', 'c3'))).toBeNull()
     const e = await leave(st, { kind: 'card-event', card: 607 })
-    expect(context(await hook(st, tool('p1', 'c4')))).toBe(`[Hive] New in your inbox: 1 message and 1 card event (#607) (${m.id}, ${e.id}). Call hive_inbox now to read them; act on them and ack them, then carry on.`)
+    expect(context(await hook(st, tool('p1', 'c4')))).toBe(`[CW] New in your inbox: 1 message and 1 card event (#607) (${m.id}, ${e.id}). Call cw_inbox now to read them; act on them and ack them, then carry on.`)
     expect(st.status).toBe('working')
   })
 
@@ -138,7 +138,7 @@ describe('notices in the hook replies (#650)', () => {
     await hook(st, { hook_event_name: 'UserPromptSubmit', prompt_id: 'p1', prompt: 'go' })
     const m = await leave(st)
     const drain = await hook(st, { hook_event_name: 'Stop', prompt_id: 'p1', stop_hook_active: false, last_assistant_message: 'Done' })
-    expect(context(drain)).toBe(`[Hive] Before you finish: your inbox has 1 message (${m.id}) you haven't read. Call hive_inbox, act on it and ack it before you end your turn.`)
+    expect(context(drain)).toBe(`[CW] Before you finish: your inbox has 1 message (${m.id}) you haven't read. Call cw_inbox, act on it and ack it before you end your turn.`)
     expect(st.status).toBe('working')
     // It didn't read it; the Stop after the continuation isn't drained again (stop_hook_active), and ends the turn.
     expect(await hook(st, { hook_event_name: 'Stop', prompt_id: 'p1', stop_hook_active: true, last_assistant_message: 'Done' })).toBeNull()
@@ -222,13 +222,13 @@ describe('notices in the hook replies (#650)', () => {
       await vi.waitFor(() => expect(asked).toBe(1), { timeout: 5000 })
       release()
       const replies = await Promise.all([first, second])
-      expect(replies.map(context)).toEqual([expect.stringMatching(/^\[Hive\] Before you finish: /), undefined])
+      expect(replies.map(context)).toEqual([expect.stringMatching(/^\[CW\] Before you finish: /), undefined])
       expect(asked).toBe(1)
       sessions.inboxNotice = real
       // A new prompt (p2): a late Stop of p1 is stale to the ledger, and gets nothing; p2's own Stop is drained.
       await hook(st, { hook_event_name: 'UserPromptSubmit', prompt_id: 'p2', prompt: 'again' })
       expect(await hook(st, { hook_event_name: 'Stop', prompt_id: 'p1', stop_hook_active: false })).toBeNull()
-      expect(context(await hook(st, { hook_event_name: 'Stop', prompt_id: 'p2', stop_hook_active: false }))).toMatch(/^\[Hive\] Before you finish: /)
+      expect(context(await hook(st, { hook_event_name: 'Stop', prompt_id: 'p2', stop_hook_active: false }))).toMatch(/^\[CW\] Before you finish: /)
       // A prompt (p4) sent while p3's Stop's notice is worked out waits behind it: the Stop is decided on p3, the turn the
       // ledger has then; p4 begins after, and has its own drain.
       await hook(st, { hook_event_name: 'UserPromptSubmit', prompt_id: 'p3', prompt: 'more' })
@@ -237,10 +237,10 @@ describe('notices in the hook replies (#650)', () => {
       await vi.waitFor(() => expect(asked).toBe(1), { timeout: 5000 })
       const next = send(full({ hook_event_name: 'UserPromptSubmit', prompt_id: 'p4', prompt: 'and more' }))
       release()
-      expect(context(await atStop)).toMatch(/^\[Hive\] Before you finish: /)
+      expect(context(await atStop)).toMatch(/^\[CW\] Before you finish: /)
       await next
       sessions.inboxNotice = real
-      expect(context(await hook(st, { hook_event_name: 'Stop', prompt_id: 'p4', stop_hook_active: false }))).toMatch(/^\[Hive\] Before you finish: /)
+      expect(context(await hook(st, { hook_event_name: 'Stop', prompt_id: 'p4', stop_hook_active: false }))).toMatch(/^\[CW\] Before you finish: /)
     } finally {
       release()
       sessions.inboxNotice = real
@@ -487,8 +487,8 @@ describe('notices in the hook replies (#650)', () => {
     // p1's prompt again, late (the turn ledger finds it stale): nothing moves back to p1.
     await hook(st, { hook_event_name: 'UserPromptSubmit', prompt_id: 'p1', prompt: 'go' })
     expect(await hook(st, { hook_event_name: 'Stop', prompt_id: 'p1', stop_hook_active: false })).toBeNull()
-    expect(context(await hook(st, tool('p2', 'c1')))).toBe(`[Hive] New in your inbox: 1 message (${m.id}). Call hive_inbox now to read it; act on it and ack it, then carry on.`)
-    expect(context(await hook(st, { hook_event_name: 'Stop', prompt_id: 'p2', stop_hook_active: false }))).toMatch(/^\[Hive\] Before you finish: /)
+    expect(context(await hook(st, tool('p2', 'c1')))).toBe(`[CW] New in your inbox: 1 message (${m.id}). Call cw_inbox now to read it; act on it and ack it, then carry on.`)
+    expect(context(await hook(st, { hook_event_name: 'Stop', prompt_id: 'p2', stop_hook_active: false }))).toMatch(/^\[CW\] Before you finish: /)
     expect(await hook(st, { hook_event_name: 'Stop', prompt_id: 'p2', stop_hook_active: false })).toBeNull()
   })
 
@@ -520,7 +520,7 @@ describe('notices in the hook replies (#650)', () => {
       const second = send(full({ hook_event_name: 'UserPromptSubmit', prompt: 'second' }))
       release()
       const drain = (await atStop) as { decision: string; reason: string }
-      expect(drain).toMatchObject({ decision: 'block', reason: expect.stringMatching(/^\[Hive\] Before you finish: /) })
+      expect(drain).toMatchObject({ decision: 'block', reason: expect.stringMatching(/^\[CW\] Before you finish: /) })
       await second
     } finally {
       release()

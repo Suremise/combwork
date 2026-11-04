@@ -82,8 +82,8 @@ const check = (name, ok, extra = '') => {
       const inbox = (await api('GET', '/v1/projects/alpha/agents/Builder/activity')).body?.inbox
       return !!inbox?.deliveries?.some((d) => d.id === id && (d.state === 'received' || d.state === 'acked'))
     }
-    /** The doorbells Hive typed into the agent (the input log's reads with "[Hive] New in your inbox"), with when. */
-    const doorbells = () => jsonl('fake-input.jsonl').filter((r) => /\[Hive\] New in your inbox/.test(r.data))
+    /** The doorbells Hive typed into the agent (the input log's reads with "[CW] New in your inbox"), with when. */
+    const doorbells = () => jsonl('fake-input.jsonl').filter((r) => /\[CW\] New in your inbox/.test(r.data))
     const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
 
     await page.getByText('alpha', { exact: true }).first().click()

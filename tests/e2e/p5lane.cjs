@@ -136,8 +136,8 @@ const ancestor = (x, y) => {
     const tokenOf = async (id) => {
       const sessionId = await waitHung(async () => (await live(id))?.sessionId)
       const launch = await waitHung(() => q.launches(fx).filter((l) => l.sessionId === sessionId && l.opts['--mcp-config']).at(-1))
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     /** The agents' tokens after a lane start, once both run again. */
     const retoken = async () => {
@@ -233,7 +233,7 @@ const ancestor = (x, y) => {
       const pass = await intent('r1', n, 'verdict', { pass: true, comment: `${file}: PASSED` })
       check(`the reviewer passes ${await keyOf(n)}`, pass.status === 200, JSON.stringify(pass.body))
       if (watched) {
-        const wakes = async () => ((await api('GET', `/v1/projects/alpha/agents/${encodeURIComponent(b1.name)}/deliveries?limit=200`, undefined, tokens.b1)).body?.deliveries ?? []).filter((d) => d.kind === 'card-event' && String(d.text ?? '').startsWith('[Hive] '))
+        const wakes = async () => ((await api('GET', `/v1/projects/alpha/agents/${encodeURIComponent(b1.name)}/deliveries?limit=200`, undefined, tokens.b1)).body?.deliveries ?? []).filter((d) => d.kind === 'card-event' && String(d.text ?? '').startsWith('[CW] '))
         const first = await waitHung(async () => (await wakes())[0])
         check(`…B1's first wake on ${await keyOf(n)} is the verdict, not its own move into Review`, !!first && /passed it|is in Passed/.test(first.text) && !/is in Review/.test(first.text), JSON.stringify(await wakes()))
       }

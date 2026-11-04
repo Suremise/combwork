@@ -65,7 +65,7 @@ export const TEAM_PAUSE_REASON = 'teamPause' as const
 const T = {
   pausing: agentMsg({
     id: 'notice.team.paused',
-    text: 'The team is pausing for an update. Finish this turn, end the runs you started (tests, builds, dev servers, test copies of Hive), commit your work, then end your turn. Until the team resumes Hive starts no card and sends you no card events or watch wakes; a message or an answer can still reach you.',
+    text: 'The team is pausing for an update. Finish this turn, end the runs you started (tests, builds, dev servers, test copies of Combwork), commit your work, then end your turn. Until the team resumes Combwork starts no card and sends you no card events or watch wakes; a message or an answer can still reach you.',
     note: "HI-2081: the notice each running agent is given once per team pause, true to what the hold does (HR1's s8 check): no card starts or events, while a message or an answer still comes."
   })
 }

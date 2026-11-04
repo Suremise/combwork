@@ -8,7 +8,7 @@
     "note": "A check name with characters no check has."
   },
   "check.link.checkNeedsCard": {
-    "text": "A check runs its project's command for it: name the card too, so Hive knows the project",
+    "text": "A check runs its project's command for it: name the card too, so Combwork knows the project",
     "note": "A check named by a caller with no project (a script), and no card."
   },
   "check.link.focusedForm": {
@@ -20,7 +20,7 @@
     "note": "A request whose folder is missing, not absolute or too long."
   },
   "check.link.noCommand": {
-    "text": "{project} has no command configured for the check \"{name}\", so nothing was run. hive-progress --check runs the command the project's options give for that name",
+    "text": "{project} has no command configured for the check \"{name}\", so nothing was run. cw-progress --check runs the command the project's options give for that name",
     "note": "#1220: a check runs the command the project's options give for it. project: its folder name; name: the check."
   },
   "check.link.noContentRevision": {

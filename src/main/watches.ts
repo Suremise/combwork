@@ -38,11 +38,11 @@ import { namedBy } from '../shared/projectKeys'
 import { projectPreferences } from './workflow/preferences'
 import { forYouOfCards } from './workflow/cardWork'
 import type { ForYouItem } from '../shared/workflow/workView'
-import { NOTICE_PREFIX } from '../shared/doorbell'
+import { currentProtocolText, LEGACY_NOTICE_PREFIX, NOTICE_PREFIX } from '../shared/doorbell'
 import { agentMsg, inDialectOf, say, type AgentMsg, type DialectSession } from '../shared/agentText'
 
 /**
- * Wake-on-change watches (#128): an agent registers what it waits for on the board (hive_wait_for_tasks with wake), ends
+ * Wake-on-change watches (#128): an agent registers what it waits for on the board (cw_wait_for_tasks with wake), ends
  * its turn, and Hive types one line into it when a watched card changes, or when its overall limit passes with no change.
  * Nothing runs while it waits. One watch per agent (a new one replaces it), kept in the workspace's .hive/watches.json so
  * it survives the agent being resumed and Hive restarting; it ends when its line is typed, or when the agent or the user
@@ -55,7 +55,7 @@ import { agentMsg, inDialectOf, say, type AgentMsg, type DialectSession } from '
  *   checked after every wait and before every write, and the watches are dropped when it closes or the window switches.
  * - Changes to a workspace's watches happen one at a time (`locked`), so a board change checked while a watch is being
  *   registered is checked again once it is in place, and a cancel can't be undone by a delivery that was under way.
- * - An agent watch (#416, hive_wait_for_agents with wake) is a watch that follows agents instead of cards: it fires when
+ * - An agent watch (#416, cw_wait_for_agents with wake) is a watch that follows agents instead of cards: it fires when
  *   a watched agent's turn ends, it waits for the user, or it stops, checked on every status change. It is the agent's
  *   one watch like any other (a card watch replaces it, and it replaces one), kept, typed and ended the same way.
  */
@@ -67,7 +67,7 @@ const userName = (): string => userNameOf(config.settings.general?.userName)
 const T = {
   usageLabel: agentMsg({ id: 'wake.watch.usageLabel', text: 'Waiting for usage: {accounts}', note: 'HI-2195: a usage watch\'s label (alone), as replies and the agent\'s watch show it. accounts: each account with its share and limit ("Max 1 at 98% of its weekly limit").' }),
   withUsage: agentMsg({ id: 'wake.watch.withUsage', text: '{label}, and usage: {accounts}', note: 'HI-2195: a watch\'s label with a usage watch beside its cards or lanes. label: the watch\'s own label; accounts: as in wake.watch.usageLabel.' }),
-  tooMany: agentMsg({ id: 'wake.watch.tooMany', text: 'This workspace already has {max} watches, the most Hive keeps: wait for some to end', note: 'An agent, lane or usage watch refused: the workspace has as many watches as Hive keeps. max: how many.' }),
+  tooMany: agentMsg({ id: 'wake.watch.tooMany', text: 'This workspace already has {max} watches, the most Combwork keeps: wait for some to end', note: 'An agent, lane or usage watch refused: the workspace has as many watches as Hive keeps. max: how many.' }),
   tooBig: agentMsg({ id: 'wake.watch.tooBig', text: 'Too many watches to keep in this workspace: wait for some to end', note: 'An agent or lane watch refused: the watches would no longer fit the file Hive keeps them in.' }),
   notSaved: agentMsg({ id: 'wake.watch.notSaved', text: 'Could not save the watch: {error}', note: 'A watch refused: it could not be saved. error: why (the system\'s or Hive\'s own error, as it is).' }),
   notCancelled: agentMsg({ id: 'wake.watch.notCancelled', text: 'Could not cancel the watch: {error}', note: 'An agent\'s watch not cancelled: the change could not be saved. error: why (as it is).' }),
@@ -79,7 +79,7 @@ const T = {
   watchEnded: agentMsg({ id: 'inbox.watchEnded.ended', text: 'its watch has ended', note: "Why a watch's wake was cancelled just before it was given: its watch has ended meanwhile." }),
   repliesOff: agentMsg({ id: 'inbox.watchEnded.repliesOff', text: "the user's replies are no longer told", note: "#418, #1099: why a wake telling the Assistant a reply of the user's to an agent was cancelled: Settings → Assistant → Tell the Assistant when I reply to an agent was turned off." }),
   notSavedWake: agentMsg({ id: 'inbox.watchEnded.notSaved', text: "cancelled: its watch couldn't be saved", note: "Why a watch's wake was cancelled as it was handed over: the watch could not be saved with it (it fires again)." }),
-  againTyping: agentMsg({ id: 'inbox.again.typing', text: 'Hive restarted while typing it', note: "Why a watch's wake may repeat (#649), after the doorbell (inbox.offer.again): Hive stopped while typing it." }),
+  againTyping: agentMsg({ id: 'inbox.again.typing', text: 'Combwork restarted while typing it', note: "Why a watch's wake may repeat (#649), after the doorbell (inbox.offer.again): Hive stopped while typing it." }),
   itsBuilder: agentMsg({ id: 'wake.card.itsBuilder', text: 'its builder', note: 'HI-2143: who submitted a card again after the merge queue returned it, in a wake to whoever watches or reviews it, when the card names no agent.' })
 }
 
@@ -595,7 +595,7 @@ function readRecord(v: unknown): WatchRecord | null {
   if (r.fired !== undefined) {
     const f = r.fired as Record<string, unknown> | null
     const cards = Array.isArray(f?.cards) ? f.cards.filter((n): n is number => cond.cards.includes(n as number)) : null
-    if (!f || typeof f.line !== 'string' || jsonBytes(f.line) > MAX_LINE_BYTES || !f.line.startsWith('[Hive] ') || !time(f.at) || !cards || (f.sending !== undefined && !time(f.sending)) || (f.delivery !== undefined && !(typeof f.delivery === 'string' && /^m\d{1,15}$/.test(f.delivery)))) return null
+    if (!f || typeof f.line !== 'string' || jsonBytes(f.line) > MAX_LINE_BYTES || !(f.line.startsWith(NOTICE_PREFIX) || f.line.startsWith(LEGACY_NOTICE_PREFIX)) || !time(f.at) || !cards || (f.sending !== undefined && !time(f.sending)) || (f.delivery !== undefined && !(typeof f.delivery === 'string' && /^m\d{1,15}$/.test(f.delivery)))) return null
     const told = Array.isArray(f.agents) && agentMarks ? f.agents.filter((k): k is string => typeof k === 'string' && k in agentMarks!) : undefined
     // A lane watch's pending marks (#649): each as a lane watch's own marks are read.
     let pendingLanes: Record<string, LaneMark> | undefined
@@ -608,7 +608,8 @@ function readRecord(v: unknown): WatchRecord | null {
         pendingLanes[id] = mark
       }
     }
-    fired = { line: f.line, at: f.at, cards, ...(told?.length ? { agents: told } : {}), ...(f.lanes === true && lanes ? { lanes: true as const } : {}), ...(f.replies === true ? { replies: true as const } : {}), ...(f.delivery ? { delivery: f.delivery as string } : {}), ...(pendingLanes ? { laneMarks: pendingLanes } : {}), ...(f.again === true ? { again: true as const } : {}), ...(f.sending ? { sending: f.sending as string } : {}), ...(f.limit === true ? { limit: true as const } : {}) }
+    // A line fired before HI-2463 is said with the current names when it goes (its prefix, cw_ tools, cw-progress).
+    fired = { line: currentProtocolText(f.line), at: f.at, cards, ...(told?.length ? { agents: told } : {}), ...(f.lanes === true && lanes ? { lanes: true as const } : {}), ...(f.replies === true ? { replies: true as const } : {}), ...(f.delivery ? { delivery: f.delivery as string } : {}), ...(pendingLanes ? { laneMarks: pendingLanes } : {}), ...(f.again === true ? { again: true as const } : {}), ...(f.sending ? { sending: f.sending as string } : {}), ...(f.limit === true ? { limit: true as const } : {}) }
   }
   // Where its view of each card ended (every card, or none from before #224), and whose own changes aren't news.
   let seen: Record<string, Seen> | undefined
@@ -1273,7 +1274,7 @@ const RUN = randomBytes(6).toString('hex')
  */
 const replyHolds = (r: DeliveryRecord): boolean => tellReplies() && (r.meta?.run !== RUN || r.meta?.generation === replyGeneration)
 
-/** The replies' part in their deliveries (#1099): offered and handed out (hive_inbox) only while replyHolds. */
+/** The replies' part in their deliveries (#1099): offered and handed out (cw_inbox) only while replyHolds. */
 registerSource('reply', {
   refresh: async (r, host) => (replyHolds(r) ? null : { cancel: inDialectOf({ projectPath: host, agentId: r.agentId }, () => say(T.repliesOff)) }),
   holds: (r) => replyHolds(r)
@@ -1899,7 +1900,7 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
     const known = (await listLanes(ws, { all: true })).filter((l) => scope === null || same(l.project, scope))
     const unknown = cond.ids.filter((id) => !known.some((l) => l.id === id))
     // agent-protocol: servers.ts gives this reply its status by its opening (/^No such lane/)
-    if (unknown.length) throw new Error(`No such lane${unknown.length === 1 ? '' : 's'}: ${unknown.join(', ')} (hive_lane list gives the lanes and their ids)`)
+    if (unknown.length) throw new Error(`No such lane${unknown.length === 1 ? '' : 's'}: ${unknown.join(', ')} (cw_lane list gives the lanes and their ids)`)
   }
   const result = await locked(store, async (): Promise<LaneWatchResult> => {
     await assertNotPlacing(ws, projectPath, agentId, scopeFor(ws, projectPath))
@@ -2126,7 +2127,7 @@ function toldOf(projectPath: string, agentId: string, n: number): { h: string | 
 
 /** Hive's own deliveries come from it. */
 // agent-protocol: the sender's name a delivery is labelled with (deliveries name their senders)
-const HIVE = { kind: 'hive', name: 'Hive' } as const
+const HIVE = { kind: 'hive', name: 'Combwork' } as const
 
 /** A watch's wake's key among its deliveries: the watch and when it fired (a restart finds the one it made). */
 const wakeRef = (rec: WatchRecord): string => `${rec.id}@${rec.fired?.at ?? ''}`
@@ -2305,7 +2306,7 @@ async function followDelivered(store: Store): Promise<void> {
  * Hands a fired watch's line to the delivery service (#649), which types it: once its agent can take a line (ready,
  * finished or watching, nobody typing there, no line of Hive's waiting), so the line is made from the cards as they are
  * then. The watch stays (the agent shows watching and takes no other work) until that delivery is received (its line
- * taken by its CLI, or fetched with hive_inbox): then it ends, and what its line told is where the agent's next watch
+ * taken by its CLI, or fetched with cw_inbox): then it ends, and what its line told is where the agent's next watch
  * starts, never on "typed". Cancelled or replaced meanwhile, its delivery is cancelled too. A card its line tells about
  * is checked again first: one that has left the agent's view is told as gone.
  */

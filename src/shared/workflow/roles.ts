@@ -61,7 +61,7 @@ export interface WorkflowPair {
   pool?: true
   lane?: string
   /**
-   * A running lane's state, as its line in `hive_lane list` says it (HI-2271): "active, on AL-1", "paused, AL-2 is
+   * A running lane's state, as its line in `cw_lane list` says it (HI-2271): "active, on AL-1", "paused, AL-2 is
    * blocked". An Assistant reading project status took the lane's card from the board's Doing column.
    */
   state?: string

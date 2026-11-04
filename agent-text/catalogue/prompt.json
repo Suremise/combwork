@@ -1,6 +1,6 @@
 {
   "prompt.card.attachments": {
-    "text": "Its attachments (open them by path): {paths}{more, select, yes {, and {moreCount} more (hive_read_task lists them)} other {}}.",
+    "text": "Its attachments (open them by path): {paths}{more, select, yes {, and {moreCount} more (cw_read_task lists them)} other {}}.",
     "note": "HI-1700: the paths of up to 10 of its attachments, joined with commas; more: yes when it has more than that, moreCount of them."
   },
   "prompt.card.backFrom": {
@@ -8,11 +8,11 @@
     "note": "More work on a card from Review, Passed or Done. column: the column it came from, by its name (Review, Passed, Done)."
   },
   "prompt.card.commentCut": {
-    "text": "{start}… (cut short: hive_read_task has it all)",
+    "text": "{start}… (cut short: cw_read_task has it all)",
     "note": "A latest comment over 4,000 characters: its start, cut."
   },
   "prompt.card.comments": {
-    "text": "The card has {n, plural, one {{count} comment} other {{count} comments}}: read {again, select, yes {the rest} other {them}} with hive_read_task.",
+    "text": "The card has {n, plural, one {{count} comment} other {{count} comments}}: read {again, select, yes {the rest} other {them}} with cw_read_task.",
     "note": "After the skill line, when the card has comments. count: how many (n, as text); again: yes for more work on a card, whose latest comment the prompt carries."
   },
   "prompt.card.dependsOn": {
@@ -32,7 +32,7 @@
     "note": "With Hive's tools: how to carry a card through is the work-on-card skill's, so the prompt only points there."
   },
   "prompt.card.start": {
-    "text": "Work on task {card} from the Hive task board: {title}",
+    "text": "Work on task {card} from the Combwork task board: {title}",
     "note": "The first line of a card's start prompt. card: its key (AM-12), or #12 for a card with none."
   },
   "prompt.context.broken": {
@@ -40,7 +40,7 @@
     "note": "#819: never silently nothing: the references that no longer resolve (prompt.context.problem), joined with \"; \"."
   },
   "prompt.context.howToRead": {
-    "text": "hive_read_section reads {ok, select, yes {each} other {the closest}} as the card has it (path: the file; heading: # and the slug{ok, select, yes { after it, none for a whole file} other {}}; from: \"project\").",
+    "text": "cw_read_section reads {ok, select, yes {each} other {the closest}} as the card has it (path: the file; heading: # and the slug{ok, select, yes { after it, none for a whole file} other {}}; from: \"project\").",
     "note": "#818, #819: from the copy the card was checked against, the project's, whatever folder the agent works in. ok: yes when some references resolve (else only the closest headings are named)."
   },
   "prompt.context.item": {
@@ -48,7 +48,7 @@
     "note": "A doc section to read first, with its size: \"1.2k\", \"56k\"."
   },
   "prompt.context.problem": {
-    "text": "{ref} ({problem, select, notFound {no such file} noHeading {no such heading} ambiguous {several headings have its text} invalid {not a doc section} outside {not in the project} hidden {in Hive's or git's own folder} notMarkdown {not Markdown} tooBig {too big to read} other {}}{closest, select, yes {; {problem, select, ambiguous {they are} other {closest}}: {headings}} other {}})",
+    "text": "{ref} ({problem, select, notFound {no such file} noHeading {no such heading} ambiguous {several headings have its text} invalid {not a doc section} outside {not in the project} hidden {in Combwork's or git's own folder} notMarkdown {not Markdown} tooBig {too big to read} other {}}{closest, select, yes {; {problem, select, ambiguous {they are} other {closest}}: {headings}} other {}})",
     "note": "Why a reference doesn't resolve: \"docs/PLAN.md#setup (no such heading; closest: #install)\". headings: the closest, each as #slug, joined with commas."
   },
   "prompt.context.readFirst": {

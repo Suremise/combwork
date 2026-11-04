@@ -1,4 +1,4 @@
-// The Assistant's settings tools (#186) on a provider's prices (#315): null puts back Hive's prices as Settings' Reset to
+// The Assistant's settings tools (#186) on a provider's prices (#315): null puts back Combwork's prices as Settings' Reset to
 // defaults does, the shipped models removed from the table too; a table keeps them removed; Revert puts the removed list
 // back with the overrides, and is refused when it changed since.
 import { readdirSync, readFileSync } from 'fs'
@@ -43,7 +43,7 @@ describe("the settings tools on a provider's prices", () => {
       expect(r).toEqual({ old: mine, new: {}, removed: { old: ['gpt-5.5'], new: [] } })
       expect(config.settings.providers.codex.prices).toEqual({})
       expect('pricesRemoved' in config.settings.providers.codex).toBe(false)
-      expect(settingChangeTexts(prices, r.old, r.new, r.removed)).toEqual({ oldText: 'gpt-7: {"input":1,"cachedInput":0.1,"output":5}, gpt-5.5: removed', newText: "gpt-7: (none), gpt-5.5: Hive's price" })
+      expect(settingChangeTexts(prices, r.old, r.new, r.removed)).toEqual({ oldText: 'gpt-7: {"input":1,"cachedInput":0.1,"output":5}, gpt-5.5: removed', newText: "gpt-7: (none), gpt-5.5: Combwork's price" })
     })
   })
 
@@ -51,7 +51,7 @@ describe("the settings tools on a provider's prices", () => {
     await withPrices({}, ['gpt-5.5'], async () => {
       const r = await applySetting(prices, null, null)
       expect(r.removed).toEqual({ old: ['gpt-5.5'], new: [] })
-      expect(settingChangeTexts(prices, r.old, r.new, r.removed)).toEqual({ oldText: 'gpt-5.5: removed', newText: "gpt-5.5: Hive's price" })
+      expect(settingChangeTexts(prices, r.old, r.new, r.removed)).toEqual({ oldText: 'gpt-5.5: removed', newText: "gpt-5.5: Combwork's price" })
     })
   })
 

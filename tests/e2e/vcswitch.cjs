@@ -149,7 +149,7 @@ function writeProject(dir, cfg) {
     const c2 = (await inv('tasks:create', { title: 'Gamma lane', project: 'gamma' })).number
     const c3 = (await inv('tasks:create', { title: 'Gamma next', project: 'gamma' })).number
     check('gamma: a card in flight under Git', (await q.intent(h, g1, c1, 'start')).status === 200 && (await startedUnder(c1)) === 'git')
-    // A lane of its own builder, registered by it (the hive_lane tool's route): no agent is started again, so G1 keeps
+    // A lane of its own builder, registered by it (the cw_lane tool's route): no agent is started again, so G1 keeps
     // its session and token.
     const gl = await q.agent(fx, h, 'GL', { project: gamma })
     const lane = await fetch(`http://127.0.0.1:${PORT}/v1/lanes`, { method: 'POST', headers: { Authorization: `Bearer ${gl.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ project: 'gamma', reviewer: 'GR', cards: [c2], name: 'gamma lane' }) })

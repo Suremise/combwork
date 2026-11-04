@@ -63,7 +63,7 @@ const A = {
   retryCancel: agentMsg({ id: 'brief.start.retryCancel', text: 'the retry of its new conversation', note: 'Who cancelled the briefs of a lane agent\'s blocked new conversation, as the delivery records it ("cancelled by …"), as it is tried again. Stored, so the Default\'s.' }),
   builderPrompt: agentMsg({
     id: 'brief.start.builderPrompt',
-    text: 'Use card-loop as the builder of lane {lane}: hive_lane next names your card.',
+    text: 'Use card-loop as the builder of lane {lane}: cw_lane next names your card.',
     note: "HR2's HI-1900 round 1: a running lane updated while its builder isn't running starts it with one line naming its lane, as coordinate-agents had the Assistant do."
   }),
   builderStarted: agentMsg({ id: 'brief.start.builderStarted', text: "{agent} wasn't running: started it on the lane.", note: "The lane change's reply: the lane's builder wasn't running, so Hive started it with brief.start.builderPrompt." }),
@@ -74,12 +74,12 @@ const A = {
   }),
   byHive: agentMsg({
     id: 'brief.record.byHive',
-    text: "{agent} is running, so Hive left it as it is: Hive gives it the lane's first card itself once it is free, so don't prompt it.",
+    text: "{agent} is running, so Combwork left it as it is: Combwork gives it the lane's first card itself once it is free, so don't prompt it.",
     note: "HI-2029: a running builder, the rules on: Hive gives it the lane's first card once it is free, so the caller is told not to prompt it (that would race Hive's start)."
   }),
   tell: agentMsg({
     id: 'brief.record.tell',
-    text: '{agents} {count, plural, one {is running, so Hive left it as it is: tell it about the lane.} other {are running, so Hive left them as they are: tell them about the lane.}}',
+    text: '{agents} {count, plural, one {is running, so Combwork left it as it is: tell it about the lane.} other {are running, so Combwork left them as they are: tell them about the lane.}}',
     note: 'A running reviewer, or the builder with the rules off: left as they are, for the caller to tell. agents: their names, joined ("a and b").'
   }),
   noSlot: agentMsg({
@@ -99,7 +99,7 @@ const A = {
   }),
   deferred: agentMsg({
     id: 'brief.record.deferred',
-    text: "{agent} wasn't free: Hive gives it the lane in a new conversation once it is, so don't prompt it.",
+    text: "{agent} wasn't free: Combwork gives it the lane in a new conversation once it is, so don't prompt it.",
     note: 'HI-2034: an agent not free yet is owed its new conversation, given once it is free.'
   }),
   failedOne: agentMsg({ id: 'brief.record.failedOne', text: "{agent} didn't start ({hasWhy, select, yes {{why}} other {unknown}})", note: 'One agent that failed to start on the lane, with why (unknown when there is none). Joined by "; " into brief.record.failed.' }),
@@ -456,7 +456,7 @@ export async function launchRecordedLane(ws: WorkspaceService, projectPath: stri
 
 /**
  * A running lane the Assistant or a script updated while its builder isn't running (HR2's HI-1900 round 1): its builder
- * started with one line naming its lane, as coordinate-agents had the Assistant do, so the lane goes on (`hive_lane next`
+ * started with one line naming its lane, as coordinate-agents had the Assistant do, so the lane goes on (`cw_lane next`
  * names its card; a card in a slot is placed there as it starts). What happened, for the reply.
  */
 export async function resumeLaneBuilder(projectPath: string, lane: { id: string; builder: { id: string; name: string } }): Promise<string> {

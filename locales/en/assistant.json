@@ -756,8 +756,8 @@
     "description": "An item of the Assistant's inbox in its ⋯ menu: its id, who it is from ({from}) and the start of its text ({text}). No preposition before the name (glossary §1 rule 4)."
   },
   "assistant.panel.inboxTip": {
-    "defaultMessage": "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with hive_inbox.",
-    "description": "The heading of the Assistant's ⋯ menu's list of what it hasn't read in its inbox ({n}: how many). hive_inbox is a tool's name: keep it."
+    "defaultMessage": "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with cw_inbox.",
+    "description": "The heading of the Assistant's ⋯ menu's list of what it hasn't read in its inbox ({n}: how many). cw_inbox is a tool's name: keep it."
   },
   "assistant.panel.inboxTipNoWakes": {
     "defaultMessage": "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet",
@@ -1404,8 +1404,8 @@
     "description": "The MCP sidebar: a button. Keep .json and .zip as they are."
   },
   "assistant.sidebar.serverNameRule": {
-    "defaultMessage": "Use letters, numbers, \"-\" and \"_\". \"hive\" is reserved.",
-    "description": "New MCP Server: a name that can't be used. Keep hive as it is (the built-in server's name)."
+    "defaultMessage": "Use letters, numbers, \"-\" and \"_\". \"combwork\" and \"hive\" are reserved.",
+    "description": "New MCP Server: a name that can't be used. Keep combwork and hive as they are (the built-in server's name and its old one, HI-2463)."
   },
   "assistant.sidebar.sharedNotes": {
     "defaultMessage": "Shared Notes",
@@ -1720,7 +1720,7 @@
     "description": "A notice: an edited skill is back as Hive ships it."
   },
   "assistant.skills.shipped.boardHygiene": {
-    "defaultMessage": "Tidy the board as the Hive Assistant: duplicates, unrecorded answers, stale blocked reasons. Use when asked to tidy the board.",
+    "defaultMessage": "Tidy the board as the Assistant: duplicates, unrecorded answers, stale blocked reasons. Use when asked to tidy the board.",
     "description": "What a skill that ships with Hive (board-hygiene) is for: under its name in the Skills view and a project's Skills tab. Keep Hive Assistant as Hive names it. Decisions are what the user decided about a card, as the card shows them."
   },
   "assistant.skills.shipped.cardLoop": {
@@ -1728,7 +1728,7 @@
     "description": "What a skill that ships with Hive (card-loop) is for: under its name in the Skills view and a project's Skills tab. Builder and reviewer are the two sides of a card loop; rounds are a card's build-and-review cycles in it."
   },
   "assistant.skills.shipped.coordinateAgents": {
-    "defaultMessage": "Run work across the workspace's agents as the Hive Assistant: cards, briefs, starting agents, waiting, handing over, stalled cards. Use when asked to get agents working, start or continue a card, or check progress.",
+    "defaultMessage": "Run work across the workspace's agents as the Assistant: cards, briefs, starting agents, waiting, handing over, stalled cards. Use when asked to get agents working, start or continue a card, or check progress.",
     "description": "What a skill that ships with Hive (coordinate-agents) is for: under its name in the Skills view and a project's Skills tab. Keep Hive Assistant as Hive names it."
   },
   "assistant.skills.shipped.generalist": {
@@ -1740,7 +1740,7 @@
     "description": "What a skill that ships with Hive (handover) is for: under its name in the Skills view and a project's Skills tab. merge-ready is another skill's name: keep it as it is."
   },
   "assistant.skills.shipped.journal": {
-    "defaultMessage": "Keep your journal as the Hive Assistant while it is on - what to write, recalling, superseding, the weekly digest and the scope. Use when something worth remembering happens, before deciding from memory, or when asked for a handover.",
+    "defaultMessage": "Keep your journal as the Assistant while it is on - what to write, recalling, superseding, the weekly digest and the scope. Use when something worth remembering happens, before deciding from memory, or when asked for a handover.",
     "description": "What a skill that ships with Hive (journal) is for: under its name in the Skills view and a project's Skills tab. The journal is the Assistant's memory across sessions; use the word Hive's settings use for it."
   },
   "assistant.skills.shipped.licenceAudit": {
@@ -1760,7 +1760,7 @@
     "description": "What a skill that ships with Hive (review-agent-work) is for: under its name in the Skills view and a project's Skills tab. Review is a column of the task board: use its name as the board shows it."
   },
   "assistant.skills.shipped.runLanes": {
-    "defaultMessage": "Run a team as the Hive Assistant: builder and reviewer lanes on card loops, planned by files, briefed and watched to their end. Use when there are three or more agents or several builder and reviewer pairs, when asked for lanes, or woken about one.",
+    "defaultMessage": "Run a team as the Assistant: builder and reviewer lanes on card loops, planned by files, briefed and watched to their end. Use when there are three or more agents or several builder and reviewer pairs, when asked for lanes, or woken about one.",
     "description": "What a skill that ships with Hive (run-lanes) is for: under its name in the Skills view and a project's Skills tab. A lane is a builder and a reviewer taking cards in turn (a card loop): use the words Hive uses for them."
   },
   "assistant.skills.shipped.splitWork": {
@@ -1768,19 +1768,19 @@
     "description": "What a skill that ships with Hive (split-work) is for: under its name in the Skills view and a project's Skills tab."
   },
   "assistant.skills.shipped.triageReport": {
-    "defaultMessage": "Turn a reported problem into a card with evidence as the Hive Assistant: cause first, then duplicates. Use when the user reports a problem.",
+    "defaultMessage": "Turn a reported problem into a card with evidence as the Assistant: cause first, then duplicates. Use when the user reports a problem.",
     "description": "What a skill that ships with Hive (triage-report) is for: under its name in the Skills view and a project's Skills tab. Keep Hive Assistant as Hive names it."
   },
   "assistant.skills.shipped.tuneSettings": {
-    "defaultMessage": "Explain and suggest Hive's settings as the Hive Assistant; change one only when the user agrees. Use when asked what a setting does or how to make Hive behave differently, or when one would fix what you see.",
+    "defaultMessage": "Explain and suggest Combwork's settings as the Assistant; change one only when the user agrees. Use when asked what a setting does or how to make Combwork behave differently, or when one would fix what you see.",
     "description": "What a skill that ships with Hive (tune-settings) is for: under its name in the Skills view and a project's Skills tab."
   },
   "assistant.skills.shipped.useHiveApi": {
-    "defaultMessage": "A hive tool's cases in detail (tools.md), and Hive's HTTP API for scripts. Use when a tool's description isn't enough, or to automate Hive over HTTP: board and notes work uses the tools.",
-    "description": "What a skill that ships with Hive (use-hive-api) is for: under its name in the Skills view and a project's Skills tab. Keep HTTP and API; hive tools are the tools Hive gives agents (hive_…), keep hive in lower case."
+    "defaultMessage": "A Combwork tool's cases in detail (tools.md), and Combwork's HTTP API for scripts. Use when a tool's description isn't enough, or to automate Combwork over HTTP: board and notes work uses the tools.",
+    "description": "What a skill that ships with Hive (use-cw-api) is for: under its name in the Skills view and a project's Skills tab. Keep HTTP and API; hive tools are the tools Hive gives agents (hive_…), keep hive in lower case."
   },
   "assistant.skills.shipped.workOnCard": {
-    "defaultMessage": "Carry a card from Hive's task board through its work, from Active to Review with a summary. Use when given a card to work on (\"work on AM-12\", a card Hive started you on, more work on one back from Review). Not for reviewing one, nor a card loop (card-loop).",
+    "defaultMessage": "Carry a card from Combwork's task board through its work, from Active to Review with a summary. Use when given a card to work on (\"work on AM-12\", a card Combwork started you on, more work on one back from Review). Not for reviewing one, nor a card loop (card-loop).",
     "description": "What a skill that ships with Hive (work-on-card) is for: under its name in the Skills view and a project's Skills tab. card-loop is another skill's name: keep it. Active and Review are stages of the task board (glossary 2.2): use their names as the board shows them. \"work on AM-12\" is what you would ask an agent: translate it."
   },
   "assistant.skills.shipped.workspaceNote": {

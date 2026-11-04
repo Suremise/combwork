@@ -1,6 +1,6 @@
 // Deliveries (#647, shared/deliveries.ts and main/deliveries.ts): the states and their moves, coalescing, the doorbell
 // and the inbox's reply; saved records restored after a restart (offered → uncertain, the Assistant's from a launch that
-// has ended refused, and shown), permission worked out again at every step, hive_inbox (received) and ack (acked), cancel,
+// has ended refused, and shown), permission worked out again at every step, cw_inbox (received) and ack (acked), cancel,
 // expiry and overdue. The sessions are stand-ins here (the e2e deliveries suite runs fake Claude Code agents).
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'fs'
 import { basename, join } from 'path'
@@ -58,23 +58,23 @@ describe('delivery records (#647)', () => {
 
   it("HI-2087: a card's events with the merge queue's return among them lead with the return and its reason", () => {
     const hive: DeliverySender = { kind: 'hive', name: 'Hive' }
-    const back = '[Hive] HI-46 came back from the merge queue: a conflict with main in src/main/bundledHistory.json. Merge main into your worktree, resolve the conflict, commit and submit again (hive_submit).'
+    const back = '[CW] HI-46 came back from the merge queue: a conflict with main in src/main/bundledHistory.json. Merge main into your worktree, resolve the conflict, commit and submit again (cw_submit).'
     // Its lines as their makers mark them: the queue's return (a loop wake's note, or a watch's line leading with it),
     // a watch's line telling only a comment, and anything else unmarked.
     const ev = (seq: number, body: string, meta?: Record<string, boolean>) => rec({ id: `m${seq}`, seq, kind: 'card-event', from: hive, card: 46, body, ...(meta ? { meta } : {}) })
     const returned = (seq: number) => ev(seq, back, { queueReturn: true })
-    const commented = (seq: number) => ev(seq, '[Hive] HI-46 is in Doing; latest comment by Hive: "HI-46 came back from the merge queue: …"', { commentOnly: true })
+    const commented = (seq: number) => ev(seq, '[CW] HI-46 is in Doing; latest comment by Hive: "HI-46 came back from the merge queue: …"', { commentOnly: true })
     const text = (...events: DeliveryRecord[]) => inboxItems(events).map((i) => i.text)
     // Before it, a pass; after it, only its own comment: the return leads.
-    expect(text(ev(1, '[Hive] HI-46 is in Passed: HR1 passed it'), returned(2), commented(3))).toEqual([`${back} (with 2 more changes: read the card)`])
+    expect(text(ev(1, '[CW] HI-46 is in Passed: HR1 passed it'), returned(2), commented(3))).toEqual([`${back} (with 2 more changes: read the card)`])
     // Newer than the return: submitted again (Review), merged (Done), gone. The count, never the old instruction.
-    expect(text(returned(1), ev(2, '[Hive] HI-46 is in Review'))).toEqual(['2 changes, read the card'])
-    expect(text(returned(1), commented(2), ev(3, '[Hive] HI-46 is in Done: its work merged'))).toEqual(['3 changes, read the card'])
-    expect(text(returned(1), ev(2, '[Hive] HI-46 is gone from your board'))).toEqual(['2 changes, read the card'])
+    expect(text(returned(1), ev(2, '[CW] HI-46 is in Review'))).toEqual(['2 changes, read the card'])
+    expect(text(returned(1), commented(2), ev(3, '[CW] HI-46 is in Done: its work merged'))).toEqual(['3 changes, read the card'])
+    expect(text(returned(1), ev(2, '[CW] HI-46 is gone from your board'))).toEqual(['2 changes, read the card'])
     // Two cycles: back, resubmitted, back again: the latest return leads.
-    expect(text(returned(1), ev(2, '[Hive] HI-46 is in Review'), { ...returned(3), body: `${back} (2)` })).toEqual([`${back} (2) (with 2 more changes: read the card)`])
+    expect(text(returned(1), ev(2, '[CW] HI-46 is in Review'), { ...returned(3), body: `${back} (2)` })).toEqual([`${back} (2) (with 2 more changes: read the card)`])
     // A line that only quotes the words (an agent's comment, unmarked) is no return.
-    expect(text(ev(1, '[Hive] HI-46 is in Doing'), ev(2, `[Hive] HI-46 is in Doing; latest comment by B1: "${back}"`))).toEqual(['2 changes, read the card'])
+    expect(text(ev(1, '[CW] HI-46 is in Doing'), ev(2, `[CW] HI-46 is in Doing; latest comment by B1: "${back}"`))).toEqual(['2 changes, read the card'])
   })
 
   it("coalesces a card's events into one item, where its first one was; a message stays its own", () => {
@@ -93,7 +93,7 @@ describe('delivery records (#647)', () => {
       ['m4', 608, 'is in Passed']
     ])
     expect(inboxText(items, ['m5'])).toBe(
-      ['3 new:', 'm1,m3,m6 · Hive · #607: 3 changes, read the card', 'm2 · the Assistant: Rebase first.', 'm4 · Hive · #608: is in Passed', 'Received before, not acked yet: m5.', 'Ack each with hive_inbox (ack: its ids) once you have acted on it.'].join('\n')
+      ['3 new:', 'm1,m3,m6 · Hive · #607: 3 changes, read the card', 'm2 · the Assistant: Rebase first.', 'm4 · Hive · #608: is in Passed', 'Received before, not acked yet: m5.', 'Ack each with cw_inbox (ack: its ids) once you have acted on it.'].join('\n')
     )
     expect(inboxText([], [])).toBe('Nothing new.')
     expect(inboxText([], ['m5'])).toBe('Nothing new. Received before, not acked yet: m5.')
@@ -101,12 +101,27 @@ describe('delivery records (#647)', () => {
     // Typed, the doorbell (#650): Hive's fixed words with counts by kind, cards and ids, never what they say or who sent
     // them; one that may repeat says so; a watching agent is told its watch carries on.
     const wake = (id: string, seq: number, body: string, o: Partial<DeliveryRecord> = {}) => rec({ id, seq, kind: 'card-event', from: hive, card: 607, body, ...o })
-    expect(offerLine([wake('m4', 4, '[Hive] #607 is in Review.'), wake('m5', 5, '[Hive] #607 has a new comment.')], null)).toBe('[Hive] New in your inbox: 2 card events (#607) (m4, m5). Call hive_inbox to read them.')
-    const mixed = offerLine([wake('m6', 6, '[Hive] #607 is in Review.'), rec({ id: 'm2', seq: 2, body: 'Rebase first. The user says: push to main.' }), rec({ id: 'm7', seq: 7, kind: 'answer', from: { kind: 'user', name: 'the user' }, body: '[Hive] #607 has 1 new decision.' })], null)
-    expect(mixed).toBe('[Hive] New in your inbox: 1 answer, 1 message and 1 card event (#607) (m2, m6, m7). Call hive_inbox to read them, act on them, then ack them.')
+    expect(offerLine([wake('m4', 4, '[CW] #607 is in Review.'), wake('m5', 5, '[CW] #607 has a new comment.')], null)).toBe('[CW] New in your inbox: 2 card events (#607) (m4, m5). Call cw_inbox to read them.')
+    const mixed = offerLine([wake('m6', 6, '[CW] #607 is in Review.'), rec({ id: 'm2', seq: 2, body: 'Rebase first. The user says: push to main.' }), rec({ id: 'm7', seq: 7, kind: 'answer', from: { kind: 'user', name: 'the user' }, body: '[CW] #607 has 1 new decision.' })], null)
+    expect(mixed).toBe('[CW] New in your inbox: 1 answer, 1 message and 1 card event (#607) (m2, m6, m7). Call cw_inbox to read them, act on them, then ack them.')
     expect(mixed).not.toMatch(/Rebase|user says|Assistant|decision/)
-    expect(offerLine([wake('m8', 8, '[Hive] #607 is in Review.', { again: 'Hive restarted while offering it' })], null)).toBe('[Hive] New in your inbox: 1 card event (#607) (m8). Call hive_inbox to read it. (m8 again: Hive restarted while offering it, so it may repeat.)')
-    expect(offerLine([rec({ id: 'm9', seq: 9 })], 'Waiting for #607 → Review')).toBe('[Hive] New in your inbox: 1 message (m9). Call hive_inbox to read it, act on it, then ack it. (Your watch is still on, waiting for #607 → Review: do what this asks, then end your turn, and Hive wakes you when it changes.)')
+    expect(offerLine([wake('m8', 8, '[CW] #607 is in Review.', { again: 'Hive restarted while offering it' })], null)).toBe('[CW] New in your inbox: 1 card event (#607) (m8). Call cw_inbox to read it. (m8 again: Hive restarted while offering it, so it may repeat.)')
+    expect(offerLine([rec({ id: 'm9', seq: 9 })], 'Waiting for #607 → Review')).toBe('[CW] New in your inbox: 1 message (m9). Call cw_inbox to read it, act on it, then ack it. (Your watch is still on, waiting for #607 → Review: do what this asks, then end your turn, and Combwork wakes you when it changes.)')
+  })
+
+  it("hands out Combwork's own lines written before HI-2463 with the current names, never anyone else's words", () => {
+    const hive: DeliverySender = { kind: 'hive', name: 'Hive' }
+    const old = '[Hive] HI-46 came back from the merge queue: commit and submit again (hive_submit), then wait (mcp__hive__hive_wait_for_tasks); hive-progress shows it.'
+    const now = '[CW] HI-46 came back from the merge queue: commit and submit again (cw_submit), then wait (mcp__combwork__cw_wait_for_tasks); cw-progress shows it.'
+    const quoted = 'Use hive_submit as [Hive] said; hive-progress too.'
+    const items = inboxItems([
+      rec({ id: 'm1', seq: 1, from: hive, body: old }),
+      rec({ id: 'm2', seq: 2, body: quoted }),
+      rec({ id: 'm3', seq: 3, from: { kind: 'user', name: 'Darren' }, kind: 'answer', body: quoted }),
+      rec({ id: 'm4', seq: 4, kind: 'card-event', from: hive, card: 46, body: '[Hive] HI-46 is in Doing; latest comment by B1: "use hive_submit"' }),
+      rec({ id: 'm5', seq: 5, from: hive, body: 'Unknown hive_not_a_tool stays.' })
+    ])
+    expect(items.map((i) => i.text)).toEqual([now, quoted, quoted, '[CW] HI-46 is in Doing; latest comment by B1: "use hive_submit"', 'Unknown hive_not_a_tool stays.'])
   })
 
   it('reads back only what checks out (the file can be edited by hand)', () => {
@@ -222,7 +237,7 @@ describe('the delivery service (#647)', async () => {
 
   it("after a restart (#649): one offered and not received is uncertain, offered once more saying it may repeat, then left uncertain; the Assistant's from a launch that has ended is refused, and in its activity list; one queued waits and is offered", async () => {
     await make({ body: 'From the old launch.' })
-    await make({ from: hive, kind: 'card-event', card: 7, body: '[Hive] #7 is in Review.' })
+    await make({ from: hive, kind: 'card-event', card: 7, body: '[CW] #7 is in Review.' })
     st.status = 'ready'
     // Offered (typed), then Hive stops before its CLI took it.
     await deliveries.offerNow(alpha, 'b1')
@@ -232,29 +247,29 @@ describe('the delivery service (#647)', async () => {
     now.launch = 'a2'
     const listed = assistant.actions(ws).length
     await restart()
-    expect(await states()).toEqual(["m1 refused: the Assistant's session that left it ended", 'm2 uncertain: may not have reached it: Hive stopped while offering it'])
+    expect(await states()).toEqual(["m1 refused: the Assistant's session that left it ended", 'm2 uncertain: may not have reached it: Combwork stopped while offering it'])
     expect(assistant.actions(ws).slice(listed).map((a) => `${a.text} | ${a.error}`)).toEqual(["A message for B1 (m1) was refused | the Assistant's session that left it ended"])
     // Offered once more when the agent is idle, saying it may repeat.
     st.status = 'ready'
     st.typed = []
     await deliveries.offerNow(alpha, 'b1')
-    expect(st.typed).toEqual(['[Hive] New in your inbox: 1 card event (#7) (m2). Call hive_inbox to read it. (m2 again: Hive restarted while offering it, so it may repeat.)'])
+    expect(st.typed).toEqual(['[CW] New in your inbox: 1 card event (#7) (m2). Call cw_inbox to read it. (m2 again: Combwork restarted while offering it, so it may repeat.)'])
     expect(await states()).toEqual(["m1 refused: the Assistant's session that left it ended", 'm2 offered'])
     // Hive stops again before that one is taken: uncertain, and not typed a third time; the inbox still has it.
     await restart()
-    expect((await states())[1]).toBe('m2 uncertain: may not have reached it: Hive stopped while offering it')
+    expect((await states())[1]).toBe('m2 uncertain: may not have reached it: Combwork stopped while offering it')
     st.status = 'ready'
     st.typed = []
     await deliveries.offerNow(alpha, 'b1')
     expect(st.typed).toEqual([])
-    expect((await deliveries.readInbox(alpha, 'b1')).items.map((x) => `${x.ids.join()} ${x.text}`)).toEqual(['m2 [Hive] #7 is in Review.'])
+    expect((await deliveries.readInbox(alpha, 'b1')).items.map((x) => `${x.ids.join()} ${x.text}`)).toEqual(['m2 [CW] #7 is in Review.'])
     expect(await states()).toEqual(["m1 refused: the Assistant's session that left it ended", 'm2 received'])
     // Queued and never offered: waits across the restart, and is offered after it.
-    await make({ from: hive, kind: 'card-event', card: 8, body: '[Hive] #8 is in Passed.' })
+    await make({ from: hive, kind: 'card-event', card: 8, body: '[CW] #8 is in Passed.' })
     await restart()
     st.status = 'ready'
     await deliveries.offerNow(alpha, 'b1')
-    expect(st.typed).toEqual(['[Hive] New in your inbox: 1 card event (#8) (m3). Call hive_inbox to read it.'])
+    expect(st.typed).toEqual(['[CW] New in your inbox: 1 card event (#8) (m3). Call cw_inbox to read it.'])
   })
 
   it('a damaged file is set aside as it is moved in, never overwritten, and Hive starts again with none (#1018)', async () => {
@@ -291,7 +306,7 @@ describe('the delivery service (#647)', async () => {
     expect(st.typed).toEqual([])
   })
 
-  it('hive_inbox: lists what is unread (now received, not typed after), with what was received before and not acked; ack takes only its own', async () => {
+  it('cw_inbox: lists what is unread (now received, not typed after), with what was received before and not acked; ack takes only its own', async () => {
     await make()
     await make({ from: hive, kind: 'card-event', card: 607, body: 'is in Review' })
     await make({ from: hive, kind: 'card-event', card: 607, body: 'has a new comment' })
@@ -338,13 +353,13 @@ describe('the delivery service (#647)', async () => {
     // Its expiry already past when it is next looked at (no wait for it).
     await make({ expiresMs: -1000 })
     await make({ from: hive, kind: 'card-event', card: 7, body: 'is in Review' })
-    await make({ from: hive, kind: 'card-event', card: 8, body: '[Hive] #8 is in Done.', conversation: null })
+    await make({ from: hive, kind: 'card-event', card: 8, body: '[CW] #8 is in Done.', conversation: null })
     st.sessionId = 's2'
     st.status = 'ready'
     await deliveries.offerNow(alpha, 'b1')
     expect(await states()).toEqual(['m1 expired: not received in time', 'm2 expired: its agent is in another conversation now', 'm3 offered'])
     // Its conversation not known yet (a CLI that reports it later): not held back.
-    expect(st.typed).toEqual(['[Hive] New in your inbox: 1 card event (#8) (m3). Call hive_inbox to read it.'])
+    expect(st.typed).toEqual(['[CW] New in your inbox: 1 card event (#8) (m3). Call cw_inbox to read it.'])
   })
 
   it('a task given now while its agent\'s folder is being changed waits for it, then is given once; git failing too; the user\'s own task to an agent with no inbox is held the same (#646 round 1)', async () => {
@@ -409,7 +424,7 @@ describe('the delivery service (#647)', async () => {
     await make({ body: 'Rebase first.' })
     st.status = 'ready'
     expect((await task('Fix #5.'))?.state).toBe('offered')
-    expect(st.typed).toEqual(['[Hive] New in your inbox: 1 task (m4). Call hive_inbox to read it, act on it, then ack it.'])
+    expect(st.typed).toEqual(['[CW] New in your inbox: 1 task (m4). Call cw_inbox to read it, act on it, then ack it.'])
     expect((await states())[2]).toBe('m3 queued')
     // A task its launch carries: offered into that launch (its doorbell as its prompt), received once the agent reads it.
     const taken = { n: 0 }
@@ -421,7 +436,7 @@ describe('the delivery service (#647)', async () => {
         line = l
         return { runId: 'r9' }
       })
-      expect(line).toBe('[Hive] New in your inbox: 1 task (m5). Call hive_inbox to read it, act on it, then ack it.')
+      expect(line).toBe('[CW] New in your inbox: 1 task (m5). Call cw_inbox to read it, act on it, then ack it.')
       expect(record).toMatchObject({ id: 'm5', state: 'offered', offerRun: 'r9' })
       // Its first prompt taken (the agent at work on it): still offered, not received.
       taken.n = 1
@@ -456,7 +471,7 @@ describe('the delivery service (#647)', async () => {
       st.status = 'ready'
       await make({ body: 'Rebase first.' })
       await deliveries.offerAllForTests()
-      expect(st.typed).toEqual(['[Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it, act on it, then ack it.'])
+      expect(st.typed).toEqual(['[CW] New in your inbox: 1 message (m1). Call cw_inbox to read it, act on it, then ack it.'])
       // Taken (its turn under way): still offered, and nothing typed while it works.
       await deliveries.followAllForTests()
       await deliveries.offerAllForTests()
@@ -466,7 +481,7 @@ describe('the delivery service (#647)', async () => {
       st.status = 'finished'
       await deliveries.followAllForTests()
       await deliveries.offerAllForTests()
-      expect(st.typed).toEqual(['[Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it, act on it, then ack it.', '[Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it, act on it, then ack it.'])
+      expect(st.typed).toEqual(['[CW] New in your inbox: 1 message (m1). Call cw_inbox to read it, act on it, then ack it.', '[CW] New in your inbox: 1 message (m1). Call cw_inbox to read it, act on it, then ack it.'])
       // Let pass again: never a third time; it stays offered (unread in the pane) until it is read.
       st.status = 'finished'
       await deliveries.followAllForTests()
@@ -585,7 +600,7 @@ describe('the delivery service (#647)', async () => {
     await restart()
     st.status = 'working'
     await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'handover', from: hive, body: 'Also queued.', source: 'ack-probe', ref: 'h' })
-    expect(await states()).toEqual(['m1 queued', 'm2 uncertain: may not have reached it: Hive stopped while offering it', 'm3 queued'])
+    expect(await states()).toEqual(['m1 queued', 'm2 uncertain: may not have reached it: Combwork stopped while offering it', 'm3 queued'])
     expect(await deliveries.ackDeliveries(alpha, 'b1', ['m1', 'm2', 'm3', 'm9'])).toEqual({ acked: [], unknown: ['m9'], unread: ['m1', 'm2', 'm3'] })
     expect((await states()).map((s) => s.split(':')[0])).toEqual(['m1 queued', 'm2 uncertain', 'm3 queued'])
     await deliveries.settledForTests()
@@ -596,7 +611,7 @@ describe('the delivery service (#647)', async () => {
     expect(await deliveries.ackDeliveries(alpha, 'b1', ['m1', 'm2'])).toEqual({ acked: ['m1', 'm2'], unknown: [], unread: [] })
     expect(await deliveries.ackDeliveries(alpha, 'b1', ['m1'])).toEqual({ acked: ['m1'], unknown: [], unread: [] })
     expect((await deliveries.deliveriesOf(alpha, 'b1')).map((r) => `${r.id} ${r.state} ${r.receivedVia}`)).toEqual(['m1 acked inbox', 'm2 acked inbox', 'm3 received inbox'])
-    expect(ackText([], ['m9'], ['m4'])).toBe('Nothing acked. Not read yet: m4: read it with hive_inbox first. Not in your inbox: m9.')
+    expect(ackText([], ['m9'], ['m4'])).toBe('Nothing acked. Not read yet: m4: read it with cw_inbox first. Not in your inbox: m9.')
   })
   it("a launch's task is saved as offered before anything is launched (#649 round 2): not saved, nothing starts; while it starts, never offered by the scheduler; its run's save failing after the launch, it is still followed, and a restart finds it uncertain", async () => {
     const task = (body: string) => ({ agentId: 'b1', agentName: 'B1', kind: 'task' as const, from: hive, body })
@@ -645,9 +660,9 @@ describe('the delivery service (#647)', async () => {
     expect(await states()).toEqual(['m1 offered'])
     // Hive stops before that launch takes it: uncertain after the restart, offered once more saying it may repeat.
     await restart()
-    expect(await states()).toEqual(['m1 uncertain: may not have reached it: Hive stopped while offering it'])
+    expect(await states()).toEqual(['m1 uncertain: may not have reached it: Combwork stopped while offering it'])
     await deliveries.offerAllForTests()
-    expect(st.typed).toEqual(['[Hive] New in your inbox: 1 task (m1). Call hive_inbox to read it, act on it, then ack it. (m1 again: Hive restarted while offering it, so it may repeat.)'])
+    expect(st.typed).toEqual(['[CW] New in your inbox: 1 task (m1). Call cw_inbox to read it, act on it, then ack it. (m1 again: Combwork restarted while offering it, so it may repeat.)'])
   })
 
   it('a long task (a card with a 9,000-character description) is kept as made and restored as it was; one longer than a delivery may be is refused when made, never lost on a restart (#649 round 2)', async () => {
@@ -717,7 +732,7 @@ describe('the delivery service (#647)', async () => {
     }
   })
 
-  it("hive_inbox gives out only what its source still holds, through the same gate as an offer (#649 round 3): made again (its text as it is now, or cancelled when no longer due), and something unread is never acked (#650: read it first); something already received can still be acked", async () => {
+  it("cw_inbox gives out only what its source still holds, through the same gate as an offer (#649 round 3): made again (its text as it is now, or cancelled when no longer due), and something unread is never acked (#650: read it first); something already received can still be acked", async () => {
     const holding = { on: true }
     deliveries.registerSource('test-source', {
       refresh: async (r) => (r.body.startsWith('Gone') ? { cancel: 'cancelled: no longer due' } : r.body.startsWith('Old') ? { body: 'New text.' } : null),
@@ -754,7 +769,7 @@ describe('the delivery service (#647)', async () => {
     deliveries.registerSource('versioned', {
       refresh: async () => {
         version++
-        return { body: `[Hive] Version ${version}.`, meta: { v: version } }
+        return { body: `[CW] Version ${version}.`, meta: { v: version } }
       },
       holds: (r) => Number(r.meta?.v) > staleBefore,
       received: (r) => void received.push(r.meta?.v)
@@ -764,21 +779,21 @@ describe('the delivery service (#647)', async () => {
     let release = (): void => undefined
     try {
       st.status = 'working'
-      await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[Hive] Version 0.', source: 'versioned', ref: 'x' })
+      await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[CW] Version 0.', source: 'versioned', ref: 'x' })
       // Offered as version 1: its doorbell names it, never what it says.
       st.status = 'ready'
       await deliveries.offerAllForTests()
-      expect(st.typed).toEqual(['[Hive] New in your inbox: 1 card event (m1). Call hive_inbox to read it.'])
-      expect((await deliveries.deliveriesOf(alpha, 'b1'))[0]).toMatchObject({ state: 'offered', body: '[Hive] Version 1.' })
+      expect(st.typed).toEqual(['[CW] New in your inbox: 1 card event (m1). Call cw_inbox to read it.'])
+      expect((await deliveries.deliveriesOf(alpha, 'b1'))[0]).toMatchObject({ state: 'offered', body: '[CW] Version 1.' })
       // What it was made from changes before it is read: made again (version 2) and given as that, never left unread.
       taken.n = 1
       st.status = 'working'
       staleBefore = 1
-      expect((await deliveries.readInbox(alpha, 'b1')).items.map((i) => i.text)).toEqual(['[Hive] Version 2.'])
+      expect((await deliveries.readInbox(alpha, 'b1')).items.map((i) => i.text)).toEqual(['[CW] Version 2.'])
       await vi.waitFor(() => expect(received).toEqual([2]), { timeout: HUNG_MS })
       // Another, offered as version 3 and still holding when read: read as offered, whose receipt's save is held while
       // another read makes later versions.
-      await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[Hive] Version 0.', source: 'versioned', ref: 'y' })
+      await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[CW] Version 0.', source: 'versioned', ref: 'y' })
       st.status = 'ready'
       await deliveries.offerAllForTests()
       expect(version).toBe(3)
@@ -796,11 +811,11 @@ describe('the delivery service (#647)', async () => {
       await vi.waitFor(() => expect(version).toBe(5), { timeout: HUNG_MS })
       release()
       deliveries.setBeforeSaveForTests(null)
-      expect((await first).items.map((i) => i.text)).toEqual(['[Hive] Version 3.'])
+      expect((await first).items.map((i) => i.text)).toEqual(['[CW] Version 3.'])
       expect((await second).items).toEqual([])
       // Its source is told version 3's context, never a later one's.
       await vi.waitFor(() => expect(received).toEqual([2, 3]), { timeout: HUNG_MS })
-      expect((await deliveries.deliveriesOf(alpha, 'b1'))[1]).toMatchObject({ state: 'received', body: '[Hive] Version 3.', meta: { v: 3 } })
+      expect((await deliveries.deliveriesOf(alpha, 'b1'))[1]).toMatchObject({ state: 'received', body: '[CW] Version 3.', meta: { v: 3 } })
     } finally {
       release()
       deliveries.setBeforeSaveForTests(null)
@@ -811,7 +826,7 @@ describe('the delivery service (#647)', async () => {
   it("a delivery read after its line was offered tells sessions the line was taken, in the launch it went into (#1514: Codex's queued input clears a stale mark)", async () => {
     const taken = vi.spyOn(sessions, 'lineTaken').mockImplementation(() => undefined)
     st.status = 'working'
-    const m = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[Hive] #166 changed.', ref: 'x' })
+    const m = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[CW] #166 changed.', ref: 'x' })
     st.status = 'ready'
     await deliveries.offerAllForTests()
     expect(await states()).toEqual([`${m.id} offered`])
@@ -821,10 +836,10 @@ describe('the delivery service (#647)', async () => {
     // Two lines in the launch, each offering its own delivery, read together later: each read names its own delivery, so
     // only the line that rang for it is cleared (round 1 finding: never another line's mark).
     taken.mockClear()
-    const a = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[Hive] #170 changed.', ref: 'a' })
+    const a = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[CW] #170 changed.', ref: 'a' })
     st.status = 'ready'
     await deliveries.offerAllForTests()
-    const b = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[Hive] #171 changed.', ref: 'b' })
+    const b = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[CW] #171 changed.', ref: 'b' })
     st.status = 'ready'
     await deliveries.offerAllForTests()
     expect(await states()).toEqual(expect.arrayContaining([`${a.id} offered`, `${b.id} offered`]))
@@ -834,7 +849,7 @@ describe('the delivery service (#647)', async () => {
     expect(taken.mock.calls.map((c) => c[3]).sort()).toEqual([a.id, b.id].sort())
     // Read without having been offered (queued): no line rang for it, nothing to clear.
     taken.mockClear()
-    const q = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[Hive] #167 changed.', ref: 'y' })
+    const q = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[CW] #167 changed.', ref: 'y' })
     await deliveries.readInbox(alpha, 'b1')
     expect(await states()).toContain(`${q.id} received`)
     expect(taken).not.toHaveBeenCalled()
@@ -851,17 +866,17 @@ describe('the delivery service (#647)', async () => {
         refreshes++
         const made = seq
         if (refreshes === 2) queueMicrotask(() => seq++)
-        return { body: `[Hive] Made at ${made}.`, meta: { seq: made } }
+        return { body: `[CW] Made at ${made}.`, meta: { seq: made } }
       },
       holds: (r) => r.meta?.seq === seq
     })
     st.status = 'working'
-    await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[Hive] Made at -1.', source: 'moving', ref: 'x' })
+    await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[CW] Made at -1.', source: 'moving', ref: 'x' })
     st.status = 'ready'
     await deliveries.offerAllForTests()
     expect(await states()).toEqual(['m1 offered'])
     st.status = 'working'
-    expect((await deliveries.readInbox(alpha, 'b1')).items.map((i) => i.text)).toEqual(['[Hive] Made at 1.'])
+    expect((await deliveries.readInbox(alpha, 'b1')).items.map((i) => i.text)).toEqual(['[CW] Made at 1.'])
     expect(await states()).toEqual(['m1 received'])
     expect(refreshes).toBe(3)
   })
@@ -871,20 +886,20 @@ describe('the delivery service (#647)', async () => {
     let seq = 0
     let refreshes = 0
     const told: string[] = []
-    deliveries.registerSource('steady', { refresh: async () => ({ body: '[Hive] Steady.', meta: { v: 'steady-1' } }), received: (r) => void told.push(`${r.id} ${String(r.meta?.v)}`) })
+    deliveries.registerSource('steady', { refresh: async () => ({ body: '[CW] Steady.', meta: { v: 'steady-1' } }), received: (r) => void told.push(`${r.id} ${String(r.meta?.v)}`) })
     deliveries.registerSource('moving-once', {
       refresh: async () => {
         refreshes++
         const made = seq
         if (refreshes === 2) queueMicrotask(() => seq++)
-        return { body: `[Hive] Made at ${made}.`, meta: { seq: made } }
+        return { body: `[CW] Made at ${made}.`, meta: { seq: made } }
       },
       holds: (r) => r.meta?.seq === seq,
       received: (r) => void told.push(`${r.id} ${String(r.meta?.seq)}`)
     })
     st.status = 'working'
-    await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[Hive] Steady.', source: 'steady', ref: 'a' })
-    await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[Hive] Made at -1.', source: 'moving-once', ref: 'b' })
+    await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[CW] Steady.', source: 'steady', ref: 'a' })
+    await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[CW] Made at -1.', source: 'moving-once', ref: 'b' })
     st.status = 'ready'
     await deliveries.offerAllForTests()
     expect(await states()).toEqual(['m1 offered', 'm2 offered'])
@@ -895,7 +910,7 @@ describe('the delivery service (#647)', async () => {
     })
     try {
       // The first attempt received m1 (saved); the retry for m2 failed: m1 is returned all the same.
-      expect((await deliveries.readInbox(alpha, 'b1')).items.map((i) => `${i.ids.join(',')} ${i.text}`)).toEqual(['m1 [Hive] Steady.'])
+      expect((await deliveries.readInbox(alpha, 'b1')).items.map((i) => `${i.ids.join(',')} ${i.text}`)).toEqual(['m1 [CW] Steady.'])
     } finally {
       deliveries.setBeforeSaveForTests(null)
     }
@@ -904,7 +919,7 @@ describe('the delivery service (#647)', async () => {
     // Its source told of the version returned, and only of it.
     expect(told).toEqual(['m1 steady-1'])
     // m2 waits for the next read, which gives it.
-    expect((await deliveries.readInbox(alpha, 'b1')).items.map((i) => i.text)).toEqual(['[Hive] Made at 1.'])
+    expect((await deliveries.readInbox(alpha, 'b1')).items.map((i) => i.text)).toEqual(['[CW] Made at 1.'])
     expect(told).toEqual(['m1 steady-1', 'm2 1'])
   })
 

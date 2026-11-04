@@ -69,7 +69,7 @@ const readBefore = (home: string, ...data: string[]): void => {
 }
 
 describe("typeLine's line as the fake reads it (HI-2385)", () => {
-  const doorbell = '[Hive] New in your inbox: 1 card event (DE-1) (m8). Call hive_inbox to read it.'
+  const doorbell = '[CW] New in your inbox: 1 card event (DE-1) (m8). Call cw_inbox to read it.'
 
   it('a doorbell Hive withdrew with DELs leaves the line empty: typed at once, taken on the first attempt', async () => {
     const t = terminal()

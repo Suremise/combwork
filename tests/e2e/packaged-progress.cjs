@@ -10,7 +10,7 @@ const { spawn } = require('child_process')
 
 const dev = process.env.HIVE_PROGRESS_CHECK_DEV === '1'
 const exe = dev ? path.join(lib.ROOT, 'node_modules', 'electron', 'dist', 'electron.exe') : path.join(lib.ROOT, 'dist', 'win-unpacked', 'Hive.exe')
-const script = dev ? path.join(lib.ROOT, 'out', 'main', 'hive-progress.js') : path.join(lib.ROOT, 'dist', 'win-unpacked', 'resources', 'app.asar.unpacked', 'out', 'main', 'hive-progress.js')
+const script = dev ? path.join(lib.ROOT, 'out', 'main', 'cw-progress.js') : path.join(lib.ROOT, 'dist', 'win-unpacked', 'resources', 'app.asar.unpacked', 'out', 'main', 'cw-progress.js')
 const data = path.join(lib.WORK, 'packaged-progress-data')
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -32,7 +32,7 @@ const srv = http.createServer((req, res) => {
 /** Runs the wrapper as its shims do; resolves to its exit code and output. */
 const wrap = (args, apiUrl) =>
   new Promise((resolve) => {
-    const env = lib.childEnv({ ELECTRON_RUN_AS_NODE: '1', HIVE_PROGRESS_DATA: data, HIVE_API_URL: apiUrl, HIVE_API_TOKEN_FILE: lib.tokenFile('agent-token') })
+    const env = lib.childEnv({ ELECTRON_RUN_AS_NODE: '1', CW_PROGRESS_DATA: data, CW_API_URL: apiUrl, CW_API_TOKEN_FILE: lib.tokenFile('agent-token') })
     const p = spawn(exe, [script, ...args], { env, cwd: lib.WORK })
     let out = ''
     let err = ''
@@ -89,10 +89,10 @@ const wrap = (args, apiUrl) =>
     p.on('close', (code) => resolve({ code, out: out.replace(/\r/g, '') }))
   })
   check('the Electron app, run directly, starts as an app', direct.code === 0 && direct.out.trim() === 'OK: Electron app', JSON.stringify(direct))
-  for (const [mode, apiUrl, extra] of [['reporting', url, {}], ['Hive unreachable', 'http://127.0.0.1:9', {}], ['HIVE_PROGRESS=0', url, { HIVE_PROGRESS: '0' }]]) {
+  for (const [mode, apiUrl, extra] of [['reporting', url, {}], ['Hive unreachable', 'http://127.0.0.1:9', {}], ['CW_PROGRESS=0', url, { CW_PROGRESS: '0' }]]) {
     const before = calls.length
     const wrapped = await new Promise((resolve) => {
-      const env = lib.childEnv({ ELECTRON_RUN_AS_NODE: '1', HIVE_PROGRESS_DATA: data, HIVE_API_URL: apiUrl, HIVE_API_TOKEN_FILE: lib.tokenFile('agent-token'), ...extra })
+      const env = lib.childEnv({ ELECTRON_RUN_AS_NODE: '1', CW_PROGRESS_DATA: data, CW_API_URL: apiUrl, CW_API_TOKEN_FILE: lib.tokenFile('agent-token'), ...extra })
       const p = spawn(exe, [script, '--', lib.ELECTRON, app], { env, cwd: lib.WORK })
       let out = ''
       p.stdout.on('data', (d) => (out += d))

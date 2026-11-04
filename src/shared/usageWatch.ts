@@ -21,7 +21,7 @@ export const USAGE_WATCH_MAX = 10
 const T = {
   label: agentMsg({ id: 'wake.usage.label', text: '{name} at {percent}% of {limit, select, weekly {its weekly limit} fiveHour {its 5-hour limit} other {either limit}}', note: 'What a usage watch waits for (HI-2195), in its label and lines: an account (name), the share (percent) and which of its limits (limit: weekly, fiveHour or any).' }),
   hit: agentMsg({ id: 'wake.usage.hit', text: '{limit} {percent}% (resets {resets})', note: 'A usage watch wake: a limit that reached its share. limit: its name ("Weekly"); percent: how much is used; resets: when, UTC ("2026-11-03T10:00Z").' }),
-  reached: agentMsg({ id: 'wake.usage.reached', text: "Usage reached: {hits}. Your watch has ended: carry on (hive_connection list for every account's usage).", note: 'Typed when a usage watch fires (HI-2195). hits: each account and the limits that reached their share ("Anthropic-1: Weekly 98% (resets …)"), "; " between.' }),
+  reached: agentMsg({ id: 'wake.usage.reached', text: "Usage reached: {hits}. Your watch has ended: carry on (cw_connection list for every account's usage).", note: 'Typed when a usage watch fires (HI-2195). hits: each account and the limits that reached their share ("Anthropic-1: Weekly 98% (resets …)"), "; " between.' }),
   limit: agentMsg({ id: 'wake.usage.limit', text: 'No account reached its share in {minutes} minutes ({watching}). Your watch has ended: watch again if you still need to.', note: "Typed when a usage watch's limit passes first. minutes: its limit; watching: what it waited for (its label)." })
 }
 

@@ -157,7 +157,7 @@
   "workspace.folder.home": "{hasAgent, select, yes {pasta antiga de {agent}} other {uma pasta antiga de revisor}}",
   "workspace.folder.slot": "{carried, select, yes {{name} (adotado, {agent})} other {{hasAgent, select, yes {{hasCards, select, yes {{name} ({agent}, {cards})} other {{name} ({agent})}}} other {{hasCards, select, yes {{name} ({cards})} other {{name}}}}}}}",
   "workspace.mcpView.builtIn": "Servidor MCP integrado do Combwork",
-  "workspace.mcpView.builtInText": "Toda sessão iniciada pelo Combwork recebe um servidor MCP <code>hive</code> que se conecta à Agent API{hasUrl, select, yes { em {url}} other {}}. Desative-o em Configurações → Agent API.",
+  "workspace.mcpView.builtInText": "Toda sessão iniciada pelo Combwork recebe um servidor MCP <code>combwork</code> que se conecta à Agent API{hasUrl, select, yes { em {url}} other {}}. Desative-o em Configurações → Agent API.",
   "workspace.mcpView.deleteServer": "Excluir servidor",
   "workspace.mcpView.dir": "Use {variable} para apontar para o código do servidor guardado em `.hive/mcp`.",
   "workspace.mcpView.format": "**Formato** — um servidor por arquivo, no formato .mcp.json do Claude Code (o Combwork o converte para outros provedores), mais uma `description` opcional:",

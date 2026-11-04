@@ -1,4 +1,4 @@
-// A card comment as its summary (#532): reports and verdicts lead with a one-line summary, and hive_read_task with
+// A card comment as its summary (#532): reports and verdicts lead with a one-line summary, and cw_read_task with
 // summary: true gives each comment as that line (with the whole comment's length when there is more).
 import { describe, expect, it } from 'vitest'
 import { COMMENT_SUMMARY_MAX, commentSummary } from '../src/shared/tasks'

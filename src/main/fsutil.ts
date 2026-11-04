@@ -39,10 +39,10 @@ const A = {
   overBytes: agentMsg({ id: 'skillCopy.tooBig.bytes', text: 'it is over {mb} MB', note: "Why a skill or mode is too big for Hive to check (HASH_LIMITS): mb is the limit in MB, a whole number. A delivery's problem and a kept revision's reason." }),
   tooDeep: agentMsg({ id: 'skillCopy.tooBig.depth', text: 'it has folders more than {depth} deep', note: 'Why a skill or mode is too big for Hive to check (HASH_LIMITS): depth is the most folder levels.' }),
   tooMany: agentMsg({ id: 'skillCopy.tooBig.entries', text: 'it has more than {entries} files and folders', note: 'Why a skill or mode is too big for Hive to check (HASH_LIMITS): entries is the most files and folders.' }),
-  tooBigToDeliver: agentMsg({ id: 'skillCopy.tooBig.deliver', text: 'it is too big for Hive to check ({why})', note: "A launch's problem for a skill over HASH_LIMITS: why is one of skillCopy.tooBig.*." }),
+  tooBigToDeliver: agentMsg({ id: 'skillCopy.tooBig.deliver', text: 'it is too big for Combwork to check ({why})', note: "A launch's problem for a skill over HASH_LIMITS: why is one of skillCopy.tooBig.*." }),
   linksNotCopied: agentMsg({
     id: 'skillCopy.links.notCopied',
-    text: "{n, plural, =1 {the link {paths} is} other {the links {paths} are}} missing from its copy: Windows didn't let Hive make {n, plural, =1 {it} other {them}} (a link to a file needs a privilege)",
+    text: "{n, plural, =1 {the link {paths} is} other {the links {paths} are}} missing from its copy: Windows didn't let Combwork make {n, plural, =1 {it} other {them}} (a link to a file needs a privilege)",
     note: "What a skill's links that couldn't be copied mean for the session that gets it. paths: the links' paths, joined with commas; n: how many."
   })
 }

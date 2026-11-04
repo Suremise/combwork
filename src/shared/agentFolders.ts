@@ -91,7 +91,7 @@ export interface FolderSlot {
   folder: string
   /** slots.ts's SlotState. */
   state: string
-  /** Its block of ports (HIVE_SLOT_PORT_BASE). */
+  /** Its block of ports (CW_SLOT_PORT_BASE). */
   portBase: number
   /** The branch its lines merge into, when it has one (#1569: the base the Changes tab compares its work with). */
   target?: string | null

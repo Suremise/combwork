@@ -162,7 +162,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('it launches in Auto', launch.includes('"--permission-mode","auto"'))
   check('…with the model its connection sets', launch.includes('"--model","sonnet"'))
   check("its mode is appended to Claude Code's system prompt", launch.includes('--append-system-prompt-file'))
-  check("Hive's reading tools are allowed", launch.includes('mcp__hive__hive_list_projects') && !launch.includes('mcp__hive__hive_write_shared_note'))
+  check("Hive's reading tools are allowed", launch.includes('mcp__combwork__cw_list_projects') && !launch.includes('mcp__combwork__cw_write_shared_note'))
   check('Planner\'s instructions are in the launch', fs.readFileSync(path.join(home, '.hive', 'launch-assistant', 'instructions.md'), 'utf8').includes('# Your mode: Planner'))
   check('it is not a project agent', (await inv('workspace:get')).projects.every((p) => p.agents.every((a) => a.id !== 'assistant')))
   // The header's fold button (#1330), as the Progress panel's: its tooltip names the shortcut (a rebinding too), and

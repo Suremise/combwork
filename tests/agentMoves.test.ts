@@ -1,4 +1,4 @@
-// Agents' old moves for one transition (#1268, SPEC §16.17, §16.8.1): a project agent's hive_update_task column move and
+// Agents' old moves for one transition (#1268, SPEC §16.17, §16.8.1): a project agent's cw_update_task column move and
 // review are translated into the intent they stand for, through the same guards: Doing → start, Review → submit, Passed →
 // a passing verdict, Done → report merge, Todo → put back; review start → start review, passed/failed → a verdict on the
 // latest submission. The reply names the intent's tool for next time; a refusal is the runtime's (the 409 contract).
@@ -73,7 +73,7 @@ const kinds = (w: WS, card: number): string[] => facts(w, card).map((f) => f.kin
 const stage = (w: WS, card: number) => foldCard(facts(w, card)).stage
 const create = (w: WS, title = 'Work') => inWorkspace(w, async () => (await tasks.createTask({ title, project: 'p' }, user)).number)
 
-/** An agent's hive_update_task: the card and its reply's lines, as the tools get them. */
+/** An agent's cw_update_task: the card and its reply's lines, as the tools get them. */
 async function update(w: WS, card: number, actor: Actor, patch: Patch, comment?: string): Promise<{ card: Awaited<ReturnType<typeof tasks.updateTask>>; said: string[] }> {
   const said: string[] = []
   const c = await inWorkspace(w, () => tasks.updateTask(card, patch, actor, { said, ...(comment !== undefined ? { comment } : {}) }))
@@ -107,26 +107,26 @@ describe("an agent's old moves as intents (#1268)", () => {
     // Doing: start, the card given to the builder.
     const start = await update(w, card, builder, { column: 'doing' })
     expect(start.card).toMatchObject({ column: 'doing', agent: 'a1' })
-    expect(start.said).toContain('As start: next time call hive_start_card')
+    expect(start.said).toContain('As start: next time call cw_start_card')
     expect(foldCard(facts(w, card)).started).toMatchObject({ builder: 'a1', folder: wt })
     commit(wt, { 'b.txt': 'b\n' }, 'b')
     // Review with a comment: submit, the comment its summary.
     const submit = await update(w, card, builder, { column: 'review' }, 'Round 1 ready')
     expect(submit.card.column).toBe('review')
     expect(submit.card.comments.at(-1)?.text).toBe('Round 1 ready')
-    expect(submit.said).toContain('As submit: next time call hive_submit')
+    expect(submit.said).toContain('As submit: next time call cw_submit')
     expect(facts(w, card).find((f) => f.kind === 'Submitted')?.data).toMatchObject({ summary: 'Round 1 ready' })
     // review start: start review, the card marked as the reviewer's; failed: a verdict, the card back in Doing.
     const review = await update(w, card, reviewer, { review: 'start' })
     expect(review.card.review?.agent).toBe('a2')
-    expect(review.said).toContain('As start review: next time call hive_start_review')
+    expect(review.said).toContain('As start review: next time call cw_start_review')
     const failed = await update(w, card, reviewer, { review: 'failed' }, 'Round 1: FAILED. 1. Add a test.')
     expect(failed.card).toMatchObject({ column: 'doing', agent: 'a1' })
     expect(failed.card.comments.at(-1)?.text).toBe('Round 1: FAILED. 1. Add a test.')
-    expect(failed.said).toContain('As verdict: next time call hive_verdict')
+    expect(failed.said).toContain('As verdict: next time call cw_verdict')
     expect(foldCard(facts(w, card)).rounds).toBe(1)
     // The builder's move to Doing moves nothing now (it is there): its comment is just a comment.
-    expect((await update(w, card, builder, { column: 'doing' }, 'On it')).said).not.toContain('As start: next time call hive_start_card')
+    expect((await update(w, card, builder, { column: 'doing' }, 'On it')).said).not.toContain('As start: next time call cw_start_card')
     commit(wt, { 'c.txt': 'c\n' }, 'c')
     await update(w, card, builder, { column: 'review' }, 'Round 2 ready')
     // review passed with column passed (the loop's verdict): its review started first, then the verdict; Approved.
@@ -138,7 +138,7 @@ describe("an agent's old moves as intents (#1268)", () => {
     sh(repo, 'merge', '-q', '--no-ff', '-m', 'merge card', 'card')
     const done = await update(w, card, builder, { column: 'done' }, 'Merged.')
     expect(done.card.column).toBe('done')
-    expect(done.said).toContain('As report merge: next time call hive_report_merge')
+    expect(done.said).toContain('As report merge: next time call cw_report_merge')
     const k = kinds(w, card)
     for (const once of ['Started', 'Integrated']) expect(k.filter((x) => x === once)).toHaveLength(1)
     expect(k.filter((x) => x === 'Submitted')).toHaveLength(2)
@@ -147,7 +147,7 @@ describe("an agent's old moves as intents (#1268)", () => {
     // More work the user asked for: a Done card back into Doing is reopened and started, a new cycle (its start's).
     const again = await update(w, card, builder, { column: 'doing' }, 'More work')
     expect(again.card).toMatchObject({ column: 'doing', agent: 'a1' })
-    expect(again.said).toContain('As start: next time call hive_start_card')
+    expect(again.said).toContain('As start: next time call cw_start_card')
     expect(kinds(w, card).filter((x) => x === 'Started')).toHaveLength(2)
     expect(facts(w, card).filter((f) => f.kind === 'Moved').slice(-2).map((f) => (f.data as { to: string }).to)).toEqual(['todo', 'active'])
     expect(stage(w, card)).toBe('active')
@@ -186,7 +186,7 @@ describe("an agent's old moves as intents (#1268)", () => {
     expect((await refused(update(w, held, builder, { column: 'doing' })))?.rule).toBe('start.notBlocked')
     expect(stage(w, held)).toBe('hold')
     await block(held, null)
-    expect((await update(w, held, builder, { column: 'doing' })).said).toContain('As start: next time call hive_start_card')
+    expect((await update(w, held, builder, { column: 'doing' })).said).toContain('As start: next time call cw_start_card')
     expect(foldCard(facts(w, held)).started).toMatchObject({ builder: 'a1' })
     // Made in Doing for another agent: started for it.
     const made = await inWorkspace(w, () => tasks.createTask({ title: 'For the reviewer', column: 'doing', agent: 'Reviewer' }, builder))
@@ -304,7 +304,7 @@ describe("an agent's old moves as intents (#1268)", () => {
     await expect(update(w, card, reviewer, { column: 'review' }, 'Mine now')).rejects.toThrow(/in Active with agent Builder.*move it to Review\./)
     const back = await update(w, card, builder, { column: 'todo' }, 'Waiting for #9 first.')
     expect(back.card.column).toBe('todo')
-    expect(back.said).toContain('As put back: next time call hive_put_back')
+    expect(back.said).toContain('As put back: next time call cw_put_back')
     expect(facts(w, card).findLast((f) => f.kind === 'Moved')?.data).toMatchObject({ to: 'todo', cause: 'intent', why: 'Waiting for #9 first.' })
   })
 
@@ -364,7 +364,7 @@ describe("an agent's old moves as intents (#1268)", () => {
     await update(w, held, user, { column: 'hold' })
     const out = await update(w, held, builder, { column: 'doing' })
     expect(out.card).toMatchObject({ column: 'doing', agent: 'a1' })
-    expect(out.said).toContain('As start: next time call hive_start_card')
+    expect(out.said).toContain('As start: next time call cw_start_card')
   })
 
   it("with workflow rules off, an agent's moves take P3's path: nothing translated, a failed review back to Doing as the verdict intent sends it (HI-1946)", async () => {

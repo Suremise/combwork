@@ -113,7 +113,7 @@ beforeEach(() => {
 })
 
 const node = process.execPath
-const env = (extra: Record<string, string | undefined> = {}) => ({ ...process.env, HIVE_API_URL: url, HIVE_API_TOKEN: undefined, HIVE_PROGRESS_DATA: join(dir, 'data'), HIVE_PROGRESS: undefined, HIVE_API_TOKEN_FILE: agentTokenFile,HIVE_WORKSPACE: undefined, HIVE_PROGRESS_WRAPPED: undefined, HIVE_TEST_SEEN: seenFile, ...extra })
+const env = (extra: Record<string, string | undefined> = {}) => ({ ...process.env, CW_API_URL: url, HIVE_API_TOKEN: undefined, CW_PROGRESS_DATA: join(dir, 'data'), CW_PROGRESS: undefined, CW_API_TOKEN_FILE: agentTokenFile,CW_WORKSPACE: undefined, CW_PROGRESS_WRAPPED: undefined, HIVE_TEST_SEEN: seenFile, ...extra })
 /**
  * Runs the wrapper, collecting what it writes. By default the run is reported only at a step line with the total, or at
  * the end, however long the command takes to start; `startWaitMs` 0 reports it at once, before the command's output.
@@ -169,7 +169,10 @@ describe('the hive-progress command line', () => {
     expect(stepLine('##hive-progress wait=\r\n')).toEqual({ wait: '' })
   })
 
-  it('reads step lines; anything else is not one', () => {
+  it('reads step lines under both names (##cw-progress, and ##hive-progress from before HI-2463); anything else is not one', () => {
+    expect(stepLine('##cw-progress step=4 total=12 name=carddialog\n')).toEqual({ step: 4, total: 12, name: 'carddialog' })
+    expect(stepLine('##cw-progress wait=waiting for a test slot\r\n')).toEqual({ wait: 'waiting for a test slot' })
+    expect(stepLine('##cw-progressive step=1')).toBeNull()
     expect(stepLine('##hive-progress step=4 total=12 name=carddialog\n')).toEqual({ step: 4, total: 12, name: 'carddialog' })
     expect(stepLine('##hive-progress step=2 name=unit tests: tips\r\n')).toEqual({ step: 2, name: 'unit tests: tips' })
     expect(stepLine('##hive-progress total=3')).toEqual({ total: 3 })
@@ -191,6 +194,8 @@ describe('the hive-progress command line', () => {
       return { before, out: out.join(''), steps }
     }
     expect(run(['a\n##hive-pro', 'gress step=1 total=2 name=x\nb\n'])).toEqual({ before: 'a\nb\n', out: 'a\nb\n', steps: [{ step: 1, total: 2, name: 'x' }] })
+    expect(run(['a\n##cw-pro', 'gress step=1 total=2 name=x\nb\n'])).toEqual({ before: 'a\nb\n', out: 'a\nb\n', steps: [{ step: 1, total: 2, name: 'x' }] })
+    expect(run(['##c', 'w-progressive\n'])).toMatchObject({ out: '##cw-progressive\n', steps: [] })
     // A prompt without a newline shows at once; a held line that ends up not a step line comes out whole.
     expect(run(['Continue? '])).toMatchObject({ before: 'Continue? ' })
     expect(run(['##hive', '-progressive\n'])).toMatchObject({ out: '##hive-progressive\n', steps: [] })
@@ -308,7 +313,7 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     resolveReply = { status: 400, body: { error: "a3f2c1d isn't what's checked out here (b71e09a is): check it out first, or leave revision out" } }
     const marker = join(dir, 'ran-refused.txt')
     const r = await wrap(['--revision', 'a3f2c1d', '--', node, '-e', `require('fs').writeFileSync(${JSON.stringify(marker)}, 'x')`], env(), 0)
-    expect(r).toEqual({ code: 2, out: '', err: "hive-progress: a3f2c1d isn't what's checked out here (b71e09a is): check it out first, or leave revision out\n" })
+    expect(r).toEqual({ code: 2, out: '', err: "cw-progress: a3f2c1d isn't what's checked out here (b71e09a is): check it out first, or leave revision out\n" })
     expect(existsSync(marker)).toBe(false)
     expect(calls).toEqual([])
   })
@@ -332,11 +337,11 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
 
   it('--check with no command configured, Hive unreachable or outside Hive runs nothing and says why', async () => {
     resolveReply = { status: 400, body: { error: 'hive has no command configured for the check "lint", so nothing was run.' } }
-    expect(await wrap(['--check', 'lint'], env(), 0)).toEqual({ code: 2, out: '', err: 'hive-progress: hive has no command configured for the check "lint", so nothing was run.\n' })
+    expect(await wrap(['--check', 'lint'], env(), 0)).toEqual({ code: 2, out: '', err: 'cw-progress: hive has no command configured for the check "lint", so nothing was run.\n' })
     // A Hive from before (no resolve call: 404) doesn't know the command either.
     resolveReply = { status: 404, body: { error: 'No such route' } }
-    expect(await wrap(['--check', 'lint'], env(), 0)).toMatchObject({ code: 2, err: expect.stringContaining("Hive couldn't be reached to look up the command for lint") })
-    expect(await wrap(['--check', 'lint'], env({ HIVE_API_URL: undefined }), 0)).toMatchObject({ code: 2, err: expect.stringContaining('only Hive knows') })
+    expect(await wrap(['--check', 'lint'], env(), 0)).toMatchObject({ code: 2, err: expect.stringContaining("Combwork couldn't be reached to look up the command for lint") })
+    expect(await wrap(['--check', 'lint'], env({ CW_API_URL: undefined }), 0)).toMatchObject({ code: 2, err: expect.stringContaining('only Combwork knows') })
     expect(calls).toEqual([])
   })
 
@@ -353,17 +358,17 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     const marker = join(dir, 'ran-revision.txt')
     const ran = ['--', node, '-e', `require('fs').writeFileSync(${JSON.stringify(marker)}, 'x')`]
     const ways: [string, () => Record<string, string | undefined>][] = [
-      ['reporting off', () => env({ HIVE_PROGRESS: '0' })],
-      ['outside Hive', () => env({ HIVE_API_URL: undefined })],
+      ['reporting off', () => env({ CW_PROGRESS: '0' })],
+      ['outside Hive', () => env({ CW_API_URL: undefined })],
       ['an older Hive (404)', () => ((resolveReply = { status: 404, body: { error: 'No such route' } }), env())],
       ['an error (500)', () => ((resolveReply = { status: 500, body: { error: 'boom' } }), env())],
       ['no answer', () => ((resolveReply = 'hang'), env())],
-      ['nothing listening', () => env({ HIVE_API_URL: 'http://127.0.0.1:9' })]
+      ['nothing listening', () => env({ CW_API_URL: 'http://127.0.0.1:9' })]
     ]
     for (const [way, e] of ways) {
       rmSync(marker, { force: true })
       const wrong = await wrap(['--revision', 'HEAD~1', ...ran], e(), 0, repoDir)
-      expect({ way, ...wrong }).toEqual({ way, code: 2, out: '', err: `hive-progress: HEAD~1 isn't what's checked out here (${head.slice(0, 7)} is): check it out first, or leave --revision out\n` })
+      expect({ way, ...wrong }).toEqual({ way, code: 2, out: '', err: `cw-progress: HEAD~1 isn't what's checked out here (${head.slice(0, 7)} is): check it out first, or leave --revision out\n` })
       expect(existsSync(marker)).toBe(false)
       expect((await wrap(['--revision', 'not-a-commit', ...ran], e(), 0, repoDir)).err).toContain("not-a-commit isn't a commit in")
       expect((await wrap(['--revision', '--all', ...ran], e(), 0, repoDir)).err).toContain('revision is a commit')
@@ -379,7 +384,7 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
   it("a check's run that didn't count says why, in one line with what to do; its exit code is the command's (#1654)", async () => {
     resolveReply = { status: 200, body: { card: 'HI-12', revision: id, testedCheckout: id, check: { name: 'typecheck', command: `"${node}" -e "0"` }, folder: dir } }
     finishReply = { ok: true, check: { name: 'typecheck', counted: false, whyNot: 'changed', changes: ['src/a.ts', ':reflog'], platform: 'git' } }
-    expect(await wrap(['--check', 'typecheck'], env(), 0)).toEqual({ code: 0, out: '', err: 'hive-progress: not counted as check typecheck: files changed in the folder while it ran (src/a.ts, a commit or checkout). Run it again with nothing else writing in the folder, or with --isolated (a check copy of its own).\n' })
+    expect(await wrap(['--check', 'typecheck'], env(), 0)).toEqual({ code: 0, out: '', err: 'cw-progress: not counted as check typecheck: files changed in the folder while it ran (src/a.ts, a commit or checkout). Run it again with nothing else writing in the folder, or with --isolated (a check copy of its own).\n' })
     // Counted, or a Hive that doesn't say: nothing more is printed.
     finishReply = { ok: true, check: { name: 'typecheck', counted: true, platform: 'git' } }
     expect((await wrap(['--check', 'typecheck'], env(), 0)).err).toBe('')
@@ -396,7 +401,7 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     resolveDelayMs = 5500
     finishReply = { ok: true, check: { name: 'typecheck', counted: true, platform: 'git' } }
     // No timeout of the test's own: the one Hive hands the session (8 s here), as a session gets it.
-    const r = await wrap(['--check', 'typecheck'], env({ HIVE_PROGRESS_REPLY_SECONDS: '8' }), 0, dir, {})
+    const r = await wrap(['--check', 'typecheck'], env({ CW_PROGRESS_REPLY_SECONDS: '8' }), 0, dir, {})
     expect(r).toEqual({ code: 0, out: '', err: '' })
     expect(resolves).toHaveLength(1)
     expect(calls.map((c) => [c.method, c.path.replace(/run-\d+/, 'ID'), c.body.check ?? c.body.ok])).toEqual([
@@ -407,16 +412,16 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
 
   it("the setting's reply time, within 1 s and 2 minutes whatever is set; 15 s without it (HI-1892)", () => {
     expect(replyTimeoutMs({})).toBe(15_000)
-    expect(replyTimeoutMs({ HIVE_PROGRESS_REPLY_SECONDS: '40' })).toBe(40_000)
-    expect(replyTimeoutMs({ HIVE_PROGRESS_REPLY_SECONDS: '100000' })).toBe(120_000)
-    expect(replyTimeoutMs({ HIVE_PROGRESS_REPLY_SECONDS: '0.2' })).toBe(1000)
-    expect(replyTimeoutMs({ HIVE_PROGRESS_REPLY_SECONDS: 'soon' })).toBe(15_000)
+    expect(replyTimeoutMs({ CW_PROGRESS_REPLY_SECONDS: '40' })).toBe(40_000)
+    expect(replyTimeoutMs({ CW_PROGRESS_REPLY_SECONDS: '100000' })).toBe(120_000)
+    expect(replyTimeoutMs({ CW_PROGRESS_REPLY_SECONDS: '0.2' })).toBe(1000)
+    expect(replyTimeoutMs({ CW_PROGRESS_REPLY_SECONDS: 'soon' })).toBe(15_000)
   })
 
   it('a check with no reply asks once more, then runs nothing and says Hive is slow; a refused connection says it couldn\'t be reached at once, asking once (HI-1892)', async () => {
     resolveReply = 'hang'
     const slow = await wrap(['--check', 'lint'], env(), 0, dir, { resolveTimeoutMs: 1000, retryMs: 50 })
-    expect(slow).toEqual({ code: 2, out: '', err: 'hive-progress: Hive is slow to answer: no reply to look up the command for lint in 1 s, asked 2 times, so nothing was run. Try again; Settings → Advanced → "hive-progress: Hive\'s reply time" gives it longer.\n' })
+    expect(slow).toEqual({ code: 2, out: '', err: 'cw-progress: Combwork is slow to answer: no reply to look up the command for lint in 1 s, asked 2 times, so nothing was run. Try again; Settings → Advanced → "cw-progress: Combwork\'s reply time" gives it longer.\n' })
     expect(resolves).toHaveLength(2)
     // Nothing listens at the address: no retry, and none of the minute it would otherwise wait.
     const closed = createServer()
@@ -424,10 +429,10 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     const gone = `http://127.0.0.1:${(closed.address() as { port: number }).port}`
     await new Promise<void>((r) => closed.close(() => r()))
     const from = Date.now()
-    const refused = await wrap(['--check', 'lint'], env({ HIVE_API_URL: gone }), 0, dir, { resolveTimeoutMs: 60_000, retryMs: 60_000 })
+    const refused = await wrap(['--check', 'lint'], env({ CW_API_URL: gone }), 0, dir, { resolveTimeoutMs: 60_000, retryMs: 60_000 })
     expect(Date.now() - from).toBeLessThan(HUNG_MS)
     expect(refused).toMatchObject({ code: 2, out: '' })
-    expect(refused.err).toBe(`hive-progress: Hive couldn't be reached to look up the command for lint (connection refused at ${gone}), so nothing was run. Is Hive running? A sandbox that blocks local network access (Claude Code's Bash sandbox does) stops it too: run the command outside the sandbox.\n`)
+    expect(refused.err).toBe(`cw-progress: Combwork couldn't be reached to look up the command for lint (connection refused at ${gone}), so nothing was run. Is Combwork running? A sandbox that blocks local network access (Claude Code's Bash sandbox does) stops it too: run the command outside the sandbox.\n`)
     expect(calls).toEqual([])
   })
 
@@ -437,17 +442,17 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
     const finishes = () => calls.filter((c) => c.path.endsWith('/finish')).length
     // The first finish arrived, its reply lost: the one sent again is refused (it has finished), so it was recorded.
     lose = 'hangFinishOnce'
-    expect(await wrap(['--check', 'typecheck'], env(), 0, dir, quick)).toEqual({ code: 0, out: '', err: "hive-progress: Hive recorded check typecheck, but its reply was lost, so how it counted isn't known.\n" })
+    expect(await wrap(['--check', 'typecheck'], env(), 0, dir, quick)).toEqual({ code: 0, out: '', err: "cw-progress: Combwork recorded check typecheck, but its reply was lost, so how it counted isn't known.\n" })
     expect(finishes()).toBe(2)
     // No reply to either.
     calls.length = 0
     lose = 'hangFinish'
-    expect(await wrap(['--check', 'typecheck'], env(), 0, dir, quick)).toEqual({ code: 0, out: '', err: "hive-progress: Hive didn't confirm it recorded check typecheck (no reply to its result, asked twice): if submitting says it hasn't passed, run it again.\n" })
+    expect(await wrap(['--check', 'typecheck'], env(), 0, dir, quick)).toEqual({ code: 0, out: '', err: "cw-progress: Combwork didn't confirm it recorded check typecheck (no reply to its result, asked twice): if submitting says it hasn't passed, run it again.\n" })
     expect(finishes()).toBe(2)
     // Its start never taken: nothing of it was recorded.
     calls.length = 0
     lose = 'hangStart'
-    expect(await wrap(['--check', 'typecheck'], env(), 0, dir, quick)).toEqual({ code: 0, out: '', err: "hive-progress: Hive didn't take this run's report (no reply in time), so check typecheck wasn't recorded: run it again.\n" })
+    expect(await wrap(['--check', 'typecheck'], env(), 0, dir, quick)).toEqual({ code: 0, out: '', err: "cw-progress: Combwork didn't take this run's report (no reply in time), so check typecheck wasn't recorded: run it again.\n" })
     expect(finishes()).toBe(0)
     // A plain run's finish is never sent again, and says nothing.
     calls.length = 0
@@ -471,7 +476,7 @@ describe('what a run is for (#1220): its card, revision and check, asked before 
 
   it('says why for each reason a check run is not counted (#1654)', () => {
     const line = (whyNot: string, more: Record<string, unknown> = {}, isolated = false) => uncountedLine({ check: { name: 'lint', counted: false, whyNot, platform: 'git', ...more } }, isolated)
-    expect(line('notCheck')).toBe("not counted as check lint: Hive didn't see the check's configured command run. Run it again with hive-progress --check lint.")
+    expect(line('notCheck')).toBe("not counted as check lint: Combwork didn't see the check's configured command run. Run it again with cw-progress --check lint.")
     expect(line('notContained')).toBe("not counted as check lint: what is checked out here doesn't contain the card's revision. Run it in the card's own folder, at its revision.")
     expect(line('dirty', { changes: ['new.txt'] })).toBe('not counted as check lint: the folder had uncommitted changes (new.txt). Commit or remove them, then run it again.')
     expect(line('moved')).toBe('not counted as check lint: something else was checked out by the time it ended. Run it again.')
@@ -592,7 +597,7 @@ describe('reporting a run', () => {
   it('with Hive unreachable, refusing, absent or turned off: the command runs as usual and nothing fails', async () => {
     const cmd = ['--', node, '-e', "console.log('out'); process.exit(4)"]
     const t0 = Date.now()
-    expect(await wrap(cmd, env({ HIVE_API_URL: 'http://127.0.0.1:9' }))).toEqual({ code: 4, out: 'out\n', err: '' })
+    expect(await wrap(cmd, env({ CW_API_URL: 'http://127.0.0.1:9' }))).toEqual({ code: 4, out: 'out\n', err: '' })
     expect(Date.now() - t0).toBeLessThan(5000)
     refuse = true
     expect(await wrap(cmd, env())).toEqual({ code: 4, out: 'out\n', err: '' })
@@ -601,11 +606,11 @@ describe('reporting a run', () => {
     calls.length = 0
     // Not reporting, the command has the console itself (nothing to collect here): only its exit code is checked.
     const quiet = ['--', node, '-e', 'process.exit(5)']
-    expect((await wrap(quiet, env({ HIVE_API_URL: undefined }))).code).toBe(5)
-    expect((await wrap(quiet, env({ HIVE_API_TOKEN_FILE: undefined }))).code).toBe(5)
+    expect((await wrap(quiet, env({ CW_API_URL: undefined }))).code).toBe(5)
+    expect((await wrap(quiet, env({ CW_API_TOKEN_FILE: undefined }))).code).toBe(5)
     // HI-2262: a token in HIVE_API_TOKEN alone is no target (sessions get only the file).
-    expect((await wrap(quiet, env({ HIVE_API_TOKEN_FILE: undefined, HIVE_API_TOKEN: 'agent-token' }))).code).toBe(5)
-    expect((await wrap(quiet, env({ HIVE_PROGRESS: '0' }))).code).toBe(5)
+    expect((await wrap(quiet, env({ CW_API_TOKEN_FILE: undefined, HIVE_API_TOKEN: 'agent-token' }))).code).toBe(5)
+    expect((await wrap(quiet, env({ CW_PROGRESS: '0' }))).code).toBe(5)
     expect(calls).toEqual([])
   })
 
@@ -673,17 +678,17 @@ describe('reporting a run', () => {
 })
 
 describe('the shared reporter and timings', () => {
-  it('finds its target: the agent token from the file Hive keeps it in, never HIVE_API_TOKEN (HI-2262); HIVE_PROGRESS=0 turns it off', () => {
+  it('finds its target: the agent token from the file Hive keeps it in, never HIVE_API_TOKEN (HI-2262); CW_PROGRESS=0 turns it off', () => {
     const file = join(dir, 'token.json')
     writeFileSync(file, JSON.stringify({ token: 'from-file' }))
-    expect(progressTarget({ HIVE_API_URL: 'http://h/', HIVE_API_TOKEN_FILE: file, HIVE_WORKSPACE: 'W' })).toEqual({ url: 'http://h', token: 'from-file', workspace: 'W' })
+    expect(progressTarget({ CW_API_URL: 'http://h/', CW_API_TOKEN_FILE: file, CW_WORKSPACE: 'W' })).toEqual({ url: 'http://h', token: 'from-file', workspace: 'W' })
     // The file's, whatever HIVE_API_TOKEN says; with it alone, no target.
-    expect(progressTarget({ HIVE_API_URL: 'http://h', HIVE_API_TOKEN: 't', HIVE_API_TOKEN_FILE: file })?.token).toBe('from-file')
-    expect(progressTarget({ HIVE_API_URL: 'http://h', HIVE_API_TOKEN: 't' })).toBeNull()
-    expect(progressTarget({ HIVE_API_URL: 'http://h', HIVE_API_TOKEN_FILE: join(dir, 'no-such-token.json') })).toBeNull()
-    expect(progressTarget({ HIVE_API_URL: 'http://h' })).toBeNull()
-    expect(progressTarget({ HIVE_API_TOKEN_FILE: file })).toBeNull()
-    expect(progressTarget({ HIVE_API_URL: 'http://h', HIVE_API_TOKEN_FILE: file, HIVE_PROGRESS: '0' })).toBeNull()
+    expect(progressTarget({ CW_API_URL: 'http://h', HIVE_API_TOKEN: 't', CW_API_TOKEN_FILE: file })?.token).toBe('from-file')
+    expect(progressTarget({ CW_API_URL: 'http://h', HIVE_API_TOKEN: 't' })).toBeNull()
+    expect(progressTarget({ CW_API_URL: 'http://h', CW_API_TOKEN_FILE: join(dir, 'no-such-token.json') })).toBeNull()
+    expect(progressTarget({ CW_API_URL: 'http://h' })).toBeNull()
+    expect(progressTarget({ CW_API_TOKEN_FILE: file })).toBeNull()
+    expect(progressTarget({ CW_API_URL: 'http://h', CW_API_TOKEN_FILE: file, CW_PROGRESS: '0' })).toBeNull()
   })
 
   it('sends the workspace, clips long text, and does nothing at all without a target', async () => {
@@ -731,7 +736,7 @@ describe('the shared reporter and timings', () => {
     const lines: string[] = []
     const inner = new ProgressRun(null, { title: 'inner' }, { lines: (l) => lines.push(l) })
     await inner.finish(true, undefined, undefined, { logPath: 'C:\\logs\\run 2' })
-    expect(lines).toEqual(['##hive-progress log=C:\\logs\\run 2'])
+    expect(lines).toEqual(['##cw-progress log=C:\\logs\\run 2'])
     // The wrapper takes the line out of the output and sends the log with the command's exit code.
     calls.length = 0
     const script = `console.log('##hive-progress log=C:\\\\logs\\\\run-record.md'); console.log('done'); process.exit(4)`
@@ -832,47 +837,51 @@ describe("the hive-progress command on a session's PATH (main/progressReporters/
     const bin = join(dir, 'bin dir')
     // A stand-in for hive-progress.js: shows what it was given, and ends with the code it was asked for.
     const script = join(dir, 'echo args.js')
-    writeFileSync(script, "process.stdout.write(JSON.stringify({ args: process.argv.slice(2), data: process.env.HIVE_PROGRESS_DATA, node: process.env.ELECTRON_RUN_AS_NODE, callers: process.env.HIVE_PROGRESS_RUN_AS_NODE || null })); process.exit(Number(process.argv.at(-1)) || 0)")
+    writeFileSync(script, "process.stdout.write(JSON.stringify({ args: process.argv.slice(2), data: process.env.CW_PROGRESS_DATA, node: process.env.ELECTRON_RUN_AS_NODE, callers: process.env.CW_PROGRESS_RUN_AS_NODE || null })); process.exit(Number(process.argv.at(-1)) || 0)")
     const data = join(dir, 'data dir')
     expect(await installShims(bin, { exec: node, script, data })).toBe(bin)
     const args = ['--title', 'two words', '--', 'node', 'a&b', '7']
     // The caller's own ELECTRON_RUN_AS_NODE (usually none) is kept for the command, beside the shim's.
     const base = { ...process.env }
     delete base.ELECTRON_RUN_AS_NODE
+    // cw-progress, and hive-progress, its name before HI-2463 (a shell alias only): the same shim, the same run.
+    for (const name of ['cw-progress', 'hive-progress'])
     for (const callers of [null, '1']) {
       const callerEnv = callers ? { ...base, ELECTRON_RUN_AS_NODE: callers } : base
       if (process.platform === 'win32') {
         // As typed at a cmd prompt.
-        const line = [join(bin, 'hive-progress.cmd'), ...args].map((a) => (/[\s&]/.test(a) ? `"${a}"` : a)).join(' ')
+        const line = [join(bin, `${name}.cmd`), ...args].map((a) => (/[\s&]/.test(a) ? `"${a}"` : a)).join(' ')
         const r = spawnSync('cmd.exe', ['/d', '/s', '/c', `"${line}"`], { encoding: 'utf8', windowsVerbatimArguments: true, env: callerEnv })
         expect([r.status, JSON.parse(r.stdout)]).toEqual([7, { args, data, node: '1', callers }])
       }
       const bash = process.platform === 'win32' ? 'C:\\Program Files\\Git\\bin\\bash.exe' : '/bin/sh'
       if (existsSync(bash)) {
-        const r = spawnSync(bash, [join(bin, 'hive-progress').replace(/\\/g, '/'), ...args], { encoding: 'utf8', env: callerEnv })
+        const r = spawnSync(bash, [join(bin, name).replace(/\\/g, '/'), ...args], { encoding: 'utf8', env: callerEnv })
         const got = JSON.parse(r.stdout)
         expect([r.status, got.args, got.node, got.data.replace(/\//g, '\\'), got.callers]).toEqual([7, args, '1', data, callers])
       }
     }
     // Written again only when they change.
-    const { mtimeMs } = statSync(join(bin, 'hive-progress.cmd'))
+    const { mtimeMs } = statSync(join(bin, 'cw-progress.cmd'))
     await installShims(bin, { exec: node, script, data })
-    expect(statSync(join(bin, 'hive-progress.cmd')).mtimeMs).toBe(mtimeMs)
-    expect(shimFiles({ exec: 'C:\\H\\Hive.exe', script: 'C:\\H\\x.js', data: 'C:\\D' })['hive-progress']).toBe(
-      "#!/bin/sh\nHIVE_PROGRESS_RUN_AS_NODE=\"${ELECTRON_RUN_AS_NODE-}\" ELECTRON_RUN_AS_NODE=1 HIVE_PROGRESS_DATA='C:/D' exec 'C:/H/Hive.exe' 'C:/H/x.js' \"$@\"\n"
+    expect(statSync(join(bin, 'cw-progress.cmd')).mtimeMs).toBe(mtimeMs)
+    const files = shimFiles({ exec: 'C:\\H\\Hive.exe', script: 'C:\\H\\x.js', data: 'C:\\D' })
+    expect([files['hive-progress'], files['hive-progress.cmd']]).toEqual([files['cw-progress'], files['cw-progress.cmd']])
+    expect(files['cw-progress']).toBe(
+      "#!/bin/sh\nCW_PROGRESS_RUN_AS_NODE=\"${ELECTRON_RUN_AS_NODE-}\" ELECTRON_RUN_AS_NODE=1 CW_PROGRESS_DATA='C:/D' exec 'C:/H/Hive.exe' 'C:/H/x.js' \"$@\"\n"
     )
   })
 
   it("the command doesn't get what started hive-progress: in Hive's executable, ELECTRON_RUN_AS_NODE is the caller's own again", async () => {
-    const shimmed = { PATH: 'p', ELECTRON_RUN_AS_NODE: '1', HIVE_PROGRESS_DATA: 'd', HIVE_PROGRESS_RUN_AS_NODE: undefined, HIVE_API_URL: 'u' }
-    expect(commandEnv(shimmed, true)).toEqual({ PATH: 'p', HIVE_API_URL: 'u' })
-    expect(commandEnv({ ...shimmed, HIVE_PROGRESS_RUN_AS_NODE: '1' }, true)).toEqual({ PATH: 'p', HIVE_API_URL: 'u', ELECTRON_RUN_AS_NODE: '1' })
+    const shimmed = { PATH: 'p', ELECTRON_RUN_AS_NODE: '1', CW_PROGRESS_DATA: 'd', CW_PROGRESS_RUN_AS_NODE: undefined, CW_API_URL: 'u' }
+    expect(commandEnv(shimmed, true)).toEqual({ PATH: 'p', CW_API_URL: 'u' })
+    expect(commandEnv({ ...shimmed, CW_PROGRESS_RUN_AS_NODE: '1' }, true)).toEqual({ PATH: 'p', CW_API_URL: 'u', ELECTRON_RUN_AS_NODE: '1' })
     // Run by plain Node, the variable is the caller's: left alone.
-    expect(commandEnv(shimmed, false)).toEqual({ PATH: 'p', ELECTRON_RUN_AS_NODE: '1', HIVE_API_URL: 'u' })
-    // The command itself, reporting on, unavailable and off: no ELECTRON_RUN_AS_NODE, no HIVE_PROGRESS_DATA.
-    const probe = ['--', node, '-e', 'process.exit(process.env.ELECTRON_RUN_AS_NODE || process.env.HIVE_PROGRESS_DATA ? 23 : 0)']
+    expect(commandEnv(shimmed, false)).toEqual({ PATH: 'p', ELECTRON_RUN_AS_NODE: '1', CW_API_URL: 'u' })
+    // The command itself, reporting on, unavailable and off: no ELECTRON_RUN_AS_NODE, no CW_PROGRESS_DATA.
+    const probe = ['--', node, '-e', 'process.exit(process.env.ELECTRON_RUN_AS_NODE || process.env.CW_PROGRESS_DATA ? 23 : 0)']
     const viaShim = { ELECTRON_RUN_AS_NODE: '1' }
-    for (const e of [env(viaShim), env({ ...viaShim, HIVE_API_URL: 'http://127.0.0.1:9' }), env({ ...viaShim, HIVE_PROGRESS: '0' })]) {
+    for (const e of [env(viaShim), env({ ...viaShim, CW_API_URL: 'http://127.0.0.1:9' }), env({ ...viaShim, CW_PROGRESS: '0' })]) {
       const code = await runWrapped(probe, { env: e, cwd: dir, stdout: { write: () => true }, stderr: { write: () => true }, stdin: 'ignore', startWaitMs: 50, viaElectron: true })
       expect(code).toBe(0)
     }
@@ -881,9 +890,9 @@ describe("the hive-progress command on a session's PATH (main/progressReporters/
 
 describe('a reporter inside a command hive-progress runs: one row, the wrapper\'s (#167)', () => {
   it('the command is told it is wrapped; a reporter in it then has no target and prints step lines instead', () => {
-    expect(progressTarget({ HIVE_API_URL: 'http://h', HIVE_API_TOKEN_FILE: agentTokenFile, HIVE_PROGRESS_WRAPPED: '1' })).toBeNull()
-    expect(wrappedLines({ HIVE_PROGRESS_WRAPPED: '1' })).toBeTypeOf('function')
-    expect(wrappedLines({ HIVE_PROGRESS_WRAPPED: '1', HIVE_PROGRESS: '0' })).toBeUndefined()
+    expect(progressTarget({ CW_API_URL: 'http://h', CW_API_TOKEN_FILE: agentTokenFile, CW_PROGRESS_WRAPPED: '1' })).toBeNull()
+    expect(wrappedLines({ CW_PROGRESS_WRAPPED: '1' })).toBeTypeOf('function')
+    expect(wrappedLines({ CW_PROGRESS_WRAPPED: '1', CW_PROGRESS: '0' })).toBeUndefined()
     expect(wrappedLines({})).toBeUndefined()
     const lines: string[] = []
     const r = new ProgressRun(null, { title: 'e2e', total: 3, step: 0, stepName: 'a' }, { lines: (l) => lines.push(l) })
@@ -891,14 +900,14 @@ describe('a reporter inside a command hive-progress runs: one row, the wrapper\'
     r.update({ estimateMs: 5000 })
     r.update({ step: 3 })
     // The API counts the steps finished; a step line names the one starting (from 1, at most the total).
-    expect(lines).toEqual(['##hive-progress step=1 total=3 name=a', '##hive-progress step=2 name=b', '##hive-progress step=3'])
+    expect(lines).toEqual(['##cw-progress step=1 total=3 name=a', '##cw-progress step=2 name=b', '##cw-progress step=3'])
     // A reporter that learns its total late prints it once, for the wrapper's run to take.
     lines.length = 0
     const late = new ProgressRun(null, { title: 'unit' }, { lines: (l) => lines.push(l) })
     late.update({ step: 1, stepName: 'a' })
     late.update({ total: 4 })
     late.update({ total: 6, step: 2 })
-    expect(lines).toEqual(['##hive-progress step=2 name=a', '##hive-progress step=2 total=4', '##hive-progress step=3'])
+    expect(lines).toEqual(['##cw-progress step=2 name=a', '##cw-progress step=2 total=4', '##cw-progress step=3'])
   })
 
   it('a reporter run under hive-progress shows in its run: one row with the total and steps', async () => {
@@ -920,7 +929,7 @@ describe("agents told to run long commands through hive-progress (Settings → G
     expect(wrapsLongCommands({ progressPanel: true, progressCommands: false })).toBe(false)
     expect(wrapsLongCommands({ progressPanel: false, progressCommands: true })).toBe(false)
     expect(hiveInstructions('web')).toContain(progressRule(true))
-    expect(progressRule(true)).toMatch(/over 30 s.*in the background too.*`hive-progress --title "<what and why, in a few words>" -- <command>`/)
+    expect(progressRule(true)).toMatch(/over 30 s.*in the background too.*`cw-progress --title "<what and why, in a few words>" -- <command>`/)
     expect(hiveInstructions('web', 'agent', false)).toContain(progressRule(false))
     expect(progressRule(false)).toMatch(/only when the user asks/)
     expect(hiveInstructions('', 'assistant')).not.toMatch(/hive-progress/)
@@ -937,8 +946,8 @@ describe("agents told to run long commands through hive-progress (Settings → G
 describe("Hive's own test runners (tests/progressReport.mts)", () => {
   const saved = { ...process.env }
   beforeEach(() => {
-    Object.assign(process.env, { HIVE_API_URL: url, HIVE_API_TOKEN_FILE: agentTokenFile, HIVE_TEST_PROGRESS_TIMINGS: join(dir, 'runner-timings.json') })
-    for (const k of ['HIVE_API_TOKEN', 'HIVE_WORKSPACE', 'HIVE_PROGRESS', 'HIVE_PROGRESS_WRAPPED']) delete process.env[k]
+    Object.assign(process.env, { CW_API_URL: url, CW_API_TOKEN_FILE: agentTokenFile, HIVE_TEST_PROGRESS_TIMINGS: join(dir, 'runner-timings.json') })
+    for (const k of ['HIVE_API_TOKEN', 'CW_WORKSPACE', 'CW_PROGRESS', 'CW_PROGRESS_WRAPPED']) delete process.env[k]
   })
   afterAll(() => {
     for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k]
@@ -957,7 +966,7 @@ describe("Hive's own test runners (tests/progressReport.mts)", () => {
     await own.finish('got a test slot after 3 s')
     expect(calls.at(-1)).toMatchObject({ path: '/v1/progress/run-1/finish', body: { ok: true, summary: 'got a test slot after 3 s' } })
     calls.length = 0
-    process.env.HIVE_PROGRESS_WRAPPED = '1'
+    process.env.CW_PROGRESS_WRAPPED = '1'
     const lines: string[] = []
     const write = vi.spyOn(process.stdout, 'write').mockImplementation((s) => (lines.push(String(s)), true))
     try {
@@ -967,9 +976,9 @@ describe("Hive's own test runners (tests/progressReport.mts)", () => {
       await wrapped.finish('got a test slot after 3 s')
     } finally {
       write.mockRestore()
-      delete process.env.HIVE_PROGRESS_WRAPPED
+      delete process.env.CW_PROGRESS_WRAPPED
     }
-    expect(lines).toEqual(['##hive-progress wait=waiting for a test slot: B4 (hb4)\n', '##hive-progress wait=waiting for a test slot: B5 (hb5)\n', '##hive-progress wait=\n'])
+    expect(lines).toEqual(['##cw-progress wait=waiting for a test slot: B4 (hb4)\n', '##cw-progress wait=waiting for a test slot: B5 (hb5)\n', '##cw-progress wait=\n'])
     expect(calls).toEqual([])
   })
 
@@ -996,7 +1005,7 @@ describe("Hive's own test runners (tests/progressReport.mts)", () => {
     const off = e2eProgress(['a'], ['--no-progress'])
     off.suite(0, 'a')
     await off.finish(true)
-    process.env.HIVE_PROGRESS = '0'
+    process.env.CW_PROGRESS = '0'
     await e2eProgress(['a'], []).finish(true)
     expect(calls).toEqual([])
   })
@@ -1034,7 +1043,7 @@ describe("Hive's own test runners (tests/progressReport.mts)", () => {
     wrapped.start(1, 'b')
     wrapped.done('b', 10, 'ok')
     await wrapped.finish(true, '2 ok, 0 failed')
-    expect(lines).toEqual(['##hive-progress step=1 total=2', '##hive-progress step=1 name=a', '##hive-progress step=2 name=b · 1 ok'])
+    expect(lines).toEqual(['##cw-progress step=1 total=2', '##cw-progress step=1 name=a', '##cw-progress step=2 name=b · 1 ok'])
     const off = scenariosProgress(['a'], 'fake', ['--no-progress'])
     off.start(0, 'a')
     await off.finish(true)

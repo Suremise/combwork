@@ -99,7 +99,8 @@ export function actorOf(a: ChangeActor | undefined): Actor {
   if (a.kind === 'user') return 'user'
   if (a.kind === 'assistant') return 'assistant'
   if (a.self) return agentActor(a.self.agentId)
-  return a.name === 'Hive' || a.name === 'Repair' ? 'hive' : agentActor(a.name)
+  // Combwork's own name (HI-2463), and Hive, which history written before it holds.
+  return a.name === 'Combwork' || a.name === 'Hive' || a.name === 'Repair' ? 'hive' : agentActor(a.name)
 }
 
 /** The stage a column stands for (P3: a move is to the column's stage). */
@@ -411,7 +412,7 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
     for (const [id, text] of now) if (!had.has(id) || had.get(id) !== text) decision({ id, text })
     for (const [id, text] of had) if (!now.has(id)) decision({ id, text }, true)
     // A lane reviewer's comment taken as its request to the builder (#1410, tasks.ts' laneReviewerAsks): the runtime's
-    // ReviewerRequest, made on the board (hive_request_builder's own is the runtime's, made there).
+    // ReviewerRequest, made on the board (cw_request_builder's own is the runtime's, made there).
     const asked = moves && history.some((h) => h.whatText?.id === HISTORY.reviewerRequest.id) ? after.comments.find((c) => c.id === comment)?.text : undefined
     const requested = asked !== undefined ? tx.append(n, { kind: 'ReviewerRequest', actor, source: 'recorded', ...ruleset(), data: { text: asked } }).seq : null // i18n-ignore: a fact's kind and codes, not text
     // A builder's comment taken as its reply to the reviewer (HI-2302, tasks.ts' builderReplies): a wake for the reviewer,
@@ -504,7 +505,7 @@ function unknownOf(r: Reads | null, fields: string[]): { platform?: Record<strin
 }
 
 /**
- * What an agent received of a card's decisions (`DecisionsReceived`): the card read in full (hive_read_task), or a line
+ * What an agent received of a card's decisions (`DecisionsReceived`): the card read in full (cw_read_task), or a line
  * telling it of new decisions (a decision delivery) received. Bound to what it was given (HR4's #1216 rounds 1 and 2):
  * `generation` is the card's decision generation read in the same snapshot as the decisions it was given, never one
  * looked up later. Recorded once per generation, in a board change of its own, only while the workspace (and the card's

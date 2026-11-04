@@ -31,7 +31,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const PARK_LINE = '[Hive] The team is pausing for an update.'
+const PARK_LINE = '[CW] The team is pausing for an update.'
 // The processes fake agents leave running ("linger"), by their identity (pid and start time), ended at the end in any case.
 const lingerFile = path.join(claudeHome, 'fake-linger.jsonl')
 const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l).pid) : [])
@@ -90,11 +90,11 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     check('Builder starts', !!(await until(() => idle(alpha, builder.id), HUNG_MS)))
     const c1 = (await inv('tasks:create', { title: 'Greeting says Hi', project: 'alpha', agent: builder.id, column: 'doing' })).number
     const c2 = (await inv('tasks:create', { title: 'Greeting trims', project: 'alpha', agent: builder.id })).number
-    await say(alpha, builder.id, `hive hive_lane ${JSON.stringify({ action: 'start', cards: [c1, c2], reviewer: 'Reviewer', name: 'greetings' })}`)
+    await say(alpha, builder.id, `hive cw_lane ${JSON.stringify({ action: 'start', cards: [c1, c2], reviewer: 'Reviewer', name: 'greetings' })}`)
     const lane = async () => (await inv('lanes:list')).find((l) => l.builder.id === builder.id && l.state !== 'ended')
     check("Builder's lane runs", !!(await until(async () => (await lane())?.state === 'active', HUNG_MS)), JSON.stringify(await lane()))
     await until(() => idle(alpha, builder.id), HUNG_MS)
-    await say(alpha, builder.id, `hive hive_wait_for_tasks ${JSON.stringify({ cards: [c1], changes: ['comment'], wake: true, limitMinutes: 60 })}`)
+    await say(alpha, builder.id, `hive cw_wait_for_tasks ${JSON.stringify({ cards: [c1], changes: ['comment'], wake: true, limitMinutes: 60 })}`)
     check('Builder watches its card', !!(await until(async () => (await live(alpha, builder.id))?.status === 'watching', HUNG_MS)))
 
     // --- Window B, another workspace (opened before the pause: the user's pause covers it).

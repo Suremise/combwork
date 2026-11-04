@@ -36,14 +36,14 @@ describe('nothing waits on the card (HI-2285)', () => {
 describe("the card watch's reply (HI-2285)", () => {
   it('nudges the builder to carry on or ask, in place of "End your turn now"', () => {
     const t = taskWaitText({ watching: 'Waiting for #5', limitAt: 'T', idle: 5 })
-    expect(t).toBe(`Waiting for #5. ${idleWatchText({ number: 5 })} Hive types a line into this session when it changes, or at T if nothing does.`)
+    expect(t).toBe(`Waiting for #5. ${idleWatchText({ number: 5 })} Combwork types a line into this session when it changes, or at T if nothing does.`)
     expect(t).toMatch(/Nothing waits on #5: it is in Doing and not submitted, with no question open for the user and no design step out for the reviewer/)
-    expect(t).toMatch(/hive_ask_user .*hive_loop_step/)
+    expect(t).toMatch(/cw_ask_user .*cw_loop_step/)
     expect(t).toMatch(/stalled after 5 min/)
     expect(t).not.toMatch(/End your turn now/)
   })
   it('a legitimate watch (no idle card) replies as before', () => {
-    expect(taskWaitText({ watching: 'Waiting for #5', limitAt: 'T' })).toBe('Waiting for #5. End your turn now: Hive types a line into this session when it changes, or at T if nothing does. Nothing runs meanwhile.')
+    expect(taskWaitText({ watching: 'Waiting for #5', limitAt: 'T' })).toBe('Waiting for #5. End your turn now: Combwork types a line into this session when it changes, or at T if nothing does. Nothing runs meanwhile.')
   })
   it('a card with commits to hand over says that first, not the nudge', () => {
     expect(taskWaitText({ watching: 'Waiting for #5', limitAt: 'T', idle: 5, unsubmitted: [{ card: 5, count: 1, atLeast: false, since: 'ab30f52' }] })).toMatch(/^Waiting for #5\. First hand #5 over/)

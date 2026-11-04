@@ -209,14 +209,14 @@ function registerDevAppId(): void {
 // hive-img://img/<encoded absolute path> serves images inside the workspace to the renderer (Attachments tab thumbnails, image and PDF previews).
 protocol.registerSchemesAsPrivileged([{ scheme: 'hive-img', privileges: { standard: true, secure: true, supportFetchAPI: true } }])
 
-/** A script a plain Node process runs (hive-mcp.js, hive-progress.js): unpacked from the asar (electron-builder.yml). */
+/** A script a plain Node process runs (cw-mcp.js, cw-progress.js): unpacked from the asar (electron-builder.yml). */
 function unpackedScript(name: string): string {
   const p = join(__dirname, name)
   return app.isPackaged ? p.replace(`app.asar${sep}`, `app.asar.unpacked${sep}`) : p
 }
 
 function hiveMcpScript(): string {
-  return unpackedScript('hive-mcp.js')
+  return unpackedScript('cw-mcp.js')
 }
 
 function appInfo(): AppInfo {
@@ -1027,7 +1027,7 @@ app.whenReady().then(async () => {
   })
   sessions.apiEnv = apiEnv
   // hive-progress on every session's PATH (#137): shims in Hive's bin folder, timings beside them.
-  void installShims(join(app.getPath('userData'), 'bin'), { exec: process.execPath, script: unpackedScript('hive-progress.js'), data: join(app.getPath('userData'), 'progress') }).then((dir) => {
+  void installShims(join(app.getPath('userData'), 'bin'), { exec: process.execPath, script: unpackedScript('cw-progress.js'), data: join(app.getPath('userData'), 'progress') }).then((dir) => {
     sessions.binDir = dir
     if (!dir) log.warn("Couldn't write the hive-progress command into Hive's bin folder; sessions start without it")
   })
@@ -1045,19 +1045,19 @@ app.whenReady().then(async () => {
         args: [hiveMcpScript()],
         env: {
           ELECTRON_RUN_AS_NODE: '1',
-          HIVE_API_URL: url,
-          HIVE_API_TOKEN_FILE: assistantTokenFile(ws),
-          HIVE_PROJECT: '',
-          HIVE_WORKSPACE: ws,
+          CW_API_URL: url,
+          CW_API_TOKEN_FILE: assistantTokenFile(ws),
+          CW_PROJECT: '',
+          CW_WORKSPACE: ws,
           HIVE_ROLE: 'assistant',
           HIVE_ASSISTANT_CONTROL: config.settings.assistant?.control ?? 'projects',
-          // Its settings tool (hive_update_setting) is offered only with Change settings on: a change restarts it.
+          // Its settings tool (cw_update_setting) is offered only with Change settings on: a change restarts it.
           HIVE_ASSISTANT_SETTINGS: config.settings.assistant?.changeSettings === true ? '1' : '0',
           // Its journal's tools (#1031) only while the journal is on: a change is told to it, and applies at its next start.
           HIVE_JOURNAL: journalSettingsOf(workspaceOf(projectPath)).enabled ? '1' : '0',
           // What it may store, for its session contract's journal rule (#1032).
           HIVE_JOURNAL_SCOPE: journalSettingsOf(workspaceOf(projectPath)).scope.join(','),
-          // The developer console's tool (hive_console) is offered only while Settings → Agent API lets agents read it.
+          // The developer console's tool (cw_console) is offered only while Settings → Agent API lets agents read it.
           HIVE_DEV_CONSOLE: config.settings.agentApi.devConsole === true ? '1' : '0',
           ...mcpAdvancedEnv(),
           ...testMcpLog()
@@ -1071,13 +1071,13 @@ app.whenReady().then(async () => {
       args: [hiveMcpScript()],
       env: {
         ELECTRON_RUN_AS_NODE: '1',
-        HIVE_API_URL: url,
+        CW_API_URL: url,
         // The agent's own token (made at each launch), which confines its board calls to its project.
-        HIVE_API_TOKEN_FILE: agentId ? agentTokenFile(projectPath, agentId) : '',
+        CW_API_TOKEN_FILE: agentId ? agentTokenFile(projectPath, agentId) : '',
         // The Assistant looks after the whole workspace: its tools have no project of their own.
-        HIVE_PROJECT: workspace.isAssistantHome(projectPath) ? '' : basename(projectPath),
+        CW_PROJECT: workspace.isAssistantHome(projectPath) ? '' : basename(projectPath),
         // With several windows, the API answers the session's tools for its own workspace.
-        HIVE_WORKSPACE: workspaceOf(projectPath).path ?? '',
+        CW_WORKSPACE: workspaceOf(projectPath).path ?? '',
         // Which agent's tools these are: Hive names it as the author of the handovers it writes.
         ...(agentId ? { HIVE_AGENT_ID: agentId } : {}),
         // Whether its instructions tell it to run long commands through hive-progress unasked.

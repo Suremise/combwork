@@ -1,7 +1,7 @@
 // Dialects wired into sessions (HI-2443, dialects card 6b; plans/2026-11-03-dialects-design.md, sections 3 and 7): the
 // Dialect setting as a pick, a session's chain from the files as loaded and the key that tells "restart to apply", the
 // API chain kept per workspace and loaded again when its files change, and the guidance revision per chain. The launch
-// itself (pinned chain, HIVE_DIALECT_FILE, the launch record) is the dialectlaunch e2e suite's.
+// itself (pinned chain, CW_DIALECT_FILE, the launch record) is the dialectlaunch e2e suite's.
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'

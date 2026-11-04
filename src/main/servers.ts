@@ -416,7 +416,7 @@ export function apiEnv(projectPath: string, agentId: string): Record<string, str
   const token = agentToken(projectPath, agentId)
   if (!info.running || !info.url || !token) return {}
   // How long hive-progress waits for the API's answers (HI-1892: Settings → Advanced, its reply time).
-  return { HIVE_API_URL: info.url, HIVE_API_TOKEN_FILE: agentTokenFile(projectPath, agentId),HIVE_PROGRESS_REPLY_SECONDS: String(advanced.number('hive.progress.replySeconds')) }
+  return { CW_API_URL: info.url, CW_API_TOKEN_FILE: agentTokenFile(projectPath, agentId),CW_PROGRESS_REPLY_SECONDS: String(advanced.number('hive.progress.replySeconds')) }
 }
 
 /** An open workspace by its folder path or its name. A name two open workspaces share is refused (409): use the path. */
@@ -571,7 +571,7 @@ async function projectSummary(p: string) {
       // Its connection (HI-1771, for a CLI with connections): the one chosen (null: the default), the one its run is on, and a switch waiting.
       ...agentConnectionFields(p, a, a.live?.provider ?? agentProvider(a, config.settings))
     })),
-    // Its builder and reviewer pairs (#1531): its running lanes', each with its state as hive_lane list says it (HI-2271:
+    // Its builder and reviewer pairs (#1531): its running lanes', each with its state as cw_lane list says it (HI-2271:
     // the card it is on), then by name; empty without either.
     pairs: workflowPairs(info.agents, await lanes.listLanes(workspaceOf(p), { project: basename(p) }).catch(() => []), laneStateText),
     // The workspace's MCP servers (HI-2059): all available to the project, those added to it running; `on` is `added`'s
@@ -779,7 +779,7 @@ async function hiveSkillsNow(): Promise<Awaited<ReturnType<typeof skillRevisions
 
 route('GET', '/v1/status', async () => ({
   // agent-protocol: the app's name
-  app: { name: 'Hive', version: app.getVersion() },
+  app: { name: 'Combwork', version: app.getVersion() },
   api: { version: API_VERSION },
   caller: await callerInfo(),
   // The guidance this Hive gives sessions, and the request's workspace's Hive skills (null without one).
@@ -999,7 +999,7 @@ route('GET', '/v1/providers', async () => {
       // Whether agents can be given context200k (a 200K window instead of the model's 1M).
       context200k: p.capabilities.contextLimit,
       modes: offeredModes(p.id, s).map((m) => ({ value: m.value, label: m.label, description: m.description })),
-      // Its connections usable in the caller's workspace (HI-2108), in the order: what hive_add_agent's connection names.
+      // Its connections usable in the caller's workspace (HI-2108), in the order: what cw_add_agent's connection names.
       ...(here ? { connections: connectionsHere(here).filter((c) => accountById(c.account)?.provider === p.id).map((c) => ({ id: c.id, name: c.name })) } : {})
     }
   })
@@ -1301,7 +1301,7 @@ route('GET', '/v1/connections/:ref', async ({ params }) => {
 })
 
 /**
- * A connection's name and values from a request body (HI-2108: hive_connection add and update): model, effort, mode,
+ * A connection's name and values from a request body (HI-2108: cw_connection add and update): model, effort, mode,
  * context200k and extraArgs, each "" or null for the CLI's own (on an update: cleared). Saving checks them as the
  * connection dialog's save does (a mode the CLI has, an effort the model takes: decision E).
  */
@@ -1327,7 +1327,7 @@ export function connectionValuesArg(body: any): ConnectionPatch {
 }
 
 /**
- * The Assistant makes or changes a connection (HI-2108, hive_connection): only with Settings → Assistant → Control →
+ * The Assistant makes or changes a connection (HI-2108, cw_connection): only with Settings → Assistant → Control →
  * Change settings on, asked again at the change, and listed in its panel. Accounts (sign-ins, servers, keys) stay the
  * user's: a connection goes only on an account that exists.
  */
@@ -1567,7 +1567,7 @@ route('POST', '/v1/projects/:name/agents/:agent/prompt', async ({ params, body }
 
 // A message for a running agent that may not take a prompt now (#530): a delivery (#647) offered at once when it can be
 // (idle, or watching: its watch carries on), else queued and offered as its next line once it is idle; the agent can also
-// fetch it with hive_inbox. cancel=true cancels those waiting.
+// fetch it with cw_inbox. cancel=true cancels those waiting.
 route('POST', '/v1/projects/:name/agents/:agent/message', async ({ params, body }) => {
   const p = projectByName(params[0])
   const agentId = await agentParam(p, decodeURIComponent(params[1]))
@@ -1619,7 +1619,7 @@ function callerSender(): DeliverySender {
 const startOnTask = (p: string, agentId: string, agentName: string, prompt: string, start: (line: string) => Promise<LiveSessionState>): Promise<LiveSessionState> =>
   launchWith(p, { agentId, agentName, kind: 'task', from: callerSender(), body: prompt }, start).then((x) => x.launched)
 
-// The Assistant's journal (#1031): its tools (hive_journal_*) only, only while it is on (Settings → Assistant → Journal).
+// The Assistant's journal (#1031): its tools (cw_journal_*) only, only while it is on (Settings → Assistant → Journal).
 // The tools come and go with the Assistant's start; each call checks again, so one turned off meanwhile is refused.
 function journalHome(): { home: string; settings: JournalSettings } {
   if (!assistantCaller()) throw new HttpError(403, say(API.journal.onlyAssistant))
@@ -1699,7 +1699,7 @@ route('POST', '/v1/builds', async ({ body }) => {
   return recordBuild(requireWorkspace(), f)
 })
 
-/** Who is calling hive_inbox: a project agent (its own), or the Assistant (its home's). */
+/** Who is calling cw_inbox: a project agent (its own), or the Assistant (its home's). */
 function inboxOwner(): { host: string; agentId: string } {
   const me = agentCaller()
   if (me) return { host: me.projectPath, agentId: me.agentId }
@@ -1707,7 +1707,7 @@ function inboxOwner(): { host: string; agentId: string } {
   throw new HttpError(400, say(API.inbox.noInbox))
 }
 
-// hive_inbox (#647): the caller's deliveries not received yet (a card's events in one item), now received; with ack, marks
+// cw_inbox (#647): the caller's deliveries not received yet (a card's events in one item), now received; with ack, marks
 // those ids acked and lists nothing. With ack and read: true (#1531, opt-in), both in one call: the ack first, by the
 // ack's own rules, then the read, whose items are received only (an item is never acked by being read). An id that
 // isn't the caller's is unknown, like one that doesn't exist.
@@ -1847,7 +1847,7 @@ route('GET', '/v1/projects/:name/agents/:agent/activity', async ({ params, query
 })
 
 /**
- * Whether a launch of an agent (its HIVE_RUN_ID) is still its running one (#1008): a test run started in an agent's
+ * Whether a launch of an agent (its CW_RUN_ID) is still its running one (#1008): a test run started in an agent's
  * shell records it, and a run waiting for a test slot asks, to say when the holder was left over by a session that has
  * ended (Hive closed, the agent stopped or restarted). Status, as agents' is: open to every caller.
  */
@@ -2084,7 +2084,7 @@ route('GET', '/v1/lanes', async ({ query }) =>
   })
 )
 
-// The next card of the calling agent's running lane (#1270, hive_lane next): to start, to carry on, or why it waits.
+// The next card of the calling agent's running lane (#1270, cw_lane next): to start, to carry on, or why it waits.
 route('GET', '/v1/lanes/next', async () =>
   laneCall(async () => {
     const a = agentCaller()
@@ -2112,7 +2112,7 @@ route('GET', '/v1/lanes/:id', async ({ params }) =>
 route('POST', '/v1/lanes', async ({ body }) => laneCall(() => laneStartCall(body)))
 
 /**
- * hive_lane start (POST /v1/lanes), and a new card placed on a lane as it is made (HI-2167, `place`: POST /v1/tasks with
+ * cw_lane start (POST /v1/lanes), and a new card placed on a lane as it is made (HI-2167, `place`: POST /v1/tasks with
  * lane): one path, the same rules, launches and the Assistant's change for both.
  */
 async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneChange> {
@@ -2490,7 +2490,7 @@ route('POST', '/v1/queue/retry', async ({ body }) => queueCard(body, 'retryMerge
 route('GET', '/v1/shared', async () => inWorkspace(requireWorkspace(), () => notesTree()))
 
 // A project's handovers, newest first (under its earlier folder names too, #514); no project: every one. Their paths
-// as /v1/shared/file takes them. What hive_read_latest_handover and the session guidance find.
+// as /v1/shared/file takes them. What cw_read_latest_handover and the session guidance find.
 route('GET', '/v1/shared/handovers', async ({ query }) => {
   const name = query.get('project')
   const project = name ? projectByName(name) : null
@@ -3054,7 +3054,7 @@ route('POST', '/v1/tasks', async ({ body }) => {
   if (!title) throw new HttpError(400, say(API.card.titleRequired))
   const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked, blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context, ...(body?.kind !== undefined ? { kind: body.kind } : {}), ...(body?.skipReview !== undefined ? { skipReview: body.skipReview as string } : {}) }
   const actor = await taskActor()
-  // Placed on a lane as it is made (HI-2167): checked before the card is made; placed after, through hive_lane start's
+  // Placed on a lane as it is made (HI-2167): checked before the card is made; placed after, through cw_lane start's
   // own path, so nobody guesses its key.
   const lane = await lanePlacement(body?.lane, input)
   // Files to keep with it (HI-1700): the list checked now; copied inside the operation that makes the card, once its
@@ -3065,7 +3065,7 @@ route('POST', '/v1/tasks', async ({ body }) => {
   // A long title is kept, with a line suggesting a shorter one (HI-1872), or one with what belongs in the description (HI-2061).
   const nudge = titleNudge(title, actor, titleKeys())
   const reply = async (c: TaskCard) => ({ ...(shortReply(body) ? await taskChange(c, attachedLines(c)) : await taskView(c)), ...(nudge ? { nudge } : {}) })
-  // Placed once it is made (the Assistant's: its own change, as hive_lane start is), never inside the card's own change.
+  // Placed once it is made (the Assistant's: its own change, as cw_lane start is), never inside the card's own change.
   const placing = async <R extends { number: number }>(r: R) => (lane ? { ...r, ...(await placeOnLane(lane, r.number)) } : r)
   if (actor.kind !== 'assistant') return placing(await reply(await create()))
   const project = typeof input.project === 'string' && input.project ? input.project : null
@@ -3171,7 +3171,7 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   })
 })
 
-/** A batch change (hive_update_tasks): checked by taskBatch; its refusals are the Agent API's statuses. */
+/** A batch change (cw_update_tasks): checked by taskBatch; its refusals are the Agent API's statuses. */
 route('POST', '/v1/tasks/batch', async ({ body }) => {
   requireWorkspace()
   const short = shortReply(body)
@@ -3607,7 +3607,7 @@ async function reviewCopyAfter(actor: tasks.TaskActor, c: TaskCard, did: { start
 
 /**
  * A put-back of a card a running lane holds (HI-2267): its reply says the lane keeps its own order and takes the card in
- * it, and how to change that order (hive_lane start, applyNow), as a line of its own. Any other intent, as it was.
+ * it, and how to change that order (cw_lane start, applyNow), as a line of its own. Any other intent, as it was.
  */
 async function withLaneOrder(intent: CardIntent, card: TaskCard, done: IntentDone): Promise<IntentDone> {
   if (intent.kind !== 'putBack') return done
@@ -3799,7 +3799,7 @@ route('POST', '/v1/tasks/:n/start', async ({ params, body }) => {
   const card = await tasks.readTask(n, await taskActor())
   // 1.0 (#1451): no agent gets a worktree of its own: asking for one is refused, never ignored.
   if (body?.worktree || body?.existingWorktree || body?.branch || body?.base || (body?.location && body.location !== 'project')) throw new HttpError(400, say(NOT_PINNED))
-  // A new agent's connection (HI-2121, as hive_add_agent's: decisions A and D): the one named, else the first usable here.
+  // A new agent's connection (HI-2121, as cw_add_agent's: decisions A and D): the one named, else the first usable here.
   if (body?.agent && body?.connection !== undefined) throw new HttpError(400, say(API.intent.connectionNewAgentOnly))
   const conn = !body?.agent && card.project && ws.path ? connectionArg(body, join(ws.path, card.project)) : undefined
   // Decision D (HI-2108): provider, model, effort, mode and context are a connection's now, refused naming those there.
@@ -4430,7 +4430,7 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
   if (viewerCaller() && req.method !== 'GET') return send(res, 403, { error: say(API.http.viewerReadOnly) })
 
   if (req.method === 'GET' && url.pathname === '/v1/events') {
-    // Events are about every open workspace: not for an Assistant, which sees only its own (it has hive_wait_for_agents).
+    // Events are about every open workspace: not for an Assistant, which sees only its own (it has cw_wait_for_agents).
     if (assistantCaller()) return send(res, 403, { error: say(API.http.eventsForCallers) })
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' })
     res.write(': connected\n\n')

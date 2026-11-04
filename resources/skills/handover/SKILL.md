@@ -33,8 +33,8 @@ Lasting decisions and conventions belong in the shared notes too (the workspace-
 
 ## Saving it
 
-Save it with `hive_create_handover` (title: a few words on the work, content: the note). Hive files it in the workspace's shared notes for this project and writes the header itself (title, project, author, session and date), so start the content at the first heading. The next session is told it exists.
+Save it with `cw_create_handover` (title: a few words on the work, content: the note). Combwork files it in the workspace's shared notes for this project and writes the header itself (title, project, author, session and date), so start the content at the first heading. The next session is told it exists.
 
-No hive tool listed: write it to `HANDOVER.md` in the project root and tell the user.
+No Combwork tool listed: write it to `HANDOVER.md` in the project root and tell the user.
 
 Finish by telling the user, in a line or two, where it is and what the next step is.

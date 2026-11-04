@@ -176,7 +176,7 @@
   "tips.connections.title": "Rode agentes em logins diferentes",
   "tips.consoleRecording.text": "No console do desenvolvedor, Gravar grava em um arquivo o que a CLI de um agente envia ao Combwork, com dados sensíveis ocultos, a menos que você marque Texto para essa gravação, e Copiar diagnóstico pode anexá-la a um relatório de bug.",
   "tips.consoleRecording.title": "Grave o que uma CLI envia",
-  "tips.consoleText.text": "Configurações → Avançado → Console do desenvolvedor: mostrar texto de prompts, respostas e comandos mostra esses textos no console do desenvolvedor, sob um banner que avisa isso, e marca Texto nas novas gravações. Tokens e logins continuam mascarados, e o hive_console dos agentes continua com dados sensíveis ocultos.",
+  "tips.consoleText.text": "Configurações → Avançado → Console do desenvolvedor: mostrar texto de prompts, respostas e comandos mostra esses textos no console do desenvolvedor, sob um banner que avisa isso, e marca Texto nas novas gravações. Tokens e logins continuam mascarados, e o cw_console dos agentes continua com dados sensíveis ocultos.",
   "tips.consoleText.title": "Veja o texto no console do desenvolvedor",
   "tips.copilot.text": "Os agentes podem usar a GitHub Copilot CLI, inclusive com o Copilot Free. A Configuração de provedores a instala e diz com qual conta ela está conectada: o login próprio dela ou o da GitHub CLI.",
   "tips.copilot.title": "Rode agentes no GitHub Copilot",

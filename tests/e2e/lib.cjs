@@ -99,8 +99,8 @@ function probeDir(name = 'probe', root = TEST_ROOT) {
   return fs.mkdtempSync(path.join(base, `${label}-${stamp}-`))
 }
 /**
- * A token in a file of its own, as Hive gives a session its token (HI-2262: HIVE_API_TOKEN_FILE, never HIVE_API_TOKEN):
- * its path, for a child's HIVE_API_TOKEN_FILE. `dir`: where (a new probe folder by default).
+ * A token in a file of its own, as Hive gives a session its token (HI-2262: CW_API_TOKEN_FILE, never HIVE_API_TOKEN):
+ * its path, for a child's CW_API_TOKEN_FILE. `dir`: where (a new probe folder by default).
  */
 function tokenFile(token, dir = probeDir('token')) {
   const file = path.join(dir, `token-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`)
@@ -1161,7 +1161,7 @@ function logFakeInput(home) {
 
 /**
  * Types a line into a fake Claude Code (pty `key`, its home `home`, the agent's name `agent`, or null for live()'s
- * agentName: its HIVE_AGENT, which the fake's records carry) that Hive may type a wake
+ * agentName: its CW_AGENT, which the fake's records carry) that Hive may type a wake
  * into at the same moment (#1553, #1560): the wake's Ctrl+U clears the line, or the two lines mix, or the line lands
  * while the agent is busy with the wake and is dropped (fake-dropped.jsonl). So its Enter goes only once the CLI has
  * read the line whole (fake-input.jsonl: logFakeInput() before the fake starts), the line counts only when nothing
@@ -1267,7 +1267,7 @@ async function typeLine(inv, key, home, agent, text, { live = null, taken = null
     // what never clears is typed over, and seen as disturbed below.
     await until(() => lineLeft(readAll()) === '', hungMs)
     if (disturb === 'before' && attempt === 1) {
-      const wake = '[Hive] A wake typed as the suite types.'
+      const wake = '[CW] A wake typed as the suite types.'
       await inv('pty:write', key, wake)
       await until(() => readSince().includes(wake), hungMs)
     }

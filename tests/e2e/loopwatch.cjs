@@ -65,7 +65,7 @@ const check = (name, ok, extra = '') => {
     return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent).map((w) => ({ ...w, raw: w.text, text: lib.unkey(w.text) }))
   }
   const script = (agent, lines) => fs.writeFileSync(path.join(claudeHome, `fake-wakes-${agent}.txt`), lines.join('\n') + '\n')
-  /** The fake drops the next n Enters that would send a line from Combwork ("[Hive]…"), as Codex did once (#376). */
+  /** The fake drops the next n Enters that would send a line from Combwork ("[CW]…"), as Codex did once (#376). */
   const dropEnters = (agent, n) => fs.writeFileSync(path.join(claudeHome, `fake-drop-enters-${agent}.txt`), String(n))
   /** What an agent is doing, for a failed check: its state, its terminal's last lines and the log's (#539). */
   const why = async (id) => {
@@ -103,7 +103,7 @@ const check = (name, ok, extra = '') => {
     }
   }
   // The card as `#N`, its workspace number: a plain number reading as another card's key is refused (HI-2197).
-  const wait = (n, extra) => `hive hive_wait_for_tasks ${JSON.stringify({ cards: [`#${n}`], ...extra, wake: true })}`
+  const wait = (n, extra) => `hive cw_wait_for_tasks ${JSON.stringify({ cards: [`#${n}`], ...extra, wake: true })}`
   // As its checks read it, the card by number (it names it by key too, #1219: checked below).
   const rawStalled = async (n) => (await api('GET', `/v1/tasks/${n}`)).body?.stalled ?? null
   const stalledOf = async (n) => lib.unkey(await rawStalled(n))
@@ -167,7 +167,7 @@ const check = (name, ok, extra = '') => {
   // Hive's loop wake for #1, in Review since section 2 (#405), reaches the reviewer: read with whatever else its inbox
   // had when it read it (#650: in section 2, with the wake whose line it took then), and the reviewer is idle again before
   // anything else is typed to it, or the next line lands while it works and is lost (#571).
-  const loopWake = `[Hive] #${c1} (Builder's card) is in Review. You review this card in its loop`
+  const loopWake = `[CW] #${c1} (Builder's card) is in Review. You review this card in its loop`
   check("…and Combwork's loop wake for it reaches the reviewer, which is idle again", !!(await until(async () => wakes('Reviewer').some((w) => w.text.includes(loopWake)) && ['ready', 'finished'].includes((await live(reviewer.id))?.status), 15000)), `${JSON.stringify(wakes('Reviewer').map((w) => w.text.slice(0, 60)))} ${await why(reviewer.id)}`)
   await inv('tasks:update', c1, { project: 'beta' })
   check('moved to another project: no longer stalled, and the mark leaves the agent', !!(await until(async () => !(await stalledOf(c1)) && !(await live(reviewer.id))?.notWatching, 8000)), JSON.stringify({ stalled: await stalledOf(c1), mark: (await live(reviewer.id))?.notWatching }))
@@ -198,12 +198,12 @@ const check = (name, ok, extra = '') => {
   await inv('tasks:update', c2, { column: 'passed' })
   check('a card that has moved on (Passed) is no longer stalled', !!(await until(async () => !(await stalledOf(c2)), 8000)))
 
-  // --- 4. HI-2080: a builder that asks the user on its card (hive_ask_user) and ends its turn with no watch waits for
+  // --- 4. HI-2080: a builder that asks the user on its card (cw_ask_user) and ends its turn with no watch waits for
   // the user, never stalled; once the user answers, the usual rule applies again.
   const c3 = (await inv('tasks:create', { title: 'Asks the user', project: 'alpha' })).number
   const started = await inv('tasks:move', c3, 'doing', { agent: builder.id })
   check('#3 starts on the builder', !!started.moved, JSON.stringify(started))
-  script('Builder', [`hive hive_ask_user ${JSON.stringify({ card: `#${c3}`, kind: 'decide', text: 'Keep the old greeting?' })}`])
+  script('Builder', [`hive cw_ask_user ${JSON.stringify({ card: `#${c3}`, kind: 'decide', text: 'Keep the old greeting?' })}`])
   await say(builder.id, wait(c3, { changes: ['comment'] }))
   check('the builder watches #3', !!(await until(async () => (await live(builder.id))?.status === 'watching', HUNG_MS)), await why(builder.id))
   await inv('tasks:comment', c3, 'Which greeting should it keep?')
@@ -225,12 +225,12 @@ const check = (name, ok, extra = '') => {
   const before = limitWakes().length
   // Its grace checks so far (loops:checks: counted once a check has decided its mark): the next is the one after its turn ends.
   const checksBefore = await inv('loops:checks', alpha, reviewer.id)
-  await say(reviewer.id, `hive hive_wait_for_tasks ${JSON.stringify({ cards: [`#${dep}`, `#${next}`], changes: ['column'], limitMinutes: 1, wake: true })}`)
+  await say(reviewer.id, `hive cw_wait_for_tasks ${JSON.stringify({ cards: [`#${dep}`, `#${next}`], changes: ['column'], limitMinutes: 1, wake: true })}`)
   check('the reviewer watches the card and the one waiting on it', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', HUNG_MS)), await why(reviewer.id))
   // The watch's limit is a minute: the wait is bounded at twice that.
   check('its limit passes: woken, then idle with no watch', !!(await until(async () => limitWakes().length > before && ['ready', 'finished'].includes((await live(reviewer.id))?.status) && !(await live(reviewer.id))?.watch, 120000)), `${JSON.stringify(limitWakes().map((w) => w.text))} ${await why(reviewer.id)}`)
   const limit = limitWakes().at(-1)?.text ?? ''
-  check("…the line says what waits on what, and not to tell the user", limit.includes(`#${next} waits on #${dep}`) && limit.includes(`#${dep} is in Doing with Builder`) && limit.endsWith("don't tell the user about them.") && !/hive_notify/.test(limit), limit)
+  check("…the line says what waits on what, and not to tell the user", limit.includes(`#${next} waits on #${dep}`) && limit.includes(`#${dep} is in Doing with Builder`) && limit.endsWith("don't tell the user about them.") && !/cw_notify/.test(limit), limit)
   check('…its grace check runs', !!(await until(async () => (await inv('loops:checks', alpha, reviewer.id)) > checksBefore, HUNG_MS)), String(await inv('loops:checks', alpha, reviewer.id)))
   check("another's card it waits on is never stalled for it (HI-2381)", !(await stalledOf(dep)) && !((await live(reviewer.id))?.notWatching ?? []).includes(dep), JSON.stringify({ stalled: await stalledOf(dep), mark: (await live(reviewer.id))?.notWatching }))
 
@@ -246,8 +246,8 @@ const check = (name, ok, extra = '') => {
   }
   const builderSession = (await live(builder.id))?.sessionId
   const launch = launches().find((l) => l.sessionId === builderSession && l.opts['--mcp-config'])
-  const hiveServer = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
-  const builderToken = hiveServer ? JSON.parse(fs.readFileSync(hiveServer.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+  const hiveServer = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+  const builderToken = hiveServer ? JSON.parse(fs.readFileSync(hiveServer.env.CW_API_TOKEN_FILE, 'utf8')).token : null
   const reviewing = builderToken ? await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${encodeURIComponent(`#${solo}`)}/start-review`, { method: 'POST', headers: { Authorization: `Bearer ${builderToken}`, 'Content-Type': 'application/json' }, body: '{}' }) : null
   check('Builder starts reviewing it', reviewing?.status === 200, String(reviewing?.status))
   await inv('tasks:update', solo, { column: 'doing' })

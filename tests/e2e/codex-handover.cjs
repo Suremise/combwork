@@ -88,7 +88,7 @@ const check = (name, ok, extra = '') => {
   await page.screenshot({ path: path.join(scratch, 'cont-2-codex.png') })
   const tr = await inv('transcript:read', proj, l1.sessionId).catch((e) => ({ error: String(e) }))
   const text = JSON.stringify(tr)
-  check('codex read the handover it was given', /hive_read_shared_note/.test(text) && /2026-09-30-demo-test\.md/.test(text), '')
+  check('codex read the handover it was given', /cw_read_shared_note/.test(text) && /2026-09-30-demo-test\.md/.test(text), '')
   check('codex answered PINEAPPLE', /PINEAPPLE/.test(text))
 
   // 2. Codex writes a handover, a second Codex agent continues from it.

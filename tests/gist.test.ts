@@ -5,8 +5,8 @@ import { gist, plainMarkdown } from '../src/shared/gist'
 
 describe('plainMarkdown', () => {
   it('takes out the marks and runs the text into one line', () => {
-    const md = '## Which way?\n\n**Agent side:** keep `hive_submit` as it is.\n\n1. Wrap the line\n2. Or cut it with _an ellipsis_\n\n> quoted [the spec](docs/SPEC.md)\n\n---\n'
-    expect(plainMarkdown(md)).toBe('Which way? Agent side: keep hive_submit as it is. Wrap the line Or cut it with an ellipsis quoted the spec')
+    const md = '## Which way?\n\n**Agent side:** keep `cw_submit` as it is.\n\n1. Wrap the line\n2. Or cut it with _an ellipsis_\n\n> quoted [the spec](docs/SPEC.md)\n\n---\n'
+    expect(plainMarkdown(md)).toBe('Which way? Agent side: keep cw_submit as it is. Wrap the line Or cut it with an ellipsis quoted the spec')
   })
   it('leaves out a fenced block, closed or not', () => {
     expect(plainMarkdown('Run this:\n\n```sh\nnpm test\n```\nthen tell me.')).toBe('Run this: then tell me.')

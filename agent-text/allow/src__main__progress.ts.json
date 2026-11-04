@@ -12,8 +12,5 @@
   "prose|error|{} must be between {} and {}": 1,
   "prose|error|{} must be text": 1,
   "prose|prop:other|Agent": 1,
-  "prose|prop:other|Script": 2,
-  "prose|return|Hive (slot {})": 1,
-  "prose|var|Hive (merge queue)": 1,
-  "prose|var|Hive (review copies)": 1
+  "prose|prop:other|Script": 2
 }

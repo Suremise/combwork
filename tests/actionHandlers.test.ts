@@ -146,7 +146,7 @@ describe('loop wakes from the facts (#1266)', () => {
     await typedUntil(st, 2)
     expect(st.typed.at(-1)).toMatchObject({ agent: 'b1' })
     // HI-1990: what comes next in its lane, in place of carrying on with the card (the next one is in Doing already).
-    expect(st.typed.at(-1)!.text).toMatch(new RegExp(`^\\[Hive\\] #${c} is in Done.*Your lane's next card, #${next} \\("Work"\\), is under way: carry on with it`))
+    expect(st.typed.at(-1)!.text).toMatch(new RegExp(`^\\[CW\\] #${c} is in Done.*Your lane's next card, #${next} \\("Work"\\), is under way: carry on with it`))
     // Moved back by the user (its builder told) and on again by its own builder: its own change wakes it not.
     st.status.set('b1', 'ready')
     await inWorkspace(w, () => tasks.updateTask(c, { column: 'passed' }, user))
@@ -199,7 +199,7 @@ describe('loop wakes from the facts (#1266)', () => {
     await worker.runActions(w)
     await typedUntil(st, 1)
     expect(st.typed[0]).toMatchObject({ agent: 'b1' })
-    expect(st.typed[0].text).toContain('Hive: "stale: submit again"')
+    expect(st.typed[0].text).toContain('Combwork: "stale: submit again"')
   })
 })
 
@@ -208,13 +208,13 @@ describe("the merge queue's comment on a card it returned (HI-2087)", () => {
   const commentAction = (ws: string, card: number): number => {
     const own = FactStore.open(store.boardFile(ws), { project: 'alpha', key: 'alpha' })
     try {
-      return own.tx((tx) => tx.action(card, 'comment', { text: `alpha-${card} came back from the merge queue: a conflict with main in a.txt. Merge main into your worktree, resolve the conflict, commit and submit again (hive_submit).`, shown: { id: 'tasks.history.queueReturned', values: { reason: 'conflict', target: 'main', check: '', files: 'a.txt' } } }, null))
+      return own.tx((tx) => tx.action(card, 'comment', { text: `alpha-${card} came back from the merge queue: a conflict with main in a.txt. Merge main into your worktree, resolve the conflict, commit and submit again (cw_submit).`, shown: { id: 'tasks.history.queueReturned', values: { reason: 'conflict', target: 'main', check: '', files: 'a.txt' } } }, null))
     } finally {
       own.close()
     }
   }
   const stateOf = (ws: string, id: number): string => (store.workspaceDb(ws).reader.prepare('SELECT state FROM card_actions WHERE id = ?').get(id) as { state: string }).state
-  const hiveComments = async (w: WS, c: number) => (await inWorkspace(w, () => tasks.getTask(c))).comments.filter((x) => x.by === 'Hive')
+  const hiveComments = async (w: WS, c: number) => (await inWorkspace(w, () => tasks.getTask(c))).comments.filter((x) => x.by === 'Combwork')
 
   it('written once on the card, its English and its message; a run again (after a restart) writes nothing more', async () => {
     const { w, ws } = await open()
@@ -361,7 +361,7 @@ describe("the builder's watch hears its reviewer's request and the user's decisi
     await watches.evaluateWatches(w)
     await typedUntil(st, 1)
     expect(st.typed[0].agent).toBe('b1')
-    expect(st.typed[0].text).toBe(`[Hive] #${c} is in Review (its reviewer asks you something); latest comment by R1 (alpha): "Which commit did you test?". Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).`)
+    expect(st.typed[0].text).toBe(`[CW] #${c} is in Review (its reviewer asks you something); latest comment by R1 (alpha): "Which commit did you test?". Your card watch has ended: carry on (cw_read_task with latestComment for the comment in full).`)
     // The request's history line, which the watch counted; the runtime's wake ran (left to the watch, or made and
     // dropped as told by it, whichever came first) and typed no second line.
     expect((await inWorkspace(w, () => tasks.getTask(c, w))).history.map((h) => `${h.by}: ${h.what}`)).toContain('R1 (alpha): Asked the builder: "Which commit did you test?"')
@@ -393,7 +393,7 @@ describe("the builder's watch hears its reviewer's request and the user's decisi
     await settled()
     await deliveries.offerAllForTests()
     expect(st.typed).toHaveLength(2)
-    for (const t of st.typed) expect(t.text).toMatch(new RegExp(`^\\[Hive\\] #${c} (\\(B1's card\\) )?is in Review \\(a new decision from the user: read its decisions\\).*Your card watch has ended`))
+    for (const t of st.typed) expect(t.text).toMatch(new RegExp(`^\\[CW\\] #${c} (\\(B1's card\\) )?is in Review \\(a new decision from the user: read its decisions\\).*Your card watch has ended`))
     // A watch for the card to be in Done only doesn't count it: the decision line tells it.
     st.typed.length = 0
     st.status.set('b1', 'watching')
@@ -1198,7 +1198,7 @@ describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
     }, HANG)
     // In the card's history in the user's language, said by Hive.
     const line = (await inWorkspace(w, () => tasks.getTask(c, w))).history.find((h) => h.whatText?.id === 'tasks.history.notified')!
-    expect(line).toMatchObject({ by: 'Hive', what: 'Notified you that its review failed' })
+    expect(line).toMatchObject({ by: 'Combwork', what: 'Notified you that its review failed' })
     // The failure resolved since (fixed, passed), and Hive restarted: the notice is still on the card, once.
     await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
     await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
@@ -1430,7 +1430,7 @@ describe("a lane builder whose watch a decision's notice ended, and that ends it
       await deliveries.offerAllForTests()
       expect(st.typed.filter((t) => t.agent === 'b1')).toHaveLength(2)
     }, HANG)
-    expect(st.typed.filter((t) => t.agent === 'b1')[1].text).toMatch(new RegExp(`^\\[Hive\\] #${c} is in Doing: R1 \\(alpha\\) failed it; latest comment by R1 \\(alpha\\): "Round 1: FAILED`))
+    expect(st.typed.filter((t) => t.agent === 'b1')[1].text).toMatch(new RegExp(`^\\[CW\\] #${c} is in Doing: R1 \\(alpha\\) failed it; latest comment by R1 \\(alpha\\): "Round 1: FAILED`))
     // Its move now: idle again with no watch, it is flagged, and the user told (in Hive the grace lets the wake land
     // first; here, with none, a check can also flag it in the moment before it is typed).
     await idleChecked('b1')

@@ -194,6 +194,19 @@
   "api.agent.workflowRoleArg": {
     "placeholders": {}
   },
+  "api.agentMcp.notAServer": {
+    "placeholders": {
+      "name": "plain",
+      "reserved": "select",
+      "server": "plain"
+    }
+  },
+  "api.ask.agentsOnly": {
+    "placeholders": {}
+  },
+  "api.ask.cantAct": {
+    "placeholders": {}
+  },
   "api.attachment.alreadyAttached": {
     "placeholders": {}
   },
@@ -1208,6 +1221,12 @@
     "placeholders": {
       "value": "plain",
       "steps": "plain"
+    }
+  },
+  "api.intent.watchEndedForTask": {
+    "placeholders": {
+      "watch": "plain",
+      "card": "plain"
     }
   },
   "api.journal.entryId": {

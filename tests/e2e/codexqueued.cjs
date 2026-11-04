@@ -73,22 +73,22 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     await inv('session:start', alpha, { agentId: codex.id })
     check('the Codex agent starts', !!(await until(() => idle(codex.id), HUNG_MS)))
 
-    // Messages are left as the Assistant leaves them (hive_message_agent, with its token).
+    // Messages are left as the Assistant leaves them (cw_message_agent, with its token).
     const asTokenFile = path.join(userData, 'assistant-api', `${createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`)
     const home = (await inv('workspace:refresh')).assistant.path
     await inv('session:start', home, { agentId: 'assistant' })
     await until(async () => (await inv('session:live')).some((s) => s.projectPath.toLowerCase() === home.toLowerCase() && s.status === 'ready'), HUNG_MS)
     const tool = (name, args) => {
-      const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
+      const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
         input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
-        env: lib.childEnv({ HIVE_API_URL: API, HIVE_WORKSPACE: ws, HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', HIVE_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', HIVE_PROJECT: '' }),
+        env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', CW_PROJECT: '' }),
         timeout: 60000
       }).toString()
       const r = JSON.parse(out.split('\n')[0]).result
       return { text: r.content[0].text, isError: !!r.isError }
     }
-    const leave = (text) => /\((m\d+)/.exec(tool('hive_message_agent', { project: 'alpha', agent: 'Codex', text }).text)?.[1] ?? null
-    const delivery = (id) => JSON.parse(tool('hive_agent_activity', { project: 'alpha', agent: 'Codex', detail: true }).text).inbox?.deliveries?.find((d) => d.id === id) ?? null
+    const leave = (text) => /\((m\d+)/.exec(tool('cw_message_agent', { project: 'alpha', agent: 'Codex', text }).text)?.[1] ?? null
+    const delivery = (id) => JSON.parse(tool('cw_agent_activity', { project: 'alpha', agent: 'Codex', detail: true }).text).inbox?.deliveries?.find((d) => d.id === id) ?? null
 
     // A turn that compacts for 25 s with no hook: Hive sees no prompt, so the agent looks idle, and the doorbell for a
     // message left meanwhile is typed into it; Codex queues it and takes it once it has compacted.

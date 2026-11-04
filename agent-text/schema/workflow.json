@@ -32,6 +32,16 @@
   "workflow.contradiction.upToDateNeedsSlots": {
     "placeholders": {}
   },
+  "workflow.focused.programMissing": {
+    "placeholders": {
+      "command": "plain"
+    }
+  },
+  "workflow.focused.resultsUnread": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
   "workflow.forYou.decidedAfterMerge": {
     "placeholders": {
       "card": "plain"

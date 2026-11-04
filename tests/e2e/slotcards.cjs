@@ -61,7 +61,7 @@ const isIn = (rev, ref) => {
     return false
   }
 }
-// The slots' installs only (a merge check's install runs the same setup, outside any slot: HIVE_SLOT unset).
+// The slots' installs only (a merge check's install runs the same setup, outside any slot: CW_SLOT unset).
 const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf8').trim().split('\n').filter((l) => l.startsWith('slot-')) : [])
 
 ;(async () => {
@@ -75,7 +75,7 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
   lib.git(alpha, ['config', 'user.email', identity.email])
   // The slots' setup: records the slot and the lock file it installed from.
   const setup = path.join(tools, 'setup.js')
-  fs.writeFileSync(setup, `require('fs').appendFileSync(${JSON.stringify(setupLog)}, process.env.HIVE_SLOT + ' ' + require('fs').readFileSync('package-lock.json', 'utf8').trim() + '\\n')\n`)
+  fs.writeFileSync(setup, `require('fs').appendFileSync(${JSON.stringify(setupLog)}, process.env.CW_SLOT + ' ' + require('fs').readFileSync('package-lock.json', 'utf8').trim() + '\\n')\n`)
   const env = lib.fakeClaude(userData, home, [alpha, ws, slotA])
   // #1553: every read of the agents' input recorded (fake-input.jsonl), for typeLine and what B1's terminal got around its held run.
   lib.logFakeInput(home)
@@ -132,8 +132,8 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     const tokenOf = async (id) => {
       const sessionId = await until(async () => (await live(id))?.sessionId, HUNG_MS)
       const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     const intent = async (token, n, name, body = {}) => {
       const res = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${encodeURIComponent(`#${n}`)}/${name}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -271,7 +271,7 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     const sGc = await intent(tg1, cGc, 'start')
     check('…while its code card still waits for a slot (start.slotAvailable)', sGc.status === 409 && sGc.body?.rule === 'start.slotAvailable' && (await card(cGc))?.column === 'todo', JSON.stringify(sGc.body))
     check('G1 puts its no-code card back: nothing of a slot to give back', (await intent(tg1, cG, 'put-back', { why: 'done looking' })).status === 200 && (await slotNow())?.lease?.lane === started.lane.id)
-    // HI-2395: the window's Start of it (a direct start, as the Assistant's hive_start_task) isn't refused as having got
+    // HI-2395: the window's Start of it (a direct start, as the Assistant's cw_start_task) isn't refused as having got
     // no slot: it starts where G1 is, nothing lent; G1 puts it back again.
     const dG = await inv('tasks:start', cG, { kind: 'agent', agentId: g1.id }).catch((e) => ({ error: String(e?.message ?? e) }))
     const directG = (await inv('tasks:facts', cG)).findLast((f) => f.kind === 'Started')?.data

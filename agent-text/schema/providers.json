@@ -50,6 +50,11 @@
   "providers.copilot.planNote": {
     "placeholders": {}
   },
+  "providers.copilot.toolNames": {
+    "placeholders": {
+      "server": "plain"
+    }
+  },
   "providers.copilot.updateAnyway": {
     "placeholders": {}
   },

@@ -688,7 +688,7 @@ describe('the adapters and the hive MCP server use them', () => {
     expect(hooks.Stop[0].timeoutSec).toBe(15)
     expect(hooks.PreToolUse[0].timeoutSec).toBe(30)
     await advanced.set('codex.mcp.toolTimeoutSeconds', 1800)
-    expect(codexMcpServer('hive', { command: 'node' }).table?.tool_timeout_sec).toBe(1800)
+    expect(codexMcpServer('combwork', { command: 'node' }).table?.tool_timeout_sec).toBe(1800)
     await advanced.set('codex.title.items', 'activity, spinner')
     await advanced.set('codex.hooks.timeoutSeconds', 8)
     const home = tempDir('hive-advanced-codex-home-')

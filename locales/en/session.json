@@ -253,7 +253,7 @@
   },
   "session.leftovers.more": {
     "defaultMessage": "{n, plural, one {# more process} other {# more processes}}",
-    "description": "The last item of a list of the processes an agent left running, after the first few: how many more there are. Hive joins it to the list (\"node serve.js, 2 × tail -f capture.log and 3 more processes\")."
+    "description": "The last item of a list of the processes an agent left running, after the first few: how many more there are. Combwork joins it to the list (\"node serve.js, 2 × tail -f capture.log and 3 more processes\")."
   },
   "session.leftovers.notEnded": {
     "defaultMessage": "{n, plural, one {# process is still running: Windows didn't let Combwork end it. It stays listed in the ⋯ menu on the agent's pane, to try again or keep.} other {# processes are still running: Windows didn't let Combwork end them. They stay listed in the ⋯ menu on the agent's pane, to try again or keep.}}",
@@ -566,6 +566,14 @@
   "session.purge.unread": {
     "defaultMessage": "Combwork couldn't record what the session used, so it is kept.",
     "description": "Purge left a session alone: Hive couldn't save its usage in the usage history, which the totals keep."
+  },
+  "session.renamedFresh.body": {
+    "defaultMessage": "{n, plural, one {# conversation} other {# conversations}} started fresh: Combwork renamed the tools agents use, so a conversation from before can't continue. The earlier ones are kept in Sessions to read.",
+    "description": "The notice after the update that renamed what agents see (HI-2463). {n} counts the conversations that started fresh instead of resuming. Sessions is a tab of the window: keep it as the window names it."
+  },
+  "session.renamedFresh.title": {
+    "defaultMessage": "Agents started new conversations",
+    "description": "A notice once after the update that renamed what agents see (HI-2463): conversations from before were started fresh."
   },
   "session.restartMode.didntStop": {
     "defaultMessage": "{agent} didn't stop in time, so it wasn't restarted in the new mode. Try again once it has stopped.",

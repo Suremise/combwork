@@ -69,8 +69,8 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     const tokenOf = async (id) => {
       const sessionId = await until(async () => (await live(id))?.sessionId)
       const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']))
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     const intent = async (token, n, name, body = {}) => {
       const res = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${encodeURIComponent(`#${n}`)}/${name}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -121,7 +121,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     check("card 1's start: built in slot-a", s1.status === 200 && same(s1.body?.data?.folder, slotA), JSON.stringify(s1.body))
     await until(() => idle(alpha, b1.id))
     await until(() => idle(aHome, 'assistant'))
-    await lib.typeLine(inv, lib.ptyKey(aHome, 'assistant'), home, null, 'hive hive_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}', { live: () => liveIn(aHome, 'assistant') })
+    await lib.typeLine(inv, lib.ptyKey(aHome, 'assistant'), home, null, 'hive cw_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}', { live: () => liveIn(aHome, 'assistant') })
     check('the Assistant watches the lanes', !!(await until(async () => (await liveIn(aHome, 'assistant'))?.status === 'watching')))
 
     // ---- B1's turn ends on a dialog of its CLI's own, under its empty input box: it takes the keys.
@@ -148,7 +148,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     check('…after three letters typed and not answered', !!(await until(() => probes(before) >= 3, 10000)) && probes(before) === 3, `${probes(before)}: ${JSON.stringify(b1Reads(before))}`)
     const header = lib.paneHeader(page, 'B1')
     check('…its pane says so, with Try again', !!(await until(async () => (await header.locator('.pane-status.input-blocked').count()) >= 1)) && (await header.locator('.pane-status.input-blocked button', { hasText: 'Try again' }).count()) === 1)
-    const waitLine = () => assistantWakes().slice(wakesBefore).filter((t) => t.startsWith('[Hive] B1 (alpha) is waiting for the user'))
+    const waitLine = () => assistantWakes().slice(wakesBefore).filter((t) => t.startsWith('[CW] B1 (alpha) is waiting for the user'))
     check("the Assistant's lane watch is woken: B1 waits for the user", !!(await until(() => waitLine().length > 0)), JSON.stringify(assistantWakes().slice(wakesBefore)))
     // What had been tried when it was blocked: whichever came first (card 1's event, or the lane's placement of card 2)
     // is the delivery that found it blocked.
@@ -185,7 +185,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     const freeAt = new Date().toISOString()
     await header.locator('.pane-status.input-blocked button', { hasText: 'Try again' }).click()
     check('Try again after the user answered: B1 takes keys again', !!(await until(async () => !(await live(b1.id))?.inputBlocked)), JSON.stringify(await live(b1.id)))
-    const given = () => b1Reads(freeAt).filter((r) => /\[Hive\] New in your inbox/.test(r.data))
+    const given = () => b1Reads(freeAt).filter((r) => /\[CW\] New in your inbox/.test(r.data))
     check('…what waited is typed into it', !!(await until(() => given().length >= 1)), JSON.stringify(b1Reads(freeAt).map((r) => r.data.slice(0, 60))))
     check('…then the lane places card 2 with it, once', !!(await until(() => placements(c2) >= 1)) && !!(await until(() => b1Reads(freeAt).some((r) => r.data.includes(`(${c2Key})`)))) && placements(c2) === placedAt + 1, JSON.stringify({ placedAt, placements: placements(c2), reads: b1Reads(freeAt).map((r) => r.data.slice(0, 60)) }))
     check('no delivery was called off after it was blocked', (await cancelled()) === cancelledAt, JSON.stringify([cancelledAt, await cancelled()]))

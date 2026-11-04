@@ -111,7 +111,7 @@ const until = async (fn, ms = 10000) => {
   const transcript = path.join(claudeHome, 'projects', alpha.replace(/[^a-zA-Z0-9]/g, '-'), `${(await live()).sessionId}.jsonl`)
   const prompt = await until(async () => {
     const lines = fs.existsSync(transcript) ? fs.readFileSync(transcript, 'utf8').split('\n').filter((l) => l.includes(`task ${nName} `)) : []
-    // Read from its inbox (#650: the task's doorbell names it; the hive_inbox call's result has its text).
+    // Read from its inbox (#650: the task's doorbell names it; the cw_inbox call's result has its text).
     const content = lines.length ? JSON.parse(lines.at(-1)).message.content : null
     return typeof content === 'string' || content === null ? content : (content.find?.((c) => typeof c.content === 'string')?.content ?? null)
   }, 15000)
@@ -125,11 +125,11 @@ const until = async (fn, ms = 10000) => {
   const skillText = read(skill)
   const afterReview = read(path.join(path.dirname(skill), 'after-review.md'))
   // By meaning rather than sentence (#1596: #1524's rewording broke a literal): one of its steps submits the work with
-  // `hive_submit`, which takes the card to Review, and one finishes it as Done by reporting the merge commit with
-  // `hive_report_merge`, both through the intent tools rather than a column move.
+  // `cw_submit`, which takes the card to Review, and one finishes it as Done by reporting the merge commit with
+  // `cw_report_merge`, both through the intent tools rather than a column move.
   const skillSteps = `${skillText}\n${afterReview}`.split('\n')
-  const submitsToReview = skillSteps.some((l) => l.includes('`hive_submit`') && /\bReview\b/.test(l))
-  const doneOnceMerged = skillSteps.some((l) => /\bDone\b/.test(l) && l.includes('`hive_report_merge`') && /\bmerge commit\b/.test(l))
+  const submitsToReview = skillSteps.some((l) => l.includes('`cw_submit`') && /\bReview\b/.test(l))
+  const doneOnceMerged = skillSteps.some((l) => /\bDone\b/.test(l) && l.includes('`cw_report_merge`') && /\bmerge commit\b/.test(l))
   check('…which says Review when the work is done, and Done once merged', submitsToReview && doneOnceMerged, JSON.stringify({ submitsToReview, doneOnceMerged, start: skillText.slice(0, 200) }))
 
   await inv('session:stop', alpha, agent.id).catch(() => undefined)

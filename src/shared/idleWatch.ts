@@ -16,8 +16,8 @@ import { agentMsg, say } from './agentText'
 const T = {
   reply: agentMsg({
     id: 'wake.idle.reply',
-    text: "Nothing waits on {card}: it is in Doing and not submitted, with no question open for the user and no design step out for the reviewer, so nobody will change it for you. Carry on with its work now rather than end your turn; if you need someone, ask: hive_ask_user for the user, hive_loop_step with a design for the reviewer, or hive_submit once it is ready. Keep this watch only for something you asked for that Hive doesn't track (a comment you requested): if you only watch it, {card} shows as stalled after {after}.",
-    note: "HI-2285: hive_wait_for_tasks's warning to a lane's builder watching only its own card while nothing on it waits on anyone (CB1 watched CL-5 for a comment and ended its turn). card: its name (HI-12); after: how long until it shows as stalled (5 min)."
+    text: "Nothing waits on {card}: it is in Doing and not submitted, with no question open for the user and no design step out for the reviewer, so nobody will change it for you. Carry on with its work now rather than end your turn; if you need someone, ask: cw_ask_user for the user, cw_loop_step with a design for the reviewer, or cw_submit once it is ready. Keep this watch only for something you asked for that Combwork doesn't track (a comment you requested): if you only watch it, {card} shows as stalled after {after}.",
+    note: "HI-2285: cw_wait_for_tasks's warning to a lane's builder watching only its own card while nothing on it waits on anyone (CB1 watched CL-5 for a comment and ended its turn). card: its name (HI-12); after: how long until it shows as stalled (5 min)."
   }),
   stalled: agentMsg({ id: 'wake.idle.stalled', text: '{agent} only watches {card} ({since}), and nothing waits on it: no question for the user, no design step, not submitted.', note: "HI-2285: why a lane's card is stalled (the Agent API, lane watches): its builder (agent) only watches it. card: its name; since: for how long (7 min)." })
 }

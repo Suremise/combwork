@@ -112,19 +112,19 @@
     "note": "A card in slot.laneEnd.note's list: not merged."
   },
   "slot.laneEnd.note": {
-    "text": "{abandoned, select, yes {Lane {lane} was abandoned} other {Lane {lane} is finished}}{listed, select, yes {: {list}} other {}}. Your session ends once this turn does; Hive resumes it for your next lane. Close the lane's work in your reply, then end your turn.",
+    "text": "{abandoned, select, yes {Lane {lane} was abandoned} other {Lane {lane} is finished}}{listed, select, yes {: {list}} other {}}. Your session ends once this turn does; Combwork resumes it for your next lane. Close the lane's work in your reply, then end your turn.",
     "note": "The note a lane's builder is given as its lane ends (HI-1706): each card (slot.laneEnd.merged or notMerged, joined by \"; \"), and that its session ends with its turn. Cut at 2000 characters."
   },
   "slot.place.cantResume": {
-    "text": "Hive can't give {card} to {agent} yet: its conversation in {slot} can't resume now ({why}).",
+    "text": "Combwork can't give {card} to {agent} yet: its conversation in {slot} can't resume now ({why}).",
     "note": "A card's notice and its builder's wake: the builder's conversation in its slot can't resume yet. {why} is one of slot.hold.*, or why the slot is held. Kept on the card, so said in the Default."
   },
   "slot.place.notReady": {
-    "text": "Hive couldn't get {slot} ready: {error}",
+    "text": "Combwork couldn't get {slot} ready: {error}",
     "note": "Why a builder's start ended (a card's stall): its slot couldn't be prepared for the card. Kept, so said in the Default."
   },
   "slot.place.notReadyFor": {
-    "text": "Hive couldn't get {slot} ready for {card}: {error}",
+    "text": "Combwork couldn't get {slot} ready for {card}: {error}",
     "note": "A card's notice and its builder's wake: its slot couldn't be prepared for it. Kept on the card, so said in the Default."
   },
   "slot.place.resumeEnded": {
@@ -132,7 +132,7 @@
     "note": "Why a builder's start ended (a card's stall): resuming its conversation failed every try. Kept, so said in the Default."
   },
   "slot.place.resumeFailed": {
-    "text": "Hive couldn't resume {agent}'s conversation in {slot} for {card} (three tries): {why}. Resume {agent} from Sessions, or start it fresh, and Hive gives it {card}.",
+    "text": "Combwork couldn't resume {agent}'s conversation in {slot} for {card} (three tries): {why}. Resume {agent} from Sessions, or start it fresh, and Combwork gives it {card}.",
     "note": "A card's notice and its builder's wake: resuming its conversation failed three times. Kept on the card, so said in the Default."
   },
   "slot.prepare.branchUnread": {
@@ -240,7 +240,7 @@
     "note": "A slot's or copy's setup error: the job its command runs in couldn't be made. {problem} is why."
   },
   "slot.run.noSupervisor": {
-    "text": "Hive's process supervisor isn't running, so it can't run a slot's commands",
+    "text": "Combwork's process supervisor isn't running, so it can't run a slot's commands",
     "note": "A slot's or copy's setup error: Hive runs their commands in a job of its own, and can't now."
   },
   "slot.start.leaseEnded": {
@@ -280,7 +280,7 @@
     "note": "As slot.takeover.gone: the slot isn't lent. {state} is its state's id (ready, dirty…)."
   },
   "slot.takeover.otherHive": {
-    "text": "is held by another Hive's run",
+    "text": "is held by another Combwork's run",
     "note": "As slot.takeover.gone: a run of another Hive (another profile) holds it."
   },
   "slot.takeover.otherRun": {

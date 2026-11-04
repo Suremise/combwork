@@ -47,6 +47,10 @@ import { HIVE_RUNS } from '../progress'
 import type { Workflow, Write } from './runtime'
 import type { RunCheck } from '../../shared/types'
 import { shellLine, type QueueCommand, type QueueFileSide, type QueueStep, type QueueStuck } from '../../shared/workflow/queue'
+import { agentMsg, say } from '../../shared/agentText'
+
+/** A focused-test run's results Combwork couldn't read, as its check's output (HI-2463: Combwork's name). */
+const RESULTS_UNREAD = agentMsg({ id: 'workflow.focused.resultsUnread', text: "Combwork couldn't take its results: {why}.", note: "A check's output: the focused tests' runner wrote results that couldn't be read. why: what was wrong with them." })
 
 export interface CheckResult {
   ok: boolean
@@ -1518,7 +1522,7 @@ export class MergeQueue {
       await this.write(card, (w) => w.fact('CheckRan', data))
       r.note?.({ name: FOCUSED_CHECK, counted: b.counted, ...(b.whyNot ? { whyNot: b.whyNot } : {}) })
       if (failed) {
-        const why = 'bad' in read ? `Hive couldn't take its results: ${read.bad}.` : read.failed.length ? `Failed: ${read.failed.map((x) => x.test).join(', ')}.` : '' // i18n-ignore: a check's output, agent-facing
+        const why = 'bad' in read ? say(RESULTS_UNREAD, { why: read.bad }) : read.failed.length ? `Failed: ${read.failed.map((x) => x.test).join(', ')}.` : '' // i18n-ignore: a check's output, agent-facing
         return { kind: 'red', transient: !!r.transient, ...(r.cause ? { cause: r.cause } : {}), output: [why, r.output].filter(Boolean).join('\n'), check: FOCUSED_CHECK, ...(r.logPath ? { logPath: r.logPath } : {}) }
       }
       if (!b.counted) return { kind: 'uncounted' }
@@ -1554,7 +1558,7 @@ export class MergeQueue {
 
   /**
    * Focused tests skipped for their environment (G20; the user's decision, 28 Oct): the entry waits, paused, for the
-   * card's reviewer agent to decide (hive_focused_skip), or the user under For you, who can override it. Asked once per
+   * card's reviewer agent to decide (cw_focused_skip), or the user under For you, who can override it. Asked once per
    * entry, tests, target head and merged tree: a request for anything else is replaced by this one (its gate's earlier
    * request of the entry retires). The answer looks at the queue again (`runOnce` lifts the pause once nothing is open).
    */
@@ -1568,7 +1572,7 @@ export class MergeQueue {
       if (w.state().requests.some(same)) return
       const request = this.wf.askUser(w, 'approve', FOCUSED_SKIP_GATE, workflowText(FOR_YOU.focusedSkip, { card: card.key, tests: listed }), { unbound: true, entry: entry.id, revision: bound.expected, result: bound.tree, tests })
       const reviewer = card.reviewer ?? passingReviewers(w.state()).at(-1) ?? null
-      if (reviewer) this.wf.wake(w, reviewer, `${card.key}'s focused tests were skipped at its merge for their environment: ${listed}. Decide whether it merges with them skipped (hive_focused_skip with request ${request}: merge true or false, and why); the user can override.`, 'answer') // i18n-ignore: a wake, agent-facing
+      if (reviewer) this.wf.wake(w, reviewer, `${card.key}'s focused tests were skipped at its merge for their environment: ${listed}. Decide whether it merges with them skipped (cw_focused_skip with request ${request}: merge true or false, and why); the user can override.`, 'answer') // i18n-ignore: a wake, agent-facing
     })
     return out
   }

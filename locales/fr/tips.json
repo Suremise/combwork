@@ -176,7 +176,7 @@
   "tips.connections.title": "Fais tourner des agents sur des identifiants différents",
   "tips.consoleRecording.text": "Dans la console de développement, Enregistrer écrit dans un fichier ce que la CLI d’un agent envoie à Combwork, expurgé sauf si tu coches le texte pour cet enregistrement, et Copier les diagnostics peut le joindre à un rapport de bug.",
   "tips.consoleRecording.title": "Enregistrer ce qu’envoie une CLI",
-  "tips.consoleText.text": "Paramètres → Avancé → Console de développement : afficher le texte des prompts, réponses et commandes les montre dans la console de développement, sous une bannière qui le signale, et coche le texte pour les nouveaux enregistrements. Les jetons et les identifiants de connexion restent masqués, et le hive_console des agents reste expurgé.",
+  "tips.consoleText.text": "Paramètres → Avancé → Console de développement : afficher le texte des prompts, réponses et commandes les montre dans la console de développement, sous une bannière qui le signale, et coche le texte pour les nouveaux enregistrements. Les jetons et les identifiants de connexion restent masqués, et le cw_console des agents reste expurgé.",
   "tips.consoleText.title": "Voir le texte dans la console de développement",
   "tips.copilot.text": "Les agents peuvent utiliser la CLI GitHub Copilot, Copilot Free compris. Configuration des fournisseurs l’installe et indique avec quel compte elle est connectée : sa propre connexion ou celle de la CLI GitHub.",
   "tips.copilot.title": "Faire tourner des agents sur GitHub Copilot",

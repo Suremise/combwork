@@ -1,8 +1,8 @@
 // The card loop with wake-on-change (#128), on two fake Claude Code agents (fake-claude/): a builder and a reviewer work
 // through two cards in order, one passing first time and one failing once then passing, each waiting with
-// hive_wait_for_tasks wake (no polling): Hive types one line into the waiting agent when its card changes, and the
+// cw_wait_for_tasks wake (no polling): Hive types one line into the waiting agent when its card changes, and the
 // fake answers it with the next line of its wake script. Checked: the order, the rounds, the final columns, one wake per
-// change; the watching status (header, Agent API), dispatch refused while watching, hive_wait_for_agents not waiting on
+// change; the watching status (header, Agent API), dispatch refused while watching, cw_wait_for_agents not waiting on
 // a watcher; no wake typed while the agent works or the user types; a watch surviving a stop and resume; Cancel. The
 // loop's lane (#483): made by the reviewer's join, updated by the builder's start, ended once its cards are Done.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
@@ -82,7 +82,7 @@ const check = (name, ok, extra = '') => {
     await typers.get(id).type(text)
   }
   // Cards as `#N`, their workspace numbers: a plain number reading as another card's key is refused (HI-2197).
-  const wait = (n, extra) => `hive hive_wait_for_tasks ${JSON.stringify({ cards: (Array.isArray(n) ? n : [n]).map((x) => `#${x}`), ...extra, wake: true })}`
+  const wait = (n, extra) => `hive cw_wait_for_tasks ${JSON.stringify({ cards: (Array.isArray(n) ? n : [n]).map((x) => `#${x}`), ...extra, wake: true })}`
 
   await page.getByText('alpha', { exact: true }).first().click()
   const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
@@ -110,7 +110,7 @@ const check = (name, ok, extra = '') => {
 
   // The reviewer joins the builder's lane first (#483): Hive makes the lane, which the builder's own start then updates.
   // Then it waits for c1 to arrive in Review: watching, never idle.
-  const lane = (body) => `hive hive_lane ${JSON.stringify(body)}`
+  const lane = (body) => `hive cw_lane ${JSON.stringify(body)}`
   // The project's own Card loops rounds and wait (workflow options since HI-1766): the lane the join makes takes them.
   await lib.setOwnOptions(inv, alpha, { loopRounds: 7, loopWaitHours: 5 })
   await say(reviewer.id, `${lane({ action: 'join', builder: 'Builder', cards: [c1, c2] })} then ${wait(c1, { column: 'review' })}`)
@@ -181,7 +181,7 @@ const check = (name, ok, extra = '') => {
   check('…and nothing was typed into it (still watching)', (await live(reviewer.id))?.status === 'watching')
   const t0 = Date.now()
   const waited = await api('POST', '/v1/agents/wait', { agents: [{ project: 'alpha', agent: 'Reviewer' }], timeoutSeconds: 20 })
-  check('hive_wait_for_agents doesn’t wait on a watcher: it reports watching at once, with what for', waited.body?.agents?.[0]?.status === 'watching' && waited.body?.agents?.[0]?.statusMessage === label && waited.body?.agents?.[0]?.watching?.cards?.[0] === c1 && Date.now() - t0 < 5000 && waited.body?.timedOut === false, JSON.stringify(waited.body))
+  check('cw_wait_for_agents doesn’t wait on a watcher: it reports watching at once, with what for', waited.body?.agents?.[0]?.status === 'watching' && waited.body?.agents?.[0]?.statusMessage === label && waited.body?.agents?.[0]?.watching?.cards?.[0] === c1 && Date.now() - t0 < 5000 && waited.body?.timedOut === false, JSON.stringify(waited.body))
 
   const joined = (await api('GET', '/v1/lanes')).body?.[0]
   check('the reviewer joining made the lane (#483): the builder, the reviewer, the cards in order', joined?.builder?.name === 'Builder' && joined?.reviewer?.name === 'Reviewer' && joined?.cards?.map((c) => c.number).join() === `${c1},${c2}` && joined?.state === 'active' && joined?.current === c1, JSON.stringify(joined))

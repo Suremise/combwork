@@ -1,5 +1,4 @@
 {
   "prose|prop:text|Copilot asks a question": 1,
-  "prose|prop:text|Copilot asks for permission": 1,
-  "prose|var|This CLI names the hive tools \"hive-<tool>\": where Hive says hive_inbox, call hive-hive_inbox.": 1
+  "prose|prop:text|Copilot asks for permission": 1
 }

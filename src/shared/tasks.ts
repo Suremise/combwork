@@ -171,7 +171,7 @@ const ST = {
   removed: agentMsg({ id: 'stall.agent.removed', text: '{agent} was removed.', note: "The card's agent (or reviewer) was removed from the project." }),
   removedUnnamed: agentMsg({ id: 'stall.agent.removedUnnamed', text: 'Its agent was removed.', note: "The card's agent was removed from the project, its name not kept." }),
   notRunning: agentMsg({ id: 'stall.agent.notRunning', text: "{agent} isn't running.", note: "The card's agent (or reviewer) has no session running." }),
-  wakeUntaken: agentMsg({ id: 'stall.loop.wakeUntaken', text: "{agent} hasn't taken the wake Hive typed for {card}: it waits in its prompt.", note: "#777: the agent watched the card, and its wake waits untaken in its prompt (its CLI didn't take the line)." }),
+  wakeUntaken: agentMsg({ id: 'stall.loop.wakeUntaken', text: "{agent} hasn't taken the wake Combwork typed for {card}: it waits in its prompt.", note: "#777: the agent watched the card, and its wake waits untaken in its prompt (its CLI didn't take the line)." }),
   notWatching: agentMsg({ id: 'stall.loop.notWatching', text: "{agent} isn't watching {card}: its turn ended with no card watch.", note: '#376: the agent looping on the card ended its turn with no card watch, so nothing wakes it.' }),
   reviewWait: agentMsg({
     id: 'stall.review.wait',
@@ -184,10 +184,10 @@ const ST = {
     text: '{reviewer} is waiting for {other}, before {card} in the lane, while {builder} waits on the review of {card}: each has waited on the other for {waited}.',
     note: "A lane deadlocked: its reviewer waits for a card before this one in the lane, while its builder waits for this card's verdict. waited: a duration (stall.duration.*)."
   }),
-  followUpWait: agentMsg({ id: 'stall.loop.followUpWait', text: '{builder} posted a follow-up on {card} for its reviewer to check and has waited {waited}: nobody has answered it (hive_loop_step ok or gaps).', note: '#1467: the builder posted a follow-up for its reviewer to check, and nobody answered. waited: a duration (stall.duration.*).' }),
+  followUpWait: agentMsg({ id: 'stall.loop.followUpWait', text: '{builder} posted a follow-up on {card} for its reviewer to check and has waited {waited}: nobody has answered it (cw_loop_step ok or gaps).', note: '#1467: the builder posted a follow-up for its reviewer to check, and nobody answered. waited: a duration (stall.duration.*).' }),
   designWait: agentMsg({
     id: 'stall.loop.designWait',
-    text: "{builder} posted a design on {card} for its reviewer to check and has waited {waited}: nobody has answered it, and it hasn't gone ahead as posted (hive_loop_step proceed).",
+    text: "{builder} posted a design on {card} for its reviewer to check and has waited {waited}: nobody has answered it, and it hasn't gone ahead as posted (cw_loop_step proceed).",
     note: "#1382: the builder posted a design for its reviewer to check before building; nobody answered, and it didn't go ahead once its wait was over. waited: a duration (stall.duration.*)."
   }),
   minutes: agentMsg({ id: 'stall.duration.minutes', text: '{minutes} min', note: 'A stall\'s duration under an hour: "40 min".' }),
@@ -732,21 +732,21 @@ export interface ContextLine {
 
 /** The prompt a card starts with (taskPrompt), and its "Read these first" (contextText, problemText). */
 const PR = {
-  start: agentMsg({ id: 'prompt.card.start', text: 'Work on task {card} from the Hive task board: {title}', note: "The first line of a card's start prompt. card: its key (AM-12), or #12 for a card with none." }),
+  start: agentMsg({ id: 'prompt.card.start', text: 'Work on task {card} from the Combwork task board: {title}', note: "The first line of a card's start prompt. card: its key (AM-12), or #12 for a card with none." }),
   backFrom: agentMsg({ id: 'prompt.card.backFrom', text: 'It was in {column} and is back in Doing for more work.', note: 'More work on a card from Review, Passed or Done. column: the column it came from, by its name (Review, Passed, Done).' }),
   dependsOn: agentMsg({ id: 'prompt.card.dependsOn', text: 'It depends on {cards}.', note: 'The cards it is blocked by, joined with commas (AM-3, AM-4).' }),
   attachments: agentMsg({
     id: 'prompt.card.attachments',
-    text: 'Its attachments (open them by path): {paths}{more, select, yes {, and {moreCount} more (hive_read_task lists them)} other {}}.',
+    text: 'Its attachments (open them by path): {paths}{more, select, yes {, and {moreCount} more (cw_read_task lists them)} other {}}.',
     note: 'HI-1700: the paths of up to 10 of its attachments, joined with commas; more: yes when it has more than that, moreCount of them.'
   }),
   latestComment: agentMsg({ id: 'prompt.card.latestComment', text: 'Its latest comment ({by}, {date}):\n\n{comment}', note: 'More work on a card: the feedback it came back with. by: who wrote it; date: YYYY-MM-DD; comment: its text (prompt.card.commentCut when long).' }),
-  commentCut: agentMsg({ id: 'prompt.card.commentCut', text: '{start}… (cut short: hive_read_task has it all)', note: 'A latest comment over 4,000 characters: its start, cut.' }),
+  commentCut: agentMsg({ id: 'prompt.card.commentCut', text: '{start}… (cut short: cw_read_task has it all)', note: 'A latest comment over 4,000 characters: its start, cut.' }),
   workOnCard: agentMsg({ id: 'prompt.card.skill.workOnCard', text: 'Use the work-on-card skill.', note: "With Hive's tools: how to carry a card through is the work-on-card skill's, so the prompt only points there." }),
   laneBuilder: agentMsg({ id: 'prompt.card.skill.laneBuilder', text: "Use the card-loop skill as this lane's builder.", note: "HI-2047: a running lane's builder works its cards in turn with card-loop (which does each with work-on-card), not work-on-card as well." }),
   comments: agentMsg({
     id: 'prompt.card.comments',
-    text: 'The card has {n, plural, one {{count} comment} other {{count} comments}}: read {again, select, yes {the rest} other {them}} with hive_read_task.',
+    text: 'The card has {n, plural, one {{count} comment} other {{count} comments}}: read {again, select, yes {the rest} other {them}} with cw_read_task.',
     note: 'After the skill line, when the card has comments. count: how many (n, as text); again: yes for more work on a card, whose latest comment the prompt carries.'
   }),
   readFirst: agentMsg({ id: 'prompt.context.readFirst', text: 'Read these first: {list}.', note: '#818: the doc sections the card says to read first (prompt.context.item), joined with commas; the agent fetches what it needs.' }),
@@ -759,12 +759,12 @@ const PR = {
   }),
   howToRead: agentMsg({
     id: 'prompt.context.howToRead',
-    text: 'hive_read_section reads {ok, select, yes {each} other {the closest}} as the card has it (path: the file; heading: # and the slug{ok, select, yes { after it, none for a whole file} other {}}; from: "project").',
+    text: 'cw_read_section reads {ok, select, yes {each} other {the closest}} as the card has it (path: the file; heading: # and the slug{ok, select, yes { after it, none for a whole file} other {}}; from: "project").',
     note: "#818, #819: from the copy the card was checked against, the project's, whatever folder the agent works in. ok: yes when some references resolve (else only the closest headings are named)."
   }),
   problem: agentMsg({
     id: 'prompt.context.problem',
-    text: '{ref} ({problem, select, notFound {no such file} noHeading {no such heading} ambiguous {several headings have its text} invalid {not a doc section} outside {not in the project} hidden {in Hive\'s or git\'s own folder} notMarkdown {not Markdown} tooBig {too big to read} other {}}{closest, select, yes {; {problem, select, ambiguous {they are} other {closest}}: {headings}} other {}})',
+    text: '{ref} ({problem, select, notFound {no such file} noHeading {no such heading} ambiguous {several headings have its text} invalid {not a doc section} outside {not in the project} hidden {in Combwork\'s or git\'s own folder} notMarkdown {not Markdown} tooBig {too big to read} other {}}{closest, select, yes {; {problem, select, ambiguous {they are} other {closest}}: {headings}} other {}})',
     note: 'Why a reference doesn\'t resolve: "docs/PLAN.md#setup (no such heading; closest: #install)". headings: the closest, each as #slug, joined with commas.'
   })
 }
@@ -796,7 +796,7 @@ export function problemText(p: ContextProblem): string {
   return say(PR.problem, { ref: p.ref, problem: p.problem, closest: p.closest?.length ? 'yes' : 'no', headings: (p.closest ?? []).map((s) => `#${s}`).join(', ') })
 }
 
-/** How much of a card's latest comment a restarted card's prompt carries (the rest is a hive_read_task away). */
+/** How much of a card's latest comment a restarted card's prompt carries (the rest is a cw_read_task away). */
 const PROMPT_COMMENT_MAX = 4000
 
 /**
@@ -815,7 +815,7 @@ export function rawTaskPrompt(card: Pick<TaskCard, 'title' | 'description'>, not
   return [card.title.trim(), note?.trim() ?? '', card.description.trim()].filter(Boolean).join('\n\n')
 }
 
-/** At most this many of a card's attachments named in its start prompt (HI-1700); hive_read_task lists them all. */
+/** At most this many of a card's attachments named in its start prompt (HI-1700); cw_read_task lists them all. */
 const PROMPT_ATTACHMENTS_MAX = 10
 
 /** The skill a running lane's builder is pointed at as it starts a lane card (HI-2047), by Hive's start or its own (HI-2092). */

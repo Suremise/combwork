@@ -47,7 +47,7 @@ const shortWait = (): void => {
   vi.spyOn(advanced, 'number').mockImplementation((setting: string) => (setting === 'claude-code.prompt.clearKeySeconds' ? 0.2 : number(setting)))
 }
 /** A delivery's try: refused because its letter went unanswered. */
-const refusedTry = (): Promise<void> => expect(sessions.sendPrompt(project, id, '[Hive] New in your inbox: 1 task')).rejects.toThrow(/couldn't be seen empty/)
+const refusedTry = (): Promise<void> => expect(sessions.sendPrompt(project, id, '[CW] New in your inbox: 1 task')).rejects.toThrow(/couldn't be seen empty/)
 const blockIt = async (): Promise<void> => {
   for (let i = 0; i < 3; i++) await refusedTry()
 }
@@ -131,7 +131,7 @@ describe('an input that takes no keys (HI-2191)', () => {
       // Its typing begun (the line writer's own lock held), however it ends (here put off part-way): done with, and said.
       expect(writer.whyNoLine(project, id)).toBeNull()
       let held = false
-      await writer.typeLine(project, id, '[Hive] New in your inbox: 1 task', () => (held ||= writer.lineBusy(project, id), true))
+      await writer.typeLine(project, id, '[CW] New in your inbox: 1 task', () => (held ||= writer.lineBusy(project, id), true))
       expect(held, 'its lock was held while it typed').toBe(true)
       expect(writer.lineBusy(project, id)).toBe(false)
       expect(told).toEqual([`${project}#${id}`])
