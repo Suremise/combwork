@@ -1,7 +1,7 @@
 // The tip card and toasts keep out of the way of buttons in their corner: with the Hive Assistant's panel open they sit
 // left of it, so the panel's ended bar (Resume, New) is never covered; with it hidden, they sit just above the
 // bottom-right agent pane's ended bar. Each button is clicked with the real pointer, after checking it is what lies
-// under its middle. Tips are on in this suite's profile. The agents run the fake Claude Code (fake-claude/). Dev build,
+// under its middle. Tips are on in this suite's profile, finished notices off. The agents run the fake Claude Code (fake-claude/). Dev build,
 // throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -30,6 +30,9 @@ const check = (name, ok, extra = '') => {
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: true }
+  // No "finished" entries: any notification closes a tip showing, a bell-only one too (HI-2424), and the Assistant's
+  // finish (bell-only once its panel is folded) closed it before its corner was measured (HI-2513).
+  cfg.settings.notifications = { ...cfg.settings.notifications, notifyOnFinished: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47899), CLAUDE_CONFIG_DIR: claudeHome })
@@ -118,6 +121,7 @@ const check = (name, ok, extra = '') => {
   const bar = page.locator('.agent-pane-body .session-ended')
   await until(async () => (await bar.count()) === 1, 10000)
   await lib.sleep(300)
+  check('the tip still shows (no notification closed it)', (await card.count()) === 1, JSON.stringify(await page.evaluate(() => window.__hiveBell?.())))
   const b2 = await box(bar)
   const c2 = await box(card)
   check('with the Assistant hidden, the card is in the window corner', c2 && c2.x + c2.width > 1400, JSON.stringify(c2))
