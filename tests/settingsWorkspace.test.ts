@@ -1,9 +1,9 @@
 // A workspace's own settings through the catalog and the settings tools: since HI-1766 its card loops' rounds and wait
 // are its workflow defaults (Settings → Workspace's workflow defaults, None and Git), kept in its workspace.json, and a
 // project's own are its workflow options; an old `loops` moves into the defaults as the workspace is read.
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { settingDefault, settingEntry, settingPatch, settingPath, settingValue } from '../src/shared/settingsCatalog'
 import { DEFAULT_SETTINGS } from '../src/shared/defaults'
@@ -12,8 +12,19 @@ import { tempDir } from './tempDir'
 describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", async () => {
   const base = tempDir('hive-settings-ws-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
-  afterAll(() => rmSync(base, { recursive: true, force: true }))
-  const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
+  const { createWorkspaceService: createService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
+  const workspaces = new Set<ReturnType<typeof createService>>()
+  const createWorkspaceService = () => {
+    const w = createService()
+    workspaces.add(w)
+    return w
+  }
+  // An assertion can fail before a test's explicit close (HI-2495). Await every service's close before tempDir's
+  // retrying cleanup removes the folders, including watchers, background refreshes and bundled-item writes.
+  afterEach(async () => {
+    for (const w of workspaces) await disposeWorkspaceService(w)
+    workspaces.clear()
+  })
   const { applySetting, entryOf, settingDetail, settingRows } = await import('../src/main/settingsTools')
 
   it('the catalog: a level default for each platform that inherits, and a project option that inherits; the old rows are gone', () => {
