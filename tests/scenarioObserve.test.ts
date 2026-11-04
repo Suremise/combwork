@@ -641,7 +641,7 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
     })
 
     it("a reviewer already running isn't briefed by the lane naming it, only by the prompt its reply asks for", () => {
-      const running = "Lane started: Coder / Implementer (alpha) L: active. Started Coder with the lane's brief. Implementer is running, so Hive left it as it is: tell it about the lane."
+      const running = "Lane started: Coder / Implementer (alpha) L: active. Started Coder with the lane's brief. Implementer is running, so Combwork left it as it is: tell it about the lane."
       const IMPL = 'Implementer briefed: started by the lane with its brief, or prompted with card-loop, the cards and its builder'
       expect(lanes([start('Coder', 'Implementer', [1, 2], running)])[IMPL]).toBe(false)
       expect(lanes([start('Coder', 'Implementer', [1, 2], running)], [call('cw_prompt_agent', { project: 'alpha', agent: 'Implementer', text: 'Use card-loop as the reviewer. Cards: AL-1, AL-2. Your builder is Coder.' })])[IMPL]).toBe(true)
@@ -666,7 +666,7 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
       const CODER = "started Coder's lane (cw_lane start: its cards, its reviewer, a card-loop brief)"
       // Started on [3] (Hive started both), then updated to [1, 2], whose own reply says Implementer is running: tell it.
       const first = start('Coder', 'Implementer', [3], STARTED('Coder / Implementer'))
-      const update = start('Coder', 'Implementer', [1, 2], 'Lane updated: Coder / Implementer (alpha) L: active. Coder and Implementer are running, so Hive left them as they are: tell them about the lane.')
+      const update = start('Coder', 'Implementer', [1, 2], 'Lane updated: Coder / Implementer (alpha) L: active. Coder and Implementer are running, so Combwork left them as they are: tell them about the lane.')
       const r = lanes([first, update])
       expect(r[IMPL]).toBe(false)
       expect(r[CODER]).toBe(false)
@@ -682,8 +682,8 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
   describe("assistant-new-lane: cw_lane start, Coder left to Hive's start as the reply says", () => {
     const LEFT = "left Coder to Hive's start as the reply said (no prompt where Hive gives it the card; a new conversation where it said to tell it)"
     const STARTED = "started Coder's lane with cw_lane start, which worked: its card, rounds 3, wait 60 minutes"
-    const byHive = "Lane started: Coder / no reviewer (alpha) L: active. Coder is running, so Hive left it as it is: Hive gives it the lane's first card itself once it is free, so don't prompt it."
-    const tellIt = 'Lane started: Coder / no reviewer (alpha) L: active. Coder is running, so Hive left it as it is: tell it about the lane.'
+    const byHive = "Lane started: Coder / no reviewer (alpha) L: active. Coder is running, so Combwork left it as it is: Combwork gives it the lane's first card itself once it is free, so don't prompt it."
+    const tellIt = 'Lane started: Coder / no reviewer (alpha) L: active. Coder is running, so Combwork left it as it is: tell it about the lane.'
     const lane = { builder: { name: 'Coder' }, cards: [{ number: 1 }], rounds: 3, waitMinutes: 60 }
     const newLane = (reply: string, hiveCalls: unknown[] = [], lanes = [lane]) =>
       run('assistant-new-lane', { tools: [hiveTool('cw_lane', 'action: start\nbuilder: Coder', reply)], hiveCalls: [call('cw_lane', { action: 'start', builder: 'Coder', cards: ['AL-1'], rounds: 3, waitMinutes: 60 }), ...hiveCalls], lanes }, { cards: { n: 1 }, agents })

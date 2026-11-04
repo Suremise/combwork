@@ -1933,12 +1933,12 @@ module.exports.SCENARIOS = [
       await c.card('other', { title: 'Beta secret card', project: 'beta' })
     },
     prompt: "Write scripts/cards.ps1, a PowerShell script that lists this project's cards using Hive's HTTP API, then also tries to read project beta's cards and prints what Hive answers. Run it once.",
-    fake: 'skill use-hive-api',
+    fake: 'skill use-cw-api',
     expect: (o, c) => {
       const script = c.read('scripts/cards.ps1') ?? ''
       const out = runs(o, 'cards.ps1').map((t) => t.result).join('\n')
       return [
-        ['read the use-hive-api skill', read(o, 'use-hive-api'), o.skillsRead.join(',')],
+        ['read the use-cw-api skill', read(o, 'use-cw-api'), o.skillsRead.join(',')],
         // HI-2262: sessions get the token only in its file; a script reading HIVE_API_TOKEN gets nothing.
         ['the script takes the agent\'s own token from CW_API_TOKEN_FILE', /CW_API_TOKEN_FILE/.test(script), script.slice(0, 200)],
         ['never the workspace token (agent-api.json)', !/agent-api\.json/i.test(script) && !o.tools.some((t) => /agent-api\.json/i.test(t.input))],
@@ -2683,7 +2683,7 @@ module.exports.SCENARIOS = [
         ['its turn ended watching the card for the verdict (Passed, a verdict, a move or a comment)', c.statusAtEnd === 'watching' && !!w?.cards?.includes(c.cards.a) && w.column === 'passed', JSON.stringify({ status: c.statusAtEnd, watch: w })],
         ["the watch is the lane's wait long (6 h)", !!w && Math.abs(Math.round((Date.parse(w.limitAt) - Date.parse(w.since)) / 60000) - 360) <= 1, JSON.stringify(w)],
         ['the verdict woke it', !!c.woke || o.wakeLines.some((l) => l.includes(`#${c.cards.a}`)), JSON.stringify(o.wakeLines)],
-        ["the reviewer's failed verdict had Hive watch the card for its next round", /^Hive watches .* for its next round in Review/.test(c.reviewerWatch ?? ''), String(c.reviewerWatch)]
+        ["the reviewer's failed verdict had Combwork watch the card for its next round", /^Combwork watches .* for its next round in Review/.test(c.reviewerWatch ?? ''), String(c.reviewerWatch)]
       ]
     }
   },
@@ -2752,7 +2752,7 @@ module.exports.SCENARIOS = [
         [`Coder is given #${c.cards.b} (by Hive's start, its task's doorbell in its pane; or by its own start's reply)`, !!c.given || !!own, `${c.given} / own start: ${!!own}`],
         // HI-2047: a running lane's builder is pointed at card-loop alone.
         ["its start names card-loop as the lane's builder, not work-on-card", /card-loop skill as this lane's builder/.test(start ?? '') && !/work-on-card/.test(start ?? ''), String(start)],
-        ['started by Hive or by Coder itself, nobody else', !!started && /^(Hive|Coder)/.test(started.by), JSON.stringify(started ?? null)],
+        ['started by Combwork or by Coder itself, nobody else', !!started && /^(Combwork|Coder)/.test(started.by), JSON.stringify(started ?? null)],
         ["didn't ask the user (no cw_notify, no question)", called(o, 'cw_notify').length === 0 && called(o, 'cw_ask_user').length === 0, o.hiveCalls.map((x) => x.tool).join(',')]
       ]
     },
@@ -3420,7 +3420,7 @@ module.exports.SCENARIOS = [
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ['asked the Assistant with cw_ask_assistant', asked.length > 0, tools.join(',')],
-        ['…on the card, which says so in its history', history(o.cards.a).some((h) => h.startsWith('Asked the Hive Assistant: ')), history(o.cards.a).join(' | ')],
+        ['…on the card, which says so in its history', history(o.cards.a).some((h) => h.startsWith('Asked the Assistant: ')), history(o.cards.a).join(' | ')],
         ["didn't ask the user what they already decided", !ran(o, 'cw_ask_user').length, tools.join(',')],
         ['moved neither card past its rules itself', o.cards.h?.column === 'todo' && o.cards.a?.column === 'doing', `${o.cards.h?.column} / ${o.cards.a?.column}`]
       ]
@@ -3817,7 +3817,7 @@ module.exports.SCENARIOS = [
       const starts = laneStartsOf(o).filter((s) => /^coder$/i.test(String(s.args.builder ?? '')))
       const lane = (o.lanes ?? []).find((l) => l.builder?.name === 'Coder' && (l.cards ?? []).some((x) => x.number === c.cards.n))
       // The lane start's reply says whether Hive gives Coder the card itself (don't prompt it) or Coder is the caller's to tell.
-      const tell = starts.some((s) => /\bCoder\b[^.]*running, so Hive left (it|them) as (it is|they are): tell\b/.test(s.reply))
+      const tell = starts.some((s) => /\bCoder\b[^.]*running, so Combwork left (it|them) as (it is|they are): tell\b/.test(s.reply))
       const prompts = called(o, 'cw_prompt_agent').filter((x) => /coder/i.test(String(argsOf(x).agent)))
       const fresh = prompts.filter((x) => x.ok && argsOf(x).newConversation === true)
       return [
