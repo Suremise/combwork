@@ -1,7 +1,7 @@
 // Agents' temp folder (HI-2496): the setting, each launch's own folder in it (stable, collision-safe, the Assistant's
 // apart), the checks that keep it out of projects, slots and Combwork's own folders (junctions too), a folder that can't
 // be made, and the launch environment's temp variables (the empty default unchanged, duplicates by case removed).
-import { mkdirSync, statSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, statSync, writeFileSync } from 'fs'
 import { dirname, join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
@@ -14,6 +14,7 @@ mkdirSync(join(base, 'profile'), { recursive: true })
 
 const { agentTempFolder, agentTempSetting, expandRoot, prepareAgentTemp, protectedFolders, withAgentTemp } = await import('../src/main/agentTemp')
 const { advanced } = await import('../src/main/advanced')
+const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 const { AGENT_TEMP_FOLDER_ID, advancedDef, checkAdvanced } = await import('../src/shared/advanced')
 
 // The run's temp folder goes with the run (tests/README.md, Isolation): no recursive delete here, junctions in it.
@@ -25,7 +26,8 @@ const fakeWs = (path: string, projects: string[], hidden: string[] = []): FakeWs
     path,
     worktreesRoot: `${path}.worktrees`,
     assistantHome: join(path, '.hive', 'assistant'),
-    listProjectPaths: async (o?: { hidden?: boolean }) => (o?.hidden ? hidden : projects)
+    listProjectPaths: async (o?: { hidden?: boolean }) => (o?.hidden ? hidden : projects),
+    knownRoots: () => []
   }) as unknown as FakeWs
 
 describe('the setting', () => {
@@ -137,6 +139,34 @@ describe('prepareAgentTemp', () => {
 })
 
 describe('protectedFolders', () => {
+  // HR1, round 1: an agent's folder registered outside the workspace and its pool (a 0.9 worktree, a slot or retired home
+  // elsewhere, a worktree noted unused) is protected from another agent's temp folder, through the real WorkspaceService.
+  it("protects another agent's registered folders outside the workspace, in a real workspace", async () => {
+    const root = join(base, 'registered')
+    const ws = join(root, 'ws')
+    const proj = join(ws, 'alpha')
+    const external = join(root, 'external-checkout')
+    const unused = join(root, 'unused-worktree')
+    for (const d of [join(proj, '.hive'), external, unused]) mkdirSync(d, { recursive: true })
+    writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-legacy', name: 'Legacy', provider: 'claude-code', worktree: { path: external, branch: 'legacy', base: 'main' } }] }))
+    const w = createWorkspaceService()
+    try {
+      await w.open(ws)
+      expect(w.projectForRoot(external)).toBe(proj)
+      w.noteUnusedWorktrees(proj, [unused])
+      const protect = [...(await protectedFolders([w])), proj]
+      for (const inside of [external, unused]) {
+        const setting = join(inside, 'temp-for-other-agent')
+        await expect(prepareAgentTemp({ setting, host: proj, agentId: 'a-other', assistant: false, protect }), inside).rejects.toThrow(/is inside/)
+        expect(existsSync(setting), inside).toBe(false)
+      }
+      // Beside them, outside every known folder: taken.
+      expect(await prepareAgentTemp({ setting: join(root, 'agent-tmp'), host: proj, agentId: 'a-other', assistant: false, protect })).toBe(agentTempFolder(join(root, 'agent-tmp'), proj, 'a-other', false))
+    } finally {
+      await disposeWorkspaceService(w)
+    }
+  })
+
   it("lists every open workspace's folder, projects, hidden ones, slots, Assistant home and .hive", async () => {
     const list = await protectedFolders([fakeWs('D:\\w1', ['D:\\w1\\a'], ['D:\\w1\\h']), fakeWs('E:\\w2', ['E:\\w2\\a'])])
     expect(list).toEqual(expect.arrayContaining(['D:\\w1', 'E:\\w2', 'D:\\w1\\a', 'D:\\w1\\h', 'D:\\w1.worktrees', join('D:\\w1', '.hive', 'assistant'), join('D:\\w1', '.hive'), 'E:\\w2\\a', 'E:\\w2.worktrees']))

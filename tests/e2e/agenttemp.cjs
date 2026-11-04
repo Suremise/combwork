@@ -1,8 +1,10 @@
 // Agents' temp folder (HI-2496): Settings → Advanced's "Agents' temp folder", empty by default, gives each launch TEMP,
 // TMP and TMPDIR in a folder of its own, <folder>\<project>-<hash>\<agent id> (the Assistant's apart), made at launch;
 // Claude Code also CLAUDE_CODE_TMPDIR, over one it inherited. Empty, a launch's variables are as before (an inherited
-// CLAUDE_CODE_TMPDIR kept). A folder inside a project stops the launch. Runs the fake Claude Code and the fake Codex,
-// which record their temp variables; the Assistant on the fake Claude Code. Dev build, throwaway profile and folders.
+// CLAUDE_CODE_TMPDIR kept). A folder inside a project stops the launch, and a launch held at its folder while its
+// workspace closes never starts its CLI (HIVE_TEST_HOLD_AGENT_TEMP: NOT RUN on a packaged build). Runs the fake Claude
+// Code and the fake Codex, which record their temp variables; the Assistant on the fake Claude Code. Dev build,
+// throwaway profile and folders.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const crypto = require('crypto')
@@ -17,6 +19,9 @@ const claudeHome = path.join(lib.WORK, 'agenttemp-claude-home')
 const codexHome = path.join(lib.WORK, 'agenttemp-codex-home')
 const tempRoot = path.join(lib.WORK, 'agenttemp-root')
 const inherited = path.join(lib.WORK, 'agenttemp-inherited')
+const wsOther = path.join(lib.WORK, 'agenttemp-ws-other')
+// Each launch holds once its temp folder is made, while this file is missing (HIVE_TEST_HOLD_AGENT_TEMP): there from the start.
+const holdGo = path.join(lib.WORK, 'agenttemp-hold-go')
 const proj = path.join(ws, 'alpha')
 const PORT = lib.port(47800)
 let failed = 0
@@ -31,8 +36,9 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 const allAt = (temp, dir) => ['TEMP', 'TMP', 'TMPDIR'].every((n) => Object.keys(temp ?? {}).filter((k) => k.toUpperCase() === n).length === 1 && same(Object.entries(temp).find(([k]) => k.toUpperCase() === n)[1], dir))
 
 ;(async () => {
-  for (const d of [userData, ws, claudeHome, codexHome, tempRoot, inherited]) fs.rmSync(d, { recursive: true, force: true })
-  for (const d of [claudeHome, codexHome, inherited, ws]) fs.mkdirSync(d, { recursive: true })
+  for (const d of [userData, ws, wsOther, claudeHome, codexHome, tempRoot, inherited, holdGo]) fs.rmSync(d, { recursive: true, force: true })
+  for (const d of [claudeHome, codexHome, inherited, ws, wsOther]) fs.mkdirSync(d, { recursive: true })
+  fs.writeFileSync(holdGo, '')
   fs.writeFileSync(path.join(codexHome, 'config.toml'), '[windows]\nsandbox = "unelevated"\n')
   lib.gitProject(proj)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([proj.toLowerCase(), ws.toLowerCase()]))
@@ -46,7 +52,7 @@ const allAt = (temp, dir) => ['TEMP', 'TMP', 'TMPDIR'].every((n) => Object.keys(
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   // Hive started with a CLAUDE_CODE_TMPDIR of the user's own: kept while the setting is empty, overridden when it is set.
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CLAUDE_CODE_TMPDIR: inherited })
+  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CLAUDE_CODE_TMPDIR: inherited, HIVE_TEST_HOLD_AGENT_TEMP: holdGo })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -109,6 +115,24 @@ const allAt = (temp, dir) => ['TEMP', 'TMP', 'TMPDIR'].every((n) => Object.keys(
     const assistantDir = path.join(tempRoot, `_assistant-${hash(assistantHome)}`, 'assistant')
     check("the Assistant's TEMP, TMP, TMPDIR and CLAUDE_CODE_TMPDIR are its own folder", allAt(a1?.temp, assistantDir) && same(a1?.env?.CLAUDE_CODE_TMPDIR, assistantDir) && fs.existsSync(assistantDir), JSON.stringify({ temp: a1?.temp, assistantDir }))
     await stop(assistantHome, 'assistant')
+
+    // --- The workspace closes while a launch waits on its folder (HR1, round 1): held once Dora's folder is made, the
+    // window opens another workspace, then the hold ends. Dora's CLI never starts, and nothing of the launch is left:
+    // back in the workspace, Dora starts as usual.
+    const dora = await lib.addAgent(inv, proj, { name: 'Dora' })
+    const doraDir = path.join(host, dora.id)
+    fs.rmSync(holdGo)
+    const doraStart = inv('session:start', proj, { agentId: dora.id }).then(() => null, (e) => String(e?.message ?? e))
+    check("Dora's launch is held with its folder made", !!(await lib.until(async () => fs.existsSync(doraDir), HUNG_MS)))
+    await lib.openWorkspace(inv, page, wsOther)
+    fs.writeFileSync(holdGo, '')
+    const doraSaid = await doraStart
+    const doraLaunched = () => claudeLaunches(proj).filter((l) => l.env?.CW_AGENT === 'Dora').length
+    check("…the workspace closed meanwhile: its launch ends, and Dora's CLI never starts", doraLaunched() === 0 && !(await inv('session:live')).some((s) => same(s.projectPath, proj) && s.agentId === dora.id), String(doraSaid))
+    await lib.openWorkspace(inv, page, ws)
+    await inv('session:start', proj, { agentId: dora.id })
+    check('…back in the workspace, Dora starts as usual (nothing of the ended launch is left)', !!(await ready(proj, dora.id)) && doraLaunched() === 1 && allAt(claudeLaunches(proj).filter((l) => l.env?.CW_AGENT === 'Dora').at(-1)?.temp, doraDir))
+    await stop(proj, dora.id)
 
     // --- A folder inside a project: the launch stops, saying why, and no folder is made there.
     const insideProj = path.join(proj, 'tmp-here')

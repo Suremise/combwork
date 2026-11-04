@@ -9,13 +9,14 @@
  * can't be used stops the launch with the reason, rather than putting the files back in the system Temp.
  */
 import { createHash } from 'crypto'
-import { mkdir, realpath, stat } from 'original-fs/promises'
+import { lstat, mkdir, realpath, stat } from 'original-fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'path'
 import { AGENT_TEMP_FOLDER_ID } from '../shared/advanced'
 import { HIVE_DIR } from '../shared/defaults'
 import { msg } from '../shared/i18n'
 import { advanced } from './advanced'
 import { hiveError } from './hiveError'
+import { takesTestSeams } from './testQuiet'
 import type { WorkspaceService } from './workspace'
 
 const M = {
@@ -92,14 +93,18 @@ async function protectedHit(p: string, protect: readonly string[]): Promise<stri
   return null
 }
 
-/** Every open workspace's folder, projects (hidden ones too, wherever they are), slots and copies, Assistant home and .hive. */
+/**
+ * Every open workspace's folder, projects (hidden ones too, wherever they are), slots and copies, agents' other known
+ * folders (registered slots, retired homes, 0.9 worktrees, wherever they are), Assistant home and .hive.
+ */
 export async function protectedFolders(workspaces: readonly WorkspaceService[]): Promise<string[]> {
   const all = await Promise.all(
     workspaces.map(async (w) => {
       if (!w.path) return []
       const projects = (await Promise.all([w.listProjectPaths().catch(() => [] as string[]), w.listProjectPaths({ hidden: true }).catch(() => [] as string[])])).flat()
       // The workspace's own folder too: its projects are listed from it, and the Assistant works in it.
-      return [w.path, ...projects, w.worktreesRoot, w.assistantHome, join(w.path, HIVE_DIR)]
+      // Agents' folders it knows elsewhere too (HR1, round 1): slots, retired homes and 0.9 worktrees outside its pool.
+      return [w.path, ...projects, w.worktreesRoot, ...w.knownRoots(), w.assistantHome, join(w.path, HIVE_DIR)]
     })
   )
   return all.flat()
@@ -131,10 +136,21 @@ export async function prepareAgentTemp(o: AgentTempLaunch): Promise<string | nul
   } catch (e) {
     throw hiveError(M.notMade, { folder: dir, why: (e as Error).message }, { kind: 'conflict' })
   }
+  await testHold()
   // Made: where it really is now (a junction made meanwhile, or one inside the root) must still be outside them.
   const after = await protectedHit(dir, o.protect)
   if (after) throw hiveError(M.inside, { folder: dir, inside: after }, { kind: 'conflict' })
   return dir
+}
+
+/**
+ * Tests only (unpackaged or quiet test builds): HIVE_TEST_HOLD_AGENT_TEMP=<file> holds each launch here, its folder made,
+ * until that file exists, so a suite can close the workspace or stop the agent while a launch waits on it (HR1, round 1).
+ */
+async function testHold(): Promise<void> {
+  const file = takesTestSeams() ? process.env.HIVE_TEST_HOLD_AGENT_TEMP : undefined
+  if (!file) return
+  while (!(await lstat(file).then(() => true, () => false))) await new Promise((r) => setTimeout(r, 100))
 }
 
 /** env with the temp variables, any case, replaced by dir; env itself when dir is null (the empty default). */
