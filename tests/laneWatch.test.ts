@@ -1362,6 +1362,56 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  // HI-2521: WR1 watched its lane 2 s after it ended (merged), and sat watching it for its 6 h limit.
+  it('HI-2521: a watch naming a lane that has ended or been abandoned replies at once and starts none, ending the one before; one naming lanes counts their end whatever its events', async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const [a, b, c] = await newCards(w, 'b1', 3)
+    const ended = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)', name: 'screenshots' })).lane
+    await lanes.endLane(w, ended.id, { mergeCommit: '47a3d54c0ffee1234567890abcdef1234567890a' })
+    const abandoned = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r2', cards: [b], by: 'B2 (alpha)' })).lane
+    await lanes.endLane(w, abandoned.id, { abandoned: true })
+    // A watch it had before: ended by the answer, and said.
+    await watches.registerWatch(w, home, 'assistant', { cards: [c], changes: ['comment'] })
+    const r = await watches.registerLaneWatch(w, home, 'assistant', { ids: [ended.id, abandoned.id], events: ['failed'] })
+    expect(r).toEqual({ already: ['Lane B1 / R1 (screenshots): ended: merged at 47a3d54c0ffe', 'Lane B2 / R2: was abandoned'], replaced: `Waiting for #${c}` })
+    expect(watches.watchFor(home, 'assistant')).toBeNull()
+    // Through the Agent API's reply: "Already: …".
+    expect(taskWaitText({ lanesAlready: (r as { already: string[] }).already, replaced: (r as { replaced: string }).replaced })).toBe(`Already: Lane B1 / R1 (screenshots): ended: merged at 47a3d54c0ffe; Lane B2 / R2: was abandoned. Your watch (waiting for #${c}) has ended.`)
+    // A running lane watched for failures only: its end still wakes the watch, which has nothing left to watch.
+    const running = (await lanes.startLane(w, { project: 'alpha', builder: 'b3', reviewer: 'r1', cards: [c], by: 'B3 (alpha)' })).lane
+    st.status = 'watching'
+    const on = await watches.registerLaneWatch(w, home, 'assistant', { ids: [running.id], events: ['failed'] })
+    expect('watching' in on).toBe(true)
+    await lanes.endLane(w, running.id, { abandoned: true })
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toMatch(/^\[CW\] Lane B3 \/ R1: was abandoned\./)
+    await disposeWorkspaceService(w)
+  })
+
+  it('HI-2521: a lane ending while its watch is being set up (after its lanes were read) still wakes the watcher', async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const [a] = await newCards(w, 'b1', 1)
+    const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })).lane
+    watches.testHooks.afterLanesRead = async () => {
+      watches.testHooks.afterLanesRead = undefined
+      await lanes.endLane(w, l.id, { mergeCommit: '47a3d54c0ffee1234567890abcdef1234567890a' })
+    }
+    try {
+      st.status = 'watching'
+      const r = await watches.registerLaneWatch(w, home, 'assistant', { ids: [l.id], events: ['failed'] })
+      // Read while it ran: a watch starts, and its own check after setup tells the end (nothing else looks).
+      expect('watching' in r).toBe(true)
+    } finally {
+      watches.testHooks.afterLanesRead = undefined
+    }
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toMatch(/^\[CW\] Lane B1 \/ R1: ended: merged at 47a3d54c0ffe\./)
+    await disposeWorkspaceService(w)
+  })
+
   it('one watch for the lanes and a card beside them: its comment wakes it, then a lane failure and its block together, in one line (#726)', async () => {
     const { w, alpha, home } = await open()
     const st = fake(alpha, home)

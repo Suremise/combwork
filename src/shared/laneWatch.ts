@@ -74,6 +74,11 @@ export type LaneEvent = (typeof LANE_EVENTS)[number]
 export const LANE_DEFAULT_EVENTS: LaneEvent[] = ['failed', 'blocked', 'unblocked', 'reblocked', 'stalled', 'merge-due', 'ended', 'abandoned', 'waiting', 'paused-user']
 /** What every lane watch counts, whatever its `events` (HI-1991): a question for the user is never filtered out. */
 export const LANE_ALWAYS_EVENTS: LaneEvent[] = ['paused-user']
+/**
+ * What a watch naming lanes always counts (HI-2521): their end. Once its lanes end it has nothing left to watch, so a
+ * watch that filtered the end out (a reviewer watching only for `failed`) would sit until its limit.
+ */
+export const LANE_END_EVENTS: LaneEvent[] = ['ended', 'abandoned']
 /** Event names from before, still accepted (HI-1991): `paused` told only a lane paused for a merge. */
 const LANE_EVENT_ALIASES: Readonly<Record<string, LaneEvent>> = { paused: 'paused-merge' }
 /** What counts on the cards beside a lane watch's lanes by default (#726); a card becoming blocked always does. */
@@ -265,6 +270,18 @@ export function laneHits(before: LaneMark | null | undefined, now: LaneNow, even
   if (on.has('ended') && now.mark.state === 'ended' && before.state !== 'ended') parts.push({ n: null, event: 'ended', text: say(T.ended, { merged: now.mergeCommit ? 'yes' : 'no', commit: now.mergeCommit?.slice(0, 12) ?? '' }) })
   if (on.has('abandoned') && now.mark.state === 'abandoned' && before.state !== 'abandoned') parts.push({ n: null, event: 'abandoned', text: say(T.abandoned) })
   return parts.length ? { id: now.id, label: now.label, parts } : null
+}
+
+/**
+ * A lane that has ended or been abandoned, as a lane watch's reply tells it at once (HI-2521: WR1 watched a lane that
+ * had ended 2 s before, and sat watching it for its 6 h limit): "Lane B1 / R1 (greetings): ended: merged at …". Null
+ * while it runs.
+ */
+export function laneOverPart(now: Pick<LaneNow, 'label' | 'mark' | 'mergeCommit'>): string | null {
+  const s = now.mark.state
+  if (s !== 'ended' && s !== 'abandoned') return null
+  const events = s === 'ended' ? say(T.ended, { merged: now.mergeCommit ? 'yes' : 'no', commit: now.mergeCommit?.slice(0, 12) ?? '' }) : say(T.abandoned)
+  return say(T.lane, { lane: now.label, events })
 }
 
 /**
