@@ -336,7 +336,7 @@ describe('Add MCP Server from File', () => {
   it('refuses other files, a bad .json, and the reserved name', async () => {
     await expect(run(() => mcp.previewMcpFile(file('server.txt', 'x')))).rejects.toThrow('Choose a .json definition or a .zip of a server folder.')
     await expect(run(() => mcp.previewMcpFile(file('x.json', '{oops')))).rejects.toThrow("x.json isn't valid JSON")
-    await expect(run(() => mcp.addMcpFromFile(file('x.json', JSON.stringify({ command: 'node' })), 'hive'))).rejects.toThrow('"hive" is reserved')
+    await expect(run(() => mcp.addMcpFromFile(file('x.json', JSON.stringify({ command: 'node' })), 'hive'))).rejects.toThrow('"combwork" and "hive" are reserved')
     // A file named hive.json gets another name to suggest.
     expect((await run(() => mcp.previewMcpFile(file('hive.json', JSON.stringify({ command: 'node' }))))).name).toBe('server')
   })

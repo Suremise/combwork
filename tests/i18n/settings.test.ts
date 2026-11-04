@@ -155,10 +155,10 @@ describe("Settings → Advanced's text", () => {
     }
     expect(advancedTakes(reply)).toBe('A whole number of seconds, 30 to 3600.')
     const bad = checkAdvanced(reply, 5)
-    expect(bad).toMatchObject({ error: 'hive tools: reply timeout takes a whole number from 30 to 3600.' })
+    expect(bad).toMatchObject({ error: 'Combwork tools: reply timeout takes a whole number from 30 to 3600.' })
     pseudo()
     // The value's title, itself a message, inside the reason.
-    expect('error' in bad && shownText(bad.errorText)).toMatch(/^\[\[ĥíṽé ţööļš: ŕéþļý ţíɱéöüţ/)
+    expect('error' in bad && shownText(bad.errorText)).toMatch(/^\[\[Çöɱƀŵöŕķ ţööļš: ŕéþļý ţíɱéöüţ/)
     expect(advancedTakes(reply)).toBe('A whole number of seconds, 30 to 3600.')
     expect(shownText(advancedTakesText(reply))).toMatch(/^\[Á ŵĥöļé ñüɱƀéŕ öƒ šéçöñðš, 30 ţö 3600\./)
     for (const d of ADVANCED_DEFS) {
@@ -171,7 +171,7 @@ describe("Settings → Advanced's text", () => {
   it("an override that isn't taken, or no longer finds the CLI's text, says so as shown; the English stays for the log", () => {
     const state = (values: Record<string, unknown>, workspace: Record<string, unknown> | null = null) => ({ values, madeFor: {}, workspace, cli: {} })
     const row = advancedRow(reply, state({ 'cw.mcp.replySeconds': 5 }))
-    expect(row.problem).toBe('hive tools: reply timeout takes a whole number from 30 to 3600.')
+    expect(row.problem).toBe('Combwork tools: reply timeout takes a whole number from 30 to 3600.')
     const lanes = advancedDef('cw.progress.lanesShown')!
     const own = advancedRow(lanes, state({}, { 'cw.progress.lanesShown': 99 }))
     expect(own.problem).toBe("This workspace's: Progress panel: lanes shown takes a whole number from 1 to 24.")
@@ -182,7 +182,7 @@ describe("Settings → Advanced's text", () => {
     expect(shownText(row.problemText!)).toContain('[')
     expect(shownText(own.problemText!)).toMatch(/^\[Ţĥíš ŵöŕķšþáçé'š:/)
     expect(shownText(miss.missText!)).toContain('Codex 0.162.1')
-    expect(row.problem).toBe('hive tools: reply timeout takes a whole number from 30 to 3600.')
+    expect(row.problem).toBe('Combwork tools: reply timeout takes a whole number from 30 to 3600.')
     expect(problems).toEqual([])
   })
 

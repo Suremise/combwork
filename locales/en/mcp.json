@@ -32,7 +32,7 @@
     "description": "The Catalogue's source picker (HI-545): every catalogue."
   },
   "mcp.catalog.badName": {
-    "defaultMessage": "Server names may contain letters, numbers, \"-\" and \"_\" (max 64 characters). \"hive\" is reserved.",
+    "defaultMessage": "Server names may contain letters, numbers, \"-\" and \"_\" (max 64 characters). \"combwork\" and \"hive\" are reserved.",
     "description": "An error installing a catalogue server (HI-545) under a name a server can't have."
   },
   "mcp.catalog.badgeInstalled": {

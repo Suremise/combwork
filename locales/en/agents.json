@@ -740,8 +740,8 @@
     "description": "After an MCP server the agent was given that isn't added to its project now (HI-2059), or isn't in the workspace. Lower case."
   },
   "agents.mcp.noteAdded": {
-    "defaultMessage": "The built-in hive server is always given. A server added to the project later reaches it only with All.",
-    "description": "Under an agent's MCP servers (Agent Settings). hive is the built-in server's name: keep it. All is the first choice above (\"All of the project's\")."
+    "defaultMessage": "The built-in combwork server is always given. A server added to the project later reaches it only with All.",
+    "description": "Under an agent's MCP servers (Agent Settings). combwork is the built-in server's name: keep it. All is the first choice above (\"All of the project's\")."
   },
   "agents.mcp.only": {
     "defaultMessage": "Only these",

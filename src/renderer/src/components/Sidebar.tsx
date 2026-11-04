@@ -136,10 +136,10 @@ const M = {
   noServers: msg({ id: 'assistant.sidebar.noServers', defaultMessage: 'No MCP servers yet. Create one with +, or add one from a .json definition or a .zip of a server folder.', description: 'The MCP sidebar with no servers. + is the add button.' }),
   deleteServer: msg({ id: 'assistant.sidebar.deleteServer', defaultMessage: 'Delete server', description: "A trash button beside an MCP server of the workspace: deletes it." }),
   builtIn: msg({ id: 'assistant.sidebar.builtIn', defaultMessage: 'Built-in', description: "The MCP sidebar: the section of Hive's own server." }),
-  hiveServerDesc: msg({ id: 'assistant.sidebar.hiveServerDesc', defaultMessage: 'Combwork tools for agents: projects, shared notes, handovers, notifications', description: "Under the built-in hive server: what it gives agents." }),
+  hiveServerDesc: msg({ id: 'assistant.sidebar.hiveServerDesc', defaultMessage: 'Combwork tools for agents: projects, shared notes, handovers, notifications', description: "Under the built-in combwork server: what it gives agents." }),
   hiveServerTip: msg({ id: 'assistant.sidebar.hiveServerTip', defaultMessage: 'Controlled in Settings → Agent API', description: "Tooltip on the built-in server's On or Off." }),
-  on: msg({ id: 'assistant.sidebar.on', defaultMessage: 'On', description: 'A badge: the built-in hive server is on.' }),
-  off: msg({ id: 'assistant.sidebar.off', defaultMessage: 'Off', description: 'A badge: the built-in hive server is off.' })
+  on: msg({ id: 'assistant.sidebar.on', defaultMessage: 'On', description: 'A badge: the built-in combwork server is on.' }),
+  off: msg({ id: 'assistant.sidebar.off', defaultMessage: 'Off', description: 'A badge: the built-in combwork server is off.' })
 }
 
 const bold = (c: React.ReactNode[]): React.ReactNode => <strong>{c}</strong>

@@ -180,7 +180,7 @@
   "workspace.mcpView.toolReadNote": "Czyta notatkę wspólną",
   "workspace.mcpView.toolSessionUsage": "Użycie tokenów, pamięć podręczna i kompaktowania sesji",
   "workspace.mcpView.toolWriteNote": "Tworzy, nadpisuje lub uzupełnia notatkę wspólną",
-  "workspace.mcpView.tryAsking": "Poproś agenta na przykład: *„Napisz przekazanie dla następnej sesji, używając narzędzi hive.”*",
+  "workspace.mcpView.tryAsking": "Poproś agenta na przykład: *„Napisz przekazanie dla następnej sesji, używając narzędzi Combwork.”*",
   "workspace.mcpView.whatItDoes": "Co robi",
   "workspace.mcpView.whatItRuns": "Co uruchamia",
   "workspace.move.branchesBanner": "{count, plural, one {Gałąź agenta nadal nosi nazwę starego folderu; Naprawa zmieni jej nazwę.} few {Gałęzie # agentów nadal noszą nazwę starego folderu; Naprawa zmieni ich nazwy.} many {Gałęzie # agentów nadal noszą nazwę starego folderu; Naprawa zmieni ich nazwy.} other {Gałęzie # agenta nadal noszą nazwę starego folderu; Naprawa zmieni ich nazwy.}}",

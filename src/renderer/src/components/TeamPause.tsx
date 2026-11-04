@@ -37,7 +37,7 @@ export const M = {
     id: 'board.team.item',
     defaultMessage:
       "{kind, select, working {{agent} is working} starting {{agent} is starting} background {{agent} has background tasks running} run {{agent}: {label} (a run)} merge {A merge: {label}} copy {A check in a copy: {label}} process {{agent}: {label} (process {pid})} writer {{agent}: its slot {label} is still held} status {{agent}: Combwork can’t tell what it is doing} other {{agent}: can’t be checked now}}",
-    description: "One thing that still runs while the team is paused (HI-2081), a line in its band. {agent} is an agent's name (or Assistant); {label} the user's own words for it (a run's title, a process's command, a slot's name); {pid} a process id. kind: working or starting; background tasks; a run (a test run through hive-progress); a merge of the merge queue; a check in a copy (a folder Hive keeps at one revision); a process (a test runner, a dev server, a test copy of Hive); its slot (a working folder Hive lends) still held by its processes; its state unknown; or (other) its processes can't be read now. Keep the select keys."
+    description: "One thing that still runs while the team is paused (HI-2081), a line in its band. {agent} is an agent's name (or Assistant); {label} the user's own words for it (a run's title, a process's command, a slot's name); {pid} a process id. kind: working or starting; background tasks; a run (a test run through cw-progress); a merge of the merge queue; a check in a copy (a folder Hive keeps at one revision); a process (a test runner, a dev server, a test copy of Hive); its slot (a working folder Hive lends) still held by its processes; its state unknown; or (other) its processes can't be read now. Keep the select keys."
   })
 }
 

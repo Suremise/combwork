@@ -319,10 +319,10 @@ export const API = {
     unknown: agentMsg({ id: 'api.lane.unknown', text: 'No lane {lane}' })
   },
   mcp: {
-    connectedOnlyBridge: agentMsg({ id: 'api.mcp.connectedOnlyBridge', text: 'Only the hive MCP bridge says it has connected, with an agent\'s or the Assistant\'s token' }),
+    connectedOnlyBridge: agentMsg({ id: 'api.mcp.connectedOnlyBridge', text: 'Only the combwork MCP bridge says it has connected, with an agent\'s or the Assistant\'s token' }),
     earlierLaunch: agentMsg({ id: 'api.mcp.earlierLaunch', text: 'That is an earlier launch\'s token' }),
     reportMax: agentMsg({ id: 'api.mcp.reportMax', text: 'At most {max} calls in one report' }),
-    reportOnlyBridge: agentMsg({ id: 'api.mcp.reportOnlyBridge', text: 'Only the hive MCP bridge reports its calls, with an agent\'s or the Assistant\'s token' })
+    reportOnlyBridge: agentMsg({ id: 'api.mcp.reportOnlyBridge', text: 'Only the combwork MCP bridge reports its calls, with an agent\'s or the Assistant\'s token' })
   },
   mergeSlot: {
     moveName: agentMsg({ id: 'api.mergeSlot.moveName', text: 'merge slot', note: 'The refused move\'s name, in the workflow\'s refusal of a Hive-merged card\'s merge slot.' }),

@@ -188,7 +188,7 @@ export interface AppSettings {
     /** The Progress panel (long runs agents report, with taskbar progress). Off: reports are accepted and ignored. */
     progressPanel: boolean
     /**
-     * Agents run long commands (about 30 s or more) through hive-progress without being asked, so they show in the
+     * Agents run long commands (about 30 s or more) through cw-progress without being asked, so they show in the
      * panel: Hive's session guidance says so. Off, or with the panel off: only when the user asks. New sessions.
      */
     progressCommands: boolean

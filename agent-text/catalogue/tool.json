@@ -44,7 +44,7 @@
     "text": "project: the project folder's copy, as a card's Read first references are given."
   },
   "tool.arg.mcpServers": {
-    "text": "The project's MCP servers it gets: [] none, [\"*\"] all (default). hive is always given."
+    "text": "The project's MCP servers it gets: [] none, [\"*\"] all (default). combwork is always given."
   },
   "tool.arg.override": {
     "text": "Moves it past the rules the move skips: reason is the user's own why, never made up."

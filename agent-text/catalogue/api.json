@@ -870,7 +870,7 @@
     "text": "No lane {lane}"
   },
   "api.mcp.connectedOnlyBridge": {
-    "text": "Only the hive MCP bridge says it has connected, with an agent's or the Assistant's token"
+    "text": "Only the combwork MCP bridge says it has connected, with an agent's or the Assistant's token"
   },
   "api.mcp.earlierLaunch": {
     "text": "That is an earlier launch's token"
@@ -879,7 +879,7 @@
     "text": "At most {max} calls in one report"
   },
   "api.mcp.reportOnlyBridge": {
-    "text": "Only the hive MCP bridge reports its calls, with an agent's or the Assistant's token"
+    "text": "Only the combwork MCP bridge reports its calls, with an agent's or the Assistant's token"
   },
   "api.mergeSlot.moveName": {
     "text": "merge slot",

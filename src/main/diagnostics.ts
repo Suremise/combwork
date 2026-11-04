@@ -68,13 +68,13 @@ async function earlierWork(): Promise<{ folders: string[]; names: string[] }> {
 export function toolListLine(label: string, rows: ToolListRow[]): string {
   const n = (v: number): string => Math.round(v).toLocaleString('en')
   // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
-  if (!rows.length) return `- ${label} hive tool list (24 h): none recorded`
+  if (!rows.length) return `- ${label} Combwork tool list (24 h): none recorded`
   const row = (r: ToolListRow): string => {
     const parts = r.descriptionChars === null || r.paramChars === null || r.schemaChars === null ? 'parts not measured' : `descriptions ${n(r.descriptionChars)}, parameters ${n(r.paramChars)}, schemas ${n(r.schemaChars)}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
     const chars = r.chars === null ? 'characters not measured' : `${n(r.chars)} chars a start (${parts})` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
     return `${r.role === 'assistant' ? 'assistant' : 'agents'} · ${r.workflow}: ${n(r.tools)} tools, ${chars}, ${n(r.bytes)} bytes, ${r.starts} start${r.starts === 1 ? '' : 's'}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
   }
-  return `- ${label} hive tool list (24 h): ${rows.map(row).join('; ')}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+  return `- ${label} Combwork tool list (24 h): ${rows.map(row).join('; ')}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
 }
 
 /** The tool list lines of each open workspace (its metrics' last 24 hours; one that can't be read says so). */
@@ -86,7 +86,7 @@ function toolListLines(windows: ReturnType<typeof hiveWindows>): string[] {
       const r = queryMetrics(w.ws, { scope: { kind: 'workspace' } })
       return toolListLine(label, toolListRows([...Object.values(r.projects), ...(r.workspace ? [r.workspace] : [])].flatMap((p) => p.catalog)))
     } catch {
-      return `- ${label} hive tool list (24 h): couldn't be read` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+      return `- ${label} Combwork tool list (24 h): couldn't be read` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
     }
   })
 }
@@ -171,7 +171,7 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
     `- Agents' processes: ${process.platform !== 'win32' ? 'not tracked (Windows only)' : trackingProblem() ? `not tracked: ${trackingProblem()}` : 'tracked'}${trackingLost() ? `; earlier, ${trackingLost()}` : ''}`,
     `- Confirm before quitting: ${s.general.confirmOnQuit}; close to tray: ${s.general.closeToTray ? 'on' : 'off'}; minimise to tray: ${s.general.minimizeToTray ? 'on' : 'off'}; keep the PC awake: ${s.general.keepAwake}`,
     `- Transcript backups: ${s.sessions.backupTranscripts ? 'on' : 'off'}; cache TTL: ${s.sessions.cacheTtl}; Overview refresh: ${s.sessions.overviewRefresh}`,
-    `- Agent API: ${s.agentApi.enabled ? 'on' : 'off'}; built-in hive MCP server: ${s.agentApi.provideHiveMcp ? 'on' : 'off'}; session input: ${s.agentApi.allowSessionInput ? 'allowed' : 'off'}`,
+    `- Agent API: ${s.agentApi.enabled ? 'on' : 'off'}; built-in combwork MCP server: ${s.agentApi.provideHiveMcp ? 'on' : 'off'}; session input: ${s.agentApi.allowSessionInput ? 'allowed' : 'off'}`,
     `- Assistant control: ${typeof s.assistant.control === 'string' ? s.assistant.control : 'custom'}`,
     `- Notifications: ${s.notifications.desktopNotifications ? 'on' : 'off'}; pop-ups about agents for ${{ all: 'all workspaces', workspace: 'this workspace', project: 'this project', none: 'none (bell only)' }[s.notifications.bannerScope]}; pop-ups ${s.notifications.bannerPosition}, ${s.notifications.bannerSeconds} s; waiting pop-ups ${s.notifications.waitingBannerStays ? 'stay' : 'close too'}; chime ${s.notifications.chimeEnabled ? 'on' : 'off'}`, // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
     `- Theme: ${s.appearance.theme}`,

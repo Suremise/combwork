@@ -2,7 +2,7 @@
   "content.mcp.badArgs": "“args”必须是字符串列表。",
   "content.mcp.badCommand": "“command”必须是要运行的程序。",
   "content.mcp.badCwd": "“cwd”必须是文件夹。",
-  "content.mcp.badName": "服务器名称只能包含字母、数字、“-”和“_”（最多 64 个字符）。“hive”为保留名称。",
+  "content.mcp.badName": "服务器名称只能包含字母、数字、“-”和“_”（最多 64 个字符）。“combwork”和“hive”为保留名称。",
   "content.mcp.badRecord": "“{field}”必须是值为字符串的对象。",
   "content.mcp.badUrl": "“url”必须是 http:// 或 https:// 地址。",
   "content.mcp.changedAdd": "{name} 在向你显示后已更改。请检查它运行的内容，然后重新添加。",

@@ -323,7 +323,7 @@ export async function keptText(projectPath: string, k: SlotKept): Promise<string
     case 'gitRefused':
       return tr(msg({ id: 'main.unused.slot.gitRefused', defaultMessage: "git didn't remove it ({detail})", description: "Why Hive didn't remove a slot listed in Unused worktrees: git worktree remove refused ({detail}: git's message). A clause." }), { detail: k.detail })
     case 'editedSkillCopy':
-      return tr(msg({ id: 'main.unused.slot.editedSkillCopy', defaultMessage: "{copies, plural, one {its skill folder {names} isn't an unchanged copy of Combwork's} other {its skill folders {names} aren't unchanged copies of Combwork's}}", description: "Why Hive didn't remove a slot listed in Unused worktrees (#1500): Hive removed its own skill copies from the slot's .agents/skills, but a folder named hive-… is left there (changed since Hive copied it, or the user's own), so the slot is kept. {names}: the folders' names, e.g. hive-merge-ready; {copies}: how many. A clause." }), { copies: k.copies.length, names: fmt.list(k.copies) })
+      return tr(msg({ id: 'main.unused.slot.editedSkillCopy', defaultMessage: "{copies, plural, one {its skill folder {names} isn't an unchanged copy of Combwork's} other {its skill folders {names} aren't unchanged copies of Combwork's}}", description: "Why Hive didn't remove a slot listed in Unused worktrees (#1500): Hive removed its own skill copies from the slot's .agents/skills, but a folder named cw-… is left there (changed since Hive copied it, or the user's own), so the slot is kept. {names}: the folders' names, e.g. cw-merge-ready; {copies}: how many. A clause." }), { copies: k.copies.length, names: fmt.list(k.copies) })
   }
 }
 
