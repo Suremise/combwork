@@ -312,7 +312,7 @@ const launchToken = (() => {
     return null
   }
 })()
-fs.appendFileSync(path.join(home, 'fake-launches.jsonl'), JSON.stringify({ cwd: process.cwd(), sessionId, pid: process.pid, parent: process.ppid, opts, env: launchEnv, temp: Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(TEMP|TMP|TMPDIR)$/i.test(k))), token: launchToken }) + '\n')
+fs.appendFileSync(path.join(home, 'fake-launches.jsonl'), JSON.stringify({ cwd: process.cwd(), sessionId, pid: process.pid, parent: process.ppid, opts, env: launchEnv, temp: Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(TEMP|TMP)(DIR)?$/i.test(k))), token: launchToken }) + '\n')
 // In a connection's folder (HI-1870: its Set Up, or an agent's first launch there): its first-run screens answered at
 // once, as Claude Code records them in the folder's .claude.json (tests/fixtures/advanced/onboarding-claude-2.1.311.jsonl).
 if (accountFolder) {
