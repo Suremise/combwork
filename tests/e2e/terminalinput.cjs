@@ -26,6 +26,8 @@ const AS_TYPED = 'hive.prompt.asTyped'
 const CTRL_CV = 'hive.terminal.ctrlCVToCli'
 const ALL_KEYS = 'hive.terminal.allKeysToCli'
 const RAW_START = 'hive.prompt.rawCardStart'
+/** The start of the wrapper Hive types around a card's start (prompt.card.start, src/shared/tasks.ts): it survives a rename. */
+const WRAPPER = 'Work on task '
 let failed = 0
 const check = (name, ok, extra = '') => {
   lib.checked(ok)
@@ -105,6 +107,8 @@ const check = (name, ok, extra = '') => {
     check('a card started on the agent is typed into its CLI', started === true, String(started))
     check('by default it goes in as one line, as a paste: spacing collapsed, line breaks gone', !!(await lib.until(async () => inputSince(from).includes('Card one Plan one: step A step B\x1b[201~'), HUNG_MS, 100)), JSON.stringify(inputSince(from)))
     check('…and the CLI gets it on one line', !!(await lib.until(async () => transcriptHas(inTranscript('Card one Plan one: step A step B')), HUNG_MS, 200)))
+    // What part 4 looks for to say Hive's wrapper is left out: shown here to be typed, so that check can fail (HI-2514).
+    check("by default it goes in inside Hive's wrapper", inputSince(from).includes(WRAPPER), JSON.stringify(inputSince(from)))
 
     await inv('advanced:set', AS_TYPED, true)
     from = readsOfInput().length
@@ -237,7 +241,7 @@ const check = (name, ok, extra = '') => {
     from = readsOfInput().length
     started = await startCard('Card raw', 'Only this.')
     check('in its own words, a card started on the agent is typed into its CLI', started === true, String(started))
-    check("…as the card's title and description alone, with none of Hive's wrapper", !!(await lib.until(async () => transcriptHas('Card raw Only this.'), HUNG_MS, 200)) && !inputSince(from).includes('Hive task board'), JSON.stringify(inputSince(from)))
+    check("…as the card's title and description alone, with none of Hive's wrapper", !!(await lib.until(async () => transcriptHas('Card raw Only this.'), HUNG_MS, 200)) && !inputSince(from).includes(WRAPPER),JSON.stringify(inputSince(from)))
     await inv('advanced:set', RAW_START, false)
   } catch (e) {
     check('the suite ran to its end', false, e?.stack ?? String(e))
