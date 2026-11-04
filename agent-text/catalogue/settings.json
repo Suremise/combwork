@@ -44,6 +44,16 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
+  "settings.advanced.claude-code.accounts.loginExpiresField.desc": {
+    "text": "The field of `claude auth status --json` with when a connection's sign-in expires, shown under its state in Settings → Accounts & Connections (HI-2528). Wrong, no expiry is shown.",
+    "note": "What the advanced setting \"Connections: sign-in expiry field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is.",
+    "audience": "both"
+  },
+  "settings.advanced.claude-code.accounts.loginExpiresField.title": {
+    "text": "Connections: sign-in expiry field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
   "settings.advanced.claude-code.accounts.loginFiles.desc": {
     "text": "The names of the files in a connection's folder that change when Claude Code signs in or out there, as a regular expression. Combwork watches them (it never reads them) and checks the connection again when one changes. Wrong, a /login or /logout typed in an agent's pane is only found at the connection's next check.",
     "note": "What the advanced setting \"Connections: login files\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep /login and /logout as they are (commands).",

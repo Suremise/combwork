@@ -517,7 +517,7 @@
   "tips.unusedWorktrees.title": "Tidy kept worktrees",
   "tips.updateFromTarget.text": "Version Control → Branches & remotes: a branch behind the target has Update. Merge the target in or rebase onto it, where the branch is checked out; a conflict is undone at once, naming its files.",
   "tips.updateFromTarget.title": "Bring a branch up to date with its target",
-  "tips.usageMoves.text": "On an account in Settings → Accounts & Connections, tick When it reaches 98% of its weekly limit, move its agents to another account: they move once their turn is over and carry on there.",
+  "tips.usageMoves.text": "In Settings → Accounts & Connections, open an account’s ⋯ → Account Settings… and tick When it reaches 98% of its weekly limit, move its agents to another account: they move once their turn is over and carry on there.",
   "tips.usageMoves.title": "Move agents before a plan runs out",
   "tips.versionControlSwitch.text": "Click None or Git atop a project’s Version Control tab to switch it from its next card; cards in flight keep the old rules. Each keeps its own workflow options, and when the folder changes (git init, say), Combwork offers the switch there.",
   "tips.versionControlSwitch.title": "Switch between None and Git",

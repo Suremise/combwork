@@ -733,6 +733,8 @@ export interface ConnectionObserved {
   orgId?: string
   /** Its plan, as the CLI names it ("max"). */
   plan?: string | null
+  /** When its sign-in expires, as the CLI says (HI-2528: Claude Code's `loginExpiresAt`); absent when it doesn't. */
+  loginExpiresAt?: string
   /** A check that failed (a timeout, output Hive couldn't read), in English for the log; the last good identity is kept. */
   error?: string
   /** Its folder isn't there, or isn't a folder Hive made (replaced from outside). */

@@ -517,7 +517,7 @@
   "tips.unusedWorktrees.title": "Faire le tri dans les worktrees conservés",
   "tips.updateFromTarget.text": "Gestion de versions → Branches et dépôts distants : une branche en retard sur la cible a Mettre à jour. Fusionne la cible ou rebase dessus, là où la branche est extraite ; un conflit est annulé aussitôt, en nommant ses fichiers.",
   "tips.updateFromTarget.title": "Mettre une branche à jour avec sa cible",
-  "tips.usageMoves.text": "Sur un compte dans Paramètres → Comptes et connexions, coche « Quand il atteint 98 % de sa limite hebdomadaire, déplacer ses agents vers » un autre compte : ils passent dès la fin de leur tour et continuent là-bas.",
+  "tips.usageMoves.text": "Dans Paramètres → Comptes et connexions, ouvre ⋯ → Paramètres du compte… sur un compte et coche « Quand il atteint 98 % de sa limite hebdomadaire, déplacer ses agents vers » un autre compte : ils passent dès la fin de leur tour et continuent là-bas.",
   "tips.usageMoves.title": "Déplacer les agents avant qu’un forfait soit épuisé",
   "tips.versionControlSwitch.text": "Clique sur Aucune ou Git en haut de l’onglet Gestion de versions pour changer dès la prochaine carte ; les cartes lancées gardent les anciennes règles. Chacune a ses options du flux de travail, et si le dossier change (git init), Combwork y propose de changer.",
   "tips.versionControlSwitch.title": "Basculer entre Aucune et Git",

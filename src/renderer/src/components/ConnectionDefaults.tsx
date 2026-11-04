@@ -11,6 +11,7 @@ import { call, errorMessage } from '../api'
 import { notify, useLanguage, useStore } from '../store'
 import { EffortPicker, ModelPicker } from './ModelPicker'
 import { Icon, Modal } from './ui'
+import { M as CARD } from './accountCard'
 
 /**
  * A connection (HI-2106, HI-2107): the named setup on an account that agents and the Assistant choose. Its dialog (Add
@@ -27,7 +28,6 @@ const M = {
   effort: msg({ id: 'settings.connection.effort', defaultMessage: 'Effort', description: "Label of a connection's reasoning effort in its dialog (HI-2107)." }),
   context: msg({ id: 'settings.connection.context', defaultMessage: 'Context', description: "Label of a connection's context window choice in its dialog (HI-2107): 1M tokens or 200K." }),
   context1m: msg({ id: 'settings.connection.context1m', defaultMessage: "1M (the model's)", description: "A choice of a connection's context: the model's own 1M-token window. 1M is a number of tokens." }),
-  context200k: msg({ id: 'settings.connection.context200k', defaultMessage: '200K', description: "A choice of a connection's context: a 200K-token window, which compacts sooner. 200K is a number of tokens." }),
   mode: msg({ id: 'settings.connection.mode', defaultMessage: 'Permission mode', description: "Label of a connection's permission mode in its dialog (HI-2107)." }),
   args: msg({ id: 'settings.connection.args', defaultMessage: 'Extra arguments', description: "Label of a connection's extra command-line arguments in its dialog (HI-2107)." }),
   tag: msg({ id: 'settings.connection.tag', defaultMessage: 'Tag', description: "Label of a connection's tag in its dialog (HI-2530): an optional free-text label of the user's, such as \"Builders\", that a usage move matches connections by. Not a workflow role." }),
@@ -216,7 +216,7 @@ function ConnectionForm({ account: a, row, settings, onClose }: { account: Accou
             <label>{tr(M.context)}</label>
             <select className="select" aria-label={tr(M.context)} data-context value={ctx ? 'on' : ''} onChange={(e) => setCtx(e.target.value === 'on')}>
               <option value="">{tr(M.context1m)}</option>
-              <option value="on">{tr(M.context200k)}</option>
+              <option value="on">{tr(CARD.context200k)}</option>
             </select>
           </>
         )}

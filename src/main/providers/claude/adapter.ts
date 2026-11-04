@@ -109,6 +109,8 @@ export interface AuthStatusFields {
   email: string
   orgId: string
   plan: string
+  /** When its sign-in expires (HI-2528: `loginExpiresAt`, an ISO time some weeks ahead, 2.1.318); absent from older CLIs. */
+  loginExpires?: string
 }
 
 /**
@@ -141,7 +143,10 @@ export function parseClaudeAuthStatus(stdout: string, f: AuthStatusFields): Conn
   const signedIn = o[f.loggedIn]
   if (typeof signedIn !== 'boolean') return { ok: false, error: `its status had no "${f.loggedIn}"` } // i18n-ignore: for the log
   const str = (k: string): string | undefined => (typeof o[k] === 'string' && o[k] ? (o[k] as string) : undefined)
-  return { ok: true, loggedIn: signedIn, email: str(f.email), orgId: str(f.orgId), plan: str(f.plan) ?? null }
+  // Its sign-in's expiry (HI-2528), only as a time Hive can read: anything else is no expiry, never a guess.
+  const expires = f.loginExpires ? str(f.loginExpires) : undefined
+  const loginExpiresAt = expires && !Number.isNaN(Date.parse(expires)) ? new Date(expires).toISOString() : undefined
+  return { ok: true, loggedIn: signedIn, email: str(f.email), orgId: str(f.orgId), plan: str(f.plan) ?? null, ...(loginExpiresAt ? { loginExpiresAt } : {}) }
 }
 
 /**
@@ -347,7 +352,8 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       loggedIn: advanced.get<string>('claude-code.accounts.loggedInField'),
       email: advanced.get<string>('claude-code.accounts.emailField'),
       orgId: advanced.get<string>('claude-code.accounts.orgField'),
-      plan: advanced.get<string>('claude-code.accounts.planField')
+      plan: advanced.get<string>('claude-code.accounts.planField'),
+      loginExpires: advanced.get<string>('claude-code.accounts.loginExpiresField')
     }
     return claudeAccountStatus(r, fields)
   }

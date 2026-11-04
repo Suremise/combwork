@@ -144,7 +144,9 @@ const check = (name, ok, extra = '') => {
       return a?.accepted?.email === 'one@example.com' && a.observed?.loggedIn === true ? a : null
     }, HUNG_MS)
     check('once the sign-in ends, it is signed in as that login, taken on as its own', !!signed, JSON.stringify((await list()).connections))
-    check('…and its row says so', !!(await lib.until(async () => /Signed in/.test(await row('Personal').innerText().catch(() => '')) && /one@example\.com · max/.test(await row('Personal').innerText().catch(() => '')), HUNG_MS)))
+    // HI-2528: its card's fields, each in its own place: Signed in as, Plan (as the CLI names it, title-cased), State.
+    const fact = (name, which) => row(name).locator(`[data-fact="${which}"] .account-fact-value`).innerText().catch(() => '')
+    check('…and its row says so: signed in as its email, on its plan', !!(await lib.until(async () => /Signed in/.test(await fact('Personal', 'state')) && (await fact('Personal', 'email')) === 'one@example.com' && (await fact('Personal', 'plan')) === 'Max', HUNG_MS)), JSON.stringify({ email: await fact('Personal', 'email'), plan: await fact('Personal', 'plan'), state: await fact('Personal', 'state') }))
     check('…with its CLI and its icon', (await row('Personal').locator('.account-cli .provider-icon').count()) === 1 && /Claude Code/.test(await row('Personal').locator('.account-cli').innerText()))
     // A browser sign-in leaves the first-run screens unanswered (its .claude.json without the onboarding field): said.
     check('…and that it needs set up, Set Up primary, with what it is for', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="needed"]').count()) === 1, HUNG_MS)) && (await row('Personal').locator('[data-set-up].primary').count()) === 1 && /first-run questions/.test(await row('Personal').locator('[data-set-up-note]').innerText().catch(() => '')))

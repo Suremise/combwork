@@ -2072,7 +2072,7 @@
     "description": "A tip's title."
   },
   "tips.usageMoves.text": {
-    "defaultMessage": "On an account in Settings → Accounts & Connections, tick When it reaches 98% of its weekly limit, move its agents to another account: they move once their turn is over and carry on there.",
+    "defaultMessage": "In Settings → Accounts & Connections, open an account’s ⋯ → Account Settings… and tick When it reaches 98% of its weekly limit, move its agents to another account: they move once their turn is over and carry on there.",
     "description": "A tip (HI-2195). Names of Hive's menus, views, settings and commands: keep them as Hive shows them; the rule is quoted as the setting shows it."
   },
   "tips.usageMoves.title": {

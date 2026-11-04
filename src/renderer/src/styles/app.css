@@ -4909,55 +4909,202 @@ h2.section#unused-worktrees {
   align-self: stretch;
   border: 1px solid var(--border);
   border-radius: 6px;
+  container: account-card / inline-size;
 }
 .account-block > .account-row {
   border: 0;
   border-bottom: 1px solid var(--border);
   border-radius: 6px 6px 0 0;
 }
+/* An account's card (HI-2528, Darren's approved mockup v2): the same fields in the same place on every card. */
+.account-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 2px 16px;
+  margin-top: 6px;
+}
+.account-fact {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.account-fact-label {
+  font-size: 11px;
+  color: var(--fg-faint);
+}
+.account-fact-value {
+  overflow-wrap: anywhere;
+}
+.account-fact .account-state {
+  margin-top: 0;
+  flex-wrap: wrap;
+}
+.account-expiry {
+  display: block;
+  font-size: 12px;
+}
+.account-expiry.expired {
+  color: var(--warning);
+}
+.account-off-tag {
+  font-weight: normal;
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  color: var(--fg-muted);
+}
+.account-block.off-here .connection-list {
+  opacity: 0.7;
+}
+/* Its plan limits (HI-2528): a small bar each, its share, and when it resets. */
+.account-usage {
+  display: grid;
+  grid-template-columns: max-content minmax(60px, 160px) max-content minmax(0, 1fr);
+  gap: 3px 10px;
+  align-items: center;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.account-usage-row {
+  display: contents;
+}
+.account-usage-label {
+  color: var(--fg-muted);
+}
+.account-usage-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border-subtle);
+  overflow: hidden;
+}
+.account-usage-bar > i {
+  display: block;
+  height: 100%;
+  background: var(--success);
+}
+.account-usage-bar.high > i {
+  background: var(--warning);
+}
+.account-usage-bar.full > i {
+  background: var(--error);
+}
+.account-usage-pct {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.account-usage-reset {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-usage-none {
+  margin-top: 6px;
+  font-size: 12px;
+}
+@container account-card (max-width: 420px) {
+  .account-usage {
+    grid-template-columns: max-content minmax(40px, 1fr) max-content;
+  }
+  .account-usage-reset {
+    grid-column: 1 / -1;
+    margin-top: -2px;
+  }
+}
+.account-settings-dialog {
+  min-width: min(520px, 80vw);
+}
+/* Its connections, a small table inside the card (HI-2528; Darren 21:40: kept where they are, broken up as a table). */
 .connection-list {
   container: connection-list / inline-size;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 4px 10px 6px 38px;
+  padding: 4px 12px 12px;
+  background: var(--bg-sidebar);
+  border-radius: 0 0 6px 6px;
 }
-/* Each row is its own grid: a users column sized apart from its text keeps the split the same in every row, so the
-   columns line up (HI-2158). It fills to 150px before the fr columns grow, and gives way to 80px in a narrow pane. */
+/* Each row is the same grid, so the columns line up: order, name, tag, five values, who uses it, its buttons. */
 .connection-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1.2fr) minmax(160px, 2fr) minmax(80px, 150px) auto;
-  gap: 10px;
+  grid-template-columns: 50px minmax(110px, 1.4fr) minmax(64px, 0.8fr) minmax(70px, 1fr) minmax(56px, 0.7fr) minmax(56px, 0.7fr) minmax(76px, 1fr) minmax(56px, 0.8fr) minmax(70px, 0.8fr) auto;
+  gap: 8px;
   align-items: center;
-  min-height: 26px;
+  min-height: 28px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 12px;
 }
-/* A list narrower than those minimums (Settings beside the sidebar in a small window, HI-2163): the summary goes under
-   the name, the users column stays 80px, none sized by its text, so the rows stay inside the card and lined up. A
-   narrow window has its own layout (below). */
-@media (min-width: 701px) {
-  @container connection-list (max-width: 439px) {
-    .connection-row {
-      grid-template-columns: minmax(0, 1fr) 80px auto;
-      grid-template-areas: 'name users more' 'summary summary more';
-      row-gap: 0;
-      padding: 2px 0;
-    }
-    .connection-row > .connection-name {
-      grid-area: name;
-    }
-    .connection-row > .connection-summary {
-      grid-area: summary;
-    }
-    .connection-row > .connection-users {
-      grid-area: users;
-    }
-    .connection-row > :last-child {
-      grid-area: more;
-    }
-  }
+.connection-row:last-of-type {
+  border-bottom: 0;
 }
-.connection-row:hover {
+.connection-head {
+  min-height: 24px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-faint);
+  border-bottom: 1px solid var(--border);
+}
+.connection-row:not(.connection-head):hover {
   background: var(--bg-hover);
+}
+.connection-cell {
+  overflow-wrap: anywhere;
+}
+.connection-cell.cli-own {
+  color: var(--fg-faint);
+  font-style: italic;
+}
+/* Each value's column name, for screen readers (the heading row is hidden from them). */
+.connection-cell-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.connection-order,
+.connection-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+.connection-actions {
+  justify-content: flex-end;
+}
+.connection-summary {
+  display: none;
+}
+/* A card narrower than the table (Settings beside the sidebar, a small window): each connection on two lines, its name,
+   tag, who uses it and its buttons, then its values in a line. */
+@container connection-list (max-width: 700px) {
+  .connection-head {
+    display: none;
+  }
+  .connection-row {
+    grid-template-columns: 50px minmax(0, 1fr) auto auto;
+    grid-template-areas: 'order name users actions' 'order summary summary summary';
+    row-gap: 0;
+    padding: 3px 0;
+  }
+  .connection-row > .connection-order {
+    grid-area: order;
+  }
+  .connection-row > .connection-name {
+    grid-area: name;
+  }
+  .connection-row > .connection-users {
+    grid-area: users;
+  }
+  .connection-row > .connection-actions {
+    grid-area: actions;
+  }
+  .connection-row > .connection-summary {
+    display: block;
+    grid-area: summary;
+  }
+  .connection-row > .connection-cell {
+    display: none;
+  }
 }
 .connection-name {
   font-weight: 600;
@@ -5005,17 +5152,10 @@ h2.section#unused-worktrees {
   color: var(--warning);
   margin-left: 4px;
 }
+/* More room under it than before (HI-2528, Darren 21:40). */
 .connection-add {
   align-self: flex-start;
-  margin-top: 2px;
-}
-@media (max-width: 700px) {
-  .connection-row {
-    grid-template-columns: 1fr auto;
-  }
-  .connection-users {
-    text-align: left;
-  }
+  margin: 10px 0 2px;
 }
 /* Its handle: drag in the one order of accounts, or Alt+Up/Down. */
 .account-handle {

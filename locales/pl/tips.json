@@ -517,7 +517,7 @@
   "tips.unusedWorktrees.title": "Uporządkuj zachowane worktree",
   "tips.updateFromTarget.text": "Kontrola wersji → Gałęzie i zdalne repozytoria: gałąź pozostająca w tyle za gałęzią docelową ma Aktualizuj. Scal gałąź docelową albo zrób rebase na nią tam, gdzie gałąź jest wybrana; konflikt jest od razu cofany, z nazwami jego plików.",
   "tips.updateFromTarget.title": "Zaktualizuj gałąź względem gałęzi docelowej",
-  "tips.usageMoves.text": "Na koncie w Ustawienia → Konta i połączenia zaznacz „Gdy osiągnie 98% swojego tygodniowego limitu, przenieś jego agentów na” inne konto: przejdą po zakończeniu swojej tury i będą tam pracować dalej.",
+  "tips.usageMoves.text": "W Ustawienia → Konta i połączenia otwórz na koncie ⋯ → Ustawienia konta… i zaznacz „Gdy osiągnie 98% swojego tygodniowego limitu, przenieś jego agentów na” inne konto: przejdą po zakończeniu swojej tury i będą tam pracować dalej.",
   "tips.usageMoves.title": "Przenieś agentów, zanim skończy się plan",
   "tips.versionControlSwitch.text": "Kliknij Brak lub Git u góry zakładki Kontrola wersji, aby przełączyć projekt od następnej karty; rozpoczęte karty zachowają stare reguły. Każdy wybór ma własne opcje przepływu pracy, a gdy folder się zmieni (np. git init), Combwork zaproponuje tam przełączenie.",
   "tips.versionControlSwitch.title": "Przełączanie między opcjami Brak i Git",
