@@ -153,7 +153,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     await inv('tasks:update', n, { project: 'beta' })
     const moved = await inv('cards:attachments', n)
     check('a move to another project takes it along', moved.length === 1 && moved[0].path.toLowerCase().startsWith(path.join(beta, '.combwork', 'attachments', 'cards').toLowerCase()) && fs.existsSync(moved[0].path), JSON.stringify(moved.map((x) => x.path)))
-    check('…and the old folder goes', !!(await until(async () => !fs.existsSync(path.join(alpha, '.combwork', 'attachments', 'cards', String(n))))))
+    check('…and the old folder goes', !!(await until(async () => !fs.existsSync(path.join(alpha, '.combwork', 'attachments', 'cards', String(n))), HUNG_MS)))
 
     // --- A session's file copied to a card from the Attachments tab; its tabs (HI-1841).
     const other = await inv('tasks:create', { title: 'Session shot belongs here', project: 'alpha' })

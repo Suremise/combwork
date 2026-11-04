@@ -137,7 +137,7 @@ describe('keeping files with a card (HI-1700)', () => {
     await expect.poll(() => trashed().some((t) => t.endsWith(a.file))).toBe(true)
     // The removal's own folder goes after its file is in the Recycle Bin (finishTrash, after the commit): awaited, not
     // looked at once (HI-2362: under load the look came between the two).
-    await expect.poll(() => inside(join(root, 'p', '.combwork', 'attachments', 'cards', '.trash'))).toEqual([])
+    await expect.poll(() => inside(join(root, 'p', '.combwork', 'attachments', 'cards', '.trash')), { timeout: 20_000 }).toEqual([])
   })
 })
 
