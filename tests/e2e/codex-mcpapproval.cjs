@@ -1,6 +1,6 @@
-// Codex pre-approves only Hive's own MCP tools (#1166), in the test CODEX_HOME. A workspace MCP server (stamp, Node
-// built-ins, no annotations) is on in the project; an agent in each of Hive's Codex modes is asked to call a hive tool
-// and then stamp's tool. Hive's tool runs without Codex asking in every mode; stamp's follows Codex's approval policy
+// Codex pre-approves only Combwork's own MCP tools (#1166; server combwork, HI-2463), in the test CODEX_HOME. A workspace MCP server (stamp, Node
+// built-ins, no annotations) is on in the project; an agent in each of Hive's Codex modes is asked to call a cw_ tool
+// and then stamp's tool. Combwork's tool runs without Codex asking in every mode; stamp's follows Codex's approval policy
 // for the mode, recorded per mode in mcpapproval.json (asked, ran without asking, or neither). Then the Assistant on
 // Codex uses its Hive tools, a read and a change (a card), without being asked. Short prompts on a small model.
 const lib = require('./lib.cjs')
@@ -22,9 +22,9 @@ const SHOWN_MS = 30000
 // Codex redraws a line by moving the cursor over letters that didn't change, and plainText makes each move a space: any
 // letter of a reply can read as a space ("DE-1 crea ed in Todo", HI-2210).
 const gappy = (text) => [...text].map((c) => (c === ' ' ? ' ' : `[${c.replace(/[\\\]^-]/g, '\\$&')} ]`)).join('')
-const LISTED = new RegExp(`ed hive\\.cw_list_projects\\s*└\\s*${gappy('demo')} \\(on`)
+const LISTED = new RegExp(`ed combwork\\.cw_list_projects\\s*└\\s*${gappy('demo')} \\(on`)
 // Its reply names the card by its key alone (#1219, HI-1661): "DE-1 created in Todo".
-const CREATED = new RegExp(`ed hive\\.cw_create_task\\s*└\\s*([A-Z]{2,4}-\\d+) ${gappy('created in Todo')}`)
+const CREATED = new RegExp(`ed combwork\\.cw_create_task\\s*└\\s*([A-Z]{2,4}-\\d+) ${gappy('created in Todo')}`)
 const record = {}
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -118,10 +118,10 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
           if (end === 'turn ended') console.log(`INFO ${mode}: attempt ${attempt} ended without stamp's call: ${JSON.stringify((await screen(key)).slice(-300))}`)
         }
         // Hive's reply on screen, which can come after the hook or the log write that ended the wait above; Codex asking
-        // about a Hive tool instead ends it too, and fails below.
+        // about a Combwork tool instead ends it too, and fails below.
         const hive = await lib.until(async () => {
           const w = await live(proj, def.id)
-          if (w?.status === 'waiting' && /hive/.test(w.statusMessage ?? '')) return 'asked'
+          if (w?.status === 'waiting' && /combwork/.test(w.statusMessage ?? '')) return 'asked'
           return LISTED.test(await screen(key)) ? 'shown' : null
         }, SHOWN_MS, 500)
         const l = await live(proj, def.id)
@@ -134,10 +134,10 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
         out.screenEnd = (await screen(key)).slice(-1500)
         fs.writeFileSync(path.join(scratch, `mcpapproval-${mode}.txt`), (await screen(key)).slice(-6000))
         await page.screenshot({ path: path.join(scratch, `mcpapproval-${mode}.png`) })
-        check(`${mode}: Hive's tool ran without Codex asking`, hive === 'shown', out.hiveCall ?? out.screenEnd.slice(-400))
+        check(`${mode}: Combwork's tool ran without Codex asking`, hive === 'shown', out.hiveCall ?? out.screenEnd.slice(-400))
         check(`${mode}: stamp's call came to an outcome`, !!end, out.screenEnd.slice(-400))
         if (end === 'asked') {
-          check(`${mode}: Codex asks about stamp's tool, not Hive's`, /mcp__stamp__stamp/.test(out.waitingMessage) && !/hive/.test(out.waitingMessage), out.waitingMessage)
+          check(`${mode}: Codex asks about stamp's tool, not Combwork's`, /mcp__stamp__stamp/.test(out.waitingMessage) && !/combwork/.test(out.waitingMessage), out.waitingMessage)
           check(`${mode}: stamp didn't run while Codex asked`, !out.stampRan)
         }
       })
@@ -189,7 +189,7 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
       fs.writeFileSync(path.join(scratch, 'mcpapproval-assistant.txt'), (await screen(akey)).slice(-6000))
       await page.screenshot({ path: path.join(scratch, 'mcpapproval-assistant.png') })
       check('Assistant: its turn ended', !!done, record.assistant.screenEnd.slice(-400))
-      check('Assistant: never asked about a Hive tool', !asked, l?.statusMessage ?? '')
+      check('Assistant: never asked about a Combwork tool', !asked, l?.statusMessage ?? '')
       check('Assistant: cw_list_projects ran', LISTED.test(shown), record.assistant.screenEnd.slice(-400))
       check('Assistant: cw_create_task ran', CREATED.test(shown), record.assistant.screenEnd.slice(-400))
       const card = (await inv('tasks:list')).find((t) => t.title === 'MCP approval check')
