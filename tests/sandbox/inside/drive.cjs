@@ -30,6 +30,9 @@ const PROFILE = [path.join(process.env.APPDATA, 'Combwork'), path.join(process.e
 // A file the upgrade must carry across in the local profile folder (accounts live there), written before it.
 const LOCAL_MARK = 'sandbox-mark.txt'
 const MARK = { userName: 'Sandbox Check', theme: 'light' }
+// Scenario 4's workspace, made before the upgrade and opened after it (HI-2506), and its card.
+const KEPT_WS = path.join(process.env.USERPROFILE, 'Workspaces', 'Kept')
+const KEPT_CARD = 'Made before the upgrade'
 const res = { step, prefix, at: new Date().toISOString(), checks: [], facts: {}, shots: [] }
 const save = () => fs.writeFileSync(path.join(OUT, `${prefix}.json`), JSON.stringify(res, null, 2))
 // Each check has a stable id ("<scenario>.<what>"): the host's report requires the ids each step must produce.
@@ -253,6 +256,16 @@ const steps = {
     fs.writeFileSync(path.join(local, LOCAL_MARK), 'kept across the upgrade')
     res.facts.runBefore = runValues()
     check('4.login-registered', 'Before the upgrade: Launch at login starts Hive.exe', res.facts.runBefore.some((v) => /\\Hive\.exe/i.test(v.command)), JSON.stringify(res.facts.runBefore))
+    // A workspace the release before makes in .hive (HI-2462, HI-2506): a project and a card naming a note by its path,
+    // for the upgrade's first open to move to .combwork.
+    fs.mkdirSync(path.join(KEPT_WS, 'demo'), { recursive: true })
+    fs.writeFileSync(path.join(KEPT_WS, 'demo', 'README.md'), '# demo\n')
+    await inv('workspace:open', KEPT_WS)
+    const made = await until(async () => fs.existsSync(path.join(KEPT_WS, '.hive', 'hive.db')) && fs.existsSync(path.join(KEPT_WS, 'demo', '.hive', 'project.json')), 30_000)
+    let card = null
+    if (made) card = await inv('tasks:create', { title: KEPT_CARD, project: 'demo', description: `The plan: ${path.join(KEPT_WS, '.hive', 'shared', 'plan.md')}` }).catch((e) => ({ error: String(e) }))
+    res.facts.keptWorkspace = { made: !!made, card }
+    check('4.workspace-made', 'Before the upgrade: a workspace with a project and a card, in .hive', !!made && typeof card?.number === 'number', JSON.stringify(res.facts.keptWorkspace))
     await shot('before-upgrade')
   },
 
@@ -301,6 +314,17 @@ const steps = {
     check('4.login-moved', 'Launch at login starts Combwork.exe, and nothing starts Hive.exe', !!runs && !runs.some((x) => /\\Hive\.exe/i.test(x.command)), JSON.stringify(res.facts.runAfter))
     const fallback = await page.locator('.toast', { hasText: "Hive Desktop's data folders" }).count()
     check('4.no-fallback', 'No notice that Hive runs from its old folders', fallback === 0, `${fallback} such notice(s)`)
+    // The workspace made before the upgrade, opened (again, or restored at start): its .hive folders moved to .combwork,
+    // its board and the card's path with them (HI-2462, HI-2506).
+    await inv('workspace:open', KEPT_WS).catch(() => undefined)
+    const movedNow = () => fs.existsSync(path.join(KEPT_WS, '.combwork', 'hive.db')) && !fs.existsSync(path.join(KEPT_WS, '.hive')) && fs.existsSync(path.join(KEPT_WS, 'demo', '.combwork', 'project.json')) && !fs.existsSync(path.join(KEPT_WS, 'demo', '.hive'))
+    const moved = await until(async () => movedNow(), 30_000)
+    res.facts.keptWorkspaceAfter = fs.existsSync(KEPT_WS) ? fs.readdirSync(KEPT_WS) : null
+    check('4.workspace-moved', "The workspace from before opens with its .hive folders moved to .combwork (the workspace's and the project's)", !!moved, JSON.stringify(res.facts.keptWorkspaceAfter))
+    const cards = await inv('tasks:list').catch((e) => ({ error: String(e) }))
+    const card = Array.isArray(cards) ? cards.find((c) => c.title === KEPT_CARD) : null
+    res.facts.keptCard = card ? { number: card.number, description: card.description } : cards
+    check('4.workspace-card', 'Its card is on the board, its path now into .combwork', !!card && card.description === `The plan: ${path.join(KEPT_WS, '.combwork', 'shared', 'plan.md')}`, JSON.stringify(res.facts.keptCard))
     await shot('after-upgrade-light')
     await theme('dark')
     await shot('after-upgrade-dark')

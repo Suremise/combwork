@@ -1,10 +1,12 @@
 // S60, the 1.0 upgrade's two-process test (#1207, SPEC §16.17, OP-41): a released 0.9 Hive (another profile) holds a
-// workspace whose board it made while the dev build opens it. The dev build asks first; Upgrade is refused with "close
-// it first" and nothing changes; Not Now leaves the board read-only with a banner. With the 0.9 Hive closed the upgrade
-// runs, keeping the 0.9 copy; the 0.9 Hive opened afterwards can't open the board (its cards are in 1.0's tables, #1209),
-// and says so. Help → Restore the 0.9 Board
-// Backup… puts the copy back, after which 0.9 writes again. Last, a 0.9 Hive started *during* the upgrade (the dev build
-// holding its lock, HIVE_TEST_UPGRADE_HOLD): what it shows is recorded for the RC notes. Banner and dialog in both themes.
+// workspace whose board it made while the dev build opens it. Since 1.1 the dev build first moves the workspace's .hive
+// folders to .combwork (HI-2462, SPEC §4.1.1): while the 0.9 Hive has the board open, that is refused, saying so, and
+// nothing changes (HI-2506: the upgrade's own "close it first" can't be reached from 0.9 any more). With the 0.9 Hive
+// closed the folders move and the dev build asks first; Not Now leaves the board read-only with a banner; Upgrade runs,
+// keeping the 0.9 copy. A 0.9 Hive opened afterwards finds no .hive and starts a fresh one beside .combwork, never
+// reaching the moved board (Darren on HI-2506, 4 Nov: "no going back"). Help → Restore the 0.9 Board Backup… puts the
+// copy back in .combwork. Last, a 0.9 Hive started *during* the upgrade (the dev build holding its lock,
+// HIVE_TEST_UPGRADE_HOLD): what it shows is recorded for the RC notes. Banner and dialog in both themes.
 //
 // The 0.9 Hive is a packaged 0.9.x build: HIVE_E2E_HIVE09 (its win-unpacked folder), else the main checkout's
 // dist/win-unpacked when that is 0.9.x; with neither, the suite is skipped. No agents. Throwaway profiles and workspace.
@@ -27,8 +29,11 @@ const shots = path.join(lib.WORK, 'boardupgrade-shots')
 const held = path.join(lib.WORK, 'boardupgrade-held.txt')
 const claudeHome = path.join(lib.WORK, 'boardupgrade-claude')
 const alpha = path.join(ws, 'alpha')
-const dbFile = path.join(ws, '.hive', 'hive.db')
-const backups = path.join(ws, '.hive', 'backups')
+// The board's folder: the 0.9 Hive's .hive until the dev build moves it to .combwork (HI-2462), the dev build's after
+// (a .hive a 0.9 Hive makes again beside it is that Hive's own, HI-2506).
+const tree = () => path.join(ws, fs.existsSync(path.join(ws, '.combwork', 'hive.db')) ? '.combwork' : '.hive')
+const dbFileNow = () => path.join(tree(), 'hive.db')
+const backupsNow = () => path.join(tree(), 'backups')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -110,14 +115,14 @@ function hive09() {
 
 /** The board file's schema version, read on a connection of its own. */
 function fileVersion() {
-  const db = new DatabaseSync(dbFile, { readOnly: true, timeout: 5000 })
+  const db = new DatabaseSync(dbFileNow(), { readOnly: true, timeout: 5000 })
   try {
     return db.prepare('SELECT max(version) AS v FROM schema_version').get().v
   } finally {
     db.close()
   }
 }
-const copiesOf = (prefix) => (fs.existsSync(backups) ? fs.readdirSync(backups).filter((f) => f.startsWith(prefix)) : [])
+const copiesOf = (prefix) => (fs.existsSync(backupsNow()) ? fs.readdirSync(backupsNow()).filter((f) => f.startsWith(prefix)) : [])
 
 /**
  * Starts the 0.9 Hive in its own profile on the workspace. Its Agent API finds the suite's port taken by the dev build at
@@ -207,19 +212,22 @@ async function themes(dev, name) {
     running.push({ name: 'dev', app: dev.app, page: dev.page })
     open.add(dev)
     dev.page.on('pageerror', (e) => check('no page errors', false, e.message))
+    // While the 0.9 Hive has its board open, the move to .combwork (HI-2462) is refused, saying so: nothing changes.
+    const refusedOpen = await failure(dev.inv('workspace:open', ws))
+    check("while 0.9 holds it, the dev build's open is refused: its .hive can't be moved", /couldn't move .*\.hive to \.combwork: a program has a file in it open/.test(refusedOpen ?? ''), refusedOpen ?? 'opened')
+    check('…nothing moved: no .combwork, the file still at v2, no 0.9 copy made', !fs.existsSync(path.join(ws, '.combwork')) && fs.existsSync(path.join(ws, '.hive', 'hive.db')) && fs.existsSync(path.join(alpha, '.hive', 'project.json')) && fileVersion() === 2 && copiesOf('hive-before-1.0-').length === 0)
+    check('…and the 0.9 Hive still writes', (await failure(old1.inv('tasks:create', { title: 'Still 0.9', project: 'alpha' }))) === null)
+    await screenshot(dev.page, '1-refused-move.png')
+
+    // 3. The 0.9 Hive closed: the folders move, and the dev build asks before upgrading.
+    await close(old1)
     await lib.openWorkspace(dev.inv, dev.page, ws)
+    check('with 0.9 closed, the folders moved to .combwork', fs.existsSync(path.join(ws, '.combwork', 'hive.db')) && !fs.existsSync(path.join(ws, '.hive')) && fs.existsSync(path.join(alpha, '.combwork', 'project.json')) && !fs.existsSync(path.join(alpha, '.hive')))
     const ask = dialogWith(dev.page, ASK)
     check('the dev build asks before upgrading', !!(await lib.until(async () => (await ask.count()) === 1, HUNG_MS)))
-    check('…saying why, that a 0.9 Combwork can then no longer open it, and that a backup is kept', /Hive 1\.0 needs to upgrade this workspace's data\. A 0\.9 Combwork can then no longer open it; a backup of the board is kept/.test(await ask.innerText().catch(() => '')), await ask.innerText().catch(() => ''))
+    check('…saying why, that a 0.9 Combwork can then no longer open it, and that a backup is kept', /Combwork 1\.0 needs to upgrade this workspace's data\. A 0\.9 Combwork can then no longer open it; a backup of the board is kept/.test(await ask.innerText().catch(() => '')), await ask.innerText().catch(() => ''))
     check("…and to back up first: no going back to 0.9.3 once agents' worktrees become slots (#1441)", /Back up first: there's no going back to 0\.9\.3 once your agents' worktrees become slots\./.test(await ask.innerText().catch(() => '')), await ask.innerText().catch(() => ''))
     await themes(dev, '1-ask')
-
-    // 3. Upgrade while the 0.9 Hive has it open: refused, nothing changed.
-    await click(ask.getByRole('button', { name: 'Upgrade', exact: true }), "the ask's Upgrade (0.9 open)")
-    check('Upgrade is refused: "close it first"', !!(await lib.until(async () => /Another Combwork has this workspace open: close it first\./.test(await ask.innerText().catch(() => '')), HUNG_MS)), await ask.innerText().catch(() => ''))
-    await themes(dev, '2-refused')
-    check('…the file still at v2, no 0.9 copy made', fileVersion() === 2 && copiesOf('hive-before-1.0-').length === 0)
-    check('…and the 0.9 Hive still writes', (await failure(old1.inv('tasks:create', { title: 'Still 0.9', project: 'alpha' }))) === null)
 
     // 4. Not Now: read-only, with the banner.
     await click(ask.getByRole('button', { name: 'Not Now', exact: true }), "the ask's Not Now")
@@ -263,8 +271,7 @@ async function themes(dev, name) {
     await dev.page.keyboard.press('Escape')
     check('…and it closes with nothing to discard', !!(await lib.until(async () => (await dialog.count()) === 0, HUNG_MS)))
 
-    // 5. The 0.9 Hive closed: the banner's Upgrade… runs it.
-    await close(old1)
+    // 5. The banner's Upgrade… runs it.
     await click(banner.getByRole('button', { name: 'Upgrade…' }), "the banner's Upgrade…")
     await click(ask.getByRole('button', { name: 'Upgrade', exact: true }), "the ask's Upgrade (0.9 closed)")
     check('with the 0.9 Combwork closed, the upgrade runs', !!(await lib.until(async () => (await ask.count()) === 0 && (await dev.page.locator('.toast', { hasText: 'Board upgraded to 1.0' }).count()) === 1, HUNG_MS)))
@@ -274,18 +281,19 @@ async function themes(dev, name) {
     check('…and the board takes changes', (await failure(dev.inv('tasks:create', { title: 'Made in 1.0', project: 'alpha' }))) === null)
     const startFailed = await failure(dev.inv('session:start', alpha, { agentId: 'a-coder' }))
     check('…and its agent starts', startFailed === null && !!(await lib.until(async () => (await live(dev)).length === 1, HUNG_MS)), startFailed ?? 'not live')
-    const markers = fs.readdirSync(path.join(ws, '.hive', 'open'))
-    check('the dev build marks the workspace open (.hive/open)', markers.length === 1 && /^boardupgrade-dev-[0-9a-f]{8}\.json$/.test(markers[0]), String(markers))
+    const markers = fs.readdirSync(path.join(ws, '.combwork', 'open'))
+    check('the dev build marks the workspace open (.combwork/open)', markers.length === 1 && /^boardupgrade-dev-[0-9a-f]{8}\.json$/.test(markers[0]), String(markers))
 
-    // 6. The 0.9 Hive opened afterwards: it can no longer open the board, its cards being in 1.0's tables (#1209; Darren,
-    // 20 Oct), and says so: the workspace not opened, or opened with its board unreadable. Nothing it tries reaches the board.
+    // 6. The 0.9 Hive opened afterwards: it finds no .hive, and starts a fresh one beside .combwork (Darren on HI-2506,
+    // 4 Nov: "no going back"; as the 1.0 upgrade, downgrades aren't supported). Nothing it does reaches the moved board.
     const old2 = await startOld(old, true)
     open.add(old2)
     const read09 = old2.openError ?? (await failure(old2.inv('tasks:list')))
-    check("0.9 opened afterwards can't open the board, saying so", read09 !== null && /couldn't be opened|newer version of Hive/.test(read09), read09 ?? 'read it')
-    const refused09 = old2.openError ?? (await failure(old2.inv('tasks:create', { title: 'From 0.9 after', project: 'alpha' })))
-    check('…nor change it', refused09 !== null, 'accepted')
-    record('0.9 after the upgrade', old2.openError ? `opening the workspace failed: ${old2.openError}` : `the workspace opened; its board: ${read09}; a change: ${refused09}`)
+    const made09 = old2.openError ?? (await failure(old2.inv('tasks:create', { title: 'From 0.9 after', project: 'alpha' })))
+    record('0.9 after the upgrade', old2.openError ? `opening the workspace failed: ${old2.openError}` : `the workspace opened on a fresh .hive; its board: ${read09 ?? 'read'}; a change: ${made09 ?? 'accepted'}`)
+    check('0.9 opened afterwards starts a .hive of its own beside .combwork', fs.existsSync(path.join(ws, '.hive')) && fs.existsSync(path.join(ws, '.combwork', 'hive.db')))
+    check("…which hasn't the moved board's cards", old2.openError !== null || !(await old2.inv('tasks:list')).some((c) => c.title === 'Made in 1.0'))
+    check('…and nothing it does reaches the moved board', fileVersion() > 2 && !(await dev.inv('tasks:list')).some((c) => c.title === 'From 0.9 after') && (await dev.inv('tasks:list')).some((c) => c.title === 'Made in 1.0'))
     await screenshot(old2.page, '4-old-after.png')
     await close(old2)
 
@@ -306,13 +314,10 @@ async function themes(dev, name) {
     check('…the 1.0 board kept, and the 0.9 copy still there', copiesOf('hive-before-restore-').length === 1 && copiesOf('hive-before-1.0-').length === 1)
     check('…and the dev build is read-only again, with its banner', !!(await lib.until(async () => (await banner.count()) === 1, HUNG_MS)))
     await refusesStart(dev, 'after the restore')
+    check("…the restored board has 0.9's cards, not the one made in 1.0", (await dev.inv('tasks:list')).some((c) => c.title === 'Still 0.9') && !(await dev.inv('tasks:list')).some((c) => c.title === 'Made in 1.0'))
     await close(dev)
-    check('the dev build removed its marker as it closed', fs.readdirSync(path.join(ws, '.hive', 'open')).length === 0)
-    const old3 = await startOld(old)
-    open.add(old3)
-    check('0.9 writes the restored board again', (await failure(old3.inv('tasks:create', { title: 'After the restore', project: 'alpha' }))) === null)
-    check("…which hasn't the card made in 1.0", !(await old3.inv('tasks:list')).some((c) => c.title === 'Made in 1.0'))
-    await close(old3)
+    check('the dev build removed its marker as it closed', fs.readdirSync(path.join(ws, '.combwork', 'open')).length === 0)
+    // The restored board stays in .combwork: a 0.9 Hive reads its own .hive (HI-2506, "no going back").
 
     // 8. A 0.9 Hive started during the upgrade: the dev build holds the lock (its main thread waits) while it starts.
     // The hold is for unpackaged builds only: a packaged one (HIVE_EXE, the Sandbox checks) ends here.
@@ -330,11 +335,11 @@ async function themes(dev, name) {
     check('…and holds the lock once its steps are in', !!(await lib.until(() => fs.existsSync(held), HUNG_MS)))
     const old4 = await startOld(old, true, HOLD_MS + HUNG_MS)
     open.add(old4)
-    // What it shows: the workspace not opened, or opened with its board unreadable.
+    // What it shows: its own .hive (made in step 6), never the board being upgraded in .combwork (HI-2506).
     const during = old4.openError ?? (await failure(old4.inv('tasks:list')))
     const duringAt = Date.now() - started
-    check('a 0.9 Hive started meanwhile is kept off the board', during !== null && duringAt < HOLD_MS, `${during ?? 'read it'} after ${duringAt} ms`)
-    record(`0.9 started during the upgrade (after ${duringAt} ms)`, old4.openError ? `opening the workspace failed: ${old4.openError}` : `the workspace opened; its board: ${during}`)
+    check('a 0.9 Hive started meanwhile opens its own .hive, within the hold', duringAt < HOLD_MS && fs.existsSync(path.join(ws, '.hive')), `${old4.openError ?? during ?? 'its own board read'} after ${duringAt} ms`)
+    record(`0.9 started during the upgrade (after ${duringAt} ms)`, old4.openError ? `opening the workspace failed: ${old4.openError}` : `the workspace opened on its own .hive; its board: ${during ?? 'read'}`)
     if (!old4.openError) record('0.9 started during the upgrade, a change', (await failure(old4.inv('tasks:create', { title: 'During', project: 'alpha' }))) ?? 'accepted')
     await screenshot(old4.page, '6-old-during.png')
     await clicked

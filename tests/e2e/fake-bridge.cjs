@@ -107,10 +107,10 @@ function fromCodexTable(text) {
 
 /**
  * Parses a scripted "hive TOOL {json}" step's arguments: the JSON object after the tool's name (no " then " in it), or
- * none.
+ * none. A tool by its 1.1 name (cw_*, HI-2463), or by an older Hive's (hive_*: upgradelane's 0.9 Hive, HI-2506).
  */
 function parseHiveStep(step) {
-  const m = /\bhive\s+(cw_[a-z_]+)(?:\s+(\{.*\}))?/i.exec(step)
+  const m = /\bhive\s+((?:cw|hive)_[a-z_]+)(?:\s+(\{.*\}))?/i.exec(step)
   if (!m) return null
   let args = {}
   try {

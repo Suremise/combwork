@@ -265,6 +265,17 @@ if (!home) {
   process.exit(2)
 }
 
+/**
+ * A variable's 1.1 name (`CW_*`, HI-2463) given what an older Hive sets (`HIVE_*`): a 0.9 or 1.0 Hive launches this fake
+ * in upgradelane (HI-2506). The launch's own environment, and its MCP server's, read either way.
+ */
+const cwEnv = (env) => {
+  const out = { ...env }
+  for (const [k, v] of Object.entries(env ?? {})) if (k.startsWith('HIVE_') && out[`CW_${k.slice(5)}`] === undefined) out[`CW_${k.slice(5)}`] = v
+  return out
+}
+for (const [k, v] of Object.entries(cwEnv(process.env))) if (process.env[k] === undefined) process.env[k] = v
+
 // Options that take a value, so the first task (the last plain argument) can be told apart.
 const WITH_VALUE = new Set(['--session-id', '--resume', '--name', '--plugin-dir', '--mcp-config', '--settings', '--append-system-prompt-file', '--allowedTools', '--model', '--effort', '--permission-mode', '--system-prompt-snapshot', '--add-dir'])
 const opts = {}
@@ -857,13 +868,22 @@ function readSkillRef(name, file) {
   write({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: numbered, is_error: text === null }] } })
 }
 
+/**
+ * The launch's own MCP server: `combwork` (HI-2463), or `hive` as a 0.9 or 1.0 Hive names it (upgradelane runs a released
+ * 0.9 Hive with this fake, HI-2506). Null with neither.
+ */
+function ownServer() {
+  const servers = JSON.parse(fs.readFileSync(opts['--mcp-config'], 'utf8')).mcpServers ?? {}
+  return servers.combwork ?? servers.hive ?? null
+}
+
 /** Calls a hive tool through the launch's own hive MCP server; the call and its reply go in the transcript. */
 async function hiveCall(tool, input) {
   const id = `toolu_hive_${randomUUID().slice(0, 8)}`
   write({ type: 'assistant', requestId: `req_${id}`, message: { model, content: [{ type: 'tool_use', id, name: `mcp__combwork__${tool}`, input }], usage: { input_tokens: 10, output_tokens: 5 } } })
   let r
   try {
-    r = await callHiveTool(JSON.parse(fs.readFileSync(opts['--mcp-config'], 'utf8')).mcpServers.combwork, tool, input)
+    r = await callHiveTool(ownServer(), tool, input)
   } catch (e) {
     r = { text: String(e), isError: true }
   }
@@ -877,7 +897,7 @@ async function boardPatch(n, change) {
   write({ type: 'assistant', requestId: `req_${id}`, message: { model, content: [{ type: 'tool_use', id, name: 'mcp__combwork__cw_update_task', input: { number: n, ...change } }], usage: { input_tokens: 10, output_tokens: 5 } } })
   let record
   try {
-    const env = JSON.parse(fs.readFileSync(opts['--mcp-config'], 'utf8')).mcpServers.combwork.env
+    const env = cwEnv(ownServer().env)
     const apiToken = JSON.parse(fs.readFileSync(env.CW_API_TOKEN_FILE, 'utf8')).token
     const res = await fetch(`${env.CW_API_URL}/v1/tasks/${n}`, {
       method: 'PATCH',
@@ -893,7 +913,7 @@ async function boardPatch(n, change) {
   // Where Hive's hive server logs the calls it runs (tests only), this call is logged too, as the server would; `direct`:
   // no hive server ran it, so none reports it to Hive's metrics.
   try {
-    const env = JSON.parse(fs.readFileSync(opts['--mcp-config'], 'utf8')).mcpServers.combwork.env
+    const env = cwEnv(ownServer().env)
     if (env.HIVE_TEST_MCP_LOG) fs.appendFileSync(env.HIVE_TEST_MCP_LOG, JSON.stringify({ at: new Date().toISOString(), tool: 'cw_update_task', role: env.HIVE_ROLE === 'assistant' ? 'assistant' : 'agent', project: env.CW_PROJECT, agent: env.HIVE_AGENT_ID ?? null, ok: record.status === 200, args: JSON.stringify({ number: n, ...change }), direct: true }) + '\n')
   } catch {
     // No log.
@@ -1442,7 +1462,7 @@ async function main() {
   // Its MCP servers connect as it starts, beside its session (#865): the launch's hive server, through the real server,
   // which tells Hive. With fake-mcp-hold-<agent> in its home, not until the test makes fake-mcp-go-<agent>, as a
   // resumed Claude Code connects them after its SessionStart.
-  const hive = opts['--mcp-config'] ? JSON.parse(fs.readFileSync(opts['--mcp-config'], 'utf8')).mcpServers?.combwork : null
+  const hive = opts['--mcp-config'] ? ownServer() : null
   const held = take('fake-mcp-hold')
     ? (async () => {
         while (!take('fake-mcp-go')) await sleep(100)
