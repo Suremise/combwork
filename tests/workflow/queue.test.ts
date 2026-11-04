@@ -117,7 +117,9 @@ describe('the merge queue', () => {
     expect(e.store.deliveries().some((d) => d.kind === 'laneEnded' && d.target === 'L')).toBe(true)
   })
 
-  it('S13: a package missing from package.json while the warm worktree still has it → the queue installs clean and the checks fail', async () => {
+  // GIT_HEAVY_MS (HI-2539): two cards built, approved and drained through the queue, 93 git processes; 7.1 s alone, and
+  // past 20 s in a changed-import run of 496 files (HI-2523). Its install and check are fakes that never wait.
+  it('S13: a package missing from package.json while the warm worktree still has it → the queue installs clean and the checks fail', { timeout: GIT_HEAVY_MS }, async () => {
     const e = team({}, { files: {} })
     commit(e.project, { 'package.json': '{"dependencies":{"left-pad":"1"}}\n', 'index.js': "require('left-pad')\n", '.gitignore': 'node_modules/\n' }, 'deps')
     // A fake install: node_modules from package.json's dependencies (clean: from scratch).
@@ -254,7 +256,9 @@ describe('the merge queue', () => {
     expect(limit.message).toContain('sent back unchanged 2 times already')
   })
 
-  it('HI-2504: after a queue conflict, its merge commit failed for proof only is resubmitted unchanged; the unmerged revision stays refused', async () => {
+  // GIT_HEAVY_MS (HI-2539): a card through the queue twice (a conflict, then merged) with three submissions and two
+  // reviews between, 119 git processes; 10.1 s alone, the file's longest, so the same load can take it past 20 s.
+  it('HI-2504: after a queue conflict, its merge commit failed for proof only is resubmitted unchanged; the unmerged revision stays refused', { timeout: GIT_HEAVY_MS }, async () => {
     const e = team()
     const { card, folder } = await queued(e, 'Clash', { 'src/x.txt': 'card\n' })
     const approved = e.wf.state(card).latest!.revision
