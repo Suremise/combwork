@@ -2677,7 +2677,7 @@ folder (the folder's line is the target); G10 is hidden when R includes you; Q =
 | Approved | **retry merge** (the user's, or the Assistant's with a reason; Hive merges, no queue entry, no follow-up waiting) | `integrate.approved` (a stale pass refuses it, naming **submit** as the way on) | Merging · `enqueue` [#1623] |
 | Merging | queue: merged | `integrate.*`, `done.contained` | Done · `recordIntegrated`, `releaseSlot`, `endLaneIfDone` |
 | Merging | queue: returned | — | Active · `returnToBuilder` (§16.9) |
-| Active | **submit** after a queue failure, same approved unstale revision | `submit.notDuplicate`, `requeue.allowed`, `integrate.approved`, `submit.decisionsReceived` (HI-2275) | Merging · `enqueue` (no review, no round) |
+| Active | **submit** after a queue failure, same approved unstale revision, no submission since the failure (HI-2504: one since, such as a conflict's merge commit reviewed and failed, is resubmitted as after any fail) | `submit.notDuplicate`, `requeue.allowed`, `integrate.approved`, `submit.decisionsReceived` (HI-2275) | Merging · `enqueue` (no review, no round) |
 | any | a decision recorded | — | `wakeOnDecision`; an Approved or Merging card: Review if the ruleset has review, else Active (stale, why: decision since), and `cancelEntry` (§16.4.6) |
 
 **Finish** (after review, or straight after submit with R = none):

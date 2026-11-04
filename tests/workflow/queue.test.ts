@@ -254,6 +254,39 @@ describe('the merge queue', () => {
     expect(limit.message).toContain('sent back unchanged 2 times already')
   })
 
+  it('HI-2504: after a queue conflict, its merge commit failed for proof only is resubmitted unchanged; the unmerged revision stays refused', async () => {
+    const e = team()
+    const { card, folder } = await queued(e, 'Clash', { 'src/x.txt': 'card\n' })
+    const approved = e.wf.state(card).latest!.revision
+    commit(e.project, { 'src/x.txt': 'target\n' }, 'the target adds the same file')
+    expect((await e.queue().drain('main'))[0]).toMatchObject({ outcome: 'returned', reason: 'conflict' })
+    // The revision that conflicted, unchanged: still refused (it lacks the target's head).
+    const lacks = refusedBy(await e.wf.submit(card.key, B1, { summary: 'again' }), 'requeue.allowed')
+    expect(lacks.message).toContain('needs a new revision')
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'again', note: 'still the same' }), 'requeue.allowed')
+    // The builder merges the target in and resolves the conflict: a new revision, reviewed as usual.
+    expect(() => sh(folder, 'merge', 'main', '--no-edit')).toThrow()
+    const merged = commit(folder, { 'src/x.txt': 'target\ncard\n' }, `${card.key}: merge main`)
+    expect(merged).not.toBe(approved)
+    expect(sh(folder, 'merge-base', '--is-ancestor', mainHead(e), merged)).toBe('')
+    const sub = await e.wf.submit(card.key, B1, { summary: 'merged main in' })
+    moved(sub)
+    expect(e.wf.state(card).stage).toBe('review')
+    // The reviewer fails it for proof only: no code change asked.
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: false, comment: 'run the packaged suites at this revision' }))
+    expect(e.wf.state(card).stage).toBe('active')
+    // The same revision with the proof: an ordinary resubmission (a note, as after any fail), never the requeue rule.
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'proof' }), 'submit.sameRevisionNote')
+    const again = await e.wf.submit(card.key, B1, { summary: 'proof', note: 'the packaged suites pass at this revision' })
+    moved(again)
+    expect(e.wf.state(card).stage).toBe('review')
+    expect(e.wf.state(card).latest!.revision).toBe(merged)
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
+    expect((await e.queue().drain('main'))[0]).toMatchObject({ outcome: 'integrated' })
+  })
+
   it("S32: a red check needs a new revision or the user's Retry merge", async () => {
     // A red check is a result: refused; the user's Retry merge (an override) requeues it once.
     const r2 = team()
