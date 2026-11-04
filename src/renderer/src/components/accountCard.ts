@@ -1,9 +1,9 @@
-import type { Account, AppSettings, Connection, PlanLimit } from '@shared/types'
-import { permissionLabel, providerDescriptor } from '@shared/providers'
-import { effortName } from '@shared/models'
-import { modelLabel } from '@shared/defaults'
-import { formatDateTime, formatTime, formatWeekdayTime } from '@shared/dates'
-import { msg, tr } from '@shared/i18n'
+import type { Account, AppSettings, Connection, PlanLimit } from '../../../shared/types'
+import { permissionLabel, providerDescriptor } from '../../../shared/providers'
+import { effortName } from '../../../shared/models'
+import { modelLabel } from '../../../shared/defaults'
+import { formatDateTime, formatTime, formatWeekdayTime } from '../../../shared/dates'
+import { msg, tr } from '../../../shared/i18n'
 
 /**
  * What Settings → Accounts & Connections' tidied cards show (HI-2528, Darren's approved mockup v2), worked out apart from

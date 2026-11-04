@@ -58,6 +58,7 @@ describe("a connection's row (HI-2528)", () => {
     expect(server.model).toEqual({ text: 'lab-large' })
     expect(server.effort).toEqual({ text: '—', none: true })
     expect(server.context).toEqual({ text: '—', none: true })
-    expect(connectionCells({}, { provider: 'codex', kind: undefined }, null).context).toEqual({ text: '—', none: true })
+    const codex = { provider: 'codex' as const, kind: undefined }
+    expect(connectionCells({}, codex, null).context).toEqual({ text: '—', none: true })
   })
 })
