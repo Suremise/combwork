@@ -1262,6 +1262,7 @@
   "settings.section.workflow.label": "バージョン管理",
   "settings.section.workspace.desc": "開いているワークスペース自身の設定です。Combworkが対象外にしているプロジェクト（非表示のもの、または引き継ぎとカードをフォルダーにまとめてCombworkから削除したもの）、プロジェクトごとにCombworkが保持する量、ウイルス対策のスキャンです。ワークフローの既定値は「バージョン管理」にあります。",
   "settings.section.workspace.label": "ワークスペース",
+  "settings.sections": "設定のセクション",
   "settings.sessions.backupRetention.desc": "CLIにまだ残っているセッションについて、Combworkがバックアップを保持する期間です。この日数のあいだ操作がないと、ごみ箱に移動します。Combworkのバックアップが唯一のコピーであるセッションには手を付けません。",
   "settings.sessions.backupRetention.option.d180": "180日",
   "settings.sessions.backupRetention.option.d30": "30日",

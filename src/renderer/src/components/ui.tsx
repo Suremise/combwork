@@ -14,6 +14,7 @@ import { providerDescriptor, providerName } from '@shared/providers'
 import { safeguardText } from '@shared/safeguards'
 import { placeTip, type Box } from '@shared/tipPlacement'
 import { placeMenu } from '@shared/menuPlacement'
+import { tabAfterKey } from '@shared/tabs'
 import { msg, tr, tRich, type Msg } from '@shared/i18n'
 import { watchStatus } from './watchLine'
 import { dialogOpened } from '../windowHealth'
@@ -217,17 +218,58 @@ export function OneLineDesc({ text, className }: { text: string | null | undefin
 
 /**
  * A section of Settings' or Project Settings' list (HI-2531): its icon and name on one compact row, the name cut with
- * "…" where the list is narrow, and then given in full on hover, and on keyboard focus once the row takes it (the
- * tooltip wraps the whole row).
+ * "…" where the list is narrow, and then given in full on hover and on keyboard focus (the tooltip wraps the whole row).
+ * A tab of its SectionNav (HI-2532): in the Tab order only when `tabbable`.
  */
-export function SectionNavRow({ id, icon, label, sub, selected, onSelect }: { id: string; icon: ReactNode; label: string; sub?: boolean; selected: boolean; onSelect: () => void }) {
+function SectionNavRow({ id, icon, label, sub, selected, tabbable, onSelect }: { id: string; icon: ReactNode; label: string; sub?: boolean; selected: boolean; tabbable: boolean; onSelect: () => void }) {
   const [ref, clipped] = useClipped<HTMLSpanElement>()
   return (
     <Tooltip content={clipped ? label : null} block focus>
-      <div className={cx('row', selected && 'selected')} data-section={id} onClick={onSelect}>
+      <div className={cx('row', selected && 'selected')} data-section={id} role="tab" aria-selected={selected} tabIndex={tabbable ? 0 : -1} onClick={onSelect}>
         {icon} <span ref={ref} className={cx('label', sub && 'settings-sub')}>{label}</span>
       </div>
     </Tooltip>
+  )
+}
+
+export interface SectionNavItem {
+  id: string
+  icon: ReactNode
+  label: string
+  /** A provider's page under Providers: indented. */
+  sub?: boolean
+}
+
+/**
+ * Settings' and Project Settings' list of sections (HI-2532): a vertical tab list the keyboard reaches and chooses in, as
+ * Tabs does a row (roving focus: one row in the Tab order, the selected one, or the first while a search shows every
+ * section). Up and Down (Left and Right too: a narrow pane lays it out as a row) choose the next section and take the
+ * focus with it, Home and End the ends, Enter and Space the focused one.
+ */
+export function SectionNav({ items, selected, onSelect }: { items: SectionNavItem[]; selected: string | null; onSelect: (id: string) => void }) {
+  const listRef = useRef<HTMLDivElement>(null)
+  const ids = items.map((s) => s.id)
+  const inOrder = selected !== null && ids.includes(selected) ? selected : ids[0]
+  const onKeyDown = (e: React.KeyboardEvent): void => {
+    const at = (e.target as HTMLElement).closest<HTMLElement>('[data-section]')?.dataset.section
+    if (!at) return
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onSelect(at)
+      return
+    }
+    const next = tabAfterKey(ids, at, e.key === 'ArrowDown' ? 'ArrowRight' : e.key === 'ArrowUp' ? 'ArrowLeft' : e.key)
+    if (next === null) return
+    e.preventDefault()
+    onSelect(next)
+    listRef.current?.querySelector<HTMLElement>(`[data-section="${CSS.escape(next)}"]`)?.focus()
+  }
+  return (
+    <div ref={listRef} className="settings-nav" role="tablist" aria-orientation="vertical" aria-label={tr(msg({ id: 'settings.sections', defaultMessage: 'Settings sections', description: "The list of sections beside Settings and Project Settings (General, Providers, Agents…), for screen readers: its name as a list of tabs (HI-2532)." }))} onKeyDown={onKeyDown}>
+      {items.map((s) => (
+        <SectionNavRow key={s.id} id={s.id} icon={s.icon} label={s.label} sub={s.sub} selected={s.id === selected} tabbable={s.id === inOrder} onSelect={() => onSelect(s.id)} />
+      ))}
+    </div>
   )
 }
 

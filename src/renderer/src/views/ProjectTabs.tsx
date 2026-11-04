@@ -32,7 +32,7 @@ import { LEFTOVERS_ROOT, LeftoversOption, LeftoversPage, useLeftovers } from '..
 import { useGitRead } from './GitTab'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { DataTable, useDateColumns, type DataColumn } from '../components/DataTable'
-import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, SectionNavRow, sentences, StaleNote, statusText, StatusDot, Tooltip } from '../components/ui'
+import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, SectionNav, sentences, StaleNote, statusText, StatusDot, Tooltip } from '../components/ui'
 import { cliReadyOf, ConnectionMark, connectionCli, connectionLine, firstReadyConnection, useConnections } from '../components/ConnectionChoice'
 import { connectionOf } from '@shared/connectionLabel'
 import { useConnectionsInUse } from '../connectionUsage'
@@ -2057,22 +2057,14 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       </div>
       <HiveVcsNotice project={project} />
       <div className="settings-body">
-        <div className="settings-nav">
-          {sections.map((s) => (
-            <SectionNavRow
-              key={s.id}
-              id={s.id}
-              icon={s.provider ? <ProviderIcon provider={s.provider} /> : <Icon name={s.icon} />}
-              label={shownText(s.text.label)}
-              sub={!!s.provider}
-              selected={!q && section === s.id}
-              onSelect={() => {
-                setSection(s.id)
-                setQuery('')
-              }}
-            />
-          ))}
-        </div>
+        <SectionNav
+          items={sections.map((s) => ({ id: s.id, icon: s.provider ? <ProviderIcon provider={s.provider} /> : <Icon name={s.icon} />, label: shownText(s.text.label), sub: !!s.provider }))}
+          selected={!q ? section : null}
+          onSelect={(id) => {
+            setSection(id as typeof section)
+            setQuery('')
+          }}
+        />
         <div className="settings-content">
           {groups.length === 0 && <div className="empty-state">{tr(S.noMatch)}</div>}
           {groups.map((g) => (

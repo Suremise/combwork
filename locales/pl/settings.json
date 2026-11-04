@@ -1262,6 +1262,7 @@
   "settings.section.workflow.label": "Kontrola wersji",
   "settings.section.workspace.desc": "To, co należy do otwartego obszaru roboczego: jego projekty pomijane przez Combwork (ukryte lub usunięte z Combwork, a ich przekazania i karty spakowane do folderu), ile Combwork przechowuje dla każdego projektu i skanowanie antywirusowe. Jego ustawienia domyślne przepływu pracy są w Kontroli wersji.",
   "settings.section.workspace.label": "Obszar roboczy",
+  "settings.sections": "Sekcje ustawień",
   "settings.sessions.backupRetention.desc": "Jak długo Combwork przechowuje swoje kopie zapasowe sesji, które CLI wciąż ma. Po tylu dniach bez aktywności trafiają do Kosza. Sesja, której jedyną kopią jest kopia zapasowa Combwork, nigdy nie jest ruszana.",
   "settings.sessions.backupRetention.option.d180": "180 dni",
   "settings.sessions.backupRetention.option.d30": "30 dni",
