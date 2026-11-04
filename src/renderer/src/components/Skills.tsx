@@ -6,7 +6,7 @@ import { call } from '../api'
 import { clearEditorDraftsUnder } from '../editorDrafts'
 import { DocEditor } from './DocEditor'
 import { AssistantMark } from './AssistantMark'
-import { Icon, IconButton, Switch, Tooltip } from './ui'
+import { Icon, IconButton, OneLineDesc, Switch, Tooltip } from './ui'
 import { confirm, notify, prompt, set, showView, useStore } from '../store'
 import { cx } from '../util'
 import { msg, tr, tRich, type Msg } from '@shared/i18n'
@@ -281,9 +281,7 @@ export function SkillRow({ skill, selected, onSelect, actionsFor, delivered }: {
           {skill.level === 'hive' && !skill.problem && skill.audience && skill.audience !== 'agents' && <AudienceBadge audience={skill.audience} small />}
         </div>
         {skill.description && (
-          <div className="desc" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {skillDescription(skill)}
-          </div>
+          <OneLineDesc text={skillDescription(skill)} />
         )}
       </div>
       {actionsFor && (

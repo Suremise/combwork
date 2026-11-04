@@ -198,6 +198,23 @@ export function OneLineTitle({ text, className }: { text: string; className?: st
   )
 }
 
+/**
+ * A list row's description kept to one line (HI-2527, Darren: "They look good on one row"), cut with "…" and then given
+ * in full on hover. The same size and look as the `.desc` it replaces. While cut, its text is also a stop for Tab (list
+ * rows aren't), so the keyboard shows the same tooltip; one that fits is no stop.
+ */
+export function OneLineDesc({ text, className }: { text: string | null | undefined; className?: string }) {
+  const [ref, clipped] = useClipped<HTMLDivElement>()
+  const cut = clipped && !!text
+  return (
+    <div ref={ref} className={cx(/* i18n-ignore: class names */ 'desc one-line-desc', className)}>
+      <Tooltip content={cut ? text : null} focus>
+        {cut ? <span tabIndex={0}>{text}</span> : text}
+      </Tooltip>
+    </div>
+  )
+}
+
 /** A tooltip's way to tell the one around it that it is showing, so only the innermost one shows (#287). */
 const TipParent = createContext<((inner: boolean) => void) | null>(null)
 

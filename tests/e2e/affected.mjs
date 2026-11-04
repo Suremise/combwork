@@ -452,6 +452,8 @@ export const AREAS = [
   { paths: ['src/main/recentWorkspaces.ts'], suites: ['recent', 'windows'] },
   { paths: ['src/renderer/src/components/Resizer.tsx'], suites: ['resize', 'progress'] },
   { paths: ['src/renderer/src/components/Sidebar.tsx'], suites: ['agentstable', 'cardchip', 'rail', 'windows', 'contrast', 'panelroom'] },
+  // Side-panel lists' one-line descriptions and their tooltips (HI-2527).
+  { paths: ['tests/e2e/onelinedesc.cjs', 'src/renderer/src/components/Modes.tsx', 'src/renderer/src/components/Skills.tsx', 'src/renderer/src/components/Templates.tsx', 'src/renderer/src/components/Dialects.tsx', 'src/renderer/src/components/AssistantView.tsx', 'src/renderer/src/components/McpCatalog.tsx'], suites: ['onelinedesc'] },
   // Leaving Settings for a view (HI-2525): the activity bar, the side panel, shortcuts, and what is half typed.
   { paths: ['tests/e2e/settingsleave.cjs', 'src/renderer/src/components/Sidebar.tsx', 'src/renderer/src/components/Shell.tsx', 'src/renderer/src/views/SettingsView.tsx', 'src/renderer/src/App.tsx'], suites: ['settingsleave'] },
   // Room for the work beside the side panels (HI-1737).

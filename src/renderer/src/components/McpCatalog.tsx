@@ -6,7 +6,7 @@ import * as actions from '../actions'
 import { call, errorMessage } from '../api'
 import { set, useStore } from '../store'
 import { cx } from '../util'
-import { Icon, SearchInput } from './ui'
+import { Icon, OneLineDesc, SearchInput } from './ui'
 import { Section } from './Sidebar'
 
 const M = {
@@ -151,9 +151,7 @@ export function McpCatalogPanel() {
                     <div className="label">
                       {r.name} <span className="faint">{r.version}</span>
                     </div>
-                    <div className="desc" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {r.description}
-                    </div>
+                    <OneLineDesc text={r.description} />
                   </div>
                   {b && <span className={cx('badge', b.cls)}>{b.text}</span>}
                 </div>

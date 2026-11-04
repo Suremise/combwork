@@ -10,7 +10,7 @@ import { AttachmentsTab } from '../views/FilesTab'
 import { PERIODS, costText, periodFrom, sumUsage, useSessions, type Period } from '../views/ProjectTabs'
 import { MODES_TIP, ModeList, ModeView, createMode } from './Modes'
 import { Section } from './Sidebar'
-import { Icon, IconButton, InfoTip, Tooltip } from './ui'
+import { Icon, IconButton, InfoTip, OneLineDesc, Tooltip } from './ui'
 import { JournalView } from './JournalView'
 import { msg, tr } from '@shared/i18n'
 
@@ -127,9 +127,7 @@ function AssistantMcpList() {
           <Icon name={m.error ? 'error' : m.def?.url ? 'globe' : 'plug'} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="label">{m.name}</div>
-            <div className="desc" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {actions.mcpErrorText(m) ?? m.def?.description ?? m.def?.command ?? m.def?.url}
-            </div>
+            <OneLineDesc text={actions.mcpErrorText(m) ?? m.def?.description ?? m.def?.command ?? m.def?.url} />
           </div>
           <div className="row-actions">
             <IconButton icon="close" title={tr(M.removeMcp, { name: m.name })} onClick={() => void actions.removeMcpServer('assistant', m)} />
