@@ -65,7 +65,7 @@
   "tasks.error.refsNotNumber": "{field} : « {value} » n’est pas un numéro de carte",
   "tasks.error.refsSelf": "{field} : une carte ne peut pas se référer à elle-même",
   "tasks.error.repairNoProject": "Le projet {project} ne fait plus partie de l’espace de travail",
-  "tasks.error.reviewAgentsOnly": "Seul un agent du projet de la carte la relit, avec ses propres outils hive.",
+  "tasks.error.reviewAgentsOnly": "Seul un agent du projet de la carte la relit, avec ses propres outils Combwork.",
   "tasks.error.reviewNotInReview": "La carte {card} est dans {column, select, hold {Suspendu} todo {À faire} doing {En cours} passed {Validé} done {Terminé} other {{column}}}. Une carte se relit dans Relecture ; s’il faut encore y travailler, c’est du travail sur la carte (déplace-la vers doing).",
   "tasks.error.reviewOnItsOwn": "Démarre une relecture seule : la carte reste où elle est, avec son agent.",
   "tasks.error.reviewSkipInReview": "{card} est en Relecture : le fait qu’elle ignore la relecture se décide avant sa soumission. Pour la faire passer sa relecture maintenant, l’utilisateur la déplace (une dérogation, avec sa raison).",

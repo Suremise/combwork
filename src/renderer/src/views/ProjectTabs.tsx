@@ -267,7 +267,7 @@ const C = {
   definedByProject: msg({ id: 'project.mcp.definedByProject', defaultMessage: 'Defined by the project (disabled)', description: "Heading in a project's MCP tab: servers in the project's own agent config." }),
   copyToWorkspace: msg({ id: 'project.mcp.copy', defaultMessage: 'Copy to workspace', description: "Button: copies the project's own MCP server to the workspace." }),
   builtIn: msg({ id: 'project.mcp.builtIn', defaultMessage: 'Built-in', description: "Heading in a project's MCP tab: Hive's own server." }),
-  hiveDesc: msg({ id: 'project.mcp.hiveDesc', defaultMessage: 'Lets agents see other projects, read and write shared notes, create handovers and notify you.', description: "What Hive's own MCP server (hive) does." }),
+  hiveDesc: msg({ id: 'project.mcp.hiveDesc', defaultMessage: 'Lets agents see other projects, read and write shared notes, create handovers and notify you.', description: "What Combwork's own MCP server (combwork) does." }),
   onAll: msg({ id: 'project.mcp.onAll', defaultMessage: 'On for all sessions', description: "Badge on Hive's own MCP server when it is on." }),
   off: msg({ id: 'project.mcp.off', defaultMessage: 'Off', description: "Badge on Hive's own MCP server when it is off." })
 }

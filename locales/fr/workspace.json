@@ -180,7 +180,7 @@
   "workspace.mcpView.toolReadNote": "Lire une note partagée",
   "workspace.mcpView.toolSessionUsage": "Utilisation des jetons, cache et compactages d’une session",
   "workspace.mcpView.toolWriteNote": "Créer, écraser ou compléter une note partagée",
-  "workspace.mcpView.tryAsking": "Essaie de demander à un agent : *« Écris une passation pour la prochaine session avec les outils hive. »*",
+  "workspace.mcpView.tryAsking": "Essaie de demander à un agent : *« Écris une passation pour la prochaine session avec les outils Combwork. »*",
   "workspace.mcpView.whatItDoes": "Ce qu’il fait",
   "workspace.mcpView.whatItRuns": "Ce qu’il exécute",
   "workspace.move.branchesBanner": "{count, plural, one {La branche d’un agent porte encore le nom d’un ancien dossier ; Réparer la renomme.} many {Les branches de # agents portent encore le nom d’un ancien dossier ; Réparer les renomme.} other {Les branches de # agents portent encore le nom d’un ancien dossier ; Réparer les renomme.}}",

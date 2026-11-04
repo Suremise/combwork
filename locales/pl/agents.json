@@ -184,7 +184,7 @@
   "agents.mcp.loading": "Ładowanie…",
   "agents.mcp.noneAdded": "{where, select, workspace {Ten obszar roboczy nie ma serwerów MCP: agent nie dostaje żadnego.} other {Do tego projektu nie dodano serwerów MCP: agent nie dostaje żadnego.}}",
   "agents.mcp.notAdded": "{where, select, workspace {nie ma go w tym obszarze roboczym} other {nie dodano go do tego projektu}}",
-  "agents.mcp.noteAdded": "Wbudowany serwer hive jest zawsze dołączany. Serwer dodany do projektu później trafi do niego tylko przy wyborze Wszystkie.",
+  "agents.mcp.noteAdded": "Wbudowany serwer combwork jest zawsze dołączany. Serwer dodany do projektu później trafi do niego tylko przy wyborze Wszystkie.",
   "agents.mcp.only": "Tylko te",
   "agents.merge.blocked": "{why, select, waiting {Agent {agent} czeka na Twoją odpowiedź. Scal, gdy skończy.} background {Agent {agent} czeka na uruchomione przez siebie zadania w tle. Scal, gdy skończy.} watching {Agent {agent} czeka na zmiany kart (obserwuje karty) i kontynuuje, gdy nastąpią. Scal, gdy skończy, albo najpierw anuluj obserwowanie.} signin {Agent {agent} zatrzymał się w trakcie zadania, bo wygasło jego logowanie. Zaloguj się ponownie i najpierw pozwól mu skończyć.} other {Agent {agent} pracuje. Scal, gdy skończy.}}",
   "agents.merge.commits": "{n, plural, one {# commit niescalony} few {# commity niescalone} many {# commitów niescalonych} other {# commita niescalonego}} do {into}",

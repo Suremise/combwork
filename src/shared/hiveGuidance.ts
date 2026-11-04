@@ -196,7 +196,7 @@ const A = {
 }
 
 /**
- * When agents run a command through hive-progress (Settings → General → Agents show long commands, while the Progress
+ * When agents run a command through cw-progress (Settings → General → Agents show long commands, while the Progress
  * panel is on): long ones by default, or only when the user asks.
  */
 export const progressRule = (wrap: boolean): string => say(wrap ? A.progressWrap : A.progressOnAsk)

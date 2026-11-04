@@ -1613,7 +1613,7 @@
   },
   "workflow.slots.copiesSizeDesc": {
     "defaultMessage": "How many copies the project keeps, each at exactly one revision, for reviewers and isolated checks. Empty keeps the larger of two and its reviewers plus one. They use the setup script.",
-    "description": "What the setting “Review and check copies” does (glossary 2.5: review copy; isolated checks: hive-progress --check --isolated)."
+    "description": "What the setting “Review and check copies” does (glossary 2.5: review copy; isolated checks: cw-progress --check --isolated)."
   },
   "workflow.slots.copy": {
     "defaultMessage": "Files copied into new slots",

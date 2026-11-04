@@ -65,7 +65,7 @@
   "tasks.error.refsNotNumber": "{field}: „{value}” to nie numer karty",
   "tasks.error.refsSelf": "{field}: karta nie może wskazywać na samą siebie",
   "tasks.error.repairNoProject": "Projekt {project} nie należy już do obszaru roboczego",
-  "tasks.error.reviewAgentsOnly": "Kartę recenzuje tylko agent jej projektu, własnymi narzędziami hive.",
+  "tasks.error.reviewAgentsOnly": "Kartę recenzuje tylko agent jej projektu, własnymi narzędziami Combwork.",
   "tasks.error.reviewNotInReview": "Karta {card} jest w kolumnie {column, select, hold {Wstrzymane} todo {Do zrobienia} doing {Aktywne} passed {Zatwierdzone} done {Gotowe} other {{column}}}. Karty recenzuje się w Recenzji; jeśli karta wymaga więcej pracy, to jest praca nad nią (przenieś ją do doing).",
   "tasks.error.reviewOnItsOwn": "Zacznij recenzję osobno: karta zostaje tam, gdzie jest, ze swoim agentem.",
   "tasks.error.reviewSkipInReview": "Karta {card} jest w kolumnie Recenzja: o pominięciu recenzji decyduje się przed przesłaniem. Aby teraz przenieść ją poza recenzję, użytkownik przesuwa ją dalej (wyjątek, z jego powodem).",

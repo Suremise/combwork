@@ -65,7 +65,7 @@
   "tasks.error.refsNotNumber": "{field}: „{value}“ ist keine Kartennummer",
   "tasks.error.refsSelf": "{field}: Eine Karte kann nicht auf sich selbst verweisen",
   "tasks.error.repairNoProject": "{project} ist jetzt kein Projekt des Arbeitsbereichs",
-  "tasks.error.reviewAgentsOnly": "Nur ein Agent aus dem Projekt der Karte reviewt sie, mit seinen eigenen hive-Tools.",
+  "tasks.error.reviewAgentsOnly": "Nur ein Agent aus dem Projekt der Karte reviewt sie, mit seinen eigenen Combwork-Tools.",
   "tasks.error.reviewNotInReview": "{card} ist in {column, select, hold {Geparkt} todo {Offen} doing {In Arbeit} passed {Genehmigt} done {Erledigt} other {{column}}}. Karten werden in Review geprüft; braucht eine Karte mehr Arbeit, ist das Arbeit an ihr (verschiebe sie nach doing).",
   "tasks.error.reviewOnItsOwn": "Starte ein Review für sich allein: Die Karte bleibt, wo sie ist, bei ihrem Agenten.",
   "tasks.error.reviewSkipInReview": "{card} ist im Review: Ob sie das Review überspringt, wird vor dem Einreichen entschieden. Um sie jetzt am Review vorbeizubringen, verschiebt der Benutzer sie weiter (eine Ausnahme, mit seiner Begründung).",

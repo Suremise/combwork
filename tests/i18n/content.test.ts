@@ -111,7 +111,7 @@ describe('refusals: English for agents and the log as before, the window in its 
       [await caught(() => notes.createNote('  ', false)), 'Name is required', 400, 'Ein Name ist nötig'],
       [await caught(() => notes.createNote('../outside.md', false)), 'Path is outside the shared notes folder', 500, 'Der Pfad liegt außerhalb des Ordners der geteilten Notizen'],
       [await caught(() => skills.createSkill('no spaces allowed', '')), 'Skill names may contain letters, numbers, "-" and "_" (max 64 characters).', 400, 'Skill-Namen dürfen Buchstaben, Ziffern, „-“ und „_“ enthalten (höchstens 64 Zeichen).'],
-      [await caught(() => mcp.createMcp('hive')), 'Server names may contain letters, numbers, "-" and "_" (max 64 characters). "hive" is reserved.', 400, 'Servernamen dürfen Buchstaben, Ziffern, „-“ und „_“ enthalten (höchstens 64 Zeichen). „hive“ ist vergeben.'],
+      [await caught(() => mcp.createMcp('hive')), 'Server names may contain letters, numbers, "-" and "_" (max 64 characters). "combwork" and "hive" are reserved.', 400, 'Servernamen dürfen Buchstaben, Ziffern, „-“ und „_“ enthalten (höchstens 64 Zeichen). „hive“ ist vergeben.'],
       [await caught(() => mcp.readMcp('../x')), 'Invalid server name', 500, 'Ungültiger Servername'],
       [await caught(() => mcp.checkMcpDef([])), 'The definition must be a JSON object, as in .combwork/mcp/<name>.json.', 500, 'Die Definition muss ein JSON-Objekt sein, wie in .combwork/mcp/<name>.json.'],
       [await caught(() => mcp.checkMcpDef({ command: 'x', args: [1] })), '"args" must be a list of strings.', 500, null],

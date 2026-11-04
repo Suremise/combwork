@@ -2,7 +2,7 @@
   "content.mcp.badArgs": "„args“ muss eine Liste von Zeichenketten sein.",
   "content.mcp.badCommand": "„command“ muss das Programm sein, das ausgeführt wird.",
   "content.mcp.badCwd": "„cwd“ muss ein Ordner sein.",
-  "content.mcp.badName": "Servernamen dürfen Buchstaben, Ziffern, „-“ und „_“ enthalten (höchstens 64 Zeichen). „hive“ ist reserviert.",
+  "content.mcp.badName": "Servernamen dürfen Buchstaben, Ziffern, „-“ und „_“ enthalten (höchstens 64 Zeichen). „combwork“ und „hive“ sind reserviert.",
   "content.mcp.badRecord": "„{field}“ muss ein Objekt aus Zeichenketten sein.",
   "content.mcp.badUrl": "„url“ muss eine http://- oder https://-Adresse sein.",
   "content.mcp.changedAdd": "{name} hat sich geändert, seit er dir gezeigt wurde. Prüfe, was er ausführt, und füge ihn erneut hinzu.",

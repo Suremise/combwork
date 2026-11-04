@@ -7,7 +7,7 @@
   "mcp.addFile.messageAdded": "Dodaje {file} do obszaru roboczego (.combwork/mcp){files, plural, =0 {} one {, z jego plikiem we własnym folderze} few {, z jego # plikami we własnym folderze} many {, z jego # plikami we własnym folderze} other {, z jego # pliku we własnym folderze}}, jeszcze nie dodając go do żadnego projektu. Dodaj go tam, gdzie ma działać: w zakładce MCP projektu, w widoku Asystenta albo tutaj przez Dodaj do…. Uruchamia:",
   "mcp.addFile.replaceDetailAdded": "Zastąp przenosi go (i folder serwera dodanego z pliku .zip) do Kosza i dodaje ten, jeszcze do żadnego projektu: projekty i Asystent, które miały stary, tracą go. Możesz też wybrać inną nazwę.",
   "mcp.catalog.allSources": "Wszystkie źródła",
-  "mcp.catalog.badName": "Nazwy serwerów mogą zawierać litery, cyfry, „-” i „_” (najwyżej 64 znaki). „hive” jest zastrzeżona.",
+  "mcp.catalog.badName": "Nazwy serwerów mogą zawierać litery, cyfry, „-” i „_” (najwyżej 64 znaki). Nazwy „combwork” i „hive” są zastrzeżone.",
   "mcp.catalog.badgeInstalled": "Zainstalowany",
   "mcp.catalog.badgeNeeds": "Nie działa tutaj",
   "mcp.catalog.badgeOther": "Nazwa zajęta",

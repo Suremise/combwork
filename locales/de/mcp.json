@@ -7,7 +7,7 @@
   "mcp.addFile.messageAdded": "Fügt {file} zum Arbeitsbereich hinzu (.combwork/mcp){files, plural, =0 {} one {, mit seiner Datei in einem eigenen Ordner} other {, mit seinen # Dateien in einem eigenen Ordner}}, noch keinem Projekt hinzugefügt. Füge ihn dort hinzu, wo er laufen soll: im Tab „MCP“ eines Projekts, in der Ansicht des Assistenten oder hier mit „Hinzufügen zu…“. Er führt aus:",
   "mcp.addFile.replaceDetailAdded": "„Ersetzen“ verschiebt den vorhandenen Server (und bei einem aus einer .zip hinzugefügten auch dessen Ordner) in den Papierkorb und fügt diesen noch keinem Projekt hinzu: Projekte und der Assistent, die den alten hatten, verlieren ihn. Oder wähle einen anderen Namen.",
   "mcp.catalog.allSources": "Alle Quellen",
-  "mcp.catalog.badName": "Servernamen dürfen Buchstaben, Ziffern, „-“ und „_“ enthalten (höchstens 64 Zeichen). „hive“ ist reserviert.",
+  "mcp.catalog.badName": "Servernamen dürfen Buchstaben, Ziffern, „-“ und „_“ enthalten (höchstens 64 Zeichen). „combwork“ und „hive“ sind reserviert.",
   "mcp.catalog.badgeInstalled": "Installiert",
   "mcp.catalog.badgeNeeds": "Läuft hier nicht",
   "mcp.catalog.badgeOther": "Name vergeben",

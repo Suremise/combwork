@@ -65,7 +65,7 @@
   "tasks.error.refsNotNumber": "{field}: “{value}” no es un número de tarjeta",
   "tasks.error.refsSelf": "{field}: una tarjeta no puede hacer referencia a sí misma",
   "tasks.error.repairNoProject": "{project} ya no es un proyecto del espacio de trabajo",
-  "tasks.error.reviewAgentsOnly": "Solo un agente del proyecto de la tarjeta la revisa, con sus propias herramientas hive.",
+  "tasks.error.reviewAgentsOnly": "Solo un agente del proyecto de la tarjeta la revisa, con sus propias herramientas Combwork.",
   "tasks.error.reviewNotInReview": "La tarjeta {card} está en la columna {column, select, hold {En espera} todo {Pendiente} doing {En curso} passed {Aprobado} done {Hecho} other {{column}}}. Una tarjeta se revisa en Revisión; si necesita más trabajo, eso es trabajar en ella (muévela a doing).",
   "tasks.error.reviewOnItsOwn": "Inicia una revisión por sí sola: la tarjeta se queda donde está, con su agente.",
   "tasks.error.reviewSkipInReview": "{card} está en Revisión: si omite la revisión se decide antes de enviarla. Para llevarla más allá de su revisión ahora, el usuario la mueve (una excepción, con su motivo).",

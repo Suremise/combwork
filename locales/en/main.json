@@ -1545,7 +1545,7 @@
   },
   "main.unexpectedClose.progressRun": {
     "defaultMessage": "{title} ({n, plural, one {# process} other {# processes}})",
-    "description": "In the notice that Hive closed unexpectedly, a test run (or other command) an agent ran through hive-progress that still runs, as one item of the list of what still runs: its title as the agent gave it ({title}: \"e2e: 196 suites in hb2\") and how many of its processes still run ({n})."
+    "description": "In the notice that Hive closed unexpectedly, a test run (or other command) an agent ran through cw-progress that still runs, as one item of the list of what still runs: its title as the agent gave it ({title}: \"e2e: 196 suites in hb2\") and how many of its processes still run ({n})."
   },
   "main.unexpectedClose.resumeAll": {
     "defaultMessage": "Resume All",
@@ -1701,7 +1701,7 @@
   },
   "main.unused.slot.editedSkillCopy": {
     "defaultMessage": "{copies, plural, one {its skill folder {names} isn't an unchanged copy of Combwork's} other {its skill folders {names} aren't unchanged copies of Combwork's}}",
-    "description": "Why Hive didn't remove a slot listed in Unused worktrees (#1500): Hive removed its own skill copies from the slot's .agents/skills, but a folder named hive-… is left there (changed since Hive copied it, or the user's own), so the slot is kept. {names}: the folders' names, e.g. hive-merge-ready; {copies}: how many. A clause."
+    "description": "Why Hive didn't remove a slot listed in Unused worktrees (#1500): Hive removed its own skill copies from the slot's .agents/skills, but a folder named cw-… is left there (changed since Hive copied it, or the user's own), so the slot is kept. {names}: the folders' names, e.g. cw-merge-ready; {copies}: how many. A clause."
   },
   "main.unused.slot.gitRefused": {
     "defaultMessage": "git didn't remove it ({detail})",

@@ -264,8 +264,8 @@
     "description": "An error from Repair: the project {project} (a folder name) it was to give cards to isn't in the workspace any more."
   },
   "tasks.error.reviewAgentsOnly": {
-    "defaultMessage": "Only an agent of the card's project reviews it, through its own hive tools.",
-    "description": "An error: the user, the Assistant or a script tried to start or end a card's review; only an agent of the card's project does that, with its hive tools (a name: keep it)."
+    "defaultMessage": "Only an agent of the card's project reviews it, through its own Combwork tools.",
+    "description": "An error: the user, the Assistant or a script tried to start or end a card's review; only an agent of the card's project does that, with its Combwork tools (the app's name)."
   },
   "tasks.error.reviewNotInReview": {
     "defaultMessage": "{card} is in {column, select, hold {On Hold} todo {Todo} doing {Doing} passed {Passed} done {Done} other {{column}}}. A card is reviewed in Review; if it needs more work, that is work on it (move it to doing).",

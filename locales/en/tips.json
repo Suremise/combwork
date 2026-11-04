@@ -732,7 +732,7 @@
     "description": "A tip's title."
   },
   "tips.copilotModes.text": {
-    "defaultMessage": "Copilot agents start in Accept edits: they edit files in their own folder and use the hive tools without asking, and ask before other commands, other MCP tools and web access. Choose Ask to approve each edit too, or Allow all to approve everything.",
+    "defaultMessage": "Copilot agents start in Accept edits: they edit files in their own folder and use the Combwork tools without asking, and ask before other commands, other MCP tools and web access. Choose Ask to approve each edit too, or Allow all to approve everything.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.copilotModes.title": {
@@ -1460,8 +1460,8 @@
     "description": "A tip's title."
   },
   "tips.perfCompareAgents.text": {
-    "defaultMessage": "Comparing two scenario benchmarks? Open a scenario in Performance → Compare: its measures show the session under test first, then the other agents (a lane’s builder and reviewer) and all of them together, with each agent’s hive calls.",
-    "description": "A tip (HI-2186). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Keep hive (Hive's tools). Glossary: builder, reviewer."
+    "defaultMessage": "Comparing two scenario benchmarks? Open a scenario in Performance → Compare: its measures show the session under test first, then the other agents (a lane’s builder and reviewer) and all of them together, with each agent’s Combwork tool calls.",
+    "description": "A tip (HI-2186). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Keep Combwork (the app's name). Glossary: builder, reviewer."
   },
   "tips.perfCompareAgents.title": {
     "defaultMessage": "Which agent a change came from",

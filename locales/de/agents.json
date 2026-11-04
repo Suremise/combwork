@@ -184,7 +184,7 @@
   "agents.mcp.loading": "Wird geladen…",
   "agents.mcp.noneAdded": "{where, select, workspace {Dieser Arbeitsbereich hat keine MCP-Server: Der Agent erhält keine.} other {Diesem Projekt sind keine MCP-Server hinzugefügt: Der Agent erhält keine.}}",
   "agents.mcp.notAdded": "{where, select, workspace {nicht in diesem Arbeitsbereich} other {diesem Projekt nicht hinzugefügt}}",
-  "agents.mcp.noteAdded": "Der integrierte Server hive wird immer mitgegeben. Ein Server, der dem Projekt später hinzugefügt wird, erreicht ihn nur mit „Alle“.",
+  "agents.mcp.noteAdded": "Der integrierte Server combwork wird immer mitgegeben. Ein Server, der dem Projekt später hinzugefügt wird, erreicht ihn nur mit „Alle“.",
   "agents.mcp.only": "Nur diese",
   "agents.merge.blocked": "{why, select, waiting {{agent} wartet auf deine Antwort. Erst mergen, wenn die Arbeit fertig ist.} background {{agent} wartet auf selbst gestartete Hintergrundaufgaben. Erst mergen, wenn die Arbeit fertig ist.} watching {{agent} wartet darauf, dass sich Karten ändern (eine Kartenbeobachtung), und macht dann weiter. Erst mergen, wenn die Arbeit fertig ist, oder zuerst die Beobachtung abbrechen.} signin {{agent} hat mitten in einer Aufgabe angehalten, als die Anmeldung abgelaufen ist. Melde dich erneut an und lass die Arbeit zuerst fertig werden.} other {{agent} arbeitet. Erst mergen, wenn die Arbeit fertig ist.}}",
   "agents.merge.commits": "{n, plural, one {# Commit} other {# Commits}} nicht in {into} gemergt",

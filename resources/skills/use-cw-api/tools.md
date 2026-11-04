@@ -141,7 +141,7 @@ One merge at a time into a branch (default: the project folder's). `claim` waits
 `cw_add_agent`, `cw_update_agent`, `cw_start_task`: its connection sets model, effort, context, mode, CLI; `provider`, `model`, `effort`, `mode`, `context200k` refused.
 - `connection`: id or name (`cw_connection`). Default or empty: the first usable here.
 - `workflowRole`: builder, reviewer, either (never its own cards) or generalist (no lanes or reviews). Default: from its name.
-- `mcpServers`: `[]` none, `["*"]` all (default); hive always.
+- `mcpServers`: `[]` none, `["*"]` all (default); combwork always.
 - A running agent takes a change when restarted; another CLI's connection only while stopped. A connection gone or off here: its CLI's first usable one runs it.
 - `cw_start_agent`: a folder new to its CLI asks the user to trust it.
 

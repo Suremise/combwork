@@ -65,7 +65,7 @@
   "tasks.error.refsNotNumber": "{field}：“{value}”不是卡片编号",
   "tasks.error.refsSelf": "{field}：卡片不能引用自身",
   "tasks.error.repairNoProject": "{project} 现在已不是工作区中的项目",
-  "tasks.error.reviewAgentsOnly": "只有卡片所属项目中的智能体才能通过它自己的 hive 工具评审卡片。",
+  "tasks.error.reviewAgentsOnly": "只有卡片所属项目中的智能体才能通过它自己的 Combwork 工具评审卡片。",
   "tasks.error.reviewNotInReview": "{card} 在“{column, select, hold {搁置} todo {待办} doing {进行中} passed {已批准} done {已完成} other {{column}}}”中。卡片在“评审”中接受评审；如果还需要更多工作，那就是处理它（移到 doing）。",
   "tasks.error.reviewOnItsOwn": "请单独开始评审：卡片保持原位，仍归其智能体。",
   "tasks.error.reviewSkipInReview": "{card} 正在评审中：是否跳过评审需在提交前决定。要让它现在越过评审，由用户将其移动（例外放行，并附上其原因）。",

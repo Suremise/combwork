@@ -989,7 +989,7 @@
   },
   "project.mcp.hiveDesc": {
     "defaultMessage": "Lets agents see other projects, read and write shared notes, create handovers and notify you.",
-    "description": "What Hive's own MCP server (hive) does."
+    "description": "What Combwork's own MCP server (combwork) does."
   },
   "project.mcp.invalid": {
     "defaultMessage": "invalid",

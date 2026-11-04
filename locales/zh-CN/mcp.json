@@ -7,7 +7,7 @@
   "mcp.addFile.messageAdded": "将 {file} 添加到工作区（.combwork/mcp）{files, plural, =0 {} other {，其 # 个文件放在单独的文件夹中}}，暂不添加到任何项目。请在它应运行的地方添加：项目的“MCP”标签页、助手的视图，或这里的“添加到…”。它运行：",
   "mcp.addFile.replaceDetailAdded": "“替换”会将原服务器（以及从 .zip 添加时的文件夹）移到回收站，并添加这个服务器，暂不添加到任何项目：原先有旧服务器的项目和助手将不再有它。也可以换个名称。",
   "mcp.catalog.allSources": "所有来源",
-  "mcp.catalog.badName": "服务器名称可包含字母、数字、“-”和“_”（最多 64 个字符）。“hive”为保留名称。",
+  "mcp.catalog.badName": "服务器名称可包含字母、数字、“-”和“_”（最多 64 个字符）。“combwork”和“hive”为保留名称。",
   "mcp.catalog.badgeInstalled": "已安装",
   "mcp.catalog.badgeNeeds": "无法在此运行",
   "mcp.catalog.badgeOther": "名称已被占用",

@@ -180,7 +180,7 @@
   "workspace.mcpView.toolReadNote": "共有ノートを読む",
   "workspace.mcpView.toolSessionUsage": "セッションのトークン使用量、キャッシュ、コンパクト化",
   "workspace.mcpView.toolWriteNote": "共有ノートを作成、上書き、追記",
-  "workspace.mcpView.tryAsking": "エージェントにこう頼んでみてください：*「hiveツールを使って、次のセッション向けの引き継ぎを書いてください。」*",
+  "workspace.mcpView.tryAsking": "エージェントにこう頼んでみてください：*「Combworkツールを使って、次のセッション向けの引き継ぎを書いてください。」*",
   "workspace.mcpView.whatItDoes": "内容",
   "workspace.mcpView.whatItRuns": "実行するコマンド",
   "workspace.move.branchesBanner": "{count, plural, other {#個のエージェントのブランチ名に古いフォルダーの名前が残っています。修復で名前を変更します。}}",

@@ -579,8 +579,8 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'cw.mcp.replySeconds',
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.mcp.replySeconds.title', defaultMessage: 'hive tools: reply timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
-    desc: msg({ id: 'settings.advanced.hive.mcp.replySeconds.desc', defaultMessage: 'How long the hive MCP server waits for Combwork to answer one of its tools (a wait\'s own time comes on top). Raise it when a slow or very busy machine makes hive tools fail with "Combwork didn\'t reply within 300 s" (#371).', description: 'What the advanced setting "hive tools: reply timeout" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    title: msg({ id: 'settings.advanced.hive.mcp.replySeconds.title', defaultMessage: 'Combwork tools: reply timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.hive.mcp.replySeconds.desc', defaultMessage: 'How long the combwork MCP server waits for Combwork to answer one of its tools (a wait\'s own time comes on top). Raise it when a slow or very busy machine makes Combwork tools fail with "Combwork didn\'t reply within 300 s" (#371).', description: 'What the advanced setting "Combwork tools: reply timeout" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 300,
     min: 30,
@@ -603,8 +603,8 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'cw.mcp.connectSeconds',
     group: 'cw',
-    title: msg({ id: 'settings.advanced.hive.mcp.connectSeconds.title', defaultMessage: 'hive tools: wait to connect', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
-    desc: msg({ id: 'settings.advanced.hive.mcp.connectSeconds.desc', defaultMessage: "How long Combwork waits, once an agent is ready, for its CLI to connect Combwork's tools before it tells the agent of new work anyway. A resumed session can be ready before its tools are, and a message then is a turn spent without them (#865). Lower it if messages reach agents late when their CLI doesn't connect Combwork's tools.", description: 'What the advanced setting "hive tools: wait to connect" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    title: msg({ id: 'settings.advanced.hive.mcp.connectSeconds.title', defaultMessage: 'Combwork tools: wait to connect', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.hive.mcp.connectSeconds.desc', defaultMessage: "How long Combwork waits, once an agent is ready, for its CLI to connect Combwork's tools before it tells the agent of new work anyway. A resumed session can be ready before its tools are, and a message then is a turn spent without them (#865). Lower it if messages reach agents late when their CLI doesn't connect Combwork's tools.", description: 'What the advanced setting "Combwork tools: wait to connect" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 30,
     min: 1,
@@ -688,7 +688,7 @@ const SOURCES: readonly AdvancedSource[] = [
     id: 'cw.wait.cardMaxSeconds',
     group: 'cw',
     title: msg({ id: 'settings.advanced.hive.wait.cardMaxSeconds.title', defaultMessage: 'Card waits: longest', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
-    desc: msg({ id: 'settings.advanced.hive.wait.cardMaxSeconds.desc', defaultMessage: "The longest an agent's cw_wait_for_tasks call (without wake) waits before it answers. It has to stay under the CLIs' own tool timeouts, so Combwork keeps it a minute below Codex's hive tool timeout whatever is set here.", description: 'What the advanced setting "Card waits: longest" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    desc: msg({ id: 'settings.advanced.hive.wait.cardMaxSeconds.desc', defaultMessage: "The longest an agent's cw_wait_for_tasks call (without wake) waits before it answers. It has to stay under the CLIs' own tool timeouts, so Combwork keeps it a minute below Codex's timeout for Combwork tools whatever is set here.", description: 'What the advanced setting "Card waits: longest" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 840,
     min: 60,
@@ -700,7 +700,7 @@ const SOURCES: readonly AdvancedSource[] = [
     id: 'cw.wait.agentsMaxSeconds',
     group: 'cw',
     title: msg({ id: 'settings.advanced.hive.wait.agentsMaxSeconds.title', defaultMessage: 'Agent waits: longest', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
-    desc: msg({ id: 'settings.advanced.hive.wait.agentsMaxSeconds.desc', defaultMessage: "The longest cw_wait_for_agents waits for agents to finish before it answers. Kept a minute below Codex's hive tool timeout, as card waits are.", description: 'What the advanced setting "Agent waits: longest" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    desc: msg({ id: 'settings.advanced.hive.wait.agentsMaxSeconds.desc', defaultMessage: "The longest cw_wait_for_agents waits for agents to finish before it answers. Kept a minute below Codex's timeout for Combwork tools, as card waits are.", description: 'What the advanced setting "Agent waits: longest" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 600,
     min: 30,
@@ -1332,8 +1332,8 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.hive.guidance.title', defaultMessage: "Combwork's guidance for agents", description: "An advanced setting's title (Settings → Advanced), listed under Combwork: the instructions Hive gives project agents on how to work with it." }),
     desc: msg({
       id: 'settings.advanced.hive.guidance.desc',
-      defaultMessage: "With Combwork's tools, each project agent gets Combwork's guidance: how to use the tools, the board and handovers, and its project's latest handover. Claude Code and Copilot get it as the hive server's instructions, Codex after your own developer_instructions. Turned off, agents still get Combwork's tools, without the guidance, from their next session. The Assistant always gets its own: they are its role.",
-      description: 'What the advanced setting "Hive\'s guidance for agents" does (Settings → Advanced, under Combwork). Claude Code, Copilot and Codex are CLIs\' names, hive the name of Hive\'s MCP server and developer_instructions a Codex setting: keep them.'
+      defaultMessage: "With Combwork's tools, each project agent gets Combwork's guidance: how to use the tools, the board and handovers, and its project's latest handover. Claude Code and Copilot get it as the combwork server's instructions, Codex after your own developer_instructions. Turned off, agents still get Combwork's tools, without the guidance, from their next session. The Assistant always gets its own: they are its role.",
+      description: 'What the advanced setting "Hive\'s guidance for agents" does (Settings → Advanced, under Combwork). Claude Code, Copilot and Codex are CLIs\' names, combwork the name of Combwork\'s MCP server and developer_instructions a Codex setting: keep them.'
     }),
     kind: 'boolean',
     default: true,
@@ -1428,8 +1428,8 @@ const SOURCES: readonly AdvancedSource[] = [
     desc: msg({
       id: 'settings.advanced.hive.skills.removeIdleCopies.desc',
       defaultMessage:
-        "Codex and Copilot read Combwork's skills from copies Combwork puts in each agent's folder (.agents/skills/hive-…); Claude Code gets them at each launch and leaves nothing behind. Once the last of Combwork's agents in a folder stops, Combwork can remove its copies, so a CLI you run there yourself doesn't see them. Slots only removes them from slots and agents' worktrees, never the project folder. Everywhere removes them from the project folder too. Never keeps them. Only copies Combwork made, and nobody changed since, are removed: never your own skills.",
-      description: 'What the advanced setting "Remove Hive\'s skill copies when no agent works in the folder" does (Settings → Advanced, under Combwork). Codex, Copilot and Claude Code are CLIs\' names and .agents/skills/hive-… a folder: keep them. Slots only, Everywhere and Never are the setting\'s choices: use the words its list shows.'
+        "Codex and Copilot read Combwork's skills from copies Combwork puts in each agent's folder (.agents/skills/cw-…); Claude Code gets them at each launch and leaves nothing behind. Once the last of Combwork's agents in a folder stops, Combwork can remove its copies, so a CLI you run there yourself doesn't see them. Slots only removes them from slots and agents' worktrees, never the project folder. Everywhere removes them from the project folder too. Never keeps them. Only copies Combwork made, and nobody changed since, are removed: never your own skills.",
+      description: 'What the advanced setting "Remove Hive\'s skill copies when no agent works in the folder" does (Settings → Advanced, under Combwork). Codex, Copilot and Claude Code are CLIs\' names and .agents/skills/cw-… a folder: keep them. Slots only, Everywhere and Never are the setting\'s choices: use the words its list shows.'
     }),
     kind: 'choice',
     choices: [
@@ -2379,8 +2379,8 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.mcp.toolTimeoutSeconds',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.mcp.toolTimeoutSeconds.title', defaultMessage: 'hive tools: timeout in Codex', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
-    desc: msg({ id: 'settings.advanced.codex.mcp.toolTimeoutSeconds.desc', defaultMessage: "How long Codex lets one of Combwork's tools run (its tool_timeout_sec for the hive server). Combwork's waits stay a minute under it.", description: 'What the advanced setting "hive tools: timeout in Codex" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    title: msg({ id: 'settings.advanced.codex.mcp.toolTimeoutSeconds.title', defaultMessage: 'Combwork tools: timeout in Codex', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.codex.mcp.toolTimeoutSeconds.desc', defaultMessage: "How long Codex lets one of Combwork's tools run (its tool_timeout_sec for the combwork server). Combwork's waits stay a minute under it.", description: 'What the advanced setting "Combwork tools: timeout in Codex" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 900,
     min: 120,
@@ -2392,8 +2392,8 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.mcp.startupTimeoutSeconds',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.mcp.startupTimeoutSeconds.title', defaultMessage: 'hive tools: startup timeout in Codex', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
-    desc: msg({ id: 'settings.advanced.codex.mcp.startupTimeoutSeconds.desc', defaultMessage: "How long Codex waits for Combwork's hive server to start, when your own Codex config has a server named hive with a startup timeout of its own: Combwork gives Codex this one instead (otherwise Codex's own, 10 s, applies). Too short, and Codex agents start without Combwork's tools.", description: 'What the advanced setting "hive tools: startup timeout in Codex" is for, and what goes wrong when it is wrong (Settings → Advanced). hive is the name of Hive\'s MCP server.' }),
+    title: msg({ id: 'settings.advanced.codex.mcp.startupTimeoutSeconds.title', defaultMessage: 'Combwork tools: startup timeout in Codex', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.codex.mcp.startupTimeoutSeconds.desc', defaultMessage: "How long Codex waits for Combwork's combwork server to start, when your own Codex config has a server named combwork with a startup timeout of its own: Combwork gives Codex this one instead (otherwise Codex's own, 10 s, applies). Too short, and Codex agents start without Combwork's tools.", description: 'What the advanced setting "Combwork tools: startup timeout in Codex" is for, and what goes wrong when it is wrong (Settings → Advanced). combwork is the name of Combwork\'s MCP server.' }),
     kind: 'number',
     default: 10,
     min: 5,
@@ -2854,8 +2854,8 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.copilot.override.allMcpInstructions.title', defaultMessage: "Include every MCP server's instructions", description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default. MCP is a protocol's name." }),
     desc: msg({
       id: 'settings.advanced.copilot.override.allMcpInstructions.desc',
-      defaultMessage: "Combwork starts Copilot with --allow-all-mcp-server-instructions, so Copilot puts the hive server's instructions (Combwork's guidance for agents) in its system prompt, and the instructions of the other servers its agents get too. Turned off, Copilot includes only the servers it allows by itself, and Combwork gives its guidance as custom instructions instead.",
-      description: 'What the advanced setting "Include every MCP server\'s instructions" does (Settings → Advanced, under GitHub Copilot). --allow-all-mcp-server-instructions is a command-line option: keep it. hive is the name of Hive\'s MCP server.'
+      defaultMessage: "Combwork starts Copilot with --allow-all-mcp-server-instructions, so Copilot puts the combwork server's instructions (Combwork's guidance for agents) in its system prompt, and the instructions of the other servers its agents get too. Turned off, Copilot includes only the servers it allows by itself, and Combwork gives its guidance as custom instructions instead.",
+      description: 'What the advanced setting "Include every MCP server\'s instructions" does (Settings → Advanced, under GitHub Copilot). --allow-all-mcp-server-instructions is a command-line option: keep it. combwork is the name of Combwork\'s MCP server.'
     }),
     kind: 'boolean',
     default: true,
@@ -2889,8 +2889,8 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.claude-code.override.mcpIsolation.title', defaultMessage: "Only the workspace's MCP servers", description: "An advanced setting's title (Settings → Advanced, under Claude Code): one of Hive's overrides of the CLI, on by default. MCP is a protocol's name." }),
     desc: msg({
       id: 'settings.advanced.claude-code.override.mcpIsolation.desc',
-      defaultMessage: "Combwork starts Claude Code with --strict-mcp-config, so its sessions get only the MCP servers the workspace gives them. Turned off, the servers in your own Claude Code config and the project's .mcp.json load beside them, as they would outside Combwork (Claude Code may ask you to approve a project's new servers first). The workspace's servers, Combwork's own hive among them, win over yours of the same name.",
-      description: 'What the advanced setting "Only the workspace\'s MCP servers" does (Settings → Advanced, under Claude Code). --strict-mcp-config is a command-line option and .mcp.json a file name: keep them. hive is the name of Hive\'s MCP server.'
+      defaultMessage: "Combwork starts Claude Code with --strict-mcp-config, so its sessions get only the MCP servers the workspace gives them. Turned off, the servers in your own Claude Code config and the project's .mcp.json load beside them, as they would outside Combwork (Claude Code may ask you to approve a project's new servers first). The workspace's servers, Combwork's own combwork server among them, win over yours of the same name.",
+      description: 'What the advanced setting "Only the workspace\'s MCP servers" does (Settings → Advanced, under Claude Code). --strict-mcp-config is a command-line option and .mcp.json a file name: keep them. combwork is the name of Combwork\'s MCP server.'
     }),
     kind: 'boolean',
     default: true,
@@ -2920,8 +2920,8 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.copilot.override.mcpIsolation.title', defaultMessage: "Only the workspace's MCP servers", description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Hive's overrides of the CLI, on by default. MCP is a protocol's name." }),
     desc: msg({
       id: 'settings.advanced.copilot.override.mcpIsolation.desc',
-      defaultMessage: "Combwork starts Copilot with --disable-builtin-mcps, and --disable-mcp-server for each server in your own Copilot config and the project's, so its sessions get only the MCP servers the workspace gives them. Turned off, those and Copilot's built-in GitHub servers load beside them, as they would outside Combwork. The workspace's servers, Combwork's own hive among them, win over yours of the same name.",
-      description: 'What the advanced setting "Only the workspace\'s MCP servers" does (Settings → Advanced, under GitHub Copilot). --disable-builtin-mcps and --disable-mcp-server are command-line options: keep them. hive is the name of Hive\'s MCP server.'
+      defaultMessage: "Combwork starts Copilot with --disable-builtin-mcps, and --disable-mcp-server for each server in your own Copilot config and the project's, so its sessions get only the MCP servers the workspace gives them. Turned off, those and Copilot's built-in GitHub servers load beside them, as they would outside Combwork. The workspace's servers, Combwork's own combwork server among them, win over yours of the same name.",
+      description: 'What the advanced setting "Only the workspace\'s MCP servers" does (Settings → Advanced, under GitHub Copilot). --disable-builtin-mcps and --disable-mcp-server are command-line options: keep them. combwork is the name of Combwork\'s MCP server.'
     }),
     kind: 'boolean',
     default: true,
@@ -2938,8 +2938,8 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.codex.override.preApproveHiveTools.title', defaultMessage: "Pre-approve Combwork's tools", description: "An advanced setting's title (Settings → Advanced, under Codex): one of Hive's overrides of the CLI, on by default." }),
     desc: msg({
       id: 'settings.advanced.codex.override.preApproveHiveTools.desc',
-      defaultMessage: "Combwork gives Codex its hive server with its tools approved (for the Assistant, only those its Control settings let it use without asking), so Codex doesn't ask before them in any mode. Turned off, Codex asks before them as its own approval policy says. What an agent or the Assistant may do with them is still decided by Combwork.",
-      description: 'What the advanced setting "Pre-approve Hive\'s tools" does (Settings → Advanced, under Codex). hive is the name of Hive\'s MCP server. Control is the name of the Assistant\'s settings page.'
+      defaultMessage: "Combwork gives Codex its combwork server with its tools approved (for the Assistant, only those its Control settings let it use without asking), so Codex doesn't ask before them in any mode. Turned off, Codex asks before them as its own approval policy says. What an agent or the Assistant may do with them is still decided by Combwork.",
+      description: 'What the advanced setting "Pre-approve Hive\'s tools" does (Settings → Advanced, under Codex). combwork is the name of Combwork\'s MCP server. Control is the name of the Assistant\'s settings page.'
     }),
     kind: 'boolean',
     default: true,
@@ -2953,8 +2953,8 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.codex.override.mcpIsolation.title', defaultMessage: "Only the workspace's MCP servers", description: "An advanced setting's title (Settings → Advanced, under Codex): one of Hive's overrides of the CLI, on by default. MCP is a protocol's name." }),
     desc: msg({
       id: 'settings.advanced.codex.override.mcpIsolation.desc',
-      defaultMessage: "Combwork's Codex sessions get the MCP servers the workspace gives them, and Combwork turns off the ones in your own Codex config and the project's (enabled=false, for those sessions only). Turned off, those load beside the workspace's too, as they would outside Combwork. Combwork's own hive server always wins over one of yours with that name.",
-      description: 'What the advanced setting "Only the workspace\'s MCP servers" does (Settings → Advanced, under Codex). enabled=false is a config value: keep it. hive is the name of Hive\'s MCP server.'
+      defaultMessage: "Combwork's Codex sessions get the MCP servers the workspace gives them, and Combwork turns off the ones in your own Codex config and the project's (enabled=false, for those sessions only). Turned off, those load beside the workspace's too, as they would outside Combwork. Combwork's own combwork server always wins over one of yours with that name.",
+      description: 'What the advanced setting "Only the workspace\'s MCP servers" does (Settings → Advanced, under Codex). enabled=false is a config value: keep it. combwork is the name of Combwork\'s MCP server.'
     }),
     kind: 'boolean',
     default: true,

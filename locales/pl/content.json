@@ -2,7 +2,7 @@
   "content.mcp.badArgs": "„args” musi być listą tekstów.",
   "content.mcp.badCommand": "„command” musi wskazywać program do uruchomienia.",
   "content.mcp.badCwd": "„cwd” musi być folderem.",
-  "content.mcp.badName": "Nazwa serwera może zawierać litery, cyfry, „-” i „_” (maks. 64 znaki). Nazwa „hive” jest zarezerwowana.",
+  "content.mcp.badName": "Nazwa serwera może zawierać litery, cyfry, „-” i „_” (maks. 64 znaki). Nazwy „combwork” i „hive” są zarezerwowane.",
   "content.mcp.badRecord": "„{field}” musi być obiektem z wartościami tekstowymi.",
   "content.mcp.badUrl": "„url” musi być adresem http:// lub https://.",
   "content.mcp.changedAdd": "Serwer {name} zmienił się od chwili, gdy został Ci pokazany. Sprawdź, co uruchamia, i dodaj go ponownie.",
