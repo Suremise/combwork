@@ -12,6 +12,7 @@ import { isProjectId } from './projectIds'
 import { cardRef } from './projectKeys'
 import { agentMsg, say } from './agentText'
 import { NOTICE_PREFIX } from './doorbell'
+import { laneTitleArgs } from './laneWatch'
 
 const T = {
   label: agentMsg({ id: 'wake.agent.label', text: 'Waiting for {agents} to finish', note: 'An agent watch\'s label (#416): a watching agent\'s status, what cw_agent_activity and the Agent API read. agents: the names, ", " between.' }),
@@ -147,7 +148,7 @@ export const agentWatchLabel = (cond: AgentWatchCondition): string => say(T.labe
  * A watch as the window shows it (#799), in the user's language, from its fields: "Waiting for B6 to finish", "Waiting
  * for #12 → Review", "Waiting on lane l-1 and #4". Its `label` is the English agents and the Agent API read.
  */
-export function watchText(w: Pick<TaskWatchInfo, 'cards' | 'column' | 'agents' | 'lanes'>, tr: Tr, list: (items: string[]) => string, form: 'line' | 'cell' = 'line'): string {
+export function watchText(w: Pick<TaskWatchInfo, 'cards' | 'column' | 'agents' | 'lanes' | 'laneTitles'>, tr: Tr, list: (items: string[]) => string, form: 'line' | 'cell' = 'line'): string {
   const cards = w.cards.map((n) => `${cardRef(n)}`).join(', ')
   // A lane watch's cards and agents beside its lanes (HI-1987) go in its {cards}, as they are listed after the lanes.
   // A lane watch's cell says it whole ("Waiting on all running lanes"), as its English label does.
@@ -155,7 +156,9 @@ export function watchText(w: Pick<TaskWatchInfo, 'cards' | 'column' | 'agents' |
   if (w.agents?.length && !w.lanes?.length) return tr(msg({ id: 'panes.watch.agents', defaultMessage: 'Waiting for {agents} to finish', description: "A watching agent's status (its pane): it waits for these agents ({agents}: their names, listed) to finish their turns." }), { agents: list(w.agents) })
   if (w.lanes?.length) {
     const lanes = w.lanes[0] === 'all' ? 'all' : w.lanes.length === 1 ? 'one' : 'some'
-    return tr(msg({ id: 'panes.watch.lanes', defaultMessage: 'Waiting on {lanes, select, all {all running lanes} one {lane {lane}} other {{n, plural, one {# lane} other {# lanes}}}}{cards, select, none {} other { and {cards}}}', description: "A watching agent's status (its pane): it waits on card loops (lanes): all of them, one ({lane}: its id) or {n}; then any cards it also watches ({cards}: \"#4, #5\"; none: leave that branch empty)." }), { lanes, lane: w.lanes[0], n: w.lanes.length, cards: [cards, ...(w.agents ?? [])].filter(Boolean).join(', ') || 'none' })
+    // HI-2522: one lane by its name ("lane combwork screenshots"), never its lane-… id, which read as a commit id.
+    const lane = lanes === 'one' ? tr(msg({ id: 'panes.watch.oneLane', defaultMessage: "{kind, select, named {lane {name}} both {{builder}'s lane {name}} builder {{builder}'s lane} other {lane {name}}}", description: "One card loop (lane) a watching agent waits on, in its status (panes.watch.lanes's {lane}). kind: named ({name}: the lane's name), both (another lane has that name, so its builder's name {builder} is said too), builder (the lane has no name: {builder}'s lane), other (a watch from an older version: {name} is the lane's internal id)." }), laneTitleArgs(w.lanes[0], w.laneTitles?.[w.lanes[0]])) : ''
+    return tr(msg({ id: 'panes.watch.lanes', defaultMessage: 'Waiting on {lanes, select, all {all running lanes} one {{lane}} other {{n, plural, one {# lane} other {# lanes}}}}{cards, select, none {} other { and {cards}}}', description: "A watching agent's status (its pane): it waits on card loops (lanes): all of them, one ({lane}: the lane as panes.watch.oneLane names it, \"lane combwork screenshots\") or {n}; then any cards it also watches ({cards}: \"#4, #5\"; none: leave that branch empty)." }), { lanes, lane, n: w.lanes.length, cards: [cards, ...(w.agents ?? [])].filter(Boolean).join(', ') || 'none' })
   }
   if (w.column) return tr(msg({ id: 'panes.watch.cardsInto', defaultMessage: 'Waiting for {cards} → {column}', description: "A watching agent's status (its pane): it waits for cards ({cards}: \"#12, #13\") to move into a board column ({column})." }), { cards, column: columnName(w.column, tr) })
   return tr(msg({ id: 'panes.watch.cards', defaultMessage: 'Waiting for {cards}', description: "A watching agent's status (its pane): it waits for these cards ({cards}: \"#12, #13\") to change." }), { cards })

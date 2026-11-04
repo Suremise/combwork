@@ -2297,6 +2297,16 @@ export interface RuntimeFacts {
   composer: 'held' | 'free'
 }
 
+/**
+ * A lane as a watch's label names it (HI-2522: "Waiting on lane lane-1d1c05" read as a commit id): by its name, else as
+ * its builder's lane; `twin`, another lane in the watcher's view has the same name, so its builder is named too.
+ */
+export interface LaneTitle {
+  name: string | null
+  builder: string
+  twin?: true
+}
+
 /** An agent's wake-on-change watch, as its state shows it: the cards and condition, since when, and its overall limit. */
 export interface TaskWatchInfo {
   cards: number[]
@@ -2306,6 +2316,11 @@ export interface TaskWatchInfo {
   agents?: string[]
   /** A lane watch's lanes, by id, or ["all"] (#531; its cards are those beside the lanes, #726). */
   lanes?: string[]
+  /**
+   * HI-2522: how its labels name each lane of `lanes` (by id), as the lanes were when the watch began; a lane missing
+   * (a watch from before) is named by its id.
+   */
+  laneTitles?: Record<string, LaneTitle>
   /** Accounts' usage watched beside its cards or lanes, or alone (HI-2195; HI-2285: such a watch waits on more than its cards). */
   usage?: true
   /** "Waiting for #12 → Review", "Waiting for B6 to finish". */

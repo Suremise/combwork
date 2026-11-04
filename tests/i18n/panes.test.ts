@@ -40,11 +40,15 @@ const watches = [
   { cards: [506, 509] },
   { cards: [], lanes: ['all'] },
   { cards: [4], lanes: ['l-1'] },
-  { cards: [], lanes: ['l-1', 'l-2'] }
+  { cards: [], lanes: ['l-1', 'l-2'] },
+  // HI-2522: one lane by its name, its builder's too when another lane has it, or as its builder's lane.
+  { cards: [], lanes: ['l-1'], laneTitles: { 'l-1': { name: 'combwork screenshots', builder: 'WB1' } } },
+  { cards: [4], lanes: ['l-1'], laneTitles: { 'l-1': { name: 'combwork screenshots', builder: 'WB1', twin: true as const } } },
+  { cards: [], lanes: ['l-1'], laneTitles: { 'l-1': { name: null, builder: 'WB1' } } }
 ]
 /** The English label agents read for each watch above. */
 const agentLabel = (w: (typeof watches)[number]): string =>
-  w.agents ? agentWatchLabel({ agents: w.agents.map((name) => ({ name, project: 'hive', id: name })) } as never) : w.lanes ? laneWatchLabel({ ids: w.lanes[0] === 'all' ? 'all' : w.lanes, events: [] }, w.cards) : watchLabel({ cards: w.cards, column: w.column })
+  w.agents ? agentWatchLabel({ agents: w.agents.map((name) => ({ name, project: 'hive', id: name })) } as never) : w.lanes ? laneWatchLabel({ ids: w.lanes[0] === 'all' ? 'all' : w.lanes, events: [] }, w.cards, [], 'laneTitles' in w ? w.laneTitles : undefined) : watchLabel({ cards: w.cards, column: w.column })
 
 describe('the panes area', () => {
   it('locales/en/panes.json has a note for translators on every message', () => {
