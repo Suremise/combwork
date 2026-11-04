@@ -196,7 +196,7 @@ const starts = () => lines(started)
     await inv('session:stop', alpha, r2.id)
     check('R2 stops', !!(await until(async () => !(await live(r2.id)), HUNG_MS)))
     check("…its review copy is returned and freed", !!(await until(async () => (await copies()).find((x) => x.name === 'copy-2')?.state === 'free' && !(await copyOf(b, r2.id)), LOOK_MS)), JSON.stringify(await copies()))
-    await inv('advanced:set', 'hive.copies.review', false)
+    await inv('advanced:set', 'cw.copies.review', false)
     const before = codexLaunches().length
     await inv('session:start', alpha, { agentId: r2.id })
     check('R2 starts again', !!(await ready(r2.id)))

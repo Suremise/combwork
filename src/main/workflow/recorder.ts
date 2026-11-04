@@ -426,7 +426,7 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
  * Whether workflow rules are enforced (Settings → Advanced: service.ts' ENFORCE, read here without the service, which
  * reaches back to the board).
  */
-export const rulesEnforced = (): boolean => advanced.get<boolean>('hive.workflow.enforce')
+export const rulesEnforced = (): boolean => advanced.get<boolean>('cw.workflow.enforce')
 
 /**
  * A failed review recorded at the card's round limit (§16.11.4, #1269): Hive asks the user (For you, Decide) as the

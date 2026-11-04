@@ -11,8 +11,10 @@
  *   cli-appears   scenario 3: Claude Code turned on, a stand-in installer puts the e2e fake on the user PATH, and
  *                 Provider Setup's "Check again" finds it without restarting Hive
  *   workspace     scenario 6: a new workspace in the fresh install (its .combwork, views and status), for the fresh-install comparison
- *   mark          scenario 4, before the upgrade: change two settings (user name, theme)
- *   after-upgrade scenario 4, after it: those settings kept, the version, a screenshot
+ *   mark          scenario 4, before the upgrade: change two settings (user name, theme), and two Advanced
+ *                 overrides under the old hive.* ids (Combwork's own and a workspace's own, HI-2518)
+ *   after-upgrade scenario 4, after it: those settings kept, the Advanced overrides under cw.* (an old id refused,
+ *                 naming the new one), the version, a screenshot
  */
 const fs = require('fs')
 const path = require('path')
@@ -37,6 +39,9 @@ const MARK = { userName: 'Sandbox Check', theme: 'light' }
 // Scenario 4's workspace, made before the upgrade and opened after it (HI-2506), and its card.
 const KEPT_WS = path.join(process.env.USERPROFILE, 'Workspaces', 'Kept')
 const KEPT_CARD = 'Made before the upgrade'
+// Scenario 4's advanced overrides (HI-2518): set under the release before's hive.* ids, read back under cw.* after.
+const ADV = { app: { old: 'hive.mcp.replySeconds', now: 'cw.mcp.replySeconds', value: 600 }, ws: { old: 'hive.progress.lanesShown', now: 'cw.progress.lanesShown', value: 6 } }
+const readJson = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return null } }
 const res = { step, prefix, at: new Date().toISOString(), checks: [], facts: {}, shots: [] }
 const save = () => fs.writeFileSync(path.join(OUT, `${prefix}.json`), JSON.stringify(res, null, 2))
 // Each check has a stable id ("<scenario>.<what>"): the host's report requires the ids each step must produce.
@@ -272,6 +277,12 @@ const steps = {
     if (made) card = await inv('tasks:create', { title: KEPT_CARD, project: 'demo', description: `The plan: ${path.join(KEPT_WS, '.hive', 'shared', 'plan.md')}` }).catch((e) => ({ error: String(e) }))
     res.facts.keptWorkspace = { made: !!made, card }
     check('4.workspace-made', 'Before the upgrade: a workspace with a project and a card, in .hive', !!made && typeof card?.number === 'number', JSON.stringify(res.facts.keptWorkspace))
+    // Advanced overrides under the release before's hive.* ids (HI-2518), one at each level: Combwork's own (advanced.json
+    // in the profile) and the workspace's own (its workspace.json), for the upgrade to bring back under cw.*.
+    const setAdv = (id, value, scope) => inv('advanced:set', id, value, scope).then(() => null, (e) => String(e))
+    res.facts.advancedSet = { app: await setAdv(ADV.app.old, ADV.app.value), workspace: made ? await setAdv(ADV.ws.old, ADV.ws.value, 'workspace') : 'no workspace' }
+    const advSaved = await until(async () => readJson(path.join(PROFILE, 'advanced.json'))?.values?.[ADV.app.old] === ADV.app.value && readJson(path.join(KEPT_WS, '.hive', 'workspace.json'))?.advanced?.[ADV.ws.old] === ADV.ws.value, 10_000)
+    check('4.advanced-saved', `Before the upgrade: ${ADV.app.old} = ${ADV.app.value} in advanced.json and the workspace's own ${ADV.ws.old} = ${ADV.ws.value}`, advSaved, JSON.stringify({ set: res.facts.advancedSet, file: readJson(path.join(PROFILE, 'advanced.json'))?.values, ws: readJson(path.join(KEPT_WS, '.hive', 'workspace.json'))?.advanced }))
     await shot('before-upgrade')
   },
 
@@ -335,6 +346,19 @@ const steps = {
     const card = Array.isArray(cards) ? cards.find((x) => x.title === KEPT_CARD) : null
     res.facts.keptCard = card ? { number: card.number, description: card.description } : cards
     check('4.workspace-card', 'Its card is on the board, its path now into .combwork', !!card && card.description === `The plan: ${path.join(KEPT_WS, '.combwork', 'shared', 'plan.md')}`, JSON.stringify(res.facts.keptCard))
+    // The advanced overrides made before (HI-2518): read back under their cw.* ids, in the app (Settings' state, the Agent
+    // API's settings read) and on disk (advanced.json rewritten at once; workspace.json at its next save, so not checked),
+    // with nothing left under the old id; and an agent naming the old id told the new one.
+    const fileNow = () => readJson(path.join(PROFILE, 'advanced.json'))?.values ?? null
+    const rewritten = await until(async () => { const v = fileNow(); return v && v[ADV.app.now] === ADV.app.value && !(ADV.app.old in v) && v }, 15_000)
+    const state = await inv('advanced:state').catch((e) => ({ error: String(e) }))
+    const viaApi = await api(`/v1/settings/${encodeURIComponent(`advanced.${ADV.app.now}`)}`).catch((e) => ({ error: String(e) }))
+    const wsApi = await api(`/v1/settings/${encodeURIComponent(`workspace.advanced.${ADV.ws.now}`)}`).catch((e) => ({ error: String(e) }))
+    res.facts.advancedAfter = { file: fileNow(), values: state?.values, workspace: state?.workspace, api: viaApi, wsApi }
+    check('4.advanced-kept', `The advanced overrides come back under cw.*: ${ADV.app.now} = ${ADV.app.value} (advanced.json rewritten, nothing under ${ADV.app.old}) and the workspace's own ${ADV.ws.now} = ${ADV.ws.value}`, !!rewritten && state?.values?.[ADV.app.now] === ADV.app.value && !(ADV.app.old in (state?.values ?? {})) && state?.workspace?.[ADV.ws.now] === ADV.ws.value && !(ADV.ws.old in (state?.workspace ?? {})), JSON.stringify(res.facts.advancedAfter))
+    const old = await api(`/v1/settings/${encodeURIComponent(`advanced.${ADV.app.old}`)}`).catch((e) => ({ error: String(e) }))
+    res.facts.advancedOldId = old
+    check('4.advanced-old-id', `An agent naming the old id (advanced.${ADV.app.old}) is told the new one`, JSON.stringify(old).includes(`use advanced.${ADV.app.now}`), JSON.stringify(old))
     await shot('after-upgrade-light')
     await theme('dark')
     await shot('after-upgrade-dark')

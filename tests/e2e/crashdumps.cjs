@@ -97,7 +97,7 @@ process.on('uncaughtException', (e) => {
     // Out of memory (#1005), with Settings → Advanced → Save a memory snapshot… on: the main process, given a small heap,
     // fills it; Node writes a heap snapshot into the profile's heap folder before the crash, which leaves a dump too.
     {
-      fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'hive.heapSnapshotNearLimit': true } }))
+      fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'cw.heapSnapshotNearLimit': true } }))
       const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [`--js-flags=--max-old-space-size=${SMALL_HEAP_MB}`, lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData }) })
       current = { app }
       identities.push(...lib.identify([app.process().pid]))

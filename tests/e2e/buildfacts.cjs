@@ -73,11 +73,11 @@ const builds = async (inv) => (await inv('journal:browse', { source: 'hive' })).
     await page.screenshot({ path: path.join(lib.WORK, 'buildfacts-journal.png') })
 
     // Settings → Advanced → Record builds in the journal off: Hive answers it wrote nothing; no marker either.
-    await inv('advanced:set', 'hive.journal.builds', false)
+    await inv('advanced:set', 'cw.journal.builds', false)
     const off = fakeBuild(api)
     check('with the switch off, Combwork says it wrote nothing', /^Build not recorded in Hive's journal: Settings → Advanced → Record builds in the journal is off\.$/.test(off), off)
     check('…and nothing was written or left', (await builds(inv)).length === 1 && (!fs.existsSync(markers) || fs.readdirSync(markers).length === 0))
-    await inv('advanced:set', 'hive.journal.builds', null)
+    await inv('advanced:set', 'cw.journal.builds', null)
 
     // Hive closed: the build is left as a marker, then recorded once as the workspace opens.
     await app.close()

@@ -5,7 +5,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ADVANCED_DEFS, advancedDef, advancedFileText, advancedUnit, advancedRow, checkAdvanced, cliFacing, groupName, parseAdvancedFile, sampleMiss, shownText, type AdvancedDef } from '../src/shared/advanced'
+import { ADVANCED_DEFS, advancedDef, advancedFileText, advancedUnit, advancedRow, checkAdvanced, cliFacing, groupName, migrateAdvancedIds, parseAdvancedFile, RENAMED_ADVANCED, sampleMiss, shownText, type AdvancedDef } from '../src/shared/advanced'
 import { CLAUDE_FOOTER_MODES } from '../src/shared/claude'
 import { COPILOT_FOOTER_MODES } from '../src/shared/copilot'
 import { SETTINGS_CATALOG, checkSettingValue, settingDefault, settingEntry, settingPatch, settingValue, settingValueText } from '../src/shared/settingsCatalog'
@@ -58,14 +58,14 @@ describe('advanced defaults', () => {
       expect(checkAdvanced(d, d.default), d.id).toEqual({ value: d.default })
       if (d.kind === 'number') expect(d.min! <= (d.default as number) && (d.default as number) <= d.max!, d.id).toBe(true)
       // Every value of a CLI's is CLI-facing (what Hive reads from it, and what it gives it); Hive's own aren't.
-      expect(cliFacing(d), d.id).toBe(d.group !== 'hive')
+      expect(cliFacing(d), d.id).toBe(d.group !== 'cw')
     }
   })
 
   it("every number's unit has a label for beside its box (#1281), and a number of seconds says s", () => {
     for (const d of ADVANCED_DEFS.filter((x) => x.unit)) expect(advancedUnit(d), d.id).toBeTruthy()
     expect(advancedUnit(def('codex.mcp.startupTimeoutSeconds'))).toBe('s')
-    expect(advancedUnit(def('hive.showDeveloperFeatures'))).toBeNull()
+    expect(advancedUnit(def('cw.showDeveloperFeatures'))).toBeNull()
   })
 
   it('every CLI-facing default has recorded samples, each found in its fixture, and reads every one', () => {
@@ -117,7 +117,7 @@ describe('an override', () => {
   // A choice (#1292: the OSC 52 policy): one of its values, as advanced.json and the tools write them.
   it('takes one of a choice\'s values, any case, shown by its name; anything else refused, listing them', async () => {
     const { advancedShown, advancedText } = await import('../src/shared/advanced')
-    const policy = def('hive.terminal.osc52')
+    const policy = def('cw.terminal.osc52')
     expect(policy).toMatchObject({ kind: 'choice', default: 'allow', applies: 'now' })
     expect(policy.choices!.map((c) => c.value)).toEqual(['allow', 'ask', 'block'])
     expect(checkAdvanced(policy, 'ask')).toEqual({ value: 'ask' })
@@ -140,14 +140,14 @@ describe('an override', () => {
     expect(checkAdvanced(field, 'rateLimits')).toEqual({ value: 'rateLimits' })
     expect(checkAdvanced(field, 'rate-limits')).toMatchObject({ error: expect.stringContaining('field name') })
     expect(checkAdvanced(field, '1st')).toMatchObject({ error: expect.any(String) })
-    expect(checkAdvanced(def('hive.showDeveloperFeatures'), 'on')).toEqual({ value: true })
-    expect(checkAdvanced(def('hive.showDeveloperFeatures'), 'yes')).toMatchObject({ error: expect.stringContaining('true or false') })
+    expect(checkAdvanced(def('cw.showDeveloperFeatures'), 'on')).toEqual({ value: true })
+    expect(checkAdvanced(def('cw.showDeveloperFeatures'), 'yes')).toMatchObject({ error: expect.stringContaining('true or false') })
     const items = def('codex.title.items')
     expect(checkAdvanced(items, 'activity, project-name, spinner')).toEqual({ value: ['activity', 'project-name', 'spinner'] })
     expect(checkAdvanced(items, ['activity'])).toEqual({ value: ['activity'] })
     expect(checkAdvanced(items, '')).toMatchObject({ error: expect.any(String) })
     expect(checkAdvanced(items, ['a b'])).toMatchObject({ error: expect.any(String) })
-    const reply = def('hive.mcp.replySeconds')
+    const reply = def('cw.mcp.replySeconds')
     expect(checkAdvanced(reply, 600)).toEqual({ value: 600 })
     expect(checkAdvanced(reply, '600')).toEqual({ value: 600 })
     expect(checkAdvanced(reply, 29)).toMatchObject({ error: expect.stringContaining('30 to 3600') })
@@ -161,23 +161,23 @@ describe('an override', () => {
     expect(sampleMiss(def('codex.rateLimits.field'), 'limits')).toMatch(/Codex 0\.159\.0 sent no field "limits" here \(it sent type, info, rate_limits\)/)
     expect(sampleMiss(def('codex.ready.placeholder'), 'Ask Codex anything')).toMatch(/doesn't find/)
     // Hive's own have nothing recorded to try.
-    expect(sampleMiss(def('hive.mcp.replySeconds'), 999)).toBeNull()
+    expect(sampleMiss(def('cw.mcp.replySeconds'), 999)).toBeNull()
   })
 
   it('is used when it checks out; else the default, saying why; a workspace\'s own comes first where one is taken', () => {
-    const lanes = def('hive.progress.lanesShown')
+    const lanes = def('cw.progress.lanesShown')
     const state = (values: Record<string, unknown>, workspace: Record<string, unknown> | null = null) => ({ values, madeFor: {}, workspace, cli: {} })
     expect(advancedRow(lanes, null).value).toBe(6)
-    expect(advancedRow(lanes, state({ 'hive.progress.lanesShown': 6 })).value).toBe(6)
-    expect(advancedRow(lanes, state({ 'hive.progress.lanesShown': 6 }, { 'hive.progress.lanesShown': 2 })).value).toBe(2)
-    const bad = advancedRow(lanes, state({ 'hive.progress.lanesShown': 'six' }))
+    expect(advancedRow(lanes, state({ 'cw.progress.lanesShown': 6 })).value).toBe(6)
+    expect(advancedRow(lanes, state({ 'cw.progress.lanesShown': 6 }, { 'cw.progress.lanesShown': 2 })).value).toBe(2)
+    const bad = advancedRow(lanes, state({ 'cw.progress.lanesShown': 'six' }))
     expect(bad.value).toBe(6)
     expect(bad.problem).toMatch(/whole number/)
-    const badOwn = advancedRow(lanes, state({ 'hive.progress.lanesShown': 6 }, { 'hive.progress.lanesShown': 99 }))
+    const badOwn = advancedRow(lanes, state({ 'cw.progress.lanesShown': 6 }, { 'cw.progress.lanesShown': 99 }))
     expect(badOwn.value).toBe(6)
     expect(badOwn.problem).toMatch(/^This workspace's/)
     // A value a workspace can't take is its own nowhere.
-    expect(advancedRow(def('hive.mcp.replySeconds'), state({}, { 'hive.mcp.replySeconds': 900 })).value).toBe(300)
+    expect(advancedRow(def('cw.mcp.replySeconds'), state({}, { 'cw.mcp.replySeconds': 900 })).value).toBe(300)
     const trust = def('claude-code.trust.prompt')
     expect(advancedRow(trust, state({ 'claude-code.trust.prompt': '(' })).value).toBe('trust this folder')
   })
@@ -193,17 +193,69 @@ describe('an override', () => {
 
 describe('advanced.json', () => {
   it('is versioned, its keys in order; a newer format, bad JSON or a wrong shape is refused; unknown ids are kept, not used', () => {
-    const text = advancedFileText({ 'hive.mcp.replySeconds': 600, 'claude-code.trust.prompt': 'I trust' }, { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } })
-    expect(JSON.parse(text)).toEqual({ format: 1, values: { 'claude-code.trust.prompt': 'I trust', 'hive.mcp.replySeconds': 600 }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } } })
-    expect(Object.keys(JSON.parse(text).values)).toEqual(['claude-code.trust.prompt', 'hive.mcp.replySeconds'])
-    expect(parseAdvancedFile(text)).toEqual({ values: { 'claude-code.trust.prompt': 'I trust', 'hive.mcp.replySeconds': 600 }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } }, unknown: [] })
+    const text = advancedFileText({ 'cw.mcp.replySeconds': 600, 'claude-code.trust.prompt': 'I trust' }, { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } })
+    expect(JSON.parse(text)).toEqual({ format: 1, values: { 'claude-code.trust.prompt': 'I trust', 'cw.mcp.replySeconds': 600 }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } } })
+    expect(Object.keys(JSON.parse(text).values)).toEqual(['claude-code.trust.prompt', 'cw.mcp.replySeconds'])
+    expect(parseAdvancedFile(text)).toEqual({ values: { 'claude-code.trust.prompt': 'I trust', 'cw.mcp.replySeconds': 600 }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } }, unknown: [], renamed: [] })
     expect(parseAdvancedFile('{ "values": ')).toMatchObject({ error: expect.stringContaining("isn't valid JSON") })
     expect(parseAdvancedFile('[]')).toMatchObject({ error: expect.stringContaining('object') })
     expect(parseAdvancedFile('{"format":2,"values":{}}')).toMatchObject({ error: expect.stringContaining('newer Combwork') })
     expect(parseAdvancedFile('{"values":[]}')).toMatchObject({ error: expect.stringContaining('"values"') })
-    expect(parseAdvancedFile('{"values":{"hive.nope":1,"hive.mcp.replySeconds":400}}')).toMatchObject({ unknown: ['hive.nope'] })
+    expect(parseAdvancedFile('{"values":{"hive.nope":1,"cw.mcp.replySeconds":400}}')).toMatchObject({ unknown: ['hive.nope'] })
     // A record for a value no longer there is dropped.
     expect(parseAdvancedFile('{"values":{},"madeFor":{"claude-code.trust.prompt":{"version":"1","value":"x"}}}')).toMatchObject({ madeFor: {} })
+  })
+
+  it("reads Combwork's own settings' hive.* ids as their cw.* ones, one way, the cw.* one winning by presence (HI-2518)", () => {
+    // Every setting of Combwork's own has a cw.* id, in group cw; no setting has a hive.* id now.
+    expect(ADVANCED_DEFS.filter((d) => d.id.startsWith('hive.'))).toEqual([])
+    for (const d of ADVANCED_DEFS) expect(d.id.startsWith(`${d.group}.`), d.id).toBe(true)
+    expect(RENAMED_ADVANCED.size).toBe(ADVANCED_DEFS.filter((d) => d.group === 'cw').length)
+    expect(RENAMED_ADVANCED.get('hive.cards.attachmentFolders')).toBe('cw.cards.attachmentFolders')
+    expect(RENAMED_ADVANCED.get('hive.outage.checkUrl.codex')).toBe('cw.outage.checkUrl.codex')
+    // Old migrations' and retired keys keep their names: they are no settings now.
+    for (const k of ['hive.assistant.otherMcpServers', 'hive.agents.perProject', 'hive.accounts.preview']) expect(RENAMED_ADVANCED.has(k), k).toBe(false)
+    expect(migrateAdvancedIds({ 'hive.mcp.replySeconds': 600, 'claude-code.trust.prompt': 'x', 'hive.agents.perProject': 3, 'hive.nope': 1 })).toEqual({ record: { 'cw.mcp.replySeconds': 600, 'claude-code.trust.prompt': 'x', 'hive.agents.perProject': 3, 'hive.nope': 1 }, renamed: ['hive.mcp.replySeconds'] })
+    // Both there: the new one is kept, false, 0 and [] too, and the old one dropped.
+    expect(migrateAdvancedIds({ 'hive.restart.resumeAfterUpdate': true, 'cw.restart.resumeAfterUpdate': false }).record).toEqual({ 'cw.restart.resumeAfterUpdate': false })
+    expect(migrateAdvancedIds({ 'cw.progress.lanesShown': 0, 'hive.progress.lanesShown': 6 }).record).toEqual({ 'cw.progress.lanesShown': 0 })
+    expect(migrateAdvancedIds({ 'hive.cards.attachmentFolders': ['C:\\x'], 'cw.cards.attachmentFolders': [] }).record).toEqual({ 'cw.cards.attachmentFolders': [] })
+    const same = { 'cw.mcp.replySeconds': 1 }
+    expect(migrateAdvancedIds(same)).toEqual({ record: same, renamed: [] })
+    // advanced.json as read: values and the version records, the old ids gone; unknown keys listed as before.
+    const read = parseAdvancedFile(JSON.stringify({ format: 1, values: { 'hive.mcp.replySeconds': 600, 'hive.nope': 1, 'cw.progress.lanesShown': 0, 'hive.progress.lanesShown': 6 }, madeFor: { 'hive.mcp.replySeconds': { version: '1', value: 600 } } }))
+    expect(read).toEqual({ values: { 'cw.mcp.replySeconds': 600, 'hive.nope': 1, 'cw.progress.lanesShown': 0 }, madeFor: { 'cw.mcp.replySeconds': { version: '1', value: 600 } }, unknown: ['hive.nope'], renamed: ['hive.mcp.replySeconds', 'hive.progress.lanesShown'] })
+  })
+
+  it('the store writes an old file back under the new ids, in its queued write, and never over a file it could not read (HI-2518)', async () => {
+    const dir = tempDir('hive-advanced-renamed-')
+    const file = join(dir, 'advanced.json')
+    writeFileSync(file, JSON.stringify({ format: 1, values: { 'hive.mcp.replySeconds': 600, 'claude-code.trust.prompt': 'I trust' }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } } }))
+    const s = new AdvancedStore()
+    try {
+      s.load(dir)
+      expect(s.number('cw.mcp.replySeconds')).toBe(600)
+      await vi.waitFor(() => expect(JSON.parse(readFileSync(file, 'utf8')).values).toEqual({ 'claude-code.trust.prompt': 'I trust', 'cw.mcp.replySeconds': 600 }), { timeout: 10_000 })
+      expect(JSON.parse(readFileSync(file, 'utf8')).madeFor).toEqual({ 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } })
+      // A hand edit with an old id later is read the new way too, and written back.
+      writeFileSync(file, JSON.stringify({ format: 1, values: { 'hive.mcp.replySeconds': 900 } }))
+      await s.reload()
+      expect(s.number('cw.mcp.replySeconds')).toBe(900)
+      await vi.waitFor(() => expect(JSON.parse(readFileSync(file, 'utf8')).values).toEqual({ 'cw.mcp.replySeconds': 900 }), { timeout: 10_000 })
+    } finally {
+      s.stop()
+    }
+    const broken = tempDir('hive-advanced-renamed-')
+    const text = '{"values":{"hive.mcp.replySeconds":600}'
+    writeFileSync(join(broken, 'advanced.json'), text)
+    const b = new AdvancedStore()
+    try {
+      b.load(broken)
+      expect(b.state(null).fileError).toBeTruthy()
+      expect(readFileSync(join(broken, 'advanced.json'), 'utf8')).toBe(text)
+    } finally {
+      b.stop()
+    }
   })
 })
 
@@ -223,28 +275,28 @@ describe('the advanced store', () => {
   it('uses defaults with no file; writes an override, with the CLI version it was made for; the default again removes it', async () => {
     const { s, dir, file } = store()
     s.load(dir)
-    expect(s.number('hive.mcp.replySeconds')).toBe(300)
+    expect(s.number('cw.mcp.replySeconds')).toBe(300)
     s.noteCli('claude-code', '2.1.296')
     await s.set('claude-code.trust.prompt', 'trust (this|the) folder')
-    await s.set('hive.mcp.replySeconds', 600)
-    expect(read(file)).toEqual({ format: 1, values: { 'claude-code.trust.prompt': 'trust (this|the) folder', 'hive.mcp.replySeconds': 600 }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.296', value: 'trust (this|the) folder' } } })
+    await s.set('cw.mcp.replySeconds', 600)
+    expect(read(file)).toEqual({ format: 1, values: { 'claude-code.trust.prompt': 'trust (this|the) folder', 'cw.mcp.replySeconds': 600 }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.296', value: 'trust (this|the) folder' } } })
     expect(s.pattern('claude-code.trust.prompt').test('Yes, I trust the folder')).toBe(true)
-    expect(s.number('hive.mcp.replySeconds')).toBe(600)
-    await expect(s.set('hive.mcp.replySeconds', 5)).rejects.toThrow('30 to 3600')
+    expect(s.number('cw.mcp.replySeconds')).toBe(600)
+    await expect(s.set('cw.mcp.replySeconds', 5)).rejects.toThrow('30 to 3600')
     await expect(s.set('hive.nope', 5)).rejects.toThrow('No advanced setting')
-    await s.set('hive.mcp.replySeconds', 300)
+    await s.set('cw.mcp.replySeconds', 300)
     await s.set('claude-code.trust.prompt', null)
     expect(read(file)).toEqual({ format: 1, values: {}, madeFor: {} })
   })
 
   it('a retired setting (the Connections preview, HI-1774) is dropped as read, never unknown, and gone at the next write; a real unknown one stays', async () => {
     const { s, dir, file } = store()
-    writeFileSync(file, JSON.stringify({ format: 1, values: { 'hive.accounts.preview': true, 'hive.nope': 1, 'hive.mcp.replySeconds': 400 }, madeFor: { 'hive.accounts.preview': { version: null, value: true } } }))
-    expect(parseAdvancedFile(readFileSync(file, 'utf8'))).toEqual({ values: { 'hive.nope': 1, 'hive.mcp.replySeconds': 400 }, madeFor: {}, unknown: ['hive.nope'] })
+    writeFileSync(file, JSON.stringify({ format: 1, values: { 'hive.accounts.preview': true, 'hive.nope': 1, 'cw.mcp.replySeconds': 400 }, madeFor: { 'hive.accounts.preview': { version: null, value: true } } }))
+    expect(parseAdvancedFile(readFileSync(file, 'utf8'))).toEqual({ values: { 'hive.nope': 1, 'cw.mcp.replySeconds': 400 }, madeFor: {}, unknown: ['hive.nope'], renamed: [] })
     s.load(dir)
     expect(s.state(null).unknown).toEqual(['hive.nope'])
-    await s.set('hive.mcp.replySeconds', 600)
-    expect(read(file)).toEqual({ format: 1, values: { 'hive.nope': 1, 'hive.mcp.replySeconds': 600 }, madeFor: {} })
+    await s.set('cw.mcp.replySeconds', 600)
+    expect(read(file)).toEqual({ format: 1, values: { 'hive.nope': 1, 'cw.mcp.replySeconds': 600 }, madeFor: {} })
     await expect(s.set('hive.accounts.preview', true)).rejects.toThrow('No advanced setting')
   })
 
@@ -282,7 +334,7 @@ describe('the advanced store', () => {
     s.load(dir)
     s.noteCli('codex', '0.162.1')
     await s.set('codex.hooks.timeoutSeconds', 8)
-    await s.set('hive.mcp.replySeconds', 600)
+    await s.set('cw.mcp.replySeconds', 600)
     expect(read(file).madeFor).toEqual({ 'codex.hooks.timeoutSeconds': { version: '0.162.1', value: 8 } })
     s.noteCli('codex', '0.163.0')
     expect(advancedRow(def('codex.hooks.timeoutSeconds'), s.state(null)).madeForOther).toBe('0.162.1')
@@ -291,11 +343,11 @@ describe('the advanced store', () => {
 
   it("resets every override (keeping ids this Hive doesn't know), and refuses while the file can't be read", async () => {
     const { s, dir, file } = store()
-    writeFileSync(file, JSON.stringify({ values: { 'hive.mcp.replySeconds': 600, 'hive.someday': 1 } }))
+    writeFileSync(file, JSON.stringify({ values: { 'cw.mcp.replySeconds': 600, 'hive.someday': 1 } }))
     s.load(dir)
     await s.resetAll()
     expect(read(file).values).toEqual({ 'hive.someday': 1 })
-    expect(s.number('hive.mcp.replySeconds')).toBe(300)
+    expect(s.number('cw.mcp.replySeconds')).toBe(300)
     writeFileSync(file, '{')
     await vi.waitFor(() => expect(s.state(null).fileError).toBeTruthy(), { timeout: 10_000 })
     await expect(s.resetAll()).rejects.toThrow('Fix or delete advanced.json')
@@ -338,21 +390,21 @@ describe('the advanced store', () => {
       // A setting already on at the first start is written to the file, not turned off.
       bindAdvancedSettings(cfg as never)
       await settled()
-      expect([read(file).values, on()]).toEqual([{ 'hive.showDeveloperFeatures': true }, true])
+      expect([read(file).values, on()]).toEqual([{ 'cw.showDeveloperFeatures': true }, true])
       // The setting changed (Settings, the Assistant): the file first.
       await change(false)
       expect([read(file).values, on()]).toEqual([{}, false])
       // The file edited by hand: the setting follows.
-      writeFileSync(file, JSON.stringify({ format: 1, values: { 'hive.showDeveloperFeatures': true } }))
+      writeFileSync(file, JSON.stringify({ format: 1, values: { 'cw.showDeveloperFeatures': true } }))
       await vi.waitFor(() => expect(on()).toBe(true), { timeout: 10_000 })
-      expect(advanced.diagnostics([null])).toEqual(['- Advanced settings: 1 override (hive.showDeveloperFeatures)'])
+      expect(advanced.diagnostics([null])).toEqual(['- Advanced settings: 1 override (cw.showDeveloperFeatures)'])
       // Set from the list: the setting too.
-      await advanced.set('hive.showDeveloperFeatures', false)
+      await advanced.set('cw.showDeveloperFeatures', false)
       expect(on()).toBe(false)
       // Reset (the section): the file too.
       await change(true)
       await reset()
-      expect([read(file).values, advanced.get('hive.showDeveloperFeatures'), on()]).toEqual([{}, false, false])
+      expect([read(file).values, advanced.get('cw.showDeveloperFeatures'), on()]).toEqual([{}, false, false])
     } finally {
       advanced.stop()
     }
@@ -362,7 +414,7 @@ describe('the advanced store', () => {
     const dir = tempDir('hive-advanced-bound-')
     const file = join(dir, 'advanced.json')
     const { cfg, given, change, on } = boundSettings()
-    const all = (): unknown[] => [existsSync(file) ? read(file).values : {}, advanced.get('hive.showDeveloperFeatures'), on()]
+    const all = (): unknown[] => [existsSync(file) ? read(file).values : {}, advanced.get('cw.showDeveloperFeatures'), on()]
     try {
       advanced.load(dir)
       // The first start writes the setting (on) to the file; turned off before that write is taken in, the off is kept.
@@ -376,23 +428,23 @@ describe('the advanced store', () => {
       // Changed again and again, quicker than the file is written: the last change is what both keep.
       await Promise.all([change(true), change(false), change(true)])
       await settled()
-      expect(all()).toEqual([{ 'hive.showDeveloperFeatures': true }, true, true])
+      expect(all()).toEqual([{ 'cw.showDeveloperFeatures': true }, true, true])
       const before = given.length
       await settled()
       expect(given.length).toBe(before)
       // Turned off, and the file edited (still on) before that change is written: the change is refused (an edit made
       // meanwhile), and the edit is what both keep; the setting was never off.
       const off = change(false)
-      writeFileSync(file, JSON.stringify({ format: 1, values: { 'hive.showDeveloperFeatures': true } }, null, 2))
+      writeFileSync(file, JSON.stringify({ format: 1, values: { 'cw.showDeveloperFeatures': true } }, null, 2))
       await expect(off).rejects.toThrow(/changed outside Combwork/)
       await settled()
-      expect(all()).toEqual([{ 'hive.showDeveloperFeatures': true }, true, true])
+      expect(all()).toEqual([{ 'cw.showDeveloperFeatures': true }, true, true])
       expect(given.slice(before)).not.toContain(false)
       // Changed past the file (not through updateSettingsChecked): refused, so the two can't come apart; other settings
       // change as ever.
       expect(() => cfg.updateSettings({ advanced: { showDeveloperFeatures: false } })).toThrow(/kept in advanced.json/)
       cfg.updateSettings({ general: { confirmOnQuit: 'never' } })
-      expect(all()).toEqual([{ 'hive.showDeveloperFeatures': true }, true, true])
+      expect(all()).toEqual([{ 'cw.showDeveloperFeatures': true }, true, true])
     } finally {
       advanced.stop()
     }
@@ -410,8 +462,8 @@ describe('the advanced store', () => {
     s.noteCli('codex', '0.162.1')
     await vi.waitFor(() => expect([read(file).madeFor['claude-code.trust.prompt']?.version, read(file).madeFor['codex.trust.prompt']?.version]).toEqual(['2.1.296', '0.162.1']), { timeout: 10_000 })
     expect([s.state(null).madeFor['claude-code.trust.prompt'].version, s.state(null).madeFor['codex.trust.prompt'].version]).toEqual(['2.1.296', '0.162.1'])
-    await Promise.all([s.set('hive.mcp.replySeconds', 600), s.set('hive.wait.cardMaxSeconds', 700), s.set('codex.hooks.timeoutSeconds', 7), s.keep('codex.trust.prompt')])
-    expect(read(file).values).toMatchObject({ 'hive.mcp.replySeconds': 600, 'hive.wait.cardMaxSeconds': 700, 'codex.hooks.timeoutSeconds': 7, 'codex.trust.prompt': 'trust (this|the) folder' })
+    await Promise.all([s.set('cw.mcp.replySeconds', 600), s.set('cw.wait.cardMaxSeconds', 700), s.set('codex.hooks.timeoutSeconds', 7), s.keep('codex.trust.prompt')])
+    expect(read(file).values).toMatchObject({ 'cw.mcp.replySeconds': 600, 'cw.wait.cardMaxSeconds': 700, 'codex.hooks.timeoutSeconds': 7, 'codex.trust.prompt': 'trust (this|the) folder' })
   })
 
   it('changes the developer setting only once advanced.json has it: a refusal (an unreadable file, an edit meanwhile) changes neither', async () => {
@@ -422,7 +474,7 @@ describe('the advanced store', () => {
     try {
       advanced.load(dir)
       await updateSettingsChecked({ advanced: { showDeveloperFeatures: true } }, update)
-      expect(read(file).values).toEqual({ 'hive.showDeveloperFeatures': true })
+      expect(read(file).values).toEqual({ 'cw.showDeveloperFeatures': true })
       expect(updates).toHaveLength(1)
       // Other settings go straight through.
       await updateSettingsChecked({ general: { showTips: false } }, update)
@@ -433,13 +485,13 @@ describe('the advanced store', () => {
       expect(updates).toHaveLength(2)
       expect(readFileSync(file, 'utf8')).toBe('{')
       // An edit made since Hive read the file: refused, the edit read.
-      writeFileSync(file, JSON.stringify({ values: { 'hive.showDeveloperFeatures': true } }))
+      writeFileSync(file, JSON.stringify({ values: { 'cw.showDeveloperFeatures': true } }))
       await vi.waitFor(() => expect(advanced.state(null).fileError).toBeNull(), { timeout: 10_000 })
       advanced.stop()
-      writeFileSync(file, JSON.stringify({ values: { 'hive.showDeveloperFeatures': true, 'hive.mcp.replySeconds': 400 } }))
+      writeFileSync(file, JSON.stringify({ values: { 'cw.showDeveloperFeatures': true, 'cw.mcp.replySeconds': 400 } }))
       await expect(updateSettingsChecked({ advanced: { showDeveloperFeatures: false } }, update)).rejects.toThrow('changed outside Combwork')
       expect(updates).toHaveLength(2)
-      expect(advanced.number('hive.mcp.replySeconds')).toBe(400)
+      expect(advanced.number('cw.mcp.replySeconds')).toBe(400)
     } finally {
       advanced.stop()
     }
@@ -447,17 +499,17 @@ describe('the advanced store', () => {
 
   it("keeps what it read while the file can't be read, and refuses changes until it's fixed", async () => {
     const { s, dir, file } = store()
-    writeFileSync(file, JSON.stringify({ values: { 'hive.mcp.replySeconds': 900 } }))
+    writeFileSync(file, JSON.stringify({ values: { 'cw.mcp.replySeconds': 900 } }))
     s.load(dir)
-    writeFileSync(file, '{ "values": { "hive.mcp.replySeconds": 9')
+    writeFileSync(file, '{ "values": { "cw.mcp.replySeconds": 9')
     await vi.waitFor(() => expect(s.state(null).fileError).toMatch(/isn't valid JSON/), { timeout: 10_000 })
-    expect(s.number('hive.mcp.replySeconds')).toBe(900)
-    await expect(s.set('hive.mcp.replySeconds', 600)).rejects.toThrow('Fix advanced.json')
+    expect(s.number('cw.mcp.replySeconds')).toBe(900)
+    await expect(s.set('cw.mcp.replySeconds', 600)).rejects.toThrow('Fix advanced.json')
     // Through the Agent API (the Assistant's PATCH /v1/settings/:id reaches this set): a refusal by the file's state, 409
     // with its words and the caller's error in metrics, never Hive's 500 (HI-1952 round 1); so is a reset of them all.
     const { apiErrorReply } = await import('../src/main/servers')
     const { apiOutcome } = await import('../src/main/metrics')
-    for (const refused of [await s.set('hive.mcp.replySeconds', 600).catch((e: unknown) => e), await s.resetAll().catch((e: unknown) => e)]) {
+    for (const refused of [await s.set('cw.mcp.replySeconds', 600).catch((e: unknown) => e), await s.resetAll().catch((e: unknown) => e)]) {
       const reply = apiErrorReply(refused)
       expect(reply.status, String(refused)).toBe(409)
       expect(reply.body.error).toMatch(/^advanced\.json isn't valid JSON.*Fix (or delete )?advanced\.json/s)
@@ -466,18 +518,18 @@ describe('the advanced store', () => {
     // No setting by that id: 404.
     expect(apiErrorReply(await s.set('hive.nope', 1).catch((e: unknown) => e)).status).toBe(404)
     // The broken file is left for the user to fix.
-    expect(readFileSync(file, 'utf8')).toBe('{ "values": { "hive.mcp.replySeconds": 9')
+    expect(readFileSync(file, 'utf8')).toBe('{ "values": { "cw.mcp.replySeconds": 9')
   })
 
   it("doesn't overwrite an edit made since it read the file", async () => {
     const { s, dir, file } = store()
     s.load(dir)
-    await s.set('hive.mcp.replySeconds', 600)
+    await s.set('cw.mcp.replySeconds', 600)
     s.stop()
-    writeFileSync(file, advancedFileText({ 'hive.mcp.replySeconds': 1200 }, {}))
-    await expect(s.set('hive.mcp.replySeconds', 700)).rejects.toThrow('changed outside Combwork')
-    expect(read(file).values).toEqual({ 'hive.mcp.replySeconds': 1200 })
-    expect(s.number('hive.mcp.replySeconds')).toBe(1200)
+    writeFileSync(file, advancedFileText({ 'cw.mcp.replySeconds': 1200 }, {}))
+    await expect(s.set('cw.mcp.replySeconds', 700)).rejects.toThrow('changed outside Combwork')
+    expect(read(file).values).toEqual({ 'cw.mcp.replySeconds': 1200 })
+    expect(s.number('cw.mcp.replySeconds')).toBe(1200)
   })
 
   it('records the CLI version once Hive learns it, keeps an override for a new version, and counts overrides for diagnostics (names only)', async () => {
@@ -494,23 +546,23 @@ describe('the advanced store', () => {
     await s.keep('copilot.trust.prompt')
     expect(read(file).madeFor['copilot.trust.prompt'].version).toBe('1.0.99')
     expect(advancedRow(def('copilot.trust.prompt'), s.state(null)).madeForOther).toBeNull()
-    expect(s.diagnostics([{ 'hive.progress.lanesShown': 6 }])).toEqual(['- Advanced settings: 1 override (copilot.trust.prompt); 1 workspace value'])
-    writeFileSync(file, JSON.stringify({ values: { 'hive.mcp.replySeconds': 'x', 'hive.other': 1 } }))
+    expect(s.diagnostics([{ 'cw.progress.lanesShown': 6 }])).toEqual(['- Advanced settings: 1 override (copilot.trust.prompt); 1 workspace value'])
+    writeFileSync(file, JSON.stringify({ values: { 'cw.mcp.replySeconds': 'x', 'hive.other': 1 } }))
     await s.reload()
-    expect(s.diagnostics([null])).toEqual(['- Advanced settings: 1 override (hive.mcp.replySeconds)', '  - not valid, so the default is used: hive.mcp.replySeconds', '  - unknown to this Hive: 1'])
+    expect(s.diagnostics([null])).toEqual(['- Advanced settings: 1 override (cw.mcp.replySeconds)', '  - not valid, so the default is used: cw.mcp.replySeconds', '  - unknown to this Hive: 1'])
   })
 
   it("the developer console's show text is off by default; turned on, its listeners hear it and diagnostics name it (#699)", async () => {
     const { s, dir } = store()
     s.load(dir)
-    expect(def('hive.console.showText')).toMatchObject({ kind: 'boolean', default: false, applies: 'now' })
-    expect(s.get<boolean>('hive.console.showText')).toBe(false)
+    expect(def('cw.console.showText')).toMatchObject({ kind: 'boolean', default: false, applies: 'now' })
+    expect(s.get<boolean>('cw.console.showText')).toBe(false)
     const heard: boolean[] = []
-    s.onChange(() => heard.push(s.get<boolean>('hive.console.showText')))
-    await s.set('hive.console.showText', true)
+    s.onChange(() => heard.push(s.get<boolean>('cw.console.showText')))
+    await s.set('cw.console.showText', true)
     expect(heard).toEqual([true])
-    expect(s.diagnostics([null])).toEqual(['- Advanced settings: 1 override (hive.console.showText)'])
-    await s.set('hive.console.showText', false)
+    expect(s.diagnostics([null])).toEqual(['- Advanced settings: 1 override (cw.console.showText)'])
+    await s.set('cw.console.showText', false)
     expect(heard).toEqual([true, false])
     expect(s.diagnostics([null])).toEqual(['- Advanced settings: no overrides'])
   })
@@ -708,8 +760,8 @@ describe('the adapters and the hive MCP server use them', () => {
       else process.env.CODEX_HOME = before
     }
     // The hive MCP server's reply timeout and waits, kept a minute under Codex's tool timeout.
-    await advanced.set('hive.mcp.replySeconds', 600)
-    await advanced.set('hive.wait.cardMaxSeconds', 3000)
+    await advanced.set('cw.mcp.replySeconds', 600)
+    await advanced.set('cw.wait.cardMaxSeconds', 3000)
     expect(mcpAdvancedEnv()).toEqual({ HIVE_REPLY_SECONDS: '600', HIVE_WAIT_MAX_SECONDS: '1740', HIVE_AGENT_WAIT_MAX_SECONDS: '600' })
     await advanced.set('codex.mcp.toolTimeoutSeconds', null)
     expect(waitMaxSeconds('cards')).toBe(840)
@@ -732,37 +784,37 @@ describe("the Assistant's settings catalog", () => {
     }
     const own = ADVANCED_DEFS.filter((d) => !d.setting)
     expect(SETTINGS_CATALOG.filter((e) => e.advanced).length).toBe(own.length + own.filter((d) => d.workspace).length)
-    const reply = settingEntry('advanced.hive.mcp.replySeconds')!
+    const reply = settingEntry('advanced.cw.mcp.replySeconds')!
     expect(settingValue(reply, {} as never, null, null, {})).toBe(300)
-    expect(settingValue(reply, {} as never, null, null, { 'hive.mcp.replySeconds': 600 })).toBe(600)
+    expect(settingValue(reply, {} as never, null, null, { 'cw.mcp.replySeconds': 600 })).toBe(600)
     expect(settingDefault(reply)).toBe(300)
     expect(checkSettingValue(reply, 20)).toMatchObject({ error: expect.any(String) })
     expect(checkSettingValue(reply, 600)).toEqual({ value: 600 })
     expect(checkSettingValue(reply, null)).toEqual({ value: null })
-    expect(settingPatch(reply, 600)).toEqual({ advanced: { id: 'hive.mcp.replySeconds', scope: 'app', value: 600 } })
+    expect(settingPatch(reply, 600)).toEqual({ advanced: { id: 'cw.mcp.replySeconds', scope: 'app', value: 600 } })
     expect(settingValueText(reply, 600)).toBe('600 s')
     const items = settingEntry('advanced.codex.title.items')!
     expect(checkSettingValue(items, 'activity, project-name')).toEqual({ value: ['activity', 'project-name'] })
     expect(settingValueText(items, ['activity', 'project-name'])).toBe('activity, project-name')
-    const lanes = settingEntry('workspace.advanced.hive.progress.lanesShown')!
+    const lanes = settingEntry('workspace.advanced.cw.progress.lanesShown')!
     expect(lanes.scope).toBe('workspace')
-    expect(settingValue(lanes, {} as never, null, { advanced: { 'hive.progress.lanesShown': 6 } })).toBe(6)
+    expect(settingValue(lanes, {} as never, null, { advanced: { 'cw.progress.lanesShown': 6 } })).toBe(6)
     expect(settingValue(lanes, {} as never, null, {})).toBeNull()
     expect(checkSettingValue(lanes, 'inherit')).toEqual({ value: null })
-    expect(settingPatch(lanes, 6)).toEqual({ advanced: { id: 'hive.progress.lanesShown', scope: 'workspace', value: 6 } })
+    expect(settingPatch(lanes, 6)).toEqual({ advanced: { id: 'cw.progress.lanesShown', scope: 'workspace', value: 6 } })
     // Agents per project (#562) is Maximum agents, a workflow option, since HI-2001 (agentLimit.test.ts).
     expect(settingEntry('workspace.advanced.hive.agents.perProject')).toBeUndefined()
     expect(settingEntry('advanced.hive.agents.perProject')).toBeUndefined()
     // The developer features switch keeps its key and entry in Hive's settings, with its advanced value's text.
-    expect(settingEntry('advanced.showDeveloperFeatures')).toMatchObject({ hidden: true, type: 'boolean', title: def('hive.showDeveloperFeatures').title, desc: def('hive.showDeveloperFeatures').desc })
-    expect(settingEntry('advanced.hive.showDeveloperFeatures')).toBeUndefined()
+    expect(settingEntry('advanced.showDeveloperFeatures')).toMatchObject({ hidden: true, type: 'boolean', title: def('cw.showDeveloperFeatures').title, desc: def('cw.showDeveloperFeatures').desc })
+    expect(settingEntry('advanced.cw.showDeveloperFeatures')).toBeUndefined()
   })
 
   it("names Combwork's own group Combwork, in its tab and where a setting is named alone (HI-2517)", () => {
-    expect(groupName('hive')).toBe('Combwork')
+    expect(groupName('cw')).toBe('Combwork')
     expect(groupName('claude-code')).toBe('Claude Code')
     expect(groupName('copilot')).toBe('GitHub Copilot')
-    expect(shownText(settingEntry('advanced.hive.mcp.replySeconds')!.title)).toBe(`Combwork: ${shownText(def('hive.mcp.replySeconds').text.title)}`)
+    expect(shownText(settingEntry('advanced.cw.mcp.replySeconds')!.title)).toBe(`Combwork: ${shownText(def('cw.mcp.replySeconds').text.title)}`)
     expect(shownText(settingEntry('advanced.codex.title.items')!.title)).toMatch(/^Codex: /)
   })
 })

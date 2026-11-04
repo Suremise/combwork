@@ -44,7 +44,7 @@ afterEach(() => {
   for (const store of stores.splice(0)) store.stop()
 })
 
-const setting = 'hive.mcp.replySeconds'
+const setting = 'cw.mcp.replySeconds'
 const legacy = 'hive.assistant.otherMcpServers'
 const text = (values: Record<string, unknown>): string => JSON.stringify({ format: 1, values })
 function opened(values: Record<string, unknown>) {

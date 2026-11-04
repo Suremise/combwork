@@ -17,7 +17,7 @@ const ws = path.join(lib.WORK, 'codex-newline-ws')
 const claudeHome = path.join(lib.WORK, 'codex-newline-claude-home')
 const proj = path.join(ws, 'alpha')
 const PORT = Number(lib.port(47702))
-const AS_TYPED = 'hive.prompt.asTyped'
+const AS_TYPED = 'cw.prompt.asTyped'
 const NEWLINE = 'codex.prompt.newlineKey'
 let failed = 0
 const check = (name, ok, extra = '') => {

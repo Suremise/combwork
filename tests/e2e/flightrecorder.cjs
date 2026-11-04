@@ -114,7 +114,7 @@ const captured = (trigger) => lib.until(() => capturesOf(trigger).find((c) => c.
     check('off: the recorder noted nothing', !/flight recorder: /.test(hiveLog()))
 
     // --- 2. Safeguard on: a capture of the turn, redacted, and its notice.
-    await setAdvanced('hive.recorder.safeguard', true)
+    await setAdvanced('cw.recorder.safeguard', true)
     check('safeguard on: the turn ends', !!(await prompts.say(`safeguard ${PRIVATE}`)))
     const guard = await captured('safeguard')
     check('safeguard on: a capture is saved, its trigger safeguard', !!guard, JSON.stringify(captures().map((c) => c.name)))
@@ -138,7 +138,7 @@ const captured = (trigger) => lib.until(() => capturesOf(trigger).find((c) => c.
     check('again: Hive noted the stop', !!(await stops(3)))
 
     // --- 3. Unknown on: an ordinary turn saves nothing; a field Hive doesn't know saves a capture naming it.
-    await setAdvanced('hive.recorder.unknown', true)
+    await setAdvanced('cw.recorder.unknown', true)
     check('unknown on: an ordinary turn ends', !!(await prompts.say('work 1')))
     check('unknown on: a turn whose hook has a new field ends', !!(await prompts.say('newfield')))
     const unknown = await captured('unknown')
@@ -147,10 +147,10 @@ const captured = (trigger) => lib.until(() => capturesOf(trigger).find((c) => c.
     check("…and the ordinary turn's hooks made none (every field of the fake's is known)", capturesOf('unknown').length === 1, JSON.stringify(capturesOf('unknown').map((c) => c.header.capture.what)))
     check('the safeguard stop again at once made no second capture', capturesOf('safeguard').length === 1, JSON.stringify(captures().map((c) => c.name)))
     check('unknown on: its notice', !!(await toastFor(`Captured something unknown from its CLI on ${label}`)))
-    await setAdvanced('hive.recorder.unknown', false)
+    await setAdvanced('cw.recorder.unknown', false)
 
     // --- 4. Version on: the agent started again on another version of Claude Code.
-    await setAdvanced('hive.recorder.version', true)
+    await setAdvanced('cw.recorder.version', true)
     const was = (await inv('provider:info'))['claude-code'].version
     await inv('session:stop', alpha, claude.id)
     check('the agent stops', !!(await lib.until(async () => !(await live(alpha, claude)), HUNG_MS)))
@@ -164,7 +164,7 @@ const captured = (trigger) => lib.until(() => capturesOf(trigger).find((c) => c.
     check('the versions are kept in the profile', JSON.parse(fs.readFileSync(path.join(userData, 'flight-recorder.json'), 'utf8')).versions?.['claude-code'] === '2.2.0')
 
     // --- 5. Stalled on: the fake Codex silent in a turn past its limit.
-    await setAdvanced('hive.recorder.stalled', true)
+    await setAdvanced('cw.recorder.stalled', true)
     await inv('session:start', beta, { agentId: codex.id })
     check('the Codex agent starts', !!(await lib.until(async () => (await live(beta, codex))?.status === 'ready', HUNG_MS)))
     const silent = await lib.sendPrompt(inv, lib.ptyKey(beta, codex.id), 'silent', { submitted: async () => (await live(beta, codex))?.status === 'working' })

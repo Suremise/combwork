@@ -127,7 +127,7 @@ export interface QueueConfig {
    */
   fence?: <T>(folder: string, fn: () => Promise<T>) => Promise<T>
   /**
-   * Merge into a checked-out branch (Advanced `hive.queue.checkedOutTarget`, OP-40, read at each use): `ask`, an entry
+   * Merge into a checked-out branch (Advanced `cw.queue.checkedOutTarget`, OP-40, read at each use): `ask`, an entry
    * ready to advance into a target checked out in a folder waits for the user's Approve (For you); `auto`, it advances.
    * A target checked out nowhere is always automatic. Left out, automatic.
    */
@@ -145,7 +145,7 @@ export interface QueueConfig {
   git?: (cwd: string, args: string[], opts?: QueueGitOptions) => Promise<QueueGitResult>
   /**
    * The longest Hive's merge commit runs when the repository signs its commits (#1350, Advanced
-   * `hive.queue.signSeconds`): a signer still waiting then (for a passphrase) is ended and the entry pauses. 60 s left out.
+   * `cw.queue.signSeconds`): a signer still waiting then (for a passphrase) is ended and the entry pauses. 60 s left out.
    */
   signTimeoutMs?: number
   /**
@@ -154,7 +154,7 @@ export interface QueueConfig {
    */
   lock?: <T>(fn: () => Promise<T>) => Promise<T>
   /**
-   * Whether workflow rules are enforced now (Settings → Advanced, `hive.workflow.enforce`, read at each use): off, an
+   * Whether workflow rules are enforced now (Settings → Advanced, `cw.workflow.enforce`, read at each use): off, an
    * entry stops just before its advance, paused `rulesOff`, and an advance already begun finishes. Left out, always.
    */
   enforced?: () => boolean
@@ -339,7 +339,7 @@ function advanceApprovedIn(s: CardState, entry: string, expected: string, result
   })
 }
 
-/** The longest a signed merge commit runs when the config gives none (Advanced `hive.queue.signSeconds`'s default). */
+/** The longest a signed merge commit runs when the config gives none (Advanced `cw.queue.signSeconds`'s default). */
 const SIGN_TIMEOUT_MS = 60_000
 
 /**

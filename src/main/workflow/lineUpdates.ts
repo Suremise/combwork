@@ -31,7 +31,7 @@ import type { LineBehind, Workflow } from './runtime'
 const log = createLogger('workflow')
 
 /** The Advanced switch (#1271): Hive moves an agent's branch after a squash merge (on), or asks the user every time. */
-export const UPDATE_AGENT_BRANCH = 'hive.workflow.updateAgentBranch'
+export const UPDATE_AGENT_BRANCH = 'cw.workflow.updateAgentBranch'
 
 /** Whether an agent is in a turn (busy): set by main from its sessions; idle when unset (unit tests set it). */
 let busy: (project: string, agent: string) => boolean = () => false

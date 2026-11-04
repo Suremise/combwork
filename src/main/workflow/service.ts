@@ -7,7 +7,7 @@
 //
 // Its options are the project's resolved ones (rulesets.ts: global → workspace → project), read again at each call
 // here; and whether reconciliation acts on what it observes is the Advanced switch "Workflow rules are enforced"
-// (`hive.workflow.enforce`), read at each use: off, Hive is as P3 left it (facts recorded, nothing refused or moved).
+// (`cw.workflow.enforce`), read at each use: off, Hive is as P3 left it (facts recorded, nothing refused or moved).
 
 import { resolve as resolvePath } from 'path'
 import { projectAgents } from '../../shared/defaults'

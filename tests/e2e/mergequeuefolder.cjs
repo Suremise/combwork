@@ -52,7 +52,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     builder = await q.agent(fx, h, 'B1')
 
     // --- Ask each time, chosen: For you, then Approve.
-    await h.inv('advanced:set', 'hive.queue.checkedOutTarget', 'ask')
+    await h.inv('advanced:set', 'cw.queue.checkedOutTarget', 'ask')
     q.steer(fx, 'pass')
     const atAsk = main()
     const one = await q.approveBy(fx, h, builder, reviewer, 'One', { 'one.txt': 'one\n' })
@@ -70,8 +70,8 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     await h.page.keyboard.press('Escape')
 
     // --- The setting back to its default, Automatically, from here (S27's card shows nothing is asked).
-    await h.inv('advanced:set', 'hive.queue.checkedOutTarget', null)
-    check('Merge into a checked-out branch: back to its default', (await h.inv('advanced:state')).values['hive.queue.checkedOutTarget'] === undefined)
+    await h.inv('advanced:set', 'cw.queue.checkedOutTarget', null)
+    check('Merge into a checked-out branch: back to its default', (await h.inv('advanced:state')).values['cw.queue.checkedOutTarget'] === undefined)
 
     // --- S27 / S42: the user commits in the folder and the Git view switches branches during the checks.
     q.steer(fx, 'wait')

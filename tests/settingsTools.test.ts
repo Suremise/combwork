@@ -53,7 +53,7 @@ describe("the settings tools on a provider's prices", () => {
 
   // HI-2480 round 2: where agents may attach files from is a permission: the Assistant reads it and never sets it.
   it("Card attachments: more folders is the user's: read and explained, never set by the Assistant, Hive's or a workspace's", async () => {
-    for (const id of ['advanced.hive.cards.attachmentFolders', 'workspace.advanced.hive.cards.attachmentFolders']) {
+    for (const id of ['advanced.cw.cards.attachmentFolders', 'workspace.advanced.cw.cards.attachmentFolders']) {
       const e = settingEntry(id)!
       expect(e, id).toMatchObject({ sensitive: true })
       expect(settingReadOnly(e), id).toMatch(/^It decides which folders agents, the Assistant and scripts may attach files to cards from: only the user can change it, in /)
@@ -63,7 +63,7 @@ describe("the settings tools on a provider's prices", () => {
   })
   // HI-2496: Agents' temp folder redirects every agent's file writes, the Assistant's own launch's too: the user's alone.
   it("Agents' temp folder is the user's: read and explained, never set by the Assistant, Hive's or a workspace's", async () => {
-    for (const id of ['advanced.hive.agents.tempFolder', 'workspace.advanced.hive.agents.tempFolder']) {
+    for (const id of ['advanced.cw.agents.tempFolder', 'workspace.advanced.cw.agents.tempFolder']) {
       const e = settingEntry(id)!
       expect(e, id).toMatchObject({ sensitive: true })
       expect(settingReadOnly(e), id).toMatch(/^It decides where agents and the Assistant itself write their temporary files: only the user can change it, in /)

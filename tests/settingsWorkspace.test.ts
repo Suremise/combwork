@@ -142,15 +142,15 @@ describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", a
         expect(plain.filter((r) => r.id.startsWith('advanced.') && r.id !== 'advanced.showDeveloperFeatures')).toEqual([expect.objectContaining({ id: 'advanced.*', value: expect.stringMatching(/^\d+ more$/), title: 'query "advanced" lists them' })])
         // Every trust-related advanced setting: each CLI's trust prompt, Claude Code's accounts field (HI-1870), Codex's per-launch trust (HI-1871), Codex's hook listing (HI-982: Hive trusts its hooks by its own hashes without it).
         expect(settingRows({ query: 'advanced trust' }).map((r) => r.id)).toEqual(['advanced.claude-code.trust.prompt', 'advanced.claude-code.accounts.trustField', 'advanced.codex.trust.perLaunch', 'advanced.codex.trust.prompt', 'advanced.codex.hooks.listMethod', 'advanced.copilot.trust.prompt'])
-        const changed = await applySetting(entryOf('advanced.hive.mcp.replySeconds'), 600, null)
+        const changed = await applySetting(entryOf('advanced.cw.mcp.replySeconds'), 600, null)
         expect([changed.old, changed.new]).toEqual([300, 600])
-        expect(JSON.parse(readFileSync(join(profile, 'advanced.json'), 'utf8')).values).toEqual({ 'hive.mcp.replySeconds': 600 })
-        expect(settingRows({}).find((r) => r.id === 'advanced.hive.mcp.replySeconds')).toMatchObject({ value: '600 s', default: '300 s' })
-        await expect(applySetting(entryOf('advanced.hive.mcp.replySeconds'), 5, null)).rejects.toThrow(/30 to 3600/)
-        const own = await applySetting(entryOf('workspace.advanced.hive.progress.lanesShown'), 6, null)
+        expect(JSON.parse(readFileSync(join(profile, 'advanced.json'), 'utf8')).values).toEqual({ 'cw.mcp.replySeconds': 600 })
+        expect(settingRows({}).find((r) => r.id === 'advanced.cw.mcp.replySeconds')).toMatchObject({ value: '600 s', default: '300 s' })
+        await expect(applySetting(entryOf('advanced.cw.mcp.replySeconds'), 5, null)).rejects.toThrow(/30 to 3600/)
+        const own = await applySetting(entryOf('workspace.advanced.cw.progress.lanesShown'), 6, null)
         expect([own.old, own.new]).toEqual([null, 6])
-        expect(settingDetail(entryOf('workspace.advanced.hive.progress.lanesShown'), null)).toMatchObject({ value: '6 lanes', default: 'inherit' })
-        await applySetting(entryOf('advanced.hive.mcp.replySeconds'), null, null)
+        expect(settingDetail(entryOf('workspace.advanced.cw.progress.lanesShown'), null)).toMatchObject({ value: '6 lanes', default: 'inherit' })
+        await applySetting(entryOf('advanced.cw.mcp.replySeconds'), null, null)
         expect(JSON.parse(readFileSync(join(profile, 'advanced.json'), 'utf8')).values).toEqual({})
         // The developer setting (its own catalogue entry) is kept in advanced.json too: an unreadable file refuses it, nothing changed.
         const { config } = await import('../src/main/config')
@@ -161,13 +161,13 @@ describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", a
         writeFileSync(join(profile, 'advanced.json'), '{}')
         await vi.waitFor(() => expect(advanced.state(null).fileError).toBeNull(), { timeout: 10_000 })
         await applySetting(entryOf('advanced.showDeveloperFeatures'), true, null)
-        expect(JSON.parse(readFileSync(join(profile, 'advanced.json'), 'utf8')).values).toEqual({ 'hive.showDeveloperFeatures': true })
+        expect(JSON.parse(readFileSync(join(profile, 'advanced.json'), 'utf8')).values).toEqual({ 'cw.showDeveloperFeatures': true })
         expect(config.settings.advanced.showDeveloperFeatures).toBe(true)
         await applySetting(entryOf('advanced.showDeveloperFeatures'), false, null)
         // A revert queued behind a newer change of the user's (#367 round 4): its guard sees the value it would replace,
         // in its own turn, so it is refused and the user's change stays. advanced.json's lock held, nothing timed.
         const { withFileLock } = await import('../src/main/fsutil')
-        const reply = entryOf('advanced.hive.mcp.replySeconds')
+        const reply = entryOf('advanced.cw.mcp.replySeconds')
         await applySetting(reply, 600, null)
         let open!: () => void
         const gate = new Promise<void>((r) => (open = r))
@@ -178,7 +178,7 @@ describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", a
           await gate
         })
         await holding
-        const users = advanced.set('hive.mcp.replySeconds', 700)
+        const users = advanced.set('cw.mcp.replySeconds', 700)
         const revert = applySetting(reply, 300, null, (current) => {
           if (current !== 600) throw new Error(`It has changed since (it is ${String(current)} now).`)
         })
@@ -186,7 +186,7 @@ describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", a
         await lock
         await users
         await expect(revert).rejects.toThrow('It has changed since (it is 700 now).')
-        expect(JSON.parse(readFileSync(join(profile, 'advanced.json'), 'utf8')).values['hive.mcp.replySeconds']).toBe(700)
+        expect(JSON.parse(readFileSync(join(profile, 'advanced.json'), 'utf8')).values['cw.mcp.replySeconds']).toBe(700)
         // Changes queued together each report the value they replaced and the one they left.
         const [a, b] = await Promise.all([applySetting(reply, 800, null), applySetting(reply, 900, null)])
         expect([a.old, a.new, b.old, b.new]).toEqual([700, 800, 800, 900])
@@ -212,7 +212,48 @@ describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", a
         await applySetting(entryOf('advanced.showDeveloperFeatures'), false, null)
         await applySetting(reply, null, null)
       })
-      expect(JSON.parse(readFileSync(join(path, '.combwork', 'workspace.json'), 'utf8')).advanced).toEqual({ 'hive.progress.lanesShown': 6 })
+      expect(JSON.parse(readFileSync(join(path, '.combwork', 'workspace.json'), 'utf8')).advanced).toEqual({ 'cw.progress.lanesShown': 6 })
+    } finally {
+      advanced.stop()
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  it("an upgraded profile's and workspace's hive.* advanced values come back under cw.*, one way; a call naming an old id is refused with the new one (HI-2518)", async () => {
+    const { advanced } = await import('../src/main/advanced')
+    const profile = join(base, 'profile-renamed')
+    mkdirSync(profile, { recursive: true })
+    // As 1.1.0's RC and 1.0 saved them: Combwork's own under hive.*, a CLI's as it is, an old migration's key, one unknown.
+    const old = { 'hive.mcp.replySeconds': 600, 'hive.restart.resumeAfterUpdate': false, 'hive.progress.lanesShown': 0, 'claude-code.trust.prompt': 'I trust', 'hive.agents.perProject': 3, 'hive.nope': 1 }
+    writeFileSync(join(profile, 'advanced.json'), JSON.stringify({ format: 1, values: old, madeFor: { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } } }))
+    const path = join(base, 'ws-renamed')
+    mkdirSync(join(path, 'alpha', '.combwork'), { recursive: true })
+    mkdirSync(join(path, '.combwork'), { recursive: true })
+    writeFileSync(join(path, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    writeFileSync(join(path, '.combwork', 'workspace.json'), JSON.stringify({ advanced: { 'hive.progress.lanesShown': 6, 'hive.restart.resumeAfterUpdate': false } }))
+    advanced.load(profile)
+    const now = { 'cw.mcp.replySeconds': 600, 'cw.restart.resumeAfterUpdate': false, 'cw.progress.lanesShown': 0, 'claude-code.trust.prompt': 'I trust', 'hive.agents.perProject': 3, 'hive.nope': 1 }
+    // In memory at once, and on disk in the store's queued write: nothing kept under the old ids.
+    expect(advanced.state(null).values).toEqual(now)
+    expect(advanced.legacy('hive.agents.perProject')).toBe(3)
+    expect(advanced.state(null).unknown).toEqual(['hive.nope'])
+    await vi.waitFor(() => expect(JSON.parse(readFileSync(join(profile, 'advanced.json'), 'utf8'))).toEqual({ format: 1, values: now, madeFor: { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } } }), { timeout: 10_000 })
+    const w = createWorkspaceService()
+    await w.open(path)
+    try {
+      expect(w.config.advanced).toEqual({ 'cw.progress.lanesShown': 6, 'cw.restart.resumeAfterUpdate': false })
+      await inWorkspace(w, async () => {
+        expect(settingDetail(entryOf('workspace.advanced.cw.progress.lanesShown'), null)).toMatchObject({ value: '6 lanes' })
+        expect(settingDetail(entryOf('advanced.cw.mcp.replySeconds'), null)).toMatchObject({ value: '600 s' })
+        // No aliases: the old id is refused, naming the new one; one that never was a setting is just unknown.
+        expect(() => entryOf('advanced.hive.mcp.replySeconds')).toThrow('advanced.hive.mcp.replySeconds was renamed: use advanced.cw.mcp.replySeconds.')
+        expect(() => entryOf('workspace.advanced.hive.progress.lanesShown')).toThrow('use workspace.advanced.cw.progress.lanesShown.')
+        expect(() => entryOf('advanced.hive.showDeveloperFeatures')).toThrow('No setting "advanced.hive.showDeveloperFeatures"')
+        expect(() => entryOf('advanced.hive.nope')).toThrow('No setting')
+        // The workspace's file changes at its next save, under the new ids only.
+        await applySetting(entryOf('workspace.advanced.cw.progress.lanesShown'), 7, null)
+        expect(JSON.parse(readFileSync(join(path, '.combwork', 'workspace.json'), 'utf8')).advanced).toEqual({ 'cw.progress.lanesShown': 7, 'cw.restart.resumeAfterUpdate': false })
+      })
     } finally {
       advanced.stop()
       await disposeWorkspaceService(w)

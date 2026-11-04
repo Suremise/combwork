@@ -1,4 +1,4 @@
-// Copies: wait for one to be free (hive.copies.quietWaitMinutes, #1563, tests/workflow/README.md's P7 table) in the app:
+// Copies: wait for one to be free (cw.copies.quietWaitMinutes, #1563, tests/workflow/README.md's P7 table) in the app:
 // a pool of one review copy, fake Claude Code agents (B1 builds two cards in the project folder; R1 and R2 review), the
 // wait set to its least, 1 minute:
 // - R1 reviews A in copy-1 and gives its verdict while still working (a turn held open, sent once the turn Hive's reviewer
@@ -55,7 +55,7 @@ const lines = (file) => {
     await lib.openWorkspace(inv, page, ws)
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, folder: 'project' } })
     await inv('slots:setSetting', alpha, 'copiesSize', 1)
-    await inv('advanced:set', 'hive.copies.quietWaitMinutes', 1)
+    await inv('advanced:set', 'cw.copies.quietWaitMinutes', 1)
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1', workflowRole: 'builder' })
     const r1 = await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'reviewer' })
     const r2 = await lib.addAgent(inv, alpha, { name: 'R2', workflowRole: 'reviewer' })

@@ -119,7 +119,7 @@ describe('the note and its sections', () => {
   })
 
   it('has its switches in Settings → Advanced, for sessions started afterwards, and a fixed path', () => {
-    expect(advancedDef(DELIVER_WORKSPACE_NOTES)).toMatchObject({ kind: 'boolean', default: true, applies: 'sessions', group: 'hive' })
+    expect(advancedDef(DELIVER_WORKSPACE_NOTES)).toMatchObject({ kind: 'boolean', default: true, applies: 'sessions', group: 'cw' })
     expect(advancedDef(WORKSPACE_NOTES_MAX_ID)).toMatchObject({ kind: 'number', default: 4096, unit: 'bytes', applies: 'sessions' })
     expect(WORKSPACE_NOTES_PATH).toBe('Workspace notes.md')
     expect(workspaceNotesPath('D:\\ws\\')).toBe('D:\\ws\\.combwork\\shared\\Workspace notes.md')

@@ -191,7 +191,7 @@ const check = (name, ok, extra = '') => {
 
     // 4c. The policy (#1292, Settings → Advanced: A CLI putting text on the clipboard). Block: a write from the pane in
     // use is refused too. Ask each time: the question shows the text; Don't Copy leaves the clipboard, Copy fills it.
-    const POLICY = 'hive.terminal.osc52'
+    const POLICY = 'cw.terminal.osc52'
     const question = page.locator('.dialog', { hasText: 'Copy to the clipboard?' })
     // A change reaches the window in its states' batch (HI-1938), after the call answers: a write before it meets the old
     // policy, refused without a new log line (one per reason a minute).

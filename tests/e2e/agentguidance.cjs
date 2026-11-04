@@ -1,4 +1,4 @@
-// Hive's guidance for agents (#1285, #966 row 13: hive.guidance, on by default), on a fake Claude Code session
+// Hive's guidance for agents (#1285, #966 row 13: cw.guidance, on by default), on a fake Claude Code session
 // (fake-claude/), so nothing signs in or spends tokens. The hive MCP server each launch was given (its --mcp-config, as
 // Hive wrote it) is started here as Claude Code would start it and asked to initialize:
 // - on: it answers with Hive's guidance as its instructions;
@@ -18,7 +18,7 @@ const ws = path.join(lib.WORK, 'agentguidance-ws')
 const claudeHome = path.join(lib.WORK, 'agentguidance-claude-home')
 const alpha = path.join(ws, 'alpha')
 const PORT = Number(lib.port(47850))
-const GUIDANCE = 'hive.guidance'
+const GUIDANCE = 'cw.guidance'
 let failed = 0
 const check = (name, ok, extra = '') => {
   lib.checked(ok)

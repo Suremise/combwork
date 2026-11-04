@@ -23,7 +23,7 @@ const h = vi.hoisted(() => ({
   stopEnds: true,
   /** The team of the workspace paused (HI-2081). */
   paused: false,
-  advanced: { 'hive.restart.resumeAfterUpdate': true, 'hive.restart.resumeReadySeconds': 90 } as Record<string, unknown>,
+  advanced: { 'cw.restart.resumeAfterUpdate': true, 'cw.restart.resumeReadySeconds': 90 } as Record<string, unknown>,
   run: 0,
   /** The notices told (HI-2356): each one's offer, its message and its buttons' commands. */
   toasts: [] as { offer?: string; message?: string; commands: string[] }[],
@@ -346,7 +346,7 @@ describe('the restart queue (HI-1707)', () => {
   })
 
   it("each workspace's own Resume agents after an update: one resumes by itself, the other is offered", async () => {
-    const a = workspace(join(dir, 'ws-a'), ['a1'], { advanced: { 'hive.restart.resumeAfterUpdate': false } })
+    const a = workspace(join(dir, 'ws-a'), ['a1'], { advanced: { 'cw.restart.resumeAfterUpdate': false } })
     const b = workspace(join(dir, 'ws-b'), ['b1'])
     h.workspaces = [a, b]
     await startWith([entry(a.path, 'a1'), entry(b.path, 'b1')])

@@ -91,7 +91,7 @@ const allAt = (temp, dir) => ['TEMP', 'TMP', 'TMPDIR'].every((n) => Object.keys(
     check('empty: no folder is made', !fs.existsSync(tempRoot))
 
     // --- Set: each launch in its own folder, made.
-    await inv('advanced:set', 'hive.agents.tempFolder', tempRoot)
+    await inv('advanced:set', 'cw.agents.tempFolder', tempRoot)
     const saved = JSON.parse(fs.readFileSync(path.join(userData, 'advanced.json'), 'utf8'))
     check('the setting takes a folder, kept in advanced.json', JSON.stringify(saved).includes(JSON.stringify(tempRoot).slice(1, -1)), JSON.stringify(saved).slice(0, 300))
     const host = path.join(tempRoot, `alpha-${hash(proj)}`)
@@ -136,7 +136,7 @@ const allAt = (temp, dir) => ['TEMP', 'TMP', 'TMPDIR'].every((n) => Object.keys(
 
     // --- A folder inside a project: the launch stops, saying why, and no folder is made there.
     const insideProj = path.join(proj, 'tmp-here')
-    await inv('advanced:set', 'hive.agents.tempFolder', insideProj)
+    await inv('advanced:set', 'cw.agents.tempFolder', insideProj)
     await stop(proj, clara.id)
     const before = claudeLaunches(proj).length
     const err = await inv('session:start', proj, { agentId: clara.id }).then(() => null, (e) => String(e?.message ?? e))
@@ -145,7 +145,7 @@ const allAt = (temp, dir) => ['TEMP', 'TMP', 'TMPDIR'].every((n) => Object.keys(
     check('…Clara never launched, and nothing was made in the project', claudeLaunches(proj).length === before && !fs.existsSync(insideProj), String(claudeLaunches(proj).length - before))
 
     // --- Emptied again: as before.
-    await inv('advanced:set', 'hive.agents.tempFolder', [])
+    await inv('advanced:set', 'cw.agents.tempFolder', [])
     await inv('session:start', proj, { agentId: clara.id })
     check('emptied: Clara starts again', !!(await ready(proj, clara.id)))
     const c2 = claudeLaunches(proj).at(-1)

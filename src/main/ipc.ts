@@ -250,7 +250,7 @@ onHiveEvent((e) => {
  * Settings → Advanced → Developer console: show text (#699): while it is on, the console's windows are sent prompt, reply
  * and command text (secrets still masked, shared/devConsole.ts); a change applies to their subscriptions at once.
  */
-const consoleShowsText = (): boolean => advanced.get<boolean>('hive.console.showText') === true
+const consoleShowsText = (): boolean => advanced.get<boolean>('cw.console.showText') === true
 advanced.onChange(() => {
   const showText = consoleShowsText()
   for (const id of consoleWindows.keys()) devConsole.setIncludeText(id, showText)

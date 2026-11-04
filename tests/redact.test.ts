@@ -166,7 +166,7 @@ describe('diagnostics redaction', () => {
   }, 300_000)
 
   it("names and identifiers keep their shape: no sign-in code is read into them, a session id's parts included", () => {
-    for (const id of ['0B6F5D1E-6D5A-4C1F-9A4E-1C2D3E4F5A6B', 'ABCD-EFGH', 'hive.console.showText', 'PreToolUse']) expect(maskSecrets(id)).toBe(id)
+    for (const id of ['0B6F5D1E-6D5A-4C1F-9A4E-1C2D3E4F5A6B', 'ABCD-EFGH', 'cw.console.showText', 'PreToolUse']) expect(maskSecrets(id)).toBe(id)
     expect(maskText('session 0B6F5D1E-6D5A-4C1F-9A4E-1C2D3E4F5A6B resumed')).toBe('session 0B6F5D1E-6D5A-4C1F-9A4E-1C2D3E4F5A6B resumed')
     expect(maskText('ran npm test -- --reporter dot; 2758 tests passed')).toBe('ran npm test -- --reporter dot; 2758 tests passed')
   })

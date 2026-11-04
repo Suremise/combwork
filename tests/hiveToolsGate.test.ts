@@ -1,7 +1,7 @@
 // No line of Hive's before a launch's hive tools have connected (#865): a resumed Claude Code is ready at its SessionStart
 // before its hive MCP server has connected, and a doorbell typed then is a turn that can't call cw_inbox. The server
 // says when the CLI has connected it (POST /v1/launch/connected → sessions.hiveToolsConnected); until then, at most
-// hive.mcp.connectSeconds (30 s) from when the launch first became ready, the line writer and the watch wakes wait. The
+// cw.mcp.connectSeconds (30 s) from when the launch first became ready, the line writer and the watch wakes wait. The
 // real SessionManager with hand-made live states.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { whyNoLine } from '../src/main/lineWriter'
@@ -117,7 +117,7 @@ describe("no line of Hive's before a launch's hive tools have connected (#865)",
       launched()
       let settled = false
       const wait = sessions.hiveToolsSettled(project, id).then(() => (settled = true))
-      await advanced.set('hive.mcp.connectSeconds', 1)
+      await advanced.set('cw.mcp.connectSeconds', 1)
       // Ready no time ago on this clock: the gate still holds, and the wait with it.
       expect(sessions.hiveToolsWaiting(project, id)).toBe(true)
       expect(settled).toBe(false)
@@ -127,7 +127,7 @@ describe("no line of Hive's before a launch's hive tools have connected (#865)",
       expect(sessions.hiveToolsWaiting(project, id)).toBe(false)
       await wait
     } finally {
-      await advanced.set('hive.mcp.connectSeconds', 30)
+      await advanced.set('cw.mcp.connectSeconds', 30)
       advanced.stop()
     }
   })

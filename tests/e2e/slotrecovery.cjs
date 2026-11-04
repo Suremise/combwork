@@ -140,7 +140,7 @@ const git = (dir, ...a) => lib.git(dir, a).trim()
     const waiting = await until(async () => ((await lane(lane4.lane.id))?.status?.reason === 'slot' ? lane(lane4.lane.id) : null), HUNG_MS)
     check("4. …restarted: still 'waiting for a slot', paused", waiting?.state === 'paused', JSON.stringify(waiting?.status))
     // The rules off: card 3 put back frees a slot, but nothing is lent to the lane.
-    await inv('advanced:set', 'hive.workflow.enforce', false)
+    await inv('advanced:set', 'cw.workflow.enforce', false)
     const pb = await intent(await tokenOf(b3.id), c3, 'put-back', { why: 'making room' })
     check('4. card 3 put back', pb.status === 200, JSON.stringify(pb.body))
     check("4. …its slot's lease ends (rules off too: data safety)", !!(await until(async () => !(await inv('slots:list', alpha)).some((s) => s.lease?.card === c3), HUNG_MS)))
@@ -148,7 +148,7 @@ const git = (dir, ...a) => lib.git(dir, a).trim()
     const freed = await until(async () => ((await inv('slots:list', alpha)).some((s) => !s.lease && !s.writer && s.state === 'ready') ? true : null), HUNG_MS)
     check('4. …a slot is free', !!freed, JSON.stringify(await inv('slots:list', alpha)))
     check('4. …with the rules off, the lane is lent nothing and its builder not started', !(await live(b4.id)) && !(await inv('slots:list', alpha)).some((s) => s.lease?.lane === lane4.lane.id))
-    await inv('advanced:set', 'hive.workflow.enforce', true)
+    await inv('advanced:set', 'cw.workflow.enforce', true)
     const inSlot = await until(async () => {
       const s = await live(b4.id)
       return s && (await inv('slots:list', alpha)).some((x) => x.lease?.lane === lane4.lane.id && same(x.folder, s.cwd)) ? s : null

@@ -106,7 +106,9 @@ export class AdvancedStore {
           made[id] = was && JSON.stringify(was.value) === JSON.stringify(value) ? (was.version || !installed ? was : { version: installed, value }) : { version: installed, value }
         }
         this.madeFor = made
-        this.recordsDue = JSON.stringify(made) !== JSON.stringify(parsed.madeFor)
+        // Old hive.* ids read as their cw.* ones (HI-2518) are written back under the new ids, in the same queued write.
+        this.recordsDue = JSON.stringify(made) !== JSON.stringify(parsed.madeFor) || parsed.renamed.length > 0
+        if (parsed.renamed.length) log.info(`advanced.json: moved ${parsed.renamed.length} setting(s) to their cw.* ids (${parsed.renamed.join(', ')})`)
         if (this.unknown.length) log.warn(`advanced.json names settings this Hive doesn't know: ${this.unknown.join(', ')}`)
       }
     }
@@ -401,14 +403,14 @@ export const workspaceDefs = (): AdvancedDef[] => ADVANCED_DEFS.filter((d) => d.
  * timeout for hive's tools so the reply always arrives in time.
  */
 export function waitMaxSeconds(kind: 'cards' | 'agents'): number {
-  const own = advanced.number(kind === 'cards' ? 'hive.wait.cardMaxSeconds' : 'hive.wait.agentsMaxSeconds')
+  const own = advanced.number(kind === 'cards' ? 'cw.wait.cardMaxSeconds' : 'cw.wait.agentsMaxSeconds')
   return Math.max(30, Math.min(own, advanced.number('codex.mcp.toolTimeoutSeconds') - 60))
 }
 
 /** What the hive MCP server needs of the advanced settings, as its environment (it runs outside Hive: Node built-ins only). */
 export function mcpAdvancedEnv(): Record<string, string> {
   return {
-    HIVE_REPLY_SECONDS: String(advanced.number('hive.mcp.replySeconds')),
+    HIVE_REPLY_SECONDS: String(advanced.number('cw.mcp.replySeconds')),
     HIVE_WAIT_MAX_SECONDS: String(waitMaxSeconds('cards')),
     HIVE_AGENT_WAIT_MAX_SECONDS: String(waitMaxSeconds('agents'))
   }

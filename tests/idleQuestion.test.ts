@@ -212,9 +212,9 @@ describe('a held line the screen took (HI-1959, the 12:47 comment)', () => {
     sessions.lineNotTaken(project, id, 'run1', '[CW] New in your inbox: 1 task (HI-1959) (m21559). Call cw_inbox to read it, act on it, then ack it.', true, rangFor)
     expect(e.state.untakenLine).toBeTruthy()
   }
-  // The second look, as its timer runs it (hive.lostLine.steadySeconds after the first): its own timer is made too long
+  // The second look, as its timer runs it (cw.lostLine.steadySeconds after the first): its own timer is made too long
   // to run within the test, so each case says when the second look comes.
-  const later = (): void => void vi.spyOn(advanced, 'number').mockImplementation(((name: string) => (name === 'hive.lostLine.steadySeconds' ? 3600 : 30)) as typeof advanced.number)
+  const later = (): void => void vi.spyOn(advanced, 'number').mockImplementation(((name: string) => (name === 'cw.lostLine.steadySeconds' ? 3600 : 30)) as typeof advanced.number)
   const secondLook = (e: Entry): void => {
     const seen = e.lostSeen as { since: string } | undefined
     ;(sessions as unknown as { lostLineSteady(id: string, l: Entry, since: string): void }).lostLineSteady(liveKey(), e, seen?.since ?? String((e.state.untakenLine as { since: string } | undefined)?.since))
@@ -332,7 +332,7 @@ describe('a held line the screen took (HI-1959, the 12:47 comment)', () => {
   })
 
   it("the timer's own second look, after the wait, lets a swallowed line go", async () => {
-    vi.spyOn(advanced, 'number').mockImplementation(((name: string) => (name === 'hive.lostLine.steadySeconds' ? 0.05 : 30)) as typeof advanced.number)
+    vi.spyOn(advanced, 'number').mockImplementation(((name: string) => (name === 'cw.lostLine.steadySeconds' ? 0.05 : 30)) as typeof advanced.number)
     quiet()
     const e = running()
     held(e)

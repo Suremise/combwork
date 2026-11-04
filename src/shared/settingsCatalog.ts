@@ -521,12 +521,12 @@ const APP_ROWS: Row[] = [
     section: 'advanced',
     key: 'showDeveloperFeatures',
     // Its text is its advanced value's (it is kept in advanced.json too, #367).
-    title: advancedDef('hive.showDeveloperFeatures')!.text.title,
-    desc: advancedDef('hive.showDeveloperFeatures')!.text.desc,
+    title: advancedDef('cw.showDeveloperFeatures')!.text.title,
+    desc: advancedDef('cw.showDeveloperFeatures')!.text.desc,
     tip: msg({ id: 'settings.advanced.showDeveloperFeatures.tip', defaultMessage: 'For power users and for developing Combwork. The console opens in a window of its own; Combwork captures a source only while it is open on it, redacted. Turning this off closes it.', description: 'The info tip of the setting this (Settings → Advanced): more on what it does and when it applies.' }),
     type: 'boolean',
     // Drawn in the list below, first among Hive's own (#367): kept in Hive's settings under this key, and in
-    // advanced.json as hive.showDeveloperFeatures (the two are one value).
+    // advanced.json as cw.showDeveloperFeatures (the two are one value).
     hidden: true
   },
   {
@@ -895,8 +895,8 @@ const SENSITIVE: [RegExp, AgentMsg][] = [
   [/^workspace\.(onClose|onOpen|commands)$|^general\.(onQuit|commands)$/, agentMsg({ id: 'settings.agent.sensitive.commands', text: 'Its commands run on this machine by themselves or by hand: the user saves them, the Assistant may only propose (HI-1954): only the user can change it, in {path}.', note: "Why the Assistant can't save commands (HI-1954): it may only propose them. {path} is where the user changes them." })],
   [/^updates\.prerelease$/, agentMsg({ id: 'settings.agent.sensitive.prerelease', text: 'It decides which builds of Combwork install: only the user can change it, in {path}.', note: "Why the Assistant can't choose pre-release builds (#186). {path} is where the user changes it." })],
   [/(^|\.)maxAgents$/, agentMsg({ id: 'settings.agent.sensitive.maxAgents', text: "Maximum agents is the user's team size, the most agents you may add: only the user can change it, in {path}.", note: "Why the Assistant can't change Maximum agents, the user's team size. {path} is where the user changes it." })],
-  [/^(workspace\.)?advanced\.hive\.cards\.attachmentFolders$/, agentMsg({ id: 'settings.agent.sensitive.attachmentFolders', text: 'It decides which folders agents, the Assistant and scripts may attach files to cards from: only the user can change it, in {path}.', note: "Why the Assistant can't change Card attachments: more folders (HI-2480): it would widen where it and agents may read files from. {path} is where the user changes it." })],
-  [/^(workspace\.)?advanced\.hive\.agents\.tempFolder$/, agentMsg({ id: 'settings.agent.sensitive.agentTempFolder', text: "It decides where agents and the Assistant itself write their temporary files: only the user can change it, in {path}.", note: "Why the Assistant can't change Agents' temp folder (HI-2496): it redirects every agent's file writes, its own launch's too. {path} is where the user changes it." })]
+  [/^(workspace\.)?advanced\.cw\.cards\.attachmentFolders$/, agentMsg({ id: 'settings.agent.sensitive.attachmentFolders', text: 'It decides which folders agents, the Assistant and scripts may attach files to cards from: only the user can change it, in {path}.', note: "Why the Assistant can't change Card attachments: more folders (HI-2480): it would widen where it and agents may read files from. {path} is where the user changes it." })],
+  [/^(workspace\.)?advanced\.cw\.agents\.tempFolder$/, agentMsg({ id: 'settings.agent.sensitive.agentTempFolder', text: "It decides where agents and the Assistant itself write their temporary files: only the user can change it, in {path}.", note: "Why the Assistant can't change Agents' temp folder (HI-2496): it redirects every agent's file writes, its own launch's too. {path} is where the user changes it." })]
 ]
 
 /** Read-only to the Assistant for now, though not sensitive (#186: keybindings). */
