@@ -307,6 +307,7 @@ export const SUITES = [
   { name: 'sessiontree' },
   { name: 'setaside' },
   { name: 'settingsleave' },
+  { name: 'settingsnav' },
   { name: 'settingstips' },
   { name: 'setupcopy' },
   { name: 'setuplayout' },

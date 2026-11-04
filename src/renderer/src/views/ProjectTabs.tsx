@@ -32,7 +32,7 @@ import { LEFTOVERS_ROOT, LeftoversOption, LeftoversPage, useLeftovers } from '..
 import { useGitRead } from './GitTab'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { DataTable, useDateColumns, type DataColumn } from '../components/DataTable'
-import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, sentences, StaleNote, statusText, StatusDot, Tooltip } from '../components/ui'
+import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, SectionNavRow, sentences, StaleNote, statusText, StatusDot, Tooltip } from '../components/ui'
 import { cliReadyOf, ConnectionMark, connectionCli, connectionLine, firstReadyConnection, useConnections } from '../components/ConnectionChoice'
 import { connectionOf } from '@shared/connectionLabel'
 import { useConnectionsInUse } from '../connectionUsage'
@@ -2059,16 +2059,18 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       <div className="settings-body">
         <div className="settings-nav">
           {sections.map((s) => (
-            <div
+            <SectionNavRow
               key={s.id}
-              className={cx('row', !q && section === s.id && 'selected')}
-              onClick={() => {
+              id={s.id}
+              icon={s.provider ? <ProviderIcon provider={s.provider} /> : <Icon name={s.icon} />}
+              label={shownText(s.text.label)}
+              sub={!!s.provider}
+              selected={!q && section === s.id}
+              onSelect={() => {
                 setSection(s.id)
                 setQuery('')
               }}
-            >
-              {s.provider ? <ProviderIcon provider={s.provider} /> : <Icon name={s.icon} />} <span className={cx('label', s.provider && 'settings-sub')}>{shownText(s.text.label)}</span>
-            </div>
+            />
           ))}
         </div>
         <div className="settings-content">
