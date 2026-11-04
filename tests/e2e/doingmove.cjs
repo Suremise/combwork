@@ -189,7 +189,7 @@ const until = async (fn, ms = 10000) => {
   check('with the dialog edits saved', dd?.title === 'Card D, renamed', dd?.title)
   check('and the card dialog closed', !!(await until(async () => (await edit.count()) === 0, 5000)))
   const dName = await named(d)
-  check('the agent gets the card as its prompt', !!(await until(async () => transcripts().includes(`Work on task ${dName} from the Hive task board: Card D, renamed`), 20000)))
+  check('the agent gets the card as its prompt', !!(await until(async () => transcripts().includes(`Work on task ${dName} from the Combwork task board: Card D, renamed`), 20000)))
 
   // --- Availability changes while the dialog is open: Idle gets busy, and can no longer be started.
   await until(async () => (await live(idle))?.status === 'ready', 10000)

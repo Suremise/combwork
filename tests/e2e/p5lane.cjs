@@ -363,7 +363,7 @@ const ancestor = (x, y) => {
     check('…and gives it to B1 in its slot (placed there)', !!(await waitHung(async () => (await kinds(c2)).includes('BuilderPlaced'))), JSON.stringify(await kinds(c2)))
     const s2 = await start(c2)
     check("only then does Two start, in the lane's slot still, its line from main's head (One merged in)", s2.s.status === 200 && path.basename(wt ?? '') === lentA && s2.base === main1 && ancestor(one.rev, s2.base) && git(wt, 'rev-parse', 'HEAD') === s2.base, JSON.stringify(s2))
-    check("…B1's own start of it is Hive's, told so", (s2.s.body?.warnings ?? []).some((x) => /^Hive started .* for you, as your lane's next card/.test(x)) && (await factsOf(c2, 'Started')).length === 1, JSON.stringify(s2.s.body))
+    check("…B1's own start of it is Hive's, told so", (s2.s.body?.warnings ?? []).some((x) => /^Combwork started .* for you, as your lane's next card/.test(x)) && (await factsOf(c2, 'Started')).length === 1, JSON.stringify(s2.s.body))
     check("…One's line, merged, deleted once Two's is out (LineDeleted)", !!(await waitHung(async () => (await kinds(c1)).includes('LineDeleted'))) && !git(alpha, 'branch', '--list', line1), JSON.stringify(await kinds(c1)))
     await shoot('3-one-merged', 'lanes', async () => (await onBoard('Done', c1)) && (await onBoard('Active', c2)))
 

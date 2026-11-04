@@ -166,7 +166,7 @@ const commit = (dir, file, text, message) => {
   const uText = async () => (await uSection.innerText().catch(() => '')).replace(/\s+/g, ' ')
   check('the Work section says the revision and its files weren’t read, with why, not that none changed', !!(await lib.until(async () => { const t = await uText(); return t.includes('Revision not read when it was submitted: ') && t.includes('Its next submission reads it again.') && t.includes('Files not read: ') && !t.includes('No files changed') }, HUNG_MS)), await uText())
   // Why, as the window words it (#1477): what couldn't be read, from the reason kept as data, said once.
-  check('…the revision line names what couldn’t be read once', !!(await lib.until(async () => /Revision not read when it was submitted: Hive couldn't read the latest commit in [^ ]+\. Its next submission reads it again\./.test(await uText()), HUNG_MS)), await uText())
+  check('…the revision line names what couldn’t be read once', !!(await lib.until(async () => /Revision not read when it was submitted: Combwork couldn't read the latest commit in [^ ]+\. Its next submission reads it again\./.test(await uText()), HUNG_MS)), await uText())
   await uSection.scrollIntoViewIfNeeded()
   const shots = async (loc, name) => {
     await page.mouse.move(5, 5)
@@ -185,7 +185,7 @@ const commit = (dir, file, text, message) => {
   check('its work records the revision as not read before the change, in English for agents', nWork?.revisions[0]?.unknown?.revision === 'not read before the change', JSON.stringify(nWork?.revisions[0]))
   const nSection = (await openCard(nobody)).locator('.card-work[data-work="recorded"]')
   const nText = async () => (await nSection.innerText().catch(() => '')).replace(/\s+/g, ' ')
-  check('the Work section says no revision was recorded, and why, once', !!(await lib.until(async () => { const t = await nText(); return t.includes("No revision recorded: Hive didn't read one when the card went to Review. Its next submission reads it again.") && t.includes('Files not read') && !t.includes('not read before the change') }, HUNG_MS)), await nText())
+  check('the Work section says no revision was recorded, and why, once', !!(await lib.until(async () => { const t = await nText(); return t.includes("No revision recorded: Combwork didn't read one when the card went to Review. Its next submission reads it again.") && t.includes('Files not read') && !t.includes('not read before the change') }, HUNG_MS)), await nText())
   await nSection.scrollIntoViewIfNeeded()
   await shots(nSection, 'notread')
 
@@ -196,7 +196,7 @@ const commit = (dir, file, text, message) => {
   const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
   await speak({ ...base0, code: 'de', locale: 'de', messages: deMessages })
   const english = /not read|latest commit|no base|no target|Its next submission/
-  check('German: nothing read before the change, said in German', !!(await lib.until(async () => { const t = await nText(); return t.includes('Keine Revision aufgezeichnet: Hive hat keine gelesen, als die Karte nach Review kam.') && t.includes('Dateien nicht gelesen') && !english.test(t) }, HUNG_MS)), await nText())
+  check('German: nothing read before the change, said in German', !!(await lib.until(async () => { const t = await nText(); return t.includes('Keine Revision aufgezeichnet: Combwork hat keine gelesen, als die Karte nach Review kam.') && t.includes('Dateien nicht gelesen') && !english.test(t) }, HUNG_MS)), await nText())
   await shots(nSection, 'notread-de')
   // The board's button has its English name again before the next card opens; then German with its dialog open.
   await speak(base0)
@@ -204,7 +204,7 @@ const commit = (dir, file, text, message) => {
   const uDe = (await openCard(u)).locator('.card-work[data-work="recorded"]')
   await speak({ ...base0, code: 'de', locale: 'de', messages: deMessages })
   const uDeText = async () => (await uDe.innerText().catch(() => '')).replace(/\s+/g, ' ')
-  check('German: what couldn’t be read, in German too', !!(await lib.until(async () => { const t = await uDeText(); return t.includes('Revision beim Einreichen nicht gelesen: Hive konnte den neuesten Commit in ') && !english.test(t) }, HUNG_MS)), await uDeText())
+  check('German: what couldn’t be read, in German too', !!(await lib.until(async () => { const t = await uDeText(); return t.includes('Revision beim Einreichen nicht gelesen: Combwork konnte den neuesten Commit in ') && !english.test(t) }, HUNG_MS)), await uDeText())
   await uDe.scrollIntoViewIfNeeded()
   await shots(uDe, 'unread-de')
   await speak(base0)
