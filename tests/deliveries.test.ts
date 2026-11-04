@@ -148,11 +148,11 @@ describe('delivery records (#647)', () => {
     const carried = rec({ id: 'm3', seq: 3, state: 'received', received: at, carriedFrom: 'old-conversation' })
     const items = inboxItems([rec({ id: 'm1', seq: 1 }), carried, rec({ id: 'm2', seq: 2, state: 'received', received: at })])
     expect(items.map((i) => [i.ids.join(','), i.text])).toEqual([['m1', 'Rebase first.'], ['m3', 'Rebase first.']])
-    // Read back as written: the conversation it came from and when it was shown again.
-    const back = rec({ state: 'received', received: at, carriedFrom: 'old-conversation', replayed: at })
+    // Read back as written: the conversation it came from and the one it was last shown again to.
+    const back = rec({ state: 'received', received: at, carriedFrom: 'old-conversation', replayedTo: 'new-conversation' })
     expect(readDelivery(JSON.parse(JSON.stringify(back)))).toEqual(back)
     expect(readDelivery({ ...back, carriedFrom: '' })).toBeNull()
-    expect(readDelivery({ ...back, replayed: 'yesterday' })).toBeNull()
+    expect(readDelivery({ ...back, replayedTo: '' })).toBeNull()
   })
 
   it('reads back only what checks out (the file can be edited by hand)', () => {

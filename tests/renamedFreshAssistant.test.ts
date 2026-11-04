@@ -20,6 +20,9 @@ const deliveries = await import('../src/main/deliveries')
 
 const OLD = '00000000-0000-4000-8000-0000000000a1'
 const NEW = '00000000-0000-4000-8000-0000000000a2'
+const THIRD = '00000000-0000-4000-8000-0000000000a3'
+/** The ids the fresh starts take, in turn. */
+const fresh = [NEW, THIRD]
 const wsPath = join(base, 'ws')
 const ws = createWorkspaceService()
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(ws, fn)
@@ -47,7 +50,7 @@ beforeAll(async () => {
   // A launch: what it was asked, then its record as the real launch writes it, under the new conversation's id.
   internals.startReserved = async (projectPath: string, agentId: string, _id: string, opts: { resumeId?: string; prompt?: string; keepWatch?: boolean }) => {
     launches.push({ resumeId: opts.resumeId, prompt: opts.prompt, keepWatch: opts.keepWatch })
-    const sessionId = opts.resumeId ?? NEW
+    const sessionId = opts.resumeId ?? fresh.shift()!
     const state = { projectPath, agentId, sessionId, provider: 'claude-code', startedAt: new Date().toISOString(), runId: `run-${launches.length}`, cwd: projectPath, status: 'starting' }
     await internals.recordSession(projectPath, { id: agentId, name: 'Assistant' }, { state, name: 'Assistant' })
     return state
@@ -63,7 +66,7 @@ afterAll(async () => {
 })
 
 describe("the Assistant's conversation from before the rename (HI-2463)", () => {
-  it('starts fresh with what waited for it, read in full by the new conversation; the new one then resumes as itself', async () => {
+  it('starts fresh with what waited for it, read in full by the new conversation (again by each later fresh one); the new one then resumes as itself', async () => {
     const make = (body: string, kind: 'rebrief' | 'answer' = 'rebrief') => deliveries.createDelivery(home, { agentId: 'assistant', conversation: OLD, kind, from: user, body })
     // In the old conversation: one read and never acked, one read and acked; then one not read yet.
     const kept = await make('Before merging, preserve the exact archived tool names.')
@@ -92,13 +95,33 @@ describe("the Assistant's conversation from before the rename (HI-2463)", () => 
     expect(texts.find((t) => t.startsWith('[CW] Your earlier conversation read a message it never acked'))).toContain(`(${kept.id})`)
     expect(texts).not.toContain('Already handled.')
     // Shown again, never acked for it: still received, its receipt kept, until the agent acks it.
-    expect(await saved(kept.id)).toMatchObject({ state: 'received', received: expect.any(String), replayed: expect.any(String) })
+    expect(await saved(kept.id)).toMatchObject({ state: 'received', received: expect.any(String), replayedTo: NEW })
     expect(await saved(done.id)).toMatchObject({ state: 'acked' })
     expect((await saved(unread.id)).state).toBe('received')
     // Shown once: the next read lists it among those received and not acked, as any other.
     const again = await deliveries.readInbox(home, 'assistant')
     expect(again.items.map((i) => i.text)).not.toContain('Before merging, preserve the exact archived tool names.')
     expect(again.unacked).toContain(kept.id)
+    const receipt = (await saved(kept.id)).received
+
+    // HR1's round 2: the old conversation resumed again (it is still from before the rename) starts another fresh one,
+    // which is shown it in full once more, with a notice of its own; within that one, once. Its receipt stays.
+    live.sessionId = OLD
+    await run(() => sessions.start(home, { agentId: 'assistant', resumeId: OLD }))
+    expect(launches.at(-1)).toEqual({ resumeId: undefined, prompt: undefined, keepWatch: true })
+    expect((await run(() => ws.sessionRecord(home, THIRD)))?.names).toBe(2)
+    live.sessionId = THIRD
+    const third = (await deliveries.readInbox(home, 'assistant')).items.map((i) => i.text)
+    expect(third).toContain('Before merging, preserve the exact archived tool names.')
+    // The one the second fresh conversation read and didn't ack either (m3): both shown, both in its notice.
+    expect(third).toContain('Tell the user the lanes are done.')
+    expect(third.find((t) => t.startsWith('[CW] Your earlier conversation read 2 messages it never acked'))).toContain(`(${kept.id}, ${unread.id})`)
+    expect(third).not.toContain('Already handled.')
+    const fourth = await deliveries.readInbox(home, 'assistant')
+    expect(fourth.items.map((i) => i.text)).not.toContain('Before merging, preserve the exact archived tool names.')
+    expect(fourth.unacked).toContain(kept.id)
+    expect(await saved(kept.id)).toMatchObject({ state: 'received', received: receipt, carriedFrom: OLD })
+    expect(await saved(done.id)).toMatchObject({ state: 'acked' })
     expect((await deliveries.ackDeliveries(home, 'assistant', [kept.id])).acked).toEqual([kept.id])
 
     // Its own next resume is a resume: the new record says it was launched with today's names.

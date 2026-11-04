@@ -88,11 +88,12 @@ export interface DeliveryRecord {
   again?: string
   /**
    * HI-2463: received, not acked, in the conversation named here, which its agent left for a fresh one (a conversation
-   * from before the rename): the new conversation's next inbox read shows it again (`replayed` then), its receipt kept.
+   * from before the rename): each conversation that reads its inbox since is shown it again once (`replayedTo`), its
+   * receipt kept.
    */
   carriedFrom?: string
-  /** When the fresh conversation's inbox read showed it again (carriedFrom). */
-  replayed?: string
+  /** The conversation (or launch) whose inbox read last showed it again (carriedFrom): each other one is shown it once. */
+  replayedTo?: string
   /**
    * What made it (#649: a watch, a loop wake…), told when it is received or ends, and its key there (`ref`): a live
    * delivery with the same source and ref is that one, never made twice.
@@ -365,7 +366,7 @@ export function readDelivery(v: unknown): DeliveryRecord | null {
   if (r.offerRun !== undefined && !str(r.offerRun, 200)) return null
   if (r.action !== undefined && !(Number.isInteger(r.action) && (r.action as number) > 0)) return null
   if (r.carriedFrom !== undefined && !(str(r.carriedFrom, 200) && r.carriedFrom)) return null
-  if (!optTime(r.replayed)) return null
+  if (r.replayedTo !== undefined && !(str(r.replayedTo, 200) && r.replayedTo)) return null
   const out: DeliveryRecord = { id: r.id, seq: r.seq as number, agentId: r.agentId, conversation: (r.conversation as string | null) || null, kind: r.kind as DeliveryKind, from, body: r.body, state: r.state as DeliveryState, created: r.created, expires: r.expires }
   if (r.agentName) out.agentName = r.agentName as string
   if (r.card) out.card = r.card as number
@@ -379,7 +380,7 @@ export function readDelivery(v: unknown): DeliveryRecord | null {
   if (r.meta) out.meta = { ...(r.meta as Record<string, string | number | boolean>) }
   if (r.action) out.action = r.action as number
   if (r.carriedFrom) out.carriedFrom = r.carriedFrom as string
-  if (r.replayed) out.replayed = r.replayed as string
+  if (r.replayedTo) out.replayedTo = r.replayedTo as string
   return out
 }
 

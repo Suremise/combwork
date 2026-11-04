@@ -1208,6 +1208,11 @@ export async function readInbox(host: string, agentId: string): Promise<{ items:
   const store = await load(host)
   const given: DeliveryRecord[] = []
   let unacked: string[] | null = null
+  // The conversation reading (what a carried delivery is shown again to once: replayedTo), or its launch while its CLI
+  // hasn't named the conversation yet.
+  const live = sessions.liveFor(host, agentId)
+  // agent-protocol: a key stored with a delivery, never shown
+  const reader = live?.sessionId || (live?.runId ? `run:${live.runId}` : 'none')
   // An offered one its agent was rung for that this read didn't give (what it was made from changed again while it was
   // made again for the read: a loop wake's roles, a decision line's board) is tried again, a few times at most (#650);
   // so is one made again for this read that its source no longer held at the hand-out (HI-1687: its card changed meanwhile).
@@ -1227,12 +1232,13 @@ export async function readInbox(host: string, agentId: string): Promise<{ items:
           const may = gate(d)
           const mine = d.records.filter((x) => x.agentId === agentId)
           const give = mine.filter((x) => may(x) && !held.has(x.id))
-          // HI-2463: what the agent's earlier conversation received and didn't ack, shown again once to the fresh one it
-          // was carried to (still received, never acked for it), while its source still holds it.
-          const replay = mine.filter((x) => x.state === 'received' && x.carriedFrom !== undefined && !x.replayed && sourceHolds(store, x, 'read'))
+          // HI-2463: what the agent's earlier conversation received and didn't ack, shown again once to each conversation
+          // that reads it since (still received, never acked for it), while its source still holds it: keyed to the
+          // reading conversation (the Assistant's shape, HR1's round 2), so each later fresh one is shown it by itself.
+          const replay = mine.filter((x) => x.state === 'received' && x.carriedFrom !== undefined && x.replayedTo !== reader && sourceHolds(store, x, 'read'))
           const before = mine.filter((x) => x.state === 'received' && needsAck(x.kind) && !replay.includes(x)).map((x) => x.id)
           for (const x of give) set(store, d, x, 'received', undefined, 'inbox')
-          for (const x of replay) put(d, x, { ...x, replayed: nowIso() })
+          for (const x of replay) put(d, x, { ...x, replayedTo: reader })
           const refused = (x: DeliveryRecord): boolean => isUnread(x) && !give.includes(x) && !held.has(x.id) && !sourceHolds(store, x, 'read')
           return { give: [...give, ...replay], before, missed: mine.some((x) => (x.state === 'offered' && !give.includes(x)) || refused(x)) }
         },
@@ -2034,6 +2040,8 @@ export async function carryConversation(host: string, agentId: string, from: str
       // was bound to (an agent runs one at a time, so the one it left received it), it is shown again on the new one's
       // next inbox read, its receipt kept (carriedFrom; never acked for it).
       if (r.state === 'received') {
+        // Shown once to each conversation that reads it (`replayedTo`, read in readInbox): a later fresh one (the old
+        // conversation resumed again) is shown it again by itself, so the marker isn't touched here.
         put(d, r, { ...r, conversation: null, carriedFrom: from })
         ids.push(r.id)
         agentName ??= r.agentName
