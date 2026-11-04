@@ -167,8 +167,10 @@ const check = (name, ok, extra = '') => {
     await dc.screenshot({ path: path.join(lib.WORK, 'consolewindow-paused.png') })
     check('paused: the list holds, and the indicator counts what came', /Paused \(\d+ new\)/.test(held) && (await rows()).length === before, `${held}; ${(await rows()).length} vs ${before}`)
     await dc.locator('.dc-pause').click()
-    const prompt = await row((r) => r.name === 'UserPromptSubmit')
-    check('resume fills in what came while paused', !!prompt && (await rows()).some((r) => r.name === 'Stop') && (await dc.locator('.dc-live').textContent()).includes('Live'))
+    // Waits for the whole fill-in: the held rows and the indicator can land in separate renders.
+    const resumed = async () => { const list = await rows(); return list.some((r) => r.name === 'UserPromptSubmit') && list.some((r) => r.name === 'Stop') && (await dc.locator('.dc-live').textContent()).includes('Live') }
+    await lib.until(resumed, HUNG_MS)
+    check('resume fills in what came while paused', await resumed(), `${await dc.locator('.dc-live').textContent()}; ${JSON.stringify((await rows()).map((r) => r.name))}`)
     check("the prompt's words reach no row", !JSON.stringify(await rows()).includes(PRIVATE))
 
     // --- Clear empties the list.
