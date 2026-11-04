@@ -1626,6 +1626,16 @@ const SOURCES: readonly AdvancedSource[] = [
     samples: [{ from: `${FIX}/advanced/auth-status-claude-2.1.310.jsonl`, version: '2.1.310', fields: ['loggedIn', 'authMethod', 'apiProvider', 'analyticsDisabled', 'projectsDirectory', 'configDirectory', 'email', 'orgId', 'orgName', 'subscriptionType'] }]
   },
   {
+    id: 'claude-code.accounts.loginExpiresField',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.accounts.loginExpiresField.title', defaultMessage: 'Connections: sign-in expiry field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.claude-code.accounts.loginExpiresField.desc', defaultMessage: "The field of `claude auth status --json` with when a connection's sign-in expires, shown under its state in Settings → Accounts & Connections (HI-2528). Wrong, no expiry is shown.", description: 'What the advanced setting "Connections: sign-in expiry field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is.' }),
+    kind: 'field',
+    default: 'loginExpiresAt',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/auth-status-claude-2.1.318.jsonl`, version: '2.1.318', fields: ['loggedIn', 'authMethod', 'apiProvider', 'analyticsDisabled', 'projectsDirectory', 'configDirectory', 'loginExpiresAt', 'email', 'orgId', 'orgName', 'subscriptionType'] }]
+  },
+  {
     id: 'claude-code.accounts.onboardedField',
     group: 'claude-code',
     title: msg({ id: 'settings.advanced.claude-code.accounts.onboardedField.title', defaultMessage: 'Connections: set-up field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),

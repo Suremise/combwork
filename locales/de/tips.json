@@ -517,7 +517,7 @@
   "tips.unusedWorktrees.title": "Behaltene Worktrees aufräumen",
   "tips.updateFromTarget.text": "Versionsverwaltung → Branches & Remotes: Ein Branch, der hinter dem Ziel liegt, hat „Aktualisieren“. Merge das Ziel hinein oder rebase darauf, dort, wo der Branch ausgecheckt ist; ein Konflikt wird sofort rückgängig gemacht und nennt seine Dateien.",
   "tips.updateFromTarget.title": "Einen Branch mit seinem Ziel auf den neuesten Stand bringen",
-  "tips.usageMoves.text": "Hake bei einem Konto unter Einstellungen → Konten & Verbindungen „Wenn es 98 % seines Wochenlimits erreicht, seine Agenten zu einem anderen Konto verschieben“ an: Sie wechseln, sobald ihr Zug zu Ende ist, und machen dort weiter.",
+  "tips.usageMoves.text": "Öffne unter Einstellungen → Konten & Verbindungen bei einem Konto ⋯ → Kontoeinstellungen… und hake „Wenn es 98 % seines Wochenlimits erreicht, seine Agenten zu einem anderen Konto verschieben“ an: Sie wechseln, sobald ihr Zug zu Ende ist, und machen dort weiter.",
   "tips.usageMoves.title": "Agenten verschieben, bevor ein Plan aufgebraucht ist",
   "tips.versionControlSwitch.text": "Klicke oben im Tab „Versionsverwaltung“ auf „Keine“ oder „Git“, um ab der nächsten Karte zu wechseln; laufende Karten behalten die alten Regeln. Jede behält ihre Workflow-Optionen, und ändert sich der Ordner (etwa git init), bietet Combwork dort den Wechsel an.",
   "tips.versionControlSwitch.title": "Zwischen Keine und Git wechseln",

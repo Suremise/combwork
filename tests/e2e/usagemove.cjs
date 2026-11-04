@@ -85,7 +85,13 @@ const check = (name, ok, extra = '') => {
     await page.locator('.settings-nav').waitFor({ timeout: HUNG_MS })
     await page.locator('.settings-nav .row[data-section="accounts"]').click()
     const block = page.locator(`.account-block[data-account="${max1.id}"]`)
-    const rule = block.locator('[data-usage-move]')
+    // HI-2528 (Darren, 21:40): the rule is off the card, in the account's settings, opened from its ⋯.
+    await block.locator('[data-connections-of]').waitFor({ timeout: HUNG_MS })
+    check('the rule is not on the account’s card', (await block.locator('[data-usage-move]').count()) === 0)
+    await block.locator('.account-row [data-action="account-menu"]').click()
+    await page.locator('.menu .menu-item', { hasText: 'Account Settings…' }).first().click()
+    const settingsDialog = page.locator(`[data-account-settings="${max1.id}"]`)
+    const rule = settingsDialog.locator('[data-usage-move]')
     await rule.waitFor({ timeout: HUNG_MS })
     check('the rule is off by default', (await rule.getAttribute('data-usage-move')) === 'off')
     // Controlled by the saved rule: ticked once Hive has it (a click, then the wait below).
@@ -95,10 +101,18 @@ const check = (name, ok, extra = '') => {
     await percent.fill('90')
     await percent.press('Enter')
     check('…and the share changed to 90%', !!(await lib.until(async () => (await inv('connections:list')).connections.find((c) => c.id === max1.id)?.usageMove?.percent === 90, HUNG_MS)))
-    // HI-2530: Max 1's Builder tagged "Builders" in its dialog (⋯ → Edit…), shown beside its name on its row.
+    await page.mouse.move(5, 5)
+    const dialogBox = await page.locator('.dialog', { has: settingsDialog }).boundingBox()
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+      await page.screenshot({ path: path.join(lib.WORK, `usagemove-rule-${theme}.png`), ...(dialogBox ? { clip: { x: Math.max(0, dialogBox.x - 8), y: Math.max(0, dialogBox.y - 8), width: Math.min(1400, dialogBox.width + 16), height: dialogBox.height + 16 } } : {}) })
+    }
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    await page.keyboard.press('Escape')
+    await settingsDialog.waitFor({ state: 'detached', timeout: HUNG_MS })
+    // HI-2530: Max 1's Builder tagged "Builders" in its dialog (its ✎, HI-2528), shown in its Tag column.
     const builderRow = block.locator(`[data-connection="${max1.builder}"]`)
-    await builderRow.locator('[data-action="connection-menu"]').click()
-    await page.locator('.menu .menu-item', { hasText: 'Edit…' }).first().click()
+    await builderRow.locator('[data-action="connection-edit"]').click()
     const tagBox = page.locator('[data-connection-tag]')
     await tagBox.waitFor({ timeout: HUNG_MS })
     await tagBox.fill('Builders')
@@ -109,7 +123,7 @@ const check = (name, ok, extra = '') => {
     const box = await block.boundingBox()
     for (const theme of ['dark', 'light']) {
       await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
-      await page.screenshot({ path: path.join(lib.WORK, `usagemove-rule-${theme}.png`), ...(box ? { clip: { x: Math.max(0, box.x - 8), y: Math.max(0, box.y - 8), width: Math.min(1400, box.width + 16), height: box.height + 16 } } : {}) })
+      await page.screenshot({ path: path.join(lib.WORK, `usagemove-card-${theme}.png`), ...(box ? { clip: { x: Math.max(0, box.x - 8), y: Math.max(0, box.y - 8), width: Math.min(1400, box.width + 16), height: box.height + 16 } } : {}) })
     }
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     await page.keyboard.press('Escape')
@@ -131,6 +145,47 @@ const check = (name, ok, extra = '') => {
     const told = await lib.until(async () => (notices().length ? notices() : null), HUNG_MS)
     const body = told?.[0]?.body ?? ''
     check('one notice names them all, with how each was matched', !!told && told.length === 1 && /4 agents move from Max 1 to Max 2/.test(told[0].title) && body.includes('One (by tag builders)') && body.includes('Two (by name)') && body.includes('Three (to its first connection)') && body.includes('Assistant (by tag assistant)'), JSON.stringify(told))
+
+    // --- HI-2528: Max 1's card now that its limits are reported: a bar for its weekly 95% and when it resets; Max 2's
+    // says it has none yet. Then the section, wide and narrow, in both themes (the tidied cards, for the review).
+    await page.keyboard.press('Control+,')
+    await page.locator('.settings-nav .row[data-section="accounts"]').click()
+    const weekly = block.locator('[data-usage] [data-limit]', { hasText: 'Weekly' })
+    check('Max 1’s card shows a bar for its weekly limit, 95%, and when it resets', !!(await lib.until(async () => ((await weekly.count()) === 1 && /95\s?%/.test(await weekly.innerText()) && /resets /.test(await weekly.locator('[data-resets]').innerText()) ? true : null), HUNG_MS)), await weekly.allInnerTexts().catch(() => []))
+    check('…its bar is red at 95%', (await weekly.locator('.account-usage-bar.full').count()) === 1)
+    check('Max 2’s says its usage isn’t reported yet', /not reported yet/.test(await page.locator(`.account-block[data-account="${max2.id}"] [data-usage="none"]`).innerText().catch(() => '')))
+    check('…and Max 1’s plan and email have their own places', (await block.locator('[data-fact="email"] .account-fact-value').innerText()) === 'one@example.com')
+    // HR1 on HI-2528: a long tag stays inside its column, ellipsised, at a wide and an intermediate width.
+    await inv('connection:update', max1.main, { tag: 'Reviewers and builders' })
+    const mainRow = block.locator(`[data-connection="${max1.main}"]`)
+    await lib.until(async () => ((await mainRow.locator('[data-tag]').getAttribute('title').catch(() => '')) ?? '').startsWith('Reviewers and builders'), HUNG_MS)
+    // Wide, a table: the tag ends before the Model column. Narrower (a compact row, its value cells hidden): inside the row.
+    for (const width of [1400, 1300]) {
+      await page.setViewportSize({ width, height: 900 })
+      const fits = await lib.until(async () => {
+        const tag = await mainRow.locator('[data-tag]').boundingBox()
+        const model = await mainRow.locator('[data-cell="model"]').boundingBox()
+        const row = await mainRow.boundingBox()
+        if (!tag || !row) return null
+        return (model ? tag.x + tag.width <= model.x + 0.5 : tag.x + tag.width <= row.x + row.width + 0.5) ? { tag, model, row } : null
+      }, HUNG_MS)
+      check(`a long tag stays inside its column at a ${width}px window, its whole text in its tooltip`, !!fits && (await mainRow.locator('[data-tag]').getAttribute('title')).startsWith('Reviewers and builders\n'), JSON.stringify({ tag: await mainRow.locator('[data-tag]').boundingBox(), model: await mainRow.locator('[data-cell="model"]').boundingBox() }))
+    }
+    await page.mouse.move(5, 5)
+    const pane = page.locator('.accounts-settings')
+    for (const [width, label] of [[1400, 'wide'], [820, 'narrow']]) {
+      await page.setViewportSize({ width, height: 900 })
+      // Narrow: each connection on two lines, no heading row, nothing wider than the pane.
+      if (label === 'narrow') check('narrow: the connections table goes to two lines, nothing scrolls sideways', !!(await lib.until(async () => ((await page.locator('.connection-head').first().isVisible()) === false && (await page.locator('.settings-content').evaluate((el) => el.scrollWidth <= el.clientWidth + 1)) ? true : null), HUNG_MS)))
+      else check('wide: the connections table has its heading row', await page.locator('.connection-head').first().isVisible())
+      for (const theme of ['dark', 'light']) {
+        await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+        await pane.screenshot({ path: path.join(lib.WORK, `usagemove-accounts-${label}-${theme}.png`) })
+      }
+    }
+    await page.setViewportSize({ width: 1400, height: 900 })
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    await page.keyboard.press('Escape')
 
     // --- The Assistant's view: GET /v1/connections gives the limits and the rule (cw_connection list's lines).
     const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token

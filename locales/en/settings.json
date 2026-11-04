@@ -1,4 +1,12 @@
 {
+  "settings.accounts.accountSettings": {
+    "defaultMessage": "Account Settings…",
+    "description": "An entry of an account's ⋯ menu (Settings → Accounts & Connections, HI-2528): opens a dialog with the account's own settings (its usage move)."
+  },
+  "settings.accounts.accountSettingsTitle": {
+    "defaultMessage": "{name}: Account Settings",
+    "description": "The title of an account's settings dialog (HI-2528); {name} is the account's name."
+  },
   "settings.accounts.addAccount": {
     "defaultMessage": "Add Account…",
     "description": "Button in Settings → Accounts & Connections (HI-2107): adds an account (asks which coding agent CLI, its name and where it gets its model), then opens its sign-in or sets up its server. It comes with its first connection."
@@ -39,6 +47,38 @@
     "defaultMessage": "Close",
     "description": "Button under a connection's sign-in or Set Up terminal (Settings → Accounts & Connections): hides it, ending the CLI in it if it still runs (asks first then)."
   },
+  "settings.accounts.col.args": {
+    "defaultMessage": "Extra args",
+    "description": "A column heading of an account's connections table (HI-2528): extra command-line arguments for the CLI. Keep it short."
+  },
+  "settings.accounts.col.connection": {
+    "defaultMessage": "Connection",
+    "description": "A column heading of an account's connections table (Settings → Accounts & Connections, HI-2528): the connection's name. Keep it short."
+  },
+  "settings.accounts.col.context": {
+    "defaultMessage": "Context",
+    "description": "A column heading of an account's connections table (HI-2528): its context window (200K or the model's own). Keep it short."
+  },
+  "settings.accounts.col.effort": {
+    "defaultMessage": "Effort",
+    "description": "A column heading of an account's connections table (HI-2528): the reasoning effort. Keep it short."
+  },
+  "settings.accounts.col.mode": {
+    "defaultMessage": "Mode",
+    "description": "A column heading of an account's connections table (HI-2528): the permission mode. Keep it short."
+  },
+  "settings.accounts.col.model": {
+    "defaultMessage": "Model",
+    "description": "A column heading of an account's connections table (HI-2528). Keep it short."
+  },
+  "settings.accounts.col.tag": {
+    "defaultMessage": "Tag",
+    "description": "A column heading of an account's connections table (HI-2528): the connection's free-text tag (HI-2530), which a usage move matches by. Keep it short."
+  },
+  "settings.accounts.col.usedBy": {
+    "defaultMessage": "Used by",
+    "description": "A column heading of an account's connections table (HI-2528): who uses the connection (agents, the Assistant). Keep it short."
+  },
   "settings.accounts.connection.base": {
     "defaultMessage": "First",
     "description": "A mark on an account's first connection (HI-2107): the one a new agent on that account gets first. Keep it short."
@@ -55,9 +95,21 @@
     "defaultMessage": "Edit…",
     "description": "An entry of a connection's ⋯ menu (Settings → Accounts & Connections, HI-2107): opens its dialog."
   },
+  "settings.accounts.connection.editNamed": {
+    "defaultMessage": "Edit {name}",
+    "description": "The tooltip of a connection's edit button (HI-2528): opens its dialog. {name} is its name."
+  },
   "settings.accounts.connection.failed": {
     "defaultMessage": "Couldn't change the connection",
     "description": "An error's title: duplicating or removing a connection failed (Settings → Accounts & Connections, HI-2107)."
+  },
+  "settings.accounts.connection.moveDown": {
+    "defaultMessage": "Move {name} down",
+    "description": "The tooltip of a connection's down arrow (HI-2528): moves it one place down among its account's connections. {name} is its name."
+  },
+  "settings.accounts.connection.moveUp": {
+    "defaultMessage": "Move {name} up",
+    "description": "The tooltip of a connection's up arrow (HI-2528): moves it one place up among its account's connections; the first is what a new agent gets. {name} is its name."
   },
   "settings.accounts.connection.remove": {
     "defaultMessage": "Remove…",
@@ -67,6 +119,10 @@
     "defaultMessage": "Only this setup goes: its account and its other connections stay.",
     "description": "The message of the dialog confirming a connection's removal (HI-2107)."
   },
+  "settings.accounts.connection.removeNamed": {
+    "defaultMessage": "Remove {name}",
+    "description": "The tooltip of a connection's remove button (HI-2528): removes it (asks first). {name} is its name."
+  },
   "settings.accounts.connection.removeTitle": {
     "defaultMessage": "Remove the connection {name}?",
     "description": "Title of the dialog confirming a connection's removal ({name}, its name; HI-2107)."
@@ -75,10 +131,6 @@
     "defaultMessage": "Its tag: a usage move puts agents on another account's connection with the same tag.",
     "description": "The tooltip of a connection's tag on its row (Settings → Accounts & Connections, HI-2530). The tag is a free-text label of the user's (\"Builders\")."
   },
-  "settings.accounts.copilotAs": {
-    "defaultMessage": "Signed in: {account}",
-    "description": "GitHub Copilot's account (HI-2107): who its PC-wide sign-in is ({account}, a GitHub user name)."
-  },
   "settings.accounts.copilotNotSignedIn": {
     "defaultMessage": "Not signed in: sign in from Provider Setup",
     "description": "GitHub Copilot's account when it isn't signed in (HI-2107). Provider Setup names a dialog."
@@ -86,6 +138,30 @@
   "settings.accounts.defaults.failed": {
     "defaultMessage": "Couldn't change the connection's defaults",
     "description": "An error's title (Settings → Accounts & Connections; HI-1770): saving a connection's default model, effort or context failed."
+  },
+  "settings.accounts.expired": {
+    "defaultMessage": "Sign-in expired {date}",
+    "description": "Under an account's state (HI-2528): its sign-in expired on that date ({date}), as the CLI last said; signing in again renews it."
+  },
+  "settings.accounts.expires": {
+    "defaultMessage": "Sign-in expires {date}",
+    "description": "Under an account's state (Settings → Accounts & Connections, HI-2528): when its sign-in expires, as the coding agent CLI says. {date} is the date."
+  },
+  "settings.accounts.fact.plan": {
+    "defaultMessage": "Plan",
+    "description": "A field's label on an account's card (HI-2528): its plan as the coding agent CLI names it (\"Max\"). Keep it short."
+  },
+  "settings.accounts.fact.signIn": {
+    "defaultMessage": "Sign-in",
+    "description": "A field's label on GitHub Copilot's account card (HI-2528): whose sign-in it is (the PC's, every workspace's). Keep it short."
+  },
+  "settings.accounts.fact.signedInAs": {
+    "defaultMessage": "Signed in as",
+    "description": "A field's label on an account's card (Settings → Accounts & Connections, HI-2528): the email (or, for GitHub Copilot, the user name) it is signed in as. Keep it short."
+  },
+  "settings.accounts.fact.state": {
+    "defaultMessage": "State",
+    "description": "A field's label on an account's card (HI-2528): whether it is signed in and set up, and when its sign-in expires. Keep it short."
   },
   "settings.accounts.keep": {
     "defaultMessage": "Keep the New Login",
@@ -183,6 +259,10 @@
     "defaultMessage": "Some settings moved onto agents can't be used by their connection",
     "description": "A notice's title (Settings → Accounts & Connections; HI-1770): a project's own model, effort or context settings were moved onto its agents (connections hold the defaults now), and some of them the agent's connection can't use: they are kept on the agent but not used."
   },
+  "settings.accounts.offHere": {
+    "defaultMessage": "Off here",
+    "description": "A tag on an account's card (HI-2528) when it is turned off in the open workspace: its connections can't be used here. Keep it short."
+  },
   "settings.accounts.onHere": {
     "defaultMessage": "On in this workspace",
     "description": "The switch on a connection (Settings → Accounts & Connections): whether it is on in the open workspace."
@@ -190,10 +270,6 @@
   "settings.accounts.onHereShort": {
     "defaultMessage": "On here",
     "description": "The switch on an account (Settings → Accounts & Connections, HI-2107): whether it is on in the open workspace. Keep it short."
-  },
-  "settings.accounts.plan": {
-    "defaultMessage": "{email} · {plan}",
-    "description": "A connection's identity in Settings → Accounts & Connections: the email it is signed in as, and its plan as the CLI names it (\"max\")."
   },
   "settings.accounts.providerSetup": {
     "defaultMessage": "Open Provider Setup",
@@ -242,6 +318,14 @@
   "settings.accounts.renameTitle": {
     "defaultMessage": "Rename {name}",
     "description": "Title of the dialog renaming a connection ({name}, its name)."
+  },
+  "settings.accounts.resetsAt": {
+    "defaultMessage": "resets at {time}",
+    "description": "Beside a plan-usage bar (HI-2528): the limit resets today, at {time}. Lower case, after the bar's percentage."
+  },
+  "settings.accounts.resetsOn": {
+    "defaultMessage": "resets {when}",
+    "description": "Beside a plan-usage bar (HI-2528): the limit resets another day; {when} is a weekday and time (\"Thu 09:00\") or a date and time further out. Lower case, after the bar's percentage."
   },
   "settings.accounts.sameLoginAccount": {
     "defaultMessage": "Signed in to the same login as another account: {names}",
@@ -319,9 +403,9 @@
     "defaultMessage": "Signed in for this PC",
     "description": "On GitHub Copilot's account (Settings → Accounts & Connections, HI-2107): its one sign-in is the PC's, used in every workspace."
   },
-  "settings.accounts.usage": {
-    "defaultMessage": "{window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} {used, number, percent}",
-    "description": "An account's plan usage in Settings → Accounts & Connections (HI-2107), once per account: a limit's window (the 5-hour one, the weekly one, or the provider's own name for another) and how much of it is used."
+  "settings.accounts.usageLabel": {
+    "defaultMessage": "{window, select, fiveHour {5-hour} weekly {Weekly} other {{label}}}",
+    "description": "The label of one plan-usage bar on an account's card (HI-2528): the 5-hour limit, the weekly one, or another the provider names ({label}, as it names it). Keep it short."
   },
   "settings.accounts.usageMove.any": {
     "defaultMessage": "either limit",
@@ -367,6 +451,10 @@
     "defaultMessage": "its weekly limit",
     "description": "An entry of the list in an account's usage move (\"When it reaches 98% of its weekly limit…\", HI-2195): its plan's weekly usage limit."
   },
+  "settings.accounts.usageNone": {
+    "defaultMessage": "Usage: not reported yet",
+    "description": "On an account's card (HI-2528) when its coding agent CLI hasn't reported any plan limits yet (they come with its sessions)."
+  },
   "settings.accounts.usedBy": {
     "defaultMessage": "{assistant, select, yes {{n, plural, =0 {Assistant} one {Assistant and # agent} other {Assistant and # agents}}} other {{n, plural, =0 {Not used here} one {# agent} other {# agents}}}}",
     "description": "Who uses a connection, on its row (Settings → Accounts & Connections, HI-2107): the Assistant (assistant is yes) and how many agents ({n}) of the open workspaces. Its tooltip names them. \"Not used here\": none in the open workspaces."
@@ -393,6 +481,14 @@
   },
   "settings.advanced.claude-code.accounts.loggedInField.title": {
     "defaultMessage": "Connections: signed-in field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.claude-code.accounts.loginExpiresField.desc": {
+    "defaultMessage": "The field of `claude auth status --json` with when a connection's sign-in expires, shown under its state in Settings → Accounts & Connections (HI-2528). Wrong, no expiry is shown.",
+    "description": "What the advanced setting \"Connections: sign-in expiry field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is."
+  },
+  "settings.advanced.claude-code.accounts.loginExpiresField.title": {
+    "defaultMessage": "Connections: sign-in expiry field",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.accounts.loginFiles.desc": {
@@ -3026,6 +3122,14 @@
   "settings.connection.cancel": {
     "defaultMessage": "Cancel",
     "description": "A connection's dialog's button that closes it without saving."
+  },
+  "settings.connection.cell.cliOwn": {
+    "defaultMessage": "CLI's own",
+    "description": "A cell of a connection's row in Settings → Accounts & Connections (HI-2528): no value chosen for that column (model, effort, context or mode), so the coding agent CLI uses its own. Keep it short."
+  },
+  "settings.connection.cell.noArgs": {
+    "defaultMessage": "none",
+    "description": "The Extra args cell of a connection's row in Settings → Accounts & Connections (HI-2528) when it passes no extra command-line arguments. Keep it short, lower case as a cell value."
   },
   "settings.connection.context": {
     "defaultMessage": "Context",

@@ -103,14 +103,15 @@ Every agent, and the Assistant, runs on a **connection**. They're in **Settings 
 
 **Combwork doesn't use your own terminal's sign-in** (`~/.claude`, `~/.codex`), which stays yours as it is. Add an account and sign it in once. Until one is on in the workspace, its CLI's agents and the Assistant can't start, and the project, the Assistant panel and **Help → Provider Setup** each offer to add one. A notice says so once, until you add an account or dismiss it.
 
-**The list.** Each account's row shows:
+**The list.** Each account is a card with the same fields in the same place:
 
-- its CLI's icon, its name and who it's signed in as (or its server);
-- its plan and usage, once per account;
-- **On here**, and **Needs set up** with a **Set Up** button when it needs it;
-- a **⋯** menu with **Rename**, **Sign In** (or **Sign In Again**), **Set Up** and **Remove**.
+- its CLI's icon and its name, and **Off here** when it's off in this workspace;
+- **Signed in as** (its email), **Plan** (as the CLI names it, such as *Max*) and **State**: signed in, set up or **Needs set up**, and when its sign-in expires, where the CLI says (Claude Code does);
+- its **usage**: a small bar for each plan limit, with how much is used and when it resets (*resets at 23:00*, *resets Thu 09:00*), or *Usage: not reported yet* until its agents have reported it;
+- a server's card shows its address and key instead, and GitHub Copilot's who it's signed in as;
+- **On here**, a **Set Up** or **Sign In** button when it needs one, and a **⋯** menu with **Account Settings…** (its usage move, below), **Rename**, **Sign In** (or **Sign In Again**), **Set Up** and **Remove**.
 
-Its connections are listed under it. Each shows its name, a summary of its values (**CLI default** for any it leaves to the CLI) and who uses it: agents and the Assistant, in the workspaces open now (hover for their names). Each has a **⋯** menu with **Edit**, **Duplicate** and **Remove**. A connection that something uses can't be removed: the refusal names who uses it. The account's first connection is marked **First**.
+Its connections are a small table inside the card: **Connection**, **Tag**, **Model**, **Effort**, **Context**, **Mode**, **Extra args** and **Used by**. A value the connection leaves to the CLI reads *CLI's own*, and a dash marks a setting that doesn't apply (a server has no effort). **Used by** counts agents and the Assistant in the workspaces open now (hover for their names). The arrows move a connection up or down among its account's; the first, marked **First**, is what a new agent on the account gets. Each row has **Edit**, **Remove** and a **⋯** with **Duplicate**. A connection that something uses can't be removed: the refusal names who uses it. On a narrow window each connection takes two lines, its values on the second.
 
 - **Add Account…** asks which CLI it's for, its name, and whether it signs in or reaches a server. It comes with its first connection, named after it, which you can edit or add to.
 - **Add Connection** under an account, or **Edit** on a connection, opens its dialog: **Name**, **Model**, **Effort** (only the levels the model takes), **Context** (Claude Code: 1M or 200K), **Permission mode** and **Extra arguments**. A server's connection has Model, Permission mode and Extra arguments, but no Effort or Context.
@@ -149,7 +150,7 @@ Accounts have one **order**, for every CLI, the same in every workspace. A new a
 
 #### Moving agents at a usage threshold <a id="usage-moves"></a>
 
-An account can move its agents to another account before its plan runs out. On the account's row in **Settings → Accounts & Connections**, tick **When it reaches [98]% of [its weekly limit], move its agents to [account]**, and choose the share, the limit (its weekly limit, its 5-hour limit, or either) and the account to move to (another of the same CLI's).
+An account can move its agents to another account before its plan runs out. In **Settings → Accounts & Connections**, open the account's **⋯ → Account Settings…** and tick **When it reaches [98]% of [its weekly limit], move its agents to [account]**, and choose the share, the limit (its weekly limit, its 5-hour limit, or either) and the account to move to (another of the same CLI's).
 
 - **What moves:** every agent on that account in the workspaces open now, and the Assistant if it's on that account too (its connection in **Settings → Assistant** then shows where it went).
 - **Where each goes:** to the connection on the other account with the same **tag** as the one it's on, else the one with the same name, else that account's first connection. A tag is any text you give a connection in its dialog (**Tag**, under its name), such as *Builders*, *Reviewers* or *Assistant*. Combwork reads no meaning into it and only compares it, ignoring case and extra spaces; if several connections there have it, the first in order wins. So tag your builders' connections *Builders* on both accounts and your Assistant's *Assistant*, and each lands on its own kind. A connection without a tag is matched by name.

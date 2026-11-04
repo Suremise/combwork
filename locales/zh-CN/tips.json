@@ -517,7 +517,7 @@
   "tips.unusedWorktrees.title": "整理保留的工作树",
   "tips.updateFromTarget.text": "“版本控制”→“分支与远程仓库”：落后于目标分支的分支有“更新”。可在分支检出的位置合并目标分支或变基到目标分支上；冲突会立即撤销，并列出其文件。",
   "tips.updateFromTarget.title": "让分支与其目标保持同步",
-  "tips.usageMoves.text": "在“设置”→“账号与连接”中的某个账号上，勾选“达到每周限额的 98% 时，将其智能体转移到”另一个账号：它们会在回合结束后转移，并在那里继续工作。",
+  "tips.usageMoves.text": "在“设置”→“账号与连接”中，打开某个账号的“⋯”→“账号设置…”，勾选“达到每周限额的 98% 时，将其智能体转移到”另一个账号：它们会在回合结束后转移，并在那里继续工作。",
   "tips.usageMoves.title": "在套餐用完前转移智能体",
   "tips.versionControlSwitch.text": "点击项目“版本控制”标签页顶部的“无”或 Git，即可从下一张卡片起切换；已开始的卡片保持旧规则。两者各自保留自己的工作流程选项；当文件夹发生变化（例如 git init）时，Combwork 会在那里提出切换。",
   "tips.versionControlSwitch.title": "在“无”和 Git 之间切换",

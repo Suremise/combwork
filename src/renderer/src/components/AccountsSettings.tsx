@@ -1,4 +1,5 @@
 import { ConnectionDialog, MovedNoticeBanner, connectionSummary, connectionUsers, effortUnusableText } from './ConnectionDefaults'
+import { connectionCells, currentLimits, planName, resetText, usageLevel, windowOf, type ConnectionCell } from './accountCard'
 import { useCallback, useEffect, useState } from 'react'
 import type { Account, PlanLimit, ProviderId } from '@shared/types'
 import { accountState, connectionReadiness, duplicateLogins, type AccountView, type ConnectionRow, type ConnectionsView, type ConnectionState } from '@shared/accounts'
@@ -6,9 +7,10 @@ import { COPILOT_ACCOUNT } from '@shared/connectionDefaults'
 import { connectionOf } from '@shared/connectionLabel'
 import { isProviderEnabled, providerDescriptor } from '@shared/providers'
 import { fmt, msg, tr } from '@shared/i18n'
+import { formatDate } from '@shared/dates'
 import { call, errorMessage } from '../api'
 import { confirm, notify, prompt, set, useStore } from '../store'
-import { Icon, IconButton, Switch, useContextMenu, type MenuEntry } from './ui'
+import { Icon, IconButton, Modal, Switch, useContextMenu, type MenuEntry } from './ui'
 import { cx, timeAgo } from '../util'
 import { TerminalView } from './TerminalView'
 import { ProviderIcon } from './ProviderIcon'
@@ -55,7 +57,6 @@ const M = {
   onHere: msg({ id: 'settings.accounts.onHereShort', defaultMessage: 'On here', description: 'The switch on an account (Settings → Accounts & Connections, HI-2107): whether it is on in the open workspace. Keep it short.' }),
   onHereTip: msg({ id: 'settings.accounts.onHere', defaultMessage: 'On in this workspace', description: 'The switch on a connection (Settings → Accounts & Connections): whether it is on in the open workspace.' }),
   thisPc: msg({ id: 'settings.accounts.thisPc', defaultMessage: 'Signed in for this PC', description: "On GitHub Copilot's account (Settings → Accounts & Connections, HI-2107): its one sign-in is the PC's, used in every workspace." }),
-  copilotAs: msg({ id: 'settings.accounts.copilotAs', defaultMessage: 'Signed in: {account}', description: "GitHub Copilot's account (HI-2107): who its PC-wide sign-in is ({account}, a GitHub user name)." }),
   copilotNotSignedIn: msg({ id: 'settings.accounts.copilotNotSignedIn', defaultMessage: 'Not signed in: sign in from Provider Setup', description: "GitHub Copilot's account when it isn't signed in (HI-2107). Provider Setup names a dialog." }),
   providerSetup: msg({ id: 'settings.accounts.providerSetup', defaultMessage: 'Open Provider Setup', description: "The only entry of GitHub Copilot's account's ⋯ menu (HI-2107): opens the Provider Setup dialog, where its sign-in is." }),
   more: msg({ id: 'settings.accounts.more', defaultMessage: 'More for {name}', description: "The ⋯ button of an account or a connection (Settings → Accounts & Connections), for screen readers and its tooltip ({name}, its name)." }),
@@ -65,9 +66,7 @@ const M = {
   removeFailed: msg({ id: 'settings.accounts.removeFailed', defaultMessage: "Couldn't remove the connection", description: "An error's title: removing a connection failed." }),
   sameLogin: msg({ id: 'settings.accounts.sameLoginAccount', defaultMessage: 'Signed in to the same login as another account: {names}', description: 'A warning on an account (Settings → Accounts & Connections, HI-2107): other accounts are signed in as the same login. {names} is their names, listed.' }),
   leftover: msg({ id: 'settings.accounts.leftover', defaultMessage: "Not all removed: {what}. Remove tries again; nothing outside its folder was touched.", description: "A warning on a connection (Settings → Accounts & Connections) whose removal stopped partway. {what} is what's left, in English." }),
-  plan: msg({ id: 'settings.accounts.plan', defaultMessage: '{email} · {plan}', description: "A connection's identity in Settings → Accounts & Connections: the email it is signed in as, and its plan as the CLI names it (\"max\")." }),
   changedTo: msg({ id: 'settings.accounts.changedTo', defaultMessage: 'Now signed in as {now}, was {was}', description: 'A warning on a connection (Settings → Accounts & Connections): its login changed (a /login typed in a pane). {now} and {was} are emails.' }),
-  usage: msg({ id: 'settings.accounts.usage', defaultMessage: '{window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} {used, number, percent}', description: "An account's plan usage in Settings → Accounts & Connections (HI-2107), once per account: a limit's window (the 5-hour one, the weekly one, or the provider's own name for another) and how much of it is used." }),
   affected: msg({ id: 'settings.accounts.affected', defaultMessage: '{n, plural, one {# running agent runs on another connection than the one chosen for it now.} other {# running agents run on another connection than the one chosen for them now.}}', description: 'Banner in Settings → Accounts & Connections after a connection was turned off or the default changed (HI-1755): how many running agents are on a connection other than the one chosen now.' }),
   switchAffected: msg({ id: 'settings.accounts.switchAffected', defaultMessage: 'Switch Them When Their Turn Is Over', description: 'Button on that banner: each of those agents ends once its turn is over and carries on, on the connection chosen now.' }),
   notTrusted: msg({ id: 'settings.accounts.notTrusted', defaultMessage: 'Not trusted yet in this workspace: {projects}', description: "Under a connection that needs set up (Settings → Accounts & Connections, HI-1870): the projects of the open workspace whose folders its coding agent CLI hasn't been told to trust yet ({projects}: their names, listed). Set Up asks the CLI's trust question for each in turn." }),
@@ -88,7 +87,35 @@ const M = {
   connectionFailed: msg({ id: 'settings.accounts.connection.failed', defaultMessage: "Couldn't change the connection", description: "An error's title: duplicating or removing a connection failed (Settings → Accounts & Connections, HI-2107)." }),
   base: msg({ id: 'settings.accounts.connection.base', defaultMessage: 'First', description: "A mark on an account's first connection (HI-2107): the one a new agent on that account gets first. Keep it short." }),
   tagTip: msg({ id: 'settings.accounts.connection.tagTip', defaultMessage: "Its tag: a usage move puts agents on another account's connection with the same tag.", description: "The tooltip of a connection's tag on its row (Settings → Accounts & Connections, HI-2530). The tag is a free-text label of the user's (\"Builders\")." }),
-  baseTip: msg({ id: 'settings.accounts.connection.baseTip', defaultMessage: 'The first of its account: what a new agent gets when this account is first in the order and on here.', description: 'The tooltip of "First" on a connection (HI-2107).' })
+  baseTip: msg({ id: 'settings.accounts.connection.baseTip', defaultMessage: 'The first of its account: what a new agent gets when this account is first in the order and on here.', description: 'The tooltip of "First" on a connection (HI-2107).' }),
+  // The tidied cards (HI-2528, Darren's approved mockup v2).
+  factSignedInAs: msg({ id: 'settings.accounts.fact.signedInAs', defaultMessage: 'Signed in as', description: "A field's label on an account's card (Settings → Accounts & Connections, HI-2528): the email (or, for GitHub Copilot, the user name) it is signed in as. Keep it short." }),
+  factPlan: msg({ id: 'settings.accounts.fact.plan', defaultMessage: 'Plan', description: "A field's label on an account's card (HI-2528): its plan as the coding agent CLI names it (\"Max\"). Keep it short." }),
+  factState: msg({ id: 'settings.accounts.fact.state', defaultMessage: 'State', description: "A field's label on an account's card (HI-2528): whether it is signed in and set up, and when its sign-in expires. Keep it short." }),
+  factSignIn: msg({ id: 'settings.accounts.fact.signIn', defaultMessage: 'Sign-in', description: "A field's label on GitHub Copilot's account card (HI-2528): whose sign-in it is (the PC's, every workspace's). Keep it short." }),
+  expires: msg({ id: 'settings.accounts.expires', defaultMessage: 'Sign-in expires {date}', description: "Under an account's state (Settings → Accounts & Connections, HI-2528): when its sign-in expires, as the coding agent CLI says. {date} is the date." }),
+  expired: msg({ id: 'settings.accounts.expired', defaultMessage: 'Sign-in expired {date}', description: "Under an account's state (HI-2528): its sign-in expired on that date ({date}), as the CLI last said; signing in again renews it." }),
+  usageLabel: msg({ id: 'settings.accounts.usageLabel', defaultMessage: '{window, select, fiveHour {5-hour} weekly {Weekly} other {{label}}}', description: "The label of one plan-usage bar on an account's card (HI-2528): the 5-hour limit, the weekly one, or another the provider names ({label}, as it names it). Keep it short." }),
+  usageNone: msg({ id: 'settings.accounts.usageNone', defaultMessage: 'Usage: not reported yet', description: "On an account's card (HI-2528) when its coding agent CLI hasn't reported any plan limits yet (they come with its sessions)." }),
+  offHere: msg({ id: 'settings.accounts.offHere', defaultMessage: 'Off here', description: "A tag on an account's card (HI-2528) when it is turned off in the open workspace: its connections can't be used here. Keep it short." }),
+  colConnection: msg({ id: 'settings.accounts.col.connection', defaultMessage: 'Connection', description: "A column heading of an account's connections table (Settings → Accounts & Connections, HI-2528): the connection's name. Keep it short." }),
+  colTag: msg({ id: 'settings.accounts.col.tag', defaultMessage: 'Tag', description: "A column heading of an account's connections table (HI-2528): the connection's free-text tag (HI-2530), which a usage move matches by. Keep it short." }),
+  colUsedBy: msg({ id: 'settings.accounts.col.usedBy', defaultMessage: 'Used by', description: "A column heading of an account's connections table (HI-2528): who uses the connection (agents, the Assistant). Keep it short." }),
+  moveUp: msg({ id: 'settings.accounts.connection.moveUp', defaultMessage: 'Move {name} up', description: "The tooltip of a connection's up arrow (HI-2528): moves it one place up among its account's connections; the first is what a new agent gets. {name} is its name." }),
+  moveDown: msg({ id: 'settings.accounts.connection.moveDown', defaultMessage: 'Move {name} down', description: "The tooltip of a connection's down arrow (HI-2528): moves it one place down among its account's connections. {name} is its name." }),
+  editNamed: msg({ id: 'settings.accounts.connection.editNamed', defaultMessage: 'Edit {name}', description: "The tooltip of a connection's edit button (HI-2528): opens its dialog. {name} is its name." }),
+  removeNamed: msg({ id: 'settings.accounts.connection.removeNamed', defaultMessage: 'Remove {name}', description: "The tooltip of a connection's remove button (HI-2528): removes it (asks first). {name} is its name." }),
+  accountSettings: msg({ id: 'settings.accounts.accountSettings', defaultMessage: 'Account Settings…', description: "An entry of an account's ⋯ menu (Settings → Accounts & Connections, HI-2528): opens a dialog with the account's own settings (its usage move)." }),
+  accountSettingsTitle: msg({ id: 'settings.accounts.accountSettingsTitle', defaultMessage: '{name}: Account Settings', description: "The title of an account's settings dialog (HI-2528); {name} is the account's name." })
+}
+
+/** The connections table's value columns (HI-2528): each heading, also the label of its value on a narrow card's row. */
+const COLUMN = {
+  model: msg({ id: 'settings.accounts.col.model', defaultMessage: 'Model', description: "A column heading of an account's connections table (HI-2528). Keep it short." }),
+  effort: msg({ id: 'settings.accounts.col.effort', defaultMessage: 'Effort', description: "A column heading of an account's connections table (HI-2528): the reasoning effort. Keep it short." }),
+  context: msg({ id: 'settings.accounts.col.context', defaultMessage: 'Context', description: "A column heading of an account's connections table (HI-2528): its context window (200K or the model's own). Keep it short." }),
+  mode: msg({ id: 'settings.accounts.col.mode', defaultMessage: 'Mode', description: "A column heading of an account's connections table (HI-2528): the permission mode. Keep it short." }),
+  args: msg({ id: 'settings.accounts.col.args', defaultMessage: 'Extra args', description: "A column heading of an account's connections table (HI-2528): extra command-line arguments for the CLI. Keep it short." })
 }
 
 const STATE: Record<ConnectionState, ReturnType<typeof msg>> = {
@@ -101,12 +128,45 @@ const STATE: Record<ConnectionState, ReturnType<typeof msg>> = {
 }
 const STATE_ICON: Record<ConnectionState, string> = { signedIn: 'pass-filled', signedOut: 'circle-slash', changed: 'warning', failed: 'question', missing: 'warning', unchecked: 'circle-outline' }
 
-/** An account's plan limits that haven't reset yet, in a line ("5-hour 42% · weekly 18%"); empty with none. */
-function usageLine(limits: readonly PlanLimit[] | undefined): string {
-  const now = Date.now()
-  const current = (limits ?? []).filter((l) => !l.resetsAt || Date.parse(l.resetsAt) > now)
-  const windowOf = (l: PlanLimit): string => (l.windowMinutes === 300 ? 'fiveHour' : l.windowMinutes === 7 * 24 * 60 ? 'weekly' : 'other')
-  return current.map((l) => tr(M.usage, { window: windowOf(l), label: l.label, used: l.usedPercent / 100 })).join(' · ')
+/** Each limit as a small bar with its share and reset (HI-2528); "not reported yet" with none. */
+function UsageBars({ limits }: { limits: readonly PlanLimit[] | undefined }) {
+  const now = useNow()
+  const shown = currentLimits(limits, now.getTime())
+  if (!shown.length) return <div className="account-usage-none faint" data-usage="none">{tr(M.usageNone)}</div>
+  return (
+    <div className="account-usage" data-usage>
+      {shown.map((l) => (
+        <div key={l.id} className="account-usage-row" data-limit={l.id}>
+          <span className="account-usage-label">{tr(M.usageLabel, { window: windowOf(l), label: l.label })}</span>
+          <span className={cx('account-usage-bar', usageLevel(l.usedPercent))} role="meter" aria-label={tr(M.usageLabel, { window: windowOf(l), label: l.label })} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(l.usedPercent)}>
+            <i style={{ width: `${Math.max(0, Math.min(100, l.usedPercent))}%` }} />
+          </span>
+          <span className="account-usage-pct">{fmt.percent(l.usedPercent / 100)}</span>
+          <span className="account-usage-reset faint" data-resets>{resetText(l.resetsAt, now)}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** The time now, a minute at a time: a reset passing drops its bar, and "at 23:00" turns into a weekday after midnight. */
+function useNow(): Date {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(t)
+  }, [])
+  return now
+}
+
+/** One labelled field of an account's card (HI-2528): the same fields in the same place on every card. */
+function Fact({ label, children, data }: { label: string; children: React.ReactNode; data?: string }) {
+  return (
+    <div className="account-fact" data-fact={data}>
+      <span className="account-fact-label">{label}</span>
+      <span className="account-fact-value">{children}</span>
+    </div>
+  )
 }
 
 type Terminal = { id: string; key: string; ended: boolean; provider: ProviderId; setUp?: boolean; in?: { folder: string; project?: string; workspace?: true } }
@@ -128,6 +188,8 @@ export function AccountsSettings() {
   // An account being dragged to another place in the one order (HI-2107), and the row it would drop on.
   const [dragging, setDragging] = useState<string | null>(null)
   const [dropAt, setDropAt] = useState<string | null>(null)
+  // The account whose Account Settings are open (HI-2528: its usage move, off the card at Darren's word, 21:40).
+  const [accountDialog, setAccountDialog] = useState<string | null>(null)
   const load = useCallback((check: boolean) => {
     call('connections:list', check)
       .then(setView)
@@ -220,49 +282,106 @@ export function AccountsSettings() {
     menu.openAt(r.left, r.bottom + 2, items, e.detail === 0)
   }
 
-  /** An account's connections, each with its summary, who uses it and its ⋯ (Edit, Duplicate, Remove). */
+  /**
+   * An account's connections as a small table inside its card (HI-2528, Darren's 21:40 decision and approved mockup v2):
+   * order, Connection (with First), Tag, Model, Effort, Context, Mode, Extra args, Used by, then Edit, Remove and ⋯
+   * (Duplicate). Each value the CLI decides reads "CLI's own"; on a narrow card each row goes to two lines (CSS).
+   */
   const connections = (a: AccountView | Account) => {
     const rows = view.connectionRows.filter((r) => r.account === a.id)
+    const moveTo = (c: ConnectionRow, i: number): Promise<void> => act(M.moveFailed, () => call('connection:move', c.id, i))
+    const cell = (k: 'model' | 'effort' | 'context' | 'mode' | 'args', v: ConnectionCell, extra?: React.ReactNode) => (
+      <span className={cx('connection-cell', `connection-${k}`, v.own && 'cli-own', v.none && 'faint')} data-cell={k}>
+        <span className="connection-cell-label">{tr(COLUMN[k])}</span>
+        {v.text}
+        {extra}
+      </span>
+    )
     return (
       <div className="connection-list" data-connections-of={a.id}>
+        {rows.length > 0 && (
+          <div className="connection-row connection-head" aria-hidden>
+            <span />
+            <span>{tr(M.colConnection)}</span>
+            <span>{tr(M.colTag)}</span>
+            <span>{tr(COLUMN.model)}</span>
+            <span>{tr(COLUMN.effort)}</span>
+            <span>{tr(COLUMN.context)}</span>
+            <span>{tr(COLUMN.mode)}</span>
+            <span>{tr(COLUMN.args)}</span>
+            <span>{tr(M.colUsedBy)}</span>
+            <span />
+          </div>
+        )}
         {rows.map((c, i) => {
           const assistant = c.users.some((u) => u.assistant)
           const agents = c.users.filter((u) => !u.assistant).length
+          const v = connectionCells(c, a, settings)
           return (
             <div key={c.id} className="connection-row" data-connection={c.id} data-users={c.users.length}>
+              <span className="connection-order">
+                <IconButton icon="arrow-up" title={tr(M.moveUp, { name: c.name })} action="connection-up" disabled={i === 0} onClick={() => void moveTo(c, i - 1)} />
+                <IconButton icon="arrow-down" title={tr(M.moveDown, { name: c.name })} action="connection-down" disabled={i === rows.length - 1} onClick={() => void moveTo(c, i + 1)} />
+              </span>
               <span className="connection-name">
                 {c.name}
                 {i === 0 && rows.length > 1 && <span className="connection-base" title={tr(M.baseTip)}>{tr(M.base)}</span>}
-                {c.tag && (
-                  <span className="connection-tag" data-tag title={tr(M.tagTip)}>
-                    <Icon name="tag" /> {c.tag}
+              </span>
+              <span className={cx('connection-cell', 'connection-tag-cell', !c.tag && 'faint')} data-cell="tag">
+                <span className="connection-cell-label">{tr(M.colTag)}</span>
+                {c.tag ? (
+                  // Cut to its column with an ellipsis (HR1 on HI-2528): the whole tag in its tooltip, above what it is for.
+                  <span className="connection-tag" data-tag title={`${c.tag}\n${tr(M.tagTip)}`}>
+                    <Icon name="tag" /> <span className="connection-tag-text">{c.tag}</span>
                   </span>
+                ) : (
+                  '—' /* i18n-ignore: no tag, a dash */
                 )}
               </span>
-              <span className="connection-summary muted" data-summary>
-                {connectionSummary(c, a, settings)}
-                {c.effortUnusable && (
+              {cell('model', v.model)}
+              {cell(
+                'effort',
+                v.effort,
+                c.effortUnusable && (
                   <span className="connection-warning" data-effort-unusable title={effortUnusableText(c, a.provider, settings)}>
                     <Icon name="warning" />
+                  </span>
+                )
+              )}
+              {cell('context', v.context)}
+              {cell('mode', v.mode)}
+              {cell('args', v.args)}
+              {/* The whole summary, for a narrow card's second line and screen readers' sake. */}
+              <span className="connection-summary muted" data-summary>
+                {connectionSummary(c, a, settings)}
+                {/* The compact row's values (HR1 on HI-2528): its effort warning too, where the Effort cell is hidden. */}
+                {c.effortUnusable && (
+                  <span className="connection-warning" data-effort-unusable-summary title={effortUnusableText(c, a.provider, settings)}>
+                    <Icon name="warning" />
+                    <span className="connection-cell-label">{effortUnusableText(c, a.provider, settings)}</span>
                   </span>
                 )}
               </span>
               <span className={cx('connection-users', c.users.length ? 'muted' : 'faint')} data-used-by title={c.users.length ? connectionUsers(c) : undefined}>
                 {tr(M.usedBy, { assistant: assistant ? 'yes' : 'no', n: agents })}
               </span>
-              <IconButton
-                icon="ellipsis"
-                title={tr(M.more, { name: c.name })}
-                action="connection-menu"
-                onClick={(e) =>
-                  openMenu(e, [
-                    { label: tr(M.edit), icon: 'edit', onClick: () => setDialog({ account: a.id, connection: c.id }) },
-                    { label: tr(M.duplicate), icon: 'copy', onClick: () => void act(M.connectionFailed, () => call('connection:duplicate', c.id)) },
-                    { separator: true },
-                    { label: tr(M.removeConnection), icon: 'trash', danger: true, onClick: () => void removeConnection(c) }
-                  ])
-                }
-              />
+              <span className="connection-actions">
+                <IconButton icon="edit" title={tr(M.editNamed, { name: c.name })} action="connection-edit" onClick={() => setDialog({ account: a.id, connection: c.id })} />
+                <IconButton icon="trash" title={tr(M.removeNamed, { name: c.name })} action="connection-remove" onClick={() => void removeConnection(c)} />
+                <IconButton
+                  icon="ellipsis"
+                  title={tr(M.more, { name: c.name })}
+                  action="connection-menu"
+                  onClick={(e) =>
+                    openMenu(e, [
+                      { label: tr(M.edit), icon: 'edit', onClick: () => setDialog({ account: a.id, connection: c.id }) },
+                      { label: tr(M.duplicate), icon: 'copy', onClick: () => void act(M.connectionFailed, () => call('connection:duplicate', c.id)) },
+                      { separator: true },
+                      { label: tr(M.removeConnection), icon: 'trash', danger: true, onClick: () => void removeConnection(c) }
+                    ])
+                  }
+                />
+              </span>
             </div>
           )
         })}
@@ -287,12 +406,16 @@ export function AccountsSettings() {
                 <ProviderIcon provider={a.provider} /> {providerDescriptor(a.provider).name}
               </span>
             </div>
-            <div className="account-ident muted" data-copilot-identity>
-              {who ? tr(M.copilotAs, { account: who }) : copilotInfo?.loggedIn === false ? tr(M.copilotNotSignedIn) : null}
+            <div className="account-facts">
+              <Fact label={tr(M.factSignedInAs)} data="email">
+                <span data-copilot-identity>{who ?? (copilotInfo?.loggedIn === false ? tr(M.copilotNotSignedIn) : <span className="faint">—</span>) /* i18n-ignore: not read yet, a dash */}</span>
+              </Fact>
+              <Fact label={tr(M.factSignIn)} data="sign-in">
+                {tr(M.thisPc)}
+              </Fact>
             </div>
           </div>
           <div className="account-actions">
-            <span className="muted small">{tr(M.thisPc)}</span>
             <IconButton icon="ellipsis" title={tr(M.more, { name: a.name })} action="account-menu" onClick={(e) => openMenu(e, [{ label: tr(M.providerSetup), icon: 'gear', onClick: () => set({ setupOpen: a.provider }) }])} />
           </div>
         </div>
@@ -371,9 +494,13 @@ export function AccountsSettings() {
           const state = accountState(a)
           const on = !!ws?.on.includes(a.id)
           const o = a.observed
-          const ident = o?.email ? (o.plan ? tr(M.plan, { email: o.email, plan: o.plan }) : o.email) : a.accepted?.email
-          const used = usageLine(usage[a.id]?.limits)
+          const email = o?.email ?? a.accepted?.email
           const same = dups.get(a.id)
+          // Its usage move lives in its Account Settings (HI-2528, Darren 21:40): there when it could have one.
+          const moveTargets = view.connections.filter((other) => other.id !== a.id && other.provider === a.provider && !other.leftover)
+          const hasMove = !server && !a.leftover && (!!a.usageMove || moveTargets.length > 0)
+          const expiry = !server && state === 'signedIn' ? o?.loginExpiresAt : undefined
+          const expired = !!expiry && Date.parse(expiry) <= Date.now()
           // Set up (HI-1870): its CLI's first-run setup and, on here, this workspace's folders trusted; once signed in (or a server's).
           const ready = !a.leftover && (server || state === 'signedIn') ? connectionReadiness(a) : null
           const needsSetUp = ready === 'needed'
@@ -387,6 +514,7 @@ export function AccountsSettings() {
           ) : null
           const signInLabel = tr(state === 'signedOut' || state === 'changed' ? M.signInAgain : M.signIn)
           const items: MenuEntry[] = [
+            ...(hasMove ? [{ label: tr(M.accountSettings), icon: 'settings-gear', onClick: () => setAccountDialog(a.id) }] : []),
             { label: tr(M.rename), icon: 'edit', disabled: !!a.leftover, onClick: () => void rename(a.id, a.name) },
             ...(!server && !a.leftover ? [{ label: signInLabel, icon: 'account', onClick: () => void signIn(a.id, a.provider) }] : []),
             ...(!server && !a.leftover && state === 'signedIn' ? [{ label: setUpLabel(), icon: 'tools', onClick: () => void setUp(a.id, a.provider) }] : []),
@@ -394,7 +522,7 @@ export function AccountsSettings() {
             { label: tr(M.remove), icon: 'trash', danger: true, onClick: () => void remove(a.id, a.name, a.signingIn || terminal?.id === a.id) }
           ]
           return (
-            <div key={a.id} className="account-block" data-account={a.id} data-cli={a.provider} data-state={server ? 'server' : state} data-order={place + 1}>
+            <div key={a.id} className={cx('account-block', wsPath && !on && 'off-here')} data-account={a.id} data-cli={a.provider} data-state={server ? 'server' : state} data-order={place + 1}>
               <div className={cx('account-row', dragging === a.id && 'dragging', dropAt === a.id && 'drop-target')} {...dropProps(a.id)}>
                 {handle(a)}
                 <div className="account-main">
@@ -403,6 +531,7 @@ export function AccountsSettings() {
                     <span className="account-cli muted">
                       <ProviderIcon provider={a.provider} /> {providerDescriptor(a.provider).name}
                     </span>
+                    {wsPath && !on && <span className="account-off-tag" data-off-here>{tr(M.offHere)}</span>}
                   </div>
                   {server ? (
                     <>
@@ -411,21 +540,29 @@ export function AccountsSettings() {
                     </>
                   ) : (
                     <>
-                      <div className="account-ident muted">
-                        {ident}
-                        {used && (
-                          <span className="account-usage" data-usage>
-                            {ident && <span className="muted"> · </span>}
-                            {used}
+                      {/* The same fields in the same place on every card (HI-2528): who, plan, state. */}
+                      <div className="account-facts">
+                        <Fact label={tr(M.factSignedInAs)} data="email">
+                          {email ?? <span className="faint">—</span> /* i18n-ignore: no email yet, a dash */}
+                        </Fact>
+                        <Fact label={tr(M.factPlan)} data="plan">
+                          {o?.plan ? planName(o.plan) : <span className="faint">—</span> /* i18n-ignore: no plan reported, a dash */}
+                        </Fact>
+                        <Fact label={tr(M.factState)} data="state">
+                          <span className={`account-state state-${state}`} title={o?.at ? tr(M.checkedAt, { when: timeAgo(o.at) }) : undefined}>
+                            <Icon name={STATE_ICON[state]} /> {tr(STATE[state])}
+                            {setUpState && <span className="muted">·</span>}
+                            {setUpState}
+                            {a.signingIn && terminal?.id !== a.id && <span className="muted"> · {tr(M.signingInElsewhere)}</span>}
                           </span>
-                        )}
+                          {expiry && (
+                            <span className={cx('account-expiry', expired ? 'expired' : 'faint')} data-expires={expiry}>
+                              {tr(expired ? M.expired : M.expires, { date: formatDate(expiry) })}
+                            </span>
+                          )}
+                        </Fact>
                       </div>
-                      <div className={`account-state state-${state}`} title={o?.at ? tr(M.checkedAt, { when: timeAgo(o.at) }) : undefined}>
-                        <Icon name={STATE_ICON[state]} /> {tr(STATE[state])}
-                        {setUpState && <span className="muted">·</span>}
-                        {setUpState}
-                        {a.signingIn && terminal?.id !== a.id && <span className="muted"> · {tr(M.signingInElsewhere)}</span>}
-                      </div>
+                      <UsageBars limits={usage[a.id]?.limits} />
                     </>
                   )}
                   {/* Said once: above its Set Up terminal while that is open (the Assistant, HI-1871). */}
@@ -434,8 +571,6 @@ export function AccountsSettings() {
                   {state === 'changed' && a.accepted && o?.email && <div className="account-warning" data-warning="changed"><Icon name="warning" /> {tr(M.changedTo, { now: o.email, was: a.accepted.email })}</div>}
                   {same && <div className="account-warning" data-warning="duplicate"><Icon name="warning" /> {tr(M.sameLogin, { names: fmt.list(same.map(nameOf)) })}</div>}
                   {a.leftover && <div className="account-warning" data-warning="leftover"><Icon name="warning" /> {tr(M.leftover, { what: a.leftover })}</div>}
-                  {/* Its usage move (HI-2195): a sign-in's plan limits; to another account of its CLI. */}
-                  {!server && !a.leftover && <UsageMoveRuleRow account={a} others={view.connections.filter((other) => other.id !== a.id && other.provider === a.provider && !other.leftover)} />}
                 </div>
                 <div className="account-actions">
                   {/* What it needs now stays a button; the rest is in its ⋯. */}
@@ -461,6 +596,28 @@ export function AccountsSettings() {
       </div>
       {adding && <AddConnectionDialog clis={view.providers} onClose={() => setAdding(false)} onSignIn={(id, cli) => void signIn(id, cli)} />}
       {dialog && <ConnectionDialog account={dialog.account} connection={dialog.connection} onClose={() => setDialog(null)} />}
+      {(() => {
+        const a = accountDialog ? view.connections.find((x) => x.id === accountDialog) : undefined
+        if (!a) return null
+        return (
+          <Modal
+            title={tr(M.accountSettingsTitle, { name: a.name })}
+            icon="settings-gear"
+            wide
+            onClose={() => setAccountDialog(null)}
+            footer={
+              <button className="btn primary" onClick={() => setAccountDialog(null)}>
+                {tr(M.close)}
+              </button>
+            }
+          >
+            <div className="account-settings-dialog" data-account-settings={a.id}>
+              {/* Its usage move (HI-2195): a sign-in's plan limits; to another account of its CLI. Saved as it changes. */}
+              <UsageMoveRuleRow account={a} others={view.connections.filter((other) => other.id !== a.id && other.provider === a.provider && !other.leftover)} />
+            </div>
+          </Modal>
+        )
+      })()}
       {terminal && (
         <div className="account-signin">
           <p className="hint">{terminal.setUp ? setUpHint(terminal.provider) : tr(M.signingIn)}</p>

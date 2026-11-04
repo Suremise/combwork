@@ -116,6 +116,13 @@ describe('what `claude auth status --json` says (the recorded fixture)', () => {
   it('signed out (exit 1, the same JSON): signed out, with no identity', () => {
     expect(parseClaudeAuthStatus(lines[1], FIELDS)).toEqual({ ok: true, loggedIn: false, email: undefined, orgId: undefined, plan: null })
   })
+  it("2.1.318's sign-in expiry, read by its field (HI-2528); a time it can't read, or a CLI without it, is none", () => {
+    const line318 = readFileSync(join(__dirname, 'fixtures', 'advanced', 'auth-status-claude-2.1.318.jsonl'), 'utf8').trim()
+    const withExpiry = { ...FIELDS, loginExpires: 'loginExpiresAt' }
+    expect(parseClaudeAuthStatus(line318, withExpiry)).toEqual({ ok: true, loggedIn: true, email: 'user@example.com', orgId: '00000000-0000-4000-8000-000000000001', plan: 'max', loginExpiresAt: '2026-11-24T12:00:00.000Z' })
+    expect(parseClaudeAuthStatus(lines[0], withExpiry)).not.toHaveProperty('loginExpiresAt')
+    expect(parseClaudeAuthStatus(JSON.stringify({ loggedIn: true, loginExpiresAt: 'soon' }), withExpiry)).not.toHaveProperty('loginExpiresAt')
+  })
   it("anything else is a failed check, never signed out: not JSON, or no signed-in field", () => {
     expect(parseClaudeAuthStatus('Error: something', FIELDS).ok).toBe(false)
     expect(parseClaudeAuthStatus('{"email":"x@y"}', FIELDS).ok).toBe(false)

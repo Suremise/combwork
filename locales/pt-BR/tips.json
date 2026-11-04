@@ -517,7 +517,7 @@
   "tips.unusedWorktrees.title": "Organize os worktrees mantidos",
   "tips.updateFromTarget.text": "Controle de versão → Branches e remotes: um branch atrás do destino tem Atualizar. Faça merge do destino ou rebase sobre ele, onde o branch está em checkout; um conflito é desfeito na hora, com os arquivos nomeados.",
   "tips.updateFromTarget.title": "Atualize um branch com o seu destino",
-  "tips.usageMoves.text": "Numa conta em Configurações → Contas e conexões, marque “Ao chegar a 98% do seu limite semanal, mover os agentes dela para” outra conta: eles passam quando o turno acabar e continuam lá.",
+  "tips.usageMoves.text": "Em Configurações → Contas e conexões, abra ⋯ → Configurações da conta… de uma conta e marque “Ao chegar a 98% do seu limite semanal, mover os agentes dela para” outra conta: eles passam quando o turno acabar e continuam lá.",
   "tips.usageMoves.title": "Mova os agentes antes que um plano acabe",
   "tips.versionControlSwitch.text": "Clique em Nenhum ou Git no topo da aba Controle de versão para mudar a partir do próximo cartão; cartões em andamento mantêm as regras antigas. Cada um guarda suas opções do fluxo de trabalho, e se a pasta mudar (git init), o Combwork oferece a troca ali.",
   "tips.versionControlSwitch.title": "Alternar entre Nenhum e Git",
