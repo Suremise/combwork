@@ -101,7 +101,7 @@ function modeLabel(m: Pick<ModeOption, 'label' | 'text'>): TextPart {
 function advancedRows(): Row[] {
   // One of Hive's settings (Show developer features) keeps its own entry, under its settings key.
   return ADVANCED_DEFS.filter((d) => !d.setting).flatMap((d): Row[] => {
-    const title = withValues(msg({ id: 'settings.advancedRow.title', defaultMessage: '{group}: {title}', description: "An advanced setting's title where it is named alone: {group} is Hive or the CLI it belongs to, {title} the setting's own title." }), { group: groupName(d.group), title: d.text.title })
+    const title = withValues(msg({ id: 'settings.advancedRow.title', defaultMessage: '{group}: {title}', description: "An advanced setting's title where it is named alone: {group} is Combwork or the CLI it belongs to, {title} the setting's own title." }), { group: groupName(d.group), title: d.text.title })
     const tip = withValues(
       msg({
         id: 'settings.advancedRow.tip',

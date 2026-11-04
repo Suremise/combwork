@@ -1,4 +1,4 @@
-// Advanced settings (#367): Settings → Advanced's list (on tabs since HI-1839: Hive, then each CLI from the
+// Advanced settings (#367): Settings → Advanced's list (on tabs since HI-1839: Combwork (HI-2517; Hive before), then each CLI from the
 // descriptors with its icon, a CLI turned off dimmed but chosen, only a tab's own values in it, remembered; filters
 // counting per tab, landing on a tab with matches or a searched id's own, a click meanwhile not remembered, a tab with
 // none saying so; the developer features switch first, a value not
@@ -50,7 +50,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     await page.locator('.settings-nav .row', { hasText: 'Advanced' }).click()
     const list = page.locator('.advanced-list')
     check('Settings → Advanced shows the list', !!(await lib.until(async () => (await list.count()) === 1, HUNG_MS)))
-    // Tabs (HI-1839): Hive, then each CLI in the providers' order, named and iconed as Settings → Providers has them.
+    // Tabs (HI-1839): Combwork (HI-2517), then each CLI in the providers' order, named and iconed as Settings → Providers has them.
     const tabs = () => list.locator('.advanced-tabs [role="tab"]').evaluateAll((els) => els.map((e) => ({ id: e.getAttribute('data-tab'), label: e.querySelector('.hive-tab-label').textContent.trim(), count: e.querySelector('.hive-tab-count') ? Number(e.querySelector('.hive-tab-count').textContent.replace(/\D/g, '')) : null, selected: e.getAttribute('aria-selected') === 'true', muted: e.hasAttribute('data-muted'), name: e.getAttribute('aria-label'), icon: e.querySelector('.hive-tab-icon .provider-icon, .hive-tab-icon .tab-hex')?.getAttribute('class') ?? null })))
     const tab = (id) => list.locator(`.advanced-tabs [role="tab"][data-tab="${id}"]`)
     const selectedTab = async () => (await tabs()).find((t) => t.selected)?.id ?? null
@@ -58,7 +58,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     // The rows on screen: only the tab shown's, each of its group.
     const visibleIds = () => list.locator('.advanced-row').evaluateAll((rows) => rows.filter((r) => r.checkVisibility()).map((r) => r.getAttribute('data-advanced')))
     const t0 = await lib.until(async () => { const t = await tabs(); return t.length ? t : null }, HUNG_MS)
-    check('tabs: Hive, then each CLI in the providers’ order, Hive first chosen', JSON.stringify(t0?.map((t) => t.label)) === JSON.stringify(['Hive', 'Claude Code', 'Codex', 'GitHub Copilot']) && t0[0].selected, JSON.stringify(t0))
+    check('tabs: Combwork, then each CLI in the providers’ order, Combwork first chosen', JSON.stringify(t0?.map((t) => t.label)) === JSON.stringify(['Combwork', 'Claude Code', 'Codex', 'GitHub Copilot']) && t0[0].selected, JSON.stringify(t0))
     check('…each with its icon: Hive’s mark, then each CLI’s own', /tab-hex/.test(t0[0].icon ?? '') && t0.slice(1).every((t) => /provider-icon/.test(t.icon ?? '')), JSON.stringify(t0.map((t) => t.icon)))
     check('…no counts while nothing filters', t0.every((t) => t.count === null))
     const providers = (await inv('settings:get')).providers
@@ -158,11 +158,11 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     check('…and not in advanced.json', !('hive.progress.lanesShown' in readFile().values))
     const state = await inv('advanced:state')
     check('the window uses it', state.workspace?.['hive.progress.lanesShown'] === 2, JSON.stringify(state.workspace))
-    check("Settings' own value stays beside it", (await lanes.getByLabel('Hive: Progress panel: lanes shown', { exact: true }).inputValue()) === '6')
+    check("Settings' own value stays beside it", (await lanes.getByLabel('Combwork: Progress panel: lanes shown', { exact: true }).inputValue()) === '6')
 
     // --- A workspace's own switch (HI-2344): it inherits Settings' value and shows it, takes on and off, and goes back.
     const resume = row('hive.restart.resumeAfterUpdate')
-    const resumeOwn = resume.getByLabel('Hive: Resume agents after an update, this workspace', { exact: true })
+    const resumeOwn = resume.getByLabel('Combwork: Resume agents after an update, this workspace', { exact: true })
     const wsOwn = () => (fs.existsSync(wsFile) ? JSON.parse(fs.readFileSync(wsFile, 'utf8')).advanced ?? {} : {})
     const shownOwn = () => resumeOwn.evaluate((s) => s.options[s.selectedIndex].textContent)
     check("a workspace's switch untouched inherits, showing Settings' value", (await resumeOwn.inputValue()) === '' && (await shownOwn()) === "on (Settings')" && !('hive.restart.resumeAfterUpdate' in wsOwn()), await shownOwn())
@@ -187,8 +187,8 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     // --- A list of folders (HI-2480): written and shown semicolons apart (a comma can be in a folder's name), edited as
     // shown, a workspace's own over Hive's, and an empty box back to the default (Hive's) or to Hive's (a workspace's).
     const folders = row('hive.cards.attachmentFolders')
-    const foldersHive = folders.getByLabel('Hive: Card attachments: more folders', { exact: true })
-    const foldersOwn = folders.getByLabel('Hive: Card attachments: more folders, this workspace', { exact: true })
+    const foldersHive = folders.getByLabel('Combwork: Card attachments: more folders', { exact: true })
+    const foldersOwn = folders.getByLabel('Combwork: Card attachments: more folders, this workspace', { exact: true })
     await foldersHive.fill('C:\\Evidence, runs;D:\\Runs')
     await foldersHive.press('Enter')
     check('a list of folders goes in advanced.json, a comma kept inside a folder', !!(await lib.until(() => JSON.stringify(readFile().values['hive.cards.attachmentFolders']) === JSON.stringify(['C:\\Evidence, runs', 'D:\\Runs']), HUNG_MS)), JSON.stringify(readFile().values['hive.cards.attachmentFolders']))
@@ -214,7 +214,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
 
     // --- Agents' temp folder (HI-2496): one folder, empty by default; two refused, saying it takes one; emptied, the default.
     const temp = row('hive.agents.tempFolder')
-    const tempHive = temp.getByLabel("Hive: Agents' temp folder", { exact: true })
+    const tempHive = temp.getByLabel("Combwork: Agents' temp folder", { exact: true })
     check("Agents' temp folder is listed, empty, with what it does", (await tempHive.inputValue()) === '' && /instead of Windows' Temp folder/.test(await temp.innerText()), await temp.innerText())
     await tempHive.fill('%LOCALAPPDATA%\\hive-test\\agent-tmp')
     await tempHive.press('Enter')

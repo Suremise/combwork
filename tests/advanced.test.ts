@@ -5,7 +5,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ADVANCED_DEFS, advancedDef, advancedFileText, advancedUnit, advancedRow, checkAdvanced, cliFacing, parseAdvancedFile, sampleMiss, type AdvancedDef } from '../src/shared/advanced'
+import { ADVANCED_DEFS, advancedDef, advancedFileText, advancedUnit, advancedRow, checkAdvanced, cliFacing, groupName, parseAdvancedFile, sampleMiss, shownText, type AdvancedDef } from '../src/shared/advanced'
 import { CLAUDE_FOOTER_MODES } from '../src/shared/claude'
 import { COPILOT_FOOTER_MODES } from '../src/shared/copilot'
 import { SETTINGS_CATALOG, checkSettingValue, settingDefault, settingEntry, settingPatch, settingValue, settingValueText } from '../src/shared/settingsCatalog'
@@ -756,5 +756,13 @@ describe("the Assistant's settings catalog", () => {
     // The developer features switch keeps its key and entry in Hive's settings, with its advanced value's text.
     expect(settingEntry('advanced.showDeveloperFeatures')).toMatchObject({ hidden: true, type: 'boolean', title: def('hive.showDeveloperFeatures').title, desc: def('hive.showDeveloperFeatures').desc })
     expect(settingEntry('advanced.hive.showDeveloperFeatures')).toBeUndefined()
+  })
+
+  it("names Combwork's own group Combwork, in its tab and where a setting is named alone (HI-2517)", () => {
+    expect(groupName('hive')).toBe('Combwork')
+    expect(groupName('claude-code')).toBe('Claude Code')
+    expect(groupName('copilot')).toBe('GitHub Copilot')
+    expect(shownText(settingEntry('advanced.hive.mcp.replySeconds')!.title)).toBe(`Combwork: ${shownText(def('hive.mcp.replySeconds').text.title)}`)
+    expect(shownText(settingEntry('advanced.codex.title.items')!.title)).toMatch(/^Codex: /)
   })
 })

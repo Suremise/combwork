@@ -53,7 +53,7 @@ const values = () => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'ut
 
     // Copies: wait for one to be free, in minutes.
     const quiet = row('hive.copies.quietWaitMinutes')
-    const box = quiet.getByLabel('Hive: Copies: wait for one to be free', { exact: true })
+    const box = quiet.getByLabel('Combwork: Copies: wait for one to be free', { exact: true })
     await box.scrollIntoViewIfNeeded()
     check('hive.copies.quietWaitMinutes: 10 by default', (await box.inputValue()) === '10')
     await box.fill('3')
