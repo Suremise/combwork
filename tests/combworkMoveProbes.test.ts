@@ -32,7 +32,7 @@ vi.mock('fs/promises', async (orig) => {
 
 const base = tempDir('hi2462-probes-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
-const { MARK_FILE, MOVED_FILE, deriveMoves, finishMove, moveFolders, movedFolders, movedPath, moveTestHooks } = await import('../src/main/combworkMove')
+const { MARK_FILE, MOVED_FILE, deriveMoves, finishMove, moveFolders, movedFolders, movedPath, moveStats, moveTestHooks } = await import('../src/main/combworkMove')
 const { cardsTestHooks, rewriteCards } = await import('../src/main/hiveMoveWorker')
 
 const json = (p: string, v: unknown): void => {
@@ -140,6 +140,36 @@ describe("HR1's round-1 probes against the derived map", () => {
       other.close()
       db.close()
     }
+  })
+})
+
+describe("HR1's round 2: readers use the published map", () => {
+  it('once a move has published the map, repeated lookups derive nothing; a move under way, or one that failed, makes readers look again', async () => {
+    const ws = join(base, 'snapshot')
+    json(join(ws, '.hive', 'workspace.json'), { version: 1 })
+    for (const p of ['a', 'b', 'c']) json(join(ws, p, '.hive', 'project.json'), { id: p })
+    const r = await moveFolders(ws)
+    if (r.late) await finishMove(ws, { boardFile: join(ws, '.combwork', 'hive.db'), relocateFolders: async () => true })
+    moveStats.derives = 0
+    for (let i = 0; i < 20; i++) {
+      expect(await movedPath(ws, join(ws, 'b', '.hive', `x${i}.png`))).toBe(join(ws, 'b', '.combwork', `x${i}.png`))
+      expect(await movedPath(ws, join(ws, 'unmoved', 'cwd'))).toBeNull()
+    }
+    expect(moveStats.derives).toBe(0)
+    // A late project, moved through its boundary: the map is published again, with it.
+    json(join(ws, 'd', '.hive', 'project.json'), { id: 'd' })
+    await moveFolders(ws, { only: join(ws, 'd') })
+    moveStats.derives = 0
+    expect(await movedPath(ws, join(ws, 'd', '.hive', 'y'))).toBe(join(ws, 'd', '.combwork', 'y'))
+    expect(moveStats.derives).toBe(0)
+    // One that fails after its rename: readers find the move on disk, then keep it.
+    json(join(ws, 'e', '.hive', 'project.json'), { id: 'e' })
+    crash.from = join(ws, 'e', '.hive')
+    await expect(moveFolders(ws, { only: join(ws, 'e') })).rejects.toThrow(/immediately after native rename/)
+    expect(await movedPath(ws, join(ws, 'e', '.hive', 'z'))).toBe(join(ws, 'e', '.combwork', 'z'))
+    moveStats.derives = 0
+    expect(await movedPath(ws, join(ws, 'e', '.hive', 'z'))).toBe(join(ws, 'e', '.combwork', 'z'))
+    expect(moveStats.derives).toBe(0)
   })
 })
 

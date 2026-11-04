@@ -1,5 +1,5 @@
-import { existsSync, lstatSync, readFileSync } from 'original-fs'
-import { lstat, mkdir, readFile, readdir, rename, writeFile } from 'original-fs/promises'
+import { existsSync } from 'original-fs'
+import { lstat, mkdir, readFile, readdir, realpath, rename, writeFile } from 'original-fs/promises'
 import { createHash, randomUUID } from 'crypto'
 import { join, resolve } from 'path'
 import { Worker } from 'worker_threads'
@@ -115,12 +115,14 @@ const markText = (id: string): string => JSON.stringify({ kind: MARK_KIND, versi
  * Whether a host's `.combwork` is one Combwork moved there from its `.hive` (s65, HR1's approval): the folder is the
  * host's own (a real folder at its place, not a link) and holds Combwork's marker, as Combwork writes it.
  */
-function movedHost(host: string): boolean {
+async function movedHost(host: string): Promise<boolean> {
   const dir = current(host)
   try {
-    const st = lstatSync(dir)
-    if (st.isSymbolicLink() || !st.isDirectory() || realPath(dir).toLowerCase() !== join(realPath(host), HIVE_DIR).toLowerCase()) return false
-    const m = JSON.parse(readFileSync(join(dir, MARK_FILE), 'utf8')) as { kind?: unknown; version?: unknown; id?: unknown }
+    const st = await lstat(dir)
+    if (st.isSymbolicLink() || !st.isDirectory()) return false
+    const [realDir, realHost] = [await realpath(dir), await realpath(host)]
+    if (realDir.toLowerCase() !== join(realHost, HIVE_DIR).toLowerCase()) return false
+    const m = JSON.parse(await readFile(join(dir, MARK_FILE), 'utf8')) as { kind?: unknown; version?: unknown; id?: unknown }
     return m.kind === MARK_KIND && m.version === 1 && typeof m.id === 'string' && m.id.length > 0
   } catch {
     return false
@@ -133,7 +135,7 @@ export async function classify(ws: string, host: string, kind: HostKind): Promis
   const newDir = current(host)
   const hasOld = existsSync(oldDir)
   const hasNew = existsSync(newDir)
-  if (hasNew && movedHost(host)) return 'moved'
+  if (hasNew && (await movedHost(host))) return 'moved'
   if (!hasOld) return 'current'
   // The workspace's own folder is the workspace; a project or the Assistant's home must really be inside it.
   if (kind !== 'workspace' && !under(realPath(host), realPath(ws))) return 'link'
@@ -161,17 +163,34 @@ export const treeOf = (ws: string): string => dataFolder(ws, 'workspace')
  */
 export async function deriveMoves(ws: string): Promise<FolderMove[]> {
   ws = resolve(ws)
+  moveStats.derives++
   const out: FolderMove[] = []
-  const wsMoved = movedHost(ws)
+  // One host at a time, asynchronously: bounded work, never a burst of file calls.
+  const wsMoved = await movedHost(ws)
   for (const h of await hostsOf(ws)) {
     if (h.kind === 'assistant') {
       const home = join(current(ws), ASSISTANT_DIR)
-      if (!movedHost(home)) continue
+      if (!(await movedHost(home))) continue
       out.push({ from: legacy(home), to: current(home) })
       if (wsMoved) out.push({ from: join(legacy(ws), ASSISTANT_DIR, LEGACY_HIVE_DIR), to: current(home) })
-    } else if (movedHost(h.host)) out.push({ from: legacy(h.host), to: current(h.host) })
+    } else if (await movedHost(h.host)) out.push({ from: legacy(h.host), to: current(h.host) })
   }
   return out
+}
+
+/** How often the map was derived from the folders (a test reads it: readers use the snapshot, never a scan of their own). */
+export const moveStats = { derives: 0 }
+
+/**
+ * Each workspace's map as its last move left it (HR1's round 2: readers never scan the workspace): published at the
+ * move's own boundaries (moveFolders, finishMove: an open, a late project), dropped while one is under way, so a reader
+ * then, or after a move that failed part-way (a crash after a rename), derives it from the folders once and keeps that.
+ * Folders move only through those boundaries, so between them the snapshot is what the folders say.
+ */
+const snapshots = new Map<string, FolderMove[]>()
+const publish = (ws: string, moves: FolderMove[]): void => {
+  snapshots.set(lower(ws), moves)
+  if (snapshots.size > 50) snapshots.delete(snapshots.keys().next().value!)
 }
 
 /** A map's hash: its moves sorted, lower case. */
@@ -187,7 +206,14 @@ async function doneHash(ws: string): Promise<string | null> {
 }
 
 /** The folders that moved in a workspace, as its folders show now: what stored paths into them are translated through. */
-export const movedFolders = (ws: string): Promise<FolderMove[]> => deriveMoves(ws)
+export async function movedFolders(ws: string): Promise<FolderMove[]> {
+  const kept = snapshots.get(lower(ws))
+  if (kept) return kept
+  const moves = await deriveMoves(ws)
+  // Only when no move is under way meanwhile: one that is drops it and publishes its own.
+  if (!chains.has(lower(ws))) publish(ws, moves)
+  return moves
+}
 
 /** Where a path stored before the move is now, through its workspace's map; null when it didn't move. */
 export async function movedPath(ws: string, p: string): Promise<string | null> {
@@ -260,7 +286,7 @@ function warn(host: string, state: HostState): void {
 
 /** A `.hive` made again beside a moved `.combwork` (an older Hive opened it since): said once, left as it is. */
 async function warnRecreated(ws: string, hosts: { host: string; kind: HostKind }[]): Promise<void> {
-  for (const h of hosts) if (movedHost(h.host) && existsSync(legacy(h.host)) && (await plainFolder(h.host, legacy(h.host)).catch(() => false)) && ours(legacy(h.host), h.kind)) warn(h.host, 'both')
+  for (const h of hosts) if ((await movedHost(h.host)) && existsSync(legacy(h.host)) && (await plainFolder(h.host, legacy(h.host)).catch(() => false)) && ours(legacy(h.host), h.kind)) warn(h.host, 'both')
 }
 
 const lockBusy = (h: { profile: string }): HiveError => hiveError(M.busy, { profile: h.profile }, { kind: 'conflict' })
@@ -276,6 +302,8 @@ export function moveFolders(ws: string, o: MoveOptions & { only?: string } = {})
 }
 
 async function moveNow(ws: string, o: MoveOptions & { only?: string }): Promise<MoveOutcome> {
+  // A move under way: readers derive the map until it publishes its own.
+  snapshots.delete(lower(ws))
   const all = await hostsOf(ws)
   const hosts = o.only ? all.filter((h) => lower(h.host) === lower(o.only!)) : all
   let planned = 0
@@ -288,7 +316,10 @@ async function moveNow(ws: string, o: MoveOptions & { only?: string }): Promise<
   // Nothing to rename, and the rewrites finished for the map as it is: no lock, nothing written.
   if (!planned) {
     const moves = await deriveMoves(ws)
-    if (!moves.length || (await doneHash(ws)) === mapHash(moves)) return { late: false, moved: 0 }
+    if (!moves.length || (await doneHash(ws)) === mapHash(moves)) {
+      publish(ws, moves)
+      return { late: false, moved: 0 }
+    }
   }
   await moveTestHooks.looked?.()
   const stop = (): void => {
@@ -350,6 +381,7 @@ async function movedUnderLock(ws: string, o: MoveOptions & { only?: string }, st
     }
   }
   const moves = await deriveMoves(ws)
+  publish(ws, moves)
   if (!moves.length || (await doneHash(ws)) === mapHash(moves)) return { late: false, moved }
   for (const phase of EARLY) {
     stop()
@@ -365,7 +397,11 @@ async function movedUnderLock(ws: string, o: MoveOptions & { only?: string }, st
 }
 
 /** The moved projects in a map: hosts whose own folder moved (not the workspace's, nor the Assistant's home). */
-const movedProjects = async (ws: string): Promise<string[]> => (await hostsOf(ws)).filter((h) => h.kind === 'project' && movedHost(h.host)).map((h) => h.host)
+async function movedProjects(ws: string): Promise<string[]> {
+  const out: string[] = []
+  for (const h of await hostsOf(ws)) if (h.kind === 'project' && (await movedHost(h.host))) out.push(h.host)
+  return out
+}
 
 async function runEarly(ws: string, moves: FolderMove[], phase: Phase): Promise<void> {
   if (phase === 'excludes') for (const p of await movedProjects(ws)) await moveExcludeLine(p)
@@ -488,6 +524,7 @@ export function finishMove(ws: string, svc: LateServices, o: MoveOptions = {}): 
 
 async function finishUnderLock(ws: string, svc: LateServices, stop: () => void): Promise<void> {
   const moves = await deriveMoves(ws)
+  publish(ws, moves)
   const hash = mapHash(moves)
   if (!moves.length || (await doneHash(ws)) === hash) return
   let deferred = false
@@ -495,7 +532,7 @@ async function finishUnderLock(ws: string, svc: LateServices, stop: () => void):
     stop()
     try {
       if (phase === 'cards') {
-        const a = await rewriteCardsOffMain({ file: svc.boardFile, moves, workspaceMoved: movedHost(ws) })
+        const a = await rewriteCardsOffMain({ file: svc.boardFile, moves, workspaceMoved: await movedHost(ws) })
         if (!a.ok) throw new Error(a.error)
         // A board still to be upgraded: its cards are rewritten at a later open, and the hash waits for that.
         if (a.deferred) deferred = true

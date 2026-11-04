@@ -93,6 +93,8 @@ describe('a conversation from before the rename (HI-2463)', () => {
     seen.carried.length = 0
     // alpha's .hive moved to .combwork: its folder holds the move's marker (combworkMove.ts writes it before the rename).
     writeFileSync(join(project, '.combwork', 'combwork-move-id'), JSON.stringify({ kind: 'combwork-move', version: 1, id: 'test', from: '.hive' }))
+    // Folders move only at the move's boundaries, which publish the map readers use: this one stands in for the move.
+    await (await import('../src/main/combworkMove')).moveFolders(wsPath)
     const slot = join(project, '.hive', 'slots', 'HI-1')
     await run(() => ws.upsertSession(project, { id: '00000000-0000-4000-8000-000000000006', agent: 'claude-code', agentId: 'b3', cwd: slot, names: 2, name: 'x', lastActiveAt: '2026-11-02T00:00:00.000Z' }))
     await run(() => ws.upsertSession(project, { id: '00000000-0000-4000-8000-000000000007', agent: 'claude-code', agentId: 'b4', cwd: project, names: 2, name: 'y', lastActiveAt: '2026-11-02T00:00:00.000Z' }))
