@@ -21,6 +21,8 @@
   "tips.agentStates.title": "Tes agents d’un coup d’œil",
   "tips.agentWorkflowRole.text": "Le Rôle dans le flux de travail de chaque agent, dans ses paramètres, dit s’il travaille sur les cartes, les relit ou les deux. Démarrer un couloir propose auteurs et relecteurs selon ce rôle.",
   "tips.agentWorkflowRole.title": "Auteurs et relecteurs",
+  "tips.agentsTempFolder.text": "Les agents écrivent des scripts et d’autres fichiers temporaires dans le dossier Temp de Windows pendant qu’ils travaillent. Choisis dans Paramètres → Avancé → Dossier temporaire des agents un dossier à toi, par exemple un dossier exclu de l’analyse antivirus, et chaque agent y aura plutôt un dossier.",
+  "tips.agentsTempFolder.title": "Gardez les fichiers temporaires des agents hors du Temp de Windows",
   "tips.allKeysToCli.text": "Dans le volet d’un agent, les raccourcis de Combwork prennent leurs touches. Active Paramètres → Avancé → Toutes les touches vont à la CLI pour envoyer chaque touche à la CLI à la place, sauf celle de la palette de commandes (Afficher toutes les commandes), pour que chaque commande reste à portée.",
   "tips.allKeysToCli.title": "Donne toutes les touches à la CLI de l’agent",
   "tips.alwaysOnTop.text": "L’épingle de la barre de titre (ou Ctrl+Alt+O) garde la fenêtre au-dessus de tes autres applications, pour qu’une série de tests ou un émulateur tourne en dessous. Chaque fenêtre a la sienne, mémorisée pour son espace de travail.",

@@ -1860,6 +1860,19 @@ Combwork's developer console shows what each coding agent's CLI sends Combwork (
 - **Help → Copy Diagnostics** lists which values you changed (their names, not what you changed them to).
 - The Assistant can explain them and, if you let it change settings, change them when you ask.
 
+#### Agents' temp folder <a id="agents-temp-folder"></a>
+
+Agents write temporary files as they work: Claude Code keeps its working scripts in a *scratchpad*, and Codex, Copilot and the commands they run write to the temp folder. By default that is Windows' Temp folder (`%TEMP%`), which antivirus scans like any other, and which you may not want to exclude, as downloads and installers land there too.
+
+**Settings → Advanced → Agents' temp folder** gives agents a folder of your own instead, such as one you already exclude from scanning ([Antivirus scanning](#antivirus-scanning)): a full path, and `%LOCALAPPDATA%` or another variable at the start is filled in. Set it for the open workspace only, or for all of Combwork. Empty, the default, agents use the system's Temp folder as before.
+
+- Each agent, and the Assistant, gets a folder of its own in it, `<folder>\<project>-<code>\<agent id>` (the code tells apart projects with the same name), made when it starts. Combwork starts it with `TEMP`, `TMP` and `TMPDIR` set to that folder, and Claude Code also with `CLAUDE_CODE_TMPDIR`, so its scratchpad goes there.
+- It applies to agents started afterwards: restart a running agent to move it.
+- It can't be inside a project, a slot or Combwork's own folders: an agent that would start with such a folder doesn't start, and says why, as it does when the folder can't be made. Its files never go back to Windows' Temp folder unasked.
+- What moves is what each CLI puts in its temp folder: Claude Code's scratchpad, and what Codex, Copilot and their commands write to `%TEMP%`. A CLI's own caches and helper files elsewhere stay where the CLI keeps them (Codex's helpers under its home, for one), and a `CLAUDE_CODE_TMPDIR` set in Claude Code's own settings file still wins there.
+- Combwork never deletes anything in it: an agent resumed later finds its scratchpad where it left it. To tidy up, stop the agents, then delete the folders you no longer want in Explorer.
+- Only you can change it: the Assistant can read and explain it, but not set it, as it moves the Assistant's own files too.
+
 #### Combwork's changes to the CLIs <a id="hives-changes-to-the-clis"></a>
 
 Combwork changes some of what each CLI does in the sessions it starts, never by editing the CLI's own config files. Each such change can be turned off in **Settings → Advanced**, under its CLI. All are on by default, as Combwork has always done; turning one off applies to sessions started afterwards, and its description says what Combwork can no longer do without it.

@@ -193,7 +193,7 @@ if (debugAt >= 0 && args[debugAt + 1] === 'prompt-input') {
 // Each launch is recorded in fake-launches.jsonl in CODEX_HOME: its folder and arguments (for what Hive tells it).
 // With its home, agent, and the names (never the values) of the login variables it was given (HI-1757).
 const loginVars = Object.keys(process.env).filter((k) => /^(CODEX_ACCESS_TOKEN|CODEX_API_KEY|OPENAI_API_KEY)$/i.test(k))
-if (process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-launches.jsonl'), JSON.stringify({ cwd: process.cwd(), args, home: process.env.CODEX_HOME, agent: process.env.CW_AGENT || null, loginVars }) + '\n')
+if (process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-launches.jsonl'), JSON.stringify({ cwd: process.cwd(), args, home: process.env.CODEX_HOME, agent: process.env.CW_AGENT || null, loginVars, temp: Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(TEMP|TMP|TMPDIR)$/i.test(k))) }) + '\n')
 
 const hookUrl = /(http:\/\/127\.0\.0\.1:\d+\/hook\?run=[\w-]+)/.exec(args.find((a) => a.startsWith('hooks.Stop=')) ?? '')?.[1]
 // Codex runs Hive's hook command, whose curl reads the Authorization header from the launch's auth file (#345).

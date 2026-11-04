@@ -21,6 +21,8 @@
   "tips.agentStates.title": "Seus agentes num relance",
   "tips.agentWorkflowRole.text": "O Papel no fluxo de trabalho de cada agente, em Configurações do agente, diz se ele trabalha nos cartões, os revisa ou ambos. Iniciar raia oferece executores e revisores conforme esse papel.",
   "tips.agentWorkflowRole.title": "Executores e revisores",
+  "tips.agentsTempFolder.text": "Os agentes gravam scripts e outros arquivos temporários na pasta Temp do Windows enquanto trabalham. Defina em Configurações → Avançado → Pasta temporária dos agentes uma pasta sua, como uma que você exclui da verificação do antivírus, e cada agente passa a ter uma pasta lá.",
+  "tips.agentsTempFolder.title": "Tire os arquivos temporários dos agentes da pasta Temp do Windows",
   "tips.allKeysToCli.text": "No painel de um agente, os atalhos do Combwork ficam com as teclas deles. Ative Configurações → Avançado → Todas as teclas vão para a CLI para mandar todas as teclas para a CLI, menos a da paleta de comandos (Mostrar todos os comandos), para que todos os comandos fiquem ao alcance.",
   "tips.allKeysToCli.title": "Dê todas as teclas à CLI do agente",
   "tips.alwaysOnTop.text": "O alfinete na barra de título (ou Ctrl+Alt+O) mantém a janela acima dos outros apps, para que uma execução de testes ou um emulador funcione por baixo. Cada janela tem o seu, lembrado para o espaço de trabalho dela.",

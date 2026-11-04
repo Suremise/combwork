@@ -7,7 +7,7 @@ import { inWorkspace } from '../src/main/workspace'
 import type { WorkspaceConfig } from '../src/shared/types'
 import { settingChangeTexts, settingEntry, settingReadOnly } from '../src/shared/settingsCatalog'
 import { advanced } from '../src/main/advanced'
-import { CARD_ATTACHMENT_FOLDERS_ID } from '../src/shared/advanced'
+import { AGENT_TEMP_FOLDER_ID, CARD_ATTACHMENT_FOLDERS_ID } from '../src/shared/advanced'
 
 const prices = settingEntry('codex.prices')!
 const mine = { 'gpt-7': { input: 1, cachedInput: 0.1, output: 5 } }
@@ -61,6 +61,17 @@ describe("the settings tools on a provider's prices", () => {
     }
     expect(advanced.get(CARD_ATTACHMENT_FOLDERS_ID)).toEqual([])
   })
+  // HI-2496: Agents' temp folder redirects every agent's file writes, the Assistant's own launch's too: the user's alone.
+  it("Agents' temp folder is the user's: read and explained, never set by the Assistant, Hive's or a workspace's", async () => {
+    for (const id of ['advanced.hive.agents.tempFolder', 'workspace.advanced.hive.agents.tempFolder']) {
+      const e = settingEntry(id)!
+      expect(e, id).toMatchObject({ sensitive: true })
+      expect(settingReadOnly(e), id).toMatch(/^It decides where agents and the Assistant itself write their temporary files: only the user can change it, in /)
+      await expect(applySetting(e, ['D:\\agent-tmp'], null), id).rejects.toMatchObject({ status: 403 })
+    }
+    expect(advanced.get(AGENT_TEMP_FOLDER_ID)).toEqual([])
+  })
+
 
 })
 
