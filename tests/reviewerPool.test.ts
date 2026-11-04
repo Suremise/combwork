@@ -42,8 +42,23 @@ const state = vi.hoisted(() => ({
   onRefused: null as null | ((agentId: string) => void),
   calls: [] as string[],
   /** Awaited as a stopped agent's launch prepares, before its `allowed` (HI-2046: a change landing meanwhile). */
-  beforeSpawn: null as null | (() => void | Promise<void>)
+  beforeSpawn: null as null | (() => void | Promise<void>),
+  /** The timer suite drives this board's changes explicitly; its stand-alone fact store also triggers the DB poll. */
+  manualBoard: null as string | null
 }))
+
+vi.mock('../src/main/events', async (orig) => {
+  const actual = await orig<typeof import('../src/main/events')>()
+  return {
+    ...actual,
+    emit: (event: Parameters<typeof actual.emit>[0]) => {
+      // HI-2455: the harness writes facts on another connection, unlike the app's board-owned runtime. Its poll is
+      // an extra board change, not a retry. Only the clock suite supplies those changes itself (without a path).
+      if (event.type === 'tasks-changed' && event.workspacePath === state.manualBoard) return
+      actual.emit(event)
+    }
+  }
+})
 
 vi.mock('../src/main/workflow/service', async (orig) => ({ ...(await orig<object>()), workflowEnforced: () => state.enforced, agentRunsGoing: (_p: string, a: string) => (state.runs.has(a) ? [{}] : []), workflowFor: async () => state.wf }))
 vi.mock('../src/main/workflow/lineUpdates', async (orig) => ({ ...(await orig<object>()), agentBusy: (_p: string, a: string) => state.busy.has(a) || state.pending.has(a) }))
@@ -100,7 +115,7 @@ afterEach(() => {
   lives.clear()
   env?.close()
   env = null
-  Object.assign(state, { enforced: true, wf: null, lanes: [], busy: new Set(), running: new Set(), status: new Map(), background: new Set(), runs: new Set(), pending: new Set(), hooksMissing: new Set(), deliveries: [], next: [], refuse: new Set(), onRefused: null, calls: [], beforeSpawn: null })
+  Object.assign(state, { enforced: true, wf: null, lanes: [], busy: new Set(), running: new Set(), status: new Map(), background: new Set(), runs: new Set(), pending: new Set(), hooksMissing: new Set(), deliveries: [], next: [], refuse: new Set(), onRefused: null, calls: [], beforeSpawn: null, manualBoard: null })
   // Nothing armed by this test outlives it (HI-2360).
   expect(poolTestHooks.retriesPending()).toBe(0)
 })
@@ -1049,7 +1064,11 @@ describe("a refused pool line's retry through the pool's events (HI-2343)", { ti
 
   /** A pool card submitted with R1 watching and its line refused until told otherwise, the pool started and given it once. */
   const refusedOnce = async (agents: AgentDef[] = ONE) => {
+    // Own the board poll's clock too (HI-2455): setup opens it, so installing timers afterward leaves that event source
+    // on real time. A loaded test must not gain board events while only its fake retry clock advances.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
+    state.manualBoard = e.home
     state.wf = e.wf
     state.running = new Set(['R1'])
     state.status.set('R1', 'watching')
@@ -1060,7 +1079,6 @@ describe("a refused pool line's retry through the pool's events (HI-2343)", { ti
       status(e, a)
     }
     poolTestHooks.retryMs = RETRY
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     open(e, e.home, agents)
     startReviewerPool()
     // R1's status as the pool first sees it (an agent's events start with its session), before anything is owed.
