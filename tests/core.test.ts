@@ -176,7 +176,7 @@ describe('MCP definitions', () => {
   })
 
   it('strips description and expands HIVE_MCP_DIR', () => {
-    expect(toLaunchDef({ description: 'd', command: 'node', args: ['${HIVE_MCP_DIR}/srv/index.js'] }, 'C:\\ws\\.hive\\mcp')).toEqual({ command: 'node', args: ['C:/ws/.hive/mcp/srv/index.js'] })
+    expect(toLaunchDef({ description: 'd', command: 'node', args: ['${HIVE_MCP_DIR}/srv/index.js'] }, 'C:\\ws\\.combwork\\mcp')).toEqual({ command: 'node', args: ['C:/ws/.combwork/mcp/srv/index.js'] })
   })
 })
 
@@ -476,7 +476,7 @@ describe('Claude Code hooks', () => {
   it('resumes the Assistant with its current instructions, not the prompt its conversation recorded (#334)', async () => {
     const { claudeCode } = await import('../src/main/providers/claude/adapter')
     const ctx = {
-      projectPath: 'C:\\ws\\.hive\\assistant', agentId: 'assistant', executable: 'C:\\bin\\claude.exe', cliVersion: '2.1.292', cwd: 'C:\\ws', workspacePath: 'C:\\ws', runId: 'r', sessionId: '00000000-0000-4000-8000-000000000000',
+      projectPath: 'C:\\ws\\.combwork\\assistant', agentId: 'assistant', executable: 'C:\\bin\\claude.exe', cliVersion: '2.1.292', cwd: 'C:\\ws', workspacePath: 'C:\\ws', runId: 'r', sessionId: '00000000-0000-4000-8000-000000000000',
       resume: true, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [] as string[], hookUrl: '', hookAuthFile: '', privateDir: 'C:/hive/launches/r', guidance: '', instructions: 'You are in Planner mode.', env: {}, allowBackgroundSessions: true, use200kContext: false
     }
     const snapshot = (c: typeof ctx): string | null => {
@@ -533,7 +533,7 @@ describe('ConversationParser', () => {
     line({ type: 'user', timestamp: 't2', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'a', content: 'zebra failed', is_error: true }] } }),
     line({ type: 'assistant', timestamp: 't3', message: { model: 'claude-opus-5-5', content: [{ type: 'tool_use', id: 'b', name: 'mcp__combwork__cw_notify', input: { message: 'done' } }] } }),
     line({ type: 'user', timestamp: 't4', message: { role: 'user', content: [{ type: 'text', text: 'look' }, { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' } }] } }),
-    line({ type: 'user', isMeta: true, timestamp: 't4', message: { role: 'user', content: [{ type: 'text', text: '[Image: source: C:\\p\\.hive\\images\\x.png]' }] } }),
+    line({ type: 'user', isMeta: true, timestamp: 't4', message: { role: 'user', content: [{ type: 'text', text: '[Image: source: C:\\p\\.combwork\\images\\x.png]' }] } }),
     line({ type: 'user', isMeta: true, timestamp: 't4', message: { role: 'user', content: '<local-command-caveat>ignore</local-command-caveat>' } }),
     line({ type: 'system', subtype: 'compact_boundary', timestamp: 't5', compactMetadata: { trigger: 'manual', preTokens: 100000, postTokens: 5000 } }),
     line({ type: 'user', isCompactSummary: true, timestamp: 't5', message: { role: 'user', content: 'Summary: zebra fixed' } }),
@@ -552,7 +552,7 @@ describe('ConversationParser', () => {
     const [, bash, mcp, user, compaction, command] = p.items as any[]
     expect(bash.tool).toMatchObject({ name: 'Bash', summary: 'Run tests', input: 'npm test', result: 'zebra failed', isError: true })
     expect(mcp.tool).toMatchObject({ name: 'combwork · cw_notify', summary: 'done', result: null })
-    expect(user.images).toEqual([{ id: 0, path: 'C:\\p\\.hive\\images\\x.png' }])
+    expect(user.images).toEqual([{ id: 0, path: 'C:\\p\\.combwork\\images\\x.png' }])
     expect(compaction).toMatchObject({ trigger: 'manual', preTokens: 100000, postTokens: 5000, nextRequestTokens: 40100, summary: 'Summary: zebra fixed' })
     expect(command).toMatchObject({ name: '/compact', args: 'keep notes', output: 'Compacted' })
     expect(p.items.at(-1)).toMatchObject({ kind: 'notice', text: 'Interrupted by you' })

@@ -153,7 +153,7 @@
   "workflow.option.dependenciesDone.desc": "Une carte qui en attend d’autres ne peut pas démarrer avant que leur travail soit intégré.",
   "workflow.option.dependenciesDone.none": "Une carte ne démarre que lorsque les cartes qu’elle attend sont terminées",
   "workflow.option.dependenciesDone.title": "Une carte ne démarre que lorsque les cartes qu’elle attend sont fusionnées",
-  "workflow.option.excluded.desc": "Tout le dossier du projet, sauf ces dossiers et fichiers (.hive toujours).",
+  "workflow.option.excluded.desc": "Tout le dossier du projet, sauf ces dossiers et fichiers (.combwork toujours).",
   "workflow.option.excluded.title": "Ce qui constitue le travail",
   "workflow.option.fileLocks.desc": "Ce qui se passe quand un agent essaie de modifier un fichier qu’un autre agent du même dossier est en train de modifier.",
   "workflow.option.fileLocks.title": "Verrous de fichiers",

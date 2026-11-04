@@ -48,8 +48,8 @@ describe('a handover links the conversations it joins, whenever the target names
   const saved = { deliveries: internals.deliveries, hiveMcp: internals.hiveMcp }
 
   beforeAll(async () => {
-    mkdirSync(join(proj, '.hive'), { recursive: true })
-    writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [{ id: 'src', name: 'Source', provider: 'codex', lastSessionId: from }, { id: 'dst', name: 'Target', provider: 'codex' }] }))
+    mkdirSync(join(proj, '.combwork'), { recursive: true })
+    writeFileSync(join(proj, '.combwork', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [{ id: 'src', name: 'Source', provider: 'codex', lastSessionId: from }, { id: 'dst', name: 'Target', provider: 'codex' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     internals.hiveMcp = () => ({})

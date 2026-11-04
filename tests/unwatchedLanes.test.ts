@@ -6,7 +6,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { unwatchedLanesNotice } from '../src/shared/doorbell'
 
-const HOME = 'C:\\ws\\.hive\\assistant'
+const HOME = 'C:\\ws\\.combwork\\assistant'
 const state = vi.hoisted(() => ({
   on: true,
   continuation: true,
@@ -17,7 +17,7 @@ const state = vi.hoisted(() => ({
 }))
 
 vi.mock('../src/main/advanced', () => ({ advanced: { get: () => state.on } }))
-vi.mock('../src/main/workspace', () => ({ workspaceFor: () => ({ path: 'C:\\ws', isAssistantHome: (p: string) => p === 'C:\\ws\\.hive\\assistant' }) }))
+vi.mock('../src/main/workspace', () => ({ workspaceFor: () => ({ path: 'C:\\ws', isAssistantHome: (p: string) => p === 'C:\\ws\\.combwork\\assistant' }) }))
 vi.mock('../src/main/lanes', () => ({ rawLanes: async () => state.lanes }))
 vi.mock('../src/main/watches', () => ({ loadedWatchFor: async () => state.watch }))
 vi.mock('../src/main/sessions', () => ({ sessions: {} }))

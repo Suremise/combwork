@@ -46,7 +46,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `resume-${n
   putSessions(proj, { version: 1, sessions: [old('11111111-0000-4000-8000-000000000001', 'Older work', '2026-09-20T10:00:00Z', { agentId: A1.id }), old('11111111-0000-4000-8000-000000000002', 'Tray fixes', '2026-09-25T10:00:00Z', { agentId: A1.id })] })
   // Hive's backups of their transcripts: a session with no transcript anywhere can't be resumed.
   for (const [sid, at] of [['11111111-0000-4000-8000-000000000001', '2026-09-20T10:00:00Z'], ['11111111-0000-4000-8000-000000000002', '2026-09-25T10:00:00Z']]) {
-    const b = path.join(proj, '.hive', 'sessions', `${sid}.jsonl`)
+    const b = path.join(proj, '.combwork', 'sessions', `${sid}.jsonl`)
     fs.mkdirSync(path.dirname(b), { recursive: true })
     fs.writeFileSync(b, JSON.stringify({ type: 'user', sessionId: sid, timestamp: at, message: { role: 'user', content: 'Earlier work' } }) + '\n')
   }
@@ -148,7 +148,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `resume-${n
   // Compressed backups (#1110): an ended session's backup as Hive keeps it (compressing it is in backupCompression.test.ts).
   const zlib = require('zlib')
   const OLDER = '11111111-0000-4000-8000-000000000001'
-  const plainB = path.join(proj, '.hive', 'sessions', `${OLDER}.jsonl`), gzB = plainB + '.gz'
+  const plainB = path.join(proj, '.combwork', 'sessions', `${OLDER}.jsonl`), gzB = plainB + '.gz'
   const compressed = () => fs.existsSync(gzB) && !fs.existsSync(plainB)
   if (fs.existsSync(plainB)) {
     fs.writeFileSync(gzB, zlib.gzipSync(fs.readFileSync(plainB)))

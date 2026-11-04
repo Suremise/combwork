@@ -20,7 +20,7 @@ export interface LaneAgent {
   name: string
 }
 
-/** A lane as kept (a row of the workspace's database, #1018; `.hive/lanes.json` before). Paused isn't kept: it is read from the board (the current card is blocked). */
+/** A lane as kept (a row of the workspace's database, #1018; `.combwork/lanes.json` before). Paused isn't kept: it is read from the board (the current card is blocked). */
 /**
  * A lane agent's new conversation owed (HI-2034, LaneRecord `freshStart`). `id`: this obligation (a retry is a new one).
  * `oldSession`: the conversation it must leave (its session id when deferred; null when unknown). `launching`: when a

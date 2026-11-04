@@ -18,6 +18,7 @@ import { TabPanel, Tabs } from '../components/Tabs'
 import { useScopedLoad } from '../scopedLoad'
 import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace'
 import { cx, formatBytes, formatKeybinding, HIVE_FILES_MIME, IMAGE_EXT, imageUrl, quotePath, timeAgo } from '../util'
+import { HIVE_DIR } from '@shared/defaults'
 
 const parentOf = (rel: string): string => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '')
 const absOf = (project: ProjectInfo, rel: string): string => (rel ? `${project.path}\\${rel.replace(/\//g, '\\')}` : project.path)
@@ -112,8 +113,8 @@ const M = {
   attachmentsLoadTarget: msg({ id: 'files.attachments.loadTarget', defaultMessage: 'the attachments', description: 'What could not be loaded when the Attachments tab first opened: shown in "Could not load {what}: {error}", with Retry.' }),
   attachmentsRefreshTarget: msg({ id: 'files.attachments.refreshTarget', defaultMessage: 'the attachments', description: 'What could not be refreshed while the attachments shown stay on screen: shown in "Could not refresh {what}; last updated …", with Retry.' }),
   attachments: msg({ id: 'files.attachments.title', defaultMessage: 'Attachments', description: 'Heading of the Attachments tab.' }),
-  infoAssistant: msg({ id: 'files.attachments.infoAssistant', defaultMessage: "Kept in the Assistant's home, .hive/attachments. Click a conversation's name to read it.", description: "The (i) beside the Hive Assistant's Attachments heading. Keep .hive/attachments as it is." }),
-  info: msg({ id: 'files.attachments.info', defaultMessage: "Kept in the project's .hive/attachments. Drag one onto the Session tab to send it again; click a session's name to read it.", description: "The (i) beside a project's Attachments heading. Keep .hive/attachments as it is." }),
+  infoAssistant: msg({ id: 'files.attachments.infoAssistant', defaultMessage: "Kept in the Assistant's home, .combwork/attachments. Click a conversation's name to read it.", description: "The (i) beside the Hive Assistant's Attachments heading. Keep .combwork/attachments as it is." }),
+  info: msg({ id: 'files.attachments.info', defaultMessage: "Kept in the project's .combwork/attachments. Drag one onto the Session tab to send it again; click a session's name to read it.", description: "The (i) beside a project's Attachments heading. Keep .combwork/attachments as it is." }),
   total: msg({ id: 'files.attachments.total', defaultMessage: '{host, select, assistant {{total, number} in {groups, plural, one {# conversation} other {# conversations}}} other {{total, number} in {groups, plural, one {# session} other {# sessions}}}}', description: 'Beside the Attachments heading: how many attachments, in how many sessions (conversations for the Hive Assistant).' }),
   openFolder: msg({ id: 'files.attachments.openFolder', defaultMessage: 'Open Attachments Folder', description: "Tooltip on the button that opens the attachments' folder in File Explorer." }),
   descAssistant: msg({ id: 'files.attachments.descAssistant', defaultMessage: 'Files pasted or dropped into the Assistant, by conversation.', description: "Under the Hive Assistant's Attachments heading." }),
@@ -988,7 +989,7 @@ const spanDay = (t: number): string => {
 const dayKey = (iso: string): string => new Date(iso).toDateString()
 
 /**
- * A project's Attachments tab, and the Hive Assistant's Attachments (`assistant`: its home's .hive/attachments, grouped by
+ * A project's Attachments tab, and the Hive Assistant's Attachments (`assistant`: its home's .combwork/attachments, grouped by
  * conversation): what was pasted or dropped into sessions, with filters by kind. Clicking a group's name opens that
  * session's transcript.
  */
@@ -1057,7 +1058,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
   }, [project.path, loadScoped])
   useEffect(load, [load])
   useFileEvents(project.path, (dirs) => {
-    if (dirs.some((d) => d === '.hive' || d.startsWith('.hive/attachments'))) load()
+    if (dirs.some((d) => d === HIVE_DIR || d.startsWith('.combwork/attachments'))) load()
   })
 
   // How many of each kind the tab shown has: a filter is offered for each kind present, counting only its own files.
@@ -1259,7 +1260,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
         <span className="faint">{!assistant && cardCount ? tr(M.totalWithCards, { total: total + cardCount, cards: cardCount, sessions: total, groups: all.length }) : tr(M.total, { host, total, groups: all.length })}</span>
         <div className="grow" />
         <IconButton icon="refresh" title={tr(M.refresh)} action="refresh-attachments" onClick={load} />
-        <IconButton icon="folder-opened" title={tr(M.openFolder)} onClick={() => void call('app:openPath', `${project.path}\\.hive\\attachments`)} />
+        <IconButton icon="folder-opened" title={tr(M.openFolder)} onClick={() => void call('app:openPath', `${project.path}\\.combwork\\attachments`)} />
       </div>
       <p className="hint images-desc">{tr(assistant ? M.descAssistant : M.desc)}</p>
       {!assistant && <Tabs<AttachTab> idBase={`${tabsId}-attach`} className="attachment-tabs" label={tr(M.tabs)} value={tab} onChange={chooseAttachTab} items={[{ id: 'pane', label: tr(M.paneTab), icon: 'comment-discussion', count: total }, { id: 'card', label: tr(M.cardTab), icon: 'checklist', count: cardCount }]} />}

@@ -39,9 +39,9 @@ let a = 0
 let b = 0
 let c = 0
 beforeAll(async () => {
-  mkdirSync(join(wsPath, 'alpha', '.hive'), { recursive: true })
+  mkdirSync(join(wsPath, 'alpha', '.combwork'), { recursive: true })
   // Two agents, for cards held (the usage history's holds, HI-1748).
-  writeFileSync(join(wsPath, 'alpha', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'agent-1', name: 'Agent 1' }, { id: 'agent-2', name: 'Agent 2' }] }))
+  writeFileSync(join(wsPath, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'agent-1', name: 'Agent 1' }, { id: 'agent-2', name: 'Agent 2' }] }))
   w = createWorkspaceService()
   await w.open(wsPath)
   a = (await run(() => tasks.createTask({ title: 'A', project: 'alpha' }, user))).number

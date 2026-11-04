@@ -65,9 +65,9 @@ describe('the side a launch is counted on', () => {
   const enabled = config.settings.providers['claude-code'].enabled
   const laneParts = sessions.laneParts
   beforeAll(async () => {
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'amb1', name: 'AMB1', provider: 'claude-code', workflowRole: 'either' }, { id: 'amb2', name: 'AMB2', provider: 'claude-code', workflowRole: 'generalist' }] }))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'amb1', name: 'AMB1', provider: 'claude-code', workflowRole: 'either' }, { id: 'amb2', name: 'AMB2', provider: 'claude-code', workflowRole: 'generalist' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     providerService.info = ((pid: string) => ({ provider: pid, found: true, path: join(base, 'no-cli.exe') })) as never

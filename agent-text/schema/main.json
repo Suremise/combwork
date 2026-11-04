@@ -292,6 +292,21 @@
       "why": "plain"
     }
   },
+  "main.hiveMove.what.cards": {
+    "placeholders": {}
+  },
+  "main.hiveMove.what.excludes": {
+    "placeholders": {}
+  },
+  "main.hiveMove.what.folders": {
+    "placeholders": {}
+  },
+  "main.hiveMove.what.notes": {
+    "placeholders": {}
+  },
+  "main.hiveMove.what.worktrees": {
+    "placeholders": {}
+  },
   "main.keys.maskingFull": {
     "placeholders": {}
   },

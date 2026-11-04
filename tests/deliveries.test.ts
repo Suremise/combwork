@@ -304,11 +304,11 @@ describe('the delivery service (#647)', async () => {
   })
 
   it('a damaged file is set aside as it is moved in, never overwritten, and Hive starts again with none (#1018)', async () => {
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'deliveries.json'), '{ not json')
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
+    writeFileSync(join(alpha, '.combwork', 'deliveries.json'), '{ not json')
     await deliveries.forgetDeliveriesForTests()
     expect(await deliveries.deliveriesOf(alpha, 'b1')).toEqual([])
-    expect(readdirSync(join(alpha, '.hive')).some((f) => f.startsWith('deliveries.json.damaged-'))).toBe(true)
+    expect(readdirSync(join(alpha, '.combwork')).some((f) => f.startsWith('deliveries.json.damaged-'))).toBe(true)
     expect((await make()).id).toBe('m1')
     // Entries that aren't deliveries are left out; the rest are kept.
     const saved = await file()
@@ -1024,7 +1024,7 @@ describe('the delivery service (#647)', async () => {
     // Read back after a restart: every one of them, nothing set aside, and the ids go on.
     await restart()
     // Nothing in the host's folder at all (#1018: the workspace's database keeps them).
-    expect(existsSync(join(alpha, '.hive'))).toBe(false)
+    expect(existsSync(join(alpha, '.combwork'))).toBe(false)
     const all = (await file()).deliveries
     expect(all.filter((r) => r.state === 'queued').length).toBe(made)
     deliveries.setFileBudgetForTests(4 * 1024 * 1024)

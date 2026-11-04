@@ -113,13 +113,13 @@ describe('deleting', () => {
 
 describe('import tokens', () => {
   it("are opaque, one window's and one workspace's, and spent by a successful import", () => {
-    const t = rememberPick('C:\\x\\a.json', 1, 'C:\\ws\\.hive', 1000)
+    const t = rememberPick('C:\\x\\a.json', 1, 'C:\\ws\\.combwork', 1000)
     expect(t).not.toContain('a.json')
-    expect(pickOfToken(t, 1, 'c:\\WS\\.hive', 2000)).toBe('C:\\x\\a.json')
-    expect(pickOfToken(t, 2, 'C:\\ws\\.hive', 2000)).toBeNull()
-    expect(pickOfToken(t, 1, 'C:\\other\\.hive', 2000)).toBeNull()
+    expect(pickOfToken(t, 1, 'c:\\WS\\.combwork', 2000)).toBe('C:\\x\\a.json')
+    expect(pickOfToken(t, 2, 'C:\\ws\\.combwork', 2000)).toBeNull()
+    expect(pickOfToken(t, 1, 'C:\\other\\.combwork', 2000)).toBeNull()
     expect(spendPick(t)).toBe(true)
-    expect(pickOfToken(t, 1, 'C:\\ws\\.hive', 2000)).toBeNull()
+    expect(pickOfToken(t, 1, 'C:\\ws\\.combwork', 2000)).toBeNull()
   })
 
   it('last ten minutes, and go with their window or workspace; at most 8 are kept, the oldest first out', () => {

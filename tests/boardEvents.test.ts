@@ -97,8 +97,8 @@ describe('board events (#1011)', () => {
   const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
 
   beforeAll(async () => {
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }, { id: 'a2', name: 'Agent 2' }] }))
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }, { id: 'a2', name: 'Agent 2' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     off = onHiveEvent((e: HiveEvent) => {

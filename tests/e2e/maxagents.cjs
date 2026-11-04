@@ -20,7 +20,7 @@ const ws = path.join(lib.WORK, 'maxagents-ws')
 const claudeHome = path.join(lib.WORK, 'maxagents-claude-home')
 const shots = path.join(lib.WORK, 'maxagents-shots')
 const solo = path.join(ws, 'solo')
-const assistantHome = path.join(ws, '.hive', 'assistant')
+const assistantHome = path.join(ws, '.combwork', 'assistant')
 const PORT = Number(lib.port(47794))
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -31,14 +31,14 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
 
 ;(async () => {
   for (const d of [userData, ws, ws + '.worktrees', claudeHome, shots]) fs.rmSync(d, { recursive: true, force: true })
-  for (const d of [userData, claudeHome, shots, path.join(ws, '.hive'), path.join(solo, '.hive')]) fs.mkdirSync(d, { recursive: true })
+  for (const d of [userData, claudeHome, shots, path.join(ws, '.combwork'), path.join(solo, '.combwork')]) fs.mkdirSync(d, { recursive: true })
   fs.writeFileSync(path.join(solo, 'notes.md'), '# Notes\n')
   // Solo, as "How do you work?" saves it, with its one agent.
   const soloOptions = { review: 'none', dependenciesDone: true, maxAgents: 1 }
-  fs.writeFileSync(path.join(solo, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'a-s1', name: 'SO-B1', workflowRole: 'builder', provider: 'claude-code' }], workflow: { platform: 'none', preset: 'solo', options: soloOptions } }))
+  fs.writeFileSync(path.join(solo, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'a-s1', name: 'SO-B1', workflowRole: 'builder', provider: 'claude-code' }], workflow: { platform: 'none', preset: 'solo', options: soloOptions } }))
   // Agents per project from before HI-2001: Settings → Advanced's (advanced.json) and this workspace's own.
   fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'hive.agents.perProject': 16 } }))
-  fs.writeFileSync(path.join(ws, '.hive', 'workspace.json'), JSON.stringify({ advanced: { 'hive.agents.perProject': 5 } }))
+  fs.writeFileSync(path.join(ws, '.combwork', 'workspace.json'), JSON.stringify({ advanced: { 'hive.agents.perProject': 5 } }))
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws, solo, assistantHome].map((p) => p.toLowerCase())))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
@@ -52,7 +52,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     await lib.openWorkspace(inv, page, ws)
     await lib.waitForProvider(inv)
     const text = async (l) => ((await l.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
-    const projectOf = () => JSON.parse(fs.readFileSync(path.join(solo, '.hive', 'project.json'), 'utf8'))
+    const projectOf = () => JSON.parse(fs.readFileSync(path.join(solo, '.combwork', 'project.json'), 'utf8'))
     const agentNames = () => projectOf().agents.map((a) => a.name)
     const shoot = async (name, target) => {
       for (const theme of ['dark', 'light']) {

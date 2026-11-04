@@ -1,12 +1,13 @@
 // Reading a Markdown document to outline it or read one section (#817): a project's file (in the folder the caller works
 // in) or a shared note (`shared:<path>`). Only Markdown, only inside its folder (through junctions too), never Hive's
-// own `.hive` or git's `.git` folder, and up to DOC_MAX: a reply never carries more than the section asked for.
+// own `.combwork` or git's `.git` folder, and up to DOC_MAX: a reply never carries more than the section asked for.
 import { readFile, stat } from 'original-fs/promises'
 import { isAbsolute, relative, resolve } from 'path'
 import { insideReal, realPath } from './fsutil'
 import { parseDocRef } from '../shared/docRefs'
 import { docOutline, findHeading, sectionText } from '../shared/docSections'
 import type { ContextProblem } from '../shared/types'
+import { HIVE_DIR } from '../shared/defaults'
 
 /** A shared note's reference starts with this: `shared:plans/i18n.md`. */
 export const SHARED_PREFIX = 'shared:'
@@ -19,12 +20,12 @@ export type DocRead = { ok: true; text: string } | { ok: false; code: 'outside' 
 
 const MARKDOWN = /\.(md|markdown|mdx)$/i
 
-/** Whether a path inside the folder goes into Hive's own `.hive` or git's `.git`. */
-const hidden = (inside: string): boolean => inside.split(/[\\/]/).some((part) => part.toLowerCase() === '.hive' || part.toLowerCase() === '.git')
+/** Whether a path inside the folder goes into Hive's own `.combwork` or git's `.git`. */
+const hidden = (inside: string): boolean => inside.split(/[\\/]/).some((part) => part.toLowerCase() === HIVE_DIR || part.toLowerCase() === '.git')
 
 /**
  * Reads a document: `path` relative to `root` (a project's folder, or the shared notes' folder for `shared:` paths).
- * A path outside it, into `.hive` or `.git`, or not Markdown is refused before anything is read.
+ * A path outside it, into `.combwork` or `.git`, or not Markdown is refused before anything is read.
  */
 export async function readDoc(root: string, path: string): Promise<DocRead> {
   const rel = path.replace(/\\/g, '/').replace(/^\.\//, '')
@@ -35,7 +36,7 @@ export async function readDoc(root: string, path: string): Promise<DocRead> {
   if (hidden(inside)) return { ok: false, code: 'hidden' }
   if (!MARKDOWN.test(abs)) return { ok: false, code: 'notMarkdown' }
   if (!insideReal(abs, [root])) return { ok: false, code: 'outside' }
-  // Where it really is, through junctions and links: one inside the folder may still lead into .hive or .git.
+  // Where it really is, through junctions and links: one inside the folder may still lead into .combwork or .git.
   if (hidden(relative(realPath(root), realPath(abs)))) return { ok: false, code: 'hidden' }
   const s = await stat(abs).catch(() => null)
   if (!s?.isFile()) return { ok: false, code: 'notFound' }

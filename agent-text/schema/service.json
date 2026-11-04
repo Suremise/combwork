@@ -522,6 +522,30 @@
       "why": "plain"
     }
   },
+  "service.hiveMove.busy": {
+    "placeholders": {
+      "profile": "plain"
+    }
+  },
+  "service.hiveMove.closed": {
+    "placeholders": {}
+  },
+  "service.hiveMove.locked": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.hiveMove.otherOpen": {
+    "placeholders": {
+      "profile": "plain"
+    }
+  },
+  "service.hiveMove.phaseFailed": {
+    "placeholders": {
+      "what": "plain",
+      "error": "plain"
+    }
+  },
   "service.hiveVcs.cantList": {
     "placeholders": {}
   },

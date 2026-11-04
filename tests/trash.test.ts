@@ -154,8 +154,8 @@ describe('trash (src/main/trash.ts)', () => {
     const dir = join(base, 'held-trash')
     process.env.HIVE_TEST_TRASH_DIR = dir
     const folder = join(base, 'held-project')
-    mkdirSync(join(folder, '.hive'), { recursive: true })
-    const file = join(folder, '.hive', 'project.json')
+    mkdirSync(join(folder, '.combwork'), { recursive: true })
+    const file = join(folder, '.combwork', 'project.json')
     writeFileSync(file, '{}')
     // A handle on a file in it (an antivirus scan, a reader closing it): Windows can't move the folder while it is open.
     const fd = openSync(file, 'r')
@@ -177,7 +177,7 @@ describe('trash (src/main/trash.ts)', () => {
     expect(existsSync(folder)).toBe(false)
     const [moved] = readFileSync(join(dir, 'trash.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l) as { from: string; to: string })
     expect(moved.from).toBe(folder)
-    expect(readFileSync(join(moved.to, '.hive', 'project.json'), 'utf8')).toBe('{}')
+    expect(readFileSync(join(moved.to, '.combwork', 'project.json'), 'utf8')).toBe('{}')
   })
 
   it('a folder kept open is refused after a few tries, whole and in place, nothing in the trash (#668)', async () => {

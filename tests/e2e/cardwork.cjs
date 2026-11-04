@@ -272,7 +272,7 @@ const commit = (dir, file, text, message) => {
   for (const p of [alpha, notes]) await inv('session:stop', p)
   await lib.until(async () => (await inv('session:live')).length === 0, HUNG_MS)
   await app.close()
-  const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { timeout: 5000 })
   db.prepare('UPDATE cards SET pre_workflow = 1 WHERE number = ?').run(old)
   db.close()
   app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })

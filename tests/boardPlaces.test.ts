@@ -38,7 +38,7 @@ const { boardFile } = await import('../src/main/boardStore')
 
 const user = { kind: 'user' } as const
 const wsPath = join(base, 'ws')
-const tasksDir = join(wsPath, '.hive', 'tasks')
+const tasksDir = join(wsPath, '.combwork', 'tasks')
 const BOARD = 200
 let w: ReturnType<typeof createWorkspaceService>
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
@@ -52,8 +52,8 @@ async function readsOf(fn: () => Promise<unknown>): Promise<number> {
 }
 
 beforeAll(async () => {
-  mkdirSync(join(wsPath, 'p', '.hive'), { recursive: true })
-  writeFileSync(join(wsPath, 'p', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+  mkdirSync(join(wsPath, 'p', '.combwork'), { recursive: true })
+  writeFileSync(join(wsPath, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   // A board of 200 cards' files from before 0.9: moved into the database as the board is first used.
   mkdirSync(tasksDir, { recursive: true })
   for (let n = 1; n <= BOARD; n++) writeFileSync(join(tasksDir, `${n}.json`), JSON.stringify(card(n, { column: (['todo', 'review', 'passed', 'done'] as const)[n % 4], archived: n % 5 === 0 })))

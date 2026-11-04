@@ -51,7 +51,7 @@ const isIn = (dir, rev, ref) => {
   for (const d of [userData, home, shots, before, after]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(shots, { recursive: true })
   const alpha0 = path.join(wsOf(before), 'alpha')
-  lib.gitProject(alpha0, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha0, { 'a.txt': 'a\n', '.gitignore': '.combwork/\n' })
   lib.git(alpha0, ['branch', '-M', 'main'])
   lib.git(alpha0, ['branch', 'integration'])
   // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
@@ -59,9 +59,9 @@ const isIn = (dir, rev, ref) => {
   lib.git(alpha0, ['config', 'user.email', identity.email])
   lib.git(alpha0, ['worktree', 'add', '-q', '-b', 'hive/hb1', path.join(treesOf(before), 'hb1'), 'integration'])
   lib.git(alpha0, ['worktree', 'add', '-q', '-b', 'hive/hr1', path.join(treesOf(before), 'hr1'), 'main'])
-  fs.mkdirSync(path.join(alpha0, '.hive'), { recursive: true })
+  fs.mkdirSync(path.join(alpha0, '.combwork'), { recursive: true })
   fs.writeFileSync(
-    path.join(alpha0, '.hive', 'project.json'),
+    path.join(alpha0, '.combwork', 'project.json'),
     JSON.stringify({
       version: 2,
       platform: 'git',
@@ -145,8 +145,8 @@ const isIn = (dir, rev, ref) => {
     // A review copy, as #1435's pool keeps one (its worktree, detached, and its row).
     const copy = path.join(treesOf(before), 'copies', 'copy-1')
     lib.git(alpha0, ['worktree', 'add', '-q', '--detach', copy])
-    const id = JSON.parse(fs.readFileSync(path.join(alpha0, '.hive', 'project.json'), 'utf8')).id
-    const db = new DatabaseSync(path.join(wsOf(before), '.hive', 'hive.db'), { timeout: 5000 })
+    const id = JSON.parse(fs.readFileSync(path.join(alpha0, '.combwork', 'project.json'), 'utf8')).id
+    const db = new DatabaseSync(path.join(wsOf(before), '.combwork', 'hive.db'), { timeout: 5000 })
     try {
       const now = new Date().toISOString()
       db.prepare("INSERT INTO copies (project, name, folder, state, created_at, used_at) VALUES (?, 'copy-1', ?, 'free', ?, ?)").run(id, copy, now, now)

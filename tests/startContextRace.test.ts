@@ -44,8 +44,8 @@ describe('a Start whose card changes while its references are checked', () => {
     const ws = tempDir('hive-startcontext-ws-')
     alpha = join(ws, 'alpha')
     for (const p of [alpha, join(ws, 'beta')]) {
-      mkdirSync(join(p, '.hive'), { recursive: true })
-      writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent' }, { id: 'a2', name: 'Other' }] }))
+      mkdirSync(join(p, '.combwork'), { recursive: true })
+      writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent' }, { id: 'a2', name: 'Other' }] }))
       writeFileSync(join(p, 'PLAN.md'), '# Plan\n\n## Setup\n\nOLD-BRIEF.\n\n## Release\n\nShip.\n')
     }
     w = createWorkspaceService()

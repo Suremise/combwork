@@ -11,6 +11,7 @@ import { isAbsolute, join, relative, sep } from 'path'
 import type { FileChange, Manifest } from '../../shared/workflow/facts'
 import { UNREADABLE } from '../../shared/workflow/texts'
 import { isUnknown, unknown, type Maybe } from './types'
+import { HIVE_DIR } from '../../shared/defaults'
 
 /** At most this many files or bytes per card; beyond, the revision is unknown and the option row says to narrow it. */
 export const NONE_MAX_FILES = 20_000
@@ -30,7 +31,7 @@ export class NoneAdapter {
 
   constructor(
     readonly project: string,
-    /** Names of folders left out of the deliverables (N4); `.hive` always is. */
+    /** Names of folders left out of the deliverables (N4); `.combwork` always is. */
     private excluded: string[] = [],
     /**
      * Whether names match whatever their case, as the file system resolves them (Windows: `NODE_MODULES` is
@@ -79,7 +80,7 @@ export class NoneAdapter {
   private skip(name: string): boolean {
     const fold = (s: string): string => (this.anyCase ? s.toLowerCase() : s)
     const n = fold(name)
-    return n === '.hive' || n === '.git' || this.excluded.some((x) => fold(x) === n)
+    return n === HIVE_DIR || n === '.git' || this.excluded.some((x) => fold(x) === n)
   }
 
   /**
@@ -151,14 +152,14 @@ export class NoneAdapter {
     return hash
   }
 
-  /** A declared path stays inside the project: no `..` out of it, no absolute path, no `.hive`. */
+  /** A declared path stays inside the project: no `..` out of it, no absolute path, no `.combwork`. */
   static inside(p: string): boolean {
     const posix = toPosix(p)
-    return !!posix && !isAbsolute(p) && !posix.split('/').some((part) => part === '..' || part === '.hive')
+    return !!posix && !isAbsolute(p) && !posix.split('/').some((part) => part === '..' || part === HIVE_DIR)
   }
 
   /**
-   * The part of a project-relative path that keeps it out of the deliverables (`.hive`, `.git` or an excluded folder), or
+   * The part of a project-relative path that keeps it out of the deliverables (`.combwork`, `.git` or an excluded folder), or
    * null (#1511). A card's paths narrow the deliverables, never widen them: declaring such a path is refused, and one
    * stored from before is left out of the card's revision (`leftOut`).
    */
@@ -171,7 +172,7 @@ export class NoneAdapter {
     )
   }
 
-  /** The declared paths a revision leaves out (#1511): those under `.hive`, `.git` or an excluded folder. */
+  /** The declared paths a revision leaves out (#1511): those under `.combwork`, `.git` or an excluded folder. */
   leftOut(paths: string[]): string[] {
     return [...new Set(paths.map(toPosix))].filter((p) => this.excludedPart(p) !== null).sort()
   }
@@ -235,7 +236,7 @@ export class NoneAdapter {
     return out.sort((x, y) => (x.path < y.path ? -1 : 1))
   }
 
-  /** Whether a project-relative path is in the deliverables (no part of it is `.hive`, `.git` or an excluded folder). */
+  /** Whether a project-relative path is in the deliverables (no part of it is `.combwork`, `.git` or an excluded folder). */
   isDeliverable(rel: string): boolean {
     return toPosix(rel).split('/').filter(Boolean).length > 0 && this.excludedPart(rel) === null
   }

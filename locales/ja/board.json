@@ -588,7 +588,7 @@
   "board.overview.stalled": "停滞",
   "board.overview.waitingForReview": "レビュー待ち",
   "board.panel.allProjects": "すべてのプロジェクト",
-  "board.panel.info": "ワークスペースのカードで、.hive/tasksにあります。エージェントとアシスタントはCombworkのツールでカードを読み、変更し、移動します（終わった作業は「レビュー」へ）。アーカイブや削除ができるのは自分だけです。",
+  "board.panel.info": "ワークスペースのカードで、.combwork/tasksにあります。エージェントとアシスタントはCombworkのツールでカードを読み、変更し、移動します（終わった作業は「レビュー」へ）。アーカイブや削除ができるのは自分だけです。",
   "board.panel.refresh": "更新",
   "board.panel.stalledInfo": "「進行中」にあるのに、誰も作業していないカードです。担当エージェントがいないか、削除されたか、実行されていません。カードループのエージェントが待たずに離れた「進行中」や「レビュー」のカードも含みます。",
   "board.panel.workspace": "ワークスペース",

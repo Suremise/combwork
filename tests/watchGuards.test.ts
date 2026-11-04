@@ -33,8 +33,8 @@ let A = ''
 
 beforeAll(async () => {
   for (const name of ['alpha', 'beta']) {
-    mkdirSync(join(wsPath, name, '.hive'), { recursive: true })
-    writeFileSync(join(wsPath, name, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }] }))
+    mkdirSync(join(wsPath, name, '.combwork'), { recursive: true })
+    writeFileSync(join(wsPath, name, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }] }))
   }
   w = createWorkspaceService()
   await w.open(wsPath)

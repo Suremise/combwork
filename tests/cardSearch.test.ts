@@ -44,8 +44,8 @@ async function open(ws: string): Promise<WS> {
 function workspace(): string {
   const ws = join(base, `ws-${++n}`)
   for (const p of ['alpha', 'beta']) {
-    mkdirSync(join(ws, p, '.hive'), { recursive: true })
-    writeFileSync(join(ws, p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: p === 'alpha' ? 'Builder Bee' : 'Reviewer Wasp' }] }))
+    mkdirSync(join(ws, p, '.combwork'), { recursive: true })
+    writeFileSync(join(ws, p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: p === 'alpha' ? 'Builder Bee' : 'Reviewer Wasp' }] }))
   }
   return ws
 }

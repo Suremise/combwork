@@ -106,6 +106,7 @@ interface HiveMessageValues {
   'session.modeOffer.one': { agent: string | number }
   'session.modeOffer.switch': undefined
   'session.modeOffer.title': { modes: string | number }
+  'session.movedFresh.body': { n: number }
   'session.newConversation.didntStop': undefined
   'session.newConversation.notRunning': undefined
   'session.newConversation.pending': undefined

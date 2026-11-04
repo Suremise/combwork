@@ -49,8 +49,8 @@ let n = 0
 function folder(p?: string, q?: string): string {
   const root = join(base, `ws-${++n}`)
   for (const [name, choice] of [['p', p], ['q', q]] as const) {
-    mkdirSync(join(root, name, '.hive'), { recursive: true })
-    writeFileSync(join(root, name, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [], ...(choice ? { cardAttachmentCleanup: choice } : {}) }))
+    mkdirSync(join(root, name, '.combwork'), { recursive: true })
+    writeFileSync(join(root, name, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [], ...(choice ? { cardAttachmentCleanup: choice } : {}) }))
   }
   return root
 }
@@ -181,7 +181,7 @@ describe("cleaning up archived cards' attachments (HI-1842)", () => {
   it("a card's folder that is a junction is never followed: what it leads to stays, and so do its rows", async () => {
     const { w, root, p } = await workspace()
     const c = await card(w, { archived: true, files: ['x.txt'] })
-    const folderOf = join(root, 'p', '.hive', 'attachments', 'cards', String(c.n))
+    const folderOf = join(root, 'p', '.combwork', 'attachments', 'cards', String(c.n))
     const outside = join(base, `outside-${n}`)
     cpSync(folderOf, outside, { recursive: true })
     renameSync(folderOf, join(base, `moved-${n}`))
@@ -198,7 +198,7 @@ describe("cleaning up archived cards' attachments (HI-1842)", () => {
     const { w, root, p } = await workspace()
     const c = await card(w, { archived: true, files: ['y.txt'] })
     const shown = await preview(w, p, 31)
-    const folderOf = join(root, 'p', '.hive', 'attachments', 'cards', String(c.n))
+    const folderOf = join(root, 'p', '.combwork', 'attachments', 'cards', String(c.n))
     const outside = join(base, `outside-${n}`)
     cpSync(folderOf, outside, { recursive: true })
     renameSync(folderOf, join(base, `moved-${n}`))

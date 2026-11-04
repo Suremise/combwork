@@ -892,7 +892,7 @@
     "description": "A tip's title."
   },
   "tips.gitInit.text": {
-    "defaultMessage": "A project without git? Its Version Control tab's Initialise repository… makes it one on main, keeps .hive out, adds a starter .gitignore if you like and makes the first commit, so agents can work in worktrees at once.",
+    "defaultMessage": "A project without git? Its Version Control tab's Initialise repository… makes it one on main, keeps .combwork out, adds a starter .gitignore if you like and makes the first commit, so agents can work in worktrees at once.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.gitInit.title": {
@@ -964,11 +964,11 @@
     "description": "A tip's title."
   },
   "tips.hiveFolder.text": {
-    "defaultMessage": "Combwork keeps each project's .hive folder (sessions, backups, launch settings) out of git by itself. Where it can't, say with no git, another version control system, or a folder OneDrive or Dropbox syncs, the project's Overview tells you.",
+    "defaultMessage": "Combwork keeps each project's .combwork folder (sessions, backups, launch settings) out of git by itself. Where it can't, say with no git, another version control system, or a folder OneDrive or Dropbox syncs, the project's Overview tells you.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.hiveFolder.title": {
-    "defaultMessage": "A project's .hive stays on this computer",
+    "defaultMessage": "A project's .combwork stays on this computer",
     "description": "A tip's title."
   },
   "tips.hiveMerges.text": {

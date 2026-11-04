@@ -26,7 +26,7 @@ const git = (cwd, ...a) => lib.git(cwd, ['-c', 'user.email=t@t', '-c', 'user.nam
 /** What the comparison must leave as it was: every ref, the index (its bytes and time), the status, the worktrees. */
 function state() {
   const index = path.join(proj, '.git', 'index')
-  return JSON.stringify({ refs: git(proj, 'for-each-ref'), index: fs.readFileSync(index).toString('base64'), mtime: fs.statSync(index).mtimeMs, status: git(proj, '--no-optional-locks', 'status', '--porcelain').split('\n').filter((l) => !l.includes('.hive')).join('\n'), worktrees: git(proj, 'worktree', 'list', '--porcelain') })
+  return JSON.stringify({ refs: git(proj, 'for-each-ref'), index: fs.readFileSync(index).toString('base64'), mtime: fs.statSync(index).mtimeMs, status: git(proj, '--no-optional-locks', 'status', '--porcelain').split('\n').filter((l) => !l.includes('.combwork')).join('\n'), worktrees: git(proj, 'worktree', 'list', '--porcelain') })
 }
 
 ;(async () => {

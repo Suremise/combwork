@@ -65,7 +65,7 @@ describe('loading a template for the Assistant, and undoing it', () => {
   const beta = join(wsPath, 'beta')
   const plain = join(wsPath, 'plain')
   const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
-  const cfgOf = (p: string) => JSON.parse(readFileSync(join(p, '.hive', 'project.json'), 'utf8'))
+  const cfgOf = (p: string) => JSON.parse(readFileSync(join(p, '.combwork', 'project.json'), 'utf8'))
   const names = (p: string): string[] => cfgOf(p).agents.map((a: StoredAgent) => a.name)
   const live = new Set<string>()
   /** alpha's key (#704), as Hive's own templates' names are made with it. */
@@ -85,7 +85,7 @@ describe('loading a template for the Assistant, and undoing it', () => {
   }
   /** alpha back as it was: its two agents, no options of its own; what else its file has (its key, #704) kept. */
   const resetAlpha = () => {
-    const file = join(alpha, '.hive', 'project.json')
+    const file = join(alpha, '.combwork', 'project.json')
     let kept: Record<string, unknown> = {}
     try {
       kept = JSON.parse(readFileSync(file, 'utf8'))
@@ -111,11 +111,11 @@ describe('loading a template for the Assistant, and undoing it', () => {
   }
 
   beforeAll(async () => {
-    for (const p of [alpha, beta, plain]) mkdirSync(join(p, '.hive'), { recursive: true })
+    for (const p of [alpha, beta, plain]) mkdirSync(join(p, '.combwork'), { recursive: true })
     repo(alpha)
     resetAlpha()
-    writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Bea', provider: 'claude-code' }] }))
-    writeFileSync(join(plain, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [] }))
+    writeFileSync(join(beta, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Bea', provider: 'claude-code' }] }))
+    writeFileSync(join(plain, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [] }))
     config.settings.providers['claude-code'].enabled = true
     config.settings.providers.codex.enabled = true
     providerService.info = ((id: string) => ({ provider: id, found: true })) as never
@@ -152,7 +152,7 @@ describe('loading a template for the Assistant, and undoing it', () => {
   })
 
   it("plans Team 3×3 with one name given: who goes and comes, pairs by the names given, its workflow's changes; nothing changed", async () => {
-    const before = readFileSync(join(alpha, '.hive', 'project.json'), 'utf8')
+    const before = readFileSync(join(alpha, '.combwork', 'project.json'), 'utf8')
     const { reply } = await run(async () => api.planReply(alpha, await api.findTemplate(alpha, { template: 'team-3x3.json' }), { 1: 'Coder' }, true))
     expect(reply.remove).toEqual(['Ann', 'Rob'])
     expect(reply.create.map((a) => a.name)).toEqual(['Coder', k('B2'), k('B3'), k('R1'), k('R2'), k('R3')])
@@ -161,7 +161,7 @@ describe('loading a template for the Assistant, and undoing it', () => {
     expect(reply.blocked).toEqual([])
     expect(reply.workflow).toMatchObject({ platform: 'git', applies: true, needsGit: false })
     expect(reply.workflow!.changes.length).toBeGreaterThan(0)
-    expect(readFileSync(join(alpha, '.hive', 'project.json'), 'utf8')).toBe(before)
+    expect(readFileSync(join(alpha, '.combwork', 'project.json'), 'utf8')).toBe(before)
   })
 
   it("a name another project's agent has is refused with a free one, never filled in", async () => {
@@ -342,7 +342,7 @@ describe('loading a template for the Assistant, and undoing it', () => {
   })
 
   it("the template edited while the load stages: its agents and the options saved are both the revision the load planned", async () => {
-    const file = join(wsPath, '.hive', 'templates', 'git-only.json')
+    const file = join(wsPath, '.combwork', 'templates', 'git-only.json')
     const t = JSON.parse(readFileSync(file, 'utf8'))
     const rounds = t.workflow.git.options.loopRounds ?? null
     expect(rounds).not.toBe(9)
@@ -378,7 +378,7 @@ describe('loading a template for the Assistant, and undoing it', () => {
       })
     /** beta's agents: two builders, one called Builder, and a reviewer called reviewer (its role's word), all on c-a. */
     const setBeta = () => {
-      const file = join(beta, '.hive', 'project.json')
+      const file = join(beta, '.combwork', 'project.json')
       const kept = JSON.parse(readFileSync(file, 'utf8'))
       writeFileSync(file, JSON.stringify({ ...kept, version: 2, migrations: { ...kept.migrations, accounts1: { at: '2026-10-30T00:00:00.000Z' } }, agents: [
         { id: 'p1', name: 'Builder', workflowRole: 'builder', provider: 'claude-code', connection: 'c-a', lastSessionId: 'old-claude-conversation' },
@@ -415,8 +415,8 @@ describe('loading a template for the Assistant, and undoing it', () => {
 
     it("a plan's connections: the builders' role and an agent called Builder apart, a template name several agents share refused", async () => {
       accounts()
-      mkdirSync(join(wsPath, '.hive', 'templates'), { recursive: true })
-      writeFileSync(join(wsPath, '.hive', 'templates', 'collide.json'), JSON.stringify({ version: 2, name: 'Collide', savedAt: '', layout: 'auto', agents: [{ name: 'Builder', role: 'builder', provider: 'claude-code' }, { name: '{key}-B{n}', role: 'builder', provider: 'claude-code' }, { name: '{key}-B{n}', role: 'builder', provider: 'claude-code' }] }))
+      mkdirSync(join(wsPath, '.combwork', 'templates'), { recursive: true })
+      writeFileSync(join(wsPath, '.combwork', 'templates', 'collide.json'), JSON.stringify({ version: 2, name: 'Collide', savedAt: '', layout: 'auto', agents: [{ name: 'Builder', role: 'builder', provider: 'claude-code' }, { name: '{key}-B{n}', role: 'builder', provider: 'claude-code' }, { name: '{key}-B{n}', role: 'builder', provider: 'claude-code' }] }))
       const e = await find(beta, 'Collide')
       const { reply } = await run(() => api.planReply(beta, e, undefined, false, { builder: 'Work', Builder: 'c-x' }))
       expect([reply.create.map((a) => a.connection), reply.blocked]).toEqual([['Personal · args', 'Work', 'Work'], []])

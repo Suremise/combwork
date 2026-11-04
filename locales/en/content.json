@@ -65,7 +65,7 @@
   },
   "content.mcp.listNotObject": {
     "defaultMessage": "Definition must be a JSON object",
-    "description": "Why an MCP server in the workspace can't be used: its definition file (.hive/mcp/<name>.json) holds JSON that isn't an object."
+    "description": "Why an MCP server in the workspace can't be used: its definition file (.combwork/mcp/<name>.json) holds JSON that isn't an object."
   },
   "content.mcp.noCommand": {
     "defaultMessage": "The definition needs a \"command\" (a server Combwork starts) or a \"url\" (an http or sse server).",
@@ -77,7 +77,7 @@
   },
   "content.mcp.notObject": {
     "defaultMessage": "The definition must be a JSON object, as in {path}.",
-    "description": "An error adding an MCP server from a file whose definition holds JSON that isn't an object. {path} is where a workspace keeps one (.hive/mcp/<name>.json)."
+    "description": "An error adding an MCP server from a file whose definition holds JSON that isn't an object. {path} is where a workspace keeps one (.combwork/mcp/<name>.json)."
   },
   "content.mcp.runs": {
     "defaultMessage": "Runs: {command}",
@@ -141,7 +141,7 @@
   },
   "content.mode.unknown": {
     "defaultMessage": "There is no mode \"{mode}\" in this workspace.",
-    "description": "An error switching the Hive Assistant's mode: the workspace has no mode (a file in .hive/modes) called {mode}."
+    "description": "An error switching the Hive Assistant's mode: the workspace has no mode (a file in .combwork/modes) called {mode}."
   },
   "content.notes.badName": {
     "defaultMessage": "Invalid name",
@@ -153,7 +153,7 @@
   },
   "content.notes.deleteRoot": {
     "defaultMessage": "Cannot delete the shared folder itself",
-    "description": "An error: the shared notes folder itself (.hive/shared) can't be deleted, only what is in it."
+    "description": "An error: the shared notes folder itself (.combwork/shared) can't be deleted, only what is in it."
   },
   "content.notes.exists": {
     "defaultMessage": "\"{name}\" already exists",
@@ -173,7 +173,7 @@
   },
   "content.notes.outside": {
     "defaultMessage": "Path is outside the shared notes folder",
-    "description": "An error: a shared note's path leads out of the workspace's shared notes folder (.hive/shared)."
+    "description": "An error: a shared note's path leads out of the workspace's shared notes folder (.combwork/shared)."
   },
   "content.skill.audience": {
     "defaultMessage": "{kind, select, text {its audience is \"{audience}\", not agents, assistant or all} empty {its audience is empty, not agents, assistant or all} list {its audience is a list, not agents, assistant or all} other {its audience is a {type}, not agents, assistant or all}}",

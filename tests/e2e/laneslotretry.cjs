@@ -59,7 +59,7 @@ const renamable = (dir) => {
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`, tools]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(tools, { recursive: true })
-  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   lib.git(alpha, ['branch', 'integration'])
   lib.git(alpha, ['config', 'user.name', identity.name])
@@ -80,7 +80,7 @@ const renamable = (dir) => {
   const turnGo = path.join(tools, 'turn-go.txt')
   const go4 = path.join(tools, 'hold4-go.txt')
   const beat4 = path.join(tools, 'hold4-beat.txt')
-  fs.writeFileSync(turn, `const fs = require('fs'); const { spawn } = require('child_process'); const c = spawn(process.execPath, [${JSON.stringify(hold)}, require('path').join(process.cwd(), '.hive', 'hold4.lock'), ${JSON.stringify(go4)}, ${JSON.stringify(beat4)}, '${HUNG_MS * 4}'], { detached: true, stdio: 'ignore', windowsHide: true }); c.unref(); const t = Date.now(); const tick = () => { if (fs.existsSync(${JSON.stringify(turnGo)}) || Date.now() - t > ${HUNG_MS * 3}) process.exit(0); setTimeout(tick, 100) }; tick()\n`)
+  fs.writeFileSync(turn, `const fs = require('fs'); const { spawn } = require('child_process'); const c = spawn(process.execPath, [${JSON.stringify(hold)}, require('path').join(process.cwd(), '.combwork', 'hold4.lock'), ${JSON.stringify(go4)}, ${JSON.stringify(beat4)}, '${HUNG_MS * 4}'], { detached: true, stdio: 'ignore', windowsHide: true }); c.unref(); const t = Date.now(); const tick = () => { if (fs.existsSync(${JSON.stringify(turnGo)}) || Date.now() - t > ${HUNG_MS * 3}) process.exit(0); setTimeout(tick, 100) }; tick()\n`)
   // Step 6's stand-in broker (HI-2467): only its current folder in the slot, no file open, until stand-go.txt (bounded),
   // writing its own PID/current-folder heartbeat. brokers.txt lists the stand-ins' ids (HIVE_TEST_SYSTEM_BROKER), brokers-active.txt the
   // Sandbox's own processes running now (HIVE_TEST_SYSTEM_BROKER_ACTIVE; while it is missing, none).
@@ -167,8 +167,8 @@ const renamable = (dir) => {
     check('…nothing left holding slot-a', !!(await until(() => renamable(slotA), HUNG_MS)))
 
     // --- 2. A process holds slot-a: B1's next lane waits for a slot, and says what holds it.
-    fs.mkdirSync(path.join(slotA, '.hive'), { recursive: true })
-    holder = spawn(process.execPath, [hold, path.join(slotA, '.hive', 'hold.lock'), holdGo, holdBeat, String(HUNG_MS * 3)], { cwd: tools, stdio: 'ignore', windowsHide: true, env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '' } })
+    fs.mkdirSync(path.join(slotA, '.combwork'), { recursive: true })
+    holder = spawn(process.execPath, [hold, path.join(slotA, '.combwork', 'hold.lock'), holdGo, holdBeat, String(HUNG_MS * 3)], { cwd: tools, stdio: 'ignore', windowsHide: true, env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '' } })
     const exited = new Promise((r) => holder.once('exit', r))
     check('a process holds slot-a', !!(await until(() => holding(holder) && !renamable(slotA), HUNG_MS)))
     const second = await inv('lanes:start', alpha, { builder: b1.id, reviewer: r1.id, cards: [c2] })
@@ -182,7 +182,7 @@ const renamable = (dir) => {
     // The passes its start asked for (its own, the lanes' and the board's) are over: no try to lend it a slot for 2 s,
     // so what lends it one from here is what notices the process has gone.
     const lastTry = () => {
-      const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { readOnly: true })
+      const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { readOnly: true })
       try {
         return Date.parse(db.prepare('SELECT MAX(from_at) AS at FROM slot_leases WHERE lane = ?').get(second.lane.id)?.at ?? '') || 0
       } finally {
@@ -236,7 +236,7 @@ const renamable = (dir) => {
     check('the lane is ended, B1 stopped, slot-a free and held by nothing', !!(await until(settled, HUNG_MS)), JSON.stringify(await slotNow()))
     const go5 = path.join(tools, 'hold5-go.txt')
     const beat5 = path.join(tools, 'hold5-beat.txt')
-    const holder5 = spawn(process.execPath, [hold, path.join(slotA, '.hive', 'hold5.lock'), go5, beat5, String(HUNG_MS * 3)], { cwd: tools, stdio: 'ignore', windowsHide: true, env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '' } })
+    const holder5 = spawn(process.execPath, [hold, path.join(slotA, '.combwork', 'hold5.lock'), go5, beat5, String(HUNG_MS * 3)], { cwd: tools, stdio: 'ignore', windowsHide: true, env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '' } })
     const exited5 = new Promise((r) => holder5.once('exit', r))
     check('a process holds slot-a', !!(await until(() => beating(beat5) && !renamable(slotA), HUNG_MS)))
     const t5 = Date.now()
@@ -284,7 +284,7 @@ const renamable = (dir) => {
     // 6a. The broker working elsewhere while a process holds slot-a (a file in it open): only the process is said.
     const go6 = path.join(tools, 'hold6-go.txt')
     const beat6 = path.join(tools, 'hold6-beat.txt')
-    const holder6 = spawn(process.execPath, [hold, path.join(slotA, '.hive', 'hold6.lock'), go6, beat6, String(HUNG_MS * 3)], { cwd: tools, stdio: 'ignore', windowsHide: true, env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '' } })
+    const holder6 = spawn(process.execPath, [hold, path.join(slotA, '.combwork', 'hold6.lock'), go6, beat6, String(HUNG_MS * 3)], { cwd: tools, stdio: 'ignore', windowsHide: true, env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '' } })
     const exited6 = new Promise((r) => holder6.once('exit', r))
     const away = standIn(tools)
     check('a process holds slot-a, the broker running elsewhere', !!(await until(() => beating(beat6) && away.ready() && !renamable(slotA), HUNG_MS)))

@@ -105,7 +105,7 @@ const check = (name, ok, extra = '') => {
   // one (HI-2122: extra arguments are a connection's), and one saved before (a config.json edited by hand) stops the
   // launch, saying why, before the CLI starts.
   const refused = 'Combwork passes the task after "--"; remove it from extra arguments.'
-  const connectionOf = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8')).agents.find((x) => x.id === agent.id).connection
+  const connectionOf = () => JSON.parse(fs.readFileSync(path.join(alpha, '.combwork', 'project.json'), 'utf8')).agents.find((x) => x.id === agent.id).connection
   const saved = () => JSON.parse(fs.readFileSync(cfgFile, 'utf8')).connections.find((c) => c.id === connectionOf())
   const before = connectionOf()
   const saving = await lib.setLaunch(inv, alpha, agent.id, { extraArgs: '--allowedTools Read Bash --' }).then(() => '', (e) => String(e?.message ?? e))

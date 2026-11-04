@@ -29,12 +29,12 @@ const identity = ['-c', 'user.name=Hive Slot Test', '-c', 'user.email=slots@exam
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`, shots]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(shots, { recursive: true })
-  lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.combwork/\n' })
   lib.git(beta, ['branch', '-M', 'main'])
   lib.git(beta, ['worktree', 'add', '-q', '-b', 'hive/hr1', path.join(trees, 'hr1'), 'main'])
-  fs.mkdirSync(path.join(beta, '.hive'), { recursive: true })
+  fs.mkdirSync(path.join(beta, '.combwork'), { recursive: true })
   fs.writeFileSync(
-    path.join(beta, '.hive', 'project.json'),
+    path.join(beta, '.combwork', 'project.json'),
     JSON.stringify({
       version: 2,
       platform: 'git',
@@ -64,8 +64,8 @@ const identity = ['-c', 'user.name=Hive Slot Test', '-c', 'user.email=slots@exam
     // A free review copy, as #1435's pool keeps one (its worktree, detached, and its row).
     const copy = path.join(trees, 'copies', 'copy-1')
     lib.git(beta, ['worktree', 'add', '-q', '--detach', copy])
-    const id = JSON.parse(fs.readFileSync(path.join(beta, '.hive', 'project.json'), 'utf8')).id
-    const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { timeout: 5000 })
+    const id = JSON.parse(fs.readFileSync(path.join(beta, '.combwork', 'project.json'), 'utf8')).id
+    const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { timeout: 5000 })
     try {
       const now = new Date().toISOString()
       db.prepare("INSERT INTO copies (project, name, folder, state, created_at, used_at) VALUES (?, 'copy-1', ?, 'free', ?, ?)").run(id, copy, now, now)

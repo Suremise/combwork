@@ -36,8 +36,8 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
   // Codex's own home: its Windows sandbox set up (the PC's, the default admin one), as Codex keeps it.
   fs.writeFileSync(path.join(codexHome, 'config.toml'), '[windows]\nsandbox = "elevated"\n')
   lib.gitProject(alpha)
-  fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One', provider: 'codex' }, { id: 'a-two', name: 'Two', provider: 'codex' }, { id: 'a-three', name: 'Three', provider: 'codex' }] }))
+  fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One', provider: 'codex' }, { id: 'a-two', name: 'Two', provider: 'codex' }, { id: 'a-three', name: 'Three', provider: 'codex' }] }))
   lib.enableProviders(userData, ['claude-code', 'codex'])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))

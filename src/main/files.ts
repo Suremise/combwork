@@ -12,8 +12,9 @@ import { msg } from '../shared/i18n'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
-import { workspace } from './workspace'
+import { workspace, workspaceFor } from './workspace'
 import { trash as toTrash } from './trash'
+import { followMovedLink } from './combworkMove'
 
 const log = createLogger('files')
 
@@ -289,8 +290,10 @@ export async function linkFiles(projectPath: string, rels: string[]): Promise<(s
       try {
         if (typeof rel !== 'string') return null
         if (await isFile(rel)) return await spelledOnDisk(projectPath, rel)
-        // A path into the old .hive/images leads to the file where it is now, in .hive/attachments (#387).
-        const to = await movedAttachment(join(projectPath, rel))
+        // A path into a .hive folder that moved leads to it in .combwork (HI-2462), and one into the old images folder to
+        // the file where it is now, in attachments (#387).
+        const ws = workspaceFor(projectPath)?.path
+        const to = await followMovedLink(join(projectPath, rel), ws ? [ws] : [], movedAttachment)
         const moved = to ? toRel(projectPath, to) : null
         return moved && (await isFile(moved)) ? await spelledOnDisk(projectPath, moved) : null
       } catch {
@@ -389,7 +392,7 @@ export async function find(projectPath: string, query: string, limit = 500): Pro
 const watchers = new Map<string, { w: FSWatcher; refs: number; dirs: Set<string>; timer?: NodeJS.Timeout }>()
 
 export function watchProject(projectPath: string): void {
-  // A project or worktree, or the Assistant's home (its Attachments: .hive/attachments there).
+  // A project or worktree, or the Assistant's home (its Attachments: .combwork/attachments there).
   projectPath = workspace.isAssistantHome(projectPath) ? workspace.assertSessionHost(projectPath) : workspace.assertRoot(projectPath)
   const key = projectPath.toLowerCase()
   const existing = watchers.get(key)
@@ -464,7 +467,7 @@ export function unwatchAll(): void {
 // ---------------------------------------------------------------------------
 
 /**
- * A session host's attachments folder (.hive/attachments, moved from .hive/images first), when it is a real folder of
+ * A session host's attachments folder (.combwork/attachments, moved from .combwork/images first), when it is a real folder of
  * the host's own: never one linked from elsewhere (a junction or symbolic link), which Hive neither lists nor deletes
  * through. Null when there is none.
  */
@@ -494,7 +497,7 @@ async function attachmentAt(projectPath: string, path: string): Promise<{ root: 
   return { root, sessionId: assertSessionId(parts[0]), abs }
 }
 
-/** A project's session attachments, or the Hive Assistant's (its home is a session host: `.hive/assistant/.hive/attachments`). */
+/** A project's session attachments, or the Hive Assistant's (its home is a session host: `.combwork/assistant/.combwork/attachments`). */
 export async function listAttachments(projectPath: string): Promise<SessionAttachmentGroup[]> {
   projectPath = workspace.assertSessionHost(projectPath)
   const root = await attachmentsRoot(projectPath)
@@ -538,7 +541,7 @@ export async function readAttachment(projectPath: string, path: string): Promise
 /**
  * Moves a session attachment to the Recycle Bin (a project's or the Assistant's), with the checks of deleting sessions
  * (#239): with its session reserved and not running (whileStopped: it can't resume and paste meanwhile), only a file
- * Hive keeps (no link out of .hive/attachments), and not one another program has open.
+ * Hive keeps (no link out of .combwork/attachments), and not one another program has open.
  */
 export async function trashAttachment(projectPath: string, path: string): Promise<void> {
   projectPath = workspace.assertSessionHost(projectPath)

@@ -36,8 +36,8 @@ const WORDS = ['usage', 'release', 'resume', 'board search', 'the', 'flaky', 'e2
 describe('the full-text search on a real board’s copy', () => {
   it.skipIf(!source)('costs and saves, timed, and finds what the board finds', { timeout: 600_000 }, async () => {
     const ws = join(base, 'ws')
-    mkdirSync(join(ws, '.hive'), { recursive: true })
-    const file = join(ws, '.hive', 'hive.db')
+    mkdirSync(join(ws, '.combwork'), { recursive: true })
+    const file = join(ws, '.combwork', 'hive.db')
     copyFileSync(source!, file)
     if (existsSync(`${source}-wal`)) copyFileSync(`${source}-wal`, `${file}-wal`)
     store.boardTestHooks.upgradeAnswer = 'yes'

@@ -125,7 +125,7 @@ let projectId = 'p1'
 /** The project's agent b1 (a builder), with its own worktree when given (`needsSetup`: its first setup still owed). */
 function writeProject(o: { worktree?: string; setup?: string } = {}): void {
   const agent = { id: 'b1', name: 'B1', provider: 'claude-code', workflowRole: 'builder', ...(o.worktree ? { worktree: { path: o.worktree, branch: 'hive/b1', base: 'main' }, needsSetup: true } : {}) }
-  writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id: projectId, worktreeSetup: o.setup ?? '', agents: [agent] }))
+  writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id: projectId, worktreeSetup: o.setup ?? '', agents: [agent] }))
 }
 const writer = () => store.slot('slot-a')?.writer ?? null
 const carriedLease = () => store.openLease('slot-a')
@@ -133,9 +133,9 @@ const carriedLease = () => store.openLease('slot-a')
 beforeAll(async () => {
   // The project a Git repository and slot-a a worktree of it (what the pool's refresh looks for).
   gitRepo(project)
-  commit(project, { '.gitignore': '.hive/\n' }, 'ignore .hive')
+  commit(project, { '.gitignore': '.combwork/\n' }, 'ignore .combwork')
   sh(project, 'worktree', 'add', '-q', '--detach', folder)
-  mkdirSync(join(project, '.hive'), { recursive: true })
+  mkdirSync(join(project, '.combwork'), { recursive: true })
   writeProject()
   await ws.open(wsPath)
   projectId = (await ws.projectConfig(project)).id ?? 'p1'

@@ -73,11 +73,11 @@ const check = (name, ok, extra = '') => {
   const mcp = JSON.parse(fs.readFileSync(path.join(lib.launchDir(userData, (await live(home, 'assistant')).runId), 'mcp.json'), 'utf8')).mcpServers.combwork
   check("the Assistant's hive tools use its token and role", mcp?.env.CW_API_TOKEN_FILE === tokenFile && mcp.env.HIVE_ROLE === 'assistant' && mcp.env.HIVE_ASSISTANT_CONTROL === 'projects', JSON.stringify(mcp?.env))
   // Its skills: the workspace's skills for the Assistant (coordinate-agents and the shared ones), none for agents only.
-  const assistantSkills = fs.readdirSync(path.join(home, '.hive', 'launch-assistant', 'plugin', 'skills')).sort()
+  const assistantSkills = fs.readdirSync(path.join(home, '.combwork', 'launch-assistant', 'plugin', 'skills')).sort()
   // use-cw-api is for both (HI-2012): its tools.md, the hive tools' detail, is copied with it.
-  check('the Assistant gets the skills for it', ['coordinate-agents', 'handover', 'pick-up', 'split-work', 'workspace-note', 'use-cw-api'].every((n) => assistantSkills.includes(n)) && fs.existsSync(path.join(home, '.hive', 'launch-assistant', 'plugin', 'skills', 'use-cw-api', 'tools.md')) && !['work-on-card', 'review-agent-work', 'merge-ready'].some((n) => assistantSkills.includes(n)), assistantSkills.join(','))
+  check('the Assistant gets the skills for it', ['coordinate-agents', 'handover', 'pick-up', 'split-work', 'workspace-note', 'use-cw-api'].every((n) => assistantSkills.includes(n)) && fs.existsSync(path.join(home, '.combwork', 'launch-assistant', 'plugin', 'skills', 'use-cw-api', 'tools.md')) && !['work-on-card', 'review-agent-work', 'merge-ready'].some((n) => assistantSkills.includes(n)), assistantSkills.join(','))
   // Its instructions: its control level and boundaries, the skill that says how, then the mode.
-  const told = fs.readFileSync(path.join(home, '.hive', 'launch-assistant', 'instructions.md'), 'utf8')
+  const told = fs.readFileSync(path.join(home, '.combwork', 'launch-assistant', 'instructions.md'), 'utf8')
   check('its instructions give its control level and point to coordinate-agents, before the mode', /Control agents and create projects/.test(told) && told.indexOf('coordinate-agents skill') > 0 && told.indexOf('coordinate-agents skill') < told.indexOf('# Your mode'), told.slice(0, 300))
   const api = async (method, p, body, bearer = token) => {
     const res = await fetch(API + p, { method, headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' }, ...(body && method !== 'GET' ? { body: JSON.stringify(body) } : {}) })
@@ -237,8 +237,8 @@ const check = (name, ok, extra = '') => {
   // From the latest handover: there has to be one.
   const none = await api('POST', '/v1/projects/alpha/handover', { from: 'Builder', to: 'Fixer', handover: false })
   check('no hand-over from the latest handover when there is none', none.status === 409 && /no handover/i.test(none.body?.error), JSON.stringify(none.body))
-  fs.mkdirSync(path.join(ws, '.hive', 'shared', 'handovers'), { recursive: true })
-  fs.writeFileSync(path.join(ws, '.hive', 'shared', 'handovers', '2026-10-01-alpha-plan.md'), '# Plan\n\n- **Project:** alpha\n\nwork 1\n')
+  fs.mkdirSync(path.join(ws, '.combwork', 'shared', 'handovers'), { recursive: true })
+  fs.writeFileSync(path.join(ws, '.combwork', 'shared', 'handovers', '2026-10-01-alpha-plan.md'), '# Plan\n\n- **Project:** alpha\n\nwork 1\n')
   // Handing over: refused at once while project agents lack Hive's tools (the Agent API is off), then done.
   await inv('settings:update', { agentApi: { enabled: false } })
   const noTools = await api('POST', '/v1/projects/alpha/handover', { from: 'Builder', to: 'Fixer', handover: false })
@@ -369,7 +369,7 @@ const check = (name, ok, extra = '') => {
   // --- HI-2328: an agent change waiting behind project.json's lock is checked again with its write. The user's own write is
   // held just before its file is replaced (as in assistantsettings), the Assistant's change queues behind it, Control is
   // lowered or the Assistant's session ends, and once the lock is free the old change changes nothing.
-  const projectFile = path.join(alpha, '.hive', 'project.json')
+  const projectFile = path.join(alpha, '.combwork', 'project.json')
   const holdNextWrite = () =>
     app.evaluate((_, target) => {
       const f = process.mainModule.require('original-fs/promises')

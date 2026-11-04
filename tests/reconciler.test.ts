@@ -55,16 +55,16 @@ async function workspace(opts: { shared?: boolean; options?: object } = {}): Pro
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
   const wt = join(ws, 'p-card')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
   git(repo, 'init', '-q', '-b', 'main')
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(repo, 'config', k, v)
-  writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+  writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
   writeFileSync(join(repo, 'a.txt'), 'one\n')
   git(repo, 'add', '-A')
   git(repo, 'commit', '-qm', 'initial')
   git(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
   // `shared`: both agents work in the project folder itself.
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', ...(opts.shared ? {} : { worktree: { path: wt, branch: 'card', base: 'main' } }) }, { id: 'a2', name: 'Reviewer' }], ...(opts.options ? { workflow: { platform: 'git', preset: null, options: opts.options } } : {}) }))
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', ...(opts.shared ? {} : { worktree: { path: wt, branch: 'card', base: 'main' } }) }, { id: 'a2', name: 'Reviewer' }], ...(opts.options ? { workflow: { platform: 'git', preset: null, options: opts.options } } : {}) }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
@@ -141,7 +141,7 @@ describe('reconciliation in the app, record-only (#1217)', () => {
     await inWorkspace(w, () => tasks.updateTask(card, { column: 'doing', agent: 'a1' }, user))
     const a = git(wt, 'rev-parse', 'HEAD')
     const runtime = (s: ReturnType<typeof FactStore.open>, locked?: <T>(fn: () => T) => Promise<T>) =>
-      new Workflow({ store: s, project: repo, projectKey: '', options: () => allOff('git'), slots: join(ws, '.hive', 'slots'), autoRun: false, reconcileActs: false, ...(locked ? { locked } : {}) })
+      new Workflow({ store: s, project: repo, projectKey: '', options: () => allOff('git'), slots: join(ws, '.combwork', 'slots'), autoRun: false, reconcileActs: false, ...(locked ? { locked } : {}) })
     // This Hive: the board's store, its writes changes of the board. The other: a connection of its own.
     const ours = runtime(FactStore.forBoard(w, { project: 'p', key: '' }), (fn) => store.boardWrite(w, async () => fn()))
     const other = FactStore.open(store.boardFile(ws), { project: 'p', key: '' })
@@ -233,7 +233,7 @@ describe('reconciliation in the app, round 2 (#1217)', () => {
     const { ws, w, repo, wt } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Cycles', project: 'p' }, user))).number
     await inWorkspace(w, () => tasks.updateTask(card, { column: 'doing', agent: 'a1' }, user))
-    const ours = new Workflow({ store: FactStore.forBoard(w, { project: 'p', key: 'p' }), project: repo, projectKey: 'p', options: () => allOff('git'), slots: join(ws, '.hive', 'slots'), autoRun: false, reconcileActs: false, locked: (fn) => store.boardWrite(w, async () => fn()) })
+    const ours = new Workflow({ store: FactStore.forBoard(w, { project: 'p', key: 'p' }), project: repo, projectKey: 'p', options: () => allOff('git'), slots: join(ws, '.combwork', 'slots'), autoRun: false, reconcileActs: false, locked: (fn) => store.boardWrite(w, async () => fn()) })
     const b = commitIn(wt, 'b.txt')
     // Read B; meanwhile C is committed and the card goes Done and is started again: a new cycle.
     await reconcile(ours, ours.store.card(card), {

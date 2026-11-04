@@ -14,7 +14,7 @@ import { trash } from './trash'
 
 /** Shared notes' refusals the window shows in its language (#849); agents (the Agent API's notes) read their English. */
 const M = {
-  outside: msg({ id: 'content.notes.outside', defaultMessage: 'Path is outside the shared notes folder', description: "An error: a shared note's path leads out of the workspace's shared notes folder (.hive/shared)." }),
+  outside: msg({ id: 'content.notes.outside', defaultMessage: 'Path is outside the shared notes folder', description: "An error: a shared note's path leads out of the workspace's shared notes folder (.combwork/shared)." }),
   exists: msg({ id: 'content.notes.exists', defaultMessage: '"{name}" already exists', description: 'An error making or renaming a shared note or folder: one called {name} is already there.' }),
   closed: msg({ id: 'content.notes.closed', defaultMessage: 'The workspace was closed or switched: nothing was changed.', description: 'An error: the workspace closed, or another opened in its window, while a handover was being renamed; nothing changed.' })
 }
@@ -71,7 +71,7 @@ export async function createNote(relPath: string, isDir: boolean): Promise<strin
 
 export async function deleteNote(p: string): Promise<void> {
   const abs = assertInShared(p)
-  if (abs === resolve(workspace.sharedDir)) throw hiveError(msg({ id: 'content.notes.deleteRoot', defaultMessage: 'Cannot delete the shared folder itself', description: "An error: the shared notes folder itself (.hive/shared) can't be deleted, only what is in it." }))
+  if (abs === resolve(workspace.sharedDir)) throw hiveError(msg({ id: 'content.notes.deleteRoot', defaultMessage: 'Cannot delete the shared folder itself', description: "An error: the shared notes folder itself (.combwork/shared) can't be deleted, only what is in it." }))
   // To the Recycle Bin, like files, skills, modes and sessions.
   if (existsSync(abs)) await trash(abs)
 }

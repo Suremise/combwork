@@ -64,7 +64,7 @@ export const serverAddedIn = (m: Pick<McpServerInfo, 'def' | 'projects'>, projec
 /** The most servers an agent's choice names. */
 export const AGENT_MCP_MAX = 50
 
-/** A workspace MCP server's name (its .hive/mcp/<name>.json); `combwork` (and `hive`, its old name) is Combwork's own. */
+/** A workspace MCP server's name (its .combwork/mcp/<name>.json); `combwork` (and `hive`, its old name) is Combwork's own. */
 /** Why an agent's list of MCP servers was refused (HI-2463: its reserved name said as Combwork's). */
 const NOT_A_SERVER = agentMsg({ id: 'api.agentMcp.notAServer', text: "\"{name}\" isn't an MCP server's name{reserved, select, yes { (the built-in {server} server is always given)} other {}}.", note: "A refusal of an agent's MCP servers: name is what was given; reserved: yes when it is Combwork's own server's name (or its old one); server: that name (combwork)." })
 

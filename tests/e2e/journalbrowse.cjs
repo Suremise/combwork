@@ -17,7 +17,7 @@ const HUNG_MS = 10000
 const userData = path.join(lib.WORK, 'journalbrowse-profile')
 const ws = path.join(lib.WORK, 'journalbrowse-ws')
 const alpha = path.join(ws, 'alpha')
-const dbFile = path.join(ws, '.hive', 'assistant', 'journal.db')
+const dbFile = path.join(ws, '.combwork', 'assistant', 'journal.db')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++

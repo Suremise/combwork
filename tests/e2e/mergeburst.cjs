@@ -25,15 +25,15 @@ const git = (args, input) => lib.git(alpha, ['-c', 'user.email=t@t', '-c', 'user
 
 function fixture() {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
-  lib.gitProject(alpha, { 'a.txt': 'one\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'a.txt': 'one\n', '.gitignore': '.combwork/\n' })
   git(['branch', '-M', 'main'])
   // COMMITS commits on `big`, a file each, made at once.
   const from = git(['rev-parse', 'main']).trim()
   let s = ''
   for (let i = 0; i < COMMITS; i++) s += `commit refs/heads/big\ncommitter T <t@t> ${1700000000 + i} +0000\ndata 6\nwork ${i % 10}\n${i ? '' : `from ${from}\n`}M 100644 inline f/${i}.txt\ndata ${String(i).length + 1}\n${i}\n\n`
   git(['fast-import', '--quiet'], s)
-  fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Builder', provider: 'claude-code' }] }))
+  fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Builder', provider: 'claude-code' }] }))
   lib.enableProviders(userData)
 }
 

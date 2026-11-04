@@ -29,13 +29,13 @@ async function workspace(name: string, entries: number, modes: number, body = 'S
   const w = createWorkspaceService()
   await w.open(ws)
   await inWorkspace(w, () => syncBundled({ fresh: true }))
-  const skills = join(ws, '.hive', 'skills')
+  const skills = join(ws, '.combwork', 'skills')
   const have = (await import('fs')).readdirSync(skills).length
   for (let i = 0; i < entries - have; i++) {
     mkdirSync(join(skills, `s${i}`))
     writeFileSync(join(skills, `s${i}`, 'SKILL.md'), `---\nname: s${i}\ndescription: Skill ${i}.\n---\n\n${body}`)
   }
-  const dir = join(ws, '.hive', 'modes')
+  const dir = join(ws, '.combwork', 'modes')
   for (let i = 0; i < modes; i++) writeFileSync(join(dir, `p${i}.md`), `---\nname: P${i}\n---\n\nA mode.\n`)
   const modePaths = (await import('fs')).readdirSync(dir).map((f) => join(dir, f))
   return { w, ws, modePaths, added: entries - have }
@@ -87,7 +87,7 @@ describe('past the retention limits', () => {
     const saved = { ...RETENTION }
     RETENTION.revisions = 50
     try {
-      const paths = Array.from({ length: 60 }, (_, i) => join(ws, '.hive', 'skills', `s${i}`))
+      const paths = Array.from({ length: 60 }, (_, i) => join(ws, '.combwork', 'skills', `s${i}`))
       const hash = (ps: string[]) => measure('', () => inWorkspace(w, async () => { for (const p of ps) await revisionOf(p) }))
       await hash(paths)
       // The 50 most recent are still kept: nothing read.
@@ -110,7 +110,7 @@ describe('past the retention limits', () => {
     try {
       // Room for about 10 of these headers.
       RETENTION.headerBytes = 10 * 120
-      const files = Array.from({ length: 30 }, (_, i) => join(ws, '.hive', 'skills', `s${i}`, 'SKILL.md'))
+      const files = Array.from({ length: 30 }, (_, i) => join(ws, '.combwork', 'skills', `s${i}`, 'SKILL.md'))
       const read = (fs: string[]) => measure('', () => inWorkspace(w, async () => { for (const f of fs) await headerOf(f, parseSkillFrontmatter) }))
       await read(files)
       // The most recent few are still kept; the oldest were dropped one by one to make room, and are read again.

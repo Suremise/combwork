@@ -121,7 +121,7 @@ describe('file links: where a path leads', () => {
   const roots: LinkRoot[] = [
     { path: 'C:\\ws\\hive', project: 'C:\\ws\\hive', agentId: null },
     { path: 'C:\\ws\\web', project: 'C:\\ws\\web', agentId: null },
-    { path: 'C:\\ws\\hive\\.hive\\worktrees\\two', project: 'C:\\ws\\hive', agentId: 'two' }
+    { path: 'C:\\ws\\hive\\.combwork\\worktrees\\two', project: 'C:\\ws\\hive', agentId: 'two' }
   ]
 
   it('joins and normalises', () => {
@@ -131,7 +131,7 @@ describe('file links: where a path leads', () => {
 
   it("an agent's relative path: its own folder", () => {
     expect(resolveLink('src/a.ts', 'C:\\ws\\hive', roots)).toEqual({ project: 'C:\\ws\\hive', agentId: null, root: 'C:\\ws\\hive', rel: 'src/a.ts' })
-    expect(resolveLink('src\\a.ts', 'C:\\ws\\hive\\.hive\\worktrees\\two', roots)).toEqual({ project: 'C:\\ws\\hive', agentId: 'two', root: 'C:\\ws\\hive\\.hive\\worktrees\\two', rel: 'src/a.ts' })
+    expect(resolveLink('src\\a.ts', 'C:\\ws\\hive\\.combwork\\worktrees\\two', roots)).toEqual({ project: 'C:\\ws\\hive', agentId: 'two', root: 'C:\\ws\\hive\\.combwork\\worktrees\\two', rel: 'src/a.ts' })
   })
 
   it('another workspace project, and the Assistant (from the workspace)', () => {

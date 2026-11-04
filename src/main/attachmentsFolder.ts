@@ -1,4 +1,4 @@
-// A session host's attachments folder (#387), `.hive/attachments`, and the move of the folder it replaces, `.hive/images`.
+// A session host's attachments folder (#387), `.combwork/attachments`, and the move of the folder it replaces, `.combwork/images`.
 // Attachments stay inside the host (decision 4): nothing is written or moved through a junction or symbolic link, at the
 // folder, its session folders or any folder above them.
 import { lstat, mkdir, readdir, readFile, rename, rmdir } from 'original-fs/promises'
@@ -23,8 +23,8 @@ const MOVED_FILE = '.moved.json'
 const moves = new Map<string, Promise<void>>()
 
 /**
- * The host's attachments folder, `<host>\.hive\attachments` (it may not exist yet), after moving what its old
- * `.hive\images` folder holds into it. A move that fails part-way (a file another program has open) leaves the rest in
+ * The host's attachments folder, `<host>\.combwork\attachments` (it may not exist yet), after moving what its old
+ * `.combwork\images` folder holds into it. A move that fails part-way (a file another program has open) leaves the rest in
  * the old folder for the next run.
  */
 export async function attachmentsDir(host: string): Promise<string> {
@@ -54,7 +54,7 @@ const SESSION_FOLDER = /^(?!\.{1,2}$)[\w.-]+$/
 
 /**
  * The host's attachments folder, or a session folder in it, made where missing, after checking that it and every folder
- * from the host down to it (`.hive`, `attachments`, the session's) is a real folder of the host's own: never a junction
+ * from the host down to it (`.combwork`, `attachments`, the session's) is a real folder of the host's own: never a junction
  * or symbolic link, never really outside the host. Throws otherwise, so nothing is written through one.
  */
 export async function ownAttachmentsFolder(host: string, sessionFolder?: string): Promise<string> {
@@ -65,7 +65,7 @@ export async function ownAttachmentsFolder(host: string, sessionFolder?: string)
     if (!(await lstat(p).catch(() => null))) await mkdir(p).catch((e: NodeJS.ErrnoException) => (e.code === 'EEXIST' ? undefined : Promise.reject(e)))
     if (!(await isOwnFolder(host, p))) {
       log.warn(`${userText(p)} is a link or not a folder: no attachments are kept through it`)
-      throw hiveError(msg({ id: 'service.attachments.notOwn', defaultMessage: "{folder} is a link or not a folder of the project's own, so Combwork keeps no attachments in it.", description: "An error keeping a pasted or dropped file for a session: its folder {folder} (in the project's .hive) is a link or leads elsewhere, so Hive writes nothing through it." }), { folder: p })
+      throw hiveError(msg({ id: 'service.attachments.notOwn', defaultMessage: "{folder} is a link or not a folder of the project's own, so Combwork keeps no attachments in it.", description: "An error keeping a pasted or dropped file for a session: its folder {folder} (in the project's .combwork) is a link or leads elsewhere, so Hive writes nothing through it." }), { folder: p })
     }
   }
   return chain[chain.length - 1]
@@ -95,7 +95,7 @@ export async function freeName(dir: string, name: string, suffix: (i: number) =>
 }
 
 /**
- * Moves `.hive\images` to `.hive\attachments`: renamed whole when there is no attachments folder yet, else file by file
+ * Moves `.combwork\images` to `.combwork\attachments`: renamed whole when there is no attachments folder yet, else file by file
  * into the session folders of the same names (a name already taken gets " (moved)", recorded in MOVED_FILE). Only real
  * folders and files of the host's own move, into real folders of its own: a link, at either end or above, stays where
  * it is with what it holds.
@@ -186,14 +186,14 @@ async function recordRenamed(root: string, from: string, to: string): Promise<vo
 }
 
 /**
- * Where a path into a host's old `.hive\images` leads now: the file the move put in `.hive\attachments`, under its new
+ * Where a path into a host's old `.combwork\images` leads now: the file the move put in `.combwork\attachments`, under its new
  * name when the move had to rename it. Null for a path not in an old folder. The old path itself, while it is still
  * there, is the caller's to try first.
  */
 export async function movedAttachment(oldPath: string): Promise<string | null> {
   const plain = movedAttachmentPath(oldPath)
   if (!plain) return null
-  const m = /[\\/]\.hive[\\/]attachments[\\/]/i.exec(plain)!
+  const m = /[\\/]\.combwork[\\/]attachments[\\/]/i.exec(plain)!
   const root = plain.slice(0, m.index + m[0].length - 1)
   const rel = relative(root, plain).split(sep).join('/')
   const map = await readMoved(root)

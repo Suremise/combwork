@@ -1,6 +1,6 @@
 ---
 name: service-changes
-description: Hive's rules for risky changes to its main process - workspaces and windows, project scope and access checks, locking, storage and clean-up, cancellation, transcripts and bounded resources. Use when developing or reviewing Hive and a change touches src/main services, the Agent API or hive tools, files under .hive, or anything several windows, agents or processes can do at once.
+description: Hive's rules for risky changes to its main process - workspaces and windows, project scope and access checks, locking, storage and clean-up, cancellation, transcripts and bounded resources. Use when developing or reviewing Hive and a change touches src/main services, the Agent API or hive tools, files under .combwork, or anything several windows, agents or processes can do at once.
 ---
 
 # Changing Hive's services

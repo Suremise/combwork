@@ -46,7 +46,7 @@ const check = (name, ok, extra = '') => {
   const home = (await inv('workspace:refresh')).assistant.path
   const key = lib.ptyKey(home, 'assistant')
   const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === home.toLowerCase() && s.agentId === 'assistant')
-  const agentFile = () => JSON.parse(fs.readFileSync(path.join(home, '.hive', 'project.json'), 'utf8')).agents?.[0] ?? {}
+  const agentFile = () => JSON.parse(fs.readFileSync(path.join(home, '.combwork', 'project.json'), 'utf8')).agents?.[0] ?? {}
   const buffer = async () => (await inv('pty:buffer', key)) ?? ''
   const panel = page.locator('.assistant-panel')
   // The conversation as the fake wrote it, and how often Hive typed a mode message into it.
@@ -87,7 +87,7 @@ const check = (name, ok, extra = '') => {
   await panel.locator('.assistant-header').getByRole('button', { name: 'Start', exact: true }).click()
   check('the Assistant runs', !!(await lib.until(async () => (await live())?.status === 'ready', 20000)))
   const session = (await live()).sessionId
-  const given = fs.readFileSync(path.join(home, '.hive', 'launch-assistant', 'instructions.md'), 'utf8')
+  const given = fs.readFileSync(path.join(home, '.combwork', 'launch-assistant', 'instructions.md'), 'utf8')
   check('its instructions are the mode, and say it may suggest another', given.includes('# Your mode: Coordinator') && /suggest switching in one short line; never switch or insist/.test(given), given.slice(-400))
   check('…its conversation records the mode it started in', record(session).mode === 'coordinator', JSON.stringify(record(session)))
   check('…and its first request records Coordinator as its system prompt', (await promptMode(session)) === 'Coordinator')
@@ -134,7 +134,7 @@ const check = (name, ok, extra = '') => {
   check('Restart in This Mode asks first, saying it re-caches the conversation', !!(await lib.until(async () => (await ask.count()) === 1, 5000)) && /cached again/.test(await ask.innerText()))
   await ask.getByRole('button', { name: 'Restart', exact: true }).click()
   check('…and resumes the same conversation', !!(await lib.until(async () => (await live())?.status === 'ready' && (await live())?.sessionId === session, 30000)), `${session} → ${(await live())?.sessionId}`)
-  const retold = fs.readFileSync(path.join(home, '.hive', 'launch-assistant', 'instructions.md'), 'utf8')
+  const retold = fs.readFileSync(path.join(home, '.combwork', 'launch-assistant', 'instructions.md'), 'utf8')
   check('…with the QA triager mode in its instructions', retold.includes('# Your mode: QA triager'))
   await idle()
   check('…which its resumed conversation uses at once, not the Coordinator prompt it recorded (#334)', (await promptMode(session)) === 'QA triager')

@@ -3,6 +3,7 @@ import { join } from 'path'
 import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { createDelivery } from './deliveries'
 import { workspaceOf } from './workspace'
+import { HIVE_DIR } from '../shared/defaults'
 
 /**
  * Hive's notes to a workspace's Assistant about its agents (HI-1612's resumes, HI-1973's retry waits): lines gathered for
@@ -26,7 +27,7 @@ export function noteForAssistant(projectPath: string, line: string, after: strin
   const timer = setTimeout(() => {
     const lines = gathered.get(k)?.lines ?? []
     gathered.delete(k)
-    void access(join(home, '.hive', 'project.json'))
+    void access(join(home, HIVE_DIR, 'project.json'))
       .then(() => createDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body: `${lines.join(' ')} ${after}` }))
       .catch(() => undefined)
   }, GATHER_MS)

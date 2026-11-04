@@ -46,10 +46,10 @@ const G: { gate: Promise<void> | null; atLock: number } = { gate: null, atLock: 
 const ws = {
   path: 'C:\\ws',
   config: { connections: { 'claude-code': { on: ['a1', 'a2', 'a3'], default: 'a1' } } },
-  assistantHome: 'C:\\ws\\.hive\\assistant',
-  isAssistantHome: (p: string) => p === 'C:\\ws\\.hive\\assistant',
+  assistantHome: 'C:\\ws\\.combwork\\assistant',
+  isAssistantHome: (p: string) => p === 'C:\\ws\\.combwork\\assistant',
   listProjectPaths: async () => [PROJECT],
-  projectConfig: async (p: string) => (p === PROJECT ? pc : p === 'C:\\ws\\.hive\\assistant' ? assistantPc : ({ agents: [] } as unknown as ProjectConfig)),
+  projectConfig: async (p: string) => (p === PROJECT ? pc : p === 'C:\\ws\\.combwork\\assistant' ? assistantPc : ({ agents: [] } as unknown as ProjectConfig)),
   projectIdsNow: () => ({ byPath: new Map([[PROJECT.toLowerCase(), 'p-1']]), byId: new Map() }),
   updateAgent: (p: string, id: string, patch: Partial<AgentDef>, check?: (current: AgentDef) => void) => {
     const run = lock.then(async () => {

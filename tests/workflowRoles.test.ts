@@ -97,10 +97,10 @@ describe('its readers (#1430)', () => {
   async function upgraded(agents: { id: string; name: string; role?: string }[]): Promise<Record<string, any>> {
     const ws = join(base, `ws-${++n}`)
     const repo = join(ws, 'p')
-    mkdirSync(join(repo, '.hive'), { recursive: true })
-    mkdirSync(join(ws, '.hive'), { recursive: true })
+    mkdirSync(join(repo, '.combwork'), { recursive: true })
+    mkdirSync(join(ws, '.combwork'), { recursive: true })
     git(repo, 'init', '-q', '-b', 'main')
-    writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents }))
+    writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents }))
     const w0 = createWorkspaceService()
     await w0.open(ws)
     await store.boardWrite(w0, async () => undefined)
@@ -112,7 +112,7 @@ describe('its readers (#1430)', () => {
     opened.push(w)
     await inWorkspace(w, () => store.upgradeBoard(w))
     expect(await adoptNow(w)).toMatchObject({ configured: 1, failed: 0 })
-    return JSON.parse(readFileSync(join(repo, '.hive', 'project.json'), 'utf8'))
+    return JSON.parse(readFileSync(join(repo, '.combwork', 'project.json'), 'utf8'))
   }
 
   it('the upgrade reads HR-named agents as reviewers (a reviewer agent reviews), and writes no role on any agent', async () => {

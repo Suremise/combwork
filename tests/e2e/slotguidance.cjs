@@ -52,7 +52,7 @@ const OWN = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown 
   fs.rmSync(apiLog, { force: true })
   for (const d of [claudeHome, codexHome]) fs.mkdirSync(d, { recursive: true })
   fs.writeFileSync(path.join(codexHome, 'config.toml'), '[windows]\nsandbox = "unelevated"\n')
-  lib.gitProject(alpha, { 'greet.js': "module.exports = (name) => 'Hello ' + name\n", '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'greet.js': "module.exports = (name) => 'Hello ' + name\n", '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   const claudeEnv = lib.fakeClaude(userData, claudeHome, [alpha, ws, ...['slot-a', 'slot-b', 'slot-c'].map((s) => path.join(root, s))])
   const withCopilot = copilotInstalled()
@@ -112,8 +112,8 @@ const OWN = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown 
       return { text: r?.content?.[0]?.text ?? '', isError: !!r?.isError }
     }
     const instructionsOf = (server) => mcp(server, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'e2e', version: '1' } })?.instructions ?? ''
-    /** A Claude Code agent's launch skills (its launch plugin, in the project's .hive). */
-    const pluginSkill = (id, name) => readOr(path.join(alpha, '.hive', `launch-${id}`, 'plugin', 'skills', name, 'SKILL.md'))
+    /** A Claude Code agent's launch skills (its launch plugin, in the project's .combwork). */
+    const pluginSkill = (id, name) => readOr(path.join(alpha, '.combwork', `launch-${id}`, 'plugin', 'skills', name, 'SKILL.md'))
     /** Codex's and Copilot's copies in a folder. */
     const copy = (folder, name) => readOr(path.join(folder, '.agents', 'skills', `cw-${name}`, 'SKILL.md'))
     const delivered = []

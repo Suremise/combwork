@@ -61,7 +61,7 @@ const write = (file, text) => {
   // Written long ago: a transcript changed in the last few seconds counts as still being written.
   fs.utimesSync(file, old, old)
 }
-const backup = (sid) => path.join(alpha, '.hive', 'sessions', `${sid}.jsonl`)
+const backup = (sid) => path.join(alpha, '.combwork', 'sessions', `${sid}.jsonl`)
 const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '04', `rollout-2026-10-04T${String(h).padStart(2, '0')}-00-00-${sid}.jsonl`)
 
 ;(async () => {

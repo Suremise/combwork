@@ -172,7 +172,7 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.card.plainNumber.next', defaultMessage: 'Name the card by its key: {key}.', description: 'How to name a card instead of a bare number: by its key, {key} (such as AM-12).' })
   ),
   'paths.excluded': r(
-    msg({ id: 'workflow.refused.paths.excluded.message', defaultMessage: "{card}: {path} is in {folder}, which a project without version control leaves out of its work.", description: "A refused declaration of a card's paths (#1511): in a project without version control (None), a card's paths are the files of its work; {path} is under {folder} (node_modules, .venv, .git, .hive or a folder the project excludes), which never counts as work. {card} is a card key like AM-12." }),
+    msg({ id: 'workflow.refused.paths.excluded.message', defaultMessage: "{card}: {path} is in {folder}, which a project without version control leaves out of its work.", description: "A refused declaration of a card's paths (#1511): in a project without version control (None), a card's paths are the files of its work; {path} is under {folder} (node_modules, .venv, .git, .combwork or a folder the project excludes), which never counts as work. {card} is a card key like AM-12." }),
     msg({ id: 'workflow.refused.paths.excluded.next', defaultMessage: "Declare only the files of the work, outside {folder}: a card's paths narrow the project's work, never widen it.", description: "The next step after a refused declaration of a card's paths: name files outside the excluded folder {folder} (#1511)." })
   ),
   'platform.unknown': r(

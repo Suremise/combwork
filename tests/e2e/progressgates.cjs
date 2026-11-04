@@ -35,7 +35,7 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
   // Every read of the agents' input recorded, for typeLine.
   lib.logFakeInput(claudeHome)
   // ok.txt is what the check looks for: ignored, so making it leaves the folder clean (a dirty one wouldn't count).
-  lib.gitProject(alpha, { 'a.ts': 'export const a = 1\n', '.gitignore': '.hive/\nok.txt\n' })
+  lib.gitProject(alpha, { 'a.ts': 'export const a = 1\n', '.gitignore': '.combwork/\nok.txt\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), alpha.toLowerCase()]))
   lib.enableProviders(userData)

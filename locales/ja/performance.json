@@ -103,7 +103,7 @@
   "performance.compare.keepTip": "「現在」の表示内容を保存して、後で比較します：{what}。",
   "performance.compare.keeps": "{range, select, 24h {24時間} 7d {7日間} other {30日間}}、{role, select, all {全員} agent {プロジェクトのエージェント} assistant {アシスタント} api {スクリプト} viewer {ビューアーアプリ} other {{role}}}、すべてのプロバイダー",
   "performance.compare.keptList": "保存済みの比較（{n, number}）",
-  "performance.compare.keptListTip": "ワークスペースの.hive/metrics/benchmarks（このマシンのみ）に最大{max, number}件まで保存されます。いっぱいになると、ピン留めしていない最も古いものが削除されます。残すにはピン留めしてください。",
+  "performance.compare.keptListTip": "ワークスペースの.combwork/metrics/benchmarks（このマシンのみ）に最大{max, number}件まで保存されます。いっぱいになると、ピン留めしていない最も古いものが削除されます。残すにはピン留めしてください。",
   "performance.compare.keptLoadTarget": "保存済みの比較",
   "performance.compare.keptNotice": "比較用に保存しました",
   "performance.compare.kind.export": "パフォーマンスの表示",

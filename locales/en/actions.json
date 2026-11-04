@@ -48,8 +48,8 @@
     "description": "Button: archives the session (or sessions) and starts a new one."
   },
   "actions.archive.detail": {
-    "defaultMessage": "The transcript is preserved in the project's .hive/archive folder. A new session starts with an empty context, which avoids re-caching the old conversation.",
-    "description": "Under the question before archiving a session. Keep .hive/archive as it is."
+    "defaultMessage": "The transcript is preserved in the project's .combwork/archive folder. A new session starts with an empty context, which avoids re-caching the old conversation.",
+    "description": "Under the question before archiving a session. Keep .combwork/archive as it is."
   },
   "actions.archive.failed": {
     "defaultMessage": "Could not archive session",
@@ -372,8 +372,8 @@
     "description": "Placeholder of the New Project dialog's name box: an example folder name (lower case, a dash)."
   },
   "actions.project.newMessage": {
-    "defaultMessage": "A new folder is created in the workspace. Combwork adds its .hive metadata folder automatically.",
-    "description": "The New Project dialog. Keep .hive as it is."
+    "defaultMessage": "A new folder is created in the workspace. Combwork adds its .combwork metadata folder automatically.",
+    "description": "The New Project dialog. Keep .combwork as it is."
   },
   "actions.project.newTitle": {
     "defaultMessage": "New Project",
@@ -876,8 +876,8 @@
     "description": "Under the notification that the project has no agents."
   },
   "actions.startAll.note": {
-    "defaultMessage": "{running, select, yes {Running agents are stopped first. } other {}}{archive, select, yes {The transcripts are kept in the project's .hive/archive folder.} other {Their conversations are kept and can be resumed from the Sessions tab.}}",
-    "description": "Under the table of Start New (All) (archive: no) or Archive and Start New (All) (archive: yes): running agents stop first (running: yes), and where the old conversations are. Keep .hive/archive as it is."
+    "defaultMessage": "{running, select, yes {Running agents are stopped first. } other {}}{archive, select, yes {The transcripts are kept in the project's .combwork/archive folder.} other {Their conversations are kept and can be resumed from the Sessions tab.}}",
+    "description": "Under the table of Start New (All) (archive: no) or Archive and Start New (All) (archive: yes): running agents stop first (running: yes), and where the old conversations are. Keep .combwork/archive as it is."
   },
   "actions.startAll.nothingToArchive": {
     "defaultMessage": "No agent has a session to archive.",

@@ -25,11 +25,11 @@ afterAll(async () => {
 /** A workspace with a project, its open point running one command (or none). */
 function workspaceAt(name: string, withOpen: boolean): string {
   const at = join(base, name)
-  mkdirSync(join(at, 'alpha', '.hive'), { recursive: true })
-  writeFileSync(join(at, 'alpha', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
-  mkdirSync(join(at, '.hive'), { recursive: true })
+  mkdirSync(join(at, 'alpha', '.combwork'), { recursive: true })
+  writeFileSync(join(at, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+  mkdirSync(join(at, '.combwork'), { recursive: true })
   const commands = { list: [{ id: 'c-00000001', name: 'Serve', command: 'serve' }], onOpen: { run: withOpen ? [{ scope: 'workspace', id: 'c-00000001' }] : [] }, onClose: { run: [] } }
-  writeFileSync(join(at, '.hive', 'workspace.json'), JSON.stringify({ version: 1, commands }))
+  writeFileSync(join(at, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, commands }))
   return at
 }
 const refused = (projectPath: string): string | null => {

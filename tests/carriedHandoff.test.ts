@@ -46,7 +46,7 @@ let store: InstanceType<typeof SlotStore>
 function writeProject(): void {
   const agent = (id: string) => ({ id, name: id.toUpperCase(), provider: 'claude-code', workflowRole: 'builder', worktree: { path: wt(`h${id}`), branch: `hive/h${id}`, base: 'main' } })
   const b5 = { id: 'b5', name: 'B5', provider: 'claude-code', workflowRole: 'builder' }
-  writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id: projectId, agents: [...['b1', 'b2', 'b3', 'b4'].map(agent), b5] }))
+  writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id: projectId, agents: [...['b1', 'b2', 'b3', 'b4'].map(agent), b5] }))
 }
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(ws, fn)
 const open = (agent: string) => store.openLeases().find((l) => l.agent === agent) ?? null
@@ -57,9 +57,9 @@ let card2 = 0
 
 beforeAll(async () => {
   gitRepo(project)
-  commit(project, { '.gitignore': '.hive/\n', 'a.txt': 'a\n' }, 'first')
+  commit(project, { '.gitignore': '.combwork/\n', 'a.txt': 'a\n' }, 'first')
   for (const a of ['b1', 'b2', 'b3', 'b4']) sh(project, 'worktree', 'add', '-q', '-b', `hive/h${a}`, wt(`h${a}`))
-  mkdirSync(join(project, '.hive'), { recursive: true })
+  mkdirSync(join(project, '.combwork'), { recursive: true })
   writeProject()
   await ws.open(wsPath)
   projectId = (await ws.projectConfig(project)).id ?? 'p1'

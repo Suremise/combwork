@@ -43,12 +43,12 @@ describe('project-config write stamps (#1498)', async () => {
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
   let n = 0
-  /** A workspace folder with projects (each a .hive/project.json). */
+  /** A workspace folder with projects (each a .combwork/project.json). */
   const folder = (...projects: string[]): string => {
     const path = join(base, `ws-${++n}`)
     for (const p of projects) {
-      mkdirSync(join(path, p, '.hive'), { recursive: true })
-      writeFileSync(join(path, p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+      mkdirSync(join(path, p, '.combwork'), { recursive: true })
+      writeFileSync(join(path, p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     }
     return path
   }
@@ -118,7 +118,7 @@ describe('project-config write stamps (#1498)', async () => {
       await w.open(path)
       const alpha = join(path, 'alpha')
       const old = w.projectConfigWrites(alpha)
-      const held = holdWrite(join(alpha, '.hive', 'project.json'))
+      const held = holdWrite(join(alpha, '.combwork', 'project.json'))
       const saving = w.updateProjectConfig(alpha, { chime: 'on' })
       try {
         await held.reached

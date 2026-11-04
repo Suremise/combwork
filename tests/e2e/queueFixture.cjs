@@ -31,7 +31,7 @@ function queueProject(name) {
 function prepare(fx) {
   for (const d of [fx.userData, fx.ws, fx.claudeHome, fx.tools, fx.shots]) fs.rmSync(d, { recursive: true, force: true })
   for (const d of [fx.claudeHome, fx.tools, fx.shots]) fs.mkdirSync(d, { recursive: true })
-  lib.gitProject(fx.alpha, { 'a.txt': 'one\ntwo\nthree\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(fx.alpha, { 'a.txt': 'one\ntwo\nthree\n', '.gitignore': '.combwork/\n' })
   lib.git(fx.alpha, ['branch', '-M', 'main'])
   lib.git(fx.alpha, ['branch', 'integration'])
   // The identity its commits use, in its git config: G12 (on in queueOptions) reads it from git each time (HI-2266).

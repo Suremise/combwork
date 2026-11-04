@@ -1,7 +1,7 @@
 /**
  * Builds recorded as facts (#1534, #1062): `npm run dist` and `npm run release` (scripts/buildFact.mjs) tell Hive of each
  * successful build, through the Agent API (`POST /v1/builds`) while Hive is running, else by a marker file in the
- * workspace's `.hive/builds` that Hive picks up when the workspace next opens. Hive writes it into the journal as its own
+ * workspace's `.combwork/builds` that Hive picks up when the workspace next opens. Hive writes it into the journal as its own
  * fact. Agent-facing English (the journal is the Assistant's).
  */
 
@@ -9,7 +9,7 @@
 export const BUILD_KINDS = ['beta', 'baseline', 'rc', 'release'] as const
 export type BuildKind = (typeof BUILD_KINDS)[number]
 
-/** Where a build's marker waits for Hive, under the workspace's `.hive` folder. */
+/** Where a build's marker waits for Hive, under the workspace's `.combwork` folder. */
 export const BUILD_MARKERS_DIR = 'builds'
 
 /** A successful build, as the scripts send it. */

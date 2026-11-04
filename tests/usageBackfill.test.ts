@@ -42,7 +42,7 @@ const write = (file: string, text: string): void => {
   mkdirSync(join(file, '..'), { recursive: true })
   writeFileSync(file, text)
 }
-const backup = (id: string): string => join(p, '.hive', 'sessions', `${id}.jsonl`)
+const backup = (id: string): string => join(p, '.combwork', 'sessions', `${id}.jsonl`)
 const keptUsage = (sid: string, outputs: number[]): SessionUsage => {
   const parser = newUsageParser('claude-code', sid)!
   parser.feed(transcript(sid, outputs))
@@ -77,16 +77,16 @@ describe("the usage history's import", () => {
   const deletedEarly = newId()
 
   beforeAll(async () => {
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
     mkdirSync(join(base, 'profile'), { recursive: true })
     writeFileSync(cache, '{"version":"0.9.3","entries":[]}')
     cliLookup.mockImplementation(async () => null)
     // A record whose backup is stale (10) while its kept usage counted 500; one with only its kept usage; a deleted one.
     write(backup(stale), transcript(stale, [10]))
     write(
-      join(p, '.hive', 'sessions.json'),
+      join(p, '.combwork', 'sessions.json'),
       JSON.stringify({
         version: 1,
         sessions: [

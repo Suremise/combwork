@@ -51,18 +51,18 @@ async function workspace(options: object | null, platform: 'git' | 'none' = 'git
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
   const wt = join(ws, 'p-card')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
   writeFileSync(join(repo, 'a.txt'), 'one\n')
   if (platform === 'git') {
     git(repo, 'init', '-q', '-b', 'main')
     for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(repo, 'config', k, v)
-    writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+    writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
     git(repo, 'add', '-A')
     git(repo, 'commit', '-qm', 'initial')
     git(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
   }
   const agents = [{ id: 'a1', name: 'Builder', ...(platform === 'git' ? { worktree: { path: wt, branch: 'card', base: 'main' } } : {}) }, { id: 'a2', name: 'Reviewer' }]
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, ...(options ? { workflow: { platform, preset: null, options } } : {}) }))
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents, ...(options ? { workflow: { platform, preset: null, options } } : {}) }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
@@ -155,7 +155,7 @@ describe('the user moves cards through the rules (#1265)', () => {
     const card = await create(w)
     await update(w, card, { column: 'doing', agent: 'a1' })
     // Every option off now: a new card moves freely; the started one is still under Pair's rules.
-    writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }], workflow: { platform: 'git', preset: null, options: allOff('git') } }))
+    writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }], workflow: { platform: 'git', preset: null, options: allOff('git') } }))
     await update(w, card, { column: 'done' })
     expect(facts(w, card).find((f) => f.kind === 'Override')).toMatchObject({ data: { rules: expect.arrayContaining(['integrate.approved']) } })
     const fresh = await create(w, 'New')
@@ -488,7 +488,7 @@ describe('drags run the intents they stand for (#1290)', () => {
       await move(w, card, 'done')
       const old = facts(w, card).find((f) => f.kind === 'Started')!.ruleset
       // Review by an agent turned on since.
-      writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }], workflow: { platform: 'git', preset: null, options: PAIR } }))
+      writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }], workflow: { platform: 'git', preset: null, options: PAIR } }))
       if (via) expect(await move(w, card, 'todo')).toMatchObject({ moved: { column: 'todo' } })
       expect(await move(w, card, 'doing')).toMatchObject({ moved: { column: 'doing' } })
       const started = facts(w, card).filter((f) => f.kind === 'Started')

@@ -42,7 +42,7 @@ const transcripts = () => {
 
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`]) fs.rmSync(d, { recursive: true, force: true })
-  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   const env = lib.fakeClaude(userData, home, [alpha, ws, slotA])
   // B1 follows Hive's notices as a model does: cw_inbox, then the ack.

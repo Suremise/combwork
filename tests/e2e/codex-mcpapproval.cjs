@@ -11,7 +11,7 @@ const scratch = lib.WORK
 const userData = path.join(scratch, 'cxmcp-profile')
 const ws = path.join(scratch, 'cxmcp-ws')
 const proj = path.join(ws, 'demo')
-const stampLog = path.join(ws, '.hive', 'mcp', 'stamp', 'calls.log')
+const stampLog = path.join(ws, '.combwork', 'mcp', 'stamp', 'calls.log')
 const small = { provider: 'codex', model: 'gpt-6-luna', effort: 'low' }
 const MODES = ['read-only', 'ask', 'approve-for-me', 'full-access']
 const TURN_MS = 180000
@@ -63,8 +63,8 @@ function prepare() {
   lib.gitProject(proj)
   fs.mkdirSync(path.dirname(stampLog), { recursive: true })
   fs.writeFileSync(path.join(path.dirname(stampLog), 'server.js'), STAMP_SERVER)
-  fs.writeFileSync(path.join(ws, '.hive', 'mcp', 'stamp.json'), JSON.stringify({ command: process.execPath, args: ['${HIVE_MCP_DIR}/stamp/server.js'] }))
-  fs.writeFileSync(path.join(ws, '.hive', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['stamp'] } }))
+  fs.writeFileSync(path.join(ws, '.combwork', 'mcp', 'stamp.json'), JSON.stringify({ command: process.execPath, args: ['${HIVE_MCP_DIR}/stamp/server.js'] }))
+  fs.writeFileSync(path.join(ws, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['stamp'] } }))
   lib.trustForCodex(proj)
   lib.enableProviders(userData, ['claude-code', 'codex'])
   // Full access is offered only with Codex's dangerous mode on.
@@ -201,7 +201,7 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
       // A Hive tool outside its Control subset (#1174, #1281: Codex pre-approves only the subset, per tool): writing a
       // shared note asks, as on Claude Code and Copilot. Cancelled here, so nothing is written.
       if (!done) return
-      const note = path.join(ws, '.hive', 'shared', 'notes', 'mcp-approval-check.md')
+      const note = path.join(ws, '.combwork', 'shared', 'notes', 'mcp-approval-check.md')
       const notePrompt = 'Write a shared note at notes/mcp-approval-check.md containing the word check, with cw_write_shared_note. Make no other tool calls, then reply DONE.'
       check('Assistant: the note prompt is taken', (await lib.sendPrompt(inv, akey, notePrompt, { submitted: async () => ['working', 'waiting'].includes((await live(home, 'assistant'))?.status) })) > 0)
       const asking = await lib.until(async () => {

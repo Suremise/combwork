@@ -419,6 +419,10 @@
     "defaultMessage": "Permission mode changed to {modes}",
     "description": "A notice's title: the permission mode in Settings changed for running agents. {modes} is the new mode's name (several joined by \" / \")."
   },
+  "session.movedFresh.body": {
+    "defaultMessage": "{n, plural, one {# conversation} other {# conversations}} started fresh: {n, plural, one {its folder} other {their folders}} moved with .hive to .combwork, so {n, plural, one {it} other {they}} can't continue there. The earlier ones are kept in Sessions to read.",
+    "description": "The notice after a workspace's .hive folders moved to .combwork (HI-2462): conversations that ran in a folder inside one started new conversations instead of resuming. {n} counts them. Keep .hive and .combwork as they are; Sessions is a tab of the window."
+  },
   "session.newConversation.didntStop": {
     "defaultMessage": "It didn't stop, so no new conversation was started.",
     "description": "Giving an agent a task in a new conversation failed: it didn't stop."

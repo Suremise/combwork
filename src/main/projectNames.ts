@@ -14,7 +14,7 @@ const log = createLogger('projectNames')
 const CLOSED = msg({ id: 'worktrees.names.closed', defaultMessage: 'The workspace was closed or switched: nothing was changed.', description: "An error: the workspace closed, or another opened in its window, while a project's name was being recorded; nothing changed." })
 
 /**
- * The workspace's record of its projects' names, by their stable ids (#514), in `.hive/project-names.json` (a kept file):
+ * The workspace's record of its projects' names, by their stable ids (#514), in `.combwork/project-names.json` (a kept file):
  * each project's folder name as Hive last saw it and its earlier ones, and every rename Hive saw, numbered. It is the
  * workspace's, not the project's: a copied folder (given an id of its own) brings none of it along. Renames are found by
  * id (a project seen under another name than its record's), so two projects that swapped names are two renames, never

@@ -50,10 +50,10 @@ async function world(): Promise<{ ws: string; w: WS; wt: string }> {
   const wt = join(base, `wt-${n}`)
   sh(p, 'worktree', 'add', '-q', '-b', 'hive/b1', wt)
   commit(wt, { 'src/b.txt': 'b1\n' }, 'B1 builds')
-  mkdirSync(join(p, '.hive'), { recursive: true })
-  writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1', worktree: { path: wt, branch: 'hive/b1', base: 'main' } }, { id: 'r1', name: 'R1 (reviewer)' }] }))
-  mkdirSync(join(ws, 'n', '.hive'), { recursive: true })
-  writeFileSync(join(ws, 'n', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+  mkdirSync(join(p, '.combwork'), { recursive: true })
+  writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1', worktree: { path: wt, branch: 'hive/b1', base: 'main' } }, { id: 'r1', name: 'R1 (reviewer)' }] }))
+  mkdirSync(join(ws, 'n', '.combwork'), { recursive: true })
+  writeFileSync(join(ws, 'n', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
   const w = await open(ws)
   const cards = [
     card(1, 'p', 'todo'),
@@ -98,7 +98,7 @@ const foldOf = (w: WS, project: string, num: number) => foldCard(FactStore.forBo
 const marked = (w: WS): number[] => store.adoptionCards(w).filter((c) => c.preWorkflow).map((c) => c.number)
 const cardOf = (w: WS, num: number) => store.adoptionCards(w).find((c) => c.number === num)
 const allFacts = (w: WS): number => store.boardRead(w, (db) => (db.prepare('SELECT COUNT(*) AS n FROM card_facts').get() as { n: number }).n)
-const config = (ws: string, project: string): Record<string, unknown> => JSON.parse(readFileSync(join(ws, project, '.hive', 'project.json'), 'utf8'))
+const config = (ws: string, project: string): Record<string, unknown> => JSON.parse(readFileSync(join(ws, project, '.combwork', 'project.json'), 'utf8'))
 const clearDone = (w: WS): Promise<unknown> => store.boardWrite(w, async () => store.boardWriteOp(w, (db) => db.prepare("DELETE FROM board_meta WHERE key = 'adoption'").run()))
 
 describe("the upgrade's adoption (#1218)", () => {
@@ -158,12 +158,12 @@ describe("the upgrade's adoption (#1218)", () => {
     const { ws, w } = await world()
     await adoptNow(w)
     const facts = allFacts(w)
-    const before = readFileSync(join(ws, 'p', '.hive', 'project.json'), 'utf8')
+    const before = readFileSync(join(ws, 'p', '.combwork', 'project.json'), 'utf8')
     expect(await adoptNow(w)).toBeNull()
     await clearDone(w)
     expect(await adoptNow(w)).toEqual({ adopted: 0, marked: 0, configured: 0, failed: 0, changed: 0 })
     expect(allFacts(w)).toBe(facts)
-    expect(readFileSync(join(ws, 'p', '.hive', 'project.json'), 'utf8')).toBe(before)
+    expect(readFileSync(join(ws, 'p', '.combwork', 'project.json'), 'utf8')).toBe(before)
   })
 
   it('two at once (another Hive, a start during the upgrade) add each fact once', async () => {
@@ -189,8 +189,8 @@ describe("the upgrade's adoption (#1218)", () => {
     expect(cardOf(w, 11)).toMatchObject({ preWorkflow: false, facts: false })
     // A new board: none of its cards are from before 1.0.
     const fresh = join(base, `ws-${++n}`)
-    mkdirSync(join(fresh, 'q', '.hive'), { recursive: true })
-    writeFileSync(join(fresh, 'q', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(fresh, 'q', '.combwork'), { recursive: true })
+    writeFileSync(join(fresh, 'q', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     const f = await open(fresh)
     await writeCard(f, 1, card(1, 'q', 'doing'))
     expect(await adoptNow(f)).toMatchObject({ adopted: 0, marked: 0 })
@@ -237,7 +237,7 @@ describe("the upgrade's adoption (#1218)", () => {
 
   it("a card whose agent's folder changed after it was read is read again, by Hive's run itself", async () => {
     const { ws, w } = await world()
-    const file = join(ws, 'p', '.hive', 'project.json')
+    const file = join(ws, 'p', '.combwork', 'project.json')
     sh(join(ws, 'p'), 'branch', 'release')
     afterSnapshot(w, () => {
       const cfg = JSON.parse(readFileSync(file, 'utf8'))
@@ -258,7 +258,7 @@ describe("the upgrade's adoption (#1218)", () => {
     other.close()
     const own = { platform: 'git', preset: null, options: { ...allOff('git'), review: 'none' } }
     const cfg = config(ws, 'p')
-    writeFileSync(join(ws, 'p', '.hive', 'project.json'), JSON.stringify({ ...cfg, workflow: own }))
+    writeFileSync(join(ws, 'p', '.combwork', 'project.json'), JSON.stringify({ ...cfg, workflow: own }))
     const r = await adoptNow(w)
     expect(config(ws, 'p').workflow).toEqual(own)
     expect(r!.configured).toBe(1)
@@ -287,15 +287,15 @@ describe("the upgrade's adoption (#1218)", () => {
 describe.runIf(!!process.env.HIVE_STORE_ROUNDTRIP_DB && existsSync(process.env.HIVE_STORE_ROUNDTRIP_DB))('on a copy of a live board (#1218)', () => {
   it('handles every card once and moves none', async () => {
     const ws = join(base, 'live')
-    mkdirSync(join(ws, '.hive'), { recursive: true })
-    copyFileSync(process.env.HIVE_STORE_ROUNDTRIP_DB!, join(ws, '.hive', 'hive.db'))
+    mkdirSync(join(ws, '.combwork'), { recursive: true })
+    copyFileSync(process.env.HIVE_STORE_ROUNDTRIP_DB!, join(ws, '.combwork', 'hive.db'))
     const w = await open(ws)
     if (store.upgradeWaiting(ws)) await inWorkspace(w, () => store.upgradeBoard(w))
     const before = store.adoptionCards(w)
     // Its projects as plain folders (None): their cards in flight are adopted with nothing read.
     for (const p of new Set(before.map((c) => c.project).filter((name) => name && /^[\w.-]+$/.test(name)))) {
-      mkdirSync(join(ws, p, '.hive'), { recursive: true })
-      writeFileSync(join(ws, p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+      mkdirSync(join(ws, p, '.combwork'), { recursive: true })
+      writeFileSync(join(ws, p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     }
     const inFlight = before.filter((c) => !c.archived && ['doing', 'review', 'passed'].includes(c.column) && c.project && existsSync(join(ws, c.project))).length
     const t0 = performance.now()

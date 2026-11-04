@@ -588,7 +588,7 @@
   "board.overview.stalled": "停滞",
   "board.overview.waitingForReview": "等待评审",
   "board.panel.allProjects": "所有项目",
-  "board.panel.info": "工作区的卡片，位于 .hive/tasks。智能体和助手通过 Combwork 的工具读取、更改和移动卡片（完成的工作会移到“评审”）；只有你能归档或删除卡片。",
+  "board.panel.info": "工作区的卡片，位于 .combwork/tasks。智能体和助手通过 Combwork 的工具读取、更改和移动卡片（完成的工作会移到“评审”）；只有你能归档或删除卡片。",
   "board.panel.refresh": "刷新",
   "board.panel.stalledInfo": "“进行中”里没有人在处理的卡片：没有指派智能体，或其智能体已被删除或未运行。还包括卡片循环中的智能体未等待就离开的“进行中”或“评审”卡片。",
   "board.panel.workspace": "工作区",

@@ -640,7 +640,7 @@
     "description": "A button over an MCP server's definition."
   },
   "workspace.mcpView.dir": {
-    "defaultMessage": "Use {variable} to point at server code stored in `.hive/mcp`.",
+    "defaultMessage": "Use {variable} to point at server code stored in `.combwork/mcp`.",
     "description": "An MCP server's view, beside its editor (Markdown). {variable} is ${CW_MCP_DIR}."
   },
   "workspace.mcpView.format": {
@@ -692,7 +692,7 @@
     "description": "What the built-in server's cw_create_handover tool does."
   },
   "workspace.mcpView.toolListNotes": {
-    "defaultMessage": "List notes in .hive/shared",
+    "defaultMessage": "List notes in .combwork/shared",
     "description": "What the built-in server's cw_list_shared_notes tool does."
   },
   "workspace.mcpView.toolListProjects": {
@@ -884,8 +884,8 @@
     "description": "A button over an open shared note."
   },
   "workspace.notes.select": {
-    "defaultMessage": "Select a note, or create one. Shared notes live in <code>.hive/shared</code> and are available to every project and agent.",
-    "description": "The Shared Notes view with no note selected. <code> is a folder: keep .hive/shared as it is."
+    "defaultMessage": "Select a note, or create one. Shared notes live in <code>.combwork/shared</code> and are available to every project and agent.",
+    "description": "The Shared Notes view with no note selected. <code> is a folder: keep .combwork/shared as it is."
   },
   "workspace.notes.workspaceNotes.assistant": {
     "defaultMessage": "the Assistant",
@@ -1173,11 +1173,11 @@
   },
   "workspace.purge.kindAttachments": {
     "defaultMessage": "Attachments",
-    "description": "The Purge dialog, a group: files pasted or dropped into sessions (.hive/attachments)."
+    "description": "The Purge dialog, a group: files pasted or dropped into sessions (.combwork/attachments)."
   },
   "workspace.purge.kindBackup": {
     "defaultMessage": "Transcript backups",
-    "description": "The Purge dialog, a group: Hive's copies of the sessions' transcripts (.hive/sessions, .hive/archive)."
+    "description": "The Purge dialog, a group: Hive's copies of the sessions' transcripts (.combwork/sessions, .combwork/archive)."
   },
   "workspace.purge.kindDeletedUsage": {
     "defaultMessage": "Old usage of deleted sessions",
@@ -1460,8 +1460,8 @@
     "description": "Remove Project: a choice, and the dialog's button for it."
   },
   "workspace.removal.removeSummary": {
-    "defaultMessage": "The folder stays on disk, and its handovers and cards are packed into it (.hive/removed), so you can move it elsewhere. Combwork offers them back wherever it sees the folder again.",
-    "description": "Remove Project: what Remove from Hive does. Keep .hive/removed as it is."
+    "defaultMessage": "The folder stays on disk, and its handovers and cards are packed into it (.combwork/removed), so you can move it elsewhere. Combwork offers them back wherever it sees the folder again.",
+    "description": "Remove Project: what Remove from Hive does. Keep .combwork/removed as it is."
   },
   "workspace.removal.removedDone": {
     "defaultMessage": "{name} was removed from Combwork",
@@ -1937,7 +1937,7 @@
   },
   "workspace.storage.archive": {
     "defaultMessage": "Archive",
-    "description": "Storage: Hive's archive folder (.hive/archive)."
+    "description": "Storage: Hive's archive folder (.combwork/archive)."
   },
   "workspace.storage.assistant": {
     "defaultMessage": "Assistant",
@@ -1949,7 +1949,7 @@
   },
   "workspace.storage.attachments": {
     "defaultMessage": "Attachments",
-    "description": "Storage: files pasted or dropped into sessions (.hive/attachments)."
+    "description": "Storage: files pasted or dropped into sessions (.combwork/attachments)."
   },
   "workspace.storage.backupDays": {
     "defaultMessage": "Backup age in days",
@@ -1957,7 +1957,7 @@
   },
   "workspace.storage.backups": {
     "defaultMessage": "Transcript backups",
-    "description": "Storage: Hive's copies of the sessions' transcripts (.hive/sessions)."
+    "description": "Storage: Hive's copies of the sessions' transcripts (.combwork/sessions)."
   },
   "workspace.storage.beforeCompression": {
     "defaultMessage": "{size} before compression",
@@ -1969,7 +1969,7 @@
   },
   "workspace.storage.cardAttachments": {
     "defaultMessage": "Card attachments",
-    "description": "Storage (HI-1700): files kept with cards (.hive/attachments/cards). Clean Up and Purge never remove them."
+    "description": "Storage (HI-1700): files kept with cards (.combwork/attachments/cards). Clean Up and Purge never remove them."
   },
   "workspace.storage.cardCleanup.archived": {
     "defaultMessage": "Archived",
@@ -2148,8 +2148,8 @@
     "description": "A Clean Up choice; {days} is a box where you type the number of days."
   },
   "workspace.storage.oldAttachmentsDesc": {
-    "defaultMessage": "Files pasted or dropped into those sessions (.hive/attachments).",
-    "description": "Under a Clean Up choice. Keep .hive/attachments as it is."
+    "defaultMessage": "Files pasted or dropped into those sessions (.combwork/attachments).",
+    "description": "Under a Clean Up choice. Keep .combwork/attachments as it is."
   },
   "workspace.storage.oldBackups": {
     "defaultMessage": "Combwork's backups of archived sessions last active more than {days} days ago",
@@ -2736,7 +2736,7 @@
     "description": "The welcome page, How Hive works: a heading."
   },
   "workspace.welcome.workspaceText": {
-    "defaultMessage": "A folder of projects. Combwork adds a <code>.hive</code> folder for shared notes, skills and MCP servers — commit it to share with your team.",
-    "description": "The welcome page, How Hive works. <code> is a folder name: keep .hive as it is."
+    "defaultMessage": "A folder of projects. Combwork adds a <code>.combwork</code> folder for shared notes, skills and MCP servers — commit it to share with your team.",
+    "description": "The welcome page, How Hive works. <code> is a folder name: keep .combwork as it is."
   }
 }

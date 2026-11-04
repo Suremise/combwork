@@ -30,15 +30,15 @@ const T = {
   noWorkspace: agentMsg({ id: 'notice.team.noWorkspace', text: 'No workspace is open', note: "HI-2081: a team pause refused: the window it was asked of has no workspace open." })
 }
 
-/** Where earlier builds saved a pause: each workspace's `.hive`, and the profile (with what a close left of them). */
+/** Where earlier builds saved a pause: each workspace's `.combwork`, and the profile (with what a close left of them). */
 const OLD_FILE = 'team-pause.json'
 const OLD_CLOSING_FILE = 'team-pause-closing.json'
 
-/** Each workspace's pause (by its .hive folder, lower case): none, not paused. */
+/** Each workspace's pause (by its .combwork folder, lower case): none, not paused. */
 const known = new Map<string, TeamPause>()
 /** The user's pause of every open workspace, while it lasts. */
 let all: TeamPause | null = null
-/** The workspaces resumed on their own from the user's pause (by their .hive): it no longer holds them. */
+/** The workspaces resumed on their own from the user's pause (by their .combwork): it no longer holds them. */
 const leftAll = new Set<string>()
 /** The workspaces whose old pause file was looked for in this run. */
 const cleared = new Set<string>()
@@ -49,7 +49,7 @@ const resumed = new Map<string, number>()
 /** Each workspace's lock: pause, resume and the gates' admission checks go one at a time. */
 const locks = new Map<string, Promise<unknown>>()
 
-/** A workspace's .hive folder, from its path (the same as its hiveDir, which a stand-in for one may not have). */
+/** A workspace's .combwork folder, from its path (the same as its hiveDir, which a stand-in for one may not have). */
 const hiveOf = (ws: Pick<WorkspaceService, 'path'>): string => join(ws.path ?? '', HIVE_DIR)
 const keyOf = (ws: Pick<WorkspaceService, 'path'>): string => hiveOf(ws).toLowerCase()
 

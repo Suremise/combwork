@@ -29,13 +29,13 @@ const { forgetMoves } = await import('../src/main/attachmentsFolder')
 const { sessions } = await import('../src/main/sessions')
 
 const wsPath = join(base, 'ws')
-const home = join(wsPath, '.hive', 'assistant')
+const home = join(wsPath, '.combwork', 'assistant')
 const s = sessions as unknown as { live: Map<string, unknown> }
 let w: ReturnType<typeof createWorkspaceService>
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
 const conv = '00000000-0000-4000-8000-000000000001'
 const other = '00000000-0000-4000-8000-000000000002'
-const attachmentsOf = (id: string): string => join(home, '.hive', 'attachments', id)
+const attachmentsOf = (id: string): string => join(home, '.combwork', 'attachments', id)
 const png = (id: string, name: string): string => {
   const p = join(attachmentsOf(id), name)
   mkdirSync(attachmentsOf(id), { recursive: true })
@@ -66,7 +66,7 @@ describe.runIf(process.platform === 'win32')("the Assistant's attachments", () =
   // Each case starts with no attachments of the Assistant's: what one leaves (a group kept, a junction) is never another's.
   beforeEach(() => {
     forgetMoves()
-    for (const root of [join(home, '.hive', 'attachments'), join(home, '.hive', 'images')]) {
+    for (const root of [join(home, '.combwork', 'attachments'), join(home, '.combwork', 'images')]) {
       for (const name of existsSync(root) ? readdirSync(root) : []) {
         const p = join(root, name)
         // A junction (the link case's) goes as a link, never followed into the folder it points at.
@@ -141,31 +141,31 @@ describe.runIf(process.platform === 'win32')("the Assistant's attachments", () =
     mkdirSync(outside, { recursive: true })
     writeFileSync(join(outside, 'personal.png'), 'mine')
     const linked = '00000000-0000-4000-8000-000000000004'
-    mkdirSync(join(home, '.hive', 'attachments'), { recursive: true })
+    mkdirSync(join(home, '.combwork', 'attachments'), { recursive: true })
     symlinkSync(outside, attachmentsOf(linked), 'junction')
     await expect(run(() => files.trashAttachmentGroup(home, linked))).rejects.toThrow(/Not one of the session attachments/)
     await expect(run(() => files.trashAttachment(home, join(attachmentsOf(linked), 'personal.png')))).rejects.toThrow(/Not one of the session attachments/)
     expect((await run(() => files.listAttachments(home))).some((g) => g.sessionId === linked)).toBe(false)
     expect(readFileSync(join(outside, 'personal.png'), 'utf8')).toBe('mine')
     expect(trashed).toEqual([])
-    // A project whose whole .hive/attachments is a junction elsewhere: not listed, nothing deleted; nor is an old
-    // .hive/images that is one moved into it.
+    // A project whose whole .combwork/attachments is a junction elsewhere: not listed, nothing deleted; nor is an old
+    // .combwork/images that is one moved into it.
     const api = join(wsPath, 'api')
-    mkdirSync(join(api, '.hive'), { recursive: true })
+    mkdirSync(join(api, '.combwork'), { recursive: true })
     const outsideRoot = join(base, 'outside-root')
     mkdirSync(join(outsideRoot, linked), { recursive: true })
     writeFileSync(join(outsideRoot, linked, 'personal.png'), 'mine too')
-    symlinkSync(outsideRoot, join(api, '.hive', 'attachments'), 'junction')
-    symlinkSync(outsideRoot, join(api, '.hive', 'images'), 'junction')
+    symlinkSync(outsideRoot, join(api, '.combwork', 'attachments'), 'junction')
+    symlinkSync(outsideRoot, join(api, '.combwork', 'images'), 'junction')
     expect(await run(() => files.listAttachments(api))).toEqual([])
     await expect(run(() => files.trashAttachmentGroup(api, linked))).rejects.toThrow(/Not one of the session attachments/)
-    await expect(run(() => files.trashAttachment(api, join(api, '.hive', 'attachments', linked, 'personal.png')))).rejects.toThrow(/Not a session attachment/)
+    await expect(run(() => files.trashAttachment(api, join(api, '.combwork', 'attachments', linked, 'personal.png')))).rejects.toThrow(/Not a session attachment/)
     expect(readFileSync(join(outsideRoot, linked, 'personal.png'), 'utf8')).toBe('mine too')
   })
 
   it('refuses ids and paths that are not its attachments', async () => {
     await expect(run(() => files.trashAttachmentGroup(home, '../x'))).rejects.toThrow()
-    await expect(run(() => files.trashAttachment(home, join(home, '.hive', 'sessions.json')))).rejects.toThrow(/Not a session attachment/)
+    await expect(run(() => files.trashAttachment(home, join(home, '.combwork', 'sessions.json')))).rejects.toThrow(/Not a session attachment/)
     await expect(run(() => files.listAttachments(join(base, 'elsewhere')))).rejects.toThrow()
   })
 })

@@ -54,9 +54,9 @@ const settled = async (st: State): Promise<void> => {
 
 describe('a Codex turn refused for its sign-in', () => {
   beforeAll(async () => {
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     vi.spyOn(providerService, 'refresh').mockResolvedValue([])

@@ -58,8 +58,8 @@ let n = 0
 async function open(cfg: Record<string, unknown> = {}): Promise<{ w: WS; ws: string; alpha: string }> {
   const ws = join(base, `ws-${++n}`)
   const alpha = join(ws, 'alpha')
-  mkdirSync(join(alpha, '.hive'), { recursive: true })
-  writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], ...cfg }))
+  mkdirSync(join(alpha, '.combwork'), { recursive: true })
+  writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], ...cfg }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)

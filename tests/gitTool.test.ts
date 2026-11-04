@@ -86,7 +86,7 @@ describe('git missing', () => {
   it('is missing, not a failed command: no exit code 1 that reads as "no"', async () => {
     const { p } = await project()
     hideGit()
-    const r = await git(p, ['check-ignore', '-q', '--no-index', '--', '.hive/'])
+    const r = await git(p, ['check-ignore', '-q', '--no-index', '--', '.combwork/'])
     expect(r).toMatchObject({ ok: false, missing: true, code: -1 })
     expect(gitTool().state).toBe('missing')
     expect(gitProblem()).toBe("Git isn't installed (or isn't on Combwork's PATH)")
@@ -119,7 +119,7 @@ describe('git missing', () => {
     expect(run(p, 'branch', '--format=%(refname:short)')).toMatch(/hive\/wt/)
   })
 
-  it('.hive is still excluded by the line Hive writes, marked unconfirmed', async () => {
+  it('.combwork is still excluded by the line Hive writes, marked unconfirmed', async () => {
     const { p } = await project()
     hideGit()
     expect(await ensureHiveExcluded(p)).toMatchObject({ excluded: true, unconfirmed: true })

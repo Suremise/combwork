@@ -126,7 +126,7 @@ describe('the shipped dialect files in a workspace', () => {
     await w.open(ws)
     try {
       await wsMod.inWorkspace(w, () => mod.syncBundled({ fresh: true }))
-      const dir = join(ws, '.hive', 'dialects')
+      const dir = join(ws, '.combwork', 'dialects')
       for (const id of Object.keys(SHIPPED)) expect(readFileSync(join(dir, `${id}.json`), 'utf8').replace(/\r\n/g, '\n'), id).toBe(read(id))
       expect(existsSync(join(dir, 'workspace.json')), "workspace.json is the user's: Hive never ships into it").toBe(false)
 

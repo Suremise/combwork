@@ -210,8 +210,8 @@
     "audience": "both"
   },
   "main.gitInit.failed.exclude": {
-    "text": "couldn't keep .hive out of git",
-    "note": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .hive is a folder's name.",
+    "text": "couldn't keep .combwork out of git",
+    "note": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .combwork is a folder's name.",
     "audience": "both"
   },
   "main.gitInit.failed.gitignore": {
@@ -225,8 +225,8 @@
     "audience": "both"
   },
   "main.gitInit.failed.ignored": {
-    "text": "git still doesn't ignore .hive here (a rule in a .gitignore may bring it back), so nothing was committed",
-    "note": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .hive and .gitignore are names.",
+    "text": "git still doesn't ignore .combwork here (a rule in a .gitignore may bring it back), so nothing was committed",
+    "note": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .combwork and .gitignore are names.",
     "audience": "both"
   },
   "main.gitInit.failed.init": {
@@ -240,8 +240,8 @@
     "audience": "both"
   },
   "main.gitInit.failed.staged": {
-    "text": ".hive was staged, so nothing was committed",
-    "note": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .hive is a folder's name.",
+    "text": ".combwork was staged, so nothing was committed",
+    "note": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .combwork is a folder's name.",
     "audience": "both"
   },
   "main.gitInit.fix.commit": {
@@ -256,12 +256,12 @@
   },
   "main.gitInit.fix.ignored": {
     "text": "fix that, then choose Make first commit in the Version Control tab",
-    "note": "What to do after .hive was found not ignored by git (main.gitInit.failed.ignored). Make first commit is a button in the Version Control tab (glossary 2.1): use its name as shown.",
+    "note": "What to do after .combwork was found not ignored by git (main.gitInit.failed.ignored). Make first commit is a button in the Version Control tab (glossary 2.1): use its name as shown.",
     "audience": "both"
   },
   "main.gitInit.fix.staged": {
-    "text": "check the .gitignore for a rule that brings .hive back",
-    "note": "What to do after .hive was staged (main.gitInit.failed.staged).",
+    "text": "check the .gitignore for a rule that brings .combwork back",
+    "note": "What to do after .combwork was staged (main.gitInit.failed.staged).",
     "audience": "both"
   },
   "main.gitInit.nested": {
@@ -302,6 +302,31 @@
   "main.gitInit.unreadable": {
     "text": "Git couldn't read this repository: {why}",
     "note": "Why a folder can't be made a git repository. {why} is git's own message.",
+    "audience": "both"
+  },
+  "main.hiveMove.what.cards": {
+    "text": "the paths in cards",
+    "note": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): links and paths in cards' descriptions and comments.",
+    "audience": "both"
+  },
+  "main.hiveMove.what.excludes": {
+    "text": "git's exclude lines",
+    "note": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): the lines that keep the folder out of git.",
+    "audience": "both"
+  },
+  "main.hiveMove.what.folders": {
+    "text": "the agents' folders inside it",
+    "note": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): slots and other agents' folders kept inside the moved folder.",
+    "audience": "both"
+  },
+  "main.hiveMove.what.notes": {
+    "text": "the paths in shared notes and handovers",
+    "note": "What the folder move was updating when it failed (service.hiveMove.phaseFailed).",
+    "audience": "both"
+  },
+  "main.hiveMove.what.worktrees": {
+    "text": "the worktrees inside it",
+    "note": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): git worktrees kept inside the moved folder.",
     "audience": "both"
   },
   "main.keys.maskingFull": {

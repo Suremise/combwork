@@ -31,8 +31,8 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
-  lib.gitProject(alpha, { 'a.txt': 'one\n', '.gitignore': '.hive/\n' })
-  lib.gitProject(gamma, { 'a.txt': 'one\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'a.txt': 'one\n', '.gitignore': '.combwork/\n' })
+  lib.gitProject(gamma, { 'a.txt': 'one\n', '.gitignore': '.combwork/\n' })
   // Beta: no version control (None).
   fs.mkdirSync(beta, { recursive: true })
   fs.writeFileSync(path.join(beta, 'notes.md'), 'notes\n')

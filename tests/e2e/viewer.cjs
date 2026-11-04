@@ -84,7 +84,7 @@ function stream(token) {
   lib.gitProject(alpha)
   lib.gitProject(beta)
   lib.git(alpha, ['branch', '-M', 'main'])
-  // The workspace too: its Assistant runs in it (.hive\assistant).
+  // The workspace too: its Assistant runs in it (.combwork\assistant).
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), beta.toLowerCase(), ws.toLowerCase()]))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
@@ -250,7 +250,7 @@ function stream(token) {
   const SECRET = 'PRIVATE_SENTINEL_620'
   const leaks = () => viewerStream.events.filter((e) => JSON.stringify(e.data).includes(SECRET) || JSON.stringify(e.data).includes(apiToken))
   await inv('settings:update', { assistant: { control: 'projects' } })
-  await inv('session:start', path.join(ws, '.hive', 'assistant'), { agentId: 'assistant' })
+  await inv('session:start', path.join(ws, '.combwork', 'assistant'), { agentId: 'assistant' })
   check('the Assistant starts', !!(await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === 'assistant')?.status === 'ready', HUNG_MS)))
   const assistantFile = path.join(userData, 'assistant-api', `${createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`)
   const assistantToken = (await lib.until(() => fs.existsSync(assistantFile) && JSON.parse(fs.readFileSync(assistantFile, 'utf8')).token, HUNG_MS)) || ''

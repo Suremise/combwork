@@ -1300,7 +1300,7 @@
     "audience": "both"
   },
   "settings.advanced.data.tip": {
-    "text": "Project settings live in each project's .hive folder; workspace settings in the workspace .hive folder.",
+    "text": "Project settings live in each project's .combwork folder; workspace settings in the workspace .combwork folder.",
     "note": "The info tip of the setting \"Settings file\" (Settings → Advanced): more on what it does and when it applies.",
     "audience": "both"
   },
@@ -3218,7 +3218,7 @@
     "audience": "both"
   },
   "settings.assistant.mode.tip": {
-    "text": "Modes are Markdown files in each workspace (.hive/modes): edit them, or add your own, in the Assistant view (the crown on the left). The panel switches mode at once, keeping the conversation.",
+    "text": "Modes are Markdown files in each workspace (.combwork/modes): edit them, or add your own, in the Assistant view (the crown on the left). The panel switches mode at once, keeping the conversation.",
     "note": "The info tip of the setting \"Default mode\" (Settings → Assistant): more on what it does and when it applies.",
     "audience": "both"
   },
@@ -4073,7 +4073,7 @@
     "audience": "both"
   },
   "settings.project.keybindings.desc": {
-    "text": "Change one to give this project its own; Reset returns it to the global shortcut. Stored in the project’s .hive folder, which is not committed.",
+    "text": "Change one to give this project its own; Reset returns it to the global shortcut. Stored in the project’s .combwork folder, which is not committed.",
     "note": "What the setting \"Shortcuts\" does, under its title (Project Settings → Keyboard Shortcuts).",
     "audience": "both"
   },
@@ -4083,7 +4083,7 @@
     "audience": "both"
   },
   "settings.project.metadata.desc": {
-    "text": "Stored in the project's .hive/project.json (excluded from git). Changes apply to new sessions; restart a running session to apply them.",
+    "text": "Stored in the project's .combwork/project.json (excluded from git). Changes apply to new sessions; restart a running session to apply them.",
     "note": "What the setting \"Settings file\" does, under its title (Project Settings → Advanced).",
     "audience": "both"
   },
@@ -4648,7 +4648,7 @@
     "audience": "both"
   },
   "settings.sessions.backupTranscripts.desc": {
-    "text": "Copy each session's transcript into the project's .hive/sessions folder.",
+    "text": "Copy each session's transcript into the project's .combwork/sessions folder.",
     "note": "What the setting \"Back up transcripts\" does, under its title (Settings → Sessions).",
     "audience": "both"
   },
@@ -4803,7 +4803,7 @@
     "audience": "both"
   },
   "settings.sessions.recordPerformance.tip": {
-    "text": "Only totals are kept: request and reply sizes, times and outcomes, the size of what each session was given, and the providers' own reported usage. Never prompts, replies, tokens or paths. Kept 30 days per workspace in .hive/metrics (git-ignored, this machine's). Turned off, nothing new is recorded; what was recorded stays until you reset it.",
+    "text": "Only totals are kept: request and reply sizes, times and outcomes, the size of what each session was given, and the providers' own reported usage. Never prompts, replies, tokens or paths. Kept 30 days per workspace in .combwork/metrics (git-ignored, this machine's). Turned off, nothing new is recorded; what was recorded stays until you reset it.",
     "note": "The info tip of the setting \"Record performance metrics\" (Settings → Sessions): more on what it does and when it applies.",
     "audience": "both"
   },
@@ -4908,7 +4908,7 @@
     "audience": "both"
   },
   "settings.sessions.usageCacheSize.tip": {
-    "text": "What each session used is kept in the usage history, in the workspace's .hive folder: this cache only spares reading a transcript again while Combwork runs. The least recently used go first when it is full. {min, number} to {max, number}.",
+    "text": "What each session used is kept in the usage history, in the workspace's .combwork folder: this cache only spares reading a transcript again while Combwork runs. The least recently used go first when it is full. {min, number} to {max, number}.",
     "note": "The info tip of the setting \"Usage cache size\" (Settings → Sessions): more on what it does and when it applies. {min} and {max} are the fewest and most transcripts it can be set to.",
     "audience": "both"
   },
@@ -5058,7 +5058,7 @@
     "audience": "both"
   },
   "settings.workspace.commands.tip": {
-    "text": "Saved in the workspace's .hive/workspace.json, which Combwork keeps out of version control. Only you can set them: the Assistant can't change them.",
+    "text": "Saved in the workspace's .combwork/workspace.json, which Combwork keeps out of version control. Only you can set them: the Assistant can't change them.",
     "note": "The info tip of the setting \"Commands\" (Settings → Workspace, HI-1954). Keep the file path as it is.",
     "audience": "both"
   },
@@ -5073,7 +5073,7 @@
     "audience": "both"
   },
   "settings.workspace.hiddenProjects.tip": {
-    "text": "Project → Remove Project… hides a project, removes it from Combwork (its folder keeps its handovers and cards in .hive/removed, so it can move to another workspace) or deletes it (to the Recycle Bin). Deleted projects are not listed here: restore the folder from the Recycle Bin and Combwork sees it as a new project.",
+    "text": "Project → Remove Project… hides a project, removes it from Combwork (its folder keeps its handovers and cards in .combwork/removed, so it can move to another workspace) or deletes it (to the Recycle Bin). Deleted projects are not listed here: restore the folder from the Recycle Bin and Combwork sees it as a new project.",
     "note": "The info tip of the setting \"Hidden and removed projects\" (Settings → Workspace): more on what it does and when it applies.",
     "audience": "both"
   },

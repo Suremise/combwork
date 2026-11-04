@@ -22,7 +22,7 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)) : [])
-const project = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8'))
+const project = () => JSON.parse(fs.readFileSync(path.join(alpha, '.combwork', 'project.json'), 'utf8'))
 
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
@@ -34,9 +34,9 @@ const project = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'proj
   cfg.modelCatalogs = { 'claude-code': { source: 'cli', version: '2.1.999', models: [{ value: 'haiku', label: 'Haiku', efforts: [] }, { value: 'sonnet', label: 'Sonnet', efforts: ['low', 'medium', 'high'] }, { value: 'opus', label: 'Opus', efforts: ['low', 'medium', 'high'] }] } }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg))
   lib.gitProject(alpha)
-  fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
+  fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
   // The project's own model, effort and context; One has none of its own, Two its own model.
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, providers: { 'claude-code': { model: 'haiku', effort: 'high', permissionMode: 'inherit', extraArgs: '', use200kContext: 'on' } }, agents: [{ id: 'a-one', name: 'One' }, { id: 'a-two', name: 'Two', model: 'opus' }] }))
+  fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, providers: { 'claude-code': { model: 'haiku', effort: 'high', permissionMode: 'inherit', extraArgs: '', use200kContext: 'on' } }, agents: [{ id: 'a-one', name: 'One' }, { id: 'a-two', name: 'Two', model: 'opus' }] }))
 
   const { app, page } = await lib.launch({ userData, env: { ...env, HIVE_TEST_CLI_HOME_CONNECTION: '0' }, viewport: { width: 1400, height: 900 } })
   try {

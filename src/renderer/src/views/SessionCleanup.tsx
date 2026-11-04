@@ -133,7 +133,7 @@ const ACTIONS: { id: CleanupAction; icon: string; label: Msg; summary: Msg }[] =
     id: 'archive',
     icon: 'archive',
     label: msg({ id: 'sessions.cleanup.archive', defaultMessage: 'Archive', description: 'A choice in Clean Up (Sessions tab): archive the old sessions (the default). Keep it short.' }),
-    summary: msg({ id: 'sessions.cleanup.archiveSummary', defaultMessage: "Combwork's own sessions are hidden from the list and their transcripts kept in .hive/archive: tick Archived to see them, and unarchive any at any time.", description: 'Under the Archive choice in Clean Up: what archiving does (.hive/archive is a folder; Archived is a checkbox above the Sessions list: use its translation).' })
+    summary: msg({ id: 'sessions.cleanup.archiveSummary', defaultMessage: "Combwork's own sessions are hidden from the list and their transcripts kept in .combwork/archive: tick Archived to see them, and unarchive any at any time.", description: 'Under the Archive choice in Clean Up: what archiving does (.combwork/archive is a folder; Archived is a checkbox above the Sessions list: use its translation).' })
   },
   {
     id: 'delete',

@@ -62,12 +62,12 @@ function trashed(match = '') {
 }
 
 /**
- * A card of a workspace's board as Hive saved it (in .hive\hive.db: its JSON document, from 1.0's tables, #1209), read on a
+ * A card of a workspace's board as Hive saved it (in .combwork\hive.db: its JSON document, from 1.0's tables, #1209), read on a
  * connection of its own (read-only; Hive writing meanwhile is fine). Throws when there is no such card.
  */
 function readCard(ws, n) {
   const { DatabaseSync } = require('node:sqlite')
-  const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { readOnly: true, timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { readOnly: true, timeout: 5000 })
   try {
     const [row] = readDocs(db, [n])
     if (!row) throw new Error(`no card #${n} in ${ws}`)
@@ -80,7 +80,7 @@ function readCard(ws, n) {
 /** Saves a card's document as another program would (a running Hive sees it within about a second, #1017). */
 function writeCard(ws, n, doc) {
   const { DatabaseSync } = require('node:sqlite')
-  const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { timeout: 5000 })
   try {
     writeDoc(db, n, doc)
   } finally {
@@ -402,7 +402,7 @@ async function setProjectLaunch(inv, proj, provider, values) {
  * before an agent just added was there, or with its connection before a change.
  */
 function savedAgents(proj) {
-  return JSON.parse(fs.readFileSync(path.join(proj, '.hive', 'project.json'), 'utf8')).agents ?? []
+  return JSON.parse(fs.readFileSync(path.join(proj, '.combwork', 'project.json'), 'utf8')).agents ?? []
 }
 
 /** Makes a project's only agent (removing any others first): for suites that reuse a workspace. */
@@ -1448,7 +1448,7 @@ function gitEnv(vars = {}) {
  * project.json. A view saved shows here a moment after Hive has it (ui-state.json is written about 300 ms later).
  */
 function projectConfig(userData, projectPath) {
-  const cfg = JSON.parse(fs.readFileSync(path.join(projectPath, '.hive', 'project.json'), 'utf8'))
+  const cfg = JSON.parse(fs.readFileSync(path.join(projectPath, '.combwork', 'project.json'), 'utf8'))
   let views = {}
   try {
     views = JSON.parse(fs.readFileSync(path.join(userData, 'ui-state.json'), 'utf8')).projectViews ?? {}

@@ -23,7 +23,7 @@ interface Entry {
   generation: number
 }
 
-/** Each workspace's, by its .hive folder (lower case). */
+/** Each workspace's, by its .combwork folder (lower case). */
 const entries = new Map<string, Entry>()
 
 function load(hiveDir: string, e: Entry): Promise<void> {
@@ -68,7 +68,7 @@ export function apiChainChanged(hiveDir: string): void {
   void load(hiveDir, e)
 }
 
-/** The .hive folder of the workspace the current Agent API request is for (null: none it names, so the Default). */
+/** The .combwork folder of the workspace the current Agent API request is for (null: none it names, so the Default). */
 const requestDir = new AsyncLocalStorage<string | null>()
 
 /**
@@ -77,7 +77,7 @@ const requestDir = new AsyncLocalStorage<string | null>()
  */
 export const inApiWorkspace = <T>(hiveDir: string | null, fn: () => T): T => requestDir.run(hiveDir, fn)
 
-/** The .hive folder bound for the current request (inApiWorkspace); null: none. A stream keeps it for its later events (HI-2465). */
+/** The .combwork folder bound for the current request (inApiWorkspace); null: none. A stream keeps it for its later events (HI-2465). */
 export const requestApiWorkspace = (): string | null => requestDir.getStore() ?? null
 
 /** The API chain of the current request's workspace (inApiWorkspace); null: the Default. */

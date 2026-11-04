@@ -38,8 +38,8 @@ describe('loop agents with no watch, and the loop wakes that reach them (HI-1693
   const open = async (cfg: Record<string, unknown> = WORKFLOW) => {
     const path = join(base, `ws-${++n}`)
     const alpha = join(path, 'alpha')
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], ...cfg }))
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], ...cfg }))
     const w = createWorkspaceService()
     await w.open(path)
     return { w, alpha }

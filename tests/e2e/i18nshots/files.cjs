@@ -48,7 +48,7 @@ function seedFiles(ctx) {
 
 /** A session's attachments: a picture, a PDF, a text file and one of another kind. */
 function seedAttachments(ctx) {
-  const dir = path.join(ctx.project, '.hive', 'attachments', ATTACHMENT_SESSION)
+  const dir = path.join(ctx.project, '.combwork', 'attachments', ATTACHMENT_SESSION)
   if (fs.existsSync(dir)) return
   fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(path.join(dir, '2026-10-14_09-30-00_screenshot.png'), ctx.lib.samplePng())

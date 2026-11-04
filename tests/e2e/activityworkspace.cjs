@@ -23,7 +23,7 @@ const ws = path.join(lib.WORK, 'activityworkspace-ws')
 const claudeHome = path.join(lib.WORK, 'activityworkspace-claude-home')
 const alpha = path.join(ws, 'alpha')
 const beta = path.join(ws, 'beta')
-const assistantHome = path.join(ws, '.hive', 'assistant')
+const assistantHome = path.join(ws, '.combwork', 'assistant')
 const otherWs = path.join(lib.WORK, 'activityworkspace-other-ws')
 const PORT = Number(lib.port(47797))
 const identity = { name: 'Hive Activity Test', email: 'activityworkspace@example.com' }
@@ -43,10 +43,10 @@ const AGENTS = [
   for (const d of [userData, ws, `${ws}.worktrees`, claudeHome, otherWs]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(path.join(otherWs, 'gamma'))
   for (const p of [alpha, beta]) {
-    lib.gitProject(p, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
+    lib.gitProject(p, { 'a.txt': 'a\n', '.gitignore': '.combwork/\n' })
     lib.git(p, ['branch', '-M', 'main'])
-    fs.mkdirSync(path.join(p, '.hive'), { recursive: true })
-    fs.writeFileSync(path.join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: AGENTS }))
+    fs.mkdirSync(path.join(p, '.combwork'), { recursive: true })
+    fs.writeFileSync(path.join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: AGENTS }))
   }
   const slotA = path.join(`${ws}.worktrees`, 'beta', 'slot-a')
   const claude = lib.fakeClaude(userData, claudeHome, [alpha, beta, ws, assistantHome, slotA])

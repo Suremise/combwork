@@ -153,7 +153,7 @@
   "workflow.option.dependenciesDone.desc": "Eine Karte, die auf andere wartet, kann erst starten, wenn deren Arbeit drin ist.",
   "workflow.option.dependenciesDone.none": "Karten starten erst, wenn die Karten, auf die sie warten, erledigt sind",
   "workflow.option.dependenciesDone.title": "Karten starten erst, wenn die Karten, auf die sie warten, gemergt sind",
-  "workflow.option.excluded.desc": "Der ganze Projektordner außer diesen Ordnern und Dateien (.hive immer).",
+  "workflow.option.excluded.desc": "Der ganze Projektordner außer diesen Ordnern und Dateien (.combwork immer).",
   "workflow.option.excluded.title": "Was die Arbeit umfasst",
   "workflow.option.fileLocks.desc": "Was passiert, wenn ein Agent eine Datei bearbeiten will, die ein anderer Agent im selben Ordner bearbeitet.",
   "workflow.option.fileLocks.title": "Dateisperren",

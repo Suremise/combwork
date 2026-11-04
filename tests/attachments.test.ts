@@ -1,5 +1,5 @@
-// Attachments (#387): which kind a file is and how each CLI's chip labels it; old .hive/images paths leading to the moved
-// files; the move of a host's .hive/images into .hive/attachments; and what attaching a file does (copied into the
+// Attachments (#387): which kind a file is and how each CLI's chip labels it; old .combwork/images paths leading to the moved
+// files; the move of a host's .combwork/images into .combwork/attachments; and what attaching a file does (copied into the
 // session's folder, or by path), with the viewer's read of a kept attachment.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -39,11 +39,11 @@ describe('attachment kinds and labels', () => {
     for (const p of ['claude-code', 'codex', 'copilot'] as const) expect([...providerDescriptor(p).capabilities.attachments].sort()).toEqual([...(matrix[p].native ?? [])].sort())
   })
 
-  it('leads a path into an old .hive/images folder to .hive/attachments', () => {
-    expect(movedAttachmentPath('D:\\ws\\api\\.hive\\images\\abc\\x.png')).toBe('D:\\ws\\api\\.hive\\attachments\\abc\\x.png')
-    expect(movedAttachmentPath('/.hive/images/abc/x.png')).toBe('/.hive/attachments/abc/x.png')
+  it('leads a path into an old .combwork/images folder to .combwork/attachments', () => {
+    expect(movedAttachmentPath('D:\\ws\\api\\.combwork\\images\\abc\\x.png')).toBe('D:\\ws\\api\\.combwork\\attachments\\abc\\x.png')
+    expect(movedAttachmentPath('/.combwork/images/abc/x.png')).toBe('/.combwork/attachments/abc/x.png')
     expect(movedAttachmentPath('D:\\ws\\api\\images\\x.png')).toBeNull()
-    expect(inAttachmentsFolder('D:\\p\\.hive\\attachments\\s\\a.pdf') && inAttachmentsFolder('D:\\p\\.hive\\images\\s\\a.png')).toBe(true)
+    expect(inAttachmentsFolder('D:\\p\\.combwork\\attachments\\s\\a.pdf') && inAttachmentsFolder('D:\\p\\.combwork\\images\\s\\a.png')).toBe(true)
     expect(inAttachmentsFolder('D:\\p\\docs\\a.pdf')).toBe(false)
   })
 })
@@ -95,32 +95,32 @@ describe.runIf(process.platform === 'win32')('attachments on disk', () => {
     await disposeWorkspaceService(w)
   })
 
-  it('moves an old .hive/images folder to .hive/attachments, whole', async () => {
-    const old = write(join(proj, '.hive', 'images', sid, '2026-01-01_10-00-00.png'))
+  it('moves an old .combwork/images folder to .combwork/attachments, whole', async () => {
+    const old = write(join(proj, '.combwork', 'images', sid, '2026-01-01_10-00-00.png'))
     const dir = await attachmentsDir(proj)
-    expect(dir).toBe(join(proj, '.hive', 'attachments'))
+    expect(dir).toBe(join(proj, '.combwork', 'attachments'))
     expect(existsSync(old)).toBe(false)
     expect(readdirSync(join(dir, sid))).toEqual(['2026-01-01_10-00-00.png'])
-    expect(existsSync(join(proj, '.hive', 'images'))).toBe(false)
+    expect(existsSync(join(proj, '.combwork', 'images'))).toBe(false)
   })
 
   it('merges it into an attachments folder that exists, keeping both of two files of one name', async () => {
-    write(join(proj, '.hive', 'attachments', sid, 'a.png'), 'new')
-    write(join(proj, '.hive', 'images', sid, 'a.png'), 'old')
-    write(join(proj, '.hive', 'images', 'run-x', 'b.png'))
+    write(join(proj, '.combwork', 'attachments', sid, 'a.png'), 'new')
+    write(join(proj, '.combwork', 'images', sid, 'a.png'), 'old')
+    write(join(proj, '.combwork', 'images', 'run-x', 'b.png'))
     const dir = await attachmentsDir(proj)
     expect(readdirSync(join(dir, sid)).sort()).toEqual(['a (moved).png', 'a.png'])
     expect(readFileSync(join(dir, sid, 'a (moved).png'), 'utf8')).toBe('old')
     expect(readdirSync(join(dir, 'run-x'))).toEqual(['b.png'])
-    expect(existsSync(join(proj, '.hive', 'images'))).toBe(false)
+    expect(existsSync(join(proj, '.combwork', 'images'))).toBe(false)
   })
 
   it('leaves an old folder that is a link where it is', async () => {
     write(join(outside, 'mine', 'personal.png'), 'mine')
-    mkdirSync(join(proj, '.hive'), { recursive: true })
-    symlinkSync(outside, join(proj, '.hive', 'images'), 'junction')
+    mkdirSync(join(proj, '.combwork'), { recursive: true })
+    symlinkSync(outside, join(proj, '.combwork', 'images'), 'junction')
     await attachmentsDir(proj)
-    expect(existsSync(join(proj, '.hive', 'attachments'))).toBe(false)
+    expect(existsSync(join(proj, '.combwork', 'attachments'))).toBe(false)
     expect(readFileSync(join(outside, 'mine', 'personal.png'), 'utf8')).toBe('mine')
   })
 
@@ -134,24 +134,24 @@ describe.runIf(process.platform === 'win32')('attachments on disk', () => {
   }
 
   it('never moves an old file through a linked session folder, out of the host', async () => {
-    const secret = write(join(proj, '.hive', 'images', sid, 'secret.png'), 'mine')
-    write(join(proj, '.hive', 'attachments', 'other', 'x.png'))
-    const away = linkAway(join(proj, '.hive', 'attachments', sid))
+    const secret = write(join(proj, '.combwork', 'images', sid, 'secret.png'), 'mine')
+    write(join(proj, '.combwork', 'attachments', 'other', 'x.png'))
+    const away = linkAway(join(proj, '.combwork', 'attachments', sid))
     await run(() => files.listAttachments(proj))
     expect(readdirSync(away)).toEqual([])
     expect(readFileSync(secret, 'utf8')).toBe('mine')
   })
 
   it("an old link to a file the move renamed opens that file, not the one that kept its name, after a restart too", async () => {
-    write(join(proj, '.hive', 'attachments', sid, 'a.png'), 'new')
-    write(join(proj, '.hive', 'images', sid, 'a.png'), 'old')
+    write(join(proj, '.combwork', 'attachments', sid, 'a.png'), 'new')
+    write(join(proj, '.combwork', 'images', sid, 'a.png'), 'old')
     await attachmentsDir(proj)
     for (const restarted of [false, true]) {
       if (restarted) forgetMoves()
-      const [oldLink, newLink] = await run(() => files.linkFiles(proj, [`.hive/images/${sid}/A.png`, `.hive/attachments/${sid}/a.png`]))
+      const [oldLink, newLink] = await run(() => files.linkFiles(proj, [`.combwork/images/${sid}/A.png`, `.combwork/attachments/${sid}/a.png`]))
       expect(readFileSync(join(proj, ...oldLink!.split('/')), 'utf8')).toBe('old')
       expect(readFileSync(join(proj, ...newLink!.split('/')), 'utf8')).toBe('new')
-      expect(readFileSync((await movedAttachment(join(proj, '.hive', 'images', sid, 'a.png')))!, 'utf8')).toBe('old')
+      expect(readFileSync((await movedAttachment(join(proj, '.combwork', 'images', sid, 'a.png')))!, 'utf8')).toBe('old')
     }
   })
 
@@ -159,30 +159,30 @@ describe.runIf(process.platform === 'win32')('attachments on disk', () => {
   const bothResolve = async (): Promise<void> => {
     for (const restarted of [false, true]) {
       if (restarted) forgetMoves()
-      const [oldLink, newLink] = await run(() => files.linkFiles(proj, [`.hive/images/${sid}/a.png`, `.hive/attachments/${sid}/a.png`]))
+      const [oldLink, newLink] = await run(() => files.linkFiles(proj, [`.combwork/images/${sid}/a.png`, `.combwork/attachments/${sid}/a.png`]))
       expect(readFileSync(join(proj, ...oldLink!.split('/')), 'utf8')).toBe('old')
       expect(readFileSync(join(proj, ...newLink!.split('/')), 'utf8')).toBe('new')
     }
   }
 
   it("a collision whose new name can't be recorded stays at its old path, where old links still find it", async () => {
-    write(join(proj, '.hive', 'attachments', sid, 'a.png'), 'new')
-    const old = write(join(proj, '.hive', 'images', sid, 'a.png'), 'old')
-    write(join(proj, '.hive', 'images', sid, 'b.png'), 'b')
+    write(join(proj, '.combwork', 'attachments', sid, 'a.png'), 'new')
+    const old = write(join(proj, '.combwork', 'images', sid, 'a.png'), 'old')
+    write(join(proj, '.combwork', 'images', sid, 'b.png'), 'b')
     // The record can't be written: something that isn't a file has its name.
-    mkdirSync(join(proj, '.hive', 'attachments', '.moved.json'), { recursive: true })
+    mkdirSync(join(proj, '.combwork', 'attachments', '.moved.json'), { recursive: true })
     await attachmentsDir(proj)
     expect(readFileSync(old, 'utf8')).toBe('old')
-    expect(existsSync(join(proj, '.hive', 'attachments', sid, 'a (moved).png'))).toBe(false)
+    expect(existsSync(join(proj, '.combwork', 'attachments', sid, 'a (moved).png'))).toBe(false)
     // What didn't collide moved all the same.
-    expect(readFileSync(join(proj, '.hive', 'attachments', sid, 'b.png'), 'utf8')).toBe('b')
+    expect(readFileSync(join(proj, '.combwork', 'attachments', sid, 'b.png'), 'utf8')).toBe('b')
     await bothResolve()
   })
 
   it('a damaged record of renamed files is kept, not replaced by one that lost its entries', async () => {
-    write(join(proj, '.hive', 'attachments', sid, 'a.png'), 'new')
-    const old = write(join(proj, '.hive', 'images', sid, 'a.png'), 'old')
-    const record = write(join(proj, '.hive', 'attachments', '.moved.json'), '{ damaged')
+    write(join(proj, '.combwork', 'attachments', sid, 'a.png'), 'new')
+    const old = write(join(proj, '.combwork', 'images', sid, 'a.png'), 'old')
+    const record = write(join(proj, '.combwork', 'attachments', '.moved.json'), '{ damaged')
     await attachmentsDir(proj)
     expect(readFileSync(record, 'utf8')).toBe('{ damaged')
     expect(readFileSync(old, 'utf8')).toBe('old')
@@ -190,40 +190,40 @@ describe.runIf(process.platform === 'win32')('attachments on disk', () => {
   })
 
   it('stopped between recording a new name and moving the file, old links still open the original', async () => {
-    write(join(proj, '.hive', 'attachments', sid, 'a.png'), 'new')
-    write(join(proj, '.hive', 'images', sid, 'a.png'), 'old')
+    write(join(proj, '.combwork', 'attachments', sid, 'a.png'), 'new')
+    write(join(proj, '.combwork', 'images', sid, 'a.png'), 'old')
     // As a run that recorded the rename, then stopped before the move, leaves it; with its folder move not yet done.
-    write(join(proj, '.hive', 'attachments', '.moved.json'), JSON.stringify({ [`${sid}/a.png`]: `${sid}/a (moved).png` }))
+    write(join(proj, '.combwork', 'attachments', '.moved.json'), JSON.stringify({ [`${sid}/a.png`]: `${sid}/a (moved).png` }))
     // Before any move this run: the old path is still there, and old links open it (the record isn't used).
     await bothResolve()
     // The next run's move finishes it, to the recorded name.
     forgetMoves()
     await attachmentsDir(proj)
-    expect(existsSync(join(proj, '.hive', 'images', sid, 'a.png'))).toBe(false)
-    expect(readFileSync(join(proj, '.hive', 'attachments', sid, 'a (moved).png'), 'utf8')).toBe('old')
+    expect(existsSync(join(proj, '.combwork', 'images', sid, 'a.png'))).toBe(false)
+    expect(readFileSync(join(proj, '.combwork', 'attachments', sid, 'a (moved).png'), 'utf8')).toBe('old')
     await bothResolve()
   })
 
-  for (const where of ['session folder', 'attachments folder', '.hive folder'] as const) {
+  for (const where of ['session folder', 'attachments folder', '.combwork folder'] as const) {
     it(`never writes an attachment through a linked ${where}`, async () => {
-      if (where === '.hive folder') rmSync(join(proj, '.hive'), { recursive: true, force: true })
-      const at = where === 'session folder' ? join(proj, '.hive', 'attachments', sid) : where === 'attachments folder' ? join(proj, '.hive', 'attachments') : join(proj, '.hive')
+      if (where === '.combwork folder') rmSync(join(proj, '.combwork'), { recursive: true, force: true })
+      const at = where === 'session folder' ? join(proj, '.combwork', 'attachments', sid) : where === 'attachments folder' ? join(proj, '.combwork', 'attachments') : join(proj, '.combwork')
       const away = linkAway(at)
       running()
       await expect(run(() => sessions.attach(proj, [write(join(outside, `ext-${n}.log`))], 'a1'))).rejects.toThrow(/link or not a folder/)
-      // HI-2085: through a linked .hive folder, Hive's own setup of the new project (its sessions and archive folders, its
+      // HI-2085: through a linked .combwork folder, Hive's own setup of the new project (its sessions and archive folders, its
       // project.json) can land there too: the refresh the folder's making scheduled may run after the link, at any point
       // in the case. Only that is let be; an attachment, or anything else, fails it.
       const setup = /^(sessions|archive)$|^project\.json(\.bak|\.[\w-]+\.tmp)?$/
       const left = readdirSync(away, { recursive: true }).map(String)
-      expect(where === '.hive folder' ? left.filter((p) => !setup.test(p)) : left).toEqual([])
+      expect(where === '.combwork folder' ? left.filter((p) => !setup.test(p)) : left).toEqual([])
     })
   }
 
   it("nor through the Assistant's linked session folder", async () => {
-    const home = join(wsPath, '.hive', 'assistant')
+    const home = join(wsPath, '.combwork', 'assistant')
     const conv = '00000000-0000-4000-8000-0000000003a8'
-    const away = linkAway(join(home, '.hive', 'attachments', conv))
+    const away = linkAway(join(home, '.combwork', 'attachments', conv))
     s.live.set(`${home.toLowerCase()}#assistant`, { state: { provider: 'claude-code', runId: 'r2', projectPath: home, agentId: 'assistant', cwd: wsPath, sessionId: conv, status: 'ready' } })
     await expect(run(() => sessions.attach(home, [write(join(outside, 'for-assistant.log'))], 'assistant'))).rejects.toThrow(/link or not a folder/)
     expect(readdirSync(away)).toEqual([])
@@ -232,17 +232,17 @@ describe.runIf(process.platform === 'win32')('attachments on disk', () => {
   it("a launch's early attachments move to its session's only between the host's own folders", async () => {
     const early = sessions as unknown as { moveEarlyAttachments: (p: string, launch: string, id: string) => Promise<void> }
     // A linked launch folder: what it leads to stays there.
-    const away = linkAway(join(proj, '.hive', 'attachments', 'run-r1'))
+    const away = linkAway(join(proj, '.combwork', 'attachments', 'run-r1'))
     write(join(away, 'early.png'), 'mine')
     await run(() => early.moveEarlyAttachments(proj, 'run-r1', sid))
     expect(readdirSync(away)).toEqual(['early.png'])
-    expect(existsSync(join(proj, '.hive', 'attachments', sid))).toBe(false)
+    expect(existsSync(join(proj, '.combwork', 'attachments', sid))).toBe(false)
     // A linked session folder: the launch's files stay in the host.
-    write(join(proj, '.hive', 'attachments', 'run-r2', 'early.png'), 'kept')
-    const away2 = linkAway(join(proj, '.hive', 'attachments', 'b0000000-0000-4000-8000-0000000003a9'))
+    write(join(proj, '.combwork', 'attachments', 'run-r2', 'early.png'), 'kept')
+    const away2 = linkAway(join(proj, '.combwork', 'attachments', 'b0000000-0000-4000-8000-0000000003a9'))
     await expect(run(() => early.moveEarlyAttachments(proj, 'run-r2', 'b0000000-0000-4000-8000-0000000003a9'))).rejects.toThrow(/link or not a folder/)
     expect(readdirSync(away2)).toEqual([])
-    expect(readFileSync(join(proj, '.hive', 'attachments', 'run-r2', 'early.png'), 'utf8')).toBe('kept')
+    expect(readFileSync(join(proj, '.combwork', 'attachments', 'run-r2', 'early.png'), 'utf8')).toBe('kept')
   })
 
   it('a file from outside the session folder is copied; one inside goes by its path, and so does a folder', async () => {
@@ -257,7 +257,7 @@ describe.runIf(process.platform === 'win32')('attachments on disk', () => {
     ])
     const done = await run(() => sessions.attach(proj, [pdf, own], 'a1'))
     expect(done[0].copied).toBe(true)
-    expect(done[0].path).toMatch(/\\\.hive\\attachments\\0{8}-0{4}-4000-8000-0000000003a7\\\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d_Q3 report\.pdf$/)
+    expect(done[0].path).toMatch(/\\\.combwork\\attachments\\0{8}-0{4}-4000-8000-0000000003a7\\\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d_Q3 report\.pdf$/)
     expect(readFileSync(done[0].path, 'utf8')).toBe('%PDF')
     expect(done[1]).toMatchObject({ path: own, copied: false })
     // Already kept: attached again as it is, not copied twice.
@@ -269,13 +269,13 @@ describe.runIf(process.platform === 'win32')('attachments on disk', () => {
     const shot = write(join(proj, 'docs', 'shot.png'))
     const [a] = await run(() => sessions.attach(proj, [shot], 'a1'))
     expect(a.copied).toBe(true)
-    expect(a.path.startsWith(join(proj, '.hive', 'attachments', sid))).toBe(true)
+    expect(a.path.startsWith(join(proj, '.combwork', 'attachments', sid))).toBe(true)
   })
 
   it('before the provider names the session, attachments wait in a folder named after the launch', async () => {
     running('')
     const [a] = await run(() => sessions.attach(proj, [write(join(outside, 'early.log'))], 'a1'))
-    expect(a.path.startsWith(join(proj, '.hive', 'attachments', 'run-r1'))).toBe(true)
+    expect(a.path.startsWith(join(proj, '.combwork', 'attachments', 'run-r1'))).toBe(true)
   })
 
   it('refuses when no session is running', async () => {
@@ -283,7 +283,7 @@ describe.runIf(process.platform === 'win32')('attachments on disk', () => {
   })
 
   it('lists every kind, reads a text one for the viewer, and Storage counts them', async () => {
-    const dir = join(proj, '.hive', 'attachments', sid)
+    const dir = join(proj, '.combwork', 'attachments', sid)
     write(join(dir, '2026-01-01_10-00-00_build.log'), 'line one\nline two')
     write(join(dir, '2026-01-01_10-00-01_dump.bin'), 'a\u0000b')
     write(join(dir, '2026-01-01_10-00-02_report.pdf'), '%PDF')
@@ -299,8 +299,8 @@ describe.runIf(process.platform === 'win32')('attachments on disk', () => {
     expect((await run(() => projectStorage(proj, true))).attachments).toBeGreaterThan(0)
   })
 
-  it("a file link to an old .hive/images path opens the moved file", async () => {
-    write(join(proj, '.hive', 'attachments', sid, 'a.png'))
-    expect(await run(() => files.linkFiles(proj, [`.hive/images/${sid}/a.png`, '.hive/images/none.png']))).toEqual([`.hive/attachments/${sid}/a.png`, null])
+  it("a file link to an old .combwork/images path opens the moved file", async () => {
+    write(join(proj, '.combwork', 'attachments', sid, 'a.png'))
+    expect(await run(() => files.linkFiles(proj, [`.combwork/images/${sid}/a.png`, '.combwork/images/none.png']))).toEqual([`.combwork/attachments/${sid}/a.png`, null])
   })
 })

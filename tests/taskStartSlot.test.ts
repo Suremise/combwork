@@ -41,9 +41,9 @@ const launched: { agentId: string; prompt?: string }[] = []
 describe("a Start of a card started before in a slot, its builder stopped (HI-1953)", () => {
   const original = s.start
   beforeAll(async () => {
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     // The Assistant that starts cards here is running: a task it gives is refused once its session has ended (#645, #649).

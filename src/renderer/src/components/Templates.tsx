@@ -26,7 +26,7 @@ import { TemplateWorkflowSection } from './TemplateWorkflowView'
  * agents in the Agent Settings dialog), and load, rename, duplicate, delete, export and import them.
  */
 
-export const TEMPLATES_TIP = msg({ id: 'assistant.templates.tip', defaultMessage: "A template is a project's agents (their roles in the workflow and settings) and layout, saved under a name. Combwork's own are read-only: duplicate one to change it. The workspace's are for every project, a project's are its own (kept in its .hive, out of git). Export one to share it as a file.", description: 'Tooltip on Templates (the Templates view and a project\'s Templates tab). Keep .hive as it is. Glossary: workflow role.' })
+export const TEMPLATES_TIP = msg({ id: 'assistant.templates.tip', defaultMessage: "A template is a project's agents (their roles in the workflow and settings) and layout, saved under a name. Combwork's own are read-only: duplicate one to change it. The workspace's are for every project, a project's are its own (kept in its .combwork, out of git). Export one to share it as a file.", description: 'Tooltip on Templates (the Templates view and a project\'s Templates tab). Keep .combwork as it is. Glossary: workflow role.' })
 
 const M = {
   newAgentName: msg({ id: 'assistant.templates.newAgentName', defaultMessage: 'Agent', description: 'The name suggested for a new agent of a template (a number follows when it is taken: Agent 2).' }),
@@ -191,7 +191,7 @@ const putEdit = (key: string, e: TemplateEdit | null): void => {
   })
   mirrorEdit(key, e)
 }
-const templateFile = (t: TemplateRef): string => `${t.scope === 'project' ? t.project : (get().workspace?.path ?? '')}\\.hive\\templates\\${t.file}`
+const templateFile = (t: TemplateRef): string => `${t.scope === 'project' ? t.project : (get().workspace?.path ?? '')}\\.combwork\\templates\\${t.file}`
 const draftKey = (key: string): string => `template:${key}`
 
 /**

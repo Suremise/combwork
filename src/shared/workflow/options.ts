@@ -100,7 +100,7 @@ export interface WorkflowOptions {
    * ruleset from before P7 keeps its id.
    */
   reviewerMode?: ReviewerMode
-  /** N4: folders and files left out of None's deliverables (`.hive` always is). */
+  /** N4: folders and files left out of None's deliverables (`.combwork` always is). */
   excluded: string[]
   /**
    * The command of each named check (G3, G9, N3): a run counts as a check only as that command (§16.13). G20's picker and

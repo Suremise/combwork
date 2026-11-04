@@ -25,7 +25,7 @@ const fakeWs = (path: string, projects: string[], hidden: string[] = []): FakeWs
   ({
     path,
     worktreesRoot: `${path}.worktrees`,
-    assistantHome: join(path, '.hive', 'assistant'),
+    assistantHome: join(path, '.combwork', 'assistant'),
     listProjectPaths: async (o?: { hidden?: boolean }) => (o?.hidden ? hidden : projects),
     knownRoots: () => []
   }) as unknown as FakeWs
@@ -77,7 +77,7 @@ describe("each launch's folder", () => {
     expect(agentTempFolder('D:\\t', 'D:\\ws1\\alpha', 'a-2', false)).not.toBe(a)
   })
   it("keeps the Assistant apart from any project, a project named assistant too", () => {
-    const home = 'D:\\ws1\\.hive\\assistant'
+    const home = 'D:\\ws1\\.combwork\\assistant'
     const asst = agentTempFolder('D:\\t', home, 'assistant', true)
     expect(asst).toMatch(/\\_assistant-[0-9a-f]{8}\\assistant$/)
     expect(agentTempFolder('D:\\t', 'D:\\ws1\\assistant', 'assistant', false)).not.toBe(asst)
@@ -93,7 +93,7 @@ describe('prepareAgentTemp', () => {
   const ws = join(base, 'ws')
   const proj = join(ws, 'alpha')
   mkdirSync(proj, { recursive: true })
-  const launch = (setting: string | null, more: Partial<Parameters<typeof prepareAgentTemp>[0]> = {}) => prepareAgentTemp({ setting, host: proj, agentId: 'a-1', assistant: false, protect: [proj, `${ws}.worktrees`, join(ws, '.hive')], ...more })
+  const launch = (setting: string | null, more: Partial<Parameters<typeof prepareAgentTemp>[0]> = {}) => prepareAgentTemp({ setting, host: proj, agentId: 'a-1', assistant: false, protect: [proj, `${ws}.worktrees`, join(ws, '.combwork')], ...more })
 
   it('empty: nothing made, null', async () => {
     expect(await launch(null)).toBeNull()
@@ -113,8 +113,8 @@ describe('prepareAgentTemp', () => {
     expect(dir?.startsWith(join(base, 'v'))).toBe(true)
     await expect(launch('%AGENT_ROOT_MISSING%\\v', { env: {} })).rejects.toThrow(/variable that isn't set/)
   })
-  it('refuses a folder inside a project, a slot or .hive, making nothing', async () => {
-    for (const root of [join(proj, 'tmp'), join(`${ws}.worktrees`, 'slot-a', 'tmp'), join(ws, '.hive', 'tmp')]) {
+  it('refuses a folder inside a project, a slot or .combwork, making nothing', async () => {
+    for (const root of [join(proj, 'tmp'), join(`${ws}.worktrees`, 'slot-a', 'tmp'), join(ws, '.combwork', 'tmp')]) {
       await expect(launch(root), root).rejects.toThrow(/is inside/)
       expect(() => statSync(root)).toThrow()
     }
@@ -147,8 +147,8 @@ describe('protectedFolders', () => {
     const proj = join(ws, 'alpha')
     const external = join(root, 'external-checkout')
     const unused = join(root, 'unused-worktree')
-    for (const d of [join(proj, '.hive'), external, unused]) mkdirSync(d, { recursive: true })
-    writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-legacy', name: 'Legacy', provider: 'claude-code', worktree: { path: external, branch: 'legacy', base: 'main' } }] }))
+    for (const d of [join(proj, '.combwork'), external, unused]) mkdirSync(d, { recursive: true })
+    writeFileSync(join(proj, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-legacy', name: 'Legacy', provider: 'claude-code', worktree: { path: external, branch: 'legacy', base: 'main' } }] }))
     const w = createWorkspaceService()
     try {
       await w.open(ws)
@@ -167,14 +167,14 @@ describe('protectedFolders', () => {
     }
   })
 
-  it("lists every open workspace's folder, projects, hidden ones, slots, Assistant home and .hive", async () => {
+  it("lists every open workspace's folder, projects, hidden ones, slots, Assistant home and .combwork", async () => {
     const list = await protectedFolders([fakeWs('D:\\w1', ['D:\\w1\\a'], ['D:\\w1\\h']), fakeWs('E:\\w2', ['E:\\w2\\a'])])
-    expect(list).toEqual(expect.arrayContaining(['D:\\w1', 'E:\\w2', 'D:\\w1\\a', 'D:\\w1\\h', 'D:\\w1.worktrees', join('D:\\w1', '.hive', 'assistant'), join('D:\\w1', '.hive'), 'E:\\w2\\a', 'E:\\w2.worktrees']))
+    expect(list).toEqual(expect.arrayContaining(['D:\\w1', 'E:\\w2', 'D:\\w1\\a', 'D:\\w1\\h', 'D:\\w1.worktrees', join('D:\\w1', '.combwork', 'assistant'), join('D:\\w1', '.combwork'), 'E:\\w2\\a', 'E:\\w2.worktrees']))
   })
   it('skips a workspace with no folder (closing) and one whose list fails', async () => {
     const failing = { ...fakeWs('F:\\w3', []), listProjectPaths: async () => Promise.reject(new Error('closed')) } as unknown as FakeWs
     const list = await protectedFolders([{ path: null } as unknown as FakeWs, failing])
-    expect(list).toEqual(['F:\\w3', 'F:\\w3.worktrees', join('F:\\w3', '.hive', 'assistant'), join('F:\\w3', '.hive')])
+    expect(list).toEqual(['F:\\w3', 'F:\\w3.worktrees', join('F:\\w3', '.combwork', 'assistant'), join('F:\\w3', '.combwork')])
   })
 })
 

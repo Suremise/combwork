@@ -176,10 +176,10 @@ describe('agent watches (main/watches.ts)', async () => {
     const path = join(base, `ws-${++n}`)
     const alpha = join(path, 'alpha')
     const beta = join(path, 'beta')
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
-    mkdirSync(join(beta, '.hive'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }, { id: 'a3', name: 'Second' }] }))
-    writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Other' }] }))
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
+    mkdirSync(join(beta, '.combwork'), { recursive: true })
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }, { id: 'a3', name: 'Second' }] }))
+    writeFileSync(join(beta, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Other' }] }))
     const w = createWorkspaceService()
     await w.open(path)
     return { w, path, alpha, beta }
@@ -273,7 +273,7 @@ describe('agent watches (main/watches.ts)', async () => {
     const st = fake(alpha)
     move(st, alpha, 'a2', nowOf())
     await watches.registerAgentWatch(w, alpha, 'a1', { agents: [reviewer(alpha)], ignoreBackground: false })
-    const id = JSON.parse(readFileSync(join(alpha, '.hive', 'project.json'), 'utf8')).id
+    const id = JSON.parse(readFileSync(join(alpha, '.combwork', 'project.json'), 'utf8')).id
     expect(savedOf(path)[0].agents.agents[0].projectId).toBe(id)
     const gamma = join(path, 'gamma')
     renameSync(alpha, gamma)
@@ -341,7 +341,7 @@ describe('agent watches (main/watches.ts)', async () => {
     await watches.registerAgentWatch(w, alpha, 'a1', { agents: [{ projectPath: beta, agentId: 'b1', name: 'Other', project: 'beta' }], ignoreBackground: false })
     const before = savedOf(path)
     // Replaced: another project at beta's folder, with b1 too.
-    writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ version: 2, id: 'p-ffffffffffff', agents: [{ id: 'b1', name: 'Other' }] }))
+    writeFileSync(join(beta, '.combwork', 'project.json'), JSON.stringify({ version: 2, id: 'p-ffffffffffff', agents: [{ id: 'b1', name: 'Other' }] }))
     Object.assign(sessions, { agentNow: (p: string, id: string) => (p.toLowerCase() === beta.toLowerCase() && id === 'b1' ? { status: 'finished', runId: 'r9', prompts: 3, pending: false, statusMessage: null, backgroundTasks: 0, reply: 'NEW PROJECT REPLY' } : agentNow(p, id)) })
     watches.noteAgentStatus({ projectPath: beta, agentId: 'b1', status: 'finished', runId: 'r9' } as never)
     // Read back first (Hive reopened), then checked.

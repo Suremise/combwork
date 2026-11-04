@@ -101,7 +101,7 @@ function prepare() {
   commitIn(alpha, {}, 'scripts')
   // beta (the pool) and gamma (everyone in the project folder): plain projects on main, the identity their own.
   for (const p of [beta, gamma, delta]) {
-    lib.gitProject(p, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
+    lib.gitProject(p, { 'a.txt': 'a\n', '.gitignore': '.combwork/\n' })
     lib.git(p, ['branch', '-M', 'main'])
     lib.git(p, ['config', 'user.name', fx.identity.name])
     lib.git(p, ['config', 'user.email', fx.identity.email])

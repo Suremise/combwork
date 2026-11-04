@@ -32,13 +32,13 @@ const check = (name, ok, extra = '') => {
 }
 const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
 const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
-const cfgOf = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8'))
+const cfgOf = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'project.json'), 'utf8'))
 
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
-  lib.gitProject(alpha, { '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
-  lib.gitProject(beta, { '.gitignore': '.hive/\n' })
+  lib.gitProject(beta, { '.gitignore': '.combwork/\n' })
   fs.mkdirSync(plain, { recursive: true })
   const env = lib.fakeClaude(userData, home, [alpha, beta, plain, ws])
   const cfgFile = path.join(userData, 'config.json')

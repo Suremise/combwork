@@ -66,13 +66,13 @@ let w: ReturnType<typeof createWorkspaceService>
 const run = <T>(fn: () => T | Promise<T>): Promise<T> => inWorkspace(w, async () => fn())
 
 beforeAll(async () => {
-  mkdirSync(join(proj, '.hive'), { recursive: true })
-  writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+  mkdirSync(join(proj, '.combwork'), { recursive: true })
+  writeFileSync(join(proj, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   w = createWorkspaceService()
   await w.open(wsPath)
   // A template with an agent for Claude Code, kept in the workspace.
-  mkdirSync(join(wsPath, '.hive', 'templates'), { recursive: true })
-  writeFileSync(join(wsPath, '.hive', 'templates', 'pair.json'), JSON.stringify({ version: 2, name: 'Pair', savedAt: '', layout: 'auto', agents: [{ name: 'Builder', role: 'builder', provider: 'claude-code' }] }))
+  mkdirSync(join(wsPath, '.combwork', 'templates'), { recursive: true })
+  writeFileSync(join(wsPath, '.combwork', 'templates', 'pair.json'), JSON.stringify({ version: 2, name: 'Pair', savedAt: '', layout: 'auto', agents: [{ name: 'Builder', role: 'builder', provider: 'claude-code' }] }))
   providerService.info = ((id: string) => ({ provider: id, found: true })) as never
 })
 afterAll(() => disposeWorkspaceService(w))
@@ -113,7 +113,7 @@ describe('refusals: English for agents and the log as before, the window in its 
       [await caught(() => skills.createSkill('no spaces allowed', '')), 'Skill names may contain letters, numbers, "-" and "_" (max 64 characters).', 400, 'Skill-Namen dürfen Buchstaben, Ziffern, „-“ und „_“ enthalten (höchstens 64 Zeichen).'],
       [await caught(() => mcp.createMcp('hive')), 'Server names may contain letters, numbers, "-" and "_" (max 64 characters). "hive" is reserved.', 400, 'Servernamen dürfen Buchstaben, Ziffern, „-“ und „_“ enthalten (höchstens 64 Zeichen). „hive“ ist vergeben.'],
       [await caught(() => mcp.readMcp('../x')), 'Invalid server name', 500, 'Ungültiger Servername'],
-      [await caught(() => mcp.checkMcpDef([])), 'The definition must be a JSON object, as in .hive/mcp/<name>.json.', 500, 'Die Definition muss ein JSON-Objekt sein, wie in .hive/mcp/<name>.json.'],
+      [await caught(() => mcp.checkMcpDef([])), 'The definition must be a JSON object, as in .combwork/mcp/<name>.json.', 500, 'Die Definition muss ein JSON-Objekt sein, wie in .combwork/mcp/<name>.json.'],
       [await caught(() => mcp.checkMcpDef({ command: 'x', args: [1] })), '"args" must be a list of strings.', 500, null],
       [await caught(() => templates.readImport(join(base, 'no-such.json'))), "That file isn't there.", 404, 'Diese Datei ist nicht da.'],
       [await caught(() => templates.templatePlan(proj, 'workspace', 'pair.json', undefined, [''])), 'Enter a name for each of its agents.', 400, 'Gib jedem ihrer Agenten einen Namen.']
@@ -160,9 +160,9 @@ describe("a skill's header problem: English for agents, the window's text beside
 describe("MCP servers: a definition's error English for the Agent API, the window's text beside it", () => {
   it("gives errorText for Hive's words only, and what a server runs in the window's language", async () => {
     setLanguage('de', GERMAN)
-    mkdirSync(join(wsPath, '.hive', 'mcp'), { recursive: true })
-    writeFileSync(join(wsPath, '.hive', 'mcp', 'list.json'), '[1, 2]')
-    writeFileSync(join(wsPath, '.hive', 'mcp', 'broken.json'), '{ not json')
+    mkdirSync(join(wsPath, '.combwork', 'mcp'), { recursive: true })
+    writeFileSync(join(wsPath, '.combwork', 'mcp', 'list.json'), '[1, 2]')
+    writeFileSync(join(wsPath, '.combwork', 'mcp', 'broken.json'), '{ not json')
     const listed = await run(() => mcp.listMcp())
     const list = listed.find((m) => m.name === 'list')!
     expect(list.error).toBe('Definition must be a JSON object')
@@ -198,7 +198,7 @@ describe("a template's load plan is the window's", () => {
 
 describe("a template file's problem: English for the log, the window's text beside it (#870)", () => {
   it("lists a damaged template with its problem in English and as text, and refuses it in English with the window's text", async () => {
-    const file = join(wsPath, '.hive', 'templates', 'empty.json')
+    const file = join(wsPath, '.combwork', 'templates', 'empty.json')
     writeFileSync(file, JSON.stringify({ version: 2, name: 'Empty', savedAt: '', layout: 'auto', agents: [] }))
     try {
       setLanguage('de', GERMAN)
@@ -223,7 +223,7 @@ describe("a template file's problem: English for the log, the window's text besi
 
 describe("lists in the language's way, never joined with English commas", () => {
   it("lists the connections' keys it doesn't know in the window's language, and English in the refusal's message (HI-2109)", async () => {
-    writeFileSync(join(wsPath, '.hive', 'templates', 'crew.json'), JSON.stringify({ version: 2, name: 'Crew', savedAt: '', layout: 'auto', agents: ['Builder', 'Reviewer', 'Tester'].map((name) => ({ name, role: 'builder', provider: 'claude-code' })) }))
+    writeFileSync(join(wsPath, '.combwork', 'templates', 'crew.json'), JSON.stringify({ version: 2, name: 'Crew', savedAt: '', layout: 'auto', agents: ['Builder', 'Reviewer', 'Tester'].map((name) => ({ name, role: 'builder', provider: 'claude-code' })) }))
     const plan = await run(() => templates.templatePlan(proj, 'workspace', 'crew.json'))
     const load = () => caught(() => templates.loadTemplate(proj, 'workspace', 'crew.json', plan.remove.map((a) => a.id), undefined, undefined, { roles: { builders: 'x', testers: 'x' }, agents: { 9: 'x' } } as never))
     setLanguage('de', GERMAN)

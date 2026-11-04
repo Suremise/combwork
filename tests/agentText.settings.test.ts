@@ -91,9 +91,9 @@ describe('the canary dialect over the settings tools', async () => {
   const { createWorkspaceService, inWorkspace, workspace } = await import('../src/main/workspace')
   const { settingDetail, settingRows } = await import('../src/main/settingsTools')
   const path = join(base, 'ws')
-  mkdirSync(join(path, 'alpha', '.hive'), { recursive: true })
-  mkdirSync(join(path, '.hive'), { recursive: true })
-  writeFileSync(join(path, 'alpha', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [], workflow: { platform: 'git', preset: null, options: {} } }))
+  mkdirSync(join(path, 'alpha', '.combwork'), { recursive: true })
+  mkdirSync(join(path, '.combwork'), { recursive: true })
+  writeFileSync(join(path, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [], workflow: { platform: 'git', preset: null, options: {} } }))
   const w = createWorkspaceService()
   await w.open(path)
 

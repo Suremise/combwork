@@ -28,8 +28,8 @@ describe('saving pane placements', () => {
   beforeEach(() => {
     wsPath = tempDir('hive-placement-ws-')
     alpha = join(wsPath, 'alpha')
-    file = join(alpha, '.hive', 'project.json')
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
+    file = join(alpha, '.combwork', 'project.json')
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
   })
   afterEach(() => disposeWorkspaceService(w))
   const saved = () => JSON.parse(readFileSync(file, 'utf8'))

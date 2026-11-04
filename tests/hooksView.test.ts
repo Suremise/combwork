@@ -136,9 +136,9 @@ const edit = (l: any, file: string, call: string) => hook(l, { hook_event_name: 
 
 describe("what Hive observed, and the lock blocks standing now", () => {
   beforeAll(async () => {
-    for (const d of [join(wsPath, '.hive'), join(p, '.hive'), join(q, '.hive')]) mkdirSync(d, { recursive: true })
+    for (const d of [join(wsPath, '.combwork'), join(p, '.combwork'), join(q, '.combwork')]) mkdirSync(d, { recursive: true })
     for (const f of ['a.txt', 'b.txt']) writeFileSync(join(p, f), 'hi\n')
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, fileLocks: 'block', agents: [] }))
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, fileLocks: 'block', agents: [] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })

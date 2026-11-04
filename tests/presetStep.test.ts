@@ -39,21 +39,21 @@ let n = 0
 async function workspace(workflow?: unknown, agents: { id: string; name: string }[] = []): Promise<{ w: WS; repo: string }> {
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
-  mkdirSync(join(ws, '.hive'), { recursive: true })
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
+  mkdirSync(join(ws, '.combwork'), { recursive: true })
   git(repo, 'init', '-q', '-b', 'main')
   for (const [k, v] of [['user.name', 'Pat Builder'], ['user.email', 'pat@example.com'], ['core.autocrlf', 'false']]) git(repo, 'config', k, v)
-  writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+  writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
   git(repo, 'add', '-A')
   git(repo, 'commit', '-qm', 'initial')
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents, ...(workflow ? { workflow } : {}) }))
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents, ...(workflow ? { workflow } : {}) }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
   return { w, repo }
 }
 
-const onDisk = (repo: string): Record<string, unknown> | undefined => JSON.parse(readFileSync(join(repo, '.hive', 'project.json'), 'utf8')).workflow
+const onDisk = (repo: string): Record<string, unknown> | undefined => JSON.parse(readFileSync(join(repo, '.combwork', 'project.json'), 'utf8')).workflow
 
 describe('the suggestion, from the agents (#1423)', () => {
   it('Solo for one or none, Pair for a builder and a reviewer, Team for more', () => {
@@ -126,11 +126,11 @@ describe('the answer (#1423)', () => {
   it("a project from before 1.0 never asks, also before its upgrade has run; an empty 0.9 board's projects get their options (HR3's round 1, finding 1)", async () => {
     const ws = join(base, `ws-${++n}`)
     const repo = join(ws, 'p')
-    mkdirSync(join(repo, '.hive'), { recursive: true })
-    mkdirSync(join(ws, '.hive'), { recursive: true })
+    mkdirSync(join(repo, '.combwork'), { recursive: true })
+    mkdirSync(join(ws, '.combwork'), { recursive: true })
     git(repo, 'init', '-q', '-b', 'main')
     // As 0.9 left it: no platform recorded, no workflow, no card on the board.
-    writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Builder' }, { id: 'r1', name: 'Reviewer' }] }))
+    writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Builder' }, { id: 'r1', name: 'Reviewer' }] }))
     const w0 = createWorkspaceService()
     await w0.open(ws)
     // Its board made (an empty one), then as 0.9 left it.

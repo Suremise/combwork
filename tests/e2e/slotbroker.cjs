@@ -263,7 +263,7 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
       kept.push(...keeper)
       check(`${part}: …and Hive is ended from outside, the broker and its keeper left running`, await endFromOutside(h.app, [pid, helperPid]))
       h = null
-      const read = await readGoneHiveDb(path.join(ws, '.hive', 'hive.db'), "SELECT writer_run AS run, writer_pid AS pid, writer_started AS started FROM slots WHERE name = 'slot-a'", Date.now())
+      const read = await readGoneHiveDb(path.join(ws, '.combwork', 'hive.db'), "SELECT writer_run AS run, writer_pid AS pid, writer_started AS started FROM slots WHERE name = 'slot-a'", Date.now())
       if (read.refused.length) console.log(`INFO ${part}: hive.db refused ${read.refused.length} read(s) before one succeeded, the keeper ${lib.stillSame(keeper).length ? 'running' : 'gone'}: ${read.refused.slice(0, 5).join(' | ')}`)
       const row = read.row
       check(`${part}: …slot-a still names its run as writer`, row?.run === run, JSON.stringify(row))

@@ -11,7 +11,7 @@ import { releaseRepoLock, takeRepoLock, type HeldRepoLock, type RepoLockHolder }
  * slow goes to main to log.
  */
 
-export type LockRequest = { id: number } & ({ type: 'take'; dir: string; profile: string; waitMs: number; noticeAfterMs: number } | { type: 'release'; dir: string; token: string })
+export type LockRequest = { id: number } & ({ type: 'take'; dir: string; profile: string; waitMs: number; noticeAfterMs: number; file?: string } | { type: 'release'; dir: string; token: string; file?: string })
 
 /** A take's answer: the lock's token, or who holds it after the wait. */
 export type TakeAnswer = { token: string } | { timedOut: RepoLockHolder }
@@ -28,10 +28,10 @@ export async function handleRequest(m: LockRequest, post: (r: LockReply) => void
     const h = held.get(m.token)
     held.delete(m.token)
     if (h) h.release()
-    else releaseRepoLock(m.dir, m.token, onSlow)
+    else releaseRepoLock(m.dir, m.token, onSlow, m.file)
     return null
   }
-  const got = await takeRepoLock(m.dir, { profile: m.profile, waitMs: m.waitMs, noticeAfterMs: m.noticeAfterMs, onSlow, onWait: (holder) => post({ id: m.id, waiting: holder }) })
+  const got = await takeRepoLock(m.dir, { profile: m.profile, waitMs: m.waitMs, noticeAfterMs: m.noticeAfterMs, onSlow, onWait: (holder) => post({ id: m.id, waiting: holder }), ...(m.file ? { file: m.file } : {}) })
   if ('timedOut' in got) return { timedOut: got.timedOut }
   held.set(got.held.token, got.held)
   return { token: got.held.token }

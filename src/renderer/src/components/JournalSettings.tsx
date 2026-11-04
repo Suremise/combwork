@@ -33,7 +33,7 @@ const M = {
   noLimit: msg({ id: 'settings.journal.noLimit', defaultMessage: 'No limit', description: "A checkbox: the journal has no size limit." }),
   size: msg({ id: 'settings.journal.size', defaultMessage: 'Now {size}, {entries, plural, one {# entry} other {# entries}}.', description: "The journal's size on disk ({size}: \"1.2 MB\") and how many entries it has." }),
   none: msg({ id: 'settings.journal.none', defaultMessage: 'No journal yet.', description: 'The journal before the Assistant or Hive has written anything.' }),
-  local: msg({ id: 'settings.journal.local', defaultMessage: 'Kept on this computer only, in .hive/assistant/journal.db, and never sent anywhere.', description: 'A note under the journal settings (privacy). Keep the file path as it is.' }),
+  local: msg({ id: 'settings.journal.local', defaultMessage: 'Kept on this computer only, in .combwork/assistant/journal.db, and never sent anywhere.', description: 'A note under the journal settings (privacy). Keep the file path as it is.' }),
   noWorkspace: msg({ id: 'settings.journal.noWorkspace', defaultMessage: "Open a workspace to set its Assistant's journal.", description: 'Settings → Assistant → Journal with no workspace open.' }),
   delete: msg({ id: 'settings.journal.delete', defaultMessage: 'Delete Journal…', description: "A button: deletes the Assistant's journal of this workspace (asks first). The … says it asks: keep it." }),
   deleteTitle: msg({ id: 'settings.journal.deleteTitle', defaultMessage: "Delete the Assistant's journal?", description: "Title of the question before the Assistant's journal is deleted." }),

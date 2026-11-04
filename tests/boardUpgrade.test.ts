@@ -283,14 +283,14 @@ async function close(w: WS): Promise<void> {
   await disposeWorkspaceService(w)
   store.closeBoard(path)
 }
-const hiveOf = (ws: string): string => join(ws, '.hive')
+const hiveOf = (ws: string): string => join(ws, '.combwork')
 const upgradeSteps = store.BOARD_MIGRATIONS.filter((m) => m.group === '1.0')
 
 /** A workspace whose board 0.9 left (its file before the 1.0 group), with card #1 on it. */
 async function board09(): Promise<string> {
   const ws = join(base, `ws-${++n}`)
-  mkdirSync(join(ws, 'p', '.hive'), { recursive: true })
-  writeFileSync(join(ws, 'p', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+  mkdirSync(join(ws, 'p', '.combwork'), { recursive: true })
+  writeFileSync(join(ws, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
   const w = await open(ws)
   await inWorkspace(w, () => tasks.createTask({ title: 'From 0.9', project: 'p' }, user))
   await close(w)
@@ -481,7 +481,7 @@ describe('while the upgrade waits, nothing needing hive.db starts or writes (#12
     await expect(inWorkspace(w, () => sessions.start(join(ws, 'p'), { agentId: 'a1' }))).rejects.toThrow('This workspace is from Combwork 0.9: upgrade it to 1.0 before starting agents')
     expect(sessions.agentsIn(ws)).toBe(0)
     // The Assistant's home is in the workspace: refused the same way.
-    await expect(inWorkspace(w, () => sessions.start(join(ws, '.hive', 'assistant'), { agentId: 'assistant' }))).rejects.toThrow('upgrade it to 1.0 before starting agents')
+    await expect(inWorkspace(w, () => sessions.start(join(ws, '.combwork', 'assistant'), { agentId: 'assistant' }))).rejects.toThrow('upgrade it to 1.0 before starting agents')
     await inWorkspace(w, () => store.upgradeBoard(w))
     expect(store.upgradeWaiting(ws)).toBe(false)
     expect(() => store.assertUpgraded(ws)).not.toThrow()
@@ -518,13 +518,13 @@ describe('while the upgrade waits, nothing needing hive.db starts or writes (#12
     const ws = await board09()
     const p = join(ws, 'p')
     const old = { version: 1, sessions: [{ id: 's1', agent: 'claude-code', name: 'From 0.9', createdAt: '2026-10-19T10:00:00.000Z', lastActiveAt: '2026-10-19T10:00:00.000Z', archived: false }] }
-    writeFileSync(join(p, '.hive', 'sessions.json'), JSON.stringify(old))
+    writeFileSync(join(p, '.combwork', 'sessions.json'), JSON.stringify(old))
     const w = await open(ws)
     const read = await inWorkspace(w, () => workspace.sessionsFile(p))
     expect(read.sessions).toEqual([])
-    expect(existsSync(join(p, '.hive', 'sessions.json'))).toBe(true)
+    expect(existsSync(join(p, '.combwork', 'sessions.json'))).toBe(true)
     // A store's open the same way: nothing moved, nothing marked.
-    const probe = join(ws, '.hive', 'never-a-store.json')
+    const probe = join(ws, '.combwork', 'never-a-store.json')
     writeFileSync(probe, '[]')
     let put = 0
     await storeRows.openTable(ws, 'sessions', 'probe', probe, async () => ({ rows: 1 }), { count: () => 0, put: () => ++put })
@@ -532,7 +532,7 @@ describe('while the upgrade waits, nothing needing hive.db starts or writes (#12
     expect(existsSync(probe)).toBe(true)
     await inWorkspace(w, () => store.upgradeBoard(w))
     expect((await inWorkspace(w, () => workspace.sessionsFile(p))).sessions.map((x) => x.id)).toEqual(['s1'])
-    expect(existsSync(join(p, '.hive', 'sessions.json'))).toBe(false)
+    expect(existsSync(join(p, '.combwork', 'sessions.json'))).toBe(false)
     await close(w)
   })
 

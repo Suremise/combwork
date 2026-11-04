@@ -73,10 +73,10 @@ function live(agentId: string, name: string): Record<string, unknown> {
 }
 
 beforeAll(async () => {
-  for (const p of [alpha, empty]) mkdirSync(join(p, '.hive'), { recursive: true })
-  mkdirSync(join(wsPath, '.hive'), { recursive: true })
-  writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'B1', provider: 'claude-code' }, { id: 'a2', name: 'R1', provider: 'claude-code' }] }))
-  writeFileSync(join(empty, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+  for (const p of [alpha, empty]) mkdirSync(join(p, '.combwork'), { recursive: true })
+  mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+  writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'B1', provider: 'claude-code' }, { id: 'a2', name: 'R1', provider: 'claude-code' }] }))
+  writeFileSync(join(empty, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   w = createWorkspaceService()
   await w.open(wsPath)
 })

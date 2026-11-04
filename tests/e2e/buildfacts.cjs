@@ -15,7 +15,7 @@ const PORT = Number(lib.port(47938))
 const userData = path.join(lib.WORK, 'buildfacts-profile')
 const ws = path.join(lib.WORK, 'buildfacts-ws')
 const repo = path.join(ws, 'hive')
-const markers = path.join(ws, '.hive', 'builds')
+const markers = path.join(ws, '.combwork', 'builds')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++

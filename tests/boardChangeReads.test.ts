@@ -49,7 +49,7 @@ const { coalescing } = await import('../src/main/coalesce')
 const user = { kind: 'user' } as const
 const wsPath = join(base, 'ws')
 const alpha = join(wsPath, 'alpha')
-const tasksDir = join(wsPath, '.hive', 'tasks')
+const tasksDir = join(wsPath, '.combwork', 'tasks')
 const BOARD = 200
 let w: ReturnType<typeof createWorkspaceService>
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
@@ -87,8 +87,8 @@ const head = (c: TaskCard) => ({ number: c.number, title: c.title, project: c.pr
 
 beforeAll(async () => {
   for (const p of ['alpha', 'beta']) {
-    mkdirSync(join(wsPath, p, '.hive'), { recursive: true })
-    writeFileSync(join(wsPath, p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }] }))
+    mkdirSync(join(wsPath, p, '.combwork'), { recursive: true })
+    writeFileSync(join(wsPath, p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }] }))
   }
   // A board of 200 cards' files from before 0.9, a quarter archived: moved into the database as the board is first used.
   mkdirSync(tasksDir, { recursive: true })

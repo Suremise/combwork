@@ -35,7 +35,7 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws, shots]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(shots, { recursive: true })
   lib.gitProject(alpha)
-  const hdir = path.join(ws, '.hive', 'shared', 'handovers')
+  const hdir = path.join(ws, '.combwork', 'shared', 'handovers')
   fs.mkdirSync(hdir, { recursive: true })
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', ...lib.fakeClaude(userData, claudeHome, [alpha]) })
   const cfgFile = path.join(userData, 'config.json')

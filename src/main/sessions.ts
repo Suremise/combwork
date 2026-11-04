@@ -152,6 +152,7 @@ import { replyStart } from '../shared/tiles'
 import { observer } from './platform/observe'
 import { projectPreferences } from './workflow/preferences'
 import { driveExitKeys, type ExitKeysIO } from './exitKeys'
+import { movedPath } from './combworkMove'
 
 const log = createLogger('sessions')
 
@@ -162,6 +163,12 @@ const RENAMED_NOTICE_QUIET_MS = 5_000
 const RENAMED_FRESH = {
   title: msg({ id: 'session.renamedFresh.title', defaultMessage: 'Agents started new conversations', description: 'A notice once after the update that renamed what agents see (HI-2463): conversations from before were started fresh.' }),
   body: msg({ id: 'session.renamedFresh.body', defaultMessage: "{n, plural, one {# conversation} other {# conversations}} started fresh: Combwork renamed the tools agents use, so a conversation from before can't continue. The earlier ones are kept in Sessions to read.", description: 'The notice after the update that renamed what agents see (HI-2463). {n} counts the conversations that started fresh instead of resuming. Sessions is a tab of the window: keep it as the window names it.' })
+}
+
+/** The notice for conversations whose folder moved with a `.hive` folder to `.combwork` (HI-2462). */
+const MOVED_FRESH = {
+  title: RENAMED_FRESH.title,
+  body: msg({ id: 'session.movedFresh.body', defaultMessage: "{n, plural, one {# conversation} other {# conversations}} started fresh: {n, plural, one {its folder} other {their folders}} moved with .hive to .combwork, so {n, plural, one {it} other {they}} can't continue there. The earlier ones are kept in Sessions to read.", description: 'The notice after a workspace\'s .hive folders moved to .combwork (HI-2462): conversations that ran in a folder inside one started new conversations instead of resuming. {n} counts them. Keep .hive and .combwork as they are; Sessions is a tab of the window.' })
 }
 
 /** The statuses in which a CLI's exit key cancels a turn (or its dialog) rather than arming its exit (HI-2272). */
@@ -334,7 +341,7 @@ interface LiveSession {
   /** Where the provider writes this session's transcript, once known (from a hook, or found by id). */
   transcriptPath?: string
   backupTimer?: NodeJS.Timeout
-  /** When the transcript was last copied to .hive/sessions (see BACKUP_INTERVAL_MS). */
+  /** When the transcript was last copied to .combwork/sessions (see BACKUP_INTERVAL_MS). */
   lastBackupAt?: number
   /** The transcript's modified time and size when it was last backed up. */
   backupMtime?: string
@@ -1680,7 +1687,7 @@ class SessionManager {
       }
     }
     // The workspace's servers on in the project (#713); the agent's own choice narrows them (#537): all of them unless
-    // it names some. Never one named as Hive's own (a hand-made .hive/mcp/hive.json): the CLIs pre-approve that one's tools.
+    // it names some. Never one named as Hive's own (a hand-made .combwork/mcp/hive.json): the CLIs pre-approve that one's tools.
     const forAgent = agent ?? projectAgents(pc)[0]
     // The Assistant gets the workspace's servers added for it (HI-1472, HI-2059: its view's MCP Servers, as a project's
     // MCP tab); never a project's.
@@ -1822,6 +1829,11 @@ class SessionManager {
     // sub-session started in a removed agent's worktree, or the Assistant's workspace folder): those, and the host's
     // records and settings they come from, read only when its own folder hasn't it.
     const own = rec?.cwd ? [rec.cwd] : []
+    // The path the CLI reported, as recorded; if it was inside a folder that moved to .combwork (HI-2462: a CLI's home
+    // kept there) and isn't there now, where the move put it. Recorded folders (`cwd`) stay as they were: the CLI files
+    // its transcripts by them.
+    const ws = workspaceFor(projectPath)?.path
+    const recorded = rec?.transcriptPath && ws && !(await stat(rec.transcriptPath).then(() => true, () => false)) ? ((await movedPath(ws, rec.transcriptPath)) ?? rec.transcriptPath) : rec?.transcriptPath
     let others: string[] | undefined
     const othersOf = async (): Promise<string[]> => {
       if (others) return others
@@ -1839,11 +1851,11 @@ class SessionManager {
         continue
       }
       for (const f of own) {
-        const t = await adapter.transcriptPath(f, sessionId, rec?.transcriptPath)
+        const t = await adapter.transcriptPath(f, sessionId, recorded)
         if (t) return { path: t, provider: id }
       }
       for (const f of await othersOf()) {
-        const t = await adapter.transcriptPath(f, sessionId, rec?.transcriptPath)
+        const t = await adapter.transcriptPath(f, sessionId, recorded)
         if (t) return { path: t, provider: id }
       }
     }
@@ -1861,7 +1873,11 @@ class SessionManager {
     // hive-progress, so it isn't resumed: a new one starts instead, as Start Fresh does, and the old one stays in Sessions
     // to read. The first prompt this start was given (a restart's note: its card, round and lane) goes to the new one.
     // Every resume comes here (a restart's, Resume All, a manual one, a lane's or a card's placement, the Assistant's).
-    const freshFrom = opts.resumeId && (await this.preRename(projectPath, opts.resumeId)) ? opts.resumeId : null
+    // HI-2462: so is one whose folder was inside a `.hive` that moved to `.combwork`: Claude Code files its transcript by
+    // that folder, and Combwork neither starts it in a folder that is gone nor copies the CLI's files; the transcript
+    // stays readable where it was recorded.
+    const freshWhy = opts.resumeId ? await this.freshReason(projectPath, opts.resumeId) : null
+    const freshFrom = freshWhy ? opts.resumeId! : null
     // It carries on the agent's own work, as a handover to itself does: its watch stays, and what waits for the old
     // conversation (its wakes, messages, tasks) is for the new one.
     if (freshFrom) opts = { ...opts, resumeId: undefined, keepWatch: true }
@@ -1888,7 +1904,7 @@ class SessionManager {
     pending.outcome = run
     try {
       const started = await run
-      if (freshFrom) this.renamedFresh(projectPath, agentId, freshFrom)
+      if (freshFrom) this.renamedFresh(projectPath, agentId, freshFrom, freshWhy!)
       return started
     } catch (e) {
       // Given up before any process of it ran: its slot's writer released now (#1434). One that ran is its exit's.
@@ -1902,16 +1918,24 @@ class SessionManager {
   }
 
   /**
-   * Whether a conversation was launched by Combwork before HI-2463 (its record has no `names`, but has what a launch of
-   * Combwork's writes: the agent it ran as, or the folder it ran in): it remembers the old names, so it starts fresh.
-   * A session adopted from outside (neither) never knew them, and resumes; a record that can't be read resumes as before.
+   * Why a conversation starts fresh rather than resume, or null when it resumes:
+   * - `renamed`: launched by Combwork before HI-2463 (its record has no `names`, but has what a launch of Combwork's
+   *   writes: the agent it ran as, or the folder it ran in): it remembers the old names. A session adopted from outside
+   *   (neither) never knew them, and resumes.
+   * - `moved` (HI-2462): the folder it ran in, as recorded (its transcript's key, never rewritten), lies inside a `.hive`
+   *   that moved to `.combwork`.
+   * A record that can't be read resumes as before.
    */
-  private async preRename(projectPath: string, sessionId: string): Promise<boolean> {
+  private async freshReason(projectPath: string, sessionId: string): Promise<'renamed' | 'moved' | null> {
     const rec = await workspace.sessionRecord(projectPath, sessionId).catch(() => undefined)
-    return !!rec && rec.names !== SESSION_NAMES && !!(rec.agentId || rec.cwd)
+    if (!rec) return null
+    if (rec.names !== SESSION_NAMES && !!(rec.agentId || rec.cwd)) return 'renamed'
+    // HI-2462: its recorded folder (where its transcript is filed, kept as it was) lies inside a folder that moved.
+    const ws = workspaceFor(projectPath)?.path
+    return ws && rec.cwd && (await movedPath(ws, rec.cwd)) ? 'moved' : null
   }
 
-  /** Fresh conversations started for ones from before HI-2463, counted per workspace for one notice (renamedNotice). */
+  /** Fresh conversations started for ones from before HI-2463 or HI-2462's move, per workspace and reason, for one notice each. */
   private renamedFreshCount = new Map<string, { n: number; timer: ReturnType<typeof setTimeout> | null }>()
 
   /**
@@ -1919,10 +1943,12 @@ class SessionManager {
    * says how many once starts have been quiet for a moment (a restart resumes several at once), counting only those that
    * started.
    */
-  private renamedFresh(projectPath: string, agentId: string, oldSession: string): void {
-    log.info(`${userText(agentId)} in ${userText(basename(projectPath))} started a new conversation: ${oldSession.slice(0, 8)} was launched before the agents' names changed (HI-2463), and stays in Sessions`)
-    const ws = workspaceFor(projectPath)?.path
-    if (!ws) return
+  private renamedFresh(projectPath: string, agentId: string, oldSession: string, why: 'renamed' | 'moved'): void {
+    log.info(`${userText(agentId)} in ${userText(basename(projectPath))} started a new conversation: ${oldSession.slice(0, 8)} ${why === 'renamed' ? "was launched before the agents' names changed (HI-2463)" : 'ran in a folder that moved to .combwork (HI-2462)'}, and stays in Sessions`)
+    const path = workspaceFor(projectPath)?.path
+    if (!path) return
+    const ws = `${path}|${why}`
+    const notice = why === 'renamed' ? RENAMED_FRESH : MOVED_FRESH
     const had = this.renamedFreshCount.get(ws) ?? { n: 0, timer: null }
     had.n++
     if (had.timer) clearTimeout(had.timer)
@@ -1930,8 +1956,8 @@ class SessionManager {
       this.renamedFreshCount.delete(ws)
       toast(
         'info',
-        tr(RENAMED_FRESH.title),
-        tr(RENAMED_FRESH.body, { n: had.n })
+        tr(notice.title),
+        tr(notice.body, { n: had.n })
       )
     }, RENAMED_NOTICE_QUIET_MS)
     had.timer.unref?.()
@@ -4853,7 +4879,7 @@ class SessionManager {
     }
   }
 
-  /** Copies the live transcript into <project>/.hive/sessions so it survives the CLI's own cleanup (backupNow), each look kept on the session until it ends (LiveSession.looks). */
+  /** Copies the live transcript into <project>/.combwork/sessions so it survives the CLI's own cleanup (backupNow), each look kept on the session until it ends (LiveSession.looks). */
   private backup(projectPath: string, agentId: string, force = false, hooksBefore?: number): Promise<void> {
     const l = this.live.get(liveId(projectPath, agentId))
     if (!l) return Promise.resolve()
@@ -7335,7 +7361,7 @@ class SessionManager {
   }
 
   /**
-   * Saves the clipboard's image for the running session in its attachments folder (<host>/.hive/attachments/<sessionId>)
+   * Saves the clipboard's image for the running session in its attachments folder (<host>/.combwork/attachments/<sessionId>)
    * and returns its path, which is pasted into the terminal so the transcript records which image was sent; null when the
    * clipboard holds no image.
    */
@@ -7760,7 +7786,7 @@ class SessionManager {
   }
 
   /**
-   * Archives or unarchives one of Hive's sessions (its backup moves to or from .hive/archive), all or nothing: with the
+   * Archives or unarchives one of Hive's sessions (its backup moves to or from .combwork/archive), all or nothing: with the
    * session reserved (nothing reads, resumes or moves it meanwhile) and nothing having it in use (assertFree), the new
    * archive is built aside, then each copy is moved; a failure at any step (a copy another program holds, the record
    * not saved) moves everything back, and the record changes only once the files have.

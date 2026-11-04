@@ -59,12 +59,12 @@ async function workspace(options: object = PAIR, o: { shared?: boolean } = {}): 
   const ws = join(base, `ws-${++n}`)
   const repo = gitRepo(join(ws, 'p'))
   const wt = o.shared ? repo : join(ws, 'p-card')
-  writeFileSync(join(repo, '.gitignore'), '.hive/\n')
-  commit(repo, {}, 'ignore .hive')
+  writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
+  commit(repo, {}, 'ignore .combwork')
   if (!o.shared) sh(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
   const agents = [{ id: 'a1', name: 'Builder', ...(o.shared ? {} : { worktree: { path: wt, branch: 'card', base: 'main' } }) }, { id: 'a2', name: 'Reviewer' }]
-  mkdirSync(join(repo, '.hive'), { recursive: true })
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options } }))
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options } }))
   return { w: await open(ws), repo, wt }
 }
 
@@ -399,11 +399,11 @@ describe('a failed review by either route: back to Doing, its builder holding it
     const ws = join(base, `ws-${++n}`)
     const repo = gitRepo(join(ws, 'p'))
     const wt = join(ws, 'p-card')
-    writeFileSync(join(repo, '.gitignore'), '.hive/\n')
-    commit(repo, {}, 'ignore .hive')
+    writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
+    commit(repo, {}, 'ignore .combwork')
     sh(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
-    mkdirSync(join(repo, '.hive'), { recursive: true })
-    writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }] }))
+    mkdirSync(join(repo, '.combwork'), { recursive: true })
+    writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }] }))
     return { w: await open(join(ws)), wt }
   }
   /** A card the builder started, committed and submitted, under the reviewer's review. */
@@ -471,10 +471,10 @@ describe("S40: an upgraded lane's old moves (#1268)", () => {
     const ws = join(base, `ws-${++n}`)
     // A lane in the project folder, as the spike's S40 (the upgrade's options: review by an agent, not checked).
     const p = gitRepo(join(ws, 'p'))
-    writeFileSync(join(p, '.gitignore'), '.hive/\n')
+    writeFileSync(join(p, '.gitignore'), '.combwork/\n')
     commit(p, { 'src/b.txt': 'b1\n' }, 'B1 builds')
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1 (reviewer)' }] }))
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1 (reviewer)' }] }))
     const w0 = await open(ws)
     for (const c of [card09(1, 'doing', 'b1'), card09(2, 'review', 'b1'), card09(3, 'passed', 'b1')]) await writeCard(w0, c.number as number, c)
     // As 0.9 left it, then upgraded and adopted.

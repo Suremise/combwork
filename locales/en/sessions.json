@@ -4,8 +4,8 @@
     "description": "An error's title: archiving or unarchiving a session failed."
   },
   "sessions.archive.message": {
-    "defaultMessage": "The transcript is preserved in .hive/archive and hidden from this list. You can unarchive it at any time.",
-    "description": "What archiving a session does. .hive/archive is a folder: keep it as it is."
+    "defaultMessage": "The transcript is preserved in .combwork/archive and hidden from this list. You can unarchive it at any time.",
+    "description": "What archiving a session does. .combwork/archive is a folder: keep it as it is."
   },
   "sessions.archive.title": {
     "defaultMessage": "Archive session?",
@@ -64,8 +64,8 @@
     "description": "Button: archives all the sessions listed. Keep it short."
   },
   "sessions.bulk.archiveDetail": {
-    "defaultMessage": "Their transcripts are kept in .hive/archive and hidden from this list: tick Archived to see them, and unarchive any at any time. {skipNote}",
-    "description": "What archiving many sessions does (.hive/archive is a folder; Archived is a checkbox above the list: use its translation); then which are passed over ({skipNote}, a sentence)."
+    "defaultMessage": "Their transcripts are kept in .combwork/archive and hidden from this list: tick Archived to see them, and unarchive any at any time. {skipNote}",
+    "description": "What archiving many sessions does (.combwork/archive is a folder; Archived is a checkbox above the list: use its translation); then which are passed over ({skipNote}, a sentence)."
   },
   "sessions.bulk.archiveMessage": {
     "defaultMessage": "Archive {what} under {branch}?",
@@ -156,8 +156,8 @@
     "description": "A choice in Clean Up (Sessions tab): archive the old sessions (the default). Keep it short."
   },
   "sessions.cleanup.archiveSummary": {
-    "defaultMessage": "Combwork's own sessions are hidden from the list and their transcripts kept in .hive/archive: tick Archived to see them, and unarchive any at any time.",
-    "description": "Under the Archive choice in Clean Up: what archiving does (.hive/archive is a folder; Archived is a checkbox above the Sessions list: use its translation)."
+    "defaultMessage": "Combwork's own sessions are hidden from the list and their transcripts kept in .combwork/archive: tick Archived to see them, and unarchive any at any time.",
+    "description": "Under the Archive choice in Clean Up: what archiving does (.combwork/archive is a folder; Archived is a checkbox above the Sessions list: use its translation)."
   },
   "sessions.cleanup.archived": {
     "defaultMessage": "{n, plural, one {# of them is archived.} other {# of them are archived.}}",

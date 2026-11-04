@@ -2,10 +2,9 @@ import { randomBytes, randomUUID, timingSafeEqual } from 'crypto'
 import { app } from 'electron'
 import { dirname, join } from 'path'
 import { mkdir } from 'original-fs/promises'
-import { ASSISTANT_AGENT_ID, ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
+import { ASSISTANT_AGENT_ID, ASSISTANT_NAME } from '../shared/assistant'
 import { activityFields, publicReason, type ActivityTarget } from '../shared/assistantActivity'
 import { controlAllows } from '../shared/assistantTools'
-import { HIVE_DIR } from '../shared/defaults'
 import type { AssistantAction, AssistantControl, AssistantQuestion, AssistantSettingChange } from '../shared/types'
 import { config } from './config'
 import { emit } from './events'
@@ -16,6 +15,7 @@ import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from
 import { hashText, writeJsonAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
 import { recordTestToken } from './testQuiet'
+import { assistantHomeIn } from './hiveFolder'
 
 /**
  * What the Hive Assistant may do through the Agent API, and what it did. Each workspace's Assistant gets its own
@@ -58,7 +58,8 @@ function stateOf(workspacePath: string): WorkspaceState {
 
 /** The Assistant's home in a workspace (events about it go to the window showing that workspace). */
 export function assistantHome(workspacePath: string): string {
-  return join(workspacePath, HIVE_DIR, ASSISTANT_DIR)
+  // In whichever of its folders is in use: before its open moves it (HI-2462), still the old one.
+  return assistantHomeIn(workspacePath)
 }
 
 /** Where a workspace's Assistant finds its token: one file per workspace, so its launch settings don't change. */

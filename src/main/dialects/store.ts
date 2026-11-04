@@ -1,6 +1,6 @@
 /**
  * A workspace's dialect files on disk (dialects, HI-2065; plans/2026-11-03-dialects-design.md, sections 3–5), in
- * `.hive/dialects/`:
+ * `.combwork/dialects/`:
  *
  *   workspace.json            the Workspace layer (the user's: Hive never ships into it)
  *   api/cli.json              the API layer, for callers with no session

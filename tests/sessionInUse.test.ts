@@ -57,7 +57,7 @@ const write = (file: string, text: string, at: Date = old): void => {
   writeFileSync(file, text)
   utimesSync(file, at, at)
 }
-const backup = (id: string, archived = false): string => join(p, '.hive', archived ? 'archive' : 'sessions', `${id}.jsonl`)
+const backup = (id: string, archived = false): string => join(p, '.combwork', archived ? 'archive' : 'sessions', `${id}.jsonl`)
 const cliFile = (id: string): string => join(cli, `${id}.jsonl`)
 
 /** One of Hive's sessions: its record, Hive's backup and the CLI's transcript (written long ago unless `at`). */
@@ -97,9 +97,9 @@ const fakeLookup = async (_p: string, id: string) => (existsSync(cliFile(id)) ? 
 
 describe.runIf(process.platform === 'win32')('archiving and deleting sessions in use', () => {
   beforeAll(async () => {
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     // The CLI's transcripts, from a folder of the test's (never ~/.claude).
@@ -427,7 +427,7 @@ describe.runIf(process.platform === 'win32')('archiving and deleting sessions in
   it("the Assistant's sub-sessions, from the workspace folder it runs in, are listed and read", async () => {
     cliLookup.mockImplementation(realTranscript)
     const { transcripts } = await import('../src/main/transcripts')
-    const home = join(wsPath, '.hive', 'assistant')
+    const home = join(wsPath, '.combwork', 'assistant')
     const parent = newId()
     await run(() => workspace.upsertSession(home, { id: parent, agent: 'claude-code', name: 'Overseeing', lastActiveAt: old.toISOString() }))
     const child = newId()

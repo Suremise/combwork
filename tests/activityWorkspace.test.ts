@@ -23,9 +23,9 @@ const wsPath = join(base, 'ws')
 const otherWs = join(base, 'other')
 const project = (ws: string, name: string): string => {
   const p = join(ws, name)
-  mkdirSync(join(p, '.hive'), { recursive: true })
+  mkdirSync(join(p, '.combwork'), { recursive: true })
   // The same agent id in both projects.
-  writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Builder' }, { id: 'r1', name: 'Reviewer' }] }))
+  writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Builder' }, { id: 'r1', name: 'Reviewer' }] }))
   return p
 }
 const alpha = project(wsPath, 'alpha')

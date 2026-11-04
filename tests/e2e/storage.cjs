@@ -18,7 +18,7 @@ const userData = path.join(lib.WORK, 'storage-profile')
 const ws = path.join(lib.WORK, 'storage-ws')
 const claudeHome = path.join(lib.WORK, 'storage-claude-home')
 const alpha = path.join(ws, 'alpha')
-const hive = path.join(alpha, '.hive')
+const hive = path.join(alpha, '.combwork')
 const cliDir = path.join(claudeHome, 'projects', alpha.replace(/[^a-zA-Z0-9]/g, '-'))
 let failed = 0
 const check = (name, ok, extra = '') => {

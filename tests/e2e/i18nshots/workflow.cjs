@@ -119,7 +119,7 @@ async function seedBilling(ctx) {
   fs.mkdirSync(tools, { recursive: true })
   const tool = path.join(tools, 'check.cmd')
   fs.writeFileSync(tool, '@exit /b 0\r\n')
-  lib.gitProject(dir, { 'invoices.txt': 'one\ntwo\nthree\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(dir, { 'invoices.txt': 'one\ntwo\nthree\n', '.gitignore': '.combwork/\n' })
   lib.git(dir, ['branch', '-M', 'main'])
   lib.git(dir, ['branch', 'integration'])
   // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).

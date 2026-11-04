@@ -18,6 +18,7 @@ import { gitTool } from './gitTool'
 import { errorText, hiveError, shownError } from './hiveError'
 import { createLogger, userText } from './logger'
 import { unwatchedWhile } from './platform/observe'
+import { HIVE_DIR } from '../shared/defaults'
 
 const log = createLogger('worktrees')
 
@@ -246,7 +247,7 @@ export async function copyIgnored(projectPath: string, dest: string, patterns: s
   const copied: string[] = []
   for (const raw of r.out.split('\0').filter(Boolean)) {
     const rel = raw.replace(/\/$/, '')
-    if (rel === '.hive' || rel.startsWith('.hive/') || !rx.some((x) => x.test(rel))) continue
+    if (rel === HIVE_DIR || rel.startsWith('.combwork/') || !rx.some((x) => x.test(rel))) continue
     const src = join(projectPath, rel)
     const target = join(dest, rel)
     try {
@@ -264,7 +265,7 @@ export async function copyIgnored(projectPath: string, dest: string, patterns: s
 /** Uncommitted files in a worktree; null when git can't say (a damaged index, say). */
 export async function dirtyCount(cwd: string): Promise<number | null> {
   const r = await gitReading(cwd, ['status', '--porcelain', '-z'])
-  return r.ok ? r.out.split('\0').filter((l) => l && !l.slice(3).startsWith('.hive/')).length : null
+  return r.ok ? r.out.split('\0').filter((l) => l && !l.slice(3).startsWith('.combwork/')).length : null
 }
 
 /**

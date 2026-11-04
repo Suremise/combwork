@@ -18,7 +18,7 @@ import { newUsageParser, parserShape, restoreParser, saveParser, type RawUsagePa
  * The usage worker (#1106): a thread of its own that keeps each workspace's usage history (usageDb.ts), so reading the
  * CLIs' transcripts never holds up Hive's main process. It reads only what a transcript added since it was last read,
  * taking up the parser's saved state; makes the session's rows (shared/usageLedger.ts) and writes them with its own
- * node:sqlite connection to `.hive/usage.db`, one short transaction a session (WAL: main and other readers never wait for
+ * node:sqlite connection to `.combwork/usage.db`, one short transaction a session (WAL: main and other readers never wait for
  * it; another Hive's worker on the same workspace waits up to db.ts's busy timeout, and a session it recorded meanwhile
  * is left as it wrote it). It answers main's queries on that file too, so main never opens it. Jobs run one at a time,
  * in the order main sends them (main keeps the queue and its priorities, usageHistory.ts); queries are answered at once,

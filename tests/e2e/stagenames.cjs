@@ -31,15 +31,15 @@ const PAIR = { review: 'agent', reviewers: 1, noSelfReview: true, preChecks: [],
 
 /** A project's project.json, as Hive keeps it, with `workflow` as given. */
 function projectJson(dir, platform, workflow) {
-  fs.mkdirSync(path.join(dir, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(dir, '.hive', 'project.json'), JSON.stringify({ version: 2, platform, agents: [], ...(workflow ? { workflow } : {}) }))
+  fs.mkdirSync(path.join(dir, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(dir, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform, agents: [], ...(workflow ? { workflow } : {}) }))
 }
 
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
-  lib.gitProject(pair, { 'a.txt': 'one\n', '.gitignore': '.hive/\n' })
-  lib.gitProject(solo, { 'b.txt': 'two\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(pair, { 'a.txt': 'one\n', '.gitignore': '.combwork/\n' })
+  lib.gitProject(solo, { 'b.txt': 'two\n', '.gitignore': '.combwork/\n' })
   fs.mkdirSync(notes, { recursive: true })
   fs.writeFileSync(path.join(notes, 'plan.md'), '# Plan\n')
   // Pair (Hive merges), with a field written by hand that no writer of this version sets: it must survive a save.
@@ -72,7 +72,7 @@ function projectJson(dir, platform, workflow) {
       const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
       return { status: res.status, body: await res.json().catch(() => null) }
     }
-    const onDisk = () => JSON.parse(fs.readFileSync(path.join(pair, '.hive', 'project.json'), 'utf8')).workflow
+    const onDisk = () => JSON.parse(fs.readFileSync(path.join(pair, '.combwork', 'project.json'), 'utf8')).workflow
 
     // --- workflow:stages for the three projects (§16.5.2), in board order, Merging in Approved.
     const ids = async (p) => (await inv('workflow:stages', p))?.stages.map((s) => `${s.id}:${s.category}`).join(' ')

@@ -668,7 +668,7 @@ export const movedSummary = (plan: MovePlan | null): WorkspaceMoved | null =>
  * command's runs, and its view preferences, each project's and its panes' (HI-2008, viewPrefs.ts). The Assistant's old token file is left: it is written again at each launch, and deleting it could take
  * a workspace's back there (HR2's round 2). Design HI-2007/s40 and s42:
  * - A move is recorded as the moved workspace opens (config.json's `profileMoves`, one per old folder) only when the
- *   old folder is gone (no .hive, not open): a copy's original keeps its own. Records about that old folder follow it
+ *   old folder is gone (no .combwork, not open): a copy's original keeps its own. Records about that old folder follow it
  *   on, keeping their own old folder (A→B becomes A→C), only when the folder they went to is gone too (a copy left
  *   there keeps them). Never evicted. Its old folders are where it was last opened (lastPath) and where its records
  *   were last all brought (workspace.json's `profileAt`, set once nothing is left to follow it), so a second move before

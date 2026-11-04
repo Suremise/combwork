@@ -56,7 +56,7 @@
   },
   "content.mcp.listNotObject": {
     "text": "Definition must be a JSON object",
-    "note": "Why an MCP server in the workspace can't be used: its definition file (.hive/mcp/<name>.json) holds JSON that isn't an object.",
+    "note": "Why an MCP server in the workspace can't be used: its definition file (.combwork/mcp/<name>.json) holds JSON that isn't an object.",
     "audience": "both"
   },
   "content.mcp.noCommand": {
@@ -71,7 +71,7 @@
   },
   "content.mcp.notObject": {
     "text": "The definition must be a JSON object, as in {path}.",
-    "note": "An error adding an MCP server from a file whose definition holds JSON that isn't an object. {path} is where a workspace keeps one (.hive/mcp/<name>.json).",
+    "note": "An error adding an MCP server from a file whose definition holds JSON that isn't an object. {path} is where a workspace keeps one (.combwork/mcp/<name>.json).",
     "audience": "both"
   },
   "content.mcp.taken": {
@@ -141,7 +141,7 @@
   },
   "content.mode.unknown": {
     "text": "There is no mode \"{mode}\" in this workspace.",
-    "note": "An error switching the Hive Assistant's mode: the workspace has no mode (a file in .hive/modes) called {mode}.",
+    "note": "An error switching the Hive Assistant's mode: the workspace has no mode (a file in .combwork/modes) called {mode}.",
     "audience": "both"
   },
   "content.notes.badName": {
@@ -156,7 +156,7 @@
   },
   "content.notes.deleteRoot": {
     "text": "Cannot delete the shared folder itself",
-    "note": "An error: the shared notes folder itself (.hive/shared) can't be deleted, only what is in it.",
+    "note": "An error: the shared notes folder itself (.combwork/shared) can't be deleted, only what is in it.",
     "audience": "both"
   },
   "content.notes.exists": {
@@ -171,7 +171,7 @@
   },
   "content.notes.outside": {
     "text": "Path is outside the shared notes folder",
-    "note": "An error: a shared note's path leads out of the workspace's shared notes folder (.hive/shared).",
+    "note": "An error: a shared note's path leads out of the workspace's shared notes folder (.combwork/shared).",
     "audience": "both"
   },
   "content.skill.audience": {

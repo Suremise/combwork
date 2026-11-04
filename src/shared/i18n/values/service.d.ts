@@ -151,6 +151,11 @@ interface HiveMessageValues {
   'service.gitRepo.upstreamGone': { upstream: string | number }
   'service.gitRepo.urlChanged': { remote: string | number }
   'service.gitRepo.urlFailed': { remote: string | number; why: string | number }
+  'service.hiveMove.busy': { profile: string | number }
+  'service.hiveMove.closed': undefined
+  'service.hiveMove.locked': { folder: string | number }
+  'service.hiveMove.otherOpen': { profile: string | number }
+  'service.hiveMove.phaseFailed': { what: string | number; error: string | number }
   'service.hiveVcs.cantList': undefined
   'service.hiveVcs.cantListWhy': { problem: string | number }
   'service.hiveVcs.changed': undefined

@@ -30,10 +30,10 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 const until = (fn, ms) => lib.until(fn, ms, 200)
-const projectJson = (p = fx.alpha) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8'))
+const projectJson = (p = fx.alpha) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'project.json'), 'utf8'))
 /** Changes the workspace's board from outside Hive, as another process would. */
 function board(sql, ...args) {
-  const db = new DatabaseSync(path.join(fx.ws, '.hive', 'hive.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(fx.ws, '.combwork', 'hive.db'), { timeout: 5000 })
   try {
     db.prepare(sql).run(...args)
   } finally {
@@ -45,7 +45,7 @@ function board(sql, ...args) {
   q.prepare(fx)
   // A second project, as a P6 build saved Pair (made before the restart below).
   const beta = path.join(fx.ws, 'beta')
-  lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.combwork/\n' })
   lib.git(beta, ['branch', '-M', 'main'])
   const marker = 'setup-marker.txt'
   let h = await q.startHive(fx, { port: PORT, keepOptions: true })
@@ -207,7 +207,7 @@ function board(sql, ...args) {
     await page.locator('[role="tab"][data-setting-tab="workflow.workspaceDefaults"]').click()
     const wsCopy = page.locator('[data-slot-default="copy"][data-level="workspace"]')
     check('Settings → Version Control’s Workspace defaults have the copied files, inheriting Hive’s', !!(await until(async () => (await wsCopy.locator('.workflow-origin').getAttribute('data-origin').catch(() => '')) === 'global' && (await wsCopy.innerText()).includes('config/hive.json'), HUNG_MS)), await wsCopy.innerText().catch(() => ''))
-    const wsJson = () => JSON.parse(fs.readFileSync(path.join(fx.ws, '.hive', 'workspace.json'), 'utf8'))
+    const wsJson = () => JSON.parse(fs.readFileSync(path.join(fx.ws, '.combwork', 'workspace.json'), 'utf8'))
     await wsCopy.locator('[data-action="none-copy"]').click()
     check('…set to none there, saved in workspace.json', !!(await until(async () => wsJson().slotDefaults?.copy === '' && (await wsCopy.locator('.workflow-origin').getAttribute('data-origin')) === 'none', HUNG_MS)), JSON.stringify(wsJson().slotDefaults))
     await shot('copy-workspace-none', wsCopy)
@@ -256,7 +256,7 @@ function board(sql, ...args) {
     const { platform: _p, ...stored } = pairOptions
     // As before P7: no step recorded in the project (the first start settled beta, with nothing to change), nor its mark.
     const { stepsDone: _done, ...cfg } = projectJson(beta)
-    fs.writeFileSync(path.join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfg, workflow: { platform: 'git', preset: 'pair', options: { ...stored, slotsUpToDate: false } } }))
+    fs.writeFileSync(path.join(beta, '.combwork', 'project.json'), JSON.stringify({ ...cfg, workflow: { platform: 'git', preset: 'pair', options: { ...stored, slotsUpToDate: false } } }))
     await h.app.close()
     board("DELETE FROM board_meta WHERE key = 'workflow.slotsUpToDateFromBeforeP7'")
     h = await q.startHive(fx, { port: PORT, keepOptions: true })

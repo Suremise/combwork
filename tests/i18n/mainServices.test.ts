@@ -186,17 +186,17 @@ describe("Initialise Git Repository's reply", () => {
     process.env.GIT_CONFIG_GLOBAL = global
     process.env.GIT_CONFIG_NOSYSTEM = '1'
     const p = join(base, 'translated')
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'sessions.json'), '{}\n')
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'sessions.json'), '{}\n')
     writeFileSync(join(p, 'a.txt'), 'a\n')
     projects = [p]
     setLanguage('pl', {
-      'main.gitInit.done': '{steps}. Folder .hive zostaje poza gitem.',
+      'main.gitInit.done': '{steps}. Folder .combwork zostaje poza gitem.',
       'main.gitInit.step.init': 'utworzono repozytorium git na main',
       'main.gitInit.step.commit': '{n, plural, one {zatwierdzono # plik} few {zatwierdzono # pliki} many {zatwierdzono # plików} other {zatwierdzono # pliku}}'
     }, 'pl-PL')
     // The starter .gitignore's step has no translation: English, in the Polish sentence.
-    expect(await initRepo(p, { gitignore: 'minimal' })).toBe('Utworzono repozytorium git na main, added a minimal .gitignore i zatwierdzono 2 pliki. Folder .hive zostaje poza gitem.')
+    expect(await initRepo(p, { gitignore: 'minimal' })).toBe('Utworzono repozytorium git na main, added a minimal .gitignore i zatwierdzono 2 pliki. Folder .combwork zostaje poza gitem.')
     expect(execFileSync('git', ['log', '--format=%s'], { cwd: p, encoding: 'utf8' }).trim()).toBe('Initial commit')
   })
 })

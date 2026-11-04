@@ -34,7 +34,7 @@ const check = (name, ok, extra = '') => {
   check('the bundled skills are EARLIER and NEWER', JSON.stringify(shipped) === JSON.stringify([...BUNDLED].sort()), `resources/skills: ${shipped.join(',')}`)
   for (const d of [userData, ws, oldWs, dump]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(proj, { recursive: true })
-  fs.mkdirSync(path.join(oldWs, '.hive'), { recursive: true })
+  fs.mkdirSync(path.join(oldWs, '.combwork'), { recursive: true })
   fs.mkdirSync(path.join(oldWs, 'p'), { recursive: true })
   // A folder of unrelated files with one skill .md among them, and a skill .zip with a script.
   fs.mkdirSync(dump, { recursive: true })
@@ -52,19 +52,19 @@ const check = (name, ok, extra = '') => {
   const { app, page, inv } = await lib.launch({ userData, env: { CODEX_HOME: lib.CODEX_HOME }, viewport: { width: 1500, height: 950 } })
   page.on('pageerror', (e) => console.log('FAIL page error', e.message))
 
-  // An existing workspace (it already has .hive) without the earlier bundled skills: the user deleted them, so they stay
+  // An existing workspace (it already has .combwork) without the earlier bundled skills: the user deleted them, so they stay
   // deleted (listed for Restore); the newer ones are added.
   await lib.openWorkspace(inv, page, oldWs)
   // Brought up to date just after the open (HI-1705): the newer ones added, then what it did is checked.
   await becomes(async () => (await inv('skills:workspace')).filter((s) => NEWER.includes(s.name) && s.bundled === 'same').length === NEWER.length)
   let list = await inv('skills:workspace')
-  check('existing workspace: skills it had are not brought back', !fs.existsSync(path.join(oldWs, '.hive', 'skills', 'handover')))
+  check('existing workspace: skills it had are not brought back', !fs.existsSync(path.join(oldWs, '.combwork', 'skills', 'handover')))
   check('existing workspace: they are listed as deleted', EARLIER.every((n) => list.find((s) => s.name === n)?.bundled === 'missing'), JSON.stringify(list.map((s) => [s.name, s.bundled])))
   check('existing workspace: the newer bundled skills are added', NEWER.every((n) => list.find((s) => s.name === n)?.bundled === 'same'), JSON.stringify(list.map((s) => [s.name, s.bundled])))
 
   // A new workspace starts with them.
   await lib.openWorkspace(inv, page, ws)
-  const skillsDir = path.join(ws, '.hive', 'skills')
+  const skillsDir = path.join(ws, '.combwork', 'skills')
   // Copied in just after the open (HI-1705).
   await becomes(() => BUNDLED.every((n) => fs.existsSync(path.join(skillsDir, n, 'SKILL.md'))))
   check('new workspace: every bundled skill is copied', BUNDLED.every((n) => fs.existsSync(path.join(skillsDir, n, 'SKILL.md'))), fs.readdirSync(skillsDir).join(','))
@@ -94,7 +94,7 @@ const check = (name, ok, extra = '') => {
 
   // An edited copy made from an older version: Hive leaves it, and says an update is there to take.
   fs.appendFileSync(pickUp, '\nMy own step.\n')
-  const manifestFile = path.join(ws, '.hive', 'bundled.json')
+  const manifestFile = path.join(ws, '.combwork', 'bundled.json')
   const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'))
   // A version Hive shipped before this one (a made-up one wouldn't count: it could be a newer Hive's).
   manifest.skills['pick-up'].from = require('../../src/main/bundledHistory.json').skills['pick-up'][0]

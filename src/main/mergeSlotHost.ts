@@ -20,6 +20,9 @@ import { addLeftMerge } from './lastRun'
 import { cardNamesOf } from './projectKeys'
 import { fmt, msg, tr } from '../shared/i18n'
 import { cardRef } from '../shared/projectKeys'
+import { HIVE_DIR } from '../shared/defaults'
+import { LEGACY_HIVE_DIR } from '../shared/hiveFolderMove'
+import { movedPath } from './combworkMove'
 
 const M = {
   leftTitle: msg({ id: 'main.mergeSlot.leftTitle', defaultMessage: '{agent} was merging when Combwork closed', description: "A notice's title as a workspace opens: the agent {agent} (its name) held the merge slot when Hive last closed, so its merge may be half done." }),
@@ -32,7 +35,7 @@ const log = createLogger('mergeSlots')
 /**
  * The app's merge slots (#350), wired to sessions (a launch's end releases its hold; status notes), Progress (a holder
  * still reporting keeps its hold), the windows (`merge-slots-changed`) and a small record per workspace in the app's
- * data (this machine's state, never the workspace's committed `.hive`), so a hold Hive closed under is reported when
+ * data (this machine's state, never the workspace's committed `.combwork`), so a hold Hive closed under is reported when
  * the workspace opens again.
  */
 export const mergeSlots = new MergeSlots({
@@ -204,7 +207,7 @@ export async function recoverMergeSlots(workspacePath: string): Promise<void> {
   const ws = workspaceFor(workspacePath)
   const ids = (await ws?.projectIds({ fresh: true })) ?? NO_PROJECT_IDS
   const last = ws?.movedFrom
-  const from = last && !existsSync(join(last, '.hive')) && !workspaceFor(last) ? last : null
+  const from = last && !existsSync(join(last, HIVE_DIR)) && !existsSync(join(last, LEGACY_HIVE_DIR)) && !workspaceFor(last) ? last : null
   const place = (h: SlotRecord): Promise<string | null> => (ws ? placeHold(ws, ids, from, h) : Promise.resolve(h.projectPath))
   const gone = [...(await orphansIn(recordFile(workspacePath), workspacePath, place)), ...(from ? await orphansIn(recordFile(from), null, place) : [])]
   // Each hold's cards as this workspace names them (HI-1661: by key); this runs outside any workspace's work.
@@ -212,7 +215,8 @@ export async function recoverMergeSlots(workspacePath: string): Promise<void> {
   for (const { hold: h, at } of gone) {
     log.info(`Merge slot: Hive closed while ${userText(h.agentName)} held it for ${userText(h.branch)}`)
     // The folder the merge was in (#984): the agent's own (its worktree), else the project's main checkout.
-    const folder = h.cwd ?? at ?? h.projectPath
+    // A folder inside a .hive that moved to .combwork since (HI-2462) is named where it is now.
+    const folder = (h.cwd ? await movedPath(workspacePath, h.cwd) : null) ?? h.cwd ?? at ?? h.projectPath
     // After an unexpected close, told in that notice (lastRun.ts).
     if (at && addLeftMerge({ agentName: h.agentName, branch: h.branch, cards: h.cards, cardNames: h.cards.map(named), folder })) continue
     const values = { branch: h.branch, hasCards: h.cards.length ? 'yes' : 'no', cards: fmt.list(h.cards.map(named), 'unit'), folder }

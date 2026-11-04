@@ -143,9 +143,9 @@ function agents() {
 
 describe('Allow on an "Ask me" lock', () => {
   beforeAll(async () => {
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, fileLocks: 'ask', agents: [] }))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, fileLocks: 'ask', agents: [] }))
     config.settings.assistant.typingPause = PAUSE
     w = createWorkspaceService()
     await w.open(wsPath)

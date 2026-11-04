@@ -1,5 +1,5 @@
 // Card attachments (HI-1700, design s8 + s11 + s13): files kept with a card, whatever sessions it has had or not yet, in its
-// host's `.hive/attachments/cards/<card number>` (its project's folder; the workspace's for a card with no project), one
+// host's `.combwork/attachments/cards/<card number>` (its project's folder; the workspace's for a card with no project), one
 // row each in `card_attachments`. Named by the card's number, which never changes (its key does: a move, a key renamed).
 //
 // Files are copied in (never moved) and published with their rows in one change of the board, under its write lock, which
@@ -48,7 +48,7 @@ const M = {
   noProject: msg({ id: 'service.cardAttach.noProject', defaultMessage: '{project} is not a project of the workspace. Nothing was attached.', description: 'An error attaching files to a card (HI-1700): the project named for it is not one of the workspace’s (a path, or a name no project has); nothing was copied.' }),
   noAttachment: msg({ id: 'service.cardAttach.noAttachment', defaultMessage: 'The card has no such attachment.', description: 'An error removing a card attachment (HI-1700) that is gone.' }),
   moved: msg({ id: 'service.cardAttach.moved', defaultMessage: "The card moved to another project meanwhile: attach again.", description: "An error attaching files to a card (HI-1700): the card moved to another project while they were copied; nothing was attached." }),
-  notOwn: msg({ id: 'service.attachments.notOwn', defaultMessage: "{folder} is a link or not a folder of the project's own, so Combwork keeps no attachments in it.", description: "An error keeping a pasted or dropped file for a session: its folder {folder} (in the project's .hive) is a link or leads elsewhere, so Hive writes nothing through it." }),
+  notOwn: msg({ id: 'service.attachments.notOwn', defaultMessage: "{folder} is a link or not a folder of the project's own, so Combwork keeps no attachments in it.", description: "An error keeping a pasted or dropped file for a session: its folder {folder} (in the project's .combwork) is a link or leads elsewhere, so Hive writes nothing through it." }),
   moveFailed: msg({ id: 'service.cardAttach.moveFailed', defaultMessage: "The card's attachments couldn't be copied to {project}, so it wasn't moved: {why}", description: "An error moving a card to another project (HI-1700): its attached files couldn't be copied there; the card stays where it was. {project} is the project's name, {why} the reason." })
 }
 
@@ -68,7 +68,7 @@ export function cardHost(ws: WorkspaceService, project: string | null | undefine
   if (!plainName(project)) throw hiveError(M.noProject, { project }, { kind: 'invalid' })
   return join(ws.path!, project)
 }
-/** A host's cards folder, `<host>\.hive\attachments\cards`. */
+/** A host's cards folder, `<host>\.combwork\attachments\cards`. */
 export const cardsRoot = (host: string): string => join(host, HIVE_DIR, ATTACHMENTS_DIR, CARD_ATTACHMENTS_DIR)
 /** A card's folder, made or not. */
 export const cardFolder = (host: string, card: number): string => join(cardsRoot(host), String(card))
@@ -174,7 +174,7 @@ const within = (p: string, roots: string[]): boolean => roots.some((r) => inside
 const allProjects = async (ws: WorkspaceService): Promise<string[]> => [...(await ws.listProjectPaths().catch(() => [] as string[])), ...(await ws.listProjectPaths({ hidden: true }).catch(() => [] as string[]))]
 
 /**
- * The innermost `.hive` folder in a real path (a host's own: the Assistant's home is inside the workspace's), and what
+ * The innermost `.combwork` folder in a real path (a host's own: the Assistant's home is inside the workspace's), and what
  * follows it: only `attachments` (a session's or a card's files) may be read through one.
  */
 function throughHive(real: string): { hive: string; next: string | undefined } | null {
@@ -231,17 +231,17 @@ export async function attachableSource(ws: WorkspaceService, caller: AttachCalle
     const own = projects.find((p) => basename(p).toLowerCase() === caller.project.toLowerCase())
     if (!own) refuse()
     const ownFolders = await workFolders(ws, own!)
-    // Protected first: another project's folders, the Assistant's home, the workspace's own .hive (wherever they are,
+    // Protected first: another project's folders, the Assistant's home, the workspace's own .combwork (wherever they are,
     // inside the caller's own folders or the temp folder included).
     const others = (await Promise.all(projects.filter((p) => p !== own).map((p) => workFolders(ws, p)))).flat()
     if (within(real, [...others, ws.assistantHome, join(ws.path!, HIVE_DIR)])) refuse()
-    // A .hive only through its own project's attachments.
+    // A .combwork only through its own project's attachments.
     if (hive && !(hive.hive.toLowerCase() === realPath(join(own!, HIVE_DIR)).toLowerCase() && hive.next === ATTACHMENTS_DIR)) refuse()
     if (!within(real, [...ownFolders, temp, ...more])) refuse()
     return real
   }
   // The Assistant and scripts: the workspace, every project's working folders wherever they are, the Assistant's home,
-  // the temp folder and the listed folders; any .hive only through its attachments.
+  // the temp folder and the listed folders; any .combwork only through its attachments.
   if (hive && hive.next !== ATTACHMENTS_DIR) refuse()
   const all = (await Promise.all(projects.map((p) => workFolders(ws, p)))).flat()
   if (!within(real, [ws.path!, ...all, ws.assistantHome, temp, ...more])) refuse()
@@ -301,7 +301,7 @@ export function checkBatch(sources: { size?: number; name?: string | null }[]): 
 }
 
 /**
- * Copies the sources into `<host>\.hive\attachments\cards\.staging\<op>` (its op.json first), each streamed, counted and
+ * Copies the sources into `<host>\.combwork\attachments\cards\.staging\<op>` (its op.json first), each streamed, counted and
  * hashed as it is read: past the file's limit or the call's total it stops (a file that grew since it was checked too),
  * and the whole staging goes. Nothing in it is published or visible until a change renames it into a card's folder.
  */
@@ -690,7 +690,7 @@ function trashRecord(v: unknown): { kind: 'remove'; card: number; files: { id: s
 }
 
 /**
- * Settles one host's cards folder (recoverCardAttachments), its whole chain checked first (`.hive`, `attachments`,
+ * Settles one host's cards folder (recoverCardAttachments), its whole chain checked first (`.combwork`, `attachments`,
  * `cards`: real folders of the host's own, never through a link) and each step again before it is used. A record that
  * isn't one Hive writes (a path in a name, an id or number it never makes) is left as it is, and logged: nothing it
  * names is touched. A file it names must be a plain file in its own operation's folder, and, put back, the one its row
@@ -849,10 +849,10 @@ export type AttachmentReadProblem = { problem: 'unknown' | 'ambiguous' | 'missin
 export const attachmentReadSeams: { beforeOpen: (() => Promise<void>) | null; afterOpen: (() => Promise<void>) | null } = { beforeOpen: null, afterOpen: null }
 
 /**
- * A card's attachment for an agent (HI-1751: HR2 couldn't read HI-1702's evidence, the document tools refusing `.hive`),
+ * A card's attachment for an agent (HI-1751: HR2 couldn't read HI-1702's evidence, the document tools refusing `.combwork`),
  * by its name or its file's name in the card's folder (`<time>_<name>`). `card`: the card as the caller was allowed to
  * read it (its scope checked), whose project decides the folder: one moved or deleted meanwhile is refused, never read
- * from another place. Only a regular file is read, its whole folder chain (`.hive`, `attachments`, `cards`, the card's)
+ * from another place. Only a regular file is read, its whole folder chain (`.combwork`, `attachments`, `cards`, the card's)
  * and itself no link, its name plain, checked before it is opened and again after, with the opened file's identity; the
  * card's row is checked again before the reply. Text (UTF-8, no NUL in its first 8 KB) is read from the byte `offset`
  * (a whole number from 0 to its size), ATTACHMENT_PAGE at a time and never more, each page ending on a whole character
@@ -878,7 +878,7 @@ export async function readCardAttachment(ws: WorkspaceService, card: { number: n
   const host = cardHost(ws, card.project)
   const folder = cardFolder(host, n)
   const path = join(folder, row.file)
-  // Each folder from the host's .hive down to the card's, and the file: there, and none of them a link.
+  // Each folder from the host's .combwork down to the card's, and the file: there, and none of them a link.
   const chain = [join(host, HIVE_DIR), join(host, HIVE_DIR, ATTACHMENTS_DIR), cardsRoot(host), folder]
   const plain = async (): Promise<'ok' | 'missing' | 'outside'> => {
     for (const d of chain) {

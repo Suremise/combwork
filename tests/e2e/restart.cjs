@@ -83,7 +83,7 @@ const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.json
   await lib.setLaunch(inv, proj, agent.id, { effort: 'high' })
   await inv('workspace:refresh')
   check('another changed effort offers Restart session', !!(await lib.until(async () => (await page.getByRole('button', { name: 'Restart session' }).count()) > 0, 10000)))
-  const dbFile = path.join(ws, '.hive', 'hive.db')
+  const dbFile = path.join(ws, '.combwork', 'hive.db')
   const hold = `const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync(${JSON.stringify(dbFile)}, { timeout: 5000 }); db.exec('BEGIN IMMEDIATE'); console.log('held'); setTimeout(() => { db.exec('COMMIT'); db.close() }, 3000)`
   const holder = require('child_process').spawn(process.execPath, ['-e', hold], { env: lib.baseEnv() })
   const released = new Promise((r) => holder.once('exit', r))

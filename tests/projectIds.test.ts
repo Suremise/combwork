@@ -26,15 +26,15 @@ const HUNG_MS = 15_000
 
 const user = { kind: 'user' } as const
 const readCard = (ws: string, n: number): Record<string, unknown> => readCardIn(ws, n)
-const projectJson = (p: string): Record<string, unknown> => JSON.parse(readFileSync(join(p, '.hive', 'project.json'), 'utf8'))
+const projectJson = (p: string): Record<string, unknown> => JSON.parse(readFileSync(join(p, '.combwork', 'project.json'), 'utf8'))
 /** The ids read again now (the workspace reuses what it read for a second), so a folder renamed just now is seen. */
 const reread = async (w: { projectIds: (o: { fresh: true }) => Promise<unknown> }): Promise<void> => void (await w.projectIds({ fresh: true }))
 
 function project(ws: string, name: string, extra: Record<string, unknown> = {}, sessions: { agentId: string }[] = []): string {
   const p = join(ws, name)
-  mkdirSync(join(p, '.hive'), { recursive: true })
-  writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [], ...extra }))
-  writeFileSync(join(p, '.hive', 'sessions.json'), JSON.stringify({ version: 1, sessions: sessions.map((s, i) => ({ id: `s${i}`, provider: 'claude-code', createdAt: '2026-10-01T00:00:00.000Z', ...s })) }))
+  mkdirSync(join(p, '.combwork'), { recursive: true })
+  writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [], ...extra }))
+  writeFileSync(join(p, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: sessions.map((s, i) => ({ id: `s${i}`, provider: 'claude-code', createdAt: '2026-10-01T00:00:00.000Z', ...s })) }))
   return p
 }
 
@@ -125,14 +125,14 @@ describe('a workspace', () => {
     // Claude was removed since, but its sessions are still the project's.
     project(wsPath, 'site', {}, [{ agentId: 'a-claude' }])
     // A card saved before ids, by a project of the workspace: it gets the id when the workspace opens.
-    mkdirSync(join(wsPath, '.hive', 'tasks'), { recursive: true })
+    mkdirSync(join(wsPath, '.combwork', 'tasks'), { recursive: true })
     const old = (n: number, name: string, agent: string | null, archived = false): void =>
-      writeFileSync(join(wsPath, '.hive', 'tasks', `${n}.json`), JSON.stringify({ number: n, title: `Old ${n}`, description: '', project: name, agent, ...(agent ? { agentName: 'Claude' } : {}), column: 'done', order: n, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived, createdAt: '2026-10-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-10-01T00:00:00.000Z' }))
+      writeFileSync(join(wsPath, '.combwork', 'tasks', `${n}.json`), JSON.stringify({ number: n, title: `Old ${n}`, description: '', project: name, agent, ...(agent ? { agentName: 'Claude' } : {}), column: 'done', order: n, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived, createdAt: '2026-10-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-10-01T00:00:00.000Z' }))
     old(1, 'beta', null)
     old(2, 'old-site', 'a-claude', true)
     old(3, 'old-site', null, true)
     old(4, 'old-site', 'a-claude')
-    writeFileSync(join(wsPath, '.hive', 'tasks', 'board.json'), JSON.stringify({ version: 1, next: 5 }))
+    writeFileSync(join(wsPath, '.combwork', 'tasks', 'board.json'), JSON.stringify({ version: 1, next: 5 }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -145,9 +145,9 @@ describe('a workspace', () => {
     expect(ids.byPath.get(join(wsPath, 'alpha').toLowerCase())).toBe(alpha)
     expect(new Set([...ids.byId.keys()]).size).toBe(3)
     // Read again: the same ids, nothing written.
-    const before = readFileSync(join(wsPath, 'alpha', '.hive', 'project.json'), 'utf8')
+    const before = readFileSync(join(wsPath, 'alpha', '.combwork', 'project.json'), 'utf8')
     expect((await w.projectIds({ fresh: true })).byId.get(alpha as string)).toBe(join(wsPath, 'alpha'))
-    expect(readFileSync(join(wsPath, 'alpha', '.hive', 'project.json'), 'utf8')).toBe(before)
+    expect(readFileSync(join(wsPath, 'alpha', '.combwork', 'project.json'), 'utf8')).toBe(before)
   })
 
   it("stamps the cards with their project's id once; one under a name no project has is left as it was", async () => {
@@ -246,7 +246,7 @@ describe('a saved id decides; nothing is lost on the way (#508 round 2)', () => 
   const wsPath = join(base, 'ws2')
   let w: ReturnType<typeof createWorkspaceService>
   const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
-  const tasksDir = join(wsPath, '.hive', 'tasks')
+  const tasksDir = join(wsPath, '.combwork', 'tasks')
   const legacy = (n: number, name: string, extra: Record<string, unknown> = {}): void =>
     writeFileSync(join(tasksDir, `${n}.json`), JSON.stringify({ number: n, title: `Legacy ${n}`, description: '', project: name, agent: null, column: 'todo', order: n, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived: false, createdAt: '2026-10-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-10-01T00:00:00.000Z', ...extra }))
   const alphaAgent = { kind: 'agent', name: 'X (alpha)', scope: 'alpha', self: { project: 'alpha', agentId: 'x1' } } as const
@@ -266,7 +266,7 @@ describe('a saved id decides; nothing is lost on the way (#508 round 2)', () => 
     writeFileSync(join(tasksDir, 'board.json'), JSON.stringify({ version: 1, next: 4 }))
     // A lane saved before ids, and one under old-site.
     const lane = (id: string, name: string, builder: string) => ({ id, project: name, name: null, builder: { id: builder, name: builder }, reviewer: null, cards: [1], rounds: 5, waitMinutes: 120, state: 'active', startedBy: 'x', startedAt: '2026-10-09T10:00:00.000Z', updatedAt: '2026-10-09T10:00:00.000Z', endedAt: null, mergeCommit: null })
-    writeFileSync(join(wsPath, '.hive', 'lanes.json'), JSON.stringify({ version: 1, lanes: [lane('lane-a', 'alpha', 'a1'), lane('lane-o', 'old-site', 'a-old')] }))
+    writeFileSync(join(wsPath, '.combwork', 'lanes.json'), JSON.stringify({ version: 1, lanes: [lane('lane-a', 'alpha', 'a1'), lane('lane-o', 'old-site', 'a-old')] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -275,8 +275,8 @@ describe('a saved id decides; nothing is lost on the way (#508 round 2)', () => 
   it('stamping gives each card its id once, every field kept; the files as they were are kept in the import backup (#1017)', async () => {
     expect(await tasks.stampCardProjects(w)).toBe(2)
     // The cards' files as they were before the move, kept as they were.
-    const kept = readdirSync(join(wsPath, '.hive')).find((f) => f.startsWith('tasks.imported-'))!
-    const before1 = JSON.parse(readFileSync(join(wsPath, '.hive', kept, '1.json'), 'utf8'))
+    const kept = readdirSync(join(wsPath, '.combwork')).find((f) => f.startsWith('tasks.imported-'))!
+    const before1 = JSON.parse(readFileSync(join(wsPath, '.combwork', kept, '1.json'), 'utf8'))
     expect(before1).toMatchObject({ project: 'alpha', custom: { kept: true } })
     expect(readCard(wsPath, 1)).toEqual({ ...before1, projectId: projectJson(join(wsPath, 'alpha')).id })
     expect(readCard(wsPath, 2).projectId).toBe(projectJson(join(wsPath, 'beta')).id)
@@ -287,14 +287,14 @@ describe('a saved id decides; nothing is lost on the way (#508 round 2)', () => 
   })
 
   it('lanes saved before ids get their project’s id when stamped, once; lanes.json kept as it was in the import backup (#1018)', async () => {
-    const before = readFileSync(join(wsPath, '.hive', 'lanes.json'), 'utf8')
+    const before = readFileSync(join(wsPath, '.combwork', 'lanes.json'), 'utf8')
     expect(await lanes.stampLaneProjects(w)).toBe(1)
     const saved = storeDocs<{ id: string; projectId?: string }>(wsPath, 'lanes')
     expect(saved.find((l) => l.id === 'lane-a')?.projectId).toBe(projectJson(join(wsPath, 'alpha')).id)
     expect(saved.find((l) => l.id === 'lane-o')?.projectId).toBeUndefined()
-    const backup = readdirSync(join(wsPath, '.hive')).find((f) => f.startsWith('lanes.json.imported-'))!
-    expect(readFileSync(join(wsPath, '.hive', backup), 'utf8')).toBe(before)
-    expect(existsSync(join(wsPath, '.hive', 'lanes.json'))).toBe(false)
+    const backup = readdirSync(join(wsPath, '.combwork')).find((f) => f.startsWith('lanes.json.imported-'))!
+    expect(readFileSync(join(wsPath, '.combwork', backup), 'utf8')).toBe(before)
+    expect(existsSync(join(wsPath, '.combwork', 'lanes.json'))).toBe(false)
     expect(await lanes.stampLaneProjects(w)).toBe(0)
   })
 
@@ -529,7 +529,7 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
   }
 
   // HI-2045: a refresh that listed a project before it was deleted (the root watcher's, 250 ms after its folder appeared)
-  // found no project.json when it read it, and made the project again (`.hive` with its sessions and archive folders).
+  // found no project.json when it read it, and made the project again (`.combwork` with its sessions and archive folders).
   it("a refresh that listed a project before it was deleted doesn't make its folder again", async () => {
     const wsPath = join(base, 'ws-deleted-in-refresh')
     project(wsPath, 'keep')
@@ -562,7 +562,7 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
     }
   })
 
-  // HI-2045 (HR2's round 1): deleted later, once `.hive` is there and before its folders and project.json are made, the
+  // HI-2045 (HR2's round 1): deleted later, once `.combwork` is there and before its folders and project.json are made, the
   // project isn't made again either: each is made only inside a folder that is there.
   it("a project deleted while it is being set up isn't made again by its folders or its project.json", async () => {
     const wsPath = join(base, 'ws-deleted-in-setup')
@@ -573,7 +573,7 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
       await w.refreshesSettled()
       const gone = join(wsPath, 'gone')
       mkdirSync(gone)
-      // Its exclusion from git starts beside the folders: the project goes then, after `.hive` was made.
+      // Its exclusion from git starts beside the folders: the project goes then, after `.combwork` was made.
       const exclude = w.ensureGitExclude.bind(w)
       w.ensureGitExclude = async (p: string) => {
         if (p.toLowerCase() === gone.toLowerCase()) rmSync(gone, { recursive: true, force: true })

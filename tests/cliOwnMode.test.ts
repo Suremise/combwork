@@ -170,9 +170,9 @@ describe('a running session on it', () => {
   let sessions: typeof import('../src/main/sessions').sessions
   let run: <T>(fn: () => Promise<T> | T) => Promise<T>
   beforeAll(async () => {
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     const ws = await import('../src/main/workspace')
     sessions = (await import('../src/main/sessions')).sessions
     const svc = ws.createWorkspaceService()

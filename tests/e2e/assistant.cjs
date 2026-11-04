@@ -11,13 +11,13 @@ const path = require('path')
 const userData = path.join(lib.WORK, 'assistant-profile')
 const ws = path.join(lib.WORK, 'assistant-ws')
 const ws2 = path.join(lib.WORK, 'assistant-ws2')
-const home = path.join(ws, '.hive', 'assistant')
+const home = path.join(ws, '.combwork', 'assistant')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const agentFile = () => JSON.parse(fs.readFileSync(path.join(home, '.hive', 'project.json'), 'utf8')).agents?.[0] ?? {}
+const agentFile = () => JSON.parse(fs.readFileSync(path.join(home, '.combwork', 'project.json'), 'utf8')).agents?.[0] ?? {}
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
 const HUNG_MS = 10000
 /** Whether fn() comes true (checked until it does, up to HUNG_MS). */
@@ -43,7 +43,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('its home is not listed as a project', info.projects.map((p) => p.name).sort().join(',') === 'api,web')
   check("its sessions are kept out of git", fs.readFileSync(path.join(home, '.gitignore'), 'utf8').includes('*'))
   // Brought in after the open (HI-1705): wait for them.
-  const modes = () => (fs.existsSync(path.join(ws, '.hive', 'modes')) ? fs.readdirSync(path.join(ws, '.hive', 'modes')).sort().join(',') : '')
+  const modes = () => (fs.existsSync(path.join(ws, '.combwork', 'modes')) ? fs.readdirSync(path.join(ws, '.combwork', 'modes')).sort().join(',') : '')
   check('Hive\'s four modes are in the workspace', await becomes(() => modes() === 'coordinator.md,planner.md,qa-triager.md,release-manager.md'), modes())
   check("it defaults to the agents' model and effort, and Auto mode", JSON.stringify(info.assistant.config.providers['claude-code']) === JSON.stringify({ model: 'inherit', effort: 'inherit', permissionMode: 'auto', extraArgs: '', use200kContext: 'inherit' }), JSON.stringify(info.assistant.config.providers['claude-code']))
 
@@ -128,7 +128,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 
   // The Modes view: create, delete and restore.
   await inv('modes:create', 'Night Watch')
-  check('a new mode is a file', fs.existsSync(path.join(ws, '.hive', 'modes', 'night-watch.md')))
+  check('a new mode is a file', fs.existsSync(path.join(ws, '.combwork', 'modes', 'night-watch.md')))
   await inv('modes:delete', 'qa-triager')
   const listed = await inv('modes:list')
   check('a deleted bundled mode is offered for restoring', listed.find((p) => p.id === 'qa-triager')?.bundled === 'missing')
@@ -163,7 +163,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('…with the model its connection sets', launch.includes('"--model","sonnet"'))
   check("its mode is appended to Claude Code's system prompt", launch.includes('--append-system-prompt-file'))
   check("Hive's reading tools are allowed", launch.includes('mcp__combwork__cw_list_projects') && !launch.includes('mcp__combwork__cw_write_shared_note'))
-  check('Planner\'s instructions are in the launch', fs.readFileSync(path.join(home, '.hive', 'launch-assistant', 'instructions.md'), 'utf8').includes('# Your mode: Planner'))
+  check('Planner\'s instructions are in the launch', fs.readFileSync(path.join(home, '.combwork', 'launch-assistant', 'instructions.md'), 'utf8').includes('# Your mode: Planner'))
   check('it is not a project agent', (await inv('workspace:get')).projects.every((p) => p.agents.every((a) => a.id !== 'assistant')))
   // The header's fold button (#1330), as the Progress panel's: its tooltip names the shortcut (a rebinding too), and
   // folding the panel leaves the Assistant running.
@@ -194,7 +194,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   const closing = inv('workspace:close')
   await lib.until(async () => (await page.locator('.dialog').count()) > 0, 10000)
   const dialog = await page.locator('.dialog').last().innerText().catch(() => '')
-  check('the close dialog names it "Assistant"', /Assistant/.test(dialog) && !/\.hive|assistant ·/i.test(dialog), dialog.replace(/\s+/g, ' ').slice(0, 200))
+  check('the close dialog names it "Assistant"', /Assistant/.test(dialog) && !/\.combwork|assistant ·/i.test(dialog), dialog.replace(/\s+/g, ' ').slice(0, 200))
   await page.locator('.dialog .btn', { hasText: 'Close workspace now' }).click()
   check('closing the workspace stops it', (await closing) === true && !(await inv('session:live')).some((s) => s.agentId === 'assistant'))
 

@@ -31,7 +31,7 @@ const waitHung = (fn) => lib.until(fn, HUNG_MS, 200)
   q.prepare(fx)
   // None's project: a plain folder, its deliverable and what N4 leaves out.
   const nada = path.join(fx.ws, 'nada')
-  fs.mkdirSync(path.join(nada, '.hive'), { recursive: true })
+  fs.mkdirSync(path.join(nada, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(nada, 'notes.txt'), 'notes\n')
   const h = await q.startHive(fx, { port: PORT })
   const { page, inv } = h
@@ -139,7 +139,7 @@ const waitHung = (fn) => lib.until(fn, HUNG_MS, 200)
     q.restoreCheck(fx)
 
     // ===== None (nada): N3 a check before review, N4 what the work is, N2 no self-review, N6 dependencies accepted.
-    fs.writeFileSync(path.join(nada, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    fs.writeFileSync(path.join(nada, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     await inv('workspace:refresh')
     const nb = await q.agent(fx, h, 'NB', { project: nada })
     const nr = await q.agent(fx, h, 'NR', { project: nada })

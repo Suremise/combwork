@@ -13934,7 +13934,7 @@ button.progress-lane-retry {
   }
 }
 
-/* .hive isn't kept out of version control (#345): the text takes the room and the buttons wrap under it in a narrow
+/* .combwork isn't kept out of version control (#345): the text takes the room and the buttons wrap under it in a narrow
    pane; one too narrow even for them clips rather than scrolling the page sideways. */
 .hive-vcs-notice {
   flex-wrap: wrap;

@@ -10,7 +10,7 @@ import { BusyButton, Icon, Markdown, Modal, useBusy } from './ui'
 
 /**
  * Cards an older Hive saved after the board moved to its database (#1017's downgrade), set aside in
- * `.hive/tasks.set-aside`: the Review… dialog (#1044, Darren's decision on #1017) is the only way they reach the board.
+ * `.combwork/tasks.set-aside`: the Review… dialog (#1044, Darren's decision on #1017) is the only way they reach the board.
  * Each is added as a new card (its old number if free, else the next; "Added by Repair" in its history) or discarded,
  * after a confirmation. Nothing else is rewritten: links to an old number stay as they are.
  */

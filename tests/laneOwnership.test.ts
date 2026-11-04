@@ -96,12 +96,12 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
   let off: () => void
   const user = { kind: 'user' } as const
   beforeAll(async () => {
-    mkdirSync(join(project, '.hive'), { recursive: true })
+    mkdirSync(join(project, '.combwork'), { recursive: true })
     writeFileSync(join(project, 'a.txt'), 'a\n')
-    writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'b1', name: 'B1' }, { id: 'b2', name: 'B2' }, { id: 'r1', name: 'R1' }] }))
+    writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'b1', name: 'B1' }, { id: 'b2', name: 'B2' }, { id: 'r1', name: 'R1' }] }))
     // Another project, for a card moved there and back (HI-1821).
-    mkdirSync(join(wsPath, 'beta', '.hive'), { recursive: true })
-    writeFileSync(join(wsPath, 'beta', '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'c1', name: 'C1' }] }))
+    mkdirSync(join(wsPath, 'beta', '.combwork'), { recursive: true })
+    writeFileSync(join(wsPath, 'beta', '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'c1', name: 'C1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     lanes.startLanes()

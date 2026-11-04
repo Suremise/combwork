@@ -67,7 +67,7 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`, tools]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(tools, { recursive: true })
-  lib.gitProject(alpha, { 'a.txt': 'a\n', 'package-lock.json': '{"v":1}\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'a.txt': 'a\n', 'package-lock.json': '{"v":1}\n', '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   lib.git(alpha, ['branch', 'integration'])
   // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
@@ -96,7 +96,7 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     // Pair with Hive merges into integration (checked out nowhere), cards in slots, slots brought up to date (G15).
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
     // G15 on, written into project.json as the Version Control tab will offer it (#1445; this version doesn't yet).
-    const pj = path.join(alpha, '.hive', 'project.json')
+    const pj = path.join(alpha, '.combwork', 'project.json')
     const raw = JSON.parse(fs.readFileSync(pj, 'utf8'))
     const own = (function find(o) {
       if (!o || typeof o !== 'object') return null

@@ -32,7 +32,7 @@ import { CATEGORY_STAGE, type Category, type StageId } from '../shared/workflow/
 const log = createLogger('board')
 
 /**
- * The workspace's task board in SQLite (#1017, design on the card): `.hive/hive.db`. Since 1.0's cards step (#1209) a
+ * The workspace's task board in SQLite (#1017, design on the card): `.combwork/hive.db`. Since 1.0's cards step (#1209) a
  * card is a row of typed columns in `cards` with its lists in child tables (labels, links, context, comments, history,
  * decisions, holds; schema/v1_0.ts), and every reader is given the card's JSON document composed from them, byte for
  * byte the document it was saved as (schema/cardRows.ts), so the Agent API's JSON is unchanged. Before the upgrade (a
@@ -330,7 +330,7 @@ interface Board {
   /** Its real location (`placeKey`) as it opened: another spelling's board of the same folder is closed with it (#1402). */
   place: string
   /**
-   * Its `.hive` at that real location, as it opened: every write and removal on disk for it (the heartbeat, the stub, the
+   * Its `.combwork` at that real location, as it opened: every write and removal on disk for it (the heartbeat, the stub, the
    * presence marker's removal) goes there, never through a spelling that may point elsewhere by then (#1402).
    */
   hive: string
@@ -398,8 +398,8 @@ const stamp = (): string => new Date().toISOString().replace(/[:.]/g, '-')
 
 /** The README left in the cards' old folder for anyone (or any older Hive) looking there. */
 const README = [
-  'The task board moved to .hive/hive.db in Hive 0.9 (#1017).', // i18n-ignore: a file left for people and older Hive versions, in English
-  'An older Hive opening this workspace shows an empty board; cards it adds here are set aside in .hive/tasks.set-aside when Hive 0.9 or later opens again, for you to review.', // i18n-ignore: as above
+  'The task board moved to .combwork/hive.db in Hive 0.9 (#1017).', // i18n-ignore: a file left for people and older Hive versions, in English
+  'An older Hive opening this workspace shows an empty board; cards it adds here are set aside in .combwork/tasks.set-aside when Hive 0.9 or later opens again, for you to review.', // i18n-ignore: as above
   'To use the board in an older Hive, use Export Board to JSON in Hive 0.9 and copy the exported files into this folder, with Hive closed.', // i18n-ignore: as above
   ''
 ].join('\r\n')
@@ -553,7 +553,7 @@ export const SET_ASIDE = `${TASKS}.set-aside`
 
 /**
  * Card files an older Hive saved in the stub folder (#1017's downgrade; Darren's decision, 17 Oct): after the move to the
- * database nothing is taken back on its own. Every `<n>.json` found there is set aside, intact, in `.hive/tasks.set-aside`,
+ * database nothing is taken back on its own. Every `<n>.json` found there is set aside, intact, in `.combwork/tasks.set-aside`,
  * free number or not, and the user is told once ("n cards made by an older Hive were found: review them"; the review to
  * add or discard them is #1044). Each file goes once: one whose very content is set aside already isn't kept twice, and
  * another file of the same name is kept beside it under a name of its own. A copy is made before the file leaves the
@@ -604,7 +604,7 @@ const SET_ASIDE_NAME = /^(\d+)(?:\.[0-9TZ-]+)?\.json$/
 const textHash = (text: string): string => createHash('sha256').update(text).digest('hex')
 
 /**
- * The files set aside in `.hive/tasks.set-aside` (#1044), oldest number first: each one's name, the number its name
+ * The files set aside in `.combwork/tasks.set-aside` (#1044), oldest number first: each one's name, the number its name
  * gives and its text (null when it can't be read). One already added to the board (its content recorded as added, its
  * file not moved yet: Windows held it) isn't listed, and goes to the Recycle Bin now.
  */
@@ -739,7 +739,7 @@ export async function untilBoardOpenable(path: string, signal: AbortSignal): Pro
  */
 function openBoard(path: string, upgrade: boolean): Board {
   const key = keyOf(path)
-  // The folder's `.hive` where it really is, now: what every later write and removal for this board uses (#1402), the
+  // The folder's `.combwork` where it really is, now: what every later write and removal for this board uses (#1402), the
   // file itself opened by its spelling (the same file at this instant; db.ts knows it by that).
   const real = realPath(path)
   const hive = join(real, HIVE_DIR)
@@ -856,7 +856,7 @@ const packaged = (): boolean => {
 let ownPresence: string | null = null
 const presenceId = (): string => (ownPresence ??= profileId(userDataOf()))
 
-/** Writes this Hive's presence marker in a workspace's .hive (its heartbeat); a failure only means one heartbeat fewer. */
+/** Writes this Hive's presence marker in a workspace's .combwork (its heartbeat); a failure only means one heartbeat fewer. */
 function markPresent(hive: string): void {
   try {
     writePresence(hive, presenceId(), { pid: process.pid, profile: basename(userDataOf()), hiveVersion: hiveVersion(), startedAt })

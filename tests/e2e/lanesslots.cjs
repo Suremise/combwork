@@ -47,7 +47,7 @@ const lines = (file) => {
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`, tools, shots]) fs.rmSync(d, { recursive: true, force: true })
   for (const d of [tools, shots]) fs.mkdirSync(d, { recursive: true })
-  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
   lib.git(alpha, ['config', 'user.name', identity.name])

@@ -81,13 +81,13 @@ const find = async (path: string): Promise<UnusedWorktree | undefined> => (await
  * one at its next read of the ids (a second later or more, as under load), and its session records are under the old one.
  */
 const agents = (trees: { path: string; branch: string }[]): void => {
-  const file = join(proj, '.hive', 'project.json')
+  const file = join(proj, '.combwork', 'project.json')
   const id = existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')) as { id?: string }).id : undefined
   writeFileSync(file, JSON.stringify({ version: 2, ...(id ? { id } : {}), agents: trees.map((t, i) => ({ id: `a${i}`, name: `A${i}`, provider: 'claude-code', worktree: { ...t, base: 'main' } })) }))
 }
 
 beforeAll(async () => {
-  mkdirSync(join(proj, '.hive'), { recursive: true })
+  mkdirSync(join(proj, '.combwork'), { recursive: true })
   execFileSync('git', ['init', '-q', '-b', 'main', proj])
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com']]) git(proj, 'config', k, v)
   commit(proj, 'a.txt')
@@ -675,7 +675,7 @@ describe('in the Changes tab (#400)', () => {
       // Meanwhile Add Agent picks it as an existing worktree: refused (no agent is pinned to a worktree in 1.0), the
       // project's agents unchanged.
       await expect(run(() => addAgent(proj, { name: 'Late', location: 'existing-worktree', worktreePath: t.path }))).rejects.toThrow(/aren’t pinned to worktrees/)
-      expect(JSON.parse(readFileSync(join(proj, '.hive', 'project.json'), 'utf8')).agents).toEqual([])
+      expect(JSON.parse(readFileSync(join(proj, '.combwork', 'project.json'), 'utf8')).agents).toEqual([])
       // A second merge or a removal of it waits for neither: refused while this one has it.
       await expect(run(() => mergeUnused(proj, t.path, { squash: false, message: 'twice', cleanup: false }))).rejects.toThrow(/already being removed or merged/)
       expect(await run(() => removeUnusedWorktree(proj, t.path))).toMatchObject({ deleted: false, reason: 'That worktree is already being removed or merged.' })

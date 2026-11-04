@@ -11,7 +11,7 @@ import { workspace } from './workspace'
 import { trash } from './trash'
 
 /**
- * The Hive Assistant's modes: Markdown files in the workspace's .hive/modes (a header with name,
+ * The Hive Assistant's modes: Markdown files in the workspace's .combwork/modes (a header with name,
  * description and icon, then the character and focus). Hive ships four (resources/modes), kept up to date in
  * each workspace like the bundled skills (bundled.ts).
  */

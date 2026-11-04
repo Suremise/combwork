@@ -54,7 +54,7 @@ const commitIn = (dir, files, message, trailer) => {
   for (const d of [userData, ws, `${ws}.worktrees`, shots]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(shots, { recursive: true })
   for (const p of [alpha, beta, gamma, delta, epsilon]) {
-    lib.gitProject(p, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
+    lib.gitProject(p, { 'a.txt': 'a\n', '.gitignore': '.combwork/\n' })
     lib.git(p, ['branch', '-M', 'main'])
     // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
     lib.git(p, ['config', 'user.name', identity.name])
@@ -310,7 +310,7 @@ const commitIn = (dir, files, message, trailer) => {
     await idle(gamma, gr1.id)
     const kv = (await intent(tgr, k, 'start-review')).status === 200 && (await intent(tgr, k, 'verdict', { pass: true, comment: 'K: passed' })).status === 200
     check('GA-R1 reviews and passes K', kv)
-    check('K is Done (committed), with no Assistant step', !!(await until(async () => (await card(k))?.column === 'done', HUNG_MS)) && !(await live(path.join(ws, '.hive', 'assistant'), 'assistant')), (await card(k))?.column)
+    check('K is Done (committed), with no Assistant step', !!(await until(async () => (await card(k))?.column === 'done', HUNG_MS)) && !(await live(path.join(ws, '.combwork', 'assistant'), 'assistant')), (await card(k))?.column)
 
     // --- 4. delta (HI-2321, seen on HI-2320): a pool lane's design checked by one reviewer and its revision by another.
     // DE-R1 checks the design (gaps) while watching the card. Its watch doesn't hold it (HI-2333): DE-B2's card Y goes to

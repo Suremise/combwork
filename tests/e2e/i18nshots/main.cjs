@@ -61,7 +61,7 @@ async function corruptFile(ctx) {
   const { inv, page } = ctx
   // Notices earlier screens left go first: the one shown then is this one.
   await closeToasts(ctx)
-  const dir = path.join(ctx.workspace, 'mainbeta', '.hive')
+  const dir = path.join(ctx.workspace, 'mainbeta', '.combwork')
   fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(path.join(dir, 'project.json'), '{ not json')
   const old = new Date(Date.now() - 60_000) // damaged a while ago: one changed within 2 s is a save in progress (#1601)

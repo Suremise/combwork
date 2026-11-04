@@ -60,8 +60,8 @@ import { withAgentNames, workspaceAgents } from './agentNames'
 import { AGENT_NAME_MAX, agentNameProblem, nameTaken, sameAgentName } from '../shared/agentNames'
 
 /**
- * Agent templates (#126): a project's agents and layout saved under a name, in the workspace (`<workspace>/.hive/
- * templates`, for every project) or the project (`<project>/.hive/templates`, private: the project's .hive is kept out
+ * Agent templates (#126): a project's agents and layout saved under a name, in the workspace (`<workspace>/.combwork/
+ * templates`, for every project) or the project (`<project>/.combwork/templates`, private: the project's .combwork is kept out
  * of git). One kept JSON file each (a damaged one is recovered from its copy). Loading one replaces the project's agents
  * — only when it is safe (none running, no uncommitted work in their worktrees, every provider on and installed), and
  * all or nothing; adding one agent from a template leaves the others alone. #127: listing every scope, rename,

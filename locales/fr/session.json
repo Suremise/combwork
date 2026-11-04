@@ -104,6 +104,7 @@
   "session.modeOffer.one": "Changer maintenant le mode de l’agent {agent} ? Sinon, le nouveau mode s’applique à partir de sa prochaine session.",
   "session.modeOffer.switch": "Changer maintenant",
   "session.modeOffer.title": "Nouveau mode d’autorisation : {modes}",
+  "session.movedFresh.body": "{n, plural, one {# conversation a recommencé} other {# conversations ont recommencé}} de zéro : {n, plural, one {son dossier a été déplacé} other {leurs dossiers ont été déplacés}} avec .hive vers .combwork, donc {n, plural, one {elle ne peut pas} other {elles ne peuvent pas}} continuer là-bas. Les précédentes restent dans Sessions, à relire.",
   "session.newConversation.didntStop": "L’agent ne s’est pas arrêté : aucune nouvelle conversation n’a été démarrée.",
   "session.newConversation.notRunning": "L’agent ne tourne pas.",
   "session.newConversation.pending": "L’agent vient de recevoir un prompt que sa CLI n’a pas encore pris.",

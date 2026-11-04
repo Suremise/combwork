@@ -65,7 +65,7 @@ describe('which servers are added to a project (HI-2059)', () => {
   })
 
   it("strips Hive's own fields from what a CLI is given", () => {
-    expect(mcp.toLaunchDef({ description: 'd', tags: ['x'], command: 'node', args: ['a.js'] }, 'C:\\ws\\.hive\\mcp')).toEqual({ command: 'node', args: ['a.js'] })
+    expect(mcp.toLaunchDef({ description: 'd', tags: ['x'], command: 'node', args: ['a.js'] }, 'C:\\ws\\.combwork\\mcp')).toEqual({ command: 'node', args: ['a.js'] })
   })
 })
 
@@ -103,9 +103,9 @@ describe('MCP servers per project (HI-2059)', () => {
   let apiary: string
   let w: ReturnType<typeof createWorkspaceService>
   const run = <T>(fn: () => Promise<T> | T): Promise<T> => inWorkspace(w, async () => fn())
-  const mcpDir = (): string => join(wsPath, '.hive', 'mcp')
+  const mcpDir = (): string => join(wsPath, '.combwork', 'mcp')
   const json = (path: string) => JSON.parse(readFileSync(path, 'utf8'))
-  const projectMcp = (p: string) => json(join(p, '.hive', 'project.json')).mcp
+  const projectMcp = (p: string) => json(join(p, '.combwork', 'project.json')).mcp
 
   /** The servers a launch in a project gets (its agent's), but Hive's own: the launch's own reader. */
   const gets = async (p: string): Promise<string[]> => run(async () => Object.keys((await sessions.effective(p, { id: 'a1', name: 'Builder', provider: 'claude-code' } as never)).mcpServers).filter((n) => n !== 'hive').sort())
@@ -149,12 +149,12 @@ describe('MCP servers per project (HI-2059)', () => {
     ambrosia = join(wsPath, 'ambrosia')
     apiary = join(wsPath, 'apiary')
     mkdirSync(mcpDir(), { recursive: true })
-    for (const p of [ambrosia, apiary]) mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(wsPath, '.hive', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['github'] } }))
+    for (const p of [ambrosia, apiary]) mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(wsPath, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['github'] } }))
     for (const n of ['github', 'notes', 'docs']) writeFileSync(join(mcpDir(), `${n}.json`), JSON.stringify({ command: 'node', args: [`${n}.js`] }))
     const agents = [{ id: 'a1', name: 'Builder', provider: 'claude-code' }]
-    writeFileSync(join(ambrosia, '.hive', 'project.json'), JSON.stringify({ version: 2, chime: 'on', agents, mcp: { disabled: [] } }))
-    writeFileSync(join(apiary, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, mcp: { disabled: ['github'], enabled: ['notes'] } }))
+    writeFileSync(join(ambrosia, '.combwork', 'project.json'), JSON.stringify({ version: 2, chime: 'on', agents, mcp: { disabled: [] } }))
+    writeFileSync(join(apiary, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents, mcp: { disabled: ['github'], enabled: ['notes'] } }))
   })
   afterEach(async () => {
     vi.restoreAllMocks()
@@ -167,12 +167,12 @@ describe('MCP servers per project (HI-2059)', () => {
     expect(await onIn('notes')).toEqual(['apiary'])
     expect(await onIn('docs')).toEqual([])
     // The workspace's old switch is kept, frozen, for a project not converted; the Assistant's list is converted too.
-    expect(json(join(wsPath, '.hive', 'workspace.json')).mcp).toEqual({ enabled: ['github', 'notes'], model: 2, assistant: [], assistantModel: 3 })
+    expect(json(join(wsPath, '.combwork', 'workspace.json')).mcp).toEqual({ enabled: ['github', 'notes'], model: 2, assistant: [], assistantModel: 3 })
     expect(projectMcp(ambrosia)).toEqual({ disabled: [], enabled: ['github'], model: 3 })
     expect(projectMcp(apiary)).toEqual({ disabled: [], enabled: ['notes'], model: 3 })
-    expect(json(join(ambrosia, '.hive', 'project.json')).chime).toBe('on')
+    expect(json(join(ambrosia, '.combwork', 'project.json')).chime).toBe('on')
     // Nothing was dropped: no notice due.
-    expect(json(join(wsPath, '.hive', 'workspace.json')).mcp.droppedNotice).toBeUndefined()
+    expect(json(join(wsPath, '.combwork', 'workspace.json')).mcp.droppedNotice).toBeUndefined()
     // Opened again: already converted, so a removal made since isn't undone.
     await run(() => mcp.removeMcpFrom({ project: ambrosia }, 'github'))
     await reopen()
@@ -181,11 +181,11 @@ describe('MCP servers per project (HI-2059)', () => {
 
   it("drops a choice kept while the workspace had the server off, and says so once", async () => {
     // #1093's model already: docs remembered in ambrosia while the workspace has it off.
-    writeFileSync(join(wsPath, '.hive', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['github'], model: 2, assistant: ['docs', 'github'] } }))
-    writeFileSync(join(ambrosia, '.hive', 'project.json'), JSON.stringify({ version: 2, mcp: { disabled: [], enabled: ['docs', 'github'] } }))
+    writeFileSync(join(wsPath, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['github'], model: 2, assistant: ['docs', 'github'] } }))
+    writeFileSync(join(ambrosia, '.combwork', 'project.json'), JSON.stringify({ version: 2, mcp: { disabled: [], enabled: ['docs', 'github'] } }))
     await open()
     expect(projectMcp(ambrosia)).toEqual({ disabled: [], enabled: ['github'], model: 3 })
-    expect(json(join(wsPath, '.hive', 'workspace.json')).mcp.assistant).toEqual(['github'])
+    expect(json(join(wsPath, '.combwork', 'workspace.json')).mcp.assistant).toEqual(['github'])
     expect(await onIn('docs')).toEqual([])
     // apiary's notes, which the workspace had off too.
     expect(w.config.mcp.droppedNotice).toBe(3)
@@ -195,14 +195,14 @@ describe('MCP servers per project (HI-2059)', () => {
     await mcp.sayMcpAddedOnce(w)
     expect(toasts).toHaveLength(1)
     expect(JSON.stringify(toasts[0])).toContain('3 choices kept for servers that were off in the workspace were dropped')
-    expect(json(join(wsPath, '.hive', 'workspace.json')).mcp.droppedNotice).toBeUndefined()
+    expect(json(join(wsPath, '.combwork', 'workspace.json')).mcp.droppedNotice).toBeUndefined()
   })
 
   it("a project whose conversion fails keeps its old meaning, so a choice the workspace had off never runs, and converts at the next open", async () => {
-    writeFileSync(join(wsPath, '.hive', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['github', 'notes'], model: 2 } }))
-    writeFileSync(join(ambrosia, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', provider: 'claude-code' }], mcp: { disabled: [], enabled: ['github'] } }))
+    writeFileSync(join(wsPath, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['github', 'notes'], model: 2 } }))
+    writeFileSync(join(ambrosia, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', provider: 'claude-code' }], mcp: { disabled: [], enabled: ['github'] } }))
     // apiary remembers docs, off in the workspace.
-    writeFileSync(join(apiary, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', provider: 'claude-code' }], mcp: { disabled: [], enabled: ['docs', 'notes'] } }))
+    writeFileSync(join(apiary, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', provider: 'claude-code' }], mcp: { disabled: [], enabled: ['docs', 'notes'] } }))
     w = createWorkspaceService()
     const write = w.mutateProjectConfig.bind(w)
     // ambrosia's write goes through; apiary's fails, after it.
@@ -222,8 +222,8 @@ describe('MCP servers per project (HI-2059)', () => {
   })
 
   it('a project not converted at open converts at the next, never starting a server the workspace had off', async () => {
-    writeFileSync(join(wsPath, '.hive', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes'], model: 2 } }))
-    writeFileSync(join(apiary, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', provider: 'claude-code' }], mcp: { disabled: [], enabled: ['docs', 'notes'] } }))
+    writeFileSync(join(wsPath, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes'], model: 2 } }))
+    writeFileSync(join(apiary, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', provider: 'claude-code' }], mcp: { disabled: [], enabled: ['docs', 'notes'] } }))
     w = createWorkspaceService()
     const write = w.mutateProjectConfig.bind(w)
     const spy = vi.spyOn(w, 'mutateProjectConfig').mockImplementation((p, fn, o) => (p === apiary ? Promise.reject(new Error('EPERM')) : write(p, fn, o)))
@@ -237,8 +237,8 @@ describe('MCP servers per project (HI-2059)', () => {
   })
 
   it("Add on a project not converted converts it in the same write, adding only what was asked", async () => {
-    writeFileSync(join(wsPath, '.hive', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes'], model: 2 } }))
-    writeFileSync(join(apiary, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', provider: 'claude-code' }], mcp: { disabled: [], enabled: ['docs', 'notes'] } }))
+    writeFileSync(join(wsPath, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes'], model: 2 } }))
+    writeFileSync(join(apiary, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', provider: 'claude-code' }], mcp: { disabled: [], enabled: ['docs', 'notes'] } }))
     w = createWorkspaceService()
     const write = w.mutateProjectConfig.bind(w)
     const spy = vi.spyOn(w, 'mutateProjectConfig').mockImplementation((p, fn, o) => (p === apiary ? Promise.reject(new Error('EPERM')) : write(p, fn, o)))
@@ -352,7 +352,7 @@ describe('MCP servers per project (HI-2059)', () => {
     await open()
     await run(() => mcp.addMcpFromFile(file('godot.json', godot), 'godot'))
     await add(ambrosia, 'godot')
-    const settings = join(ambrosia, '.hive', 'project.json')
+    const settings = join(ambrosia, '.combwork', 'project.json')
     const saved = readFileSync(settings, 'utf8')
     // Another writer is partway through saving ambrosia's settings: the file doesn't parse yet.
     writeFileSync(settings, '{')

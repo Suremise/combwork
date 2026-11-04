@@ -32,7 +32,7 @@ const check = (name, ok, extra = '') => {
   // Every read of the agents' input recorded, for typeLine (#1560).
   lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
-  fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), alpha.toLowerCase(), path.join(ws, '.hive', 'assistant').toLowerCase()]))
+  fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), alpha.toLowerCase(), path.join(ws, '.combwork', 'assistant').toLowerCase()]))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))

@@ -234,7 +234,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
     reload()
   }
   const archive = async (s: SessionListItem, archived: boolean): Promise<void> => {
-    if (archived && !(await confirm({ title: tr(msg({ id: 'sessions.archive.title', defaultMessage: 'Archive session?', description: 'Title of the confirmation before archiving a session (Sessions tab).' })), message: tr(msg({ id: 'sessions.archive.message', defaultMessage: 'The transcript is preserved in .hive/archive and hidden from this list. You can unarchive it at any time.', description: 'What archiving a session does. .hive/archive is a folder: keep it as it is.' })), confirmLabel: tr(ARCHIVE) }))) return
+    if (archived && !(await confirm({ title: tr(msg({ id: 'sessions.archive.title', defaultMessage: 'Archive session?', description: 'Title of the confirmation before archiving a session (Sessions tab).' })), message: tr(msg({ id: 'sessions.archive.message', defaultMessage: 'The transcript is preserved in .combwork/archive and hidden from this list. You can unarchive it at any time.', description: 'What archiving a session does. .combwork/archive is a folder: keep it as it is.' })), confirmLabel: tr(ARCHIVE) }))) return
     const closed = await closeView([s.id])
     await actions.attempt(tr(msg({ id: 'sessions.archive.failed', defaultMessage: 'Could not archive', description: "An error's title: archiving or unarchiving a session failed." })), () => call('session:archive', project.path, s.id, archived))
     moving.current = false
@@ -283,7 +283,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
           : {
               title: tr(msg({ id: 'sessions.bulk.archiveTitle', defaultMessage: 'Archive {what}?', description: 'Title of the confirmation before archiving many sessions: how many ({what}: "3 sessions and 12 sub-sessions").' }), where),
               message: tr(msg({ id: 'sessions.bulk.archiveMessage', defaultMessage: 'Archive {what} under {branch}?', description: 'The confirmation before archiving many sessions ({what}: "3 sessions") under a branch of the Sessions tree ({branch}: a provider, an agent or a session).' }), where),
-              detail: tr(msg({ id: 'sessions.bulk.archiveDetail', defaultMessage: 'Their transcripts are kept in .hive/archive and hidden from this list: tick Archived to see them, and unarchive any at any time. {skipNote}', description: 'What archiving many sessions does (.hive/archive is a folder; Archived is a checkbox above the list: use its translation); then which are passed over ({skipNote}, a sentence).' }), { skipNote }),
+              detail: tr(msg({ id: 'sessions.bulk.archiveDetail', defaultMessage: 'Their transcripts are kept in .combwork/archive and hidden from this list: tick Archived to see them, and unarchive any at any time. {skipNote}', description: 'What archiving many sessions does (.combwork/archive is a folder; Archived is a checkbox above the list: use its translation); then which are passed over ({skipNote}, a sentence).' }), { skipNote }),
               confirmLabel: tr(msg({ id: 'sessions.bulk.archiveAll', defaultMessage: 'Archive All', description: 'Button: archives all the sessions listed. Keep it short.' }))
             }
       ))

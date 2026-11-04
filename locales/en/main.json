@@ -312,8 +312,8 @@
     "description": "Why a folder can't be made a git repository again."
   },
   "main.gitInit.done": {
-    "defaultMessage": "{steps}. .hive stays out of git. Agents can work in worktrees now.",
-    "description": "What making a git repository did. {steps} lists the steps (main.gitInit.step.*), its first capitalised. .hive is a folder's name."
+    "defaultMessage": "{steps}. .combwork stays out of git. Agents can work in worktrees now.",
+    "description": "What making a git repository did. {steps} lists the steps (main.gitInit.step.*), its first capitalised. .combwork is a folder's name."
   },
   "main.gitInit.failed.commit": {
     "defaultMessage": "couldn't make the first commit",
@@ -324,8 +324,8 @@
     "description": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). {key} is a git setting (user.name, user.email)."
   },
   "main.gitInit.failed.exclude": {
-    "defaultMessage": "couldn't keep .hive out of git",
-    "description": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .hive is a folder's name."
+    "defaultMessage": "couldn't keep .combwork out of git",
+    "description": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .combwork is a folder's name."
   },
   "main.gitInit.failed.gitignore": {
     "defaultMessage": "couldn't write the .gitignore",
@@ -336,8 +336,8 @@
     "description": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter): git has no identity to commit as. {which} says what it lacks."
   },
   "main.gitInit.failed.ignored": {
-    "defaultMessage": "git still doesn't ignore .hive here (a rule in a .gitignore may bring it back), so nothing was committed",
-    "description": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .hive and .gitignore are names."
+    "defaultMessage": "git still doesn't ignore .combwork here (a rule in a .gitignore may bring it back), so nothing was committed",
+    "description": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .combwork and .gitignore are names."
   },
   "main.gitInit.failed.init": {
     "defaultMessage": "couldn't initialise the repository",
@@ -348,8 +348,8 @@
     "description": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter)."
   },
   "main.gitInit.failed.staged": {
-    "defaultMessage": ".hive was staged, so nothing was committed",
-    "description": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .hive is a folder's name."
+    "defaultMessage": ".combwork was staged, so nothing was committed",
+    "description": "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .combwork is a folder's name."
   },
   "main.gitInit.fix.commit": {
     "defaultMessage": "{git}. Commit in a terminal, or ask an agent to",
@@ -361,11 +361,11 @@
   },
   "main.gitInit.fix.ignored": {
     "defaultMessage": "fix that, then choose Make first commit in the Version Control tab",
-    "description": "What to do after .hive was found not ignored by git (main.gitInit.failed.ignored). Make first commit is a button in the Version Control tab (glossary 2.1): use its name as shown."
+    "description": "What to do after .combwork was found not ignored by git (main.gitInit.failed.ignored). Make first commit is a button in the Version Control tab (glossary 2.1): use its name as shown."
   },
   "main.gitInit.fix.staged": {
-    "defaultMessage": "check the .gitignore for a rule that brings .hive back",
-    "description": "What to do after .hive was staged (main.gitInit.failed.staged)."
+    "defaultMessage": "check the .gitignore for a rule that brings .combwork back",
+    "description": "What to do after .combwork was staged (main.gitInit.failed.staged)."
   },
   "main.gitInit.nested": {
     "defaultMessage": "This folder is inside the git repository in {root}. Confirm that you want a repository of its own inside it.",
@@ -418,6 +418,42 @@
   "main.gitInit.unreadable": {
     "defaultMessage": "Git couldn't read this repository: {why}",
     "description": "Why a folder can't be made a git repository. {why} is git's own message."
+  },
+  "main.hiveMove.bothBody": {
+    "defaultMessage": "Combwork uses .combwork and leaves .hive as it is. Move anything you still need out of .hive yourself.",
+    "description": "The warning's text (HI-2462): which of the two folders Combwork uses, and that it never changes the other. Keep .hive and .combwork as they are."
+  },
+  "main.hiveMove.bothTitle": {
+    "defaultMessage": "{folder} has both a .hive and a .combwork folder",
+    "description": "A warning's title as a workspace opens (HI-2462): the folder {folder} has Combwork's folder under both its old name (.hive) and its new one (.combwork). Keep .hive and .combwork as they are."
+  },
+  "main.hiveMove.linkBody": {
+    "defaultMessage": "It is a link to another folder, or the project is a link to a folder outside the workspace, so Combwork leaves it as it is. To use it, rename it .combwork yourself with Combwork closed.",
+    "description": "The warning's text (HI-2462): why the .hive folder wasn't renamed, and how the user can do it. Keep .hive and .combwork as they are."
+  },
+  "main.hiveMove.linkTitle": {
+    "defaultMessage": "{folder}'s .hive folder wasn't moved",
+    "description": "A warning's title as a workspace opens (HI-2462): the folder {folder}'s .hive wasn't renamed .combwork. Keep .hive and .combwork as they are."
+  },
+  "main.hiveMove.what.cards": {
+    "defaultMessage": "the paths in cards",
+    "description": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): links and paths in cards' descriptions and comments."
+  },
+  "main.hiveMove.what.excludes": {
+    "defaultMessage": "git's exclude lines",
+    "description": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): the lines that keep the folder out of git."
+  },
+  "main.hiveMove.what.folders": {
+    "defaultMessage": "the agents' folders inside it",
+    "description": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): slots and other agents' folders kept inside the moved folder."
+  },
+  "main.hiveMove.what.notes": {
+    "defaultMessage": "the paths in shared notes and handovers",
+    "description": "What the folder move was updating when it failed (service.hiveMove.phaseFailed)."
+  },
+  "main.hiveMove.what.worktrees": {
+    "defaultMessage": "the worktrees inside it",
+    "description": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): git worktrees kept inside the moved folder."
   },
   "main.installDir.close": {
     "defaultMessage": "Close",

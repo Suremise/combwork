@@ -72,7 +72,7 @@ section { margin: 8px; }
 <section><div class="col"><div class="col-head"><h3>DO ZROBIENIA TERAZ</h3><button>+</button><button>⋯</button></div></div></section>
 <section><div class="archive"><table><tr><td>Karta</td><td>Zarchiwizowano</td><td>Przywróć kartę</td></tr></table></div></section>
 <section><div class="prices"><table><tr><th>Model</th><th>Wejście</th><th>Wyjście</th><th>Pamięć podręczna</th></tr></table></div></section>
-<section><div class="banner"><div class="text">Folder .hive jest zatwierdzony w repozytorium, więc jego pliki trafiają do historii projektu i widzą je wszyscy.</div><div class="space"></div></div></section>
+<section><div class="banner"><div class="text">Folder .combwork jest zatwierdzony w repozytorium, więc jego pliki trafiają do historii projektu i widzą je wszyscy.</div><div class="space"></div></div></section>
 <section style="display: flex; gap: 20px"><table class="keys"><tr><td class="cmd">Einstellungen</td><td>Ctrl+,</td></tr></table><div lang="ja" style="width: 70px; word-break: break-all">設定のArbeitsbereichを開く</div></section>
 <section><div class="mode"><span>Domyślny tryb pracy</span><span class="badge">W użyciu</span></div></section>
 <section style="position: relative; height: 30px"><button class="edge">Wznów w agencie</button></section>
@@ -138,7 +138,7 @@ app.whenReady().then(() => {
     check('a column heading wrapping under its buttons (#886, #890, #892: board columns)', has('wraps', 'DO ZROBIENIA TERAZ'), said())
     check("a table's last column cut off (#886: the archived cards table)", has('cut-off', 'Przywróć kartę'), said())
     check('a table scrolling sideways (#887, #892: the API prices table)', has('sideways', 'Pamięć podręczna'), said())
-    check('a banner squeezed into a narrow column (#886: the .hive committed banner)', has('squeezed', 'Folder .hive'), said())
+    check('a banner squeezed into a narrow column (#886: the .combwork committed banner)', has('squeezed', 'Folder .combwork'), said())
     check('a word broken across lines (#887, #892: the shortcuts table)', has('mid-word', 'Einstellungen'), said())
     check('a Latin word broken inside Japanese text (HI-1590)', has('mid-word', 'Arbeitsbereich'), said())
     check('a badge over its label (#890, #892: the mode row)', has('overlaps', 'W użyciu') || has('overlaps', 'Domyślny tryb'), said())

@@ -1,5 +1,5 @@
 // The Hive Assistant view (#243): its sections are Modes, Conversations and Attachments; Attachments shows what was
-// pasted into its conversations (its home's .hive/attachments), grouped by conversation, in the project Attachments tab's grid
+// pasted into its conversations (its home's .combwork/attachments), grouped by conversation, in the project Attachments tab's grid
 // and viewer; a group's name opens that conversation's transcript in the conversations tree (#239's), and a group can
 // be moved to the Recycle Bin at once. Its tiles (#900): a file that isn't an image shows its type's icon, every tile its
 // size, and the group's heading the span of days, with a divider where each day starts. "Show Assistant Attachments" is a command. Modes' New Mode… (a prompt opened from a
@@ -17,7 +17,7 @@ const HUNG_MS = 10000
 
 const userData = path.join(lib.WORK, 'assistantimages-profile')
 const ws = path.join(lib.WORK, 'assistantimages-ws')
-const home = path.join(ws, '.hive', 'assistant')
+const home = path.join(ws, '.combwork', 'assistant')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -54,9 +54,9 @@ const stamp = (d, name) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.
     { type: 'user', sessionId: conv, timestamp: at(9), message: { role: 'user', content: 'What should the agents do this week?' } },
     { type: 'assistant', sessionId: conv, requestId: 'r1', timestamp: at(9), message: { model: 'claude-opus-5-5', content: [{ type: 'text', text: 'Start with the tray icon.' }], usage: { input_tokens: 10, output_tokens: 20 } } }
   ]
-  fs.mkdirSync(path.join(home, '.hive', 'sessions'), { recursive: true })
-  fs.writeFileSync(path.join(home, '.hive', 'sessions', `${conv}.jsonl`), transcript.map((l) => JSON.stringify(l)).join('\n') + '\n')
-  const imgDir = path.join(home, '.hive', 'attachments', conv)
+  fs.mkdirSync(path.join(home, '.combwork', 'sessions'), { recursive: true })
+  fs.writeFileSync(path.join(home, '.combwork', 'sessions', `${conv}.jsonl`), transcript.map((l) => JSON.stringify(l)).join('\n') + '\n')
+  const imgDir = path.join(home, '.combwork', 'attachments', conv)
   fs.mkdirSync(imgDir, { recursive: true })
   // Two images today, a log yesterday and notes three days ago: three days, newest first.
   const now = new Date()
@@ -87,7 +87,7 @@ const stamp = (d, name) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.
     await lib.sleep(500) // on purpose: a dialog opened again by the same key press would be on screen by now
   }
   await newMode('Enter Test')
-  check('Enter in New Mode… makes the mode', !!(await lib.until(async () => fs.existsSync(path.join(ws, '.hive', 'modes', 'enter-test.md')), 5000)))
+  check('Enter in New Mode… makes the mode', !!(await lib.until(async () => fs.existsSync(path.join(ws, '.combwork', 'modes', 'enter-test.md')), 5000)))
   check('…and leaves no dialog open', (await page.locator('.dialog').count()) === 0, String(await page.locator('.dialog').count()))
   await newMode('Enter Test')
   check('Enter with a name already used shows why', !!(await lib.until(async () => (await page.getByText('There is already a mode called').count()) > 0, 5000)))
@@ -98,7 +98,7 @@ const stamp = (d, name) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.
   await lib.until(async () => (await page.locator('.dialog input.input').count()) === 1 && (await page.locator('.dialog input.input').evaluate((el) => el === document.activeElement)), 5000)
   await page.keyboard.type('Blur Test')
   await page.keyboard.down('Enter')
-  check('Enter held down makes the mode, with no dialog left open', !!(await lib.until(async () => fs.existsSync(path.join(ws, '.hive', 'modes', 'blur-test.md')) && (await page.locator('.dialog').count()) === 0, 5000)))
+  check('Enter held down makes the mode, with no dialog left open', !!(await lib.until(async () => fs.existsSync(path.join(ws, '.combwork', 'modes', 'blur-test.md')) && (await page.locator('.dialog').count()) === 0, 5000)))
   await page.evaluate(() => window.dispatchEvent(new Event('blur')))
   await page.evaluate(() => {
     const t = document.createElement('textarea')
@@ -164,7 +164,7 @@ const stamp = (d, name) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.
   check('its images are gone from its home', !fs.existsSync(imgDir) || fs.readdirSync(imgDir).length === 0)
   // Hive's copy of its transcript, whole: plain, or compressed by the backups' housekeeping (#1110), which may run
   // meanwhile (#1298). The .gz is in place before the plain file goes, so reading the plain one first misses neither.
-  const backup = path.join(home, '.hive', 'sessions', `${conv}.jsonl`)
+  const backup = path.join(home, '.combwork', 'sessions', `${conv}.jsonl`)
   const kept = (() => {
     try {
       return fs.readFileSync(backup, 'utf8')

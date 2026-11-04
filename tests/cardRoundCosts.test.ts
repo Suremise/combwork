@@ -196,8 +196,8 @@ describe('cardRoundCosts (#1226)', () => {
 
   async function world(): Promise<WS> {
     const ws = join(base, `ws-${opened.length + 1}`)
-    mkdirSync(join(ws, 'p', '.hive'), { recursive: true })
-    writeFileSync(join(ws, 'p', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: ['b1', 'r1', 'r2'].map((id) => ({ id, name: id.toUpperCase() })) }))
+    mkdirSync(join(ws, 'p', '.combwork'), { recursive: true })
+    writeFileSync(join(ws, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: ['b1', 'r1', 'r2'].map((id) => ({ id, name: id.toUpperCase() })) }))
     const w = createWorkspaceService()
     await w.open(ws)
     opened.push(w)

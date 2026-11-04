@@ -1,5 +1,5 @@
 // Add MCP Server from File (#550): a .json definition or a .zip of a server folder, checked, unpacked safely into
-// .hive/mcp/<name>/ and added nowhere (HI-2059); a name in use is refused unless replaced; what it runs is shown by name.
+// .combwork/mcp/<name>/ and added nowhere (HI-2059); a name in use is refused unless replaced; what it runs is shown by name.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -80,10 +80,10 @@ describe('Add MCP Server from File', () => {
   beforeEach(async () => {
     const dir = join(base, `case-${++cases}`)
     const wsPath = join(dir, 'ws')
-    mcpDir = join(wsPath, '.hive', 'mcp')
+    mcpDir = join(wsPath, '.combwork', 'mcp')
     trashDir = join(dir, 'trash')
     process.env.HIVE_TEST_TRASH_DIR = trashDir
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -147,7 +147,7 @@ describe('Add MCP Server from File', () => {
     expect(existsSync(join(mcpDir, 'github-2.json'))).toBe(true)
   })
 
-  it("unpacks a server folder .zip into .hive/mcp/<name>/, its definition from hive-mcp.json or the mcp repo's example", async () => {
+  it("unpacks a server folder .zip into .combwork/mcp/<name>/, its definition from hive-mcp.json or the mcp repo's example", async () => {
     const f = file('ollama-v2.zip', ollamaZip())
     const preview = await run(() => mcp.previewMcpFile(f))
     expect(preview).toMatchObject({ name: 'ollama', files: 2, exists: false })
@@ -156,7 +156,7 @@ describe('Add MCP Server from File', () => {
     expect(m).toMatchObject({ projects: [], assistant: false })
     expect(readFileSync(join(mcpDir, 'ollama', 'server.js'), 'utf8')).toBe('// server')
     expect(existsSync(join(mcpDir, 'ollama', 'lib', 'util.js'))).toBe(true)
-    // The definition is the server's .json, not a file in its folder; nothing else is left in .hive/mcp.
+    // The definition is the server's .json, not a file in its folder; nothing else is left in .combwork/mcp.
     expect(existsSync(join(mcpDir, 'ollama', 'hive-mcp.example.json'))).toBe(false)
     expect(existsSync(join(mcpDir, '__MACOSX'))).toBe(false)
     expect(readFileSync(join(mcpDir, 'ollama.json'), 'utf8')).toContain('${HIVE_MCP_DIR}/ollama/server.js')
@@ -206,7 +206,7 @@ describe('Add MCP Server from File', () => {
 
   it("a definition's old and new MCP folder variables both point at the workspace's MCP folder", async () => {
     const def = { command: '${CW_MCP_DIR}/a/run.cmd', args: ['${HIVE_MCP_DIR}/a/x.js', '--cw=${CW_MCP_DIR}/b', '${OTHER_DIR}'], env: { A: '${HIVE_MCP_DIR}', B: '${CW_MCP_DIR}/c' }, cwd: '${HIVE_MCP_DIR}/a' }
-    expect(mcp.toLaunchDef(def, 'C:\\ws\\.hive\\mcp')).toEqual({ command: 'C:/ws/.hive/mcp/a/run.cmd', args: ['C:/ws/.hive/mcp/a/x.js', '--cw=C:/ws/.hive/mcp/b', '${OTHER_DIR}'], env: { A: 'C:/ws/.hive/mcp', B: 'C:/ws/.hive/mcp/c' }, cwd: 'C:/ws/.hive/mcp/a' })
+    expect(mcp.toLaunchDef(def, 'C:\\ws\\.combwork\\mcp')).toEqual({ command: 'C:/ws/.combwork/mcp/a/run.cmd', args: ['C:/ws/.combwork/mcp/a/x.js', '--cw=C:/ws/.combwork/mcp/b', '${OTHER_DIR}'], env: { A: 'C:/ws/.combwork/mcp', B: 'C:/ws/.combwork/mcp/c' }, cwd: 'C:/ws/.combwork/mcp/a' })
     // A folder named with $ in it is used as it is, never as a replacement pattern.
     expect(mcp.toLaunchDef({ command: '${CW_MCP_DIR}/x' }, 'C:\\a$&b')).toEqual({ command: 'C:/a$&b/x' })
     // Moving a server's folder references finds either variable and writes the new one.

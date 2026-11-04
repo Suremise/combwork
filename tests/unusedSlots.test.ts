@@ -77,10 +77,10 @@ describe('Unused Worktrees and the Merge dialog on slots (#1450)', { timeout: 12
 
   beforeAll(async () => {
     gitRepo(project)
-    commit(project, { '.gitignore': '.hive/\n' }, 'ignore .hive')
-    mkdirSync(join(project, '.hive'), { recursive: true })
+    commit(project, { '.gitignore': '.combwork/\n' }, 'ignore .combwork')
+    mkdirSync(join(project, '.combwork'), { recursive: true })
     const cfg = { ...DEFAULT_PROJECT_CONFIG, id: 'alpha-id', agents: [{ id: 'b1', name: 'B1', provider: 'claude-code', workflowRole: 'builder' }, { id: 'r1', name: 'R1', provider: 'claude-code', workflowRole: 'reviewer' }] }
-    writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify(cfg))
+    writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify(cfg))
     await ws.open(wsPath)
     root = join(ws.worktreesRoot, 'alpha')
     store = new SlotStore(fileSlotConn(boardFile(wsPath)), (await ws.projectConfig(project)).id ?? 'alpha-id')

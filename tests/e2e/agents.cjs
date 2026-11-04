@@ -102,9 +102,9 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   check('worktree session runs in the worktree', l3 && path.resolve(l3.cwd).toLowerCase() === path.resolve(wtPath).toLowerCase(), l3?.cwd)
   p = await project()
   check('setup cleared', !p.agents.find((a) => a.id === a3.id).needsSetup)
-  check('launch folders per agent', fs.existsSync(path.join(proj, '.hive', `launch-${a1.id}`, 'plugin')) && fs.existsSync(path.join(proj, '.hive', `launch-${a3.id}`, 'plugin')))
+  check('launch folders per agent', fs.existsSync(path.join(proj, '.combwork', `launch-${a1.id}`, 'plugin')) && fs.existsSync(path.join(proj, '.combwork', `launch-${a3.id}`, 'plugin')))
   // Settings and MCP config in each launch's private folder, in Hive's user data, not the project (#345).
-  check("each launch's settings outside the project", fs.existsSync(path.join(lib.launchDir(userData, l1.runId), 'settings.json')) && fs.existsSync(path.join(lib.launchDir(userData, l3.runId), 'settings.json')) && !fs.existsSync(path.join(proj, '.hive', `launch-${a1.id}`, 'settings.json')))
+  check("each launch's settings outside the project", fs.existsSync(path.join(lib.launchDir(userData, l1.runId), 'settings.json')) && fs.existsSync(path.join(lib.launchDir(userData, l3.runId), 'settings.json')) && !fs.existsSync(path.join(proj, '.combwork', `launch-${a1.id}`, 'settings.json')))
   const argsOk = fs.readFileSync(path.join(lib.launchDir(userData, l3.runId), 'settings.json'), 'utf8').includes('PreToolUse')
   check('PreToolUse hook registered', argsOk)
 

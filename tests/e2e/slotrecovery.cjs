@@ -33,7 +33,7 @@ const git = (dir, ...a) => lib.git(dir, a).trim()
 
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`]) fs.rmSync(d, { recursive: true, force: true })
-  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   lib.git(alpha, ['branch', 'integration'])
   const env = lib.fakeClaude(userData, home, [alpha, ws, ...['slot-a', 'slot-b', 'slot-c', 'slot-d'].map((s) => path.join(root, s))])

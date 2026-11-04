@@ -103,7 +103,7 @@
   "performance.compare.keepTip": "保存“当前”视图显示的内容以供以后比较：{what}。",
   "performance.compare.keeps": "{range, select, 24h {24 小时} 7d {7 天} other {30 天}}，{role, select, all {所有人} agent {项目智能体} assistant {助手} api {脚本} viewer {查看者应用} other {{role}}}，所有提供方",
   "performance.compare.keptList": "已保存的对比（{n, number}）",
-  "performance.compare.keptListTip": "保存在工作区的 .hive/metrics/benchmarks 中（仅限本机），最多 {max, number} 个：存满时会移除最早的未固定项。固定某一项即可保留它。",
+  "performance.compare.keptListTip": "保存在工作区的 .combwork/metrics/benchmarks 中（仅限本机），最多 {max, number} 个：存满时会移除最早的未固定项。固定某一项即可保留它。",
   "performance.compare.keptLoadTarget": "已保存的对比",
   "performance.compare.keptNotice": "已保存以供比较",
   "performance.compare.kind.export": "性能视图",

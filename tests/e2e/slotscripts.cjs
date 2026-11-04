@@ -26,7 +26,7 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   q.prepare(fx)
   // Git-ignored files in the project folder: one the copy patterns name, two they don't.
-  fs.writeFileSync(path.join(fx.alpha, '.gitignore'), '.hive/\n*.key\nnotes.local\n.env\n')
+  fs.writeFileSync(path.join(fx.alpha, '.gitignore'), '.combwork/\n*.key\nnotes.local\n.env\n')
   lib.git(fx.alpha, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qam', 'ignore the local files'])
   fs.writeFileSync(path.join(fx.alpha, 'api.key'), 'secret-1\n')
   fs.writeFileSync(path.join(fx.alpha, 'notes.local'), 'mine\n')

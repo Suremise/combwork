@@ -54,8 +54,8 @@ const mode = ({ name, word: w }) =>
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(path.join(ws, 'demo'), { 'README.md': '# Demo\n' })
-  fs.mkdirSync(path.join(ws, '.hive', 'modes'), { recursive: true })
-  for (const [id, m] of Object.entries(modes)) fs.writeFileSync(path.join(ws, '.hive', 'modes', `codeword-${id}.md`), mode(m))
+  fs.mkdirSync(path.join(ws, '.combwork', 'modes'), { recursive: true })
+  for (const [id, m] of Object.entries(modes)) fs.writeFileSync(path.join(ws, '.combwork', 'modes', `codeword-${id}.md`), mode(m))
   lib.enableProviders(userData)
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47926), CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
@@ -170,7 +170,7 @@ const mode = ({ name, word: w }) =>
 
   // --- Switched while it is stopped, then resumed: told the mode once, and on Charlie's instructions.
   await menu(modes.charlie.name)
-  check('switching while it is stopped saves the mode', !!(await lib.until(async () => JSON.parse(fs.readFileSync(path.join(home, '.hive', 'project.json'), 'utf8')).agents?.[0]?.mode === 'codeword-charlie', 5000)))
+  check('switching while it is stopped saves the mode', !!(await lib.until(async () => JSON.parse(fs.readFileSync(path.join(home, '.combwork', 'project.json'), 'utf8')).agents?.[0]?.mode === 'codeword-charlie', 5000)))
   launchMark = lib.hiveLogLines(userData).length
   await inv('session:start', home, { resumeId: session, agentId: 'assistant' })
   await lib.cliStep('resumed after a switch while stopped', { session: key }, async () => {

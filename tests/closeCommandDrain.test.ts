@@ -28,7 +28,7 @@ let n = 0
 const dismissals: (() => void)[] = []
 const workspace = (): string => {
   const ws = join(base, `ws-${++n}`)
-  mkdirSync(join(ws, '.hive'), { recursive: true })
+  mkdirSync(join(ws, '.combwork'), { recursive: true })
   dismissals.push(admitted(ws))
   board.workspaceDb(ws)
   return ws
@@ -95,7 +95,7 @@ describe('the drain, with the real stores', () => {
       entered.open()
       await held.wait
     }
-    const place = { workspace: ws, scope: 'p-drain', file: join(ws, 'alpha', '.hive', 'sessions.json') }
+    const place = { workspace: ws, scope: 'p-drain', file: join(ws, 'alpha', '.combwork', 'sessions.json') }
     const saving = sessions.changeSessions(place as never, (f) => void f.sessions.push({ id: 'last-change', provider: 'claude-code' } as never))
     await entered.wait
     close(ws)

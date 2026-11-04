@@ -103,7 +103,7 @@
   "performance.compare.keepTip": "Zachowaj to, co pokazuje widok Teraz, aby porównać to później: {what}.",
   "performance.compare.keeps": "{range, select, 24h {24 godziny} 7d {7 dni} other {30 dni}}, {role, select, all {wszyscy} agent {agenci projektów} assistant {Asystent} api {skrypty} viewer {aplikacje podglądu} other {{role}}}, wszyscy dostawcy",
   "performance.compare.keptList": "Zachowane do porównania ({n, number})",
-  "performance.compare.keptListTip": "Przechowywane w folderze .hive/metrics/benchmarks obszaru roboczego (tylko na tym komputerze), najwyżej {max, number}: gdy brak miejsca, znika najstarszy nieprzypięty. Przypnij, aby zachować.",
+  "performance.compare.keptListTip": "Przechowywane w folderze .combwork/metrics/benchmarks obszaru roboczego (tylko na tym komputerze), najwyżej {max, number}: gdy brak miejsca, znika najstarszy nieprzypięty. Przypnij, aby zachować.",
   "performance.compare.keptLoadTarget": "zachowanych porównań",
   "performance.compare.keptNotice": "Zachowano do porównania",
   "performance.compare.kind.export": "Widok Wydajność",

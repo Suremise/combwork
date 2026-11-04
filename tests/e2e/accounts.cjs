@@ -47,8 +47,8 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(conversation, '{"kept":true}\n')
   // Each project with a Claude Code agent: "Needs set up" counts only projects a connection would be used in (HI-1871).
   const projectWithAgent = (dir) => {
-    fs.mkdirSync(path.join(dir, '.hive'), { recursive: true })
-    fs.writeFileSync(path.join(dir, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One', provider: 'claude-code' }] }))
+    fs.mkdirSync(path.join(dir, '.combwork'), { recursive: true })
+    fs.writeFileSync(path.join(dir, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One', provider: 'claude-code' }] }))
   }
   for (const w of [ws1, ws2]) projectWithAgent(path.join(w, 'alpha'))
   // `hold`: the fake's sign-in waits (for a browser that never comes) until its terminal is closed.
@@ -64,7 +64,7 @@ const check = (name, ok, extra = '') => {
     const inv = invOn(page)
     await lib.openWorkspace(inv, page, ws1)
     const list = () => inv('connections:list')
-    const wsJson = (w) => JSON.parse(fs.readFileSync(path.join(w, '.hive', 'workspace.json'), 'utf8')).connections
+    const wsJson = (w) => JSON.parse(fs.readFileSync(path.join(w, '.combwork', 'workspace.json'), 'utf8')).connections
     const shots = async (name) => {
       while ((await page.locator('.toast').count()) > 0) await page.locator('.toast').first().locator('button').last().click()
       await page.mouse.move(5, 5)
@@ -374,8 +374,8 @@ const check = (name, ok, extra = '') => {
   migCfg.recentWorkspaces = [migNew, migOld]
   fs.writeFileSync(migCfgFile, JSON.stringify(migCfg, null, 2))
   for (const [w, def] of [[migNew, 'a-max2'], [migOld, 'a-max1']]) {
-    fs.mkdirSync(path.join(w, '.hive'), { recursive: true })
-    fs.writeFileSync(path.join(w, '.hive', 'workspace.json'), JSON.stringify({ version: 1, connections: { 'claude-code': { on: ['a-max1', 'a-max2'], default: def } } }))
+    fs.mkdirSync(path.join(w, '.combwork'), { recursive: true })
+    fs.writeFileSync(path.join(w, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, connections: { 'claude-code': { on: ['a-max1', 'a-max2'], default: def } } }))
   }
   const mig = await lib.launch({ userData: migProfile, env: migEnv, viewport: { width: 1200, height: 800 } })
   try {

@@ -40,9 +40,9 @@ afterEach(() => {
 /** A workspace with a project `p`, and the cards' files from before 0.9 given (`files`: name → text). */
 function workspaceWith(files: Record<string, string> = {}): string {
   const ws = join(base, `ws-${++n}`)
-  mkdirSync(join(ws, 'p', '.hive'), { recursive: true })
-  writeFileSync(join(ws, 'p', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
-  const tasksDir = join(ws, '.hive', 'tasks')
+  mkdirSync(join(ws, 'p', '.combwork'), { recursive: true })
+  writeFileSync(join(ws, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+  const tasksDir = join(ws, '.combwork', 'tasks')
   mkdirSync(tasksDir, { recursive: true })
   for (const [name, text] of Object.entries(files)) writeFileSync(join(tasksDir, name), text)
   return ws
@@ -55,7 +55,7 @@ async function open(ws: string): Promise<WS> {
 }
 const card = (num: number, fields: Record<string, unknown> = {}): Record<string, unknown> => ({ number: num, title: `Card ${num}`, description: `About ${num}`, project: 'p', agent: null, column: 'todo', order: num, labels: [], blocked: null, blockedBy: [], links: [], comments: [{ at: '2026-10-01T00:00:00.000Z', by: 'You', text: `Note ${num}`, id: `c${num}` }], history: [], archived: false, createdAt: '2026-10-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-10-01T00:00:00.000Z', ...fields })
 const fileOf = (c: Record<string, unknown>): string => JSON.stringify(c, null, 2) + '\n'
-const hiveFolders = (ws: string): string[] => readdirSync(join(ws, '.hive')).sort()
+const hiveFolders = (ws: string): string[] => readdirSync(join(ws, '.combwork')).sort()
 
 describe('the database layer (db.ts)', () => {
   it('opens with WAL and its settings, runs each step once, recorded with the version that ran it', () => {
@@ -187,7 +187,7 @@ async function killedWorkspace(): Promise<{ ws: string; file: string }> {
   await inWorkspace(first, () => tasks.createTask({ title: 'Kept', project: 'p' }, user))
   await disposeWorkspaceService(first)
   store.closeBoard(ws)
-  const file = join(ws, '.hive', 'hive.db')
+  const file = join(ws, '.combwork', 'hive.db')
   await leftByAKill(file)
   return { ws, file }
 }
@@ -323,9 +323,9 @@ describe("moving the cards' files in (#1017)", () => {
     expect((await inWorkspace(w, () => tasks.createTask({ title: 'New', project: 'p' }, user))).number).toBe(40)
     // The folder kept as it was, under its backup name; the stub has the next number and a README.
     const kept = hiveFolders(ws).find((f) => f.startsWith('tasks.imported-'))!
-    expect(readdirSync(join(ws, '.hive', kept)).sort()).toEqual(Object.keys(files).sort())
-    expect(readFileSync(join(ws, '.hive', kept, '1.json'), 'utf8')).toBe(files['1.json'])
-    expect(readdirSync(join(ws, '.hive', 'tasks')).sort()).toEqual(['README.txt', 'board.json'])
+    expect(readdirSync(join(ws, '.combwork', kept)).sort()).toEqual(Object.keys(files).sort())
+    expect(readFileSync(join(ws, '.combwork', kept, '1.json'), 'utf8')).toBe(files['1.json'])
+    expect(readdirSync(join(ws, '.combwork', 'tasks')).sort()).toEqual(['README.txt', 'board.json'])
     expect(notices).toEqual([{ kind: 'imported', cards: 2, damaged: ['3.json'], folder: kept }])
     // The import is recorded; opening again imports nothing (the stub has no cards).
     await disposeWorkspaceService(w)
@@ -334,7 +334,7 @@ describe("moving the cards' files in (#1017)", () => {
     expect(hiveFolders(ws).filter((f) => f.startsWith('tasks.'))).toEqual([kept])
     // Closed, the stub's next number is the board's (an older Hive opening it never reuses one).
     await disposeWorkspaceService(again)
-    expect(JSON.parse(readFileSync(join(ws, '.hive', 'tasks', 'board.json'), 'utf8')).next).toBe(41)
+    expect(JSON.parse(readFileSync(join(ws, '.combwork', 'tasks', 'board.json'), 'utf8')).next).toBe(41)
   })
 
   it('a folder Windows refuses to rename is renamed at the next open; the cards are in the database meanwhile, imported once', async () => {
@@ -342,7 +342,7 @@ describe("moving the cards' files in (#1017)", () => {
     store.boardTestHooks.refuseRename = () => true
     const w = await open(ws)
     expect((await inWorkspace(w, () => tasks.allTasks(w))).map((c) => c.number)).toEqual([5])
-    expect(existsSync(join(ws, '.hive', 'tasks', '5.json'))).toBe(true)
+    expect(existsSync(join(ws, '.combwork', 'tasks', '5.json'))).toBe(true)
     await inWorkspace(w, () => tasks.updateTask(5, { title: 'Changed since' }, user))
     await disposeWorkspaceService(w)
     store.boardTestHooks.refuseRename = null
@@ -350,7 +350,7 @@ describe("moving the cards' files in (#1017)", () => {
     // Not imported again (the change made meanwhile is kept), and the folder has its backup name now.
     expect((await inWorkspace(again, () => tasks.getTask(5, again))).title).toBe('Changed since')
     expect(hiveFolders(ws).some((f) => f.startsWith('tasks.imported-'))).toBe(true)
-    expect(readdirSync(join(ws, '.hive', 'tasks')).sort()).toEqual(['README.txt', 'board.json'])
+    expect(readdirSync(join(ws, '.combwork', 'tasks')).sort()).toEqual(['README.txt', 'board.json'])
   })
 
   it("a new workspace's board starts empty, with a stub and no backup folder", async () => {
@@ -368,12 +368,12 @@ describe("cards an older Hive saved meanwhile (#1017 downgrade, Darren's decisio
     const w = await open(ws)
     await inWorkspace(w, () => tasks.allTasks(w))
     await disposeWorkspaceService(w)
-    return { ws, stub: join(ws, '.hive', 'tasks') }
+    return { ws, stub: join(ws, '.combwork', 'tasks') }
   }
   const older = (num: number, fields: Record<string, unknown> = {}) => fileOf(card(num, { createdAt: '2026-10-05T00:00:00.000Z', updatedAt: '2026-10-05T00:00:00.000Z', ...fields }))
   const titlesOf = async (w: WS): Promise<string[]> => (await inWorkspace(w, () => tasks.allTasks(w))).map((c) => `#${c.number} ${c.title}`).sort()
-  const asideIn = (ws: string): string[] => (existsSync(join(ws, '.hive', store.SET_ASIDE)) ? readdirSync(join(ws, '.hive', store.SET_ASIDE)).sort() : [])
-  const asideText = (ws: string, f: string): string => readFileSync(join(ws, '.hive', store.SET_ASIDE, f), 'utf8')
+  const asideIn = (ws: string): string[] => (existsSync(join(ws, '.combwork', store.SET_ASIDE)) ? readdirSync(join(ws, '.combwork', store.SET_ASIDE)).sort() : [])
+  const asideText = (ws: string, f: string): string => readFileSync(join(ws, '.combwork', store.SET_ASIDE, f), 'utf8')
   /** Opens the workspace, reads its board and gives the notices it told. */
   async function openTold(ws: string): Promise<{ w: WS; notices: BoardNotice[] }> {
     const notices: BoardNotice[] = []
@@ -465,13 +465,13 @@ describe('reviewing the set-aside cards (#1044, Darren\'s decision on #1017: the
     const first = await open(ws)
     await inWorkspace(first, () => tasks.allTasks(first))
     await disposeWorkspaceService(first)
-    for (const [f, text] of Object.entries(stubFiles)) writeFileSync(join(ws, '.hive', 'tasks', f), text)
+    for (const [f, text] of Object.entries(stubFiles)) writeFileSync(join(ws, '.combwork', 'tasks', f), text)
     const w = await open(ws)
     await inWorkspace(w, () => tasks.allTasks(w))
     return { ws, w }
   }
   const older = (num: number, fields: Record<string, unknown> = {}) => fileOf(card(num, { createdBy: 'Assistant', createdAt: '2026-10-05T00:00:00.000Z', updatedAt: '2026-10-05T00:00:00.000Z', ...fields }))
-  const asideIn = (ws: string): string[] => readdirSync(join(ws, '.hive', store.SET_ASIDE)).sort()
+  const asideIn = (ws: string): string[] => readdirSync(join(ws, '.combwork', store.SET_ASIDE)).sort()
 
   it('lists each with its old number, whether it is free, who made it and a preview; a file that is not a card only as unreadable', async () => {
     const { w } = await asideWith({ '1.json': fileOf(card(1)) }, { '1.json': older(1, { title: 'Clashes' }), '7.json': older(7, { title: 'Free', description: 'x'.repeat(2000), column: 'review' }), '8.json': '{ damaged' })
@@ -497,11 +497,11 @@ describe('reviewing the set-aside cards (#1044, Darren\'s decision on #1017: the
     expect(c.history.at(-1)).toMatchObject({ by: 'Repair', what: 'Added from an older Combwork, where it was made as #7' })
     // The older Hive's file goes to the Recycle Bin, recoverable.
     await vi.waitFor(() => expect(asideIn(ws)).toEqual([]), { timeout: HUNG_MS })
-    await vi.waitFor(() => expect(trashedFrom(ws)).toEqual([join('.hive', store.SET_ASIDE, '7.json')]), { timeout: HUNG_MS })
+    await vi.waitFor(() => expect(trashedFrom(ws)).toEqual([join('.combwork', store.SET_ASIDE, '7.json')]), { timeout: HUNG_MS })
     expect(await inWorkspace(w, () => tasks.setAsideCards(w))).toEqual([])
     // The same file back (it couldn't leave the stub): set aside again at the next open, but never listed or added twice.
     await disposeWorkspaceService(w)
-    writeFileSync(join(ws, '.hive', 'tasks', '7.json'), older(7, { title: 'Made in rc.3', links: [1, 40], labels: ['old'], decisions: [{ id: 'd1', text: 'Keep it', decidedBy: 'user', recordedBy: 'You', at: '2026-10-05T00:00:00.000Z' }] }))
+    writeFileSync(join(ws, '.combwork', 'tasks', '7.json'), older(7, { title: 'Made in rc.3', links: [1, 40], labels: ['old'], decisions: [{ id: 'd1', text: 'Keep it', decidedBy: 'user', recordedBy: 'You', at: '2026-10-05T00:00:00.000Z' }] }))
     const w2 = await open(ws)
     expect(await inWorkspace(w2, () => tasks.setAsideCards(w2))).toEqual([])
     await vi.waitFor(() => expect(asideIn(ws)).toEqual([]), { timeout: HUNG_MS })
@@ -543,7 +543,7 @@ describe('reviewing the set-aside cards (#1044, Darren\'s decision on #1017: the
     for (const k of Object.keys(was).filter((f) => !['number', 'order', 'history', 'updatedAt', 'review', 'held'].includes(f))) expect([k, doc[k]]).toEqual([k, was[k]])
     expect((doc.history as unknown[]).slice(0, -1)).toEqual(was.history)
     await vi.waitFor(() => expect(asideIn(ws)).toEqual([]), { timeout: HUNG_MS })
-    await vi.waitFor(() => expect(trashedFrom(ws)).toEqual([join('.hive', store.SET_ASIDE, '7.json')]), { timeout: HUNG_MS })
+    await vi.waitFor(() => expect(trashedFrom(ws)).toEqual([join('.combwork', store.SET_ASIDE, '7.json')]), { timeout: HUNG_MS })
   })
 
   it('Add brings back a card whose own fields are of the wrong type, as any read would show it: a broken cost or history field never stops it (#1044 round 2)', async () => {
@@ -572,19 +572,19 @@ describe('reviewing the set-aside cards (#1044, Darren\'s decision on #1017: the
     expect(store.cardDoc(w, 11)!.mine).toEqual({ kept: true })
     // Each original in the Recycle Bin, recoverable as it was.
     await vi.waitFor(() => expect(asideIn(ws)).toEqual([]), { timeout: HUNG_MS })
-    await vi.waitFor(() => expect(trashedFrom(ws).sort()).toEqual(Object.keys(files).map((f) => join('.hive', store.SET_ASIDE, f)).sort()), { timeout: HUNG_MS })
+    await vi.waitFor(() => expect(trashedFrom(ws).sort()).toEqual(Object.keys(files).map((f) => join('.combwork', store.SET_ASIDE, f)).sort()), { timeout: HUNG_MS })
   })
 
   it('Discard moves the file to the trash, nothing on the board changes; a damaged file is refused by Add; names outside the folder are refused', async () => {
     const { ws, w } = await asideWith({ '1.json': fileOf(card(1)) }, { '3.json': older(3), '4.json': '{ damaged' })
     await expect(inWorkspace(w, () => tasks.addSetAsideCard(w, '4.json'))).rejects.toThrow(/can only be discarded/)
-    await expect(inWorkspace(w, () => tasks.addSetAsideCard(w, '..\\..\\p\\.hive\\project.json'))).rejects.toThrow(/can only be discarded/)
+    await expect(inWorkspace(w, () => tasks.addSetAsideCard(w, '..\\..\\p\\.combwork\\project.json'))).rejects.toThrow(/can only be discarded/)
     await inWorkspace(w, () => tasks.discardSetAsideCard(w, '..\\tasks\\board.json'))
-    expect(existsSync(join(ws, '.hive', 'tasks', 'board.json'))).toBe(true)
+    expect(existsSync(join(ws, '.combwork', 'tasks', 'board.json'))).toBe(true)
     await inWorkspace(w, () => tasks.discardSetAsideCard(w, '3.json'))
     await inWorkspace(w, () => tasks.discardSetAsideCard(w, '4.json'))
     expect(asideIn(ws)).toEqual([])
-    await vi.waitFor(() => expect(trashedFrom(ws).sort()).toEqual([join('.hive', store.SET_ASIDE, '3.json'), join('.hive', store.SET_ASIDE, '4.json')]), { timeout: HUNG_MS })
+    await vi.waitFor(() => expect(trashedFrom(ws).sort()).toEqual([join('.combwork', store.SET_ASIDE, '3.json'), join('.combwork', store.SET_ASIDE, '4.json')]), { timeout: HUNG_MS })
     expect(await titlesOf(w)).toEqual(['#1 Card 1'])
   })
 })
@@ -597,7 +597,7 @@ describe('numbers an older Hive could take (#1017 round 1)', () => {
     const w = await open(ws)
     const made = await inWorkspace(w, () => tasks.createTask({ title: 'Made in 0.9', project: 'p' }, user))
     // Read while the board is open: nothing has closed it.
-    expect(JSON.parse(readFileSync(join(ws, '.hive', 'tasks', 'board.json'), 'utf8')).next).toBe(made.number + 1)
+    expect(JSON.parse(readFileSync(join(ws, '.combwork', 'tasks', 'board.json'), 'utf8')).next).toBe(made.number + 1)
   })
 
   it("a damaged card file's number is never given to another card, moving in or back (as before 0.9)", async () => {
@@ -607,7 +607,7 @@ describe('numbers an older Hive could take (#1017 round 1)', () => {
     expect((await inWorkspace(w, () => tasks.createTask({ title: 'Next', project: 'p' }, user))).number).toBe(3)
     await disposeWorkspaceService(w)
     // A damaged file an older Hive left in the stub: its number is past the board's, and kept from new cards.
-    writeFileSync(join(ws, '.hive', 'tasks', '9.json'), '{ damaged too')
+    writeFileSync(join(ws, '.combwork', 'tasks', '9.json'), '{ damaged too')
     w = await open(ws)
     expect((await inWorkspace(w, () => tasks.createTask({ title: 'After', project: 'p' }, user))).number).toBe(10)
   })
@@ -626,7 +626,7 @@ describe('Export Board to JSON (#1017)', () => {
     // The export as an older Hive's board folder, opened by this one: the same cards.
     const copy = workspaceWith(Object.fromEntries(readdirSync(out).map((f) => [f, readFileSync(join(out, f), 'utf8')])))
     // Its project the same project (its id with it), as a workspace copied whole would have it.
-    writeFileSync(join(copy, 'p', '.hive', 'project.json'), readFileSync(join(ws, 'p', '.hive', 'project.json')))
+    writeFileSync(join(copy, 'p', '.combwork', 'project.json'), readFileSync(join(ws, 'p', '.combwork', 'project.json')))
     const w2 = await open(copy)
     expect(JSON.stringify(await inWorkspace(w2, () => tasks.allTasks(w2)))).toBe(JSON.stringify(await inWorkspace(w, () => tasks.allTasks(w))))
   })
@@ -663,14 +663,14 @@ describe('a board opened under another name for its folder (#1402)', () => {
   }
   /** The window's board, opened as it is first used (by its window's spelling). */
   const useBoard = (w: WS) => inWorkspace(w, () => tasks.listTasks({}))
-  const fenced = (ws: string): boolean => refusal(join(ws, '.hive', 'hive.db')) !== null
+  const fenced = (ws: string): boolean => refusal(join(ws, '.combwork', 'hive.db')) !== null
   /** The next number in the stub older versions read, and the profiles' presence markers there. */
-  const stubNext = (ws: string): number => JSON.parse(readFileSync(join(ws, '.hive', 'tasks', 'board.json'), 'utf8')).next
-  const markers = (ws: string): string[] => (existsSync(join(ws, '.hive', 'open')) ? readdirSync(join(ws, '.hive', 'open')) : [])
+  const stubNext = (ws: string): number => JSON.parse(readFileSync(join(ws, '.combwork', 'tasks', 'board.json'), 'utf8')).next
+  const markers = (ws: string): string[] => (existsSync(join(ws, '.combwork', 'open')) ? readdirSync(join(ws, '.combwork', 'open')) : [])
   /** Nothing holds the folder: it can be moved (Windows refuses while a connection has its database open). */
   async function moves(ws: string): Promise<void> {
     await renameRetrying(ws, `${ws}-moved`)
-    expect(existsSync(join(`${ws}-moved`, '.hive', 'hive.db'))).toBe(true)
+    expect(existsSync(join(`${ws}-moved`, '.combwork', 'hive.db'))).toBe(true)
   }
 
   for (const kind of ['junction', '8.3'] as const) {

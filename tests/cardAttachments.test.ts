@@ -43,8 +43,8 @@ let n = 0
 async function workspace(): Promise<{ w: WS; root: string }> {
   const root = join(base, `ws-${++n}`)
   for (const p of ['p', 'q']) {
-    mkdirSync(join(root, p, '.hive'), { recursive: true })
-    writeFileSync(join(root, p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(root, p, '.combwork'), { recursive: true })
+    writeFileSync(join(root, p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   }
   const w = createWorkspaceService()
   await w.open(root)
@@ -75,7 +75,7 @@ describe('keeping files with a card (HI-1700)', () => {
     const a = await inWorkspace(w, () => att.attachToCard(w, c, [{ path: src }], 'You'))
     expect(a.added).toEqual([true])
     const kept = a.attachments[0]
-    expect(kept.path.startsWith(join(root, 'p', '.hive', 'attachments', 'cards', String(c)) + sep)).toBe(true)
+    expect(kept.path.startsWith(join(root, 'p', '.combwork', 'attachments', 'cards', String(c)) + sep)).toBe(true)
     expect(kept.name).toBe('shot.png')
     expect(kept.kind).toBe('image')
     expect(readFileSync(kept.path, 'utf8')).toBe('png bytes')
@@ -98,7 +98,7 @@ describe('keeping files with a card (HI-1700)', () => {
     await expect(inWorkspace(w, () => att.attachToCard(w, c, [{ path: ok }, { path: big }], 'You'))).rejects.toThrow(/larger than/)
     await expect(inWorkspace(w, () => att.attachToCard(w, c, Array.from({ length: 11 }, () => ({ path: ok })), 'You'))).rejects.toThrow(/At most 10/)
     expect(rows(w, c)).toEqual([])
-    expect(inside(join(root, 'p', '.hive', 'attachments', 'cards', '.staging'))).toEqual([])
+    expect(inside(join(root, 'p', '.combwork', 'attachments', 'cards', '.staging'))).toEqual([])
   })
 
   it('stops a copy at the limit while streaming: a file that grew after it was checked fails, nothing published', async () => {
@@ -111,7 +111,7 @@ describe('keeping files with a card (HI-1700)', () => {
     const staged = att.stage(join(root, 'p'), c, [{ path: growing }])
     appendFileSync(growing, 'y'.repeat(max + 10))
     await expect(staged).rejects.toThrow(/larger than/)
-    expect(inside(join(root, 'p', '.hive', 'attachments', 'cards', '.staging'))).toEqual([])
+    expect(inside(join(root, 'p', '.combwork', 'attachments', 'cards', '.staging'))).toEqual([])
     expect(rows(w, c)).toEqual([])
   })
 
@@ -125,7 +125,7 @@ describe('keeping files with a card (HI-1700)', () => {
     }))).rejects.toThrow('the rest of the change failed')
     await staging.dispose()
     expect(rows(w, c)).toEqual([])
-    expect(inside(join(root, 'p', '.hive', 'attachments', 'cards', String(c)))).toEqual([])
+    expect(inside(join(root, 'p', '.combwork', 'attachments', 'cards', String(c)))).toEqual([])
   })
 
   it('removes one through the cards’ trash, to the Recycle Bin once committed', async () => {
@@ -137,7 +137,7 @@ describe('keeping files with a card (HI-1700)', () => {
     await expect.poll(() => trashed().some((t) => t.endsWith(a.file))).toBe(true)
     // The removal's own folder goes after its file is in the Recycle Bin (finishTrash, after the commit): awaited, not
     // looked at once (HI-2362: under load the look came between the two).
-    await expect.poll(() => inside(join(root, 'p', '.hive', 'attachments', 'cards', '.trash'))).toEqual([])
+    await expect.poll(() => inside(join(root, 'p', '.combwork', 'attachments', 'cards', '.trash')), { timeout: 20_000 }).toEqual([])
   })
 })
 
@@ -149,7 +149,7 @@ describe('recovering what an interrupted operation left (HI-1700, s13)', () => {
     const c = await card(w)
     const [a] = (await inWorkspace(w, () => att.attachToCard(w, c, [{ data: new TextEncoder().encode('keep me'), name: 'keep.txt' }], 'You'))).attachments
     // What removeCardAttachment does before its commit: the record, then the rename. Then the crash (the row stays).
-    const op = join(root, 'p', '.hive', 'attachments', 'cards', TRASH, 'op1')
+    const op = join(root, 'p', '.combwork', 'attachments', 'cards', TRASH, 'op1')
     mkdirSync(op, { recursive: true })
     writeFileSync(join(op, OP_FILE), JSON.stringify({ kind: 'remove', card: c, files: [{ id: a.id, file: a.file }] }))
     renameSync(a.path, join(op, a.file))
@@ -163,7 +163,7 @@ describe('recovering what an interrupted operation left (HI-1700, s13)', () => {
     const { w, root } = await workspace()
     const c = await card(w)
     const [a] = (await inWorkspace(w, () => att.attachToCard(w, c, [{ data: new TextEncoder().encode('go'), name: 'go.txt' }], 'You'))).attachments
-    const op = join(root, 'p', '.hive', 'attachments', 'cards', TRASH, 'op2')
+    const op = join(root, 'p', '.combwork', 'attachments', 'cards', TRASH, 'op2')
     mkdirSync(op, { recursive: true })
     writeFileSync(join(op, OP_FILE), JSON.stringify({ kind: 'remove', card: c, files: [{ id: a.id, file: a.file }] }))
     renameSync(a.path, join(op, a.file))
@@ -203,8 +203,8 @@ describe('recovering what an interrupted operation left (HI-1700, s13)', () => {
     // A whole cards folder that is a junction: left as it is.
     const other = join(base, `elsewhere-${++n}`)
     const theirs = file(join(other, String(c)), 'theirs.txt', 'theirs')
-    mkdirSync(join(root, 'q', '.hive', 'attachments'), { recursive: true })
-    junction(other, join(root, 'q', '.hive', 'attachments', 'cards'))
+    mkdirSync(join(root, 'q', '.combwork', 'attachments'), { recursive: true })
+    junction(other, join(root, 'q', '.combwork', 'attachments', 'cards'))
     const r = await inWorkspace(w, () => att.recoverCardAttachments(w))
     expect(r.left).toBeGreaterThan(0)
     expect(readFileSync(theirs, 'utf8')).toBe('theirs')
@@ -235,7 +235,7 @@ describe('recovering what an interrupted operation left (HI-1700, s13)', () => {
     const { w, root } = await workspace()
     const c = await card(w)
     const [a] = (await inWorkspace(w, () => att.attachToCard(w, c, [{ data: new TextEncoder().encode('folder'), name: 'f.txt' }], 'You'))).attachments
-    const cards = join(root, 'p', '.hive', 'attachments', 'cards')
+    const cards = join(root, 'p', '.combwork', 'attachments', 'cards')
     const op = join(cards, TRASH, 'op3')
     mkdirSync(op, { recursive: true })
     writeFileSync(join(op, OP_FILE), JSON.stringify({ kind: 'delete', card: c }))
@@ -254,7 +254,7 @@ describe('recovering what an interrupted operation left (HI-1700, s13)', () => {
   it('staging goes; a file with no row goes to the Recycle Bin; a folder of a card that is gone goes too', async () => {
     const { w, root } = await workspace()
     const c = await card(w)
-    const cards = join(root, 'p', '.hive', 'attachments', 'cards')
+    const cards = join(root, 'p', '.combwork', 'attachments', 'cards')
     file(join(cards, STAGING, 'opx'), '0.part', 'half')
     const stray = file(join(cards, String(c)), 'stray.txt', 'no row')
     file(join(cards, '999999'), 'orphan.txt', 'no card')
@@ -270,7 +270,7 @@ describe('moving and deleting a card with attachments (HI-1700)', () => {
     const { w, root } = await workspace()
     const c = await card(w)
     const [a] = (await inWorkspace(w, () => att.attachToCard(w, c, [{ data: new TextEncoder().encode('moving'), name: 'm.txt' }], 'You'))).attachments
-    const to = join(root, 'q', '.hive', 'attachments', 'cards', String(c), a.file)
+    const to = join(root, 'q', '.combwork', 'attachments', 'cards', String(c), a.file)
     // Undone: the copy goes, the original stays.
     await expect(inWorkspace(w, () => store.boardWrite(w, async () => {
       await att.moveCardFolder(w, c, 'p', 'q')
@@ -299,9 +299,9 @@ describe('moving and deleting a card with attachments (HI-1700)', () => {
 
 describe("never a session's (HI-1700)", () => {
   it("Clean Up with every option and Purge leave the cards' folder alone", () => {
-    const facts = { sessions: [], attachmentFolders: [{ name: 'cards', path: 'C:\\x\\.hive\\attachments\\cards', bytes: 5 }], liveNames: new Set<string>(), now: Date.now() }
+    const facts = { sessions: [], attachmentFolders: [{ name: 'cards', path: 'C:\\x\\.combwork\\attachments\\cards', bytes: 5 }], liveNames: new Set<string>(), now: Date.now() }
     expect(planCleanup(facts, { archivedAttachmentsDays: 0, orphanAttachments: true, archivedBackupsDays: 0, goneBackups: true })).toEqual([])
-    const purge = planPurge({ host: 'C:\\x', hostName: 'x', sessions: [], files: [], attachmentFolders: [{ name: 'cards', path: 'C:\\x\\.hive\\attachments\\cards', files: [{ path: 'C:\\x\\.hive\\attachments\\cards\\a.txt', bytes: 1, mtimeMs: 1 }] }], deletedUsage: [], liveNames: new Set() })
+    const purge = planPurge({ host: 'C:\\x', hostName: 'x', sessions: [], files: [], attachmentFolders: [{ name: 'cards', path: 'C:\\x\\.combwork\\attachments\\cards', files: [{ path: 'C:\\x\\.combwork\\attachments\\cards\\a.txt', bytes: 1, mtimeMs: 1 }] }], deletedUsage: [], liveNames: new Set() })
     expect(purge.items).toEqual([])
   })
 })
@@ -320,21 +320,21 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
     mkdirSync(join(root, 'p', 'nested'), { recursive: true })
     junction(join(root, 'q'), join(root, 'p', 'nested', 'q-link'))
     await expect(att.attachableSource(w, agent, join(root, 'p', 'nested', 'q-link', 'theirs.png'))).rejects.toThrow(/not a file that can be attached/)
-    // The Assistant's home and the workspace's .hive; a project's .hive but its attachments; a folder; nothing there.
-    await expect(att.attachableSource(w, agent, file(join(w.assistantHome, '.hive', 'attachments', 's1'), 'a.png', 'a'))).rejects.toThrow()
-    await expect(att.attachableSource(w, agent, file(join(root, '.hive'), 'x.txt', 'x'))).rejects.toThrow()
-    await expect(att.attachableSource(w, agent, join(root, 'p', '.hive', 'project.json'))).rejects.toThrow()
-    expect(await att.attachableSource(w, agent, file(join(root, 'p', '.hive', 'attachments', 's1'), 'pasted.png', 'p'))).toBeTruthy()
+    // The Assistant's home and the workspace's .combwork; a project's .combwork but its attachments; a folder; nothing there.
+    await expect(att.attachableSource(w, agent, file(join(w.assistantHome, '.combwork', 'attachments', 's1'), 'a.png', 'a'))).rejects.toThrow()
+    await expect(att.attachableSource(w, agent, file(join(root, '.combwork'), 'x.txt', 'x'))).rejects.toThrow()
+    await expect(att.attachableSource(w, agent, join(root, 'p', '.combwork', 'project.json'))).rejects.toThrow()
+    expect(await att.attachableSource(w, agent, file(join(root, 'p', '.combwork', 'attachments', 's1'), 'pasted.png', 'p'))).toBeTruthy()
     await expect(att.attachableSource(w, agent, join(root, 'p'))).rejects.toThrow()
     await expect(att.attachableSource(w, agent, join(root, 'p', 'nothing.png'))).rejects.toThrow(/not a file that can be attached/)
   })
 
-  it("the Assistant and scripts: the workspace, the projects' folders, its home and the temp folder; a .hive only through attachments", async () => {
+  it("the Assistant and scripts: the workspace, the projects' folders, its home and the temp folder; a .combwork only through attachments", async () => {
     const { w, root } = await workspace()
     const ws = { kind: 'workspace' } as const
     expect(await att.attachableSource(w, ws, file(join(root, 'q'), 'theirs.png', 't'))).toBeTruthy()
-    expect(await att.attachableSource(w, ws, file(join(w.assistantHome, '.hive', 'attachments', 's1'), 'pasted.png', 'a'))).toBeTruthy()
-    await expect(att.attachableSource(w, ws, join(root, 'q', '.hive', 'project.json'))).rejects.toThrow()
+    expect(await att.attachableSource(w, ws, file(join(w.assistantHome, '.combwork', 'attachments', 's1'), 'pasted.png', 'a'))).toBeTruthy()
+    await expect(att.attachableSource(w, ws, join(root, 'q', '.combwork', 'project.json'))).rejects.toThrow()
   })
 
   // HI-2480: a folder the user lists (Settings → Advanced → Card attachments: more folders, Hive's or the workspace's).
@@ -368,10 +368,10 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
       const c = await card(w)
       const a = await inWorkspace(w, async () => att.attachToCard(w, c, [{ path: await att.attachableSource(w, agent, zip) }], 'HB1'))
       expect(a.attachments.map((x) => x.name)).toEqual(['run4.zip'])
-      // Protected folders stay refused inside a listed one: another project's, and a .hive beyond its attachments.
+      // Protected folders stay refused inside a listed one: another project's, and a .combwork beyond its attachments.
       await advanced.set(CARD_ATTACHMENT_FOLDERS_ID, root)
       await expect(att.attachableSource(w, agent, file(join(root, 'q'), 'theirs.png', 't'))).rejects.toThrow(/not a file that can be attached/)
-      await expect(att.attachableSource(w, agent, file(join(root, '.hive'), 'x.txt', 'x'))).rejects.toThrow(/not a file that can be attached/)
+      await expect(att.attachableSource(w, agent, file(join(root, '.combwork'), 'x.txt', 'x'))).rejects.toThrow(/not a file that can be attached/)
 
       // The workspace's own list over Hive's; unset, Hive's again. A variable that isn't set leaves its folder out.
       await w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, [evidence])
@@ -411,8 +411,8 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
   it("Attach to card from a pane: only that host's session attachments", async () => {
     const { w, root } = await workspace()
     const pane = { kind: 'pane', host: join(root, 'p') } as const
-    expect(await att.attachableSource(w, pane, file(join(root, 'p', '.hive', 'attachments', 's1'), 'x.png', 'x'))).toBeTruthy()
-    await expect(att.attachableSource(w, pane, file(join(root, 'q', '.hive', 'attachments', 's1'), 'y.png', 'y'))).rejects.toThrow()
+    expect(await att.attachableSource(w, pane, file(join(root, 'p', '.combwork', 'attachments', 's1'), 'x.png', 'x'))).toBeTruthy()
+    await expect(att.attachableSource(w, pane, file(join(root, 'q', '.combwork', 'attachments', 's1'), 'y.png', 'y'))).rejects.toThrow()
     await expect(att.attachableSource(w, pane, file(join(root, 'p'), 'z.png', 'z'))).rejects.toThrow()
   })
 })
@@ -426,7 +426,7 @@ describe("attachment links in a card's text (HI-1700)", () => {
     expect(attachmentRefs(text)).toEqual(['draft-1', '0123456789ab'])
     const stored = withStoredIds(text, new Map([['draft-1', 'aaaaaaaaaaaa']]))
     expect(attachmentRefs(stored)).toEqual(['aaaaaaaaaaaa', '0123456789ab'])
-    expect(withAttachmentPaths(stored, [{ id: 'aaaaaaaaaaaa', path: 'C:\\w\\p\\.hive\\attachments\\cards\\1\\s.png' }])).toBe('See ![s](C:\\w\\p\\.hive\\attachments\\cards\\1\\s.png) and [l](attachment removed), again ![s](C:\\w\\p\\.hive\\attachments\\cards\\1\\s.png).')
+    expect(withAttachmentPaths(stored, [{ id: 'aaaaaaaaaaaa', path: 'C:\\w\\p\\.combwork\\attachments\\cards\\1\\s.png' }])).toBe('See ![s](C:\\w\\p\\.combwork\\attachments\\cards\\1\\s.png) and [l](attachment removed), again ![s](C:\\w\\p\\.combwork\\attachments\\cards\\1\\s.png).')
   })
 })
 
@@ -472,11 +472,11 @@ describe("a card's change with files (HI-1700, s11 §3–4)", () => {
     const big = new Uint8Array(26 * 1024 * 1024)
     const drafts = { files: [1, 2, 3, 4].map((k) => ({ data: big, name: `${k}.bin` })), keys: ['draft-1', 'draft-2', 'draft-3', 'draft-4'] }
     await expect(inWorkspace(w, () => att.stageDrafts(w, drafts, 'p'))).rejects.toThrow(/At most 10 files and/)
-    expect(inside(join(root, 'p', '.hive', 'attachments', 'cards', '.staging'))).toEqual([])
+    expect(inside(join(root, 'p', '.combwork', 'attachments', 'cards', '.staging'))).toEqual([])
     // A folder among them: refused whole.
     await expect(inWorkspace(w, () => att.stageDrafts(w, { files: [{ data: new TextEncoder().encode('ok'), name: 'ok.txt' }, { path: join(root, 'p') }], keys: ['draft-1', 'draft-2'] }, 'p'))).rejects.toThrow(/not a file/)
     expect(rows(w, c)).toEqual([])
-    expect(inside(join(root, 'p', '.hive', 'attachments', 'cards', '.staging'))).toEqual([])
+    expect(inside(join(root, 'p', '.combwork', 'attachments', 'cards', '.staging'))).toEqual([])
   })
 })
 
@@ -484,10 +484,10 @@ describe("a card's start prompt names its attachments (HI-1700)", () => {
   it('lists their paths (up to ten) and gives its description the paths for its links', async () => {
     const { taskPrompt } = await import('../src/shared/tasks')
     const seven = { number: 7, key: 'AL-7', title: 'Fix the button', description: 'See ![shot](attachment:aaaaaaaaaaaa).', blockedBy: [], comments: [], context: [] } as never
-    const files = Array.from({ length: 12 }, (_, i) => ({ id: i === 0 ? 'aaaaaaaaaaaa' : `b${String(i).padStart(11, '0')}`, path: `C:/w/p/.hive/attachments/cards/7/f${i}.png` }))
+    const files = Array.from({ length: 12 }, (_, i) => ({ id: i === 0 ? 'aaaaaaaaaaaa' : `b${String(i).padStart(11, '0')}`, path: `C:/w/p/.combwork/attachments/cards/7/f${i}.png` }))
     const prompt = taskPrompt(seven, true, { attachments: files })
-    expect(prompt).toContain('See ![shot](C:/w/p/.hive/attachments/cards/7/f0.png).')
-    expect(prompt).toContain('Its attachments (open them by path): C:/w/p/.hive/attachments/cards/7/f0.png, ')
+    expect(prompt).toContain('See ![shot](C:/w/p/.combwork/attachments/cards/7/f0.png).')
+    expect(prompt).toContain('Its attachments (open them by path): C:/w/p/.combwork/attachments/cards/7/f0.png, ')
     expect(prompt).toContain('f9.png, and 2 more (cw_read_task lists them).')
     expect(prompt).not.toContain('f10.png')
     expect(taskPrompt(seven, true)).not.toContain('Its attachments')

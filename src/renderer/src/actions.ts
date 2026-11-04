@@ -213,7 +213,7 @@ export async function createProject(): Promise<void> {
   let key = ''
   const name = await prompt({
     title: tr(msg({ id: 'actions.project.newTitle', defaultMessage: 'New Project', description: 'Title of the New Project dialog.' })),
-    message: tr(msg({ id: 'actions.project.newMessage', defaultMessage: 'A new folder is created in the workspace. Combwork adds its .hive metadata folder automatically.', description: 'The New Project dialog. Keep .hive as it is.' })),
+    message: tr(msg({ id: 'actions.project.newMessage', defaultMessage: 'A new folder is created in the workspace. Combwork adds its .combwork metadata folder automatically.', description: 'The New Project dialog. Keep .combwork as it is.' })),
     placeholder: tr(msg({ id: 'actions.project.namePlaceholder', defaultMessage: 'project-name', description: "Placeholder of the New Project dialog's name box: an example folder name (lower case, a dash)." })),
     confirmLabel: tr(msg({ id: 'actions.project.create', defaultMessage: 'Create', description: 'Button: creates the project.' })),
     validate: (v) =>
@@ -923,7 +923,7 @@ async function startNewAll_(path: string, archive: boolean): Promise<void> {
   const running = agents.filter((a) => a.live)
   const data = batchAgentsData(p, get().tasks, archive ? 'archive' : 'start', agents)
   const lines = tableText(data)
-  const note = tr(msg({ id: 'actions.startAll.note', defaultMessage: "{running, select, yes {Running agents are stopped first. } other {}}{archive, select, yes {The transcripts are kept in the project's .hive/archive folder.} other {Their conversations are kept and can be resumed from the Sessions tab.}}", description: 'Under the table of Start New (All) (archive: no) or Archive and Start New (All) (archive: yes): running agents stop first (running: yes), and where the old conversations are. Keep .hive/archive as it is.' }), { running: running.length ? 'yes' : 'no', archive: archive ? 'yes' : 'no' })
+  const note = tr(msg({ id: 'actions.startAll.note', defaultMessage: "{running, select, yes {Running agents are stopped first. } other {}}{archive, select, yes {The transcripts are kept in the project's .combwork/archive folder.} other {Their conversations are kept and can be resumed from the Sessions tab.}}", description: 'Under the table of Start New (All) (archive: no) or Archive and Start New (All) (archive: yes): running agents stop first (running: yes), and where the old conversations are. Keep .combwork/archive as it is.' }), { running: running.length ? 'yes' : 'no', archive: archive ? 'yes' : 'no' })
   const kind = archive ? 'archive' : 'start'
   const ok = await confirm({
     title: tr(msg({ id: 'actions.startAll.title', defaultMessage: '{kind, select, archive {{n, plural, one {Archive and start new?} other {Archive and start new for all agents?}}} other {{n, plural, one {Start a new session?} other {Start new sessions for all agents?}}}}', description: 'Title of the question before Start New (All) or Archive and Start New (All) (archive) for {n} agents.' }), { kind, n: agents.length }),
@@ -978,7 +978,7 @@ export async function archiveCurrent(path: string | null = get().selectedProject
   const ok = await confirm({
     title: tr(msg({ id: 'actions.archive.title', defaultMessage: 'Archive session and start fresh?', description: 'Title of the question before archiving the session and starting a new one.' })),
     message: tr(msg({ id: 'actions.archive.message', defaultMessage: 'Archive "{session}" and start a new session?', description: 'The question before archiving a session ({session}: its name or title) and starting a new one.' }), { session: target.name || target.title || target.id.slice(0, 8) }),
-    detail: tr(msg({ id: 'actions.archive.detail', defaultMessage: "The transcript is preserved in the project's .hive/archive folder. A new session starts with an empty context, which avoids re-caching the old conversation.", description: 'Under the question before archiving a session. Keep .hive/archive as it is.' })),
+    detail: tr(msg({ id: 'actions.archive.detail', defaultMessage: "The transcript is preserved in the project's .combwork/archive folder. A new session starts with an empty context, which avoids re-caching the old conversation.", description: 'Under the question before archiving a session. Keep .combwork/archive as it is.' })),
     confirmLabel: archiveAndStartNew(),
     action: 'archive-start'
   })
@@ -1198,8 +1198,8 @@ export async function addMcpServerFromFile(): Promise<McpServerInfo | null> {
     message: tr(
       msg({
         id: 'mcp.addFile.messageAdded',
-        defaultMessage: 'Adds {file} to the workspace (.hive/mcp){files, plural, =0 {} one {, with its file in a folder of its own} other {, with its # files in a folder of its own}}, added to no project yet. Add it where it should run: a project’s MCP tab, the Assistant’s view, or Add to… here. It runs:',
-        description: 'Add MCP Server from File (HI-2059), above the command the server runs. {file} is the file added; {files} how many files a .zip brings. Keep .hive/mcp as it is; "MCP tab" and "Add to…" as Hive shows them.'
+        defaultMessage: 'Adds {file} to the workspace (.combwork/mcp){files, plural, =0 {} one {, with its file in a folder of its own} other {, with its # files in a folder of its own}}, added to no project yet. Add it where it should run: a project’s MCP tab, the Assistant’s view, or Add to… here. It runs:',
+        description: 'Add MCP Server from File (HI-2059), above the command the server runs. {file} is the file added; {files} how many files a .zip brings. Keep .combwork/mcp as it is; "MCP tab" and "Add to…" as Hive shows them.'
       }),
       { file: basename(file), files: server.files }
     ),

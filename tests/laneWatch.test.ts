@@ -411,8 +411,8 @@ describe('lane watches (main/watches.ts, #531)', async () => {
   const open = async (builders = 3) => {
     const path = join(base, `ws-${++k}`)
     const alpha = join(path, 'alpha')
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [...Array.from({ length: builders }, (_, i) => `b${i + 1}`), 'r1', 'r2'].map((id) => ({ id, name: id.toUpperCase() })) }))
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [...Array.from({ length: builders }, (_, i) => `b${i + 1}`), 'r1', 'r2'].map((id) => ({ id, name: id.toUpperCase() })) }))
     const w = createWorkspaceService()
     await w.open(path)
     mkdirSync(w.assistantHome, { recursive: true })

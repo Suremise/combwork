@@ -25,12 +25,12 @@ const git = (cwd, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'u
 
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
-  lib.gitProject(alpha, { 'a.txt': 'one\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'a.txt': 'one\n', '.gitignore': '.combwork/\n' })
   git(alpha, 'branch', '-M', 'main')
   git(alpha, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
   // The builder works in that worktree, on `card`, merging back into main.
-  fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Builder', provider: 'claude-code', worktree: { path: wt, branch: 'card', base: 'main' } }] }))
+  fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Builder', provider: 'claude-code', worktree: { path: wt, branch: 'card', base: 'main' } }] }))
   lib.enableProviders(userData)
 
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47930) })

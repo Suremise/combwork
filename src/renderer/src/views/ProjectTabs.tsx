@@ -303,7 +303,7 @@ const S = {
   compactAbove: msg({ id: 'project.settings.compactAbove', defaultMessage: 'Suggest compacting above', description: 'Accessible name of the number box of tokens above which compacting is suggested.' }),
   neverChoice: msg({ id: 'project.settings.neverChoice', defaultMessage: 'Never', description: 'A choice: the warning or suggestion is off.' }),
   warnOver: msg({ id: 'project.settings.warnOver', defaultMessage: 'Warn when a transcript is over', description: 'Accessible name of the number box of megabytes above which a transcript is flagged.' }),
-  openHive: msg({ id: 'project.settings.openHive', defaultMessage: 'Open .hive folder', description: "Button: opens the project's .hive folder. Keep .hive." }),
+  openHive: msg({ id: 'project.settings.openHive', defaultMessage: 'Open .combwork folder', description: "Button: opens the project's .combwork folder. Keep .combwork." }),
   resetTitle: msg({ id: 'project.settings.resetTitle', defaultMessage: 'Reset project settings?', description: 'Title of the confirmation before resetting the project settings.' }),
   resetMessage: msg({ id: 'project.settings.resetMessage', defaultMessage: "The default provider, each provider’s model, effort, permission mode, context and extra arguments, the chime, the fresh-start suggestion, the compact threshold, the transcript size warning, file locks, worktree setup and the card-loop rounds and wait go back to Inherit, and loop wakes back on. Agents and skill and MCP opt-outs are kept.", description: 'The confirmation before resetting the project settings.' }),
   reset: msg({ id: 'project.settings.reset', defaultMessage: 'Reset', description: "The reset confirmation's button." }),
@@ -2012,7 +2012,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       key: 'metadata',
       ...rowText('project.metadata'),
       render: () => (
-        <button className="btn subtle" onClick={() => void call('app:openPath', `${project.path}\\.hive`)}>
+        <button className="btn subtle" onClick={() => void call('app:openPath', `${project.path}\\.combwork`)}>
           <Icon name="folder-opened" /> {tr(S.openHive)}
         </button>
       )

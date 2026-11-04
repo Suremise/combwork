@@ -34,8 +34,8 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   lib.gitProject(alpha)
-  fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }, { id: 'a-two', name: 'Two' }] }))
+  fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }, { id: 'a-two', name: 'Two' }] }))
 
   const { app, page, inv } = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_CLI_HOME_CONNECTION: '0', HIVE_TEST_NOTIFY_LOG: notifyLog }, viewport: { width: 1400, height: 900 } })
   try {
@@ -43,7 +43,7 @@ const check = (name, ok, extra = '') => {
     await lib.openWorkspace(inv, page, ws)
     const live = async (agentId) => (await inv('session:live')).find((s) => s.agentId === agentId && s.status !== 'stopped') ?? null
     const rows = async () => (await inv('connections:list')).connectionRows
-    const agentConnection = async (id) => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8')).agents.find((a) => a.id === id)?.connection
+    const agentConnection = async (id) => JSON.parse(fs.readFileSync(path.join(alpha, '.combwork', 'project.json'), 'utf8')).agents.find((a) => a.id === id)?.connection
 
     // --- Two accounts, each signed in with the fake, the project trusted in each, each with Main (its first) and Builder.
     const connect = async (name, email) => {
@@ -90,7 +90,7 @@ const check = (name, ok, extra = '') => {
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     await page.keyboard.press('Escape')
 
-    const assistantFile = path.join(ws, '.hive', 'assistant', '.hive', 'project.json')
+    const assistantFile = path.join(ws, '.combwork', 'assistant', '.combwork', 'project.json')
     const assistantConnection = () => (fs.existsSync(assistantFile) ? (JSON.parse(fs.readFileSync(assistantFile, 'utf8')).agents ?? []).map((a) => a.connection ?? null) : null)
     const assistantBefore = assistantConnection()
     // --- One reports Max 1 at 95% of its weekly limit: One switches to Max 2's Builder and resumes; Two moves at once.

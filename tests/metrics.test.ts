@@ -244,10 +244,10 @@ describe('saving', () => {
     await w.close()
     await metrics.flushMetrics()
     expect(metricsSaved(path)).not.toBeNull()
-    // No file of their own, nor a .gitignore for one: the database is git-ignored by .hive's.
-    expect(existsSync(join(path, '.hive', 'metrics', 'metrics.json'))).toBe(false)
-    expect(existsSync(join(path, '.hive', 'metrics', '.gitignore'))).toBe(false)
-    expect(readFileSync(join(path, '.hive', '.gitignore'), 'utf8')).toMatch(/^hive\.db$/m)
+    // No file of their own, nor a .gitignore for one: the database is git-ignored by .combwork's.
+    expect(existsSync(join(path, '.combwork', 'metrics', 'metrics.json'))).toBe(false)
+    expect(existsSync(join(path, '.combwork', 'metrics', '.gitignore'))).toBe(false)
+    expect(readFileSync(join(path, '.combwork', '.gitignore'), 'utf8')).toMatch(/^hive\.db$/m)
     // Only aggregates: no project path, no route asked for.
     expect(savedText(path)).not.toContain(path.replace(/\\/g, '\\\\'))
     await w.open(path)
@@ -316,7 +316,7 @@ describe('switching and the skill service', () => {
     await inWorkspace(w, () => skillRevisions())
     // Edited: invalidated, read again.
     const { appendFileSync } = await import('fs')
-    appendFileSync(join(path, '.hive', 'skills', 'handover', 'SKILL.md'), '\nmore\n')
+    appendFileSync(join(path, '.combwork', 'skills', 'handover', 'SKILL.md'), '\nmore\n')
     await inWorkspace(w, () => Promise.all([skillRevisions(), skillRevisions(), skillRevisions()]))
     const s = metrics.queryMetrics(w, { scope: { kind: 'workspace' } }).skills!
     expect(s.scans.count).toBeGreaterThanOrEqual(3)
@@ -401,9 +401,9 @@ describe('retention, whatever happens to the clock', () => {
 
 describe('the saved file is untrusted', () => {
   const hourOf = (t: number) => Math.floor(t / HOUR) * HOUR
-  const fileOf = (path: string) => join(path, '.hive', 'metrics', 'metrics.json')
+  const fileOf = (path: string) => join(path, '.combwork', 'metrics', 'metrics.json')
   const write = (path: string, data: unknown) => {
-    mkdirSync(join(path, '.hive', 'metrics'), { recursive: true })
+    mkdirSync(join(path, '.combwork', 'metrics'), { recursive: true })
     writeFileSync(fileOf(path), typeof data === 'string' ? data : JSON.stringify(data))
   }
   const histogram = Array.from({ length: LATENCY_BOUNDS_MS.length + 1 }, () => 0)
@@ -507,7 +507,7 @@ describe('the saved file is untrusted', () => {
 
 describe('moved into the workspace database (#1019)', () => {
   const hourOf = (t: number) => Math.floor(t / HOUR) * HOUR
-  const dirOf = (path: string) => join(path, '.hive', 'metrics')
+  const dirOf = (path: string) => join(path, '.combwork', 'metrics')
   const backups = (path: string) => readdirSync(dirOf(path)).filter((f) => f.startsWith('metrics.json.imported-'))
   /** A workspace folder never opened, with its metrics folder (an older Hive's). */
   const fresh = () => {
@@ -1465,8 +1465,8 @@ describe('#116 round 2: observation boundaries, evicted history, unreadable sess
 describe('HI-2049: launches and tool lists by workflow role', () => {
   const hourOf = (t: number) => Math.floor(t / HOUR) * HOUR
   const write = (path: string, data: unknown) => {
-    mkdirSync(join(path, '.hive', 'metrics'), { recursive: true })
-    writeFileSync(join(path, '.hive', 'metrics', 'metrics.json'), JSON.stringify(data))
+    mkdirSync(join(path, '.combwork', 'metrics'), { recursive: true })
+    writeFileSync(join(path, '.combwork', 'metrics', 'metrics.json'), JSON.stringify(data))
   }
   const launch = (workflow: 'builder' | 'reviewer' | 'either' | 'none') => ({ provider: 'claude-code', role: 'agent' as const, workflow, guidanceBytes: 100, guidanceChars: 100, customBytes: 0, customChars: 0, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: 1, skillCatalogBytes: 10, skillBytes: 20, skillsNotDelivered: 0, skillsUnmeasured: 0 })
 
@@ -1531,8 +1531,8 @@ describe('HI-2049: launches and tool lists by workflow role', () => {
 describe("HI-2063: the tool list's parts", () => {
   const hourOf = (t: number) => Math.floor(t / HOUR) * HOUR
   const write = (path: string, data: unknown) => {
-    mkdirSync(join(path, '.hive', 'metrics'), { recursive: true })
-    writeFileSync(join(path, '.hive', 'metrics', 'metrics.json'), JSON.stringify(data))
+    mkdirSync(join(path, '.combwork', 'metrics'), { recursive: true })
+    writeFileSync(join(path, '.combwork', 'metrics', 'metrics.json'), JSON.stringify(data))
   }
 
   it('parts come both or neither, with the characters, and add up to no more than them', async () => {

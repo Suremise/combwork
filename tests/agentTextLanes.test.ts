@@ -173,8 +173,8 @@ describe('the canary dialect over the lanes service (main/lanes.ts)', () => {
   const user = { kind: 'user' } as const
   beforeAll(async () => {
     const p = join(wsPath, 'alpha')
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'b2', name: 'B2' }, { id: 'b3', name: 'B3' }, { id: 'g1', name: 'G1', workflowRole: 'generalist' }] }))
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'b2', name: 'B2' }, { id: 'b3', name: 'B3' }, { id: 'g1', name: 'G1', workflowRole: 'generalist' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     lanes.startLanes()
@@ -275,7 +275,7 @@ describe('the canary dialect over the lanes service (main/lanes.ts)', () => {
       }
       const started = kept.find((f) => f.summary === `Lane started: B1 / R1, #${c1.number}`)!
       expect(started.summaryText!.values).toMatchObject({ named: 'no', state: 'started', who: 'B1 / R1', cards: `#${c1.number}` })
-      const h = join(base, 'journal-ws', '.hive', 'assistant')
+      const h = join(base, 'journal-ws', '.combwork', 'assistant')
       const out = admitted(join(base, 'journal-ws'))
       try {
         const id = journalStore.writeEntry(h, journalSettings({ enabled: true }), { kind: 'event', ...started, tags: ['hive', ...(started.tags ?? [])] }, 'hive')

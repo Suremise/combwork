@@ -19,7 +19,7 @@ const userData = path.join(lib.WORK, 'dialectsview-profile')
 const ws = path.join(lib.WORK, 'dialectsview-ws')
 const claudeHome = path.join(lib.WORK, 'dialectsview-claude-home')
 const proj = path.join(ws, 'alpha')
-const dialects = path.join(ws, '.hive', 'dialects')
+const dialects = path.join(ws, '.combwork', 'dialects')
 const PORT = lib.port(47711)
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -281,7 +281,7 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
   await ready(clara.id)
   const usage = async () => (await inv('dialects:usage')).find((u) => u.agentId === clara.id)
   check('restarted, Clara no longer needs a restart for her dialect', !!(await until(async () => (await usage())?.moved === false, HUNG_MS)))
-  const skill = path.join(ws, '.hive', 'skills', 'work-on-card', 'SKILL.md')
+  const skill = path.join(ws, '.combwork', 'skills', 'work-on-card', 'SKILL.md')
   fs.appendFileSync(skill, '\nA change.\n')
   const restartForSkill = !!(await until(async () => (await inv('workspace:refresh')).projects.find((p) => p.name === 'alpha').agents.find((a) => a.id === clara.id)?.restartNeeded, HUNG_MS))
   check('a skill-only edit asks her for a restart, but not for her dialect', restartForSkill && (await usage())?.moved === false)

@@ -588,7 +588,7 @@
   "board.overview.stalled": "À l’arrêt",
   "board.overview.waitingForReview": "En attente de relecture",
   "board.panel.allProjects": "Tous les projets",
-  "board.panel.info": "Les cartes de l’espace de travail, dans .hive/tasks. Les agents et l’Assistant les lisent, les modifient et les déplacent avec les outils de Combwork (le travail fini passe en Relecture) ; toi seul peux les archiver ou les supprimer.",
+  "board.panel.info": "Les cartes de l’espace de travail, dans .combwork/tasks. Les agents et l’Assistant les lisent, les modifient et les déplacent avec les outils de Combwork (le travail fini passe en Relecture) ; toi seul peux les archiver ou les supprimer.",
   "board.panel.refresh": "Actualiser",
   "board.panel.stalledInfo": "Cartes de la colonne En cours dont personne ne s’occupe : aucun agent ne les a, ou leur agent a été retiré ou ne tourne pas. Aussi les cartes des colonnes En cours ou Relecture qu’un agent d’une boucle de cartes a laissées sans les attendre.",
   "board.panel.workspace": "Espace de travail",

@@ -45,9 +45,9 @@ fs.mkdirSync(shots, { recursive: true })
   await lib.acceptClaudeTrust(inv, proj, agent.id)
   check('the session starts', !!(await lib.until(async () => (await inv('session:live')).some((l) => l.status === 'ready'), 30000)))
   const typed = async () => (await inv('pty:buffer', lib.ptyKey(proj, agent.id))).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
-  /** The attachments' paths on the CLI's input line: copies Hive keeps with the session (.hive/attachments/<session>/…). */
+  /** The attachments' paths on the CLI's input line: copies Hive keeps with the session (.combwork/attachments/<session>/…). */
   // A copy's name may have spaces (its own name after the time), when its path is quoted.
-  const kept = async (ext = 'png') => [...new Set([...(await typed()).matchAll(new RegExp(`[\\\\/]\\.hive[\\\\/]attachments[\\\\/][^"\\r\\n]+?\\.${ext}(?=["\\s]|$)`, 'gi'))].map((m) => m[0]))]
+  const kept = async (ext = 'png') => [...new Set([...(await typed()).matchAll(new RegExp(`[\\\\/]\\.combwork[\\\\/]attachments[\\\\/][^"\\r\\n]+?\\.${ext}(?=["\\s]|$)`, 'gi'))].map((m) => m[0]))]
   const images = () => kept('png')
   /** The chips over the terminal: each attachment's name and label. */
   const chips = async () => (await page.locator('.attachment-chip').evaluateAll((els) => els.map((e) => `${e.querySelector('.attachment-chip-name')?.textContent} | ${e.querySelector('.attachment-chip-label')?.textContent}`)))
@@ -93,7 +93,7 @@ fs.mkdirSync(shots, { recursive: true })
   check("a dropped image's path reaches it too (a copy kept with the session)", !!(await lib.until(async () => (await images()).length >= 2, 10000)), (await typed()).slice(-300))
   await page.screenshot({ path: path.join(shots, '2-drop.png') })
 
-  const imgDir = path.join(proj, '.hive', 'attachments', st.sessionId)
+  const imgDir = path.join(proj, '.combwork', 'attachments', st.sessionId)
   const saved = fs.existsSync(imgDir) ? fs.readdirSync(imgDir) : []
   const shown = (await images()).map((p) => path.basename(p))
   check('both are saved with the session, as the paths say', saved.length === 2 && shown.every((f) => saved.includes(f)) && pasted?.toLowerCase().includes(st.sessionId.toLowerCase()), JSON.stringify({ saved, shown }))
@@ -128,7 +128,7 @@ fs.mkdirSync(shots, { recursive: true })
 
   // The Images tab's viewer (#258): Delete is greyed out, saying why, on the running session's images, not on a stopped
   // session's; moving between them changes it, and so does the session stopping.
-  const pastDir = path.join(proj, '.hive', 'attachments', '0b6e0000-0000-4000-8000-000000000258')
+  const pastDir = path.join(proj, '.combwork', 'attachments', '0b6e0000-0000-4000-8000-000000000258')
   fs.mkdirSync(pastDir, { recursive: true })
   const pastPng = path.join(pastDir, '2026-01-01T09-00-00.png')
   fs.writeFileSync(pastPng, lib.samplePng())

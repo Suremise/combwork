@@ -153,7 +153,7 @@
   "workflow.option.dependenciesDone.desc": "他のカードを待つカードは、それらの作業が取り込まれるまで開始できません。",
   "workflow.option.dependenciesDone.none": "待っているカードが完了してから開始する",
   "workflow.option.dependenciesDone.title": "待っているカードがマージされてから開始する",
-  "workflow.option.excluded.desc": "プロジェクトフォルダー全体から、これらのフォルダーとファイルを除いたものです（.hiveは常に除外）。",
+  "workflow.option.excluded.desc": "プロジェクトフォルダー全体から、これらのフォルダーとファイルを除いたものです（.combworkは常に除外）。",
   "workflow.option.excluded.title": "作業の対象",
   "workflow.option.fileLocks.desc": "同じフォルダーの別のエージェントが編集中のファイルを、エージェントが編集しようとしたときの動作です。",
   "workflow.option.fileLocks.title": "ファイルロック",

@@ -965,7 +965,7 @@ export const SESSION_LEASES_STEP: SchemaStep = {
 }
 
 /**
- * Card attachments (HI-1700): files kept with a card, in `<host>/.hive/attachments/cards/<number>` (its project's folder,
+ * Card attachments (HI-1700): files kept with a card, in `<host>/.combwork/attachments/cards/<number>` (its project's folder,
  * the workspace's for a card with none), named there `file` (`<time>_<name>`), `name` as given. One copy of a file per card
  * (`sha256`); `comment`, the id of the comment that brought it (none: added to the card itself, or by its description).
  * Gone with the card (its folder to the Recycle Bin, cardAttachments.ts).

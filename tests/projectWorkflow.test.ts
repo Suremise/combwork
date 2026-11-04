@@ -46,14 +46,14 @@ const OTHERS = { kept: { none: { preset: 'solo', options: { review: 'none' }, pr
 async function workspace(workflow?: unknown): Promise<{ w: WS; repo: string }> {
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
-  mkdirSync(join(ws, '.hive'), { recursive: true })
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
+  mkdirSync(join(ws, '.combwork'), { recursive: true })
   git(repo, 'init', '-q', '-b', 'main')
   for (const [k, v] of [['user.name', 'Pat Builder'], ['user.email', 'pat@example.com'], ['core.autocrlf', 'false']]) git(repo, 'config', k, v)
-  writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+  writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
   git(repo, 'add', '-A')
   git(repo, 'commit', '-qm', 'initial')
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], ...(workflow ? { workflow } : {}) }))
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], ...(workflow ? { workflow } : {}) }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
@@ -61,7 +61,7 @@ async function workspace(workflow?: unknown): Promise<{ w: WS; repo: string }> {
 }
 
 /** project.json's `workflow` as it is on disk. */
-const onDisk = (repo: string): Record<string, unknown> => JSON.parse(readFileSync(join(repo, '.hive', 'project.json'), 'utf8')).workflow
+const onDisk = (repo: string): Record<string, unknown> => JSON.parse(readFileSync(join(repo, '.combwork', 'project.json'), 'utf8')).workflow
 
 describe('writeWorkflow (#1417)', () => {
   it('sets the platform, preset and options, and keeps every other field', () => {

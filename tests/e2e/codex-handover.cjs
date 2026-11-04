@@ -23,7 +23,7 @@ const check = (name, ok, extra = '') => {
   lib.trustForCodex(proj)
   lib.enableProviders(userData, ['claude-code', 'codex'])
   // A handover for Codex to pick up.
-  const hdir = path.join(ws, '.hive', 'shared', 'handovers')
+  const hdir = path.join(ws, '.combwork', 'shared', 'handovers')
   fs.rmSync(hdir, { recursive: true, force: true })
   fs.mkdirSync(hdir, { recursive: true })
   // The goal is this task's alone: "and do nothing else" was taken to cover Hive's later request to write a handover,

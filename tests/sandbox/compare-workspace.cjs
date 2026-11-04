@@ -12,7 +12,7 @@
  * workspace; otherwise it writes nothing and exits 1 saying what is missing. A folder that doesn't exist counts as
  * empty; one that can't be read is an error, never "none".
  *
- * Read-only, and names only: it lists what the workspace's .hive and its projects hold (folder and file names, counts,
+ * Read-only, and names only: it lists what the workspace's .combwork and its projects hold (folder and file names, counts,
  * which convention files exist), never a note's, skill's or convention file's contents. It doesn't look in any CLI's
  * home (~/.claude, ~/.codex, ~/.copilot): agent memory lives there and is out of scope (it matters only with a model).
  */
@@ -51,8 +51,9 @@ function inventory(ws) {
   let st
   try { st = fs.statSync(ws) } catch (e) { throw new Error(`The workspace ${ws} can't be read: ${e.code || e.message}`, { cause: e }) }
   if (!st.isDirectory()) throw new Error(`The workspace ${ws} is not a folder`)
-  const h = path.join(ws, '.hive')
-  if (!exists(path.join(h, 'workspace.json'))) throw new Error(`${ws} is not a Hive workspace (no .hive\\workspace.json)`)
+  // .combwork from 1.1 (HI-2462); .hive in a workspace no 1.1 has opened yet.
+  const h = ['.combwork', '.hive'].map((f) => path.join(ws, f)).find((d) => exists(path.join(d, 'workspace.json')))
+  if (!h) throw new Error(`${ws} is not a Hive workspace (no .combwork\\workspace.json or .hive\\workspace.json)`)
   const workspaceJson = readJson(path.join(h, 'workspace.json'))
   const bundled = readJson(path.join(h, 'bundled.json'), { optional: true })
   const skills = dirs(path.join(h, 'skills'))
@@ -106,7 +107,7 @@ function evidenceProblems(report) {
   if (typeof s1.banner !== 'string') problems.push('s1: fact banner missing')
   if (!Array.isArray(s1.setupTabs)) problems.push('s1: fact setupTabs missing')
   if (!s1.version) problems.push('s1: fact version missing')
-  if (!Array.isArray(s6.hive)) problems.push('s6: fact hive (the new workspace\'s .hive) missing')
+  if (!Array.isArray(s6.hive)) problems.push('s6: fact hive (the new workspace\'s .combwork) missing')
   if (!s6.views || typeof s6.views !== 'object') problems.push('s6: fact views missing')
   if (!s6.workspaceJson) problems.push('s6: fact workspaceJson missing')
   const st = f['s1-state']

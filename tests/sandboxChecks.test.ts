@@ -79,9 +79,9 @@ test('the server: --server, else the workspace\'s installed copy, else a hive-mc
   const hive = path.join(s.dir, 'ws', 'hive')
   fs.mkdirSync(hive, { recursive: true })
   const opts = ['--installer', installer, '--only', 'fresh', '--hive', hive]
-  assert.throws(() => plan([...opts]), /No windows-sandbox server found \(looked in .*\.hive.*mcp.*windows-sandbox.*server\.js and .*mcp.*servers.*windows-sandbox.*server\.js\): pass --server/)
+  assert.throws(() => plan([...opts]), /No windows-sandbox server found \(looked in .*\.combwork.*mcp.*windows-sandbox.*server\.js and .*mcp.*servers.*windows-sandbox.*server\.js\): pass --server/)
   const [installed, checkout] = serverCandidates(hive)
-  assert.strictEqual(installed, path.join(s.dir, 'ws', '.hive', 'mcp', 'windows-sandbox', 'server.js'))
+  assert.strictEqual(installed, path.join(s.dir, 'ws', '.combwork', 'mcp', 'windows-sandbox', 'server.js'))
   assert.strictEqual(checkout, path.join(s.dir, 'ws', 'mcp', 'servers', 'windows-sandbox', 'server.js'))
   for (const f of [installed, checkout]) { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, '') }
   assert.strictEqual(plan(opts).serverJs, installed)

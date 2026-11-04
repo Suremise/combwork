@@ -16,7 +16,7 @@ import type { StoredText } from '../shared/types'
 const log = createLogger('journal')
 
 /**
- * The Assistant's journal (#989, #1031): a database of its own beside its home (`.hive/assistant/journal.db`), apart
+ * The Assistant's journal (#989, #1031): a database of its own beside its home (`.combwork/assistant/journal.db`), apart
  * from the board's. Entries are small and typed (a one-line summary, optional detail and why, a project, an importance,
  * links to cards, commits, notes and other entries, tags), written by the Assistant (its tools) and by Hive (facts:
  * lanes, merges, an unexpected close). Recall gives one-line rows, at most a few, ranked; an entry's detail is read one
@@ -136,12 +136,12 @@ interface OpenJournal {
 const open = new Map<string, OpenJournal>()
 const keyOf = (file: string): string => file.toLowerCase()
 
-/** The journal file of an Assistant home (`<workspace>/.hive/assistant`). */
+/** The journal file of an Assistant home (`<workspace>/.combwork/assistant`). */
 export const journalFile = (home: string): string => join(home, JOURNAL_FILE)
 
 /**
  * Where a journal is, resolved once as a call enters and used for everything it does (#1456): the open one's file and
- * workspace as it opened, else where its spelling leads now and that file's workspace (null: in no `.hive`). Never
+ * workspace as it opened, else where its spelling leads now and that file's workspace (null: in no `.combwork`). Never
  * the spelling itself, which a junction pointed elsewhere meanwhile would take to another workspace's journal.
  */
 interface Located {
@@ -157,7 +157,7 @@ function located(home: string): Located {
 }
 
 /**
- * Journals being deleted (#1031 round 1), by their workspace's place (#1456: under any spelling; a file in no `.hive` by
+ * Journals being deleted (#1031 round 1), by their workspace's place (#1456: under any spelling; a file in no `.combwork` by
  * itself): nothing opens them meanwhile, so the file can go.
  */
 const deleting = new Set<string>()

@@ -8,8 +8,8 @@ const path = require('path')
 
 const userData = path.join(lib.WORK, 'drafts-profile')
 const ws = path.join(lib.WORK, 'drafts-ws')
-const note = path.join(ws, '.hive', 'shared', 'plan.md')
-const server = path.join(ws, '.hive', 'mcp', 'demo.json')
+const note = path.join(ws, '.combwork', 'shared', 'plan.md')
+const server = path.join(ws, '.combwork', 'mcp', 'demo.json')
 const sleep = lib.sleep
 let failed = 0
 const check = (name, ok, extra = '') => {

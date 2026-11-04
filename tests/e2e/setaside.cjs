@@ -21,7 +21,7 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 
-/** A card file as an older Combwork saves it in `.hive/tasks`. */
+/** A card file as an older Combwork saves it in `.combwork/tasks`. */
 const olderCard = (number, fields) =>
   JSON.stringify({ number, title: `Card ${number}`, description: '', project: 'alpha', agent: null, column: 'todo', order: number, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived: false, createdAt: '2026-10-05T09:30:00.000Z', createdBy: 'You', updatedAt: '2026-10-05T09:30:00.000Z', ...fields }, null, 2) + '\n'
 
@@ -29,8 +29,8 @@ const olderCard = (number, fields) =>
   for (const d of [userData, ws, other]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(alpha)
   lib.gitProject(path.join(other, 'beta'))
-  fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-coder', name: 'Coder' }] }))
+  fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-coder', name: 'Coder' }] }))
   const { app, page, inv } = await lib.launch({ userData, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -39,7 +39,7 @@ const olderCard = (number, fields) =>
     const one = await inv('tasks:create', { title: 'On the board', project: 'alpha' })
     const two = await inv('tasks:create', { title: 'Links to #1', project: 'alpha' })
     await inv('tasks:update', two.number, { links: [one.number] })
-    const stub = path.join(ws, '.hive', 'tasks')
+    const stub = path.join(ws, '.combwork', 'tasks')
     check('the stub is there for older versions', fs.existsSync(path.join(stub, 'board.json')))
 
     // Another workspace meanwhile; then an older Hive saves three files in the stub: a card with a free number, one
@@ -105,8 +105,8 @@ const olderCard = (number, fields) =>
     await page.screenshot({ path: path.join(lib.WORK, 'setaside-discard.png') })
     await ask.getByRole('button', { name: 'Discard', exact: true }).click()
     check('…then the list is empty', !!(await lib.until(async () => /No cards are set aside/.test(await dialog.innerText()), HUNG_MS)))
-    check('…and the file is in the trash', !!(await lib.until(async () => lib.trashed(path.join('setaside-ws', '.hive', 'tasks.set-aside', `${free + 1}.json`)).length === 1, HUNG_MS)))
-    check('the set-aside folder is empty', fs.readdirSync(path.join(ws, '.hive', 'tasks.set-aside')).length === 0)
+    check('…and the file is in the trash', !!(await lib.until(async () => lib.trashed(path.join('setaside-ws', '.combwork', 'tasks.set-aside', `${free + 1}.json`)).length === 1, HUNG_MS)))
+    check('the set-aside folder is empty', fs.readdirSync(path.join(ws, '.combwork', 'tasks.set-aside')).length === 0)
     await dialog.getByRole('button', { name: 'Close', exact: true }).click()
     // The toolbar reads the count again as the board changes: the menu, opened again until then, stops offering it.
     const menuWithout = async () => {

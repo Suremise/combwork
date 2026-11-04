@@ -45,7 +45,7 @@ const user = { kind: 'user' } as const
 function gitInit(folder: string): void {
   git(folder, 'init', '-q', '-b', 'main')
   for (const [k, v] of [['user.name', 'Pat Builder'], ['user.email', 'pat@example.com'], ['core.autocrlf', 'false']]) git(folder, 'config', k, v)
-  writeFileSync(join(folder, '.gitignore'), '.hive/\n')
+  writeFileSync(join(folder, '.gitignore'), '.combwork/\n')
   git(folder, 'add', '-A')
   git(folder, 'commit', '-qm', 'initial')
 }
@@ -57,13 +57,13 @@ function gitInit(folder: string): void {
 async function workspace(o: { platform: 'git' | 'none'; workflow?: unknown; none?: boolean; subfolder?: boolean }): Promise<{ w: WS; repo: string }> {
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
-  mkdirSync(join(ws, '.hive'), { recursive: true })
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
+  mkdirSync(join(ws, '.combwork'), { recursive: true })
   if (o.subfolder) {
     writeFileSync(join(repo, 'a.txt'), 'a\n')
     gitInit(ws)
   } else if (!o.none) gitInit(repo)
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: o.platform, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], ...(o.workflow ? { workflow: o.workflow } : {}) }))
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: o.platform, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], ...(o.workflow ? { workflow: o.workflow } : {}) }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)

@@ -118,7 +118,7 @@ describe('in ProjectInfo', () => {
     await w.refreshesSettled()
     return p
   }
-  const recorded = (p: string): ProjectConfig['platform'] => (JSON.parse(readFileSync(join(p, '.hive', 'project.json'), 'utf8')) as ProjectConfig).platform
+  const recorded = (p: string): ProjectConfig['platform'] => (JSON.parse(readFileSync(join(p, '.combwork', 'project.json'), 'utf8')) as ProjectConfig).platform
   const notices = (p: string) => events.flatMap((e) => (e.type === 'toast' && e.toast.source === p ? [e.toast] : []))
   const info = (p: string) => inWorkspace(w, () => w.projectInfo(p))
 
@@ -202,9 +202,9 @@ describe('in ProjectInfo', () => {
 
   it('a project.json naming no platform stays readable, with a warning said once', async () => {
     const p = join(ws, 'delta')
-    mkdirSync(join(p, '.hive'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
     for (const value of ['mercurial', 7]) {
-      writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [], platform: value }))
+      writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [], platform: value }))
       expect((await info(p)).platform).toEqual({ id: 'none', capabilities: PLATFORMS.none.capabilities, detected: { platform: 'none' }, invalid: String(value) })
       await info(p)
     }
@@ -251,8 +251,8 @@ describe('in ProjectInfo', () => {
 
   it('a project from before platforms (none recorded) follows detection, offering nothing, until the upgrade records one', async () => {
     const p = join(ws, 'gamma')
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     expect((await info(p)).platform).toEqual({ id: 'none', capabilities: PLATFORMS.none.capabilities, detected: { platform: 'none' } })
     gitInit(p)
     expect((await info(p)).platform).toMatchObject({ id: 'git', detected: { platform: 'git' } })

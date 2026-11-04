@@ -27,9 +27,9 @@ const check = (name, ok, extra = '') => {
   fs.mkdirSync(proj, { recursive: true })
   fs.mkdirSync(shots, { recursive: true })
   // Two servers, both on in the workspace (they never run: the fake Claude Code only records its --mcp-config).
-  fs.mkdirSync(path.join(ws, '.hive', 'mcp'), { recursive: true })
-  for (const n of ['notes', 'sandbox']) fs.writeFileSync(path.join(ws, '.hive', 'mcp', `${n}.json`), JSON.stringify({ description: `The ${n} server`, command: 'node', args: [`${n}.js`] }))
-  fs.writeFileSync(path.join(ws, '.hive', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes', 'sandbox'] } }))
+  fs.mkdirSync(path.join(ws, '.combwork', 'mcp'), { recursive: true })
+  for (const n of ['notes', 'sandbox']) fs.writeFileSync(path.join(ws, '.combwork', 'mcp', `${n}.json`), JSON.stringify({ description: `The ${n} server`, command: 'node', args: [`${n}.js`] }))
+  fs.writeFileSync(path.join(ws, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes', 'sandbox'] } }))
   const env = lib.fakeClaude(userData, home, [proj, ws])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))

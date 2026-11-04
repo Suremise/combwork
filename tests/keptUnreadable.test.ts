@@ -198,8 +198,8 @@ describe('a kept file that is there but unreadable (HI-2414)', () => {
   })
 
   it("says the file couldn't be read, as a conflict", () => {
-    const e = new KeptFileUnreadable('C:\\ws\\.hive\\project.json')
-    expect(e.message).toBe("C:\\ws\\.hive\\project.json couldn't be read: nothing was changed. Try again in a moment.")
+    const e = new KeptFileUnreadable('C:\\ws\\.combwork\\project.json')
+    expect(e.message).toBe("C:\\ws\\.combwork\\project.json couldn't be read: nothing was changed. Try again in a moment.")
     expect(e.kind).toBe('conflict')
   })
 })
@@ -208,8 +208,8 @@ describe('a project setting saved while project.json is unreadable (HI-2414)', (
   it('is refused: project.json and its .bak stay byte for byte, the saved agents and id kept', async () => {
     const ws = join(base, 'ws')
     const alpha = join(ws, 'alpha')
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
-    const file = join(alpha, '.hive', 'project.json')
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
+    const file = join(alpha, '.combwork', 'project.json')
     writeFileSync(file, JSON.stringify({ version: 2, agents: [] }))
     const w = createWorkspaceService()
     onTestFinished(() => disposeWorkspaceService(w))
@@ -233,8 +233,8 @@ describe('a project setting saved while project.json is unreadable (HI-2414)', (
 describe("workspace.json unreadable when its workspace opens (HI-2414, HR3's round 1)", () => {
   it('its settings are never saved from the .bak, even once another reader has read the file', async () => {
     const ws = join(base, 'ws-settings')
-    const file = join(ws, '.hive', 'workspace.json')
-    mkdirSync(join(ws, '.hive'), { recursive: true })
+    const file = join(ws, '.combwork', 'workspace.json')
+    mkdirSync(join(ws, '.combwork'), { recursive: true })
     // The file has a server turned on; its .bak, from before, doesn't.
     const saved = { version: 1, mcp: { enabled: ['saved-server'] } }
     writeFileSync(file, pretty(saved))
@@ -259,8 +259,8 @@ describe("workspace.json unreadable when its workspace opens (HI-2414, HR3's rou
 
   it("unreadable, then read again part way through another program's save, then saved: the finished settings kept (HR3's round 2)", async () => {
     const ws = join(base, 'ws-saving')
-    const file = join(ws, '.hive', 'workspace.json')
-    mkdirSync(join(ws, '.hive'), { recursive: true })
+    const file = join(ws, '.combwork', 'workspace.json')
+    mkdirSync(join(ws, '.combwork'), { recursive: true })
     const saved = { version: 1, mcp: { enabled: ['saved-server'] } }
     writeFileSync(file, pretty(saved))
     writeFileSync(`${file}.bak`, pretty({ version: 1, mcp: { enabled: [] } }))

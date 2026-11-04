@@ -158,8 +158,8 @@ describe('installing and updating (HI-545)', () => {
   let share: string
   let w: ReturnType<typeof createWorkspaceService>
   const run = <T>(fn: () => Promise<T> | T): Promise<T> => inWorkspace(w, async () => fn())
-  const mcpDir = (): string => join(wsPath, '.hive', 'mcp')
-  const projectMcp = (p: string) => JSON.parse(readFileSync(join(p, '.hive', 'project.json'), 'utf8')).mcp
+  const mcpDir = (): string => join(wsPath, '.combwork', 'mcp')
+  const projectMcp = (p: string) => JSON.parse(readFileSync(join(p, '.combwork', 'project.json'), 'utf8')).mcp
   const agent = { id: 'a1', name: 'Builder', provider: 'claude-code' }
   const launched = async (p: string) => run(async () => (await sessions.effective(p, agent as never)).mcpServers)
   const source = (): string => pathToFileURL(join(share, 'catalog.json')).href
@@ -204,8 +204,8 @@ describe('installing and updating (HI-545)', () => {
     apiary = join(wsPath, 'apiary')
     mkdirSync(mcpDir(), { recursive: true })
     for (const p of [ambrosia, apiary]) {
-      mkdirSync(join(p, '.hive'), { recursive: true })
-      writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [agent], mcp: { disabled: [], enabled: [], model: 3 } }))
+      mkdirSync(join(p, '.combwork'), { recursive: true })
+      writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [agent], mcp: { disabled: [], enabled: [], model: 3 } }))
     }
     catalog.testHooks.facts = PC
     publish('1.0.0')
@@ -318,7 +318,7 @@ describe('installing and updating (HI-545)', () => {
     publish('1.1.0', 'server2.js')
     await pages()
     const u = await prepareUpdate()
-    const settings = join(ambrosia, '.hive', 'project.json')
+    const settings = join(ambrosia, '.combwork', 'project.json')
     const saved = readFileSync(settings, 'utf8')
     writeFileSync(settings, '{')
     await expect(run(() => catalog.updateCatalogServer(u.p.id, u.shown, u.places))).rejects.toThrow("Couldn't read the settings of ambrosia")

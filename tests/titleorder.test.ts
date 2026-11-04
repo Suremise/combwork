@@ -50,7 +50,7 @@ function agent() {
 describe('the title in order with the hooks', () => {
   const told = vi.spyOn(sessions as unknown as { notify: (...a: unknown[]) => void }, 'notify').mockImplementation(() => undefined)
   beforeAll(async () => {
-    mkdirSync(join(p, '.hive'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
     w = createWorkspaceService()
     await w.open(wsPath)
   })

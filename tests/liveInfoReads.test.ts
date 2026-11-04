@@ -48,14 +48,14 @@ async function running(p: string, agentId: string): Promise<void> {
 }
 
 beforeAll(async () => {
-  const skills = join(wsPath, '.hive', 'skills')
+  const skills = join(wsPath, '.combwork', 'skills')
   const bundled = resolve('resources/skills')
   for (const name of ['handover', 'pick-up', 'work-on-card', 'merge-ready'].slice(0, SKILLS)) cpSync(join(bundled, name), join(skills, name), { recursive: true })
-  mkdirSync(join(wsPath, '.hive', 'mcp'), { recursive: true })
-  writeFileSync(join(wsPath, '.hive', 'mcp', 'tool.json'), JSON.stringify({ command: 'node', args: ['tool.js'] }))
+  mkdirSync(join(wsPath, '.combwork', 'mcp'), { recursive: true })
+  writeFileSync(join(wsPath, '.combwork', 'mcp', 'tool.json'), JSON.stringify({ command: 'node', args: ['tool.js'] }))
   for (const p of projects) {
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: agentsOf(p) }))
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: agentsOf(p) }))
   }
   w = createWorkspaceService()
   w.setLiveProvider((p, cfg, scope) => sessions.liveInfo(p, cfg, scope))
@@ -93,7 +93,7 @@ describe("a refresh's running agents share the workspace's reads (#1002)", () =>
   })
 
   it("a change to the workspace's skills or servers still asks every running agent for a restart, at the next refresh", async () => {
-    writeFileSync(join(wsPath, '.hive', 'mcp', 'other.json'), JSON.stringify({ command: 'node', args: ['other.js'] }))
+    writeFileSync(join(wsPath, '.combwork', 'mcp', 'other.json'), JSON.stringify({ command: 'node', args: ['other.js'] }))
     await run(() => workspace.mutateProjectConfig(projects[0], (c) => ({ mcp: { ...c.mcp, enabled: ['other'] } })))
     await run(() => workspace.saveWorkspaceConfigWith((c) => ({ mcp: { ...c.mcp, enabled: ['other'] } })))
     let info = await run(() => workspace.refresh())
@@ -101,7 +101,7 @@ describe("a refresh's running agents share the workspace's reads (#1002)", () =>
     expect(changed(info, projects[0])).toEqual([true, true, true])
     expect(changed(info, projects[1])).toEqual([false, false, false])
     // A skill edited: every running agent of both projects.
-    writeFileSync(join(wsPath, '.hive', 'skills', 'handover', 'extra.md'), 'More.\n')
+    writeFileSync(join(wsPath, '.combwork', 'skills', 'handover', 'extra.md'), 'More.\n')
     info = await run(() => workspace.refresh())
     expect(changed(info, projects[1])).toEqual([true, true, true])
   })
@@ -179,7 +179,7 @@ describe("a refresh's running agents share the workspace's reads (#1002)", () =>
   it("closing waits for a scheduled refresh already running, which reads the projects' files (#1341)", async () => {
     // A workspace of its own, closed here.
     const other = join(base, 'closing')
-    mkdirSync(join(other, 'gamma', '.hive'), { recursive: true })
+    mkdirSync(join(other, 'gamma', '.combwork'), { recursive: true })
     const w2 = createWorkspaceService()
     await w2.open(other)
     await w2.refreshesSettled()

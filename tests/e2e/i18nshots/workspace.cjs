@@ -96,12 +96,12 @@ async function statusBar(ctx) {
 }
 
 /**
- * A session of the Hive Assistant with usage today, as a Hive backup (.hive/sessions in its home), so the Workspace
+ * A session of the Hive Assistant with usage today, as a Hive backup (.combwork/sessions in its home), so the Workspace
  * Overview has an Assistant row and chart series (wsoverview seeds projects the same way).
  */
 function seedAssistantUsage(ctx) {
-  const assistant = path.join(ctx.workspace, '.hive', 'assistant')
-  const home = path.join(assistant, '.hive')
+  const assistant = path.join(ctx.workspace, '.combwork', 'assistant')
+  const home = path.join(assistant, '.combwork')
   const id = '77777777-aaaa-bbbb-cccc-000000000807'
   const at = new Date().toISOString()
   fs.mkdirSync(path.join(home, 'sessions'), { recursive: true })
@@ -122,7 +122,7 @@ function seedAssistantUsage(ctx) {
  * otherwise, #1172): listed, then waited for until main counts it.
  */
 async function assistantUsageRecorded(ctx) {
-  await ctx.inv('session:list', path.join(ctx.workspace, '.hive', 'assistant'))
+  await ctx.inv('session:list', path.join(ctx.workspace, '.combwork', 'assistant'))
   const counted = async () => (await ctx.inv('workspace:usage')).assistant.some((s) => s.usage)
   if (!(await ctx.lib.until(counted, ctx.hungMs))) throw new Error("the Assistant's seeded session never reached the usage history")
 }

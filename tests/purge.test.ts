@@ -46,9 +46,9 @@ const write = (file: string, text: string): void => {
   mkdirSync(join(file, '..'), { recursive: true })
   writeFileSync(file, text)
 }
-const active = (id: string, host = p): string => join(host, '.hive', 'sessions', `${id}.jsonl`)
-const archived = (id: string, host = p): string => join(host, '.hive', 'archive', `${id}.jsonl`)
-const attachments = (id: string, host = p): string => join(host, '.hive', 'attachments', id)
+const active = (id: string, host = p): string => join(host, '.combwork', 'sessions', `${id}.jsonl`)
+const archived = (id: string, host = p): string => join(host, '.combwork', 'archive', `${id}.jsonl`)
+const attachments = (id: string, host = p): string => join(host, '.combwork', 'attachments', id)
 const records = async (host = p) => (await run(() => workspace.sessionsFile(host))).sessions
 const binCount = (): number => readdirSync(bin).length
 
@@ -99,10 +99,10 @@ const reasons = (r: { skipped: { reason: string }[] }): string => r.skipped.map(
 describe('Purge', () => {
   beforeAll(async () => {
     for (const host of [p, other]) {
-      mkdirSync(join(host, '.hive'), { recursive: true })
-      writeFileSync(join(host, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
+      mkdirSync(join(host, '.combwork'), { recursive: true })
+      writeFileSync(join(host, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
     }
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
     w = createWorkspaceService()
     await w.open(wsPath)
     cliLookup.mockImplementation(lookup)
@@ -110,7 +110,7 @@ describe('Purge', () => {
   // Each test starts from no sessions, so what Purge does is only to the test's own.
   beforeEach(async () => {
     for (const host of [p, other]) {
-      for (const d of ['archive', 'sessions', 'attachments']) rmSync(join(host, '.hive', d), { recursive: true, force: true })
+      for (const d of ['archive', 'sessions', 'attachments']) rmSync(join(host, '.combwork', d), { recursive: true, force: true })
       await w.mutateSessions(host, (f) => {
         f.sessions = []
         f.deleted = []
@@ -171,16 +171,16 @@ describe('Purge', () => {
     const dead = newId()
     write(active(dead) + '.gz', 'gz')
     write(join(attachments(dead), 'b.txt'), 'b')
-    write(join(p, '.hive', 'attachments', 'run-abc', 'c.txt'), 'c')
+    write(join(p, '.combwork', 'attachments', 'run-abc', 'c.txt'), 'c')
     // Not Hive's per session: left alone.
-    write(join(p, '.hive', 'sessions', 'notes.txt'), 'mine')
+    write(join(p, '.combwork', 'sessions', 'notes.txt'), 'mine')
     const { preview, result } = await purgeWith(project)
     expect(preview.running).toBe(1)
     expect(preview.items.some((i) => i.sessionId === live)).toBe(false)
     expect(preview.items.map((i) => i.kind).sort()).toEqual(['leftover-backup', 'orphan-attachments', 'orphan-attachments'])
     expect(result.skipped).toEqual([])
-    expect([existsSync(active(live)), existsSync(attachments(live)), existsSync(active(dead) + '.gz'), existsSync(attachments(dead)), existsSync(join(p, '.hive', 'attachments', 'run-abc'))]).toEqual([true, true, false, false, false])
-    expect(existsSync(join(p, '.hive', 'sessions', 'notes.txt'))).toBe(true)
+    expect([existsSync(active(live)), existsSync(attachments(live)), existsSync(active(dead) + '.gz'), existsSync(attachments(dead)), existsSync(join(p, '.combwork', 'attachments', 'run-abc'))]).toEqual([true, true, false, false, false])
+    expect(existsSync(join(p, '.combwork', 'sessions', 'notes.txt'))).toBe(true)
   })
 
   it("removes a session's leftover spare and half-made copies with it", async () => {
@@ -190,7 +190,7 @@ describe('Purge', () => {
     const { preview, result } = await purgeWith(project)
     expect(preview.items.filter((i) => i.kind === 'leftover-backup').length).toBe(2)
     expect(result.skipped).toEqual([])
-    expect(readdirSync(join(p, '.hive', 'sessions'))).toEqual([])
+    expect(readdirSync(join(p, '.combwork', 'sessions'))).toEqual([])
   })
 
   it("drops old kept usage once the usage history has it, and the totals don't change", async () => {
@@ -433,7 +433,7 @@ describe('Purge', () => {
     const { preview, result } = await purgeWith(project)
     expect([preview.recoverable, preview.items.filter((i) => i.kind === 'leftover-backup').length]).toEqual([0, 1])
     expect(result).toMatchObject({ deleted: 1, skipped: [] })
-    expect(readdirSync(join(p, '.hive', 'sessions'))).toEqual([])
+    expect(readdirSync(join(p, '.combwork', 'sessions'))).toEqual([])
   })
 
   it('a preview is applied once, and an unknown one is refused', async () => {

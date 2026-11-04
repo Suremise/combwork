@@ -14,6 +14,7 @@ import { assistantMcpAdded, MCP_ADDED_MODEL, mcpAdded, mcpNames } from '../share
 import { randomUUID } from 'crypto'
 import { currentWorkspace, inWorkspace, workspace, type WorkspaceService } from './workspace'
 import { trash } from './trash'
+import { HIVE_DIR } from '../shared/defaults'
 
 export { findSecretWarnings }
 
@@ -80,7 +81,7 @@ export async function listMcp(places = false): Promise<McpServerInfo[]> {
       // Before the text: a revision never stands for newer text than what is shown.
       const revision = (await mcpRevision(path)) ?? undefined
       const def = JSON.parse(await readFile(path, 'utf8')) as McpServerDef
-      if (!def || typeof def !== 'object' || Array.isArray(def)) throw hiveError(msg({ id: 'content.mcp.listNotObject', defaultMessage: 'Definition must be a JSON object', description: "Why an MCP server in the workspace can't be used: its definition file (.hive/mcp/<name>.json) holds JSON that isn't an object." }))
+      if (!def || typeof def !== 'object' || Array.isArray(def)) throw hiveError(msg({ id: 'content.mcp.listNotObject', defaultMessage: 'Definition must be a JSON object', description: "Why an MCP server in the workspace can't be used: its definition file (.combwork/mcp/<name>.json) holds JSON that isn't an object." }))
       if (!def.command && !def.url) throw hiveError(msg({ id: 'content.mcp.listNoCommand', defaultMessage: 'Definition needs a "command" (stdio) or a "url" (http/sse)', description: "Why an MCP server in the workspace can't be used: its definition has neither of the two fields that say what it is. Keep \"command\", \"url\", stdio, http and sse as they are." }))
       out.push({ name, path, def, revision, projects: projectsOf(name), assistant: assistant.has(name), secretWarnings: findSecretWarnings(def), runs: mcpRuns(def) })
     } catch (e) {
@@ -143,7 +144,7 @@ async function changeProjectNow(projectPath: string, change: (added: string[]) =
 /** One of this workspace's projects as it is now (not hidden, its folder there): its path. */
 function projectHere(p: string): string {
   const path = workspace.assertProject(p)
-  if (!existsSync(join(path, '.hive', 'project.json'))) throw hiveError(msg({ id: 'mcp.error.noProject', defaultMessage: '{project} is no longer a project in this workspace.', description: 'An error adding an MCP server to a project, or removing it (HI-2059): the project was removed or moved meanwhile. {project} is its folder name.' }), { project: basename(path) }, { kind: 'notFound' })
+  if (!existsSync(join(path, HIVE_DIR, 'project.json'))) throw hiveError(msg({ id: 'mcp.error.noProject', defaultMessage: '{project} is no longer a project in this workspace.', description: 'An error adding an MCP server to a project, or removing it (HI-2059): the project was removed or moved meanwhile. {project} is its folder name.' }), { project: basename(path) }, { kind: 'notFound' })
   return path
 }
 
@@ -274,7 +275,7 @@ async function allProjectPaths(): Promise<string[]> {
  * kept-file reader's last good copy or default, which stands in for a file still being saved.
  */
 async function membershipOf(projectPath: string, name: string): Promise<ProjectConfig['mcp'] | null> {
-  const file = join(projectPath, '.hive', 'project.json')
+  const file = join(projectPath, HIVE_DIR, 'project.json')
   const unreadable = (e: unknown): Error => hiveError(msg({ id: 'mcp.error.cannotClear', defaultMessage: "Couldn't read the settings of {project}, so {name} wasn't changed: it may still be added there. Try again once the project can be read.", description: 'An error replacing, creating or deleting an MCP server (HI-2059): a project\'s settings file could not be read, so Hive could not make sure the server is removed there, and changed nothing. {project} is the project\'s folder name, {name} the server.' }), { project: basename(projectPath), name }, { kind: 'conflict', cause: e })
   const exists = await stat(file).then(
     () => true,
@@ -439,7 +440,7 @@ const MCP_JSON_MAX_BYTES = 1024 * 1024
 
 /** A definition from a file, checked as launches need it, so a broken one is never added. */
 export function checkMcpDef(raw: unknown): McpServerDef {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw hiveError(msg({ id: 'content.mcp.notObject', defaultMessage: 'The definition must be a JSON object, as in {path}.', description: "An error adding an MCP server from a file whose definition holds JSON that isn't an object. {path} is where a workspace keeps one (.hive/mcp/<name>.json)." }), { path: '.hive/mcp/<name>.json' })
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw hiveError(msg({ id: 'content.mcp.notObject', defaultMessage: 'The definition must be a JSON object, as in {path}.', description: "An error adding an MCP server from a file whose definition holds JSON that isn't an object. {path} is where a workspace keeps one (.combwork/mcp/<name>.json)." }), { path: '.combwork/mcp/<name>.json' })
   const def = raw as McpServerDef
   if (typeof def.command !== 'string' && typeof def.url !== 'string') throw hiveError(msg({ id: 'content.mcp.noCommand', defaultMessage: 'The definition needs a "command" (a server Combwork starts) or a "url" (an http or sse server).', description: 'An error adding an MCP server from a file whose definition has neither field that says what it is. Keep "command", "url", http and sse as they are.' }))
   if (def.command !== undefined && (typeof def.command !== 'string' || !def.command.trim())) throw hiveError(msg({ id: 'content.mcp.badCommand', defaultMessage: '"command" must be the program to run.', description: 'An error adding an MCP server from a file: its definition\'s "command" field (keep it as it is) is empty or not text.' }))
@@ -483,7 +484,7 @@ export function zipLinks(data: Uint8Array): string[] {
 
 /**
  * A server .zip: its definition (MCP_ZIP_DEFINITIONS) at the top, or inside one folder (which is dropped), and the
- * other files, which become .hive/mcp/<name>/. Refused: links, paths that would land outside the folder or that
+ * other files, which become .combwork/mcp/<name>/. Refused: links, paths that would land outside the folder or that
  * Windows can't hold, too many files or bytes. Nothing in it runs.
  */
 export function serverFromZip(data: Uint8Array): { def: McpServerDef; files: Map<string, Uint8Array>; folder: string | null } {
@@ -629,7 +630,7 @@ export async function writeServerNow(name: string, def: McpServerDef, files: Map
     if (existsSync(json)) await trash(json)
   }
   // The folder is claimed (created, never reused: two adds at once can't share one) and written in place, since the
-  // workspace's watcher holds the folders under .hive, so Windows refuses to rename one into place. If anything
+  // workspace's watcher holds the folders under .combwork, so Windows refuses to rename one into place. If anything
   // fails, what was written goes again, so a retry isn't blocked.
   let claimed = false
   try {

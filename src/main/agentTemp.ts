@@ -5,7 +5,7 @@
  * environment is as before. Provider-specific variables (Claude Code's CLAUDE_CODE_TMPDIR) are their adapters'.
  *
  * It never points inside a workspace's folder, a project, a slot, review copies, the Assistant's home or a workspace's
- * .hive, in any open workspace: checked on the real paths (a junction in the way counts), before and after the folder is made. A folder that
+ * .combwork, in any open workspace: checked on the real paths (a junction in the way counts), before and after the folder is made. A folder that
  * can't be used stops the launch with the reason, rather than putting the files back in the system Temp.
  */
 import { createHash } from 'crypto'
@@ -95,7 +95,7 @@ async function protectedHit(p: string, protect: readonly string[]): Promise<stri
 
 /**
  * Every open workspace's folder, projects (hidden ones too, wherever they are), slots and copies, agents' other known
- * folders (registered slots, retired homes, 0.9 worktrees, wherever they are), Assistant home and .hive.
+ * folders (registered slots, retired homes, 0.9 worktrees, wherever they are), Assistant home and .combwork.
  */
 export async function protectedFolders(workspaces: readonly WorkspaceService[]): Promise<string[]> {
   const all = await Promise.all(

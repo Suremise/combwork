@@ -44,8 +44,8 @@ describe("a lane's brief kept with the lane, and delivered outside slots (HI-179
   const project = join(wsPath, 'alpha')
   const user = { kind: 'user' } as const
   beforeAll(async () => {
-    mkdirSync(join(project, '.hive'), { recursive: true })
-    writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] }))
+    mkdirSync(join(project, '.combwork'), { recursive: true })
+    writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     lanes.startLanes()
@@ -146,8 +146,8 @@ describe("a lane's brief kept with the lane, and delivered outside slots (HI-179
   it("two open workspaces whose folders share a prefix (ws, ws-other): each one's current brief stays valid, found in its own workspace (HR4's round 1)", async () => {
     const otherPath = `${wsPath}-other`
     const otherProject = join(otherPath, 'alpha')
-    mkdirSync(join(otherProject, '.hive'), { recursive: true })
-    writeFileSync(join(otherProject, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] }))
+    mkdirSync(join(otherProject, '.combwork'), { recursive: true })
+    writeFileSync(join(otherProject, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] }))
     const other = createWorkspaceService()
     await other.open(otherPath)
     try {
