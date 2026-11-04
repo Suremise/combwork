@@ -5071,7 +5071,8 @@ h2.section#unused-worktrees {
   to { transform: rotate(360deg); }
 }
 .empty-state {
-  padding: 40px;
+  /* HI-2533: its sides give way in a narrow pane (6% of it, 16 px at least), as wide ones keep 40 px. */
+  padding: 40px clamp(16px, 6%, 40px);
   text-align: center;
   color: var(--fg-muted);
 }
@@ -5118,6 +5119,13 @@ h2.section#unused-worktrees {
 /* ---------- Files tab ---------- */
 .split-list.files-list {
   width: 360px;
+}
+/* HI-2533: in a narrow pane (a 900 px window with the sidebar open) the list gives way, leaving 280 px beside it, so the
+   empty state there reads as text, not a thin column (it had 76 px for Files' hint, 116 px for Skills'), while the list
+   keeps room for its names. */
+.split-list:is(.files-list, .skills-list) {
+  min-width: 200px;
+  max-width: calc(100% - 280px);
 }
 .files-filter {
   display: flex;
