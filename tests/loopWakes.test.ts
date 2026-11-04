@@ -374,6 +374,65 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  it('another card changing before every send does not starve a loop wake (HI-2486)', async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const c = await newCard(w)
+    const unrelated = await newCard(w)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+    st.status.set('r1', 'working')
+    await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+    await settled()
+    const send = sessions.sendPrompt
+    let attempts = 0
+    sessions.sendPrompt = (async (p: string, id: string, text: string, guard?: () => void) => {
+      attempts++
+      await inWorkspace(w, () => tasks.updateTask(unrelated, {}, user, { comment: `Other work ${attempts}.` }))
+      return send(p, id, text, guard)
+    }) as typeof sessions.sendPrompt
+    try {
+      st.status.set('r1', 'ready')
+      await loopWakes.tryLoopWakes()
+      expect(attempts).toBe(1)
+      expect(st.typed).toEqual([{ agent: 'r1', text: expect.stringContaining(`#${c} (B1's card) is in Review`) }])
+    } finally {
+      sessions.sendPrompt = send
+      await drained()
+      await settled()
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  it('its own card changing while a wake is being typed still stops that offer (HI-2486)', async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const c = await newCard(w)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+    st.status.set('r1', 'working')
+    await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+    await settled()
+    const send = sessions.sendPrompt
+    let changed = false
+    sessions.sendPrompt = (async (p: string, id: string, text: string, guard?: () => void) => {
+      changed = true
+      await inWorkspace(w, () => tasks.updateTask(c, {}, user, { comment: 'New information on this card.' }))
+      return send(p, id, text, guard)
+    }) as typeof sessions.sendPrompt
+    try {
+      st.status.set('r1', 'ready')
+      await loopWakes.tryLoopWakes()
+      expect(changed).toBe(true)
+      expect(st.typed).toEqual([])
+    } finally {
+      sessions.sendPrompt = send
+      await drained()
+      await settled()
+      await disposeWorkspaceService(w)
+    }
+  })
+
   it("a builder's watch for Passed alone doesn't stand in for a failed verdict, which leaves the card in Review; it does for a passing one (round 1 finding 2)", async () => {
     await loopWakes.clearLoopWakes()
     const { w, alpha } = await open()

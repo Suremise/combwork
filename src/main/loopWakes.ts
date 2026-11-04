@@ -342,7 +342,7 @@ const reviewActed = (h: TaskCard['history'][number]): boolean => {
   return s === 'started' || s === 'passed' || s === 'failed'
 }
 
-/** Counts the board's and lanes' changes: a wake checked or typed while one lands is stopped and worked out again. */
+/** Counts board and lane changes when a wake's own card key cannot be read. */
 let rolesSeq = 0
 
 /**
@@ -399,7 +399,7 @@ const madeFrom = new Map<string, { seq: number; column: TaskCard['column']; key:
 /**
  * The loop wakes' part in their deliveries (#649): made again just before each offer (the line from the card as it is
  * now; dropped if no longer due, its watch tells it, or it is someone else's wake now, who gets it instead); offered only
- * while the board and lanes haven't changed since (else made again at the next try) and its watch doesn't tell it;
+ * while its card, lanes and project settings haven't changed (else made again at the next try) and its watch doesn't tell it;
  * received, noted on the card.
  */
 registerSource('loop', {
@@ -440,17 +440,16 @@ registerSource('loop', {
       return { body: loopWakeLine({ ...cardChange(p.n, card, kinds), about: await wakeAboutFor(ws, host, card, p.kind, r.agentId) }, p.kind, p.text, next), meta: { ...r.meta, v } }
     })
   },
-  // Its version made, its watch not telling it, and what it was decided from as it was: for a line being typed, also
-  // nothing on the board or lanes changed (#578 round 2: it stops at once); for a hand-out (hive_inbox, and the notices
-  // naming what it would give), only a change to its own card, lanes or project settings, so another lane's traffic
-  // doesn't keep it from being read (HI-1687). Asked at the locked boundary, with nothing awaited.
-  holds: (r, host, by) => {
+  // Its version made, its watch not telling it, and its own card, lanes and project settings unchanged. The same check
+  // for typing and reading (HI-2486, HI-1687): unrelated board traffic must not keep cancelling its doorbell. An own-lane
+  // change still stops it before the next key (#578 round 2). Asked at the locked boundary, with nothing awaited.
+  holds: (r, host) => {
     const p = wakeOf(r)
     const m = madeFrom.get(madeKey(host, r.id, r.meta?.v))
     if (!p || !m || covered(host, r.agentId, { number: p.n, column: m.column } as TaskCard, p.kind)) return false
     const ws = workspaceFor(host)
     const unchanged = m.key !== null && !!ws && wakeKey(ws, host, p.n) === m.key
-    return by === 'read' ? unchanged || (m.key === null && m.seq === rolesSeq) : m.seq === rolesSeq && (m.key === null || unchanged)
+    return unchanged || (m.key === null && m.seq === rolesSeq)
   },
   received: (r, host) => {
     madeFrom.delete(madeKey(host, r.id, r.meta?.v))
