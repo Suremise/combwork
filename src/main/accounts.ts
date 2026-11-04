@@ -971,7 +971,9 @@ async function resolveTarget(p: { name: string; path: string }): Promise<Project
 
 const trustKey = (id: string, ws: string): string => `${id}|${ws.toLowerCase()}`
 
-type TrustAnswer = { pending: { project: string; folder: string }[]; unknown: boolean }
+/** A folder still to trust: its project, where it is asked, and whether it's a Git root (HI-2520: no inherited trust then). */
+type PendingTrust = { project: string; folder: string; git: boolean }
+type TrustAnswer = { pending: PendingTrust[]; unknown: boolean }
 type Projects = { name: string; path: string }[]
 
 /**
@@ -1066,7 +1068,7 @@ async function readTrustOnce(id: string, projects: Projects): Promise<TrustAnswe
   const askAt = (t: ProjectTarget, r: TrustReading): string | null => (r === false ? t.root : r && typeof r === 'object' ? r.at : null)
   return { pending: targets.flatMap((t, i) => {
     const at = askAt(t, got[i])
-    return at ? [{ project: t.project, folder: at }] : []
+    return at ? [{ project: t.project, folder: at, git: t.git }] : []
   }), unknown: got.some((x) => x === null) }
 }
 
@@ -1129,10 +1131,11 @@ export async function setUpPlace(id: string): Promise<ConnectionTrust['setUpIn']
 /**
  * Where Set Up asks a CLI's trust question next (HI-1871), from the resolved trust roots still pending (each a main
  * repository root, or a project without Git's own folder: never a worktree's path). For a CLI whose trust of a folder
- * covers the folders inside it (`trustInherits`: Claude Code), the workspace's own folder while it covers one of them:
- * one answer for all those inside it, their slots and copies (worktrees of them) and the Assistant's home. A root
- * outside it (a worktree project's main repository kept elsewhere: HR3's case) stays its own target, asked next.
- * Otherwise the first pending root (Codex: one per project; a trusted folder above a repository doesn't cover it).
+ * covers the plain folders inside it (`trustInherits`: Claude Code), the workspace's own folder while it covers a pending
+ * folder without Git: one answer for all of those and the Assistant's home. A Git root is never covered by a folder
+ * above it (HI-2520, measured with Claude Code 2.1.316–2.1.318), so each is asked at its own root, as is a root outside
+ * the workspace (a worktree project's main repository kept elsewhere: HR3's case). Otherwise the first pending root
+ * (Codex: one per project; a trusted folder above a repository doesn't cover it).
  */
 function setUpTarget(a: Account, pending: TrustAnswer['pending']): ConnectionTrust['setUpIn'] {
   return chooseSetUpTarget(!!providerDescriptor(a.provider).capabilities.connections?.trustInherits, workspace.path, pending)
@@ -1142,7 +1145,8 @@ function setUpTarget(a: Account, pending: TrustAnswer['pending']): ConnectionTru
 export function chooseSetUpTarget(inherits: boolean, ws: string | null | undefined, pending: TrustAnswer['pending']): ConnectionTrust['setUpIn'] {
   if (!pending.length) return undefined
   const inside = (folder: string): boolean => !!ws && (folder + sep).toLowerCase().startsWith((resolve(ws) + sep).toLowerCase())
-  if (ws && inherits && pending.some((p) => inside(p.folder))) return { folder: resolve(ws), workspace: true }
+  // Only a pending folder without Git: the workspace's trust covers no repository, so asking there again would loop.
+  if (ws && inherits && pending.some((p) => !p.git && inside(p.folder))) return { folder: resolve(ws), workspace: true }
   return { folder: pending[0].folder, project: pending[0].project }
 }
 

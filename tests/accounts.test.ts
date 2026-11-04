@@ -497,13 +497,20 @@ describe("whether a connection trusts a workspace's folders (HI-1870)", () => {
     return dir
   }
   const t = (root: string | null, short = false) => ({ root, git: true, short })
+  const plain = (root: string) => ({ root, git: false, short: false })
 
-  it("Claude Code: the recorded entry's folder and its subfolders; not another case, not an 8.3 path (unknown), as 2.1.311 looked them up", async () => {
+  it("Claude Code: the recorded entry's folder and the plain folders inside it; not another case, not an 8.3 path (unknown)", async () => {
     // The recorded entry (C:/work/alpha), and the entry Claude Code writes itself for a subfolder it ran in (false).
     const j = JSON.parse(readFileSync(TRUST, 'utf8'))
     j.projects['C:/work/alpha/child'] = { hasTrustDialogAccepted: false }
     const dir = trustHome('claude', JSON.stringify(j))
-    expect(await trustsOf(dir, [t('C:\\work\\alpha'), t('C:\\work\\alpha\\child'), t('C:\\work\\beta'), t('C:\\WORK\\ALPHA'), t('C:\\work\\alpha', true), t(null)])).toEqual([true, true, false, false, null, null])
+    expect(await trustsOf(dir, [t('C:\\work\\alpha'), plain('C:\\work\\alpha\\child'), t('C:\\work\\beta'), t('C:\\WORK\\ALPHA'), t('C:\\work\\alpha', true), t(null)])).toEqual([true, true, false, false, null, null])
+  })
+
+  it('Claude Code: a Git root under a trusted folder is not trusted; a plain folder there is (HI-2520, measured with 2.1.316–2.1.318)', async () => {
+    // Darren's Anthropic-1: D:/Development/HIVE trusted, its repositories cli and apiary never trusted themselves.
+    const dir = trustHome('ancestor', JSON.stringify({ projects: { 'D:/Development/HIVE': { hasTrustDialogAccepted: true }, 'D:/Development/HIVE/hive': { hasTrustDialogAccepted: true }, 'D:/Development/HIVE/scratch': { hasTrustDialogAccepted: false } } }))
+    expect(await trustsOf(dir, [t('D:\\Development\\HIVE\\cli'), t('D:\\Development\\HIVE\\apiary'), t('D:\\Development\\HIVE\\hive'), plain('D:\\Development\\HIVE\\scratch'), plain('D:\\Development\\HIVE\\notes\\deep')])).toEqual([false, false, true, true, true])
   })
 
   it("Claude Code: no .claude.json yet is untrusted; one it can't read is unknown", async () => {
@@ -565,23 +572,37 @@ describe("whether a connection trusts a workspace's folders (HI-1870)", () => {
 
 describe("where Set Up asks a CLI's trust question (HI-1871)", () => {
   const ws = 'C:\\work\\ws'
-  const alpha = { project: 'alpha', folder: 'C:\\work\\ws\\alpha' }
-  const beta = { project: 'beta', folder: 'C:\\work\\ws\\beta' }
+  // Plain folders (no Git), which a trusted workspace folder covers.
+  const alpha = { project: 'alpha', folder: 'C:\\work\\ws\\alpha', git: false }
+  const beta = { project: 'beta', folder: 'C:\\work\\ws\\beta', git: false }
+  // Git roots inside the workspace, which it never covers (HI-2520).
+  const cli = { project: 'cli', folder: 'C:\\work\\ws\\cli', git: true }
+  const apiary = { project: 'apiary', folder: 'C:\\work\\ws\\apiary', git: true }
   // A worktree project inside the workspace whose main repository is kept elsewhere: its trust root is outside.
-  const wtProject = { project: 'alpha-wt', folder: 'C:\\repos\\alpha' }
+  const wtProject = { project: 'alpha-wt', folder: 'C:\\repos\\alpha', git: true }
 
-  it('a CLI whose trust is inherited (Claude Code): the workspace folder, once, for the roots inside it', () => {
+  it('a CLI whose trust is inherited (Claude Code): the workspace folder, once, for the plain folders inside it', () => {
     expect(accounts.chooseSetUpTarget(true, ws, [alpha, beta])).toEqual({ folder: ws, workspace: true })
     // The workspace folder covers alpha; the outside root stays pending, asked next.
     expect(accounts.chooseSetUpTarget(true, ws, [wtProject, alpha])).toEqual({ folder: ws, workspace: true })
     // Only an outside root left (a worktree project's main repository elsewhere): that root, never the workspace again.
     expect(accounts.chooseSetUpTarget(true, ws, [wtProject])).toEqual({ folder: 'C:\\repos\\alpha', project: 'alpha-wt' })
     // A folder whose name only starts like the workspace's isn't inside it.
-    expect(accounts.chooseSetUpTarget(true, ws, [{ project: 'x', folder: 'C:\\work\\ws2\\x' }])).toEqual({ folder: 'C:\\work\\ws2\\x', project: 'x' })
+    expect(accounts.chooseSetUpTarget(true, ws, [{ project: 'x', folder: 'C:\\work\\ws2\\x', git: false }])).toEqual({ folder: 'C:\\work\\ws2\\x', project: 'x' })
   })
 
-  it("a CLI whose trust isn't inherited (Codex): each pending root in turn; nothing pending: none", () => {
+  it('Claude Code: Git roots inside the workspace are asked at their own root, never the workspace folder (HI-2520)', () => {
+    // Git roots only: the first, then the next once it's trusted; the workspace folder would cover neither, so never it.
+    expect(accounts.chooseSetUpTarget(true, ws, [cli, apiary])).toEqual({ folder: cli.folder, project: 'cli' })
+    expect(accounts.chooseSetUpTarget(true, ws, [apiary])).toEqual({ folder: apiary.folder, project: 'apiary' })
+    // Mixed: the workspace folder first, for the plain one; once it's trusted, the Git roots left, one at a time.
+    expect(accounts.chooseSetUpTarget(true, ws, [cli, alpha, apiary])).toEqual({ folder: ws, workspace: true })
+    expect(accounts.chooseSetUpTarget(true, ws, [cli, apiary])).toEqual({ folder: cli.folder, project: 'cli' })
+  })
+
+  it("a CLI whose trust isn't inherited (Codex): each pending root in turn, Git or not; nothing pending: none", () => {
     expect(accounts.chooseSetUpTarget(false, ws, [alpha, beta])).toEqual({ folder: alpha.folder, project: 'alpha' })
+    expect(accounts.chooseSetUpTarget(false, ws, [cli, alpha])).toEqual({ folder: cli.folder, project: 'cli' })
     expect(accounts.chooseSetUpTarget(true, ws, [])).toBeUndefined()
   })
 })
@@ -589,7 +610,7 @@ describe("where Set Up asks a CLI's trust question (HI-1871)", () => {
 describe("whether a connection is set up (connectionReadiness, HI-1870)", () => {
   it('anything definitely not done wins, then anything unknown, else done', () => {
     const none = { pending: [], unknown: false }
-    const pending = { pending: [{ project: 'alpha', folder: 'C:\\w\\alpha' }], unknown: false }
+    const pending = { pending: [{ project: 'alpha', folder: 'C:\\w\\alpha', git: false }], unknown: false }
     expect(connectionReadiness({ setUp: true })).toBe('done')
     expect(connectionReadiness({ setUp: true, trust: none })).toBe('done')
     expect(connectionReadiness({ setUp: false, trust: { ...none, unknown: true } })).toBe('needed')
@@ -987,7 +1008,7 @@ describe("a workspace's accounts", () => {
       it("a CLI's reading that asks at another folder (Codex: a worktree project's own entry, HR3) is where Set Up goes", async () => {
         const own = join(base, 'own-entry')
         held[0].answer([{ at: own }, true])
-        await vi.waitFor(() => expect(row().trust?.pending).toEqual([{ project: 'alpha', folder: own }]), { timeout: HUNG_MS })
+        await vi.waitFor(() => expect(row().trust?.pending).toEqual([{ project: 'alpha', folder: own, git: false }]), { timeout: HUNG_MS })
       })
 
       it('while its first read is held: Checking…, never done; refreshes mark it dirty, so one more read, not one each', async () => {
@@ -1042,9 +1063,9 @@ describe("a workspace's accounts", () => {
         expect(row().trust?.checking).toBe(true)
         held[1].answer([true, false])
         // The Set Up asked against the old set gets the current set's folder.
-        // Claude Code's trust of a folder covers those inside it (HI-1871): Set Up asks once, in the workspace's folder.
+        // Claude Code's trust of a folder covers the plain folders inside it (HI-1871, HI-2520): Set Up asks once, in the workspace's folder.
         expect(await folder).toBe(resolve(wsPath))
-        expect(row().trust).toEqual({ pending: [{ project: 'beta', folder: realpathSync.native(folders[1]) }], unknown: false, setUpIn: { folder: resolve(wsPath), workspace: true } })
+        expect(row().trust).toEqual({ pending: [{ project: 'beta', folder: realpathSync.native(folders[1]), git: false }], unknown: false, setUpIn: { folder: resolve(wsPath), workspace: true } })
         for (let i = 0; i < 5; i++) run(() => accounts.accountsView())
         expect(held).toHaveLength(2)
       })

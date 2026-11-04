@@ -63,7 +63,7 @@
   "settings.accounts.setUpChecking": "Vérification…",
   "settings.accounts.setUpDone": "Configurée",
   "settings.accounts.setUpIn": "Il s’ouvre dans le dossier de {project}, {folder} : réponds à la question de {cli} pour lui faire confiance.",
-  "settings.accounts.setUpInWorkspace": "Il s’ouvre dans le dossier de cet espace de travail, {folder} : réponds à la question de {cli} pour lui faire confiance, et avec lui à chaque projet qu’il contient.",
+  "settings.accounts.setUpInWorkspace": "Il s’ouvre dans le dossier de cet espace de travail, {folder} : réponds à la question de {cli} pour lui faire confiance, et avec lui à chaque projet qu’il contient qui n’est pas un dépôt Git. Chaque dépôt Git est ensuite demandé dans son propre dossier.",
   "settings.accounts.setUpNeeded": "À configurer",
   "settings.accounts.signIn": "Se connecter",
   "settings.accounts.signInAgain": "Se reconnecter",
