@@ -1327,6 +1327,15 @@ export function showView(a: Exclude<Activity, 'docs' | 'settings'>): void {
   set({ activity: a, lastSideActivity: a, sidebarVisible: true })
 }
 
+/**
+ * A click in the side panel while Settings fills the main area (HI-2525): the side panel is where you work, so Settings
+ * steps aside for that panel's own view, as its activity bar button does. The gear brings Settings back at its section.
+ */
+export function leaveSettingsForSidePanel(): void {
+  const s = get()
+  if (s.activity === 'settings') showView(s.lastSideActivity)
+}
+
 /** Each view shown, counted: a card's Activity found after the window went elsewhere isn't opened (openCardActivity). */
 let navigations = 0
 

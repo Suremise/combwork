@@ -24,6 +24,10 @@ With several Combwork windows open, they share what the tips remember: a tip see
 
 Any dialog (Add Agent, Agent Settings, a card, a question…) can be moved out of the way: drag it by its header. It stays inside the window, and **Escape** while dragging puts it back. A dialog opens in the middle again next time. A question over a dialog moves on its own, and Escape closes just the question. The image viewers stay where they are. When a dialog closes, the keyboard goes back to what had it before, such as the button that opened it. Pressing **Enter** to confirm a name (New Mode…, a rename) never presses that button again, so the dialog doesn't reopen.
 
+### Settings and the activity bar <a id="settings-and-the-activity-bar"></a>
+
+**Settings** (the gear at the bottom of the activity bar, Ctrl+,) fills the main area, with the side panel still showing the view you were last in beside it. Settings is where you shape Combwork; the activity bar and the side panel are where you work, so you can leave Settings at any moment: click any item of the activity bar (or use its shortcut or the **View** menu), or click anything in the side panel, such as a project, a card's filter or a dialect file, and that view takes the main area. The gear brings Settings back on the section you were on. Nothing you were typing is lost: a setting saves as you click away, and a box that saves only with its button (a viewer token's name, a model to price, a catalogue's address) still has your text when you come back.
+
 ### Search and filter boxes <a id="search-and-filter-boxes"></a>
 
 Every search and filter box (the board's search, Settings, the Files and Sessions tabs, the sidebar's filters, tables' filters, Tips, Keyboard Shortcuts and the command palette) shows an **×** at its right while it has text: click it, or press **Escape**, to clear it and see everything again; the cursor stays in the box. In a dialog or the command palette, the first Escape clears the box and the next one closes it.
