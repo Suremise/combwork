@@ -94,11 +94,11 @@ describe('the session contract', () => {
   })
 
   // #1529 (P8): whether a card needs review, who merges and how many rounds are the project's options, its kind and
-  // hive.workflow.enforce: the contract names the intents and leaves each case to Hive's reply or refusal. Every session
+  // cw.workflow.enforce: the contract names the intents and leaves each case to Hive's reply or refusal. Every session
   // gets the same contract, so each line reads right for a solo user with the rules off as for a Git team with them on.
   it('stays conditional where the gates are: no round count, no review or merge stated as the rule', () => {
     for (const text of [agent, hiveInstructions('web', 'agent', false)]) {
-      // hive.workflow.enforce off: no round limit, no one card at a time, lane edits at once.
+      // cw.workflow.enforce off: no round limit, no one card at a time, lane edits at once.
       expect(text).not.toMatch(/\b\d+ rounds?\b|\bround limit\b|\bone (?:card )?at a time\b/i)
       // Review off or by the user: a card can finish on submit, with no reviewer.
       expect(text).not.toMatch(/\b(?:move|moves) (?:it|a card|the card) to (?:doing|review|passed|done)\b|\ba reviewer (?:is|gets|takes)\b/i)

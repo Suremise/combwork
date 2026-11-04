@@ -74,7 +74,7 @@ describe("other CLIs' retry waits (HI-1973)", () => {
   })
   afterEach(async () => {
     sessions.retryOverdue = null
-    await advanced.set('hive.retry.tellAssistantAfterSeconds', null)
+    await advanced.set('cw.retry.tellAssistantAfterSeconds', null)
   })
   afterAll(async () => {
     s.live.clear()
@@ -150,7 +150,7 @@ describe("other CLIs' retry waits (HI-1973)", () => {
   })
 
   it('tells the Assistant once a turn when a wait goes on past the while, kept through its tries; one that ends sooner tells nothing', async () => {
-    await advanced.set('hive.retry.tellAssistantAfterSeconds', 60)
+    await advanced.set('cw.retry.tellAssistantAfterSeconds', 60)
     const told: State[] = []
     sessions.retryOverdue = (st) => void told.push(st as never)
     const { st } = agent('notice', copilot, 'copilot')
@@ -192,7 +192,7 @@ describe("other CLIs' retry waits (HI-1973)", () => {
   })
 
   it("Copilot's wait, its retry time unknown, stands through long quiet backoffs (the 5 s loop's looks), tells the Assistant once past the while, and ends on progress (HR6's round 1)", async () => {
-    await advanced.set('hive.retry.tellAssistantAfterSeconds', 60)
+    await advanced.set('cw.retry.tellAssistantAfterSeconds', 60)
     const told: State[] = []
     sessions.retryOverdue = (st) => void told.push(st as never)
     const start = Date.now()
@@ -270,7 +270,7 @@ describe("other CLIs' retry waits (HI-1973)", () => {
   })
 
   it('tells nobody at 0', async () => {
-    await advanced.set('hive.retry.tellAssistantAfterSeconds', 0)
+    await advanced.set('cw.retry.tellAssistantAfterSeconds', 0)
     const told: unknown[] = []
     sessions.retryOverdue = (st) => void told.push(st)
     const { st } = agent('never', copilot, 'copilot')

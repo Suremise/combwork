@@ -40,9 +40,9 @@ export const CATALOG_PAGE = 50
 const PREPARED_MAX = 4
 const PREPARED_MS = 10 * 60 * 1000
 
-export const FETCH_SECONDS = 'hive.mcpCatalog.fetchSeconds'
-export const DOWNLOAD_SECONDS = 'hive.mcpCatalog.downloadSeconds'
-export const PROBE_SECONDS = 'hive.mcpCatalog.probeSeconds'
+export const FETCH_SECONDS = 'cw.mcpCatalog.fetchSeconds'
+export const DOWNLOAD_SECONDS = 'cw.mcpCatalog.downloadSeconds'
+export const PROBE_SECONDS = 'cw.mcpCatalog.probeSeconds'
 const seconds = (id: string, fallback: number): number => {
   const v = advanced.get(id)
   return typeof v === 'number' && v > 0 ? v : fallback

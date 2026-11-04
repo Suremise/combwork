@@ -18,12 +18,12 @@ export const workspaceNotesPath = (workspacePath: string): string => `${workspac
 /** The note's name in agents' text: the shared note they read for the rest of a cut note (its file's name, never translated). */
 const NOTE_NAME = WORKSPACE_NOTES_PATH.replace(/\.md$/, '')
 
-/** How much of the note an agent gets at most, by default (Settings → Advanced, hive.notes.workspaceNotesMax). */
+/** How much of the note an agent gets at most, by default (Settings → Advanced, cw.notes.workspaceNotesMax). */
 export const WORKSPACE_NOTES_MAX = 4096
 
 const N = {
   header: agentMsg({ id: 'contract.notes.header', text: 'Workspace notes (this machine), from the shared note "{note}":', note: "The line above the Workspace notes a launch delivers (#1433). note: the shared note's name." }),
-  cut: agentMsg({ id: 'contract.notes.cut', text: '(cut: read the shared note {note} for the rest)', note: "Ends Workspace notes cut at their limit (Settings → Advanced, hive.notes.workspaceNotesMax). note: the shared note's name." })
+  cut: agentMsg({ id: 'contract.notes.cut', text: '(cut: read the shared note {note} for the rest)', note: "Ends Workspace notes cut at their limit (Settings → Advanced, cw.notes.workspaceNotesMax). note: the shared note's name." })
 }
 
 /** A heading that starts a section (`#` or `##`, outside a code block), and its text. */

@@ -7,7 +7,7 @@
 // lease checked inside it. When the queue is empty, paused, or the workspace closes, it releases its runner.
 //
 // The card's ruleset decides (§16.6.5): an entry whose card started under Hive merges is merged even after the project's
-// options moved to another finisher. With workflow rules off (`hive.workflow.enforce`), nothing runs to an advance: open
+// options moved to another finisher. With workflow rules off (`cw.workflow.enforce`), nothing runs to an advance: open
 // entries pause `rulesOff` (once an advance has begun, recovery finishes it), and carry on when the rules are on again.
 // A target checked out in a folder is advanced there by the journaled update (#1351, §16.9.2), with that folder fenced
 // (folderFence.ts) and paused while an agent builds in it; asked first (For you) while Settings → Advanced, Merge into a

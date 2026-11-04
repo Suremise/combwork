@@ -98,7 +98,7 @@ export interface LaneRecord {
   slotWait?: { since: string; note: string; stoppedOnly?: true }
   /**
    * The lane's agents still owed their new conversation (HI-2034): its start found one in a turn or with a prompt it
-   * hadn't taken yet, so it is launched once free (laneStarts.ts' pass), within `hive.lanes.freshStartWaitMinutes`.
+   * hadn't taken yet, so it is launched once free (laneStarts.ts' pass), within `cw.lanes.freshStartWaitMinutes`.
    * Kept with the lane (its row's `extra`), changed only under the lanes' lock. While its builder's is here, Hive gives
    * the builder no card (never into the old conversation).
    */

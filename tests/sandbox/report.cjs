@@ -46,8 +46,8 @@ const EDGE_IDS = ['8.wait', '8.wait-unchanged', '8.continues', '8.refuses', '8.r
 function overPrevious(n, pre) {
   return {
     drivers: {
-      [`${pre}-mark`]: { scenario: n, ids: ['4.settings-saved', '4.login-registered', '4.workspace-made'], facts: ['version'] },
-      [`${pre}-after`]: { scenario: n, ids: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.local-moved', '4.roaming-moved', '4.record', '4.login-moved', '4.no-fallback', '4.workspace-moved', '4.workspace-card'], facts: ['version'] },
+      [`${pre}-mark`]: { scenario: n, ids: ['4.settings-saved', '4.login-registered', '4.workspace-made', '4.advanced-saved'], facts: ['version'] },
+      [`${pre}-after`]: { scenario: n, ids: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.local-moved', '4.roaming-moved', '4.record', '4.login-moved', '4.no-fallback', '4.workspace-moved', '4.workspace-card', '4.advanced-kept', '4.advanced-old-id'], facts: ['version'] },
       [`${pre}-notify`]: { scenario: n, ids: [`${n}.notification`], facts: ['exe'] }
     },
     shots: [`${pre}-mark-before-upgrade.png`, `${pre}-desktop-before.jpg`, `${pre}-desktop-after.jpg`, `${pre}-after-after-upgrade-light.png`, `${pre}-after-after-upgrade-dark.png`, `${pre}-toast.jpg`]

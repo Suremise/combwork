@@ -617,10 +617,10 @@ const prose = (seed, n) => {
   check("the Agent API's card JSON: the title kept, nudge beside it", viaApi.status === 200 && viaApi.body?.title === LONG && viaApi.body?.nudge === NUDGE, viaApi.text.slice(0, 300))
   const mine = await inv('tasks:create', { title: LONG, project: 'alpha' })
   check("the user's own long title, from the window: kept, no nudge", mine?.title === LONG && mine?.nudge === undefined, JSON.stringify(mine).slice(0, 300))
-  await inv('advanced:set', 'hive.cards.titleNudgeChars', 0)
+  await inv('advanced:set', 'cw.cards.titleNudgeChars', 0)
   const unNudged = tool('cw_create_task', { title: LONG, description: 'Off.' }).text
   check('with Suggest a shorter title past at 0: kept, no nudge', !unNudged.includes('\n') && unNudged.endsWith(`: ${LONG}`), unNudged)
-  await inv('advanced:set', 'hive.cards.titleNudgeChars', 80)
+  await inv('advanced:set', 'cw.cards.titleNudgeChars', 80)
   // Out of Todo again, as the user would park them: the checks below count Todo's 50.
   for (const made of (await api('GET', '/v1/tasks?column=todo')).body.filter((x) => x.title.startsWith(LONG) || x.title === 'Restart notice stays after a restart')) await inv('tasks:update', made.number, { column: 'hold' })
   measure('cw_reorder_tasks (as Assistant)', tool('cw_reorder_tasks', { column: 'todo', cards: [todo[31], todo[32]] }, 'assistant'), 300)

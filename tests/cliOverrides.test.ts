@@ -618,7 +618,7 @@ describe("Hive's guidance for agents (#1285, row 13)", () => {
 
   it('is a switch of its own under Hive, on by default, taken by sessions started afterwards (e2e agentguidance checks the hive server it gives)', async () => {
     const { HIVE_GUIDANCE } = await import('../src/shared/advanced')
-    expect(advancedDef(HIVE_GUIDANCE)).toMatchObject({ group: 'hive', kind: 'boolean', default: true, applies: 'sessions' })
+    expect(advancedDef(HIVE_GUIDANCE)).toMatchObject({ group: 'cw', kind: 'boolean', default: true, applies: 'sessions' })
   })
 })
 

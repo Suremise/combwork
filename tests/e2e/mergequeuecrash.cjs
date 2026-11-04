@@ -38,7 +38,7 @@ const main = () => q.head(fx, 'main')
     const h = await q.startHive(fx, { port: PORT, env, keepOptions: !!crew })
     if (!crew) {
       await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: f.options() })
-      await h.inv('advanced:set', 'hive.queue.checkedOutTarget', 'auto')
+      await h.inv('advanced:set', 'cw.queue.checkedOutTarget', 'auto')
       crew = { builder: await q.agent(fx, h, 'CB'), reviewer: await q.agent(fx, h, 'CR') }
     } else crew = { builder: await q.rejoin(fx, h, crew.builder), reviewer: await q.rejoin(fx, h, crew.reviewer) }
     return h

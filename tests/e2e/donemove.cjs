@@ -48,7 +48,7 @@ const until = async (fn, ms = 10000) => {
   await lib.openWorkspace(inv, page, ws)
   // The board's own moves, as before 1.0's rules (#1275): its project has every rule off, where Review isn't a stage, so
   // with the rules enforced the board refuses it (boardgates covers that); turned off, every column is a plain move.
-  await inv('advanced:set', 'hive.workflow.enforce', false)
+  await inv('advanced:set', 'cw.workflow.enforce', false)
   await page.getByText('alpha', { exact: true }).first().click()
   const agent = await lib.addAgent(inv, alpha, { name: 'Mover' })
   const key = lib.ptyKey(alpha, agent.id)

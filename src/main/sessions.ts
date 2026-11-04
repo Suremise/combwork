@@ -427,7 +427,7 @@ interface LiveSession {
   launchReadyAt?: number
   /**
    * This launch was given Hive's tools (the hive MCP server, #865): `connecting` until its server says the CLI has
-   * connected (POST /v1/launch/connected), and no line of Hive's is typed meanwhile, at most hive.mcp.connectSeconds
+   * connected (POST /v1/launch/connected), and no line of Hive's is typed meanwhile, at most cw.mcp.connectSeconds
    * from when it first became ready (readyAt), for a CLI that never connects it.
    */
   hiveTools?: 'connecting' | 'connected'
@@ -595,7 +595,7 @@ interface LiveSession {
   inputBlocked?: { runId: string; ask: Ask; box: string | null; since: number; retrying?: boolean }
   /** A look at its screen for that question and a lost line is queued (one at a time, however much the CLI draws). */
   idleChecking?: boolean
-  /** The held line first seen lost (HI-1959): a second look after hive.lostLine.steadySeconds decides. */
+  /** The held line first seen lost (HI-1959): a second look after cw.lostLine.steadySeconds decides. */
   lostSeen?: { since: string; timer: ReturnType<typeof setTimeout> }
 }
 
@@ -1340,13 +1340,13 @@ class SessionManager {
   /**
    * Whether an agent's launch was given Hive's tools and its CLI hasn't connected them yet (#865): a resumed Claude Code
    * is ready at its SessionStart before its hive server has connected, and a doorbell typed then is a turn that can't
-   * call cw_inbox. At most hive.mcp.connectSeconds from when it first became ready, for a CLI that never connects it
+   * call cw_inbox. At most cw.mcp.connectSeconds from when it first became ready, for a CLI that never connects it
    * (its server failed to start, or MCP is off in it).
    */
   hiveToolsWaiting(projectPath: string, agentId: string): boolean {
     const l = this.live.get(liveId(projectPath, agentId))
     if (l?.hiveTools !== 'connecting') return false
-    return l.readyAt === undefined || Date.now() - l.readyAt < advanced.number('hive.mcp.connectSeconds') * 1000
+    return l.readyAt === undefined || Date.now() - l.readyAt < advanced.number('cw.mcp.connectSeconds') * 1000
   }
 
   /**
@@ -1382,7 +1382,7 @@ class SessionManager {
         clearTimeout(timer)
         if (this.hiveToolsWaiting(projectPath, agentId)) {
           const l = this.live.get(key)!
-          const bound = advanced.number('hive.mcp.connectSeconds') * 1000
+          const bound = advanced.number('cw.mcp.connectSeconds') * 1000
           timer = setTimeout(look, (l.readyAt === undefined ? bound : Math.max(0, bound - (Date.now() - l.readyAt))) + 50)
           return
         }
@@ -3702,7 +3702,7 @@ class SessionManager {
       // A question at its start (its folder's trust) waits for the user while it is on its screen.
       const text = l.screen?.text() ?? null
       const startWaits = st.status === 'waiting' || (!!l.askedAtStart && (text === null || !l.adapter.startupQuestion || l.adapter.startupQuestion.test(text.replace(/\s+/g, ' '))))
-      const after = hooksMissing(w, { startWaits, screen: this.screenTurn(l) }, Date.now(), advanced.number('hive.hooks.missingSeconds') * 1000)
+      const after = hooksMissing(w, { startWaits, screen: this.screenTurn(l) }, Date.now(), advanced.number('cw.hooks.missingSeconds') * 1000)
       if (after) this.hooksGone(l, after)
     })
   }
@@ -5355,7 +5355,7 @@ class SessionManager {
 
   /**
    * A line Hive typed, held as not taken, gone from the CLI's input since (HI-1959: a screen of the CLI's took it): seen
-   * lost, it is looked at again after hive.lostLine.steadySeconds, and any draw meanwhile that says otherwise (a redraw, a
+   * lost, it is looked at again after cw.lostLine.steadySeconds, and any draw meanwhile that says otherwise (a redraw, a
    * dialog, text in the input, a turn) calls that off.
    */
   private lookAtHeldLine(id: string, l: LiveSession, asked: boolean): void {
@@ -5364,7 +5364,7 @@ class SessionManager {
     if (l.lostSeen?.since === u.since) return
     this.dropLostLook(l)
     const runId = l.state.runId
-    const timer = setTimeout(() => void this.inHookOrder(runId, () => this.lostLineSteady(id, l, u.since)).catch((e) => log.warn('lost line: check failed', e)), advanced.number('hive.lostLine.steadySeconds') * 1000)
+    const timer = setTimeout(() => void this.inHookOrder(runId, () => this.lostLineSteady(id, l, u.since)).catch((e) => log.warn('lost line: check failed', e)), advanced.number('cw.lostLine.steadySeconds') * 1000)
     timer.unref?.()
     l.lostSeen = { since: u.since, timer }
   }
@@ -6709,14 +6709,14 @@ class SessionManager {
   retryOverdue: ((st: LiveSessionState) => void) | null = null
 
   /**
-   * A retry wait that has gone on past Settings → Advanced's while (HI-1973, `hive.retry.tellAssistantAfterSeconds`; 0:
+   * A retry wait that has gone on past Settings → Advanced's while (HI-1973, `cw.retry.tellAssistantAfterSeconds`; 0:
    * never), counted from the turn's first retry: told once a turn (retryOverdue). One that ends sooner tells nothing, and
    * a later turn's is told again.
    */
   private checkRetryNotice(projectPath: string, agentId: string, now = Date.now()): void {
     const l = this.live.get(liveId(projectPath, agentId))
     const w = l?.state.retryWait
-    const after = advanced.number('hive.retry.tellAssistantAfterSeconds') * 1000
+    const after = advanced.number('cw.retry.tellAssistantAfterSeconds') * 1000
     if (!l || !w || !after || !l.retryTurn || l.retryTold === l.retryTurn || !retryWaitCurrent(w, now)) return
     if (now - Date.parse(w.since) < after) return
     l.retryTold = l.retryTurn

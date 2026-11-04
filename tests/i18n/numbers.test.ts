@@ -118,7 +118,7 @@ describe('numbers in messages follow the language (#879)', () => {
   })
 
   it('through the code that shows them: an advanced setting in seconds, a duration in hours, silent minutes', () => {
-    const replySeconds = ADVANCED_DEFS.find((d) => d.id === 'hive.mcp.replySeconds')!
+    const replySeconds = ADVANCED_DEFS.find((d) => d.id === 'cw.mcp.replySeconds')!
     const silent = (min: number | null) => unknownStateText({ turn: { state: 'unknown', ...(min === null ? {} : { silentSince: new Date(Date.UTC(2026, 9, 15) - min * 60_000).toISOString() }) } } as never, Date.UTC(2026, 9, 15), tr)
     expect([advancedShown(replySeconds, 3600), durationText(1250 * 3_600_000, tr), silent(1500), silent(null)]).toEqual(['3,600 s', '1,250 h', 'Silent 1,500 min · state unknown', 'Silent ? min · state unknown'])
     const ids = ['settings.advanced.unit.seconds', 'board.duration.hours', 'panes.runtime.silent']

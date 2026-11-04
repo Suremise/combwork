@@ -334,11 +334,11 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     check("…and its card in the lane's queue is waiting for you", !!(await until(async () => (await tabsLane.locator(`.progress-lane-queue-row[data-card="${a.number}"]`).getAttribute('data-state').catch(() => null)) === 'waiting', HUNG_MS)), await tabsLane.locator(`.progress-lane-queue-row[data-card="${a.number}"]`).getAttribute('data-state').catch(() => ''))
     await tabsLane.locator('.progress-lane-expand').click()
     await shoot('lanes-wait')
-    await inv('advanced:set', 'hive.lanes.waitYouMinutes', 1)
+    await inv('advanced:set', 'cw.lanes.waitYouMinutes', 1)
     // The bound a minute: marked once a minute has passed (a condition, bounded for a hung run).
     check('…past its bound (a minute, Settings → Advanced), the time is marked', !!(await until(async () => ((await tabsWaited.getAttribute('class').catch(() => '')) ?? '').includes('long'), 120_000)), await tabsWaited.textContent().catch(() => ''))
     await shoot('lanes-wait-long')
-    await inv('advanced:set', 'hive.lanes.waitYouMinutes', null)
+    await inv('advanced:set', 'cw.lanes.waitYouMinutes', null)
     // Six more lanes (solo, their builders started by Hive): seven in all, more than fit.
     for (let i = 2; i <= 7; i++) {
       const bx = await lib.addAgent(inv, alpha, { name: `B${i}` })

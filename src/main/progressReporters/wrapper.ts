@@ -413,7 +413,7 @@ export interface WrapperIo {
 
 /**
  * How long hive-progress waits for Hive's reply (HI-1892: a fixed 5 s gave up on a Hive whose main was slow): Settings →
- * Advanced, "hive-progress: Hive's reply time" (hive.progress.replySeconds), handed to sessions as
+ * Advanced, "hive-progress: Hive's reply time" (cw.progress.replySeconds), handed to sessions as
  * CW_PROGRESS_REPLY_SECONDS; without it, 15 s. Kept within 1 s to 2 minutes whatever is set, so a hung Hive never holds
  * a command for long.
  */

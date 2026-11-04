@@ -157,7 +157,7 @@
   },
   "contract.notes.cut": {
     "text": "(cut: read the shared note {note} for the rest)",
-    "note": "Ends Workspace notes cut at their limit (Settings → Advanced, hive.notes.workspaceNotesMax). note: the shared note's name."
+    "note": "Ends Workspace notes cut at their limit (Settings → Advanced, cw.notes.workspaceNotesMax). note: the shared note's name."
   },
   "contract.notes.header": {
     "text": "Workspace notes (this machine), from the shared note \"{note}\":",

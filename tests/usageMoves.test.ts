@@ -20,7 +20,7 @@ vi.mock('electron', () => ({
 }))
 
 const H = vi.hoisted(() => ({ advanced: true as boolean, notices: [] as { title: string; api?: string }[] }))
-vi.mock('../src/main/advanced', () => ({ advanced: { get: (id: string) => (id === 'hive.accounts.usageMoves' ? H.advanced : undefined) } }))
+vi.mock('../src/main/advanced', () => ({ advanced: { get: (id: string) => (id === 'cw.accounts.usageMoves' ? H.advanced : undefined) } }))
 // Told once through tell() (HI-2320): what it tells, by its title and its English one.
 vi.mock('../src/main/notify', () => ({ tell: (t: { title: string; apiTitle?: string }) => void H.notices.push({ title: t.title, api: t.apiTitle }) }))
 vi.mock('../src/main/planUsage', () => ({ connectionLoginNow: () => null }))
