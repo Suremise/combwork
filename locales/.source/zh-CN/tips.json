@@ -198,6 +198,8 @@
   "tips.developerConsole.title": "Watch what a CLI sends Combwork",
   "tips.dialects.text": "The Dialects view shows every text Combwork gives agents, and lets a model, a CLI or the workspace word some of them its own way. Duplicate a file to try a change on one agent (Agent Settings → Dialect); it applies at the agent's next launch.",
   "tips.dialects.title": "Tune the words Combwork gives agents",
+  "tips.dialectsNewModel.text": "In the Dialects view, New Model File on a CLI's group starts a file for a model, even one no agent runs yet: type its ID. Duplicate can name the copy's model too, and Set Model gives one of your files to a model. It applies at each agent's next launch.",
+  "tips.dialectsNewModel.title": "A dialect file for any model",
   "tips.editTemplates.text": "Select a template in the Templates view and choose Edit…: add, copy, reorder or remove its agents, change each in the Agent Settings dialog (its Save saves the template too), rename it and pick its layout.",
   "tips.editTemplates.title": "Edit a template in place",
   "tips.fileLinks.text": "File paths an agent prints, like src/app.ts:42, are links: Ctrl+click one to open the file in the Files tab at that line.",

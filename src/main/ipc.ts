@@ -1228,7 +1228,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       if ('from' in r) dialectsChanged()
       return r
     },
-    'dialects:models': (cli) => (isKnownProvider(String(cli)) ? sessions.dialectModelsSeen(String(cli) as ProviderId) : []),
+    'dialects:models': (cli) => (isKnownProvider(String(cli)) ? sessions.dialectModelsSeen(workspace.path, String(cli) as ProviderId) : []),
     'dialects:revert': async (path) => {
       const id = String(path).replace(/\.json$/i, '')
       if (!placeOf(String(path)) || !(await bundledIds('dialects')).some((x) => x.toLowerCase() === id.toLowerCase())) throw hiveError(M.notDialect, { path: String(path) }, { kind: 'invalid' })

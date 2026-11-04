@@ -198,6 +198,8 @@
   "tips.developerConsole.title": "Veja o que uma CLI envia ao Combwork",
   "tips.dialects.text": "A visão Dialetos mostra todos os textos que o Combwork dá aos agentes e permite que um modelo, uma CLI ou o espaço de trabalho redija alguns deles do seu jeito. Duplique um arquivo para experimentar uma alteração num agente (Configurações do agente → Dialeto); ela vale a partir do próximo início do agente.",
   "tips.dialects.title": "Ajuste as palavras que o Combwork dá aos agentes",
+  "tips.dialectsNewModel.text": "Na visão Dialetos, Novo arquivo de modelo no grupo de uma CLI começa um arquivo para um modelo, mesmo um que nenhum agente roda ainda: digite o ID dele. Duplicar também pode indicar o modelo da cópia, e Definir modelo dá um dos seus arquivos a um modelo. Vale a partir do próximo início de cada agente.",
+  "tips.dialectsNewModel.title": "Um arquivo de dialeto para qualquer modelo",
   "tips.editTemplates.text": "Selecione um modelo na visualização Modelos e escolha Editar…: adicione, copie, reordene ou remova os agentes dele, altere cada um no diálogo Configurações do agente (o Salvar dele também salva o modelo), renomeie o modelo e escolha o layout.",
   "tips.editTemplates.title": "Edite um modelo ali mesmo",
   "tips.fileLinks.text": "Caminhos de arquivo que um agente imprime, como src/app.ts:42, são links: use Ctrl+clique em um para abrir o arquivo na aba Arquivos, naquela linha.",

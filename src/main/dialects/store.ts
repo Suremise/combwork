@@ -111,6 +111,15 @@ const jsonFiles = async (folder: string): Promise<string[]> =>
     .catch(() => [])
 
 /**
+ * Whether a folder already has an entry of this file name, in any case, whatever it is (HR2, HI-2523 r1): Windows names
+ * are case-blind, so "Upper.JSON" (which jsonFiles leaves out) is the file "Upper.json" would overwrite.
+ */
+const nameInUse = async (folder: string, fileName: string): Promise<boolean> =>
+  readdir(folder)
+    .then((names) => names.some((n) => n.toLowerCase() === fileName.toLowerCase()))
+    .catch(() => false)
+
+/**
  * Loads a workspace's dialects, each file checked against the schema. Within a folder, files are taken in name order,
  * and a model claimed twice (two files made outside Hive) is the first one's: the other is marked and Auto skips it.
  */
@@ -171,7 +180,7 @@ function fileRefusal(place: DialectPlace, file: DialectFile, schema: DialectSche
 async function writeChecked(dir: string, path: string, place: DialectPlace, file: DialectFile, schema: DialectSchema, opts: { fresh?: boolean } = {}): Promise<DialectRefusal | null> {
   const refusal = fileRefusal(place, file, schema)
   if (refusal) return refusal
-  if (opts.fresh && (await jsonFiles(place.kind === 'workspace' ? dir : join(dir, place.folder))).some((n) => n.toLowerCase() === path.split('/').pop()!.toLowerCase())) return { refused: 'nameTaken', path }
+  if (opts.fresh && (await nameInUse(place.kind === 'workspace' ? dir : join(dir, place.folder), path.split('/').pop()!))) return { refused: 'nameTaken', path }
   if (file.model !== undefined && place.kind === 'folder') {
     const other = (await claimsIn(dir, place.folder)).find((c) => c.path.toLowerCase() !== path.toLowerCase() && sameModel(c.model, file.model!))
     if (other) return { refused: 'modelClaimed', model: file.model, by: other.path }
@@ -317,7 +326,7 @@ export async function createDialect(dir: string, folder: string, label: string, 
   return withFileLock(lockOf(dir, place), async () => {
     const source = opts.from === undefined ? { name, texts: {} } : await readDialect(dir, opts.from)
     if (!source) return { refused: 'missing', path: opts.from! }
-    if ((await jsonFiles(join(dir, folder))).some((n) => n.toLowerCase() === `${name}.json`.toLowerCase())) return { refused: 'nameTaken', path }
+    if (await nameInUse(join(dir, folder), `${name}.json`)) return { refused: 'nameTaken', path }
     const file: DialectFile = { name, texts: source.texts, ...(model !== undefined ? { model } : {}) }
     const r = await writeClaiming(dir, folder, path, file, opts.from === undefined ? 'New Model File' : 'Duplicate') // i18n-ignore: log text
     return { path, from: r.from }

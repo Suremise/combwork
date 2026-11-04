@@ -121,6 +121,7 @@ import { chainGuidanceRevision, GUIDANCE_REVISION, launchParts, launchRecord } f
 import { say, setChainResolver } from '../shared/agentText'
 import { inDefaultDialect, inDialectOf } from '../shared/agentText/asyncScope'
 import { agentTextSchema, chainKey, dialectsDir, loadDialects, pickOf, sessionChainOf, writeDialectFile, type DialectSet, type ModelSlot, type ResolvedChain, type SessionDialect } from './dialects'
+import { dialectModelSuggestions } from './dialects/suggestions'
 import { apiChainChanged, forgetApiChain, requestApiChain } from './dialects/apiChain'
 import type { DialectUsage } from '../shared/dialects'
 import { SESSION } from './sessionText'
@@ -2611,20 +2612,12 @@ class SessionManager {
   }
 
   /**
-   * The model IDs Combwork has seen a CLI run (HI-2523: the Dialects view's suggestions for a model file), each once: the
-   * real model IDs its running sessions launched with (what their dialect matched by), then its connections' models (a
-   * connection's chosen model, a server connection's listed or typed ones). Only a convenience: the dialog takes any ID
-   * typed, and Combwork curates no list (Darren's decision on HI-2523).
+   * The model IDs Combwork has seen a CLI run, for a workspace's Dialects view (HI-2523): its own running sessions'
+   * launch model IDs, then the CLI's connections' models (dialectModelSuggestions says which, in what order).
    */
-  dialectModelsSeen(cli: ProviderId): string[] {
-    const seen: string[] = []
-    for (const l of this.live.values()) if (l.dialect?.input.cli === cli && l.dialect.input.modelId) seen.push(l.dialect.input.modelId)
-    const accounts = allAccounts().filter((a) => a.provider === cli)
-    for (const c of allConnections()) if (c.model && accounts.some((a) => a.id === c.account)) seen.push(c.model)
-    for (const a of accounts) for (const m of a.server?.models ?? []) seen.push(m.id)
-    const out: string[] = []
-    for (const m of seen.map((x) => x.trim())) if (m && !out.some((o) => o.toLowerCase() === m.toLowerCase())) out.push(m)
-    return out
+  dialectModelsSeen(workspacePath: string | null | undefined, cli: ProviderId): string[] {
+    const live = [...this.live.values()].flatMap((l) => (l.dialect ? [{ cli: l.dialect.input.cli, modelId: l.dialect.input.modelId, workspace: workspaceFor(l.state.projectPath)?.path }] : []))
+    return dialectModelSuggestions(cli, workspacePath, live, allAccounts(), allConnections())
   }
 
   /** The chain a running session speaks (the resolver's session scope): null for the Default, or one not running. */

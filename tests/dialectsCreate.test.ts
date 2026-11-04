@@ -7,6 +7,7 @@ import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { dialectLabelProblem } from '../src/shared/dialects'
 import { dialectModelId, dialectModelOf, dialectModelProblem, isUnresolvedAlias } from '../src/shared/models'
+import { dialectModelSuggestions } from '../src/main/dialects/suggestions'
 import { createDialect, loadDialects, modelSlot, promoteDialect, readDialect, resolveSessionChain, type DialectFile, type DialectSchema } from '../src/main/dialects'
 import { tempDir } from './tempDir'
 
@@ -90,6 +91,37 @@ describe('the model ID a file claims (HI-2523)', () => {
   })
 })
 
+describe('the model field’s suggestions (HI-2523)', () => {
+  const accounts = [
+    { id: 'acc-claude', provider: 'claude-code' as const },
+    { id: 'acc-ollama', provider: 'claude-code' as const, server: { models: [{ id: 'qwen3:32b' }, { id: 'llama3.1:8b-instruct' }] } as never },
+    { id: 'acc-codex', provider: 'codex' as const }
+  ]
+  const connections = [
+    { account: 'acc-claude', model: 'claude-sonnet-5-5' },
+    { account: 'acc-codex', model: 'gpt-6.1-sol' },
+    { account: 'acc-claude' }
+  ]
+  const live = [
+    { cli: 'claude-code', modelId: 'gemma-local', workspace: 'D:\\A' },
+    { cli: 'claude-code', modelId: 'only-in-b', workspace: 'D:\\B' },
+    { cli: 'codex', modelId: 'gpt-6-astra', workspace: 'D:\\A' },
+    { cli: 'claude-code', modelId: null, workspace: 'D:\\A' }
+  ]
+
+  it('are this workspace’s running launches, then the CLI’s connections’ models, each once', () => {
+    expect(dialectModelSuggestions('claude-code', 'd:\\a', live, accounts, connections)).toEqual(['gemma-local', 'claude-sonnet-5-5', 'qwen3:32b', 'llama3.1:8b-instruct'])
+    expect(dialectModelSuggestions('codex', 'D:\\A', live, accounts, connections)).toEqual(['gpt-6-astra', 'gpt-6.1-sol'])
+  })
+
+  it('never take another workspace’s running session (HR2 r1): two windows, two workspaces', () => {
+    expect(dialectModelSuggestions('claude-code', 'D:\\B', live, accounts, connections)).toEqual(['only-in-b', 'claude-sonnet-5-5', 'qwen3:32b', 'llama3.1:8b-instruct'])
+    expect(dialectModelSuggestions('claude-code', 'D:\\B', live, accounts, connections)).not.toContain('gemma-local')
+    // No workspace: the connections' models only.
+    expect(dialectModelSuggestions('claude-code', null, live, accounts, connections)).toEqual(['claude-sonnet-5-5', 'qwen3:32b', 'llama3.1:8b-instruct'])
+  })
+})
+
 describe('a launch’s model ID (dialectModelId, HI-2523)', () => {
   it('is a word that isn’t one of the CLI’s aliases as typed; an alias it can’t resolve stays unknown', () => {
     expect(dialectModelId('claude-code', null, 'gemma')).toBe('gemma')
@@ -157,6 +189,18 @@ describe('New Model File, Duplicate and Set Model (HI-2523)', () => {
     expect(await createDialect(dir, '../x', 'X', { isCli })).toEqual({ refused: 'path' })
     expect(await createDialect(dir, 'codex', 'Bad', { model: 'a\nb', isCli })).toEqual({ refused: 'model', problem: 'control' })
     expect((await loadDialects(dir, SCHEMA)).folders['claude-code'].files.map((f) => f.path)).toEqual(['claude-code/Opus 5.5.json'])
+  })
+
+  it('refuses a name a file of the folder has with another case of extension, keeping its bytes (HR2 r1)', async () => {
+    const dir = folder()
+    const upper = join(dir, 'codex', 'Upper.JSON')
+    writeFileSync(upper, 'not even a dialect, but the user’s')
+    const before = readFileSync(upper)
+    expect(await createDialect(dir, 'codex', 'Upper', { model: 'qwen3:32b', isCli })).toEqual({ refused: 'nameTaken', path: 'codex/Upper.json' })
+    expect(await createDialect(dir, 'codex', 'upper', { isCli })).toEqual({ refused: 'nameTaken', path: 'codex/upper.json' })
+    write(dir, 'codex/Source.json', file('source', { name: 'Source' }))
+    expect(await createDialect(dir, 'codex', 'UPPER', { from: 'codex/Source.json', isCli })).toEqual({ refused: 'nameTaken', path: 'codex/UPPER.json' })
+    expect(readFileSync(upper).equals(before)).toBe(true)
   })
 
   it('Duplicate with a model takes the claim in one step: the file that had it keeps its texts as a test copy', async () => {
