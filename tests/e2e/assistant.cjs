@@ -48,7 +48,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check("it defaults to the agents' model and effort, and Auto mode", JSON.stringify(info.assistant.config.providers['claude-code']) === JSON.stringify({ model: 'inherit', effort: 'inherit', permissionMode: 'auto', extraArgs: '', use200kContext: 'inherit' }), JSON.stringify(info.assistant.config.providers['claude-code']))
 
   // The panel: hidden at first, Ctrl+Alt+I shows it, and each workspace remembers it.
-  check('the panel starts hidden, as a strip', (await page.locator('.assistant-panel').count()) === 0 && (await page.locator('.assistant-rail', { hasText: 'Hive Assistant' }).count()) === 1)
+  check('the panel starts hidden, as a strip', (await page.locator('.assistant-panel').count()) === 0 && (await page.locator('.assistant-rail', { hasText: 'Assistant' }).count()) === 1)
   await page.locator('.assistant-rail').click()
   const panelWidth = async () => Math.round((await page.locator('.assistant-panel').boundingBox().catch(() => null))?.width ?? -1)
   check('clicking the strip shows the panel', await becomes(async () => (await page.locator('.assistant-panel').count()) === 1 && (await page.locator('.assistant-rail').count()) === 0))

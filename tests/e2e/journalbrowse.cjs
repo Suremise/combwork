@@ -95,7 +95,7 @@ function seed(cards, secondKey) {
     const plan = rows.filter({ hasText: 'Build the timeline first' })
     check('a card linked by its key is its card chip too (HI-1661)', (await plan.locator(`.card-chip[data-task="${second.number}"]`).count()) === 1, await plan.innerHTML())
     check('a superseded entry is marked', (await view.locator('.journal-row.superseded').count()) === 1)
-    check("Hive's fact is there, by Hive", (await view.locator('.journal-row', { hasText: '"Journal browser" is Done' }).locator('.journal-source-mark[aria-label="Hive"]').count()) === 1, await view.locator('.journal-row').last().innerHTML())
+    check("Combwork's fact is there, by Combwork", (await view.locator('.journal-row', { hasText: '"Journal browser" is Done' }).locator('.journal-source-mark[aria-label="Combwork"]').count()) === 1, await view.locator('.journal-row').last().innerHTML())
     /** The notices in the corner closed, so a screenshot shows the browser. */
     const dismissToasts = async () => {
       const close = page.locator('.toast .icon-btn[aria-label="Dismiss"]')

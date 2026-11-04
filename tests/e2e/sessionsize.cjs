@@ -141,7 +141,7 @@ const sizeText = (n) => (n < MB ? `${Math.max(1, Math.round(n / 1024))} KB` : `$
     const smallTip = await lib.hoverTip(page, size('Small session'), (t) => t.startsWith('Transcript:'))
     check('a small one just says its size', /^Transcript: \d+ KB on disk/.test(smallTip) && !/Hand the work over/.test(smallTip), smallTip)
     const goneTip = await lib.hoverTip(page, size('Gone session'), (t) => /no transcript file/.test(t))
-    check('"—" says why', /Claude Code has no transcript file for this session \(Hive keeps a backup of it\)\./.test(goneTip), goneTip)
+    check('"—" says why', /Claude Code has no transcript file for this session \(Combwork keeps a backup of it\)\./.test(goneTip), goneTip)
 
     // --- Both themes, and a narrow window: the size stays in its row, readable.
     for (const theme of ['dark', 'light']) {
