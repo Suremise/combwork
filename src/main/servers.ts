@@ -336,7 +336,7 @@ let apiError: string | undefined
  * Event-stream clients: the project agent each is (null: a script or a viewer, which gets every event) with the launch
  * whose token it came with (`run`), and the viewer token it came with.
  */
-/** Each events stream: its agent (null: the workspace token or a viewer); for one with none, the .hive folder of the workspace its request was for (`apiDir`, HI-2465), whose API chain its lines are said in. */
+/** Each events stream: its agent (null: the workspace token or a viewer); for one with none, the .combwork folder of the workspace its request was for (`apiDir`, HI-2465), whose API chain its lines are said in. */
 const sseClients = new Map<ServerResponse, { agent: AgentIdentity | null; apiDir: string | null; run: string | null; viewer: string | null }>()
 
 /** What an Agent API request is measured as (metrics.ts), filled in as it is handled and recorded when it ends. */
@@ -3251,7 +3251,7 @@ route('POST', '/v1/tasks/reorder', async ({ body }) => {
 
 // Only a card's newest comment (its author, time and whole text), for "check the latest comment": the card's
 // description, earlier comments and history stay out of the reply. A card without comments gives comment null.
-// A card's attachment, read through Hive (HI-1751: the document tools refuse `.hive`, so a reviewer couldn't read the
+// A card's attachment, read through Hive (HI-1751: the document tools refuse `.combwork`, so a reviewer couldn't read the
 // builder's evidence): a page of its text, or its kind and path for an image or a binary file. Only a card the caller may
 // read (its scope, as GET /v1/tasks/:n), from that card's own folder.
 route('GET', '/v1/tasks/:n/attachments/:name', async ({ params, query }) => {
@@ -4628,7 +4628,7 @@ function statusFor(e: Error): number {
  * Each stream client's line for an event (apiEvents.ts: every event for the workspace token and viewers, a project agent
  * its project's), said in that client's own dialect scope (HI-2465), bound here whatever request or none is running as
  * the event comes: an agent's session's chain; for the workspace token and viewers, the API chain of the workspace their
- * stream was opened for while it is open (`open`, .hive folders in lower case; closed, or none named: the Default). One
+ * stream was opened for while it is open (`open`, .combwork folders in lower case; closed, or none named: the Default). One
  * line per agent, and per such workspace.
  */
 function streamLines(event: HiveEvent, open: ReadonlySet<string>): (client: { agent: AgentIdentity | null; apiDir: string | null }) => string | null {

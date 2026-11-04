@@ -91,8 +91,8 @@ function citedBy(rel, cards, children = [], label = 'hive-test') {
 }
 
 /**
- * The workspace's board for the repository at root, found up from its main checkout: its database (.hive\hive.db, Hive 0.9
- * and later, #1017) or, before that, its cards folder (.hive\tasks); null when there is none. A workspace moved to the
+ * The workspace's board for the repository at root, found up from its main checkout: its database (.combwork\hive.db, Hive 0.9
+ * and later, #1017) or, before that, its cards folder (.combwork\tasks); null when there is none. A workspace moved to the
  * database keeps a stub tasks folder for older versions: the database is looked for first, so the stub never counts.
  */
 function findBoard(root) {
@@ -103,9 +103,9 @@ function findBoard(root) {
     dir = root
   }
   for (;;) {
-    const db = path.join(dir, '.hive', 'hive.db')
+    const db = path.join(dir, '.combwork', 'hive.db')
     if (fs.existsSync(db)) return db
-    const tasks = path.join(dir, '.hive', 'tasks')
+    const tasks = path.join(dir, '.combwork', 'tasks')
     if (fs.existsSync(path.join(tasks, 'board.json'))) return tasks
     const up = path.dirname(dir)
     if (up === dir) return null
@@ -177,7 +177,7 @@ function readCards(tasksDir) {
 function evidence({ tasksDir, cards, testRoot = runContext.TEST_ROOT, label = 'hive-test' } = {}) {
   const load = () => {
     if (cards) return { ok: true, cards }
-    if (!tasksDir) return { ok: false, why: "no board was found (the workspace's .hive\\hive.db or .hive\\tasks, up from this repository's main checkout)" }
+    if (!tasksDir) return { ok: false, why: "no board was found (the workspace's .combwork\\hive.db or .combwork\\tasks, up from this repository's main checkout)" }
     return readCards(tasksDir)
   }
   /** Rules over one look (get: the cards, read when asked). */

@@ -70,8 +70,8 @@ const check = (name, ok, extra = '') => {
   // (Their headers are upper-case by CSS.)
   const groups = async () => (await sidebar.locator('.template-group .skill-group').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim().toLowerCase())
   const templatesOf = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')) : [])
-  const wsTemplates = path.join(ws, '.hive', 'templates')
-  const own = (p) => path.join(p, '.hive', 'templates')
+  const wsTemplates = path.join(ws, '.combwork', 'templates')
+  const own = (p) => path.join(p, '.combwork', 'templates')
   // The file dialogs, answered in main (a deleted template goes to the suite's trash folder, #414).
   const saveTo = (file) => app.evaluate(({ dialog: d }, f) => { d.showSaveDialog = async () => ({ canceled: false, filePath: f }) }, file)
   const openFile = (file) => app.evaluate(({ dialog: d }, f) => { d.showOpenDialog = async () => ({ canceled: false, filePaths: [f] }) }, file)

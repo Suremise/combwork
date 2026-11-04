@@ -46,7 +46,7 @@ const check = (name, ok, extra = '') => {
 
     const saved = () => {
       try {
-        return JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8')).agents.map((a) => a.name).join()
+        return JSON.parse(fs.readFileSync(path.join(alpha, '.combwork', 'project.json'), 'utf8')).agents.map((a) => a.name).join()
       } catch {
         return '' // being written
       }

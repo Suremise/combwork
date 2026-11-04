@@ -1,6 +1,6 @@
 /**
  * Projects' stable ids (#508). A project is known by its folder's name, which changes when the folder is renamed or
- * moved; its id, kept in its own .hive/project.json, goes with the folder. What the workspace keeps about a project
+ * moved; its id, kept in its own .combwork/project.json, goes with the folder. What the workspace keeps about a project
  * (cards, lanes, watches) stores the id beside the name, and the name is read back from the id, so a rename can't
  * leave them behind.
  */

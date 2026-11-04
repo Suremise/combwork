@@ -42,11 +42,11 @@ function legacySwitch(on: boolean | undefined): void {
 function oldWorkspace(mcpCfg: Record<string, unknown> = { enabled: ['notes', 'sandbox'], model: 2 }): { ws: string; proj: string } {
   const ws = tempDir('hive-assistantmcp-ws-')
   const proj = join(ws, 'demo')
-  mkdirSync(join(ws, '.hive', 'mcp'), { recursive: true })
-  mkdirSync(join(proj, '.hive'), { recursive: true })
-  for (const n of ['notes', 'sandbox', 'idle']) writeFileSync(join(ws, '.hive', 'mcp', `${n}.json`), JSON.stringify({ description: `The ${n} server`, command: 'node', args: [`${n}.js`] }))
-  writeFileSync(join(ws, '.hive', 'workspace.json'), JSON.stringify({ version: 1, mcp: mcpCfg }))
-  writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', provider: 'claude-code' }], mcp: { disabled: [], enabled: ['sandbox'] } }))
+  mkdirSync(join(ws, '.combwork', 'mcp'), { recursive: true })
+  mkdirSync(join(proj, '.combwork'), { recursive: true })
+  for (const n of ['notes', 'sandbox', 'idle']) writeFileSync(join(ws, '.combwork', 'mcp', `${n}.json`), JSON.stringify({ description: `The ${n} server`, command: 'node', args: [`${n}.js`] }))
+  writeFileSync(join(ws, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: mcpCfg }))
+  writeFileSync(join(proj, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', provider: 'claude-code' }], mcp: { disabled: [], enabled: ['sandbox'] } }))
   return { ws, proj }
 }
 
@@ -59,7 +59,7 @@ async function opened(ws: string): Promise<Service> {
 /** The servers a launch gets, but Hive's own. */
 const gets = async (path: string, agent: object): Promise<string[]> => Object.keys((await sessions.effective(path, agent as never)).mcpServers).filter((n) => n !== 'hive').sort()
 const assistantGets = (w: Service) => gets(w.assistantHome, ASSISTANT)
-const saved = (ws: string): unknown => json(join(ws, '.hive', 'workspace.json')).mcp.assistant
+const saved = (ws: string): unknown => json(join(ws, '.combwork', 'workspace.json')).mcp.assistant
 
 const was = process.env.HIVE_TEST_TRASH_DIR
 beforeAll(() => {
@@ -222,7 +222,7 @@ describe("the Assistant's added servers (HI-1472, HI-2059)", () => {
       await expect(inWorkspace(w, () => mcp.addMcpTo('assistant', 'notes', { def: null }))).rejects.toThrow('has changed since it was shown to you')
       const shown = (await inWorkspace(w, () => mcp.listMcp(true))).find((x) => x.name === 'notes')!
       // Replaced meanwhile: refused.
-      writeFileSync(join(ws, '.hive', 'mcp', 'notes.json'), JSON.stringify({ command: 'node', args: ['other.js'] }))
+      writeFileSync(join(ws, '.combwork', 'mcp', 'notes.json'), JSON.stringify({ command: 'node', args: ['other.js'] }))
       await expect(inWorkspace(w, () => mcp.addMcpTo('assistant', 'notes', { def: shown.def, revision: shown.revision }))).rejects.toThrow('has changed since it was shown to you')
       await expect(inWorkspace(w, () => mcp.addMcpTo('assistant', 'missing', { def: null }))).rejects.toThrow('no MCP server named missing')
       expect(saved(ws)).toEqual([])
@@ -243,7 +243,7 @@ describe("the Assistant's added servers (HI-1472, HI-2059)", () => {
       expect(await assistantGets(w)).toEqual(['notes'])
       expect((await inWorkspace(w, () => mcp.listMcp(true))).filter((m) => m.assistant).map((m) => m.name)).toEqual(['notes'])
       await inWorkspace(w, () => mcp.removeMcpFrom('assistant', 'sandbox'))
-      expect(json(join(ws, '.hive', 'workspace.json')).mcp).toMatchObject({ assistant: ['notes'], assistantModel: 3 })
+      expect(json(join(ws, '.combwork', 'workspace.json')).mcp).toMatchObject({ assistant: ['notes'], assistantModel: 3 })
       expect(await assistantGets(w)).toEqual(['notes'])
     } finally {
       await disposeWorkspaceService(w)
@@ -262,7 +262,7 @@ describe("the Assistant's added servers (HI-1472, HI-2059)", () => {
       await inWorkspace(w, () => mcp.deleteMcp('idle'))
       expect(saved(ws)).toEqual([])
       // Added again under the name: added nowhere, as for every project.
-      writeFileSync(join(ws, '.hive', 'mcp', 'idle.json'), JSON.stringify({ command: 'node', args: ['idle.js'] }))
+      writeFileSync(join(ws, '.combwork', 'mcp', 'idle.json'), JSON.stringify({ command: 'node', args: ['idle.js'] }))
       expect((await inWorkspace(w, () => mcp.listMcp(true))).find((x) => x.name === 'idle')?.assistant).toBe(false)
     } finally {
       await disposeWorkspaceService(w)

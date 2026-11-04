@@ -28,11 +28,11 @@ let n = 0
 const dismissals: (() => void)[] = []
 const workspace = (): string => {
   const ws = join(base, `ws-${++n}`)
-  mkdirSync(join(ws, '.hive'), { recursive: true })
+  mkdirSync(join(ws, '.combwork'), { recursive: true })
   dismissals.push(admitted(ws))
   return ws
 }
-const files = (ws: string): string[] => readdirSync(join(ws, '.hive')).sort()
+const files = (ws: string): string[] => readdirSync(join(ws, '.combwork')).sort()
 /** Its window closes it: dismissed (#1395), then its board closed, as WorkspaceService.close does; `reopen` opens it again. */
 const closed = (ws: string): void => {
   dismiss(ws)
@@ -400,7 +400,7 @@ describe("what saves keep of committed entries is bounded (round 1, finding 2)",
 describe("0.8's lanes.json moved in (from #1018's tests)", () => {
   it('once, in order; the file kept as a backup, as it was; not read again', async () => {
     const ws = workspace()
-    const file = join(ws, '.hive', 'lanes.json')
+    const file = join(ws, '.combwork', 'lanes.json')
     const list = [{ ...LANE, id: 'b' }, { ...LANE, id: 'a' }]
     const text = JSON.stringify({ version: 1, lanes: list })
     writeFileSync(file, text)
@@ -410,14 +410,14 @@ describe("0.8's lanes.json moved in (from #1018's tests)", () => {
     expect(got.docs).toEqual(list)
     expect(JSON.parse(got.meta.get('imported')!)).toMatchObject({ rows: 2, file })
     const backup = files(ws).find((f) => f.startsWith('lanes.json.imported-'))!
-    expect(readFileSync(join(ws, '.hive', backup), 'utf8')).toBe(text)
+    expect(readFileSync(join(ws, '.combwork', backup), 'utf8')).toBe(text)
     await tables.openTable(ws, 'lanes', file, read)
     expect(reads).toBe(1)
   })
 
   it("a file that can't be read now is not marked moved: it stays, and the next open moves it in", async () => {
     const ws = workspace()
-    const file = join(ws, '.hive', 'lanes.json')
+    const file = join(ws, '.combwork', 'lanes.json')
     // A folder where the file is: reading it fails as a file Windows holds open would (not "there is none").
     mkdirSync(file)
     await expect(tables.openTable(ws, 'lanes', file, () => lanes.readLanesFile(file))).rejects.toThrow(/Could not read the lanes/)
@@ -431,17 +431,17 @@ describe("0.8's lanes.json moved in (from #1018's tests)", () => {
 
   it('a damaged lanes file is set aside, kept as it was, and none are moved in', async () => {
     const ws = workspace()
-    const file = join(ws, '.hive', 'lanes.json')
+    const file = join(ws, '.combwork', 'lanes.json')
     writeFileSync(file, '{ not json')
     const got = await tables.openTable(ws, 'lanes', file, () => lanes.readLanesFile(file))
     expect(got.docs).toEqual([])
     const aside = files(ws).find((f) => f.startsWith('lanes.json.damaged-'))!
-    expect(readFileSync(join(ws, '.hive', aside), 'utf8')).toBe('{ not json')
+    expect(readFileSync(join(ws, '.combwork', aside), 'utf8')).toBe('{ not json')
   })
 
   it("every entry moved in has a row of its own, whatever ids the file gives (one another's fallback, the same twice, none)", async () => {
     const ws = workspace()
-    const file = join(ws, '.hive', 'lanes.json')
+    const file = join(ws, '.combwork', 'lanes.json')
     const list = [{ id: '#1', n: 0 }, { n: 1 }, { id: 'a', n: 2 }, { id: 'a', n: 3 }, { id: '#1', n: 4 }, { id: '#3', n: 5 }]
     writeFileSync(file, JSON.stringify({ version: 1, lanes: list }))
     const got = await tables.openTable(ws, 'lanes', file, () => lanes.readLanesFile(file))

@@ -59,8 +59,8 @@ async function close(w: WS): Promise<void> {
 function workspace(projects = ['hive', 'ambrosia']): string {
   const ws = join(base, `ws-${++n}`)
   for (const p of projects) {
-    mkdirSync(join(ws, p, '.hive'), { recursive: true })
-    writeFileSync(join(ws, p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+    mkdirSync(join(ws, p, '.combwork'), { recursive: true })
+    writeFileSync(join(ws, p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
   }
   return ws
 }
@@ -148,7 +148,7 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
     const info = await keys.createProjectWithKey(w, 'fresh', null)
     expect(info.projects.map((p) => p.name)).toContain('fresh')
     // Its id was given before the refresh read it: none is given (written) meanwhile.
-    expect(JSON.parse(readFileSync(join(ws, 'fresh', '.hive', 'project.json'), 'utf8')).id).toMatch(/^p-/)
+    expect(JSON.parse(readFileSync(join(ws, 'fresh', '.combwork', 'project.json'), 'utf8')).id).toMatch(/^p-/)
     // A write to the new project's project.json after the refresh has read it and before it reports (as the id's was,
     // since HI-1705's parallel reads): the refresh hands back the list from before (#999), and New Project waits for the
     // one that write scheduled. Before the fix the reply had no project, and the window stayed on the one shown.
@@ -401,8 +401,8 @@ describe("another project's card, for an agent confined to its own (round 1, fin
     const h = await inWorkspace(w, () => tasks.createTask({ title: 'H', project: 'hive' }, user))
     // hive renamed hivemind (its id goes with it); a new project takes the folder hive.
     renameSync(join(ws, 'hive'), join(ws, 'hivemind'))
-    mkdirSync(join(ws, 'hive', '.hive'), { recursive: true })
-    writeFileSync(join(ws, 'hive', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+    mkdirSync(join(ws, 'hive', '.combwork'), { recursive: true })
+    writeFileSync(join(ws, 'hive', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
     await w.projectIds({ fresh: true })
     // The card as saved still says hive: the board's readers follow its id, and so must keys.
     expect(store.cardKeyOf(w, h.number)?.project).toBe('hive')

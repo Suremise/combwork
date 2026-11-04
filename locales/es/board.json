@@ -588,7 +588,7 @@
   "board.overview.stalled": "Estancadas",
   "board.overview.waitingForReview": "Por revisar",
   "board.panel.allProjects": "Todos los proyectos",
-  "board.panel.info": "Las tarjetas del espacio de trabajo, en .hive/tasks. Los agentes y el Asistente las leen, cambian y mueven con las herramientas de Combwork (el trabajo terminado pasa a Revisión); solo tú las archivas o eliminas.",
+  "board.panel.info": "Las tarjetas del espacio de trabajo, en .combwork/tasks. Los agentes y el Asistente las leen, cambian y mueven con las herramientas de Combwork (el trabajo terminado pasa a Revisión); solo tú las archivas o eliminas.",
   "board.panel.refresh": "Actualizar",
   "board.panel.stalledInfo": "Tarjetas de En curso en las que nadie trabaja: ningún agente las tiene, o su agente se quitó o no está en ejecución. También tarjetas de En curso o Revisión que un agente de un ciclo de tarjetas dejó sin quedarse esperándolas.",
   "board.panel.workspace": "Espacio de trabajo",

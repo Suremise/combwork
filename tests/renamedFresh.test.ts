@@ -33,8 +33,8 @@ const seen = { launches: [] as { agentId: string; resumeId?: string; prompt?: st
 const internals = sessions as any
 
 beforeAll(async () => {
-  mkdirSync(join(project, '.hive'), { recursive: true })
-  writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id: 'p1', agents: ['b1', 'b2', 'b3', 'b4'].map((id) => ({ id, name: id.toUpperCase(), provider: 'claude-code' })) }))
+  mkdirSync(join(project, '.combwork'), { recursive: true })
+  writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id: 'p1', agents: ['b1', 'b2', 'b3', 'b4'].map((id) => ({ id, name: id.toUpperCase(), provider: 'claude-code' })) }))
   await ws.open(wsPath)
   await ws.refresh()
   const rec = (id: string, agentId: string | undefined, o: Record<string, unknown> = {}) => run(() => ws.upsertSession(project, { id, agent: 'claude-code', ...(agentId ? { agentId, cwd: project } : {}), name: id, lastActiveAt: '2026-11-01T00:00:00.000Z', ...o }))

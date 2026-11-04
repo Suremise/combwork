@@ -388,7 +388,7 @@ export async function cleanup(projectPath: string, opts: CleanupOptions, listed:
 }
 
 /**
- * The files of .hive/sessions and .hive/archive that are Hive's per session: a backup (`<id>.jsonl`, compressed or not)
+ * The files of .combwork/sessions and .combwork/archive that are Hive's per session: a backup (`<id>.jsonl`, compressed or not)
  * and what is left of one: a spare (`.spare`, trashAllOrNothing), a half-made copy (`.<pid>-<time>.tmp`, compressing)
  * and the names an archive sets aside (`.archiving`, `.previous`, `.archived`). Group 3 is empty for a backup.
  */

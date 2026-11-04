@@ -367,7 +367,7 @@ export function TerminalView({
   visible: boolean
   onExit?: (code: number) => void
   autoFocus?: boolean
-  /** Set for session terminals: pasted and dropped files are attached, kept in the session host's .hive/attachments. */
+  /** Set for session terminals: pasted and dropped files are attached, kept in the session host's .combwork/attachments. */
   projectPath?: string
   /** The agent whose session this is. */
   agentId?: string
@@ -559,7 +559,7 @@ export function TerminalView({
     })
 
     // Files dropped from Explorer or Hive's Files/Attachments tabs are attached (#387): their paths are pasted, each copied
-    // into the session's .hive/attachments first when it comes from outside the session's folder or is an image.
+    // into the session's .combwork/attachments first when it comes from outside the session's folder or is an image.
     host.current!.addEventListener('dragover', (e) => {
       if (!carriesFiles(e.dataTransfer)) return
       e.preventDefault()

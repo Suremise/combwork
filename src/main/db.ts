@@ -4,11 +4,11 @@ import { basename, dirname, join } from 'path'
 import { timedStep } from './stallWork'
 
 /**
- * Hive's SQLite layer (#990, #1017): every database Hive keeps (the workspace's board in `.hive/hive.db`; later its metrics,
+ * Hive's SQLite layer (#990, #1017): every database Hive keeps (the workspace's board in `.combwork/hive.db`; later its metrics,
  * and the Assistant's journal in a file of its own, #989) is opened, set up and migrated here, with Node's built-in
  * `node:sqlite` (no native module to rebuild for each Electron). Nothing else imports `node:sqlite`, so another library
  * would be a change to this file only. Its calls are synchronous: at these sizes a query or a commit takes well under a
- * millisecond on main's thread, once the WAL's checkpoints, which fsync the file, are out of the commits (`checkpointer`, #1633). The usage history (`.hive/usage.db`, #1106) is opened here too, by the usage worker on a
+ * millisecond on main's thread, once the WAL's checkpoints, which fsync the file, are out of the commits (`checkpointer`, #1633). The usage history (`.combwork/usage.db`, #1106) is opened here too, by the usage worker on a
  * thread of its own (usageWorker.ts): nothing here is tied to main's thread.
  */
 

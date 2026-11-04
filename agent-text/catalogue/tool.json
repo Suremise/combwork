@@ -333,7 +333,7 @@
     "text": "Combwork's settings, a line each (id = value; [read-only]: the user's only); query matches words, scope narrows, project adds its own. At most 200 lines: offset carries on. cw_read_setting explains one."
   },
   "tool.listSharedNotes.description": {
-    "text": "The workspace's shared notes and handovers (.hive/shared): a path and date a line. cw_read_shared_note reads one."
+    "text": "The workspace's shared notes and handovers (.combwork/shared): a path and date a line. cw_read_shared_note reads one."
   },
   "tool.listSkills.description": {
     "text": "The skills for this project's agents, a line each: Combwork's for agents (not those for the Assistant alone), user, plugin and local skills. A listing, not of what a running session loaded."
@@ -459,7 +459,7 @@
     "text": "One setting in full: where it is, its value and default, what it takes and does, and whether you may change it. project: for a project's setting."
   },
   "tool.readSharedNote.description": {
-    "text": "Read a shared note by its path relative to .hive/shared (e.g. \"handovers/2026-01-01-auth.md\"), with its revision."
+    "text": "Read a shared note by its path relative to .combwork/shared (e.g. \"handovers/2026-01-01-auth.md\"), with its revision."
   },
   "tool.readTask.arg.attachments": {
     "text": "All, when narrowed."
@@ -742,6 +742,6 @@
     "text": "Wait for cards to change (changes narrows it), or with column until one is there. wake=true: a card watch; Combwork types a line here when one changes. End your turn after it. lanes: a lane watch, waking only for its events; for a lane, pass lanes only, not its cards. (detail: use-cw-api, tools.md)"
   },
   "tool.writeSharedNote.description": {
-    "text": "Create or overwrite a shared note (.hive/shared); append=true adds to its end. expectedRevision: written only if unchanged since you read it. \"Workspace notes.md\" is the user's and the Assistant's to write."
+    "text": "Create or overwrite a shared note (.combwork/shared); append=true adds to its end. expectedRevision: written only if unchanged since you read it. \"Workspace notes.md\" is the user's and the Assistant's to write."
   }
 }

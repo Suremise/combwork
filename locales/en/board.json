@@ -2356,8 +2356,8 @@
     "description": "The Board sidebar's first row: shows every project's cards."
   },
   "board.panel.info": {
-    "defaultMessage": "The workspace's cards, in .hive/tasks. Agents and the Assistant read, change and move them through Combwork's tools (finished work goes to Review); only you archive or delete them.",
-    "description": "The (i) beside the Board sidebar's title. Keep .hive/tasks as it is (a folder). Review is a board column."
+    "defaultMessage": "The workspace's cards, in .combwork/tasks. Agents and the Assistant read, change and move them through Combwork's tools (finished work goes to Review); only you archive or delete them.",
+    "description": "The (i) beside the Board sidebar's title. Keep .combwork/tasks as it is (a folder). Review is a board column."
   },
   "board.panel.refresh": {
     "defaultMessage": "Refresh",

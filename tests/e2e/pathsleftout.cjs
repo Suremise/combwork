@@ -27,10 +27,10 @@ const waitHung = (fn) => lib.until(fn, HUNG_MS, 200)
   const pair = path.join(fx.ws, 'nopair')
   const solo = path.join(fx.ws, 'nosolo')
   for (const dir of [pair, solo]) {
-    fs.mkdirSync(path.join(dir, '.hive'), { recursive: true })
+    fs.mkdirSync(path.join(dir, '.combwork'), { recursive: true })
     fs.writeFileSync(path.join(dir, 'a.txt'), 'a\n')
     fs.writeFileSync(path.join(dir, 'b.txt'), 'b\n')
-    fs.writeFileSync(path.join(dir, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    fs.writeFileSync(path.join(dir, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   }
   const h = await q.startHive(fx, { port: PORT })
   const { page, inv } = h

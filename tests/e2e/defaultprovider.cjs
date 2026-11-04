@@ -89,7 +89,7 @@ const check = (name, ok, extra = '') => {
   check('nothing was added meanwhile', (await agents()).length === 0, JSON.stringify(await agents()))
   // A project has no default provider of its own any more (HI-2106, decision A): one sent is not kept.
   await inv('project:updateConfig', alpha, { defaultProvider: 'claude-code' })
-  check("…a project's own default isn't kept, and Automatic warns of nothing", !JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8')).defaultProvider && !!(await lib.until(async () => (await card.locator('[data-provider-warning]').count()) === 0, 10000)))
+  check("…a project's own default isn't kept, and Automatic warns of nothing", !JSON.parse(fs.readFileSync(path.join(alpha, '.combwork', 'project.json'), 'utf8')).defaultProvider && !!(await lib.until(async () => (await card.locator('[data-provider-warning]').count()) === 0, 10000)))
   await app.close()
 
   // --- 2. Claude Code turned on but not installed, Codex installed.

@@ -1,5 +1,5 @@
 // Builds recorded as facts (#1534, #1062): npm run dist and npm run release tell Hive of each successful build
-// (scripts/buildFact.mjs), through the Agent API when Hive answers, else by a marker in the workspace's .hive/builds;
+// (scripts/buildFact.mjs), through the Agent API when Hive answers, else by a marker in the workspace's .combwork/builds;
 // Hive writes it into the journal as its own entry, once, while Settings → Advanced → Record builds in the journal and
 // the journal take it (src/main/buildFacts.ts). A failed build records nothing.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
@@ -119,14 +119,14 @@ describe('a build fact', () => {
 describe('the scripts tell Hive of a build', () => {
   const ws = join(base, 'scripts-ws')
   const repo = join(ws, 'hive')
-  const markers = (): string[] => (existsSync(join(ws, '.hive', 'builds')) ? readdirSync(join(ws, '.hive', 'builds')) : [])
+  const markers = (): string[] => (existsSync(join(ws, '.combwork', 'builds')) ? readdirSync(join(ws, '.combwork', 'builds')) : [])
   const env = { CW_WORKSPACE: ws }
   // The session's token in its file (HI-2262: never HIVE_API_TOKEN).
   const tokenFile = join(base, 'agent-token.json')
   writeFileSync(tokenFile, JSON.stringify({ token: 't' }))
   beforeAll(() => {
-    mkdirSync(join(ws, '.hive'), { recursive: true })
-    writeFileSync(join(ws, '.hive', 'workspace.json'), '{}')
+    mkdirSync(join(ws, '.combwork'), { recursive: true })
+    writeFileSync(join(ws, '.combwork', 'workspace.json'), '{}')
     mkdirSync(join(repo, 'dist'), { recursive: true })
   })
   const input = { root: repo, version: '1.0.0-rc.1', commit: fact.commit, branch: '1.0.0', installer: fact.installer, builtAt: fact.builtAt, by: 'dist', kind: 'baseline' }
@@ -151,7 +151,7 @@ describe('the scripts tell Hive of a build', () => {
     // Left as a marker, as with no API named; taken away again so the next test counts its own.
     const left = markers().filter((m) => !was.has(m))
     expect(left).toHaveLength(1)
-    for (const m of left) rmSync(join(ws, '.hive', 'builds', m))
+    for (const m of left) rmSync(join(ws, '.combwork', 'builds', m))
   })
 
   it("by a marker when Hive can't be reached, or no API is named", async () => {
@@ -160,7 +160,7 @@ describe('the scripts tell Hive of a build', () => {
     const left = markers()
     expect(left).toHaveLength(2)
     expect(left.every((n) => n.endsWith('.json'))).toBe(true)
-    expect(JSON.parse(readFileSync(join(ws, '.hive', 'builds', left[0]), 'utf8'))).toEqual(fact)
+    expect(JSON.parse(readFileSync(join(ws, '.combwork', 'builds', left[0]), 'utf8'))).toEqual(fact)
   })
 
   it('after dist: only a build with its build-info.json (a successful one) is recorded', async () => {
@@ -226,7 +226,7 @@ describe('the scripts tell Hive of a build', () => {
 describe('Hive records a build in the journal', () => {
   let w: ReturnType<typeof createWorkspaceService>
   const wsPath = join(base, 'ws')
-  const dir = join(wsPath, '.hive', 'builds')
+  const dir = join(wsPath, '.combwork', 'builds')
   const leave = (name: string, body: unknown): void => {
     mkdirSync(dir, { recursive: true })
     writeFileSync(join(dir, name), typeof body === 'string' ? body : JSON.stringify(body))
@@ -234,8 +234,8 @@ describe('Hive records a build in the journal', () => {
   const facts = (): { summary: string; tags?: string[] }[] => (existsSync(journal.journalFile(w.assistantHome)) ? journal.recall(w.assistantHome, { limit: 50 }).filter((r) => r.source === 'hive') : [])
   beforeAll(async () => {
     advanced.load(join(base, 'profile'))
-    mkdirSync(join(wsPath, 'alpha', '.hive'), { recursive: true })
-    writeFileSync(join(wsPath, 'alpha', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(wsPath, 'alpha', '.combwork'), { recursive: true })
+    writeFileSync(join(wsPath, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -326,8 +326,8 @@ describe('Hive records a build in the journal', () => {
   // other workspace's journal and the marker was gone. Now it's put back for its own workspace's next open.
   it("writes a marker only into its own workspace's journal: switched meanwhile, it's put back", async () => {
     const other = join(base, 'ws-other')
-    mkdirSync(join(other, 'beta', '.hive'), { recursive: true })
-    writeFileSync(join(other, 'beta', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(other, 'beta', '.combwork'), { recursive: true })
+    writeFileSync(join(other, 'beta', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     leave('2026-10-24T11-06-00-000Z-ff.json', { ...fact, version: '1.0.0-rc.5' })
     let release = (): void => {}
     held.gate = new Promise<void>((resolve) => (release = resolve))

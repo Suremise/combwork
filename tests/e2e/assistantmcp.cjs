@@ -29,15 +29,15 @@ const check = (name, ok, extra = '') => {
 
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
-  for (const p of [proj, other]) fs.mkdirSync(path.join(p, '.hive'), { recursive: true })
+  for (const p of [proj, other]) fs.mkdirSync(path.join(p, '.combwork'), { recursive: true })
   // Three servers (they never run: the fake Claude Code only records its --mcp-config): notes and sandbox on in the
   // workspace, extra off. demo has sandbox on and extra kept while the workspace has it off; other has notes on.
   // workspace.json has no Assistant choices yet (a workspace from before).
-  fs.mkdirSync(path.join(ws, '.hive', 'mcp'), { recursive: true })
-  for (const n of ['notes', 'sandbox', 'extra']) fs.writeFileSync(path.join(ws, '.hive', 'mcp', `${n}.json`), JSON.stringify({ description: `The ${n} server`, command: 'node', args: [`${n}.js`], ...(n === 'notes' ? { tags: ['memory'] } : {}) }))
-  fs.writeFileSync(path.join(ws, '.hive', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes', 'sandbox'], model: 2 } }))
-  fs.writeFileSync(path.join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, mcp: { disabled: [], enabled: ['extra', 'sandbox'] } }))
-  fs.writeFileSync(path.join(other, '.hive', 'project.json'), JSON.stringify({ version: 2, mcp: { disabled: [], enabled: ['notes'] } }))
+  fs.mkdirSync(path.join(ws, '.combwork', 'mcp'), { recursive: true })
+  for (const n of ['notes', 'sandbox', 'extra']) fs.writeFileSync(path.join(ws, '.combwork', 'mcp', `${n}.json`), JSON.stringify({ description: `The ${n} server`, command: 'node', args: [`${n}.js`], ...(n === 'notes' ? { tags: ['memory'] } : {}) }))
+  fs.writeFileSync(path.join(ws, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes', 'sandbox'], model: 2 } }))
+  fs.writeFileSync(path.join(proj, '.combwork', 'project.json'), JSON.stringify({ version: 2, mcp: { disabled: [], enabled: ['extra', 'sandbox'] } }))
+  fs.writeFileSync(path.join(other, '.combwork', 'project.json'), JSON.stringify({ version: 2, mcp: { disabled: [], enabled: ['notes'] } }))
   const env = lib.fakeClaude(userData, home, [proj, other, ws])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -56,8 +56,8 @@ const check = (name, ok, extra = '') => {
       }
       await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     }
-    const wsMcp = () => JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'workspace.json'), 'utf8')).mcp
-    const projectMcp = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8')).mcp
+    const wsMcp = () => JSON.parse(fs.readFileSync(path.join(ws, '.combwork', 'workspace.json'), 'utf8')).mcp
+    const projectMcp = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'project.json'), 'utf8')).mcp
     const apiToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const api = async (route, token) => {
       const r = await fetch(`http://127.0.0.1:${PORT}${route}`, { headers: { Authorization: `Bearer ${token}` } })
@@ -136,15 +136,15 @@ const check = (name, ok, extra = '') => {
       for (const l of lines.map((x) => JSON.parse(x)).reverse()) {
         const f = l.opts?.['--mcp-config']
         const servers = f && fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')).mcpServers : null
-        if (agentId === 'assistant' ? l.cwd?.toLowerCase() === ws.toLowerCase() : servers?.combwork?.env?.HIVE_AGENT_ID === agentId) return servers
+        if (agentId === 'assistant' ? l.cwd?.toLowerCase() === ws.toLowerCase() : servers?.hive?.env?.HIVE_AGENT_ID === agentId) return servers
       }
       return null
     }
     const a = await lib.until(() => launched('assistant'), 30000)
     const b = await lib.until(() => launched(agent.id), 30000)
     const c = await lib.until(() => launched(otherAgent.id), 30000)
-    check("the Assistant's launch has notes and the hive server, not sandbox", !!a?.notes && !!a?.combwork && !a?.sandbox && !a?.extra, JSON.stringify(Object.keys(a ?? {})))
-    check("demo's agent has sandbox and the hive server, not notes or extra", !!b?.sandbox && !!b?.combwork && !b?.notes && !b?.extra, JSON.stringify(Object.keys(b ?? {})))
+    check("the Assistant's launch has notes and the hive server, not sandbox", !!a?.notes && !!a?.hive && !a?.sandbox && !a?.extra, JSON.stringify(Object.keys(a ?? {})))
+    check("demo's agent has sandbox and the hive server, not notes or extra", !!b?.sandbox && !!b?.hive && !b?.notes && !b?.extra, JSON.stringify(Object.keys(b ?? {})))
     check("…without Hive's own fields (its tags)", !('tags' in (c?.notes ?? { tags: 1 })) && !('description' in (c?.notes ?? {})), JSON.stringify(c?.notes))
 
     // --- The Agent API: where each is added for the workspace's token; only its own project's for an agent's.

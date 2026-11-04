@@ -66,16 +66,16 @@ async function workspace(options: object = PAIR): Promise<{ w: WS; repo: string;
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
   const wt = join(ws, 'p-card')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
   writeFileSync(join(repo, 'a.txt'), 'one\n')
   git(repo, 'init', '-q', '-b', 'main')
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(repo, 'config', k, v)
-  writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+  writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
   git(repo, 'add', '-A')
   git(repo, 'commit', '-qm', 'initial')
   git(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
   const agents = [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }, { id: 'a3', name: 'Other' }]
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options } }))
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options } }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
@@ -641,8 +641,8 @@ describe('a card by intent (#1267)', () => {
           // Its agents' CLI turned on and found, as a template's load checks.
           config.settings.providers['claude-code'].enabled = true
           providerService.info = ((id: string) => ({ provider: id, found: true })) as never
-          mkdirSync(join(w.path!, '.hive', 'templates'), { recursive: true })
-          writeFileSync(join(w.path!, '.hive', 'templates', `solo-${n}.json`), JSON.stringify({ version: 2, name: 'Solo', layout: 'auto', agents: [{ name: `Solo${n}`, role: 'builder', provider: 'claude-code' }] }))
+          mkdirSync(join(w.path!, '.combwork', 'templates'), { recursive: true })
+          writeFileSync(join(w.path!, '.combwork', 'templates', `solo-${n}.json`), JSON.stringify({ version: 2, name: 'Solo', layout: 'auto', agents: [{ name: `Solo${n}`, role: 'builder', provider: 'claude-code' }] }))
           return templates.loadTemplate(p, 'workspace', `solo-${n}.json`, await agentIds(w))
         })
     ],

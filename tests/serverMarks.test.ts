@@ -93,8 +93,8 @@ describe("a run's server markers (sessions.ts)", async () => {
   let k = 0
 
   beforeAll(async () => {
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'A1' }, { id: 'a2', name: 'A2' }] }))
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'A1' }, { id: 'a2', name: 'A2' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     // A server's model with the $9 Claude Code reported for it: read with the report, $9; without it, no price (null).
@@ -205,8 +205,8 @@ describe("a run's server markers (sessions.ts)", async () => {
   it('a workspace closing with an unsaved marker: its host fails closed, so its reopening reads it without the report', async () => {
     const ws2 = join(base, 'ws2')
     const beta = join(ws2, 'beta')
-    mkdirSync(join(beta, '.hive'), { recursive: true })
-    writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
+    mkdirSync(join(beta, '.combwork'), { recursive: true })
+    writeFileSync(join(beta, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
     const other = createWorkspaceService()
     await other.open(ws2)
     vi.spyOn(WorkspaceService.prototype, 'mutateSessions').mockRejectedValue(new Error('disk full'))

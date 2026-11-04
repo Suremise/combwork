@@ -31,7 +31,7 @@ function queueProject(name) {
 function prepare(fx) {
   for (const d of [fx.userData, fx.ws, fx.claudeHome, fx.tools, fx.shots]) fs.rmSync(d, { recursive: true, force: true })
   for (const d of [fx.claudeHome, fx.tools, fx.shots]) fs.mkdirSync(d, { recursive: true })
-  lib.gitProject(fx.alpha, { 'a.txt': 'one\ntwo\nthree\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(fx.alpha, { 'a.txt': 'one\ntwo\nthree\n', '.gitignore': '.combwork/\n' })
   lib.git(fx.alpha, ['branch', '-M', 'main'])
   lib.git(fx.alpha, ['branch', 'integration'])
   // The identity its commits use, in its git config: G12 (on in queueOptions) reads it from git each time (HI-2266).
@@ -134,7 +134,7 @@ async function liveToken(fx, live, where = () => true, stale = null) {
     const s = await live()
     if (!s?.runId || !where(s)) return null
     const launch = launches(fx).find((l) => l.opts['--mcp-config'] && path.basename(path.dirname(l.opts['--mcp-config'])) === s.runId)
-    const hive = launch ? read(launch.opts['--mcp-config'])?.mcpServers?.combwork : null
+    const hive = launch ? read(launch.opts['--mcp-config'])?.mcpServers?.hive : null
     const token = hive ? read(hive.env.CW_API_TOKEN_FILE)?.token : null
     return token && token !== stale ? { launch, token } : null
   }, HUNG_MS, 200)

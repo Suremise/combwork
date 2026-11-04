@@ -780,8 +780,8 @@ describe("a workspace's accounts", () => {
     const older = join(base, 'mig-older')
     const none = join(base, 'mig-none')
     const wsJson = (dir: string, connections: unknown): void => {
-      mkdirSync(join(dir, '.hive'), { recursive: true })
-      writeFileSync(join(dir, '.hive', 'workspace.json'), JSON.stringify({ version: 1, connections }))
+      mkdirSync(join(dir, '.combwork'), { recursive: true })
+      writeFileSync(join(dir, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, connections }))
     }
     wsJson(newer, { 'claude-code': { on: [one.id, two.id], default: two.id } })
     wsJson(older, { 'claude-code': { on: [one.id], default: one.id } })
@@ -849,7 +849,7 @@ describe("a workspace's accounts", () => {
     it('turning one on saves it in workspace.json, as its default, and remembers it for new workspaces', async () => {
       const a = await accounts.addAccount('claude-code', 'Here')
       await run(() => accounts.setAccountOn(a.id, true))
-      expect(JSON.parse(readFileSync(join(wsPath, '.hive', 'workspace.json'), 'utf8')).connections).toEqual({ 'claude-code': { on: [a.id] } })
+      expect(JSON.parse(readFileSync(join(wsPath, '.combwork', 'workspace.json'), 'utf8')).connections).toEqual({ 'claude-code': { on: [a.id] } })
       expect(config.get().lastUsedConnection?.['claude-code']).toBe(a.id)
       expect(accounts.newWorkspaceAccounts()).toEqual({ 'claude-code': { on: [a.id] } })
       await run(() => accounts.setAccountOn(a.id, false))
@@ -891,12 +891,12 @@ describe("a workspace's accounts", () => {
       // next reads the ids, in temp files and a .bak beside it, and a folder removed while that lands is found not empty
       // (HI-2060).
       const writeProject = (i: number, agent: { provider: string; connection?: string }): void => {
-        mkdirSync(join(folders[i], '.hive'), { recursive: true })
-        writeFileSync(join(folders[i], '.hive', 'project.json'), JSON.stringify({ version: 2, id: `p-2060000000${i}`, agents: [{ id: `a-${i}`, name: `Agent ${i}`, ...agent }] }))
+        mkdirSync(join(folders[i], '.combwork'), { recursive: true })
+        writeFileSync(join(folders[i], '.combwork', 'project.json'), JSON.stringify({ version: 2, id: `p-2060000000${i}`, agents: [{ id: `a-${i}`, name: `Agent ${i}`, ...agent }] }))
       }
       // Each project with a Claude Code agent of its own (HI-1871: only projects the connection would be used in count).
       const projectsNow = async (n: number): Promise<void> => {
-        // No refresh under way as a folder goes: its ensureProject makes folders in .hive (HI-2060).
+        // No refresh under way as a folder goes: its ensureProject makes folders in .combwork (HI-2060).
         await w.refreshesSettled()
         for (const [i, f] of folders.entries()) {
           if (i >= n) {

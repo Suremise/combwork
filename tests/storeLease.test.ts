@@ -42,7 +42,7 @@ let n = 0
 /** A new workspace folder with a project. */
 function workspace(): string {
   const ws = join(base, `ws-${++n}`)
-  mkdirSync(join(ws, 'proj', '.hive'), { recursive: true })
+  mkdirSync(join(ws, 'proj', '.combwork'), { recursive: true })
   return ws
 }
 /** Another window's workspace, to switch to (closing the one open). */
@@ -74,7 +74,7 @@ let w: ReturnType<typeof createWorkspaceService>
 
 describe("a store's save holds its own connection (#1383)", () => {
   beforeAll(() => {
-    mkdirSync(join(elsewhere, 'proj', '.hive'), { recursive: true })
+    mkdirSync(join(elsewhere, 'proj', '.combwork'), { recursive: true })
     mkdirSync(join(base, 'profile'), { recursive: true })
     w = createWorkspaceService()
   })
@@ -218,7 +218,7 @@ describe("a store's save holds its own connection (#1383)", () => {
   it("a session's last change after its window closed the workspace lands, its host not read this run, and leaves nothing open (#1381)", async () => {
     const ws = workspace()
     const proj = join(ws, 'proj')
-    writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, id: 'p-lease', agents: [] }))
+    writeFileSync(join(proj, '.combwork', 'project.json'), JSON.stringify({ version: 2, id: 'p-lease', agents: [] }))
     await w.open(ws)
     await w.open(elsewhere)
     expect(board.boardOpen(ws)).toBe(false)
@@ -236,9 +236,9 @@ describe("a store's save holds its own connection (#1383)", () => {
   it("a session's change whose host's file moves in as the window closes the workspace lands, and leaves nothing open (#1381)", async () => {
     const ws = workspace()
     const proj = join(ws, 'proj')
-    writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, id: 'p-move', agents: [] }))
+    writeFileSync(join(proj, '.combwork', 'project.json'), JSON.stringify({ version: 2, id: 'p-move', agents: [] }))
     // Its old file, moved in by the first change of this run.
-    writeFileSync(join(proj, '.hive', 'sessions.json'), JSON.stringify({ version: 1, sessions: [{ id: 's-old', agent: 'claude-code', name: 'Old', createdAt: at, lastActiveAt: at, archived: false }] }))
+    writeFileSync(join(proj, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: [{ id: 's-old', agent: 'claude-code', name: 'Old', createdAt: at, lastActiveAt: at, archived: false }] }))
     await w.open(ws)
     const g = gate()
     const reading = gate()
@@ -265,10 +265,10 @@ describe("a store's save holds its own connection (#1383)", () => {
   it("a session deleted while its workspace is closed stays deleted when its host's old file moves in at the next open (HI-1736)", async () => {
     const ws = workspace()
     const proj = join(ws, 'proj')
-    writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, id: 'p-deleted', agents: [] }))
+    writeFileSync(join(proj, '.combwork', 'project.json'), JSON.stringify({ version: 2, id: 'p-deleted', agents: [] }))
     // Its old file, not moved in yet: s-old (deleted below) and s-keep.
     const rec = (id: string) => ({ id, agent: 'claude-code', name: id, createdAt: at, lastActiveAt: at, archived: false })
-    writeFileSync(join(proj, '.hive', 'sessions.json'), JSON.stringify({ version: 1, sessions: [rec('s-old'), rec('s-keep')] }))
+    writeFileSync(join(proj, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: [rec('s-old'), rec('s-keep')] }))
     await w.open(ws)
     await w.open(elsewhere)
     expect(board.boardOpen(ws)).toBe(false)

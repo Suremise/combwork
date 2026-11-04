@@ -21,7 +21,7 @@ const CLI = path.join(__dirname, 'sandbox', 'compare-workspace.cjs')
 const scratch = (name: string) => ({ dir: tempDir(`sandbox-${name}-`) })
 
 function workspace(dir: string, { personas = ['planner'], skills = ['handover', 'my-own'] } = {}): string {
-  const h = path.join(dir, '.hive')
+  const h = path.join(dir, '.combwork')
   for (const d of ['personas', 'mcp', 'shared/conventions', 'shared/handovers', 'templates', 'tasks', ...skills.map(s => `skills/${s}`)]) fs.mkdirSync(path.join(h, d), { recursive: true })
   fs.writeFileSync(path.join(h, 'bundled.json'), JSON.stringify({ skills: { handover: {} }, personas: { planner: {} } }))
   fs.writeFileSync(path.join(h, 'workspace.json'), JSON.stringify({ mcp: { enabled: ['ollama'] } }))
@@ -65,7 +65,7 @@ test('the comparison lists what only this workspace has, by name, and reads no n
   fs.readFileSync = ((p: fs.PathOrFileDescriptor, ...a: [never]) => { read.push(String(p)); return orig(p, ...a) }) as typeof fs.readFileSync
   let inv
   try { inv = inventory(ws) } finally { fs.readFileSync = orig }
-  assert.deepStrictEqual(read.map(p => path.relative(ws, p)).sort(), [path.join('.hive', 'bundled.json'), path.join('.hive', 'workspace.json')])
+  assert.deepStrictEqual(read.map(p => path.relative(ws, p)).sort(), [path.join('.combwork', 'bundled.json'), path.join('.combwork', 'workspace.json')])
   assert.deepStrictEqual(inv.customSkills, ['my-own'])
   assert.deepStrictEqual(inv.projects.find((p: Json) => p.name === 'app'), { name: 'app', conventionFiles: ['CLAUDE.md'], conventionDirs: ['.claude', '.agents'], ownSkills: ['release-app'] })
   const r = report()
@@ -127,10 +127,10 @@ test('a workspace that is missing, not a folder, not a Hive workspace or unreada
   const noHive = path.join(s.dir, 'plain-folder')
   fs.mkdirSync(noHive)
   const broken = workspace(path.join(s.dir, 'broken'))
-  fs.rmSync(path.join(broken, '.hive', 'skills'), { recursive: true, force: true })
-  fs.writeFileSync(path.join(broken, '.hive', 'skills'), '') // a file where a folder must be: readdir fails (ENOTDIR)
+  fs.rmSync(path.join(broken, '.combwork', 'skills'), { recursive: true, force: true })
+  fs.writeFileSync(path.join(broken, '.combwork', 'skills'), '') // a file where a folder must be: readdir fails (ENOTDIR)
   const badJson = workspace(path.join(s.dir, 'badjson'))
-  fs.writeFileSync(path.join(badJson, '.hive', 'workspace.json'), '{not json')
+  fs.writeFileSync(path.join(badJson, '.combwork', 'workspace.json'), '{not json')
   for (const [ws, re] of <[string, RegExp][]>[[path.join(s.dir, 'nope'), /can't be read: ENOENT/], [file, /is not a folder/], [noHive, /not a Hive workspace/], [broken, /can't read .*skills: ENOTDIR/], [badJson, /isn't valid JSON/]]) {
     assert.throws(() => inventory(ws), re, ws)
     const out = cli(s, report(), ws)
@@ -139,6 +139,6 @@ test('a workspace that is missing, not a folder, not a Hive workspace or unreada
   }
   // A folder that simply doesn't exist yet (no templates) is empty, not an error.
   const ok = workspace(path.join(s.dir, 'ok'))
-  fs.rmSync(path.join(ok, '.hive', 'templates'), { recursive: true })
+  fs.rmSync(path.join(ok, '.combwork', 'templates'), { recursive: true })
   assert.strictEqual(inventory(ok).templates, 0)
 })

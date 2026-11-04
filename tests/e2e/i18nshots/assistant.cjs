@@ -94,7 +94,7 @@ const SHIPPED_MODES = ['coordinator', 'planner', 'qa-triager', 'release-manager'
 const modeName = (ctx, id) => ctx.page.locator(`.sidebar .mode-row[data-mode="${id}"] .label`).first().evaluate((el) => el.firstChild?.textContent ?? '')
 
 /** A mode file's own name (its front matter). */
-const fileName = (ctx, id) => /^name:\s*(.+)$/m.exec(fs.readFileSync(path.join(ctx.workspace, '.hive', 'modes', `${id}.md`), 'utf8'))?.[1].trim()
+const fileName = (ctx, id) => /^name:\s*(.+)$/m.exec(fs.readFileSync(path.join(ctx.workspace, '.combwork', 'modes', `${id}.md`), 'utf8'))?.[1].trim()
 
 /**
  * The Assistant view: what it has used, its modes (one of the user's own among them), its conversations. Under the

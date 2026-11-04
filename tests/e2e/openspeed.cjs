@@ -30,15 +30,15 @@ const logText = () => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8')
   for (const name of ['alpha', 'bravo', 'charlie', 'delta']) {
     const dir = path.join(ws, name)
     lib.gitProject(dir)
-    fs.mkdirSync(path.join(dir, '.hive'), { recursive: true })
-    fs.writeFileSync(path.join(dir, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: `a-${name}-1`, name: 'Coder' }, { id: `a-${name}-2`, name: 'Reviewer' }] }))
+    fs.mkdirSync(path.join(dir, '.combwork'), { recursive: true })
+    fs.writeFileSync(path.join(dir, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: `a-${name}-1`, name: 'Coder' }, { id: `a-${name}-2`, name: 'Reviewer' }] }))
   }
   const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47700) } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   try {
-    // Its first open sets it up (its .hive, the bundled skills and modes copied in): the timed open is an ordinary one.
+    // Its first open sets it up (its .combwork, the bundled skills and modes copied in): the timed open is an ordinary one.
     await lib.openWorkspace(inv, page, ws)
-    const manifest = path.join(ws, '.hive', 'bundled.json')
+    const manifest = path.join(ws, '.combwork', 'bundled.json')
     check('the first open brings its bundled skills and modes in, after it', !!(await lib.until(() => fs.existsSync(manifest), HUNG_MS)))
     await inv('workspace:close')
 
@@ -70,7 +70,7 @@ const logText = () => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8')
     const after = await lib.until(() => logText().slice(mark).match(/after opening ⁨?openspeed-ws⁩?: (.*)/)?.[1], HUNG_MS)
     check('what the open started is said once it has all ended, each part timed', !!after && /\d+ ms in all/.test(after), after ?? 'no line')
     check('…its bundled skills and modes among them', !!after && /its bundled skills and modes \d+ ms/.test(after), after ?? 'no line')
-    check('the open said its own parts too', /Opened workspace .* in \d+ ms: its \.hive folder and settings \d+ ms/.test(logText().slice(mark)))
+    check('the open said its own parts too', /Opened workspace .* in \d+ ms: its \.combwork folder and settings \d+ ms/.test(logText().slice(mark)))
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

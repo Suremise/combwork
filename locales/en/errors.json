@@ -132,16 +132,16 @@
     "description": "Refusal to open or save a file outside what Hive may touch."
   },
   "errors.hive.cantList": {
-    "defaultMessage": "Git couldn't list the files it tracks in .hive.",
-    "description": "Listing the files of .hive that git tracks failed. Keep \".hive\" as it is."
+    "defaultMessage": "Git couldn't list the files it tracks in .combwork.",
+    "description": "Listing the files of .combwork that git tracks failed. Keep \".combwork\" as it is."
   },
   "errors.hive.noRepo": {
-    "defaultMessage": "No git repository holds this project: exclude .hive in the version control or sync service you use.",
-    "description": "Exclude .hive from git: the project isn't in a git repository. Keep \".hive\" as it is."
+    "defaultMessage": "No git repository holds this project: exclude .combwork in the version control or sync service you use.",
+    "description": "Exclude .combwork from git: the project isn't in a git repository. Keep \".combwork\" as it is."
   },
   "errors.hive.notIgnored": {
-    "defaultMessage": "Git still doesn't ignore .hive here: a rule in a .gitignore (a line starting with !) may bring it back. Combwork doesn't edit .gitignore files.",
-    "description": "Exclude .hive from git: after excluding it, git still sees it. Keep \".hive\", \".gitignore\" and \"!\" as they are."
+    "defaultMessage": "Git still doesn't ignore .combwork here: a rule in a .gitignore (a line starting with !) may bring it back. Combwork doesn't edit .gitignore files.",
+    "description": "Exclude .combwork from git: after excluding it, git still sees it. Keep \".combwork\", \".gitignore\" and \"!\" as they are."
   },
   "errors.image.not": {
     "defaultMessage": "Not an image",

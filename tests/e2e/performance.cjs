@@ -44,19 +44,19 @@ const buckets = [
   bucket(hourStart(now - 5 * HOUR), { alpha: part([apiSeries('/v1/tasks', 'agent', 'ok', 20), apiSeries('/v1/tasks/:n', 'agent', 'server-error', 3, 300)], [mcpSeries('cw_list_tasks', 10, 600), mcpSeries('cw_read_task', 4, 2500)], [launch('claude-code', 2)], [toolList]) }),
   bucket(hourStart(now - 1 * HOUR), { alpha: part([apiSeries('/v1/tasks', 'agent', 'ok', 7)]), beta: part([apiSeries('/v1/tasks', 'agent', 'ok', 12)], [mcpSeries('cw_list_tasks', 2, 600)], [launch('codex', 1)]) }, part([apiSeries('/v1/tasks', 'api', 'ok', 5)]))
 ]
-fs.mkdirSync(path.join(ws, '.hive', 'metrics'), { recursive: true })
+fs.mkdirSync(path.join(ws, '.combwork', 'metrics'), { recursive: true })
 /** Claude Code sessions in a session host's backups (what Provider usage reads), each a request an hour ago. */
 const sessionsIn = (host, ids) => {
   const at = new Date(now - HOUR).toISOString()
-  fs.mkdirSync(path.join(host, '.hive', 'sessions'), { recursive: true })
+  fs.mkdirSync(path.join(host, '.combwork', 'sessions'), { recursive: true })
   for (const id of ids) {
     const lines = [{ type: 'user', timestamp: at, message: { role: 'user', content: 'Go' } }, { type: 'assistant', requestId: `${id}-r`, timestamp: at, message: { model: 'claude-opus-5-5', content: [{ type: 'text', text: 'Done.' }], usage: { input_tokens: 5, cache_read_input_tokens: 1000, cache_creation_input_tokens: 100, output_tokens: 40 } } }]
-    fs.writeFileSync(path.join(host, '.hive', 'sessions', `${id}.jsonl`), lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
+    fs.writeFileSync(path.join(host, '.combwork', 'sessions', `${id}.jsonl`), lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
   }
-  fs.writeFileSync(path.join(host, '.hive', 'sessions.json'), JSON.stringify({ version: 1, sessions: ids.map((id) => ({ id, agent: 'claude-code', name: id.slice(-4), createdAt: at, lastActiveAt: at, archived: false })) }))
+  fs.writeFileSync(path.join(host, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: ids.map((id) => ({ id, agent: 'claude-code', name: id.slice(-4), createdAt: at, lastActiveAt: at, archived: false })) }))
 }
 sessionsIn(path.join(ws, 'alpha'), ['66666666-aaaa-bbbb-cccc-000000000001', '66666666-aaaa-bbbb-cccc-000000000002'])
-sessionsIn(path.join(ws, '.hive', 'assistant'), ['66666666-aaaa-bbbb-cccc-000000000003'])
+sessionsIn(path.join(ws, '.combwork', 'assistant'), ['66666666-aaaa-bbbb-cccc-000000000003'])
 // One loss Hive couldn't attribute to a project (its bookkeeping was full), in alpha's hour.
 Object.assign(buckets[1], { dropped: 1, droppedBy: { '\u0000untracked': 1 } })
 // Observed: around the older work, then the last day with a 4-hour gap (Hive closed) 10 to 6 hours ago.
@@ -65,7 +65,7 @@ const observed = [
   [now - 26 * HOUR, now - 10 * HOUR],
   [now - 6 * HOUR, now - 60_000]
 ]
-fs.writeFileSync(path.join(ws, '.hive', 'metrics', 'metrics.json'), JSON.stringify({ version: 1, buckets, observed, evictedThrough: now - 5 * 24 * HOUR }))
+fs.writeFileSync(path.join(ws, '.combwork', 'metrics', 'metrics.json'), JSON.stringify({ version: 1, buckets, observed, evictedThrough: now - 5 * 24 * HOUR }))
 
 let failed = 0
 const check = (name, ok, extra = '') => {

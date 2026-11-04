@@ -30,8 +30,8 @@ afterAll(async () => {
 describe('the board on a real board’s copy', () => {
   it.skipIf(!source)('reads and writes, timed', { timeout: 600_000 }, async () => {
     const ws = join(base, 'ws')
-    mkdirSync(join(ws, '.hive'), { recursive: true })
-    const file = join(ws, '.hive', 'hive.db')
+    mkdirSync(join(ws, '.combwork'), { recursive: true })
+    const file = join(ws, '.combwork', 'hive.db')
     copyFileSync(source!, file)
     if (existsSync(`${source}-wal`)) copyFileSync(`${source}-wal`, `${file}-wal`)
     const raw = new DatabaseSync(file)

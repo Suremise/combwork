@@ -4,7 +4,7 @@
   "mcp.add.message": "Les serveurs de l’espace de travail pas encore ajoutés ici. Les sessions démarrées à partir de maintenant reçoivent celui que tu ajoutes.",
   "mcp.add.title": "Ajouter un serveur à {project}",
   "mcp.add.titleAssistant": "Ajouter un serveur pour l’Assistant",
-  "mcp.addFile.messageAdded": "Ajoute {file} à l’espace de travail (.hive/mcp){files, plural, =0 {} one {, avec son fichier dans un dossier à lui} many {, avec ses # fichiers dans un dossier à lui} other {, avec ses # fichiers dans un dossier à lui}}, ajouté encore à aucun projet. Ajoute-le là où il doit tourner : l’onglet MCP d’un projet, la vue de l’Assistant ou Ajouter à… ici. Il exécute :",
+  "mcp.addFile.messageAdded": "Ajoute {file} à l’espace de travail (.combwork/mcp){files, plural, =0 {} one {, avec son fichier dans un dossier à lui} many {, avec ses # fichiers dans un dossier à lui} other {, avec ses # fichiers dans un dossier à lui}}, ajouté encore à aucun projet. Ajoute-le là où il doit tourner : l’onglet MCP d’un projet, la vue de l’Assistant ou Ajouter à… ici. Il exécute :",
   "mcp.addFile.replaceDetailAdded": "Remplacer place l’ancien (et le dossier d’un serveur ajouté depuis un .zip) dans la Corbeille et ajoute celui-ci à aucun projet pour l’instant : les projets et l’Assistant qui avaient l’ancien le perdent. Sinon, choisis un autre nom.",
   "mcp.catalog.allSources": "Toutes les sources",
   "mcp.catalog.badName": "Les noms de serveur peuvent contenir des lettres, des chiffres, « - » et « _ » (64 caractères au plus). « hive » est réservé.",

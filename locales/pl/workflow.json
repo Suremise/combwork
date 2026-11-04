@@ -153,7 +153,7 @@
   "workflow.option.dependenciesDone.desc": "Karta, która czeka na inne, nie może wystartować, dopóki ich praca nie zostanie włączona.",
   "workflow.option.dependenciesDone.none": "Karta startuje dopiero, gdy karty, na które czeka, są gotowe",
   "workflow.option.dependenciesDone.title": "Karta startuje dopiero, gdy karty, na które czeka, są scalone",
-  "workflow.option.excluded.desc": "Cały folder projektu, z wyjątkiem tych folderów i plików (zawsze .hive).",
+  "workflow.option.excluded.desc": "Cały folder projektu, z wyjątkiem tych folderów i plików (zawsze .combwork).",
   "workflow.option.excluded.title": "Co jest wynikiem pracy",
   "workflow.option.fileLocks.desc": "Co się dzieje, gdy agent próbuje edytować plik, który edytuje inny agent w tym samym folderze.",
   "workflow.option.fileLocks.title": "Blokady plików",

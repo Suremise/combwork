@@ -81,7 +81,7 @@ export function AssistantSidePanel() {
                 <>
                   <IconButton icon="add" title={tr(M.newMode)} onClick={() => void createMode()} />
                   <IconButton icon="refresh" title={tr(M.refresh)} onClick={() => set((s) => ({ modesVersion: s.modesVersion + 1 }))} />
-                  <IconButton icon="folder-opened" title={tr(M.openFolder)} onClick={() => void call('app:openPath', `${wsPath}\\.hive\\modes`)} />
+                  <IconButton icon="folder-opened" title={tr(M.openFolder)} onClick={() => void call('app:openPath', `${wsPath}\\.combwork\\modes`)} />
                 </>
               }
             >

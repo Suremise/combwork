@@ -29,11 +29,11 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(alpha)
   // A Git project that sets no workflow option itself: it inherits every one.
-  fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], workflow: { platform: 'git', preset: null, options: {} }, loopRounds: 8, fileLocks: 'warn', loopWakes: true }))
+  fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], workflow: { platform: 'git', preset: null, options: {} }, loopRounds: 8, fileLocks: 'warn', loopWakes: true }))
   // Saved by a build from before HI-1766: the workspace's Card loop wait (3 h); the project's own rounds and file locks above.
-  fs.mkdirSync(path.join(ws, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(ws, '.hive', 'workspace.json'), JSON.stringify({ loops: { waitHours: 3 } }))
+  fs.mkdirSync(path.join(ws, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(ws, '.combwork', 'workspace.json'), JSON.stringify({ loops: { waitHours: 3 } }))
 
   const { app, page } = await lib.launch({ userData, viewport: { width: 1400, height: 950 } })
   try {
@@ -41,7 +41,7 @@ const check = (name, ok, extra = '') => {
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
     const text = (loc) => loc.innerText().catch(() => '')
     await lib.openWorkspace(inv, page, ws)
-    const wsJson = () => JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'workspace.json'), 'utf8'))
+    const wsJson = () => JSON.parse(fs.readFileSync(path.join(ws, '.combwork', 'workspace.json'), 'utf8'))
     const shots = async (name, target) => {
       // The toasts of earlier saves dismissed, and the pointer off the rows.
       while ((await page.locator('.toast').count()) > 0) await page.locator('.toast').first().locator('button').last().click()
@@ -68,7 +68,7 @@ const check = (name, ok, extra = '') => {
     const before = await startCard('Before the default')
     check('a card started before the change has its ruleset', !!before)
     // A running lane of alpha's, as the card-loop skill registers one (lanes.ts reads its table each time).
-    const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { timeout: 5000 })
+    const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { timeout: 5000 })
     try {
       const at = new Date().toISOString()
       const next = await inv('tasks:create', { title: 'Next in the lane', project: 'alpha' })

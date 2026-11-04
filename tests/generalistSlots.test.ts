@@ -30,14 +30,14 @@ function writeProject(): void {
     { id: 'g1', name: 'G1', provider: 'claude-code', workflowRole: 'generalist' },
     { id: 'r1', name: 'R1', provider: 'claude-code', workflowRole: 'reviewer' }
   ]
-  writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id: projectId, agents }))
+  writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id: projectId, agents }))
 }
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(ws, fn)
 
 beforeAll(async () => {
   gitRepo(project)
-  commit(project, { '.gitignore': '.hive/\n', 'a.txt': 'a\n' }, 'first')
-  mkdirSync(join(project, '.hive'), { recursive: true })
+  commit(project, { '.gitignore': '.combwork/\n', 'a.txt': 'a\n' }, 'first')
+  mkdirSync(join(project, '.combwork'), { recursive: true })
   writeProject()
   await ws.open(wsPath)
   projectId = (await ws.projectConfig(project)).id ?? 'p1'

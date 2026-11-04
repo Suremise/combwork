@@ -333,7 +333,7 @@
   "project.settings.offLower": "关闭",
   "project.settings.on": "开启",
   "project.settings.onLower": "开启",
-  "project.settings.openHive": "打开 .hive 文件夹",
+  "project.settings.openHive": "打开 .combwork 文件夹",
   "project.settings.overrides": "覆盖了全局默认值",
   "project.settings.reset": "重置",
   "project.settings.resetButton": "恢复默认设置",

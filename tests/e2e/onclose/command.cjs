@@ -15,10 +15,10 @@ const [marker, label, reason, workspace, mode = 'quick'] = process.argv.slice(2)
 function check() {
   const out = { label, reason, at: Date.now() }
   if (workspace && workspace !== '-') {
-    const db = path.join(workspace, '.hive', 'hive.db')
+    const db = path.join(workspace, '.combwork', 'hive.db')
     const wal = `${db}-wal`
     out.walLeft = fs.existsSync(wal) ? fs.statSync(wal).size : 0
-    const copy = `${marker}.hive.db`
+    const copy = `${marker}.combwork.db`
     fs.copyFileSync(db, copy)
     const { DatabaseSync } = require('node:sqlite')
     const c = new DatabaseSync(copy)

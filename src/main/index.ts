@@ -41,7 +41,7 @@ import { chooseProfile, choiceLine, setProfileChoices } from './profileFolders'
 import { syncLoginItemAtStart } from './loginItem'
 import { startProfileNotices } from './profileNotices'
 import { PROVIDERS, dangerModes, labelList, projectProviderConfig, providerSettings } from '../shared/providers'
-import { projectAgents } from '../shared/defaults'
+import { HIVE_DIR, projectAgents } from '../shared/defaults'
 import { setDateStyle } from '../shared/dates'
 import { SERVABLE_EXT, servableType, unwatchAll } from './files'
 import { movedAttachment } from './attachmentsFolder'
@@ -134,6 +134,7 @@ import { startRetryNotice } from './retryNotice'
 import { chooseStartLanguage, languageInfo, startI18n, switchLanguage } from './i18n'
 import { fmt, msg, tr } from '../shared/i18n'
 import { clearSavedPauses } from './teamPause'
+import { followMovedLink } from './combworkMove'
 
 const log = createLogger('main')
 let quitting = false
@@ -942,9 +943,9 @@ function showCorrupt(file: string, aside: string, restored: boolean): void {
 onBoardNotice((path, n) => {
   if (n.kind === 'imported') {
     if (!n.damaged.length) return
-    toast('warning', tr(msg({ id: 'main.board.damagedTitle', defaultMessage: "{n, plural, one {# card file couldn't be read} other {# card files couldn't be read}}", description: "A notice as Hive moved the board's cards into its database: some card files weren't valid. {n} is how many." }), { n: n.damaged.length }), tr(msg({ id: 'main.board.damagedBody', defaultMessage: '{files} stayed out of the board. They are kept in {folder}.', description: "The notice about card files Hive couldn't read as it moved the board into its database: {files} lists them, {folder} is where they are kept." }), { files: fmt.list(n.damaged.slice(0, 5), 'unit'), folder: join(path, '.hive', n.folder) }), undefined, 'board')
+    toast('warning', tr(msg({ id: 'main.board.damagedTitle', defaultMessage: "{n, plural, one {# card file couldn't be read} other {# card files couldn't be read}}", description: "A notice as Hive moved the board's cards into its database: some card files weren't valid. {n} is how many." }), { n: n.damaged.length }), tr(msg({ id: 'main.board.damagedBody', defaultMessage: '{files} stayed out of the board. They are kept in {folder}.', description: "The notice about card files Hive couldn't read as it moved the board into its database: {files} lists them, {folder} is where they are kept." }), { files: fmt.list(n.damaged.slice(0, 5), 'unit'), folder: join(path, HIVE_DIR, n.folder) }), undefined, 'board')
   } else {
-    toast('warning', tr(msg({ id: 'main.board.foundTitle', defaultMessage: '{n, plural, one {# card made by an older Combwork was found: review it} other {# cards made by an older Combwork were found: review them}}', description: "A notice: this workspace was opened in an older Hive meanwhile, and it saved cards; they weren't added to the board, but kept for the user to review. {n} is how many." }), { n: n.cards }), tr(msg({ id: 'main.board.foundBody', defaultMessage: 'They are kept, unchanged, in {folder}. Nothing on the board was changed for them: Review… adds each to the board or discards it.', description: 'The notice about cards an older Hive saved: {folder} is the folder where they are kept.' }), { folder: join(path, '.hive', n.folder) }), [{ label: tr(msg({ id: 'main.board.review', defaultMessage: 'Review…', description: "A button on the notice about cards an older Hive saved: opens a dialog listing them, to add each to the board or discard it." })), command: 'task.reviewSetAside' }], 'board')
+    toast('warning', tr(msg({ id: 'main.board.foundTitle', defaultMessage: '{n, plural, one {# card made by an older Combwork was found: review it} other {# cards made by an older Combwork were found: review them}}', description: "A notice: this workspace was opened in an older Hive meanwhile, and it saved cards; they weren't added to the board, but kept for the user to review. {n} is how many." }), { n: n.cards }), tr(msg({ id: 'main.board.foundBody', defaultMessage: 'They are kept, unchanged, in {folder}. Nothing on the board was changed for them: Review… adds each to the board or discards it.', description: 'The notice about cards an older Hive saved: {folder} is the folder where they are kept.' }), { folder: join(path, HIVE_DIR, n.folder) }), [{ label: tr(msg({ id: 'main.board.review', defaultMessage: 'Review…', description: "A button on the notice about cards an older Hive saved: opens a dialog listing them, to add each to the board or discard it." })), command: 'task.reviewSetAside' }], 'board')
   }
 })
 
@@ -977,8 +978,9 @@ app.whenReady().then(async () => {
     if (!SERVABLE_EXT.test(p) || insideArchive(p) || !workspace.isAllowedPath(p)) return new Response('Not found', { status: 404 }) // i18n-ignore: an HTTP reply to the window, never shown
     // Read with original-fs, never Electron's file: loader, which would open an archive on the path and keep it (#246, #261).
     let st = await stat(p).catch(() => null)
-    // A path into the old .hive/images serves the file where it is now, in .hive/attachments (#387).
-    const moved = st ? null : await movedAttachment(p)
+    // A path into a .hive folder that moved serves the file in .combwork (HI-2462), and one into the old images folder
+    // the file where it is now, in attachments (#387).
+    const moved = st ? null : await followMovedLink(p, openWorkspaces().flatMap((w) => (w.path ? [w.path] : [])), movedAttachment)
     if (moved && workspace.isAllowedPath(moved)) {
       st = await stat(moved).catch(() => null)
       p = moved

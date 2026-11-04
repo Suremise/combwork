@@ -1,5 +1,5 @@
 // Initialise repository (#701): a project folder becomes a git repository on main with a first commit, against real
-// git. .hive is excluded before anything is staged, so it is never in the first commit, and a .gitignore that brings it
+// git. .combwork is excluded before anything is staged, so it is never in the first commit, and a .gitignore that brings it
 // back stops the run before anything is staged; the identity is asked for when git has none and saved to that
 // repository's config only, never the global one; a starter .gitignore never replaces the folder's own; a folder inside
 // another repository needs the user's say, and one another version control system keeps is refused. Each test makes its
@@ -49,11 +49,11 @@ const gitOr = (cwd: string, ...a: string[]): string | null => {
 const committed = (cwd: string): string[] => git(cwd, 'ls-tree', '-r', '--name-only', 'HEAD').split('\n').filter(Boolean)
 
 let base = ''
-/** A new project folder (in the workspace) with .hive and its sessions file in it, and these files. */
+/** A new project folder (in the workspace) with .combwork and its sessions file in it, and these files. */
 function project(name: string, files: Record<string, string> = {}, under = base): string {
   const dir = join(under, name)
-  mkdirSync(join(dir, '.hive'), { recursive: true })
-  writeFileSync(join(dir, '.hive', 'sessions.json'), '{}\n')
+  mkdirSync(join(dir, '.combwork'), { recursive: true })
+  writeFileSync(join(dir, '.combwork', 'sessions.json'), '{}\n')
   for (const [f, text] of Object.entries(files)) {
     mkdirSync(join(dir, f, '..'), { recursive: true })
     writeFileSync(join(dir, f), text)
@@ -88,34 +88,34 @@ function globalIdentity(): string {
 }
 
 describe('initialising', () => {
-  it('makes an empty folder a repository on main with an empty first commit, .hive kept out of it, and refreshes', async () => {
+  it('makes an empty folder a repository on main with an empty first commit, .combwork kept out of it, and refreshes', async () => {
     globalIdentity()
     const p = project('empty')
     const check = await initCheck(p)
     expect(check).toMatchObject({ refused: null, empty: true, hasGitignore: false, identity: { name: 'Global Person', email: 'global@example.com' } })
     expect(check.parentRepo).toBeUndefined()
     const said = await initRepo(p, { gitignore: 'none' })
-    expect(said).toBe('Initialised a git repository on main and made an empty first commit. .hive stays out of git. Agents can work in worktrees now.')
+    expect(said).toBe('Initialised a git repository on main and made an empty first commit. .combwork stays out of git. Agents can work in worktrees now.')
     expect(git(p, 'symbolic-ref', '--short', 'HEAD')).toBe('main')
     expect(committed(p)).toEqual([])
     expect(git(p, 'log', '--format=%s|%an|%ae')).toBe('Initial commit|Global Person|global@example.com')
-    expect(readFileSync(join(p, '.git', 'info', 'exclude'), 'utf8')).toMatch(/^\/\.hive\/$/m)
-    // .hive is ignored, not just untracked: git status doesn't list it.
+    expect(readFileSync(join(p, '.git', 'info', 'exclude'), 'utf8')).toMatch(/^\/\.combwork\/$/m)
+    // .combwork is ignored, not just untracked: git status doesn't list it.
     expect(git(p, 'status', '--porcelain', '--untracked-files=all')).toBe('')
     // The global identity was used, not copied into the repository.
     expect(gitOr(p, 'config', '--local', 'user.name')).toBeNull()
     expect(refresh).toHaveBeenCalledTimes(1)
   })
 
-  it('commits the folder with a starter .gitignore, never .hive nor what the template ignores, and keeps Hive skill copies out', async () => {
+  it('commits the folder with a starter .gitignore, never .combwork nor what the template ignores, and keeps Hive skill copies out', async () => {
     globalIdentity()
     const p = project('node-app', { 'package.json': '{}\n', 'src/index.js': 'x\n', 'node_modules/a/index.js': 'y\n', 'debug.log': 'z\n', '.agents/skills/hive-handover/SKILL.md': 'copy\n' })
     expect((await initCheck(p)).empty).toBe(false)
     const said = await initRepo(p, { gitignore: 'node' })
-    expect(said).toBe('Initialised a git repository on main, added a Node .gitignore, and committed 3 files. .hive stays out of git. Agents can work in worktrees now.')
+    expect(said).toBe('Initialised a git repository on main, added a Node .gitignore, and committed 3 files. .combwork stays out of git. Agents can work in worktrees now.')
     expect(committed(p).sort()).toEqual(['.gitignore', 'package.json', 'src/index.js'])
     expect(readFileSync(join(p, '.gitignore'), 'utf8')).toBe(gitignoreText('node'))
-    expect(gitignoreText('node')).not.toMatch(/\.hive/)
+    expect(gitignoreText('node')).not.toMatch(/\.combwork/)
   })
 
   it('keeps the folder\'s own .gitignore, whatever starter one was chosen', async () => {
@@ -129,12 +129,12 @@ describe('initialising', () => {
     expect(committed(p).sort()).toEqual(['.gitignore', 'a.txt'])
   })
 
-  it('excludes .hive before anything is staged: a .gitignore that brings it back stops it with nothing committed, saying so', async () => {
+  it('excludes .combwork before anything is staged: a .gitignore that brings it back stops it with nothing committed, saying so', async () => {
     globalIdentity()
-    const p = project('unignored', { '.gitignore': '!/.hive/\n', 'a.txt': 'a\n' })
-    await expect(initRepo(p, { gitignore: 'none' })).rejects.toThrow(/^Initialised a git repository on main, but git still doesn't ignore \.hive here .*nothing was committed/)
+    const p = project('unignored', { '.gitignore': '!/.combwork/\n', 'a.txt': 'a\n' })
+    await expect(initRepo(p, { gitignore: 'none' })).rejects.toThrow(/^Initialised a git repository on main, but git still doesn't ignore \.combwork here .*nothing was committed/)
     // The exclude line is there, and nothing was staged or committed.
-    expect(readFileSync(join(p, '.git', 'info', 'exclude'), 'utf8')).toMatch(/^\/\.hive\/$/m)
+    expect(readFileSync(join(p, '.git', 'info', 'exclude'), 'utf8')).toMatch(/^\/\.combwork\/$/m)
     expect(gitOr(p, 'rev-parse', '--verify', '-q', 'HEAD')).toBeNull()
     expect(git(p, 'diff', '--cached', '--name-only')).toBe('')
   })
@@ -239,7 +239,7 @@ describe('the commit identity', () => {
     await expect(initRepo(p, { gitignore: 'minimal', nested: true })).rejects.toThrow("Initialised a git repository on main, but git has no name or email to make the first commit as here: enter them and choose Make first commit")
     expect(gitOr(p, 'rev-parse', '--verify', '-q', 'HEAD')).toBeNull()
     expect(existsSync(join(p, '.gitignore'))).toBe(false)
-    expect(readFileSync(join(p, '.git', 'info', 'exclude'), 'utf8')).toMatch(/^\/\.hive\/$/m)
+    expect(readFileSync(join(p, '.git', 'info', 'exclude'), 'utf8')).toMatch(/^\/\.combwork\/$/m)
     // Asked again, it goes on from there: the identity read from the repository itself, so both are needed now.
     const again = await initCheck(p)
     expect(again).toMatchObject({ refused: null, resume: true, identity: {} })
@@ -248,7 +248,7 @@ describe('the commit identity', () => {
     expect(initProblem(again, { name: '', email: '' })).toBe('Enter the name your commits are made as')
     expect(initAbout('child', again)).toMatch(/^child is a git repository with no commits yet/)
     const said = await initRepo(p, { gitignore: 'minimal', name: 'Child Person', email: 'child@example.com' })
-    expect(said).toBe("Set this repository's commit identity, added a minimal .gitignore, and committed 2 files. .hive stays out of git. Agents can work in worktrees now.")
+    expect(said).toBe("Set this repository's commit identity, added a minimal .gitignore, and committed 2 files. .combwork stays out of git. Agents can work in worktrees now.")
     expect(git(p, 'log', '--format=%an <%ae>')).toBe('Child Person <child@example.com>')
     expect(committed(p).sort()).toEqual(['.gitignore', 'a.txt'])
     expect((await initCheck(p)).refused).toBe('This folder is a git repository already.')
@@ -261,7 +261,7 @@ describe('the commit identity', () => {
     execFileSync('git', ['config', 'user.email', 'hand@example.com'], { cwd: p })
     const check = await initCheck(p)
     expect(check).toMatchObject({ refused: null, resume: true, identity: { name: 'Hand Person', email: 'hand@example.com' } })
-    expect(await initRepo(p, { gitignore: 'none' })).toBe('Committed 1 file. .hive stays out of git. Agents can work in worktrees now.')
+    expect(await initRepo(p, { gitignore: 'none' })).toBe('Committed 1 file. .combwork stays out of git. Agents can work in worktrees now.')
     expect(git(p, 'symbolic-ref', '--short', 'HEAD')).toBe('trunk')
     expect(committed(p)).toEqual(['a.txt'])
   })
@@ -331,12 +331,12 @@ describe("its refusals (#881): English in the log, the window's language in the 
 
   it('a run that stops part way is a HiveError: its message English, shown in German, the steps capitalised in both', async () => {
     globalIdentity()
-    const p = project('unignored-de', { '.gitignore': '!/.hive/\n', 'a.txt': 'a\n' })
+    const p = project('unignored-de', { '.gitignore': '!/.combwork/\n', 'a.txt': 'a\n' })
     setLanguage('de', german())
     const e = await initRepo(p, { gitignore: 'none' }).catch((x: unknown) => x)
     expect(e).toBeInstanceOf(HiveError)
-    expect((e as Error).message).toMatch(/^Initialised a git repository on main, but git still doesn't ignore \.hive here/)
-    expect(shownError(e)).toMatch(/^Ein Git-Repository auf main initialisiert, aber git ignoriert \.hive hier noch immer nicht/)
+    expect((e as Error).message).toMatch(/^Initialised a git repository on main, but git still doesn't ignore \.combwork here/)
+    expect(shownError(e)).toMatch(/^Ein Git-Repository auf main initialisiert, aber git ignoriert \.combwork hier noch immer nicht/)
   })
 
   it('a failure after the starter .gitignore: its name is text too, so the English stays English and the window follows a language change', async () => {

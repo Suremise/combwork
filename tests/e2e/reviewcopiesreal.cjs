@@ -80,7 +80,7 @@ const namingCopies = () => {
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`, copilotDir]) fs.rmSync(d, { recursive: true, force: true })
   fs.rmSync(apiLog, { force: true })
-  lib.gitProject(alpha, { 'test.js': "require('fs').writeFileSync(require('path').join(__dirname, 'ran.txt'), 'ran in ' + __dirname)\n", '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'test.js': "require('fs').writeFileSync(require('path').join(__dirname, 'ran.txt'), 'ran in ' + __dirname)\n", '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   if (!parts.codex) lib.trustForCodex(alpha)
   lib.enableProviders(userData, ['claude-code', 'codex', 'copilot'])

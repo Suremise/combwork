@@ -46,8 +46,8 @@ let k = 0
 async function open(): Promise<{ w: WS; card: number }> {
   const path = join(base, `ws-${++k}`)
   for (const [p, id] of [['alpha', 'b1'], ['beta', 'c1']]) {
-    mkdirSync(join(path, p, '.hive'), { recursive: true })
-    writeFileSync(join(path, p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id, name: id.toUpperCase() }] }))
+    mkdirSync(join(path, p, '.combwork'), { recursive: true })
+    writeFileSync(join(path, p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id, name: id.toUpperCase() }] }))
   }
   const w = createWorkspaceService()
   await w.open(path)

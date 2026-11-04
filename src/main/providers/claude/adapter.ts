@@ -583,7 +583,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     args.push('--plugin-dir', plugin)
     // Folders it may also work in (#1439: a reviewer's review copies), within its permission mode. --add-dir takes several
     // (2.1.309), so an option always follows it here, never the first prompt. Its launch plugin too, where that is outside
-    // its folder (HI-2274: a slot's or worktree's session, the plugin in the project's .hive): Claude Code asks before it
+    // its folder (HI-2274: a slot's or worktree's session, the plugin in the project's .combwork): Claude Code asks before it
     // reads a skill's reference file there (acceptEdits, 2.1.309), and a session nobody watches waits on that for good.
     const added = [...(ctx.extraDirs ?? []), ...(containsPlace(ctx.cwd, plugin) ? [] : [plugin])]
     for (const d of added) args.push('--add-dir', d)

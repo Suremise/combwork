@@ -100,12 +100,12 @@
     "description": "Beside a session's name in the Attachments tab: how many, and the days they were added. {from} and {to} are days, such as \"9 Oct\", \"yesterday\" or \"today\"; {days} is one when they were all added on one day."
   },
   "files.attachments.info": {
-    "defaultMessage": "Kept in the project's .hive/attachments. Drag one onto the Session tab to send it again; click a session's name to read it.",
-    "description": "The (i) beside a project's Attachments heading. Keep .hive/attachments as it is."
+    "defaultMessage": "Kept in the project's .combwork/attachments. Drag one onto the Session tab to send it again; click a session's name to read it.",
+    "description": "The (i) beside a project's Attachments heading. Keep .combwork/attachments as it is."
   },
   "files.attachments.infoAssistant": {
-    "defaultMessage": "Kept in the Assistant's home, .hive/attachments. Click a conversation's name to read it.",
-    "description": "The (i) beside the Hive Assistant's Attachments heading. Keep .hive/attachments as it is."
+    "defaultMessage": "Kept in the Assistant's home, .combwork/attachments. Click a conversation's name to read it.",
+    "description": "The (i) beside the Hive Assistant's Attachments heading. Keep .combwork/attachments as it is."
   },
   "files.attachments.kind.image": {
     "defaultMessage": "Images",

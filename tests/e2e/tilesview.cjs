@@ -316,7 +316,7 @@ const check = (name, ok, extra = '') => {
     // --- Reordering (#993), Same as panes: tiles drag like pane headers, and the panes follow.
     const saved = () => {
       try {
-        return JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8')).agents.map((a) => a.name).join()
+        return JSON.parse(fs.readFileSync(path.join(alpha, '.combwork', 'project.json'), 'utf8')).agents.map((a) => a.name).join()
       } catch {
         return '' // being written
       }

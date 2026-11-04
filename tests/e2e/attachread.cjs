@@ -1,5 +1,5 @@
 // A reviewer in a review copy reads the builder's attached files through Hive (HI-1751: HR2, a Codex reviewer, couldn't
-// read HI-1702's evidence: the document tools refuse .hive, and it rightly didn't go round Hive to the files). A fake
+// read HI-1702's evidence: the document tools refuse .combwork, and it rightly didn't go round Hive to the files). A fake
 // Claude Code builder (B1) attaches a probe, its results (over a page long, a character of several bytes at the page's
 // end) and a screenshot to its card, and submits; a fake Codex reviewer (R1) and a fake Claude Code one (E1, either) each
 // start a review, which leases each a review copy, and call cw_read_attachment through their launch's own hive MCP
@@ -40,9 +40,9 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
   for (const d of [userData, ws, `${ws}.worktrees`, claudeHome, codexHome]) fs.rmSync(d, { recursive: true, force: true })
   for (const d of [claudeHome, codexHome]) fs.mkdirSync(d, { recursive: true })
   fs.writeFileSync(path.join(codexHome, 'config.toml'), '[windows]\nsandbox = "unelevated"\n')
-  lib.gitProject(alpha, { 'a.ts': 'export const a = 1\n', '.gitignore': '.hive/\nevidence/\n' })
+  lib.gitProject(alpha, { 'a.ts': 'export const a = 1\n', '.gitignore': '.combwork/\nevidence/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
-  lib.gitProject(beta, { 'b.ts': 'export const b = 1\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(beta, { 'b.ts': 'export const b = 1\n', '.gitignore': '.combwork/\n' })
   const evidence = path.join(alpha, 'evidence')
   fs.mkdirSync(evidence, { recursive: true })
   fs.writeFileSync(path.join(evidence, 'probe.cjs'), probe)
@@ -168,7 +168,7 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
     // The 4-byte character across the page's end: the first page stops before it, the second starts with it.
     check('…and the results in pages from the offset each names, from 0 to its size, each its bytes (a 4-byte character at the page end starting the second)', r1Results.ok && r1Results.ranges.length >= 2 && r1Results.ranges[1].from === PAGE - 2 && r1Results.ranges[1].starts.startsWith('😀run 1'), JSON.stringify(r1Results))
     const shot = await ask(alpha, r1.id, { card: a, name: 'shot.png' })
-    check('…and the screenshot by its path, to open with its own file reading', /^shot\.png: an image \(12 bytes\)\. Open it with your own file reading: .*[\\/]\.hive[\\/]attachments[\\/]cards[\\/]\d+[\\/][^\\/]*shot\.png$/.test(shot ?? '') && fs.readFileSync(shot.split('file reading: ')[1]).equals(png), shot)
+    check('…and the screenshot by its path, to open with its own file reading', /^shot\.png: an image \(12 bytes\)\. Open it with your own file reading: .*[\\/]\.combwork[\\/]attachments[\\/]cards[\\/]\d+[\\/][^\\/]*shot\.png$/.test(shot ?? '') && fs.readFileSync(shot.split('file reading: ')[1]).equals(png), shot)
 
     // --- E1 (Claude Code, either) starts its review of C: a review copy; reads C's probe, and A's as a project agent may.
     const e1Token = JSON.parse(fs.readFileSync(JSON.parse(fs.readFileSync((await until(async () => {

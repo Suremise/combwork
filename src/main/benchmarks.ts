@@ -11,10 +11,11 @@ import { errorText, hiveError } from './hiveError'
 import type { WorkspaceService } from './workspace'
 import { ownerOfName } from './projectNames'
 import { existsSync } from 'original-fs'
+import { HIVE_DIR } from '../shared/defaults'
 
 /**
  * Kept comparisons (#117): scenario benchmarks and Performance exports a user imported (or kept from the page), each a
- * validated, normalised artifact in the workspace's `.hive/metrics/benchmarks` (git-ignored with the metrics), at most
+ * validated, normalised artifact in the workspace's `.combwork/metrics/benchmarks` (git-ignored with the metrics), at most
  * BENCHMARK_LIMITS.kept: when full, the oldest unpinned one goes, once the new one is safely kept. Each scope (the whole
  * workspace, its own work, a project) has its own list and remembers its chosen baseline and run; a project's page sees
  * only its own project's.
@@ -86,7 +87,7 @@ const M = {
 /** The context of a workspace now (synchronously: call it before awaiting anything). */
 export function benchContext(w: WorkspaceService): BenchContext {
   if (!w.path || w.lifetime.aborted) throw hiveError(msg({ id: 'service.benchmarks.noWorkspace', defaultMessage: 'No workspace is open.', description: "An error on the Performance page: kept comparisons need a workspace open." }), undefined, { kind: 'conflict' })
-  return { dir: join(w.path, '.hive', 'metrics', 'benchmarks'), lifetime: w.lifetime, workspacePath: w.path, idOf: (p) => w.projectIdsNow().byPath.get(join(w.path!, p).toLowerCase()) ?? null, ownerOf: (p) => ownerOfName(w, p) }
+  return { dir: join(w.path, HIVE_DIR, 'metrics', 'benchmarks'), lifetime: w.lifetime, workspacePath: w.path, idOf: (p) => w.projectIdsNow().byPath.get(join(w.path!, p).toLowerCase()) ?? null, ownerOf: (p) => ownerOfName(w, p) }
 }
 
 /** Refuses work whose workspace closed or switched since it started. */

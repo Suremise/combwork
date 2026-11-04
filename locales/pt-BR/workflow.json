@@ -153,7 +153,7 @@
   "workflow.option.dependenciesDone.desc": "Um cartão que aguarda outros não pode começar antes que o trabalho deles esteja incorporado.",
   "workflow.option.dependenciesDone.none": "Os cartões só começam quando os cartões que aguardam estão concluídos",
   "workflow.option.dependenciesDone.title": "Os cartões só começam quando os cartões que aguardam estão mesclados",
-  "workflow.option.excluded.desc": "A pasta inteira do projeto, exceto estas pastas e arquivos (.hive sempre).",
+  "workflow.option.excluded.desc": "A pasta inteira do projeto, exceto estas pastas e arquivos (.combwork sempre).",
   "workflow.option.excluded.title": "O que é o trabalho",
   "workflow.option.fileLocks.desc": "O que acontece quando um agente tenta editar um arquivo que outro agente na mesma pasta está editando.",
   "workflow.option.fileLocks.title": "Bloqueios de arquivo",

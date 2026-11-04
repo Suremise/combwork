@@ -588,7 +588,7 @@
   "board.overview.stalled": "Stalled",
   "board.overview.waitingForReview": "Waiting for review",
   "board.panel.allProjects": "All projects",
-  "board.panel.info": "The workspace's cards, in .hive/tasks. Agents and the Assistant read, change and move them through Combwork's tools (finished work goes to Review); only you archive or delete them.",
+  "board.panel.info": "The workspace's cards, in .combwork/tasks. Agents and the Assistant read, change and move them through Combwork's tools (finished work goes to Review); only you archive or delete them.",
   "board.panel.refresh": "Refresh",
   "board.panel.stalledInfo": "Cards in Active that nobody is working on: no agent has them, or their agent was removed or isn't running. Also cards in Active or Review that an agent in a card loop left without waiting on them.",
   "board.panel.workspace": "Workspace",

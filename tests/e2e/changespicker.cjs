@@ -57,18 +57,18 @@ function inUse(project, name) {
   git(b4, 'commit', '-qm', 'B4 work')
   const other = path.join(outside, 'experiment')
   git(repo, 'worktree', 'add', '-q', '-b', 'experiment', other, main)
-  fs.mkdirSync(path.join(repo, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [coder] }))
+  fs.mkdirSync(path.join(repo, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [coder] }))
   const at = new Date().toISOString()
-  fs.writeFileSync(path.join(repo, '.hive', 'sessions.json'), JSON.stringify({ version: 1, sessions: [{ id: 'b4-session', agent: 'claude-code', name: 'B4 work', createdAt: at, lastActiveAt: at, archived: false, agentId: 'a-b4', agentName: 'B4', cwd: b4 }] }))
+  fs.writeFileSync(path.join(repo, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: [{ id: 'b4-session', agent: 'claude-code', name: 'B4 work', createdAt: at, lastActiveAt: at, archived: false, agentId: 'a-b4', agentName: 'B4', cwd: b4 }] }))
   // cold: no agents, one unused worktree (its agent was removed, keeping it).
   const coldMain = git(cold, 'rev-parse', '--abbrev-ref', 'HEAD').trim()
   git(cold, 'worktree', 'add', '-q', '-b', 'hive/old', path.join(trees, 'cold', 'old'), coldMain)
   // coldfail: the same, its first listing failing; plain: no worktrees, its first listing failing.
   git(coldfail, 'worktree', 'add', '-q', '-b', 'hive/kept', path.join(trees, 'coldfail', 'kept'), git(coldfail, 'rev-parse', '--abbrev-ref', 'HEAD').trim())
   // busy: its only worktree is in use.
-  fs.mkdirSync(path.join(busy, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(busy, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [inUse(busy, 'Solo')] }))
+  fs.mkdirSync(path.join(busy, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(busy, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [inUse(busy, 'Solo')] }))
 
   const { app, page, inv } = await lib.launch({ userData, viewport: { width: 1400, height: 860 } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))

@@ -39,8 +39,8 @@ describe("a skill's files for its page (listedSkillFiles)", () => {
   it("lists a listed skill's files (a link inside never followed), and refuses any folder that isn't a listed skill", async () => {
     const ws = join(base, 'ws')
     const project = join(ws, 'alpha')
-    mkdirSync(join(project, '.hive'), { recursive: true })
-    writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(project, '.combwork'), { recursive: true })
+    writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     const w = createWorkspaceService()
     await w.open(ws)
     try {

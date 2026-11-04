@@ -349,7 +349,7 @@
   "project.settings.offLower": "off",
   "project.settings.on": "On",
   "project.settings.onLower": "on",
-  "project.settings.openHive": "Open .hive folder",
+  "project.settings.openHive": "Open .combwork folder",
   "project.settings.overrides": "Overrides the global default",
   "project.settings.reset": "Reset",
   "project.settings.resetButton": "Reset to defaults",

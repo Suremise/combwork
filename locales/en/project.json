@@ -1336,8 +1336,8 @@
     "description": "A global setting that is on, shown in \"Inherit (on)\"."
   },
   "project.settings.openHive": {
-    "defaultMessage": "Open .hive folder",
-    "description": "Button: opens the project's .hive folder. Keep .hive."
+    "defaultMessage": "Open .combwork folder",
+    "description": "Button: opens the project's .combwork folder. Keep .combwork."
   },
   "project.settings.overrides": {
     "defaultMessage": "Overrides the global default",

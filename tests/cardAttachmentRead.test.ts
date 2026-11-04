@@ -1,4 +1,4 @@
-// Reading a card's attachment through Hive (HI-1751: the document tools refuse `.hive`, so HR2 couldn't read HI-1702's
+// Reading a card's attachment through Hive (HI-1751: the document tools refuse `.combwork`, so HR2 couldn't read HI-1702's
 // evidence), on the real board with two projects: a page of its text by byte offset, the pages joined giving its text
 // exactly (a character of any UTF-8 length at a page's end, a byte-order mark, the end of the file); an image, a PDF, a
 // file with a NUL or bytes that aren't UTF-8 by its kind and path; offsets that aren't a byte of it refused, for text and
@@ -42,8 +42,8 @@ let n = 0
 async function workspace(): Promise<{ w: WS; root: string }> {
   const root = join(base, `ws-${++n}`)
   for (const p of ['p', 'q']) {
-    mkdirSync(join(root, p, '.hive'), { recursive: true })
-    writeFileSync(join(root, p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(root, p, '.combwork'), { recursive: true })
+    writeFileSync(join(root, p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   }
   const w = createWorkspaceService()
   await w.open(root)
@@ -76,7 +76,7 @@ async function allPages(w: WS, c: { number: number; project: string | null }, na
   }
   throw new Error('more than 100 pages')
 }
-const folderOf = (root: string, c: number): string => join(root, 'p', '.hive', 'attachments', 'cards', String(c))
+const folderOf = (root: string, c: number): string => join(root, 'p', '.combwork', 'attachments', 'cards', String(c))
 
 describe("a card's attachment read through Hive (HI-1751)", () => {
   it('a small text file whole; a long one in pages whose contents joined are its text, a character of each UTF-8 length at a page end', async () => {
@@ -138,14 +138,14 @@ describe("a card's attachment read through Hive (HI-1751)", () => {
     expect('choices' in none ? [...none.choices!].sort() : null).toEqual([...files].sort())
   })
 
-  it('only from its card\'s own folder: a junction at the card\'s folder, cards, attachments or .hive, a linked file, or a name that is not plain, refused', async () => {
+  it('only from its card\'s own folder: a junction at the card\'s folder, cards, attachments or .combwork, a linked file, or a name that is not plain, refused', async () => {
     const { w, root } = await workspace()
     const c = await cardWith(w, { 'a.txt': 'mine' })
-    const hive = join(root, 'p', '.hive')
+    const hive = join(root, 'p', '.combwork')
     const levels = [folderOf(root, c.number), join(hive, 'attachments', 'cards'), join(hive, 'attachments'), hive]
     for (const level of levels) {
       // The real folder set aside, a junction to a copy elsewhere in its place (another project's, say). Each move tried
-      // again while Windows says the folder is in use (HI-2348: under a full run's load, renaming .hive failed with EPERM
+      // again while Windows says the folder is in use (HI-2348: under a full run's load, renaming .combwork failed with EPERM
       // once, something holding a file in it for a moment).
       const aside = `${level}-aside`
       await moveFolder(level, aside)

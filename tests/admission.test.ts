@@ -27,8 +27,8 @@ let n = 0
 /** A new workspace folder with a project (its stable id given: #508) whose agent reads an inbox. */
 function workspace(): string {
   const ws = join(base, `ws-${++n}`)
-  mkdirSync(join(ws, 'proj', '.hive'), { recursive: true })
-  writeFileSync(join(ws, 'proj', '.hive', 'project.json'), JSON.stringify({ version: 2, id: `p-${n.toString(16).padStart(12, '0')}`, agents: [{ id: 'b1', name: 'B1' }] }))
+  mkdirSync(join(ws, 'proj', '.combwork'), { recursive: true })
+  writeFileSync(join(ws, 'proj', '.combwork', 'project.json'), JSON.stringify({ version: 2, id: `p-${n.toString(16).padStart(12, '0')}`, agents: [{ id: 'b1', name: 'B1' }] }))
   return ws
 }
 /** Whether nothing holds the folder's files open: Windows won't rename a folder with an open SQLite file in it. */
@@ -49,7 +49,7 @@ let w: ReturnType<typeof createWorkspaceService>
 const elsewhere = join(base, 'elsewhere')
 
 beforeAll(() => {
-  mkdirSync(join(elsewhere, 'proj', '.hive'), { recursive: true })
+  mkdirSync(join(elsewhere, 'proj', '.combwork'), { recursive: true })
   mkdirSync(join(base, 'profile'), { recursive: true })
   // No agent runs: nothing is typed, deliveries only wait.
   Object.assign(sessions, { liveFor: () => null, setInbox: () => undefined })
@@ -70,7 +70,7 @@ describe('admission follows the window (#1395)', () => {
       const ws = workspace()
       await w.open(ws)
       expect(fence.admittedCount()).toBe(before + 1)
-      expect(fence.refusal(join(ws, '.hive', 'hive.db'))).toBeNull()
+      expect(fence.refusal(join(ws, '.combwork', 'hive.db'))).toBeNull()
     }
     await w.close()
     expect(fence.admittedCount()).toBe(before)
@@ -95,8 +95,8 @@ describe('admission follows the window (#1395)', () => {
     const before = fence.admittedCount()
     const ws = join(base, `broken-${++n}`)
     mkdirSync(ws, { recursive: true })
-    // Its .hive a file: the workspace's folders can't be made there.
-    writeFileSync(join(ws, '.hive'), 'not a folder')
+    // Its .combwork a file: the workspace's folders can't be made there.
+    writeFileSync(join(ws, '.combwork'), 'not a folder')
     await expect(w.open(ws)).rejects.toThrow()
     expect(fence.admittedCount()).toBe(before)
     expect(w.path).toBeNull()
@@ -124,7 +124,7 @@ describe("the journal (#1395)", () => {
 
   it('an entry left for a workspace no window holds is written on a connection of its own, closed again; a failing one leaves nothing open either', async () => {
     const ws = workspace()
-    const home = join(ws, '.hive', 'assistant')
+    const home = join(ws, '.combwork', 'assistant')
     mkdirSync(home, { recursive: true })
     const id = journal.leaveEntry(home, settings, fact('Hive closed unexpectedly'), 'hive')
     expect(id).toBeGreaterThan(0)
@@ -277,7 +277,7 @@ describe('deliveries (#1395)', () => {
           if (then === 'pointed at the other workspace') junction(b, via)
         })
         const store = (await deliveries.load(join(via, 'proj'))) as unknown as { place: { key: string; scope: string; host: string }; records: { id: string; body: string }[] }
-        const idOf = (ws: string): string => JSON.parse(readFileSync(join(ws, 'proj', '.hive', 'project.json'), 'utf8')).id
+        const idOf = (ws: string): string => JSON.parse(readFileSync(join(ws, 'proj', '.combwork', 'project.json'), 'utf8')).id
         expect({ key: store.place.key, scope: store.place.scope, records: store.records.map((r) => r.body) }).toEqual({ key: placeKey(a), scope: idOf(a), records: ['A’s own'] })
         // A delivery made through that store is saved in A; B keeps only its own.
         const made = await deliveries.createDelivery(join(via, 'proj'), delivery('made through the junction'))
@@ -313,8 +313,8 @@ describe('deliveries (#1395)', () => {
 
   it("a delivery left for one project's host isn't given to, nor read again by, another project's in the same workspace (control)", async () => {
     const ws = workspace()
-    mkdirSync(join(ws, 'other', '.hive'), { recursive: true })
-    writeFileSync(join(ws, 'other', '.hive', 'project.json'), JSON.stringify({ version: 2, id: 'p-ffffffffffff', agents: [{ id: 'b1', name: 'B1' }] }))
+    mkdirSync(join(ws, 'other', '.combwork'), { recursive: true })
+    writeFileSync(join(ws, 'other', '.combwork', 'project.json'), JSON.stringify({ version: 2, id: 'p-ffffffffffff', agents: [{ id: 'b1', name: 'B1' }] }))
     const other = join(ws, 'other')
     let theirs: Awaited<ReturnType<typeof deliveries.load>> | null = null
     let records: unknown = null

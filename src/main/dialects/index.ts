@@ -3,7 +3,7 @@
  * workspace's dialect files, checked against the schema, resolved into the chain a session or a request speaks in.
  *
  * - format.ts: a file's shape and its one check (the schema's);
- * - store.ts: `.hive/dialects/` on disk, `.state.json`'s switches, saves, imports, duplicates, Promote, and the file a
+ * - store.ts: `.combwork/dialects/` on disk, `.state.json`'s switches, saves, imports, duplicates, Promote, and the file a
  *   launch's resolved texts go in (`CW_DIALECT_FILE`);
  * - match.ts: which file fills a session's model slot (Auto by the real model ID, or the agent's pick);
  * - chain.ts: Model file → CLI → Workspace → Default, or API → Workspace → Default for a caller with no session.

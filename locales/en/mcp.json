@@ -20,8 +20,8 @@
     "description": "Title of the Add server picker (HI-2059) in the Hive Assistant's view."
   },
   "mcp.addFile.messageAdded": {
-    "defaultMessage": "Adds {file} to the workspace (.hive/mcp){files, plural, =0 {} one {, with its file in a folder of its own} other {, with its # files in a folder of its own}}, added to no project yet. Add it where it should run: a project’s MCP tab, the Assistant’s view, or Add to… here. It runs:",
-    "description": "Add MCP Server from File (HI-2059), above the command the server runs. {file} is the file added; {files} how many files a .zip brings. Keep .hive/mcp as it is; \"MCP tab\" and \"Add to…\" as Hive shows them."
+    "defaultMessage": "Adds {file} to the workspace (.combwork/mcp){files, plural, =0 {} one {, with its file in a folder of its own} other {, with its # files in a folder of its own}}, added to no project yet. Add it where it should run: a project’s MCP tab, the Assistant’s view, or Add to… here. It runs:",
+    "description": "Add MCP Server from File (HI-2059), above the command the server runs. {file} is the file added; {files} how many files a .zip brings. Keep .combwork/mcp as it is; \"MCP tab\" and \"Add to…\" as Hive shows them."
   },
   "mcp.addFile.replaceDetailAdded": {
     "defaultMessage": "Replace moves it (and the folder of one added from a .zip) to the Recycle Bin and adds this one to no project yet: projects and the Assistant that had the old one lose it. Or choose another name.",

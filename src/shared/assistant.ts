@@ -7,17 +7,17 @@ import { PROVIDERS } from './providers'
 
 /**
  * The Hive Assistant: one per workspace, its overseer. It runs like a project's agent (same terminal, hooks,
- * status, usage and quit handling) from a home folder Hive never lists as a project, .hive/assistant, and
+ * status, usage and quit handling) from a home folder Hive never lists as a project, .combwork/assistant, and
  * works in the workspace folder. Settings → Assistant holds its defaults; the home's one agent holds the
  * workspace's own choices (Assistant Settings), over them.
  */
 
-/** The Assistant's home in a workspace's .hive folder. */
+/** The Assistant's home in a workspace's .combwork folder. */
 export const ASSISTANT_DIR = 'assistant'
 /** Its agent's id (the home's only agent). */
 export const ASSISTANT_AGENT_ID = 'assistant'
 export const ASSISTANT_NAME = 'Assistant'
-/** Where the workspace's modes are, in its .hive folder. */
+/** Where the workspace's modes are, in its .combwork folder. */
 export const MODES_DIR = 'modes'
 /**
  * Where they were until 0.9.3, when modes were called personas (#1084): moved to MODES_DIR as the workspace opens, and

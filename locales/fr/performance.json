@@ -103,7 +103,7 @@
   "performance.compare.keepTip": "Conserver ce que montre la vue Maintenant pour le comparer plus tard : {what}.",
   "performance.compare.keeps": "{range, select, 24h {24 heures} 7d {7 jours} other {30 jours}}, {role, select, all {tout le monde} agent {agents des projets} assistant {l’Assistant} api {scripts} viewer {applications de consultation} other {{role}}}, tous les fournisseurs",
   "performance.compare.keptList": "Conservées pour comparaison ({n, number})",
-  "performance.compare.keptListTip": "Conservées dans .hive/metrics/benchmarks de l’espace de travail (sur cet ordinateur), {max, number} au plus : une fois la limite atteinte, la plus ancienne non épinglée part. Épingle-en une pour la garder.",
+  "performance.compare.keptListTip": "Conservées dans .combwork/metrics/benchmarks de l’espace de travail (sur cet ordinateur), {max, number} au plus : une fois la limite atteinte, la plus ancienne non épinglée part. Épingle-en une pour la garder.",
   "performance.compare.keptLoadTarget": "les comparaisons conservées",
   "performance.compare.keptNotice": "Conservé pour comparaison",
   "performance.compare.kind.export": "Vue Performances",

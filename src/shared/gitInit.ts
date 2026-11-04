@@ -1,5 +1,5 @@
 // Initialise repository (#701): a project that isn't a git repository becomes one from its Git tab, in one click: `git
-// init -b main`, .hive excluded before anything is staged, an optional starter .gitignore, a first commit, then a
+// init -b main`, .combwork excluded before anything is staged, an optional starter .gitignore, a first commit, then a
 // refresh so worktrees work at once. Shared by the main process, the window and their tests.
 
 import type { Text } from './advanced'
@@ -31,7 +31,7 @@ export interface GitInitCheck {
   conditionalIdentity?: boolean
   /** The folder has a .gitignore of its own: it is kept, and no starter one is offered. */
   hasGitignore: boolean
-  /** The folder has nothing to commit (apart from .hive): the first commit is an empty one. */
+  /** The folder has nothing to commit (apart from .combwork): the first commit is an empty one. */
   empty: boolean
 }
 
@@ -65,8 +65,8 @@ const M = {
   dotnet: msg({ id: 'git.init.gitignore.dotnet', defaultMessage: '.NET', description: 'Initialise repository, Starter .gitignore: for a .NET project. A name: usually kept.' }),
   godot: msg({ id: 'git.init.gitignore.godot', defaultMessage: 'Godot', description: 'Initialise repository, Starter .gitignore: for a Godot game. A name: usually kept.' }),
   gitignoreName: msg({ id: 'git.init.gitignoreName', defaultMessage: '{choice, select, minimal {a minimal .gitignore} other {a {kind} .gitignore}}', description: 'The starter .gitignore Initialise repository added, in what it reports it did ("added a Node .gitignore"). {choice} is minimal, or another kind: {kind} is Node, Python, .NET or Godot.' }),
-  resume: msg({ id: 'git.init.resume', defaultMessage: '{name} is a git repository with no commits yet, and worktrees need one. This keeps its .hive out of git and commits {empty, select, yes {nothing yet (an empty first commit)} other {everything in the folder}} as the first commit.{gitignore, select, yes { Its own .gitignore is kept.} other {}}', description: "Make the first commit dialog, for a repository with no commit. {name} is the project; {empty} is yes when its folder has nothing to commit; {gitignore} is yes when it has a .gitignore of its own." }),
-  makes: msg({ id: 'git.init.makes', defaultMessage: 'Makes {name} a git repository on a branch called main, keeps its .hive out of git, and commits {empty, select, yes {nothing yet (an empty first commit)} other {everything in the folder}} as the first commit, so agents can work in worktrees at once.', description: 'The Initialise repository dialog: what it will do. {name} is the project; {empty} is yes when its folder has nothing to commit. Keep main (the branch name).' }),
+  resume: msg({ id: 'git.init.resume', defaultMessage: '{name} is a git repository with no commits yet, and worktrees need one. This keeps its .combwork out of git and commits {empty, select, yes {nothing yet (an empty first commit)} other {everything in the folder}} as the first commit.{gitignore, select, yes { Its own .gitignore is kept.} other {}}', description: "Make the first commit dialog, for a repository with no commit. {name} is the project; {empty} is yes when its folder has nothing to commit; {gitignore} is yes when it has a .gitignore of its own." }),
+  makes: msg({ id: 'git.init.makes', defaultMessage: 'Makes {name} a git repository on a branch called main, keeps its .combwork out of git, and commits {empty, select, yes {nothing yet (an empty first commit)} other {everything in the folder}} as the first commit, so agents can work in worktrees at once.', description: 'The Initialise repository dialog: what it will do. {name} is the project; {empty} is yes when its folder has nothing to commit. Keep main (the branch name).' }),
   kept: msg({ id: 'git.init.kept', defaultMessage: 'Its own .gitignore is kept.', description: 'The Initialise repository dialog, after what it will do, when the folder has a .gitignore.' }),
   nested: msg({ id: 'git.init.nested', defaultMessage: 'It is inside the git repository in {folder}: a repository inside another is usually a mistake, and that one will no longer see the files here as its own.', description: "The Initialise repository dialog, when the project's folder is inside another repository. {folder} is that repository's folder." }),
   enterName: msg({ id: 'git.init.enterName', defaultMessage: 'Enter the name your commits are made as', description: 'Under the Initialise repository dialog while the name git needs is empty.' }),
@@ -97,7 +97,7 @@ export function isGitignoreChoice(v: unknown): v is GitignoreChoice {
   return GITIGNORE_CHOICES.some((c) => c.value === v)
 }
 
-/** The starter .gitignore's text for a choice (null for none). Never lists .hive: git's info/exclude keeps it out (#345). */
+/** The starter .gitignore's text for a choice (null for none). Never lists .combwork: git's info/exclude keeps it out (#345). */
 export function gitignoreText(choice: GitignoreChoice): string | null {
   if (choice === 'none') return null
   const lines = choice === 'minimal' ? MINIMAL : [...TEMPLATES[choice], '', ...MINIMAL]

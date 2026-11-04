@@ -1,7 +1,7 @@
 // Overview tab: the session details' agent picker and the compaction history, a data table (#124): pages, rows per
 // page, a trigger filter and a text filter (no matches: Clear filters), sorting by a header, and a row opening its
 // compaction in the Sessions tab at its divider; a compaction after a big turn says so (#154). In a throwaway profile
-// and workspace. Transcripts are Hive backups (.hive/sessions); no agent is started.
+// and workspace. Transcripts are Hive backups (.combwork/sessions); no agent is started.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -14,7 +14,7 @@ const shots = path.join(scratch, 'oshots')
 for (const d of [userData, ws, shots]) fs.rmSync(d, { recursive: true, force: true })
 fs.mkdirSync(shots, { recursive: true })
 const proj = path.join(ws, 'demo')
-const sessDir = path.join(proj, '.hive', 'sessions')
+const sessDir = path.join(proj, '.combwork', 'sessions')
 fs.mkdirSync(sessDir, { recursive: true })
 lib.enableProviders(userData)
 

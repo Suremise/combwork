@@ -17,7 +17,7 @@ const claudeHome = path.join(lib.WORK, 'sessionsize-claude-home')
 const codexHome = path.join(lib.WORK, 'sessionsize-codex-home')
 const copilotHome = path.join(lib.WORK, 'sessionsize-copilot-home')
 const alpha = path.join(ws, 'alpha')
-const assistantHome = path.join(ws, '.hive', 'assistant')
+const assistantHome = path.join(ws, '.combwork', 'assistant')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -95,7 +95,7 @@ const sizeText = (n) => (n < MB ? `${Math.max(1, Math.round(n / 1024))} KB` : `$
     }
     write(files.small, claudeLines(S.small, 6, 'A small one', 3000))
     write(files.long, claudeLines(S.long, 5, 'A long one', Math.round(1.4 * MB)))
-    write(path.join(alpha, '.hive', 'sessions', `${S.gone}.jsonl`), claudeLines(S.gone, 3, 'Gone from the CLI'))
+    write(path.join(alpha, '.combwork', 'sessions', `${S.gone}.jsonl`), claudeLines(S.gone, 3, 'Gone from the CLI'))
     write(files.codex, rollout(S.codex, 4, 'A Codex one'))
     write(files.copilot, copilotEvents(S.copilot, 2, 'A Copilot one'))
     write(files.assistant, claudeLines(S.assistant, 7, 'Plan the week', Math.round(1.2 * MB)))

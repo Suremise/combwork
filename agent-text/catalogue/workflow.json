@@ -238,7 +238,7 @@
     "audience": "both"
   },
   "workflow.option.excluded.desc": {
-    "text": "The whole project folder, apart from these folders and files (.hive always).",
+    "text": "The whole project folder, apart from these folders and files (.combwork always).",
     "note": "What the workflow option “What the work is” does: the folders and files listed are left out of a card’s work.",
     "audience": "both"
   },
@@ -829,7 +829,7 @@
   },
   "workflow.refused.paths.excluded.message": {
     "text": "{card}: {path} is in {folder}, which a project without version control leaves out of its work.",
-    "note": "A refused declaration of a card's paths (#1511): in a project without version control (None), a card's paths are the files of its work; {path} is under {folder} (node_modules, .venv, .git, .hive or a folder the project excludes), which never counts as work. {card} is a card key like AM-12.",
+    "note": "A refused declaration of a card's paths (#1511): in a project without version control (None), a card's paths are the files of its work; {path} is under {folder} (node_modules, .venv, .git, .combwork or a folder the project excludes), which never counts as work. {card} is a card key like AM-12.",
     "audience": "both"
   },
   "workflow.refused.paths.excluded.next": {

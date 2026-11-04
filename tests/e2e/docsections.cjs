@@ -2,7 +2,7 @@
 // project's Markdown in the folder it works in (its worktree's copy), not another project's (403, as its sessions);
 // the workspace token reads any project's (the project folder's copy) and shared notes (shared:<path>); a section by
 // slug or text comes with its subsections; a repeated heading is ambiguous (409, listing both slugs) and an unknown one
-// lists the closest (404); paths outside the project (.., a junction out of it), into .hive or .git, or not Markdown are
+// lists the closest (404); paths outside the project (.., a junction out of it), into .combwork or .git, or not Markdown are
 // refused before anything is read. The agent runs the fake Claude Code. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
 // Dev build only (#1580): it starts this checkout's Electron itself, and Alfie is a 0.9 worktree agent
@@ -126,7 +126,7 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
     for (const [what, p, status] of [
       ['outside the project (..)', '../beta/docs/PLAN.md', 400],
       ['through a junction out of it', 'beta-link/docs/PLAN.md', 400],
-      ["in Hive's own folder", '.hive/project.json', 400],
+      ["in Hive's own folder", '.combwork/project.json', 400],
       ["in git's", '.git/description.md', 400],
       ['not Markdown', 'notes.txt', 400],
       ['an absolute path', path.join(beta, 'docs', 'PLAN.md'), 400],
@@ -143,15 +143,15 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
     check("…and the project folder's copy (not a worktree's)", r.status === 200 && r.body.headings[0].text === 'Plan (alpha)', JSON.stringify(r.body).slice(0, 200))
     r = await outline(workspaceToken, { path: 'docs/PLAN.md' })
     check('a project file with no project and no agent: project is required', r.status === 400 && /project is required/.test(r.body.error), JSON.stringify(r))
-    // A junction inside the project into its .hive (#817 round 2): refused by where it leads, not only by its name.
-    fs.mkdirSync(path.join(alpha, '.hive', 'private'), { recursive: true })
-    fs.writeFileSync(path.join(alpha, '.hive', 'private', 'SECRET.md'), '# Private\n\nHIVE SECRET\n')
-    fs.symlinkSync(path.join(alpha, '.hive', 'private'), path.join(alpha, 'alias'), 'junction')
+    // A junction inside the project into its .combwork (#817 round 2): refused by where it leads, not only by its name.
+    fs.mkdirSync(path.join(alpha, '.combwork', 'private'), { recursive: true })
+    fs.writeFileSync(path.join(alpha, '.combwork', 'private', 'SECRET.md'), '# Private\n\nHIVE SECRET\n')
+    fs.symlinkSync(path.join(alpha, '.combwork', 'private'), path.join(alpha, 'alias'), 'junction')
     fs.symlinkSync(path.join(alpha, '.git'), path.join(alpha, 'git-alias'), 'junction')
     fs.writeFileSync(path.join(alpha, '.git', 'NOTE.md'), '# Git\n\nGIT SECRET\n')
-    for (const p of ['alias/SECRET.md', 'git-alias/NOTE.md', '.hive/private/SECRET.md']) {
+    for (const p of ['alias/SECRET.md', 'git-alias/NOTE.md', '.combwork/private/SECRET.md']) {
       r = await section(workspaceToken, { path: p, heading: '#private', project: 'alpha' })
-      check(`a path into .hive or .git by another name (${p}): refused, nothing read`, r.status === 400 && !/(HIVE|GIT) SECRET/.test(JSON.stringify(r.body)), JSON.stringify(r))
+      check(`a path into .combwork or .git by another name (${p}): refused, nothing read`, r.status === 400 && !/(HIVE|GIT) SECRET/.test(JSON.stringify(r.body)), JSON.stringify(r))
     }
     const note = '# Design\n\n## Extraction lanes\n\nLanes.\n\n## Review\n\nReview.\n'
     await fetch(`http://127.0.0.1:${PORT}/v1/shared/file?path=${encodeURIComponent('plans/design.md')}`, { method: 'PUT', headers: { Authorization: `Bearer ${workspaceToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ content: note }) })

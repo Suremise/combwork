@@ -36,7 +36,7 @@ describe('sessions.backupAllNow', () => {
     const live = (sessions as unknown as { live: Map<string, unknown> }).live
     const add = (agentId: string, sessionId: string, transcriptPath?: string): void =>
       void live.set(`${project}#${agentId}`, { state: { projectPath: project, agentId, sessionId, status: 'working' }, transcriptPath })
-    const backup = (sessionId: string): string => readFileSync(join(project, '.hive', 'sessions', `${sessionId}.jsonl`), 'utf8')
+    const backup = (sessionId: string): string => readFileSync(join(project, '.combwork', 'sessions', `${sessionId}.jsonl`), 'utf8')
     return { sessions, config, profile, add, backup }
   }
 
@@ -82,7 +82,7 @@ describe('sessions.backupAllNow', () => {
       // One 1 MB step of 60 ms past the budget, not 16 of them.
       expect(Date.now() - t).toBeLessThan(250)
       // The copy it couldn't finish isn't put in place.
-      expect(existsSync(join(profile, 'alpha', '.hive', 'sessions', `${SID}.jsonl`))).toBe(false)
+      expect(existsSync(join(profile, 'alpha', '.combwork', 'sessions', `${SID}.jsonl`))).toBe(false)
     })
   })
 

@@ -29,7 +29,7 @@ const log = createLogger('projects')
 /**
  * A project leaving Hive (Project → Remove Project…), three ways:
  * - Hide: nothing moves; Hive leaves the folder out until it's restored (Settings → Workspace).
- * - Remove from Hive: its workspace files (handovers, cards) are packed into its own .hive/removed and leave the
+ * - Remove from Hive: its workspace files (handovers, cards) are packed into its own .combwork/removed and leave the
  *   workspace, so the folder carries them wherever it goes; Hive offers them back when it sees the folder again.
  * - Delete: the folder, its worktrees and its handovers go to the Recycle Bin, and its cards are deleted.
  * The CLIs' own transcripts (~/.claude, ~/.codex) are never touched.
@@ -46,7 +46,7 @@ async function allNames(ws: WorkspaceService): Promise<string[]> {
 }
 
 /**
- * The project's handovers in the shared notes, by path relative to .hive/shared: those its id owns (#514), never
+ * The project's handovers in the shared notes, by path relative to .combwork/shared: those its id owns (#514), never
  * another project's that had its name (they are moved or deleted).
  */
 async function handoversOf(ws: WorkspaceService, name: string): Promise<string[]> {
@@ -307,7 +307,7 @@ interface Manifest {
   cards: number
 }
 
-/** Writes the project's handovers and cards into <project>/.hive/removed, with a manifest. */
+/** Writes the project's handovers and cards into <project>/.combwork/removed, with a manifest. */
 async function pack(ws: WorkspaceService, p: string, handovers: string[]): Promise<void> {
   const dir = join(p, HIVE_DIR, REMOVED_DIR)
   // An older pack (removed before, restored without unpacking) makes way for this one.

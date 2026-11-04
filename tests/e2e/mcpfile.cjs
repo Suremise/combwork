@@ -20,7 +20,7 @@ const proj = path.join(ws, 'demo')
 const other = path.join(ws, 'other')
 const dump = path.join(lib.WORK, 'mcpfile-dump')
 const home = path.join(lib.WORK, 'mcpfile-claude-home')
-const mcpDir = path.join(ws, '.hive', 'mcp')
+const mcpDir = path.join(ws, '.combwork', 'mcp')
 const shots = path.join(lib.WORK, 'mcpfile-shots')
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -63,7 +63,7 @@ const check = (name, ok, extra = '') => {
 
   // What is added to a project (HI-2059), as project.json has it.
   const projectMcp = (p) => {
-    const f = path.join(p, '.hive', 'project.json')
+    const f = path.join(p, '.combwork', 'project.json')
     return fs.existsSync(f) ? (JSON.parse(fs.readFileSync(f, 'utf8')).mcp ?? {}) : {}
   }
   const where = (name) => row(name).locator('.mcp-where').innerText().catch(() => '')
@@ -96,7 +96,7 @@ const check = (name, ok, extra = '') => {
   check("its view shows what it runs", !!(await lib.until(async () => (await runs.innerText().catch(() => '')).includes('Runs: npx -y @modelcontextprotocol/server-github'), HUNG_MS)))
   await shot('2-json-added')
 
-  // --- A .zip of a server folder: unpacked to .hive/mcp/notes/, its definition from hive-mcp.json; added nowhere.
+  // --- A .zip of a server folder: unpacked to .combwork/mcp/notes/, its definition from hive-mcp.json; added nowhere.
   await pick(path.join(dump, 'notes.zip'))
   await addButton.click()
   await lib.until(async () => (await add.count()) === 1, HUNG_MS)
@@ -106,7 +106,7 @@ const check = (name, ok, extra = '') => {
   await add.getByRole('button', { name: 'Add' }).click()
   check('the zip is added', !!(await lib.until(async () => !!(await server('notes')), HUNG_MS)))
   check('added nowhere', !!(await lib.until(async () => (await where('notes')) === 'Not added anywhere', HUNG_MS)) && !(projectMcp(proj).enabled ?? []).includes('notes'), await where('notes'))
-  check("its code is in .hive/mcp/notes", fs.existsSync(path.join(mcpDir, 'notes', 'server.js')))
+  check("its code is in .combwork/mcp/notes", fs.existsSync(path.join(mcpDir, 'notes', 'server.js')))
 
   // --- The same name again: Replace or Choose Another Name; another name moves its folder references.
   await pick(path.join(dump, 'notes.zip'))

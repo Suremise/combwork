@@ -1,6 +1,6 @@
 // Deliveries (#647): what the Assistant leaves for an agent is a saved record with an id and a state, on fake Claude Code
 // agents (fake-claude/) and the Assistant's hive tools (hive-mcp.js with its token). A message for a working agent is
-// queued and saved for the project (in the workspace's .hive/hive.db, #1018), its pane shows "✉ 1 unread"; the agent fetches it mid-turn with
+// queued and saved for the project (in the workspace's .combwork/hive.db, #1018), its pane shows "✉ 1 unread"; the agent fetches it mid-turn with
 // cw_inbox (received, so it isn't typed after) and acks it (acked); one typed into it is offered, and received once its
 // CLI takes the line (#649), then acked; one not acked in time shows as overdue; cw_agent_activity gives each one's state
 // and times, so the Assistant sees them. A stop of the agent keeps what waits for it; once the Assistant's launch ends,

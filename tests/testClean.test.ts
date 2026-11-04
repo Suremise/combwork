@@ -182,11 +182,11 @@ describe('what cards cite (they keep it)', () => {
 
   it('finds the database before the stub folder an older Hive reads (#1017): a moved board never reads as empty', () => {
     const ws = temp('hive-clean-find-')
-    mkdirSync(join(ws, '.hive', 'tasks'), { recursive: true })
-    writeFileSync(join(ws, '.hive', 'tasks', 'board.json'), '{"next":9}')
-    expect(findBoard(ws)).toBe(join(ws, '.hive', 'tasks'))
-    writeFileSync(join(ws, '.hive', 'hive.db'), '')
-    expect(findBoard(ws)).toBe(join(ws, '.hive', 'hive.db'))
+    mkdirSync(join(ws, '.combwork', 'tasks'), { recursive: true })
+    writeFileSync(join(ws, '.combwork', 'tasks', 'board.json'), '{"next":9}')
+    expect(findBoard(ws)).toBe(join(ws, '.combwork', 'tasks'))
+    writeFileSync(join(ws, '.combwork', 'hive.db'), '')
+    expect(findBoard(ws)).toBe(join(ws, '.combwork', 'hive.db'))
   })
 })
 

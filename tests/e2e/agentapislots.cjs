@@ -39,7 +39,7 @@ const NOTE = (where) => `# Note\n\nThe ${where} copy.\n`
 
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`]) fs.rmSync(d, { recursive: true, force: true })
-  lib.gitProject(alpha, { 'NOTE.md': NOTE('project'), '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'NOTE.md': NOTE('project'), '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   const env = lib.fakeClaude(userData, home, [alpha, ws, ...['slot-a', 'slot-b', 'hb2'].map((s) => path.join(root, s))])
   const cfgFile = path.join(userData, 'config.json')

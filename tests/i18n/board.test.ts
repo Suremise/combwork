@@ -191,7 +191,7 @@ describe('the board area', () => {
 
   it("an inbox built in one language shows the Assistant's name in the language shown now", () => {
     const projects = [] as Parameters<typeof inbox>[0]
-    const assistant = { path: 'C:\\ws\\.hive\\assistant', name: 'assistant', agents: [{ id: 'assistant', name: 'Assistant', live: { status: 'waiting', statusSince: '' }, place: { folder: 'C:\\ws\\.hive\\assistant', is: 'project', name: null, branch: null } }] } as unknown as Parameters<typeof inbox>[1]
+    const assistant = { path: 'C:\\ws\\.combwork\\assistant', name: 'assistant', agents: [{ id: 'assistant', name: 'Assistant', live: { status: 'waiting', statusSince: '' }, place: { folder: 'C:\\ws\\.combwork\\assistant', is: 'project', name: null, branch: null } }] } as unknown as Parameters<typeof inbox>[1]
     const [item] = inbox(projects, assistant, () => null).needYou
     expect(item.assistant).toBe(true)
     expect(inboxName(item)).toBe('Assistant')

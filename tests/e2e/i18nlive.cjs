@@ -18,7 +18,7 @@ const path = require('path')
 const ws = path.join(lib.WORK, 'i18nlive-ws')
 const proj = path.join(ws, 'demo')
 const SESSION = '33333333-aaaa-bbbb-cccc-000000000003' // synthetic
-const transcript = path.join(proj, '.hive', 'sessions', `${SESSION}.jsonl.gz`)
+const transcript = path.join(proj, '.combwork', 'sessions', `${SESSION}.jsonl.gz`)
 fs.rmSync(ws, { recursive: true, force: true })
 fs.mkdirSync(path.dirname(transcript), { recursive: true })
 fs.writeFileSync(
@@ -32,7 +32,7 @@ fs.writeFileSync(
       .join('\n') + '\n'
   )
 )
-fs.writeFileSync(path.join(proj, '.hive', 'sessions.json'), JSON.stringify({ version: 1, sessions: [{ id: SESSION, agent: 'claude-code', name: 'Interrupted', createdAt: '2026-10-14T10:00:00.000Z', lastActiveAt: '2026-10-14T10:01:00.000Z', archived: false }] }))
+fs.writeFileSync(path.join(proj, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: [{ id: SESSION, agent: 'claude-code', name: 'Interrupted', createdAt: '2026-10-14T10:00:00.000Z', lastActiveAt: '2026-10-14T10:01:00.000Z', archived: false }] }))
 
 const HUNG_MS = 15000
 let pass = 0

@@ -52,16 +52,16 @@ const at = '2026-10-19T10:00:00.000Z'
 const rec = (id: string, over: Partial<SessionRecord> = {}): SessionRecord => ({ id, agent: 'claude-code', name: `Session ${id}`, createdAt: at, lastActiveAt: at, archived: false, ...over })
 const usage = (id: string) => ({ id, provider: 'claude-code' as const, usage: { inputTokens: 10, outputTokens: 20 } })
 const oldFile = () => ({ version: 1, sessions: [rec('s1'), rec('s2', { cards: [{ number: 5, title: 'Five' }] }), rec('s3')], deleted: ['gone1', 'gone2'], deletedUsage: [usage('gone1'), usage('gone2')] })
-const files = (p: string): string[] => readdirSync(join(p, '.hive')).filter((f) => f.startsWith('sessions.json'))
-const idOf = (p: string): string => JSON.parse(readFileSync(join(p, '.hive', 'project.json'), 'utf8')).id
+const files = (p: string): string[] => readdirSync(join(p, '.combwork')).filter((f) => f.startsWith('sessions.json'))
+const idOf = (p: string): string => JSON.parse(readFileSync(join(p, '.combwork', 'project.json'), 'utf8')).id
 
 const wsPath = join(base, 'ws')
 let w: ReturnType<typeof createWorkspaceService>
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
 const project = (name: string, file?: unknown): string => {
   const p = join(wsPath, name)
-  mkdirSync(join(p, '.hive'), { recursive: true })
-  if (file !== undefined) writeFileSync(join(p, '.hive', 'sessions.json'), typeof file === 'string' ? file : JSON.stringify(file))
+  mkdirSync(join(p, '.combwork'), { recursive: true })
+  if (file !== undefined) writeFileSync(join(p, '.combwork', 'sessions.json'), typeof file === 'string' ? file : JSON.stringify(file))
   return p
 }
 
@@ -83,7 +83,7 @@ describe("a host's sessions.json moved into the workspace's database (#1061)", (
     expect(f.deleted).toEqual(['gone1', 'gone2'])
     expect(f.deletedUsage?.map((u) => u.id)).toEqual(['gone1', 'gone2'])
     expect(files(p).some((n) => n.startsWith('sessions.json.imported-'))).toBe(true)
-    expect(existsSync(join(p, '.hive', 'sessions.json'))).toBe(false)
+    expect(existsSync(join(p, '.combwork', 'sessions.json'))).toBe(false)
     // In the database's tables under the project's id (#1211), with the mark that it moved in.
     const db = workspaceDb(wsPath).reader
     const ids = (sql: string): string[] => (db.prepare(sql).all(idOf(p)) as { id: string }[]).map((r) => r.id)
@@ -92,26 +92,26 @@ describe("a host's sessions.json moved into the workspace's database (#1061)", (
     expect(ids('SELECT id FROM sessions_deleted_usage WHERE host = ? ORDER BY ord')).toEqual(['gone1', 'gone2'])
     expect(JSON.parse(storeValue(workspaceDb(wsPath).reader, 'sessions', idOf(p), 'imported')!)).toMatchObject({ rows: 3 })
     // Opening the workspace made no new file in its place.
-    expect(existsSync(join(wsPath, 'eps', '.hive', 'sessions.json'))).toBe(false)
+    expect(existsSync(join(wsPath, 'eps', '.combwork', 'sessions.json'))).toBe(false)
   })
 
   it("a file that can't be read now moves nothing in and marks nothing: the next read moves it in", async () => {
     // A folder where the file should be stands in for one held open: reading it fails.
     const p = project('locked')
-    mkdirSync(join(p, '.hive', 'sessions.json'))
+    mkdirSync(join(p, '.combwork', 'sessions.json'))
     await run(() => workspace.ensureProject(p))
     await run(() => workspace.projectIds({ fresh: true }))
     await expect(run(() => workspace.sessionsFile(p))).rejects.toThrow()
     expect(storeValue(workspaceDb(wsPath).reader, 'sessions', idOf(p), 'imported')).toBeNull()
-    renameSync(join(p, '.hive', 'sessions.json'), join(p, '.hive', 'held'))
-    writeFileSync(join(p, '.hive', 'sessions.json'), JSON.stringify({ version: 1, sessions: [rec('late')] }))
+    renameSync(join(p, '.combwork', 'sessions.json'), join(p, '.combwork', 'held'))
+    writeFileSync(join(p, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: [rec('late')] }))
     expect((await run(() => workspace.sessionsFile(p))).sessions.map((s) => s.id)).toEqual(['late'])
   })
 
   it('a file found after it moved in (a crash before its rename, or an older Hive) is kept unread: the records stay the database’s', async () => {
     const p = join(wsPath, 'beta')
     await run(() => workspace.sessionsFile(p))
-    writeFileSync(join(p, '.hive', 'sessions.json'), JSON.stringify({ version: 1, sessions: [rec('stale')] }))
+    writeFileSync(join(p, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: [rec('stale')] }))
     const f = await run(() => workspace.sessionsFile(p))
     expect(f.sessions.map((s) => s.id)).toEqual(['s1', 's2', 's3'])
     // Kept at the next move in's check (each host is checked once a run: a new workspace service checks again).
@@ -124,7 +124,7 @@ describe("a host's sessions.json moved into the workspace's database (#1061)", (
 
   it('a damaged file is moved in from its backup', async () => {
     const p = project('damaged', '{"version":1,"sessions":[{"id":')
-    writeFileSync(join(p, '.hive', 'sessions.json.bak'), JSON.stringify({ version: 1, sessions: [rec('from-bak')] }))
+    writeFileSync(join(p, '.combwork', 'sessions.json.bak'), JSON.stringify({ version: 1, sessions: [rec('from-bak')] }))
     await run(() => workspace.ensureProject(p))
     await run(() => workspace.projectIds({ fresh: true }))
     expect((await run(() => workspace.sessionsFile(p))).sessions.map((s) => s.id)).toEqual(['from-bak'])
@@ -285,15 +285,15 @@ describe('following the project', () => {
     const before = await run(() => workspace.sessionsFile(p))
     expect(await run(() => w.exportSessions(p))).toBe(3)
     expect(workspaceDb(wsPath).reader.prepare('SELECT id FROM sessions WHERE host = ?').all(idOf(p))).toEqual([])
-    const written = JSON.parse(readFileSync(join(p, '.hive', 'sessions.json'), 'utf8'))
+    const written = JSON.parse(readFileSync(join(p, '.combwork', 'sessions.json'), 'utf8'))
     expect(written.sessions.map((s: { id: string }) => s.id)).toEqual(['s1', 's2', 's3'])
     // Read during the removal (a refresh): nothing, and the file stays for the folder to take.
     expect((await run(() => workspace.sessionsFile(p))).sessions).toEqual([])
-    expect(existsSync(join(p, '.hive', 'sessions.json'))).toBe(true)
+    expect(existsSync(join(p, '.combwork', 'sessions.json'))).toBe(true)
     // A removal that didn't end with the project hidden (it failed later): its records come back.
     await run(() => w.releaseSessions(p))
     expect(await run(() => workspace.sessionsFile(p))).toEqual(before)
-    expect(existsSync(join(p, '.hive', 'sessions.json'))).toBe(false)
+    expect(existsSync(join(p, '.combwork', 'sessions.json'))).toBe(false)
   })
 
   it('a change committed as the export begins is in the file, never lost (review round 1)', async () => {
@@ -312,7 +312,7 @@ describe('following the project', () => {
     } finally {
       storeTestHooks.beforeSave = null
     }
-    expect(JSON.parse(readFileSync(join(p, '.hive', 'sessions.json'), 'utf8')).sessions.map((x: { id: string }) => x.id)).toEqual(['old', 'newly-committed'])
+    expect(JSON.parse(readFileSync(join(p, '.combwork', 'sessions.json'), 'utf8')).sessions.map((x: { id: string }) => x.id)).toEqual(['old', 'newly-committed'])
     await run(() => w.releaseSessions(p))
     expect((await run(() => workspace.sessionsFile(p))).sessions.map((x) => x.id)).toEqual(['old', 'newly-committed'])
   })
@@ -327,7 +327,7 @@ describe('following the project', () => {
     fileHooks.afterWrite = (path) => {
       if (!path.endsWith('sessions.json')) return
       fileHooks.afterWrite = null
-      const db = new DatabaseSync(join(wsPath, '.hive', 'hive.db'), { timeout: 0 })
+      const db = new DatabaseSync(join(wsPath, '.combwork', 'hive.db'), { timeout: 0 })
       try {
         db.prepare("UPDATE sessions SET name = 'committed elsewhere' WHERE host = ? AND id = 'one'").run(idOf(p))
         wrote = 'committed'
@@ -371,7 +371,7 @@ describe('following the project', () => {
     }
     expect(w.hiddenProjects().find((h) => h.name === 'travels')?.mode).toBe('removed')
     await run(() => w.refresh())
-    const file = join(p, '.hive', 'sessions.json')
+    const file = join(p, '.combwork', 'sessions.json')
     expect(JSON.parse(readFileSync(file, 'utf8')).sessions.map((x: { id: string }) => x.id)).toEqual(['t1', 't2'])
     // Read while removed (a project id lookup, the board): nothing here, and the file stays.
     expect((await run(() => workspace.sessionsFile(p))).sessions).toEqual([])
@@ -402,7 +402,7 @@ describe('following the project', () => {
     // Worked out before the project was hidden as removed (a change waiting for its database lease meanwhile).
     const place = await run(() => (w as unknown as { sessionsPlace: (pp: string) => Promise<SessionsPlace> }).sessionsPlace(p))
     await run(() => removal.removeProject(p, 'remove'))
-    const file = join(p, '.hive', 'sessions.json')
+    const file = join(p, '.combwork', 'sessions.json')
     expect((await readSessions(place)).sessions).toEqual([])
     expect(existsSync(file)).toBe(true)
     await run(() => removal.restoreProject('stale-place'))
@@ -415,8 +415,8 @@ describe('following the project', () => {
     await run(() => workspace.projectIds({ fresh: true }))
     await run(() => workspace.upsertSession(p, { id: 'u1' }))
     await run(() => removal.removeProject(p, 'remove'))
-    const file = join(p, '.hive', 'sessions.json')
-    const cfg = join(p, '.hive', 'project.json')
+    const file = join(p, '.combwork', 'sessions.json')
+    const cfg = join(p, '.combwork', 'project.json')
     // Its id can't be read: the read is under `folder:unread-id`, where no export is marked.
     renameSync(cfg, `${cfg}.aside`)
     try {
@@ -434,8 +434,8 @@ describe('following the project', () => {
   it("a change landing after its workspace was replaced or closed leaves a removed project's file in the folder (#1161)", async () => {
     const ws2 = join(base, 'closing-ws')
     const p2 = join(ws2, 'gone')
-    mkdirSync(join(p2, '.hive'), { recursive: true })
-    const file = join(p2, '.hive', 'sessions.json')
+    mkdirSync(join(p2, '.combwork'), { recursive: true })
+    const file = join(p2, '.combwork', 'sessions.json')
     const s2 = createWorkspaceService()
     let place: SessionsPlace
     try {
@@ -460,7 +460,7 @@ describe('following the project', () => {
     expect(await changeSessions(place, (f) => f.sessions.map((x) => x.id))).toEqual([])
     expect(existsSync(file)).toBe(true)
     // Closed, and its workspace.json can't be read either: still nothing moved in.
-    const cfg = join(ws2, '.hive', 'workspace.json')
+    const cfg = join(ws2, '.combwork', 'workspace.json')
     renameSync(cfg, `${cfg}.aside`)
     try {
       expect(await changeSessions(place, (f) => f.sessions.map((x) => x.id))).toEqual([])
@@ -485,7 +485,7 @@ describe('following the project', () => {
     const place: SessionsPlace = { ...own, scope: 'folder:held-read' }
     expect(place.removed!()).toBe(false)
     // Its file's read is held; the project is removed meanwhile, writing its records into that file.
-    const file = join(p, '.hive', 'sessions.json')
+    const file = join(p, '.combwork', 'sessions.json')
     let release!: () => void
     const started = new Promise<void>((r) => (held.started = r))
     held.gate = new Promise<void>((r) => (release = r))
@@ -522,7 +522,7 @@ describe('following the project', () => {
       f.sessions.push(rec('late'))
     })
     expect((await run(() => workspace.sessionsFile(p))).sessions.map((x) => x.id)).toEqual(['before', 'late'])
-    expect(existsSync(join(p, '.hive', 'sessions.json'))).toBe(false)
+    expect(existsSync(join(p, '.combwork', 'sessions.json'))).toBe(false)
   })
 
   it('a project renamed keeps its records (they are under its id)', async () => {
@@ -530,7 +530,7 @@ describe('following the project', () => {
     const before = await run(() => workspace.sessionsFile(p))
     const renamed = join(wsPath, 'alpha-renamed')
     // Tried again while Windows refuses it (HI-1163): a refresh the earlier tests' folder changes scheduled may still be
-    // reading the project's .hive, and any file or listing open in a folder stops it being renamed (EPERM).
+    // reading the project's .combwork, and any file or listing open in a folder stops it being renamed (EPERM).
     await moveFolder(p, renamed)
     await run(() => workspace.projectIds({ fresh: true }))
     expect(await run(() => workspace.sessionsFile(renamed))).toEqual(before)

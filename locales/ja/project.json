@@ -333,7 +333,7 @@
   "project.settings.offLower": "オフ",
   "project.settings.on": "オン",
   "project.settings.onLower": "オン",
-  "project.settings.openHive": ".hiveフォルダーを開く",
+  "project.settings.openHive": ".combworkフォルダーを開く",
   "project.settings.overrides": "全体の既定値を上書きしています",
   "project.settings.reset": "リセット",
   "project.settings.resetButton": "既定に戻す",

@@ -139,7 +139,7 @@ const check = (name, ok, extra = '') => {
 
   // --- Races with the user's own edits (#186 review): a project config write held just before its file is replaced,
   // so another change waits for the lock behind it.
-  const projectFile = path.join(alpha, '.hive', 'project.json')
+  const projectFile = path.join(alpha, '.combwork', 'project.json')
   const holdNextWrite = () =>
     app.evaluate((_, target) => {
       const f = process.mainModule.require('original-fs/promises')

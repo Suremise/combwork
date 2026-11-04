@@ -1,5 +1,5 @@
 // Add MCP Server from File (#550): a .json definition or a .zip of a server folder, checked, unpacked safely into
-// .hive/mcp/<name>/ and added nowhere (HI-2059); a name in use is refused unless replaced; what it runs is shown by name.
+// .combwork/mcp/<name>/ and added nowhere (HI-2059); a name in use is refused unless replaced; what it runs is shown by name.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -80,10 +80,10 @@ describe('Add MCP Server from File', () => {
   beforeEach(async () => {
     const dir = join(base, `case-${++cases}`)
     const wsPath = join(dir, 'ws')
-    mcpDir = join(wsPath, '.hive', 'mcp')
+    mcpDir = join(wsPath, '.combwork', 'mcp')
     trashDir = join(dir, 'trash')
     process.env.HIVE_TEST_TRASH_DIR = trashDir
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -147,7 +147,7 @@ describe('Add MCP Server from File', () => {
     expect(existsSync(join(mcpDir, 'github-2.json'))).toBe(true)
   })
 
-  it("unpacks a server folder .zip into .hive/mcp/<name>/, its definition from hive-mcp.json or the mcp repo's example", async () => {
+  it("unpacks a server folder .zip into .combwork/mcp/<name>/, its definition from hive-mcp.json or the mcp repo's example", async () => {
     const f = file('ollama-v2.zip', ollamaZip())
     const preview = await run(() => mcp.previewMcpFile(f))
     expect(preview).toMatchObject({ name: 'ollama', files: 2, exists: false })
@@ -156,7 +156,7 @@ describe('Add MCP Server from File', () => {
     expect(m).toMatchObject({ projects: [], assistant: false })
     expect(readFileSync(join(mcpDir, 'ollama', 'server.js'), 'utf8')).toBe('// server')
     expect(existsSync(join(mcpDir, 'ollama', 'lib', 'util.js'))).toBe(true)
-    // The definition is the server's .json, not a file in its folder; nothing else is left in .hive/mcp.
+    // The definition is the server's .json, not a file in its folder; nothing else is left in .combwork/mcp.
     expect(existsSync(join(mcpDir, 'ollama', 'hive-mcp.example.json'))).toBe(false)
     expect(existsSync(join(mcpDir, '__MACOSX'))).toBe(false)
     expect(readFileSync(join(mcpDir, 'ollama.json'), 'utf8')).toContain('${HIVE_MCP_DIR}/ollama/server.js')

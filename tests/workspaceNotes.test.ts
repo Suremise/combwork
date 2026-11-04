@@ -122,7 +122,7 @@ describe('the note and its sections', () => {
     expect(advancedDef(DELIVER_WORKSPACE_NOTES)).toMatchObject({ kind: 'boolean', default: true, applies: 'sessions', group: 'hive' })
     expect(advancedDef(WORKSPACE_NOTES_MAX_ID)).toMatchObject({ kind: 'number', default: 4096, unit: 'bytes', applies: 'sessions' })
     expect(WORKSPACE_NOTES_PATH).toBe('Workspace notes.md')
-    expect(workspaceNotesPath('D:\\ws\\')).toBe('D:\\ws\\.hive\\shared\\Workspace notes.md')
+    expect(workspaceNotesPath('D:\\ws\\')).toBe('D:\\ws\\.combwork\\shared\\Workspace notes.md')
   })
 })
 
@@ -232,8 +232,8 @@ describe("in a workspace: the launch's notes and the switch", () => {
     const { workspaceNotesFor } = await import('../src/main/workspaceNotes')
     const root = join(base, 'ws')
     for (const p of PROJECTS) {
-      mkdirSync(join(root, p, '.hive'), { recursive: true })
-      writeFileSync(join(root, p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+      mkdirSync(join(root, p, '.combwork'), { recursive: true })
+      writeFileSync(join(root, p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     }
     const ws = createWorkspaceService()
     await ws.open(root)
@@ -272,8 +272,8 @@ describe("in a workspace: the launch's notes and the switch", () => {
     const { closeAllBoards } = await import('../src/main/boardStore')
     const root = join(base, 'ws-prompted')
     const proj = join(root, 'alpha')
-    mkdirSync(join(proj, '.hive'), { recursive: true })
-    writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-first', name: 'First' }, { id: 'a-second', name: 'Second' }] }))
+    mkdirSync(join(proj, '.combwork'), { recursive: true })
+    writeFileSync(join(proj, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-first', name: 'First' }, { id: 'a-second', name: 'Second' }] }))
     const old = '7b1d2e3f-0000-4000-8000-000000000000'
     const open = async () => {
       const ws = createWorkspaceService()

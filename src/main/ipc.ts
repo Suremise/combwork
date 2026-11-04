@@ -174,9 +174,9 @@ const M = {
   notWorktree: msg({ id: 'errors.worktree.notGit', defaultMessage: "{path} isn't a git worktree (it has no .git file). Choose the folder the worktree was moved to.", description: "Repair: the folder chosen as an agent's moved worktree isn't one. {path} is that folder. Keep \".git\" as it is." }),
   removeHow: msg({ id: 'errors.project.removeHow', defaultMessage: 'Unknown way to remove a project: {how}', description: "Refusal of a call to remove a project in a way that doesn't exist (a programming error, rarely seen). {how} is what it asked for." }),
   stopFirst: msg({ id: 'errors.project.stopFirst', defaultMessage: 'Stop the running session before deactivating this project.', description: 'Turning a project off while one of its agents is running.' }),
-  noRepo: msg({ id: 'errors.hive.noRepo', defaultMessage: 'No git repository holds this project: exclude .hive in the version control or sync service you use.', description: "Exclude .hive from git: the project isn't in a git repository. Keep \".hive\" as it is." }),
-  stillTracked: msg({ id: 'errors.hive.notIgnored', defaultMessage: "Git still doesn't ignore .hive here: a rule in a .gitignore (a line starting with !) may bring it back. Combwork doesn't edit .gitignore files.", description: 'Exclude .hive from git: after excluding it, git still sees it. Keep ".hive", ".gitignore" and "!" as they are.' }),
-  cantList: msg({ id: 'errors.hive.cantList', defaultMessage: "Git couldn't list the files it tracks in .hive.", description: 'Listing the files of .hive that git tracks failed. Keep ".hive" as it is.' }),
+  noRepo: msg({ id: 'errors.hive.noRepo', defaultMessage: 'No git repository holds this project: exclude .combwork in the version control or sync service you use.', description: "Exclude .combwork from git: the project isn't in a git repository. Keep \".combwork\" as it is." }),
+  stillTracked: msg({ id: 'errors.hive.notIgnored', defaultMessage: "Git still doesn't ignore .combwork here: a rule in a .gitignore (a line starting with !) may bring it back. Combwork doesn't edit .gitignore files.", description: 'Exclude .combwork from git: after excluding it, git still sees it. Keep ".combwork", ".gitignore" and "!" as they are.' }),
+  cantList: msg({ id: 'errors.hive.cantList', defaultMessage: "Git couldn't list the files it tracks in .combwork.", description: 'Listing the files of .combwork that git tracks failed. Keep ".combwork" as it is.' }),
   notImage: msg({ id: 'errors.image.not', defaultMessage: 'Not an image', description: "Copy image: the file isn't an image Hive can read." }),
   holdRequired: msg({ id: 'errors.mergeSlot.holdRequired', defaultMessage: 'Which hold to release is required', description: 'Releasing a merge slot without saying which (a programming error, rarely seen).' }),
   laneRequired: msg({ id: 'errors.lane.required', defaultMessage: 'Which lane to end is required', description: 'Ending a card loop without saying which (a programming error, rarely seen).' }),
@@ -459,7 +459,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     boardSteps(contextWorkspace()!, false, after)
     // Builds of Hive left for it while it was closed (#1534), into the journal once.
     void after.track('builds left for it', pickUpBuilds(ws).catch((e) => log.warn('recording the builds left for Hive', e))) // i18n-ignore: a part of a log line's timing
-    // What failed or interrupted saves and the project-id migration left in the .hive folders (#1016).
+    // What failed or interrupted saves and the project-id migration left in the .combwork folders (#1016).
     void after.track('leftovers', sweepWorkspaceLeftovers(ws).catch((e) => log.warn('removing leftover temp and backup files', e))) // i18n-ignore: a part of a log line's timing
     // Its open point's commands (HI-1954), in its window, its agents held until they're done (the gate reserved as it opened).
     void after.track('open commands', runOpenCommands(contextWorkspace()!)) // i18n-ignore: a part of a log line's timing

@@ -225,7 +225,7 @@ async function changeAssistant(patch: Omit<AgentPatch, 'name'>, restart: { title
 }
 
 /**
- * Makes a mode (a file in .hive/modes) this workspace's Assistant's, at once and without a restart (#259): a running Assistant
+ * Makes a mode (a file in .combwork/modes) this workspace's Assistant's, at once and without a restart (#259): a running Assistant
  * is told in its conversation (now, or when it has finished what it is doing), which keeps its context; its next
  * launch starts in the mode.
  */

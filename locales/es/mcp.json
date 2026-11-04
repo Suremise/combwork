@@ -4,7 +4,7 @@
   "mcp.add.message": "Los servidores del espacio de trabajo que aún no están agregados aquí. Las sesiones que se inicien desde ahora reciben el que agregues.",
   "mcp.add.title": "Agregar un servidor a {project}",
   "mcp.add.titleAssistant": "Agregar un servidor para el Asistente",
-  "mcp.addFile.messageAdded": "Agrega {file} al espacio de trabajo (.hive/mcp){files, plural, =0 {} one {, con su archivo en una carpeta propia} many {, con sus # archivos en una carpeta propia} other {, con sus # archivos en una carpeta propia}}, sin agregarlo aún a ningún proyecto. Agrégalo donde deba ejecutarse: la pestaña MCP de un proyecto, la vista del Asistente o Agregar a… aquí. Ejecuta:",
+  "mcp.addFile.messageAdded": "Agrega {file} al espacio de trabajo (.combwork/mcp){files, plural, =0 {} one {, con su archivo en una carpeta propia} many {, con sus # archivos en una carpeta propia} other {, con sus # archivos en una carpeta propia}}, sin agregarlo aún a ningún proyecto. Agrégalo donde deba ejecutarse: la pestaña MCP de un proyecto, la vista del Asistente o Agregar a… aquí. Ejecuta:",
   "mcp.addFile.replaceDetailAdded": "Reemplazar mueve el anterior (y la carpeta de uno agregado desde un .zip) a la Papelera de reciclaje y agrega este sin agregarlo aún a ningún proyecto: los proyectos y el Asistente que tenían el anterior lo pierden. O elige otro nombre.",
   "mcp.catalog.allSources": "Todas las fuentes",
   "mcp.catalog.badName": "Los nombres de servidor pueden tener letras, números, “-” y “_” (64 caracteres como máximo). “hive” está reservado.",

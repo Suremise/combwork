@@ -92,7 +92,7 @@ const tomlString = (v) => (v.startsWith('"') ? JSON.parse(v) : v)
         await lib.until(async () => (await inv('workspace:refresh'))?.projects?.some((p) => p.name === 'alpha'), HUNG_MS)
         if (catalog === 'long') {
           for (let i = 1; i <= 40; i++) {
-            const d = path.join(ws, '.hive', 'skills', `team-skill-${i}`)
+            const d = path.join(ws, '.combwork', 'skills', `team-skill-${i}`)
             fs.mkdirSync(d, { recursive: true })
             fs.writeFileSync(path.join(d, 'SKILL.md'), `---\nname: team-skill-${i}\ndescription: The team's procedure number ${i} for one of its recurring jobs. Use when the user asks for job ${i}.\n---\n\nSteps.\n`)
           }

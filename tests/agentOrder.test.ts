@@ -54,9 +54,9 @@ describe('saving the order', () => {
   let w: ReturnType<typeof createWorkspaceService>
   const wsPath = join(base, 'ws')
   const alpha = join(wsPath, 'alpha')
-  const file = join(alpha, '.hive', 'project.json')
+  const file = join(alpha, '.combwork', 'project.json')
   beforeAll(async () => {
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
     const agents = [
       { id: 'a1', name: 'Agent 1', model: 'opus' },
       { id: 'a2', name: 'Agent 2' },

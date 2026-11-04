@@ -84,8 +84,8 @@ const M = {
   newNote: msg({ id: 'assistant.sidebar.newNote', defaultMessage: 'New Note', description: "Shared Notes: the dialog's title." }),
   notePlaceholder: msg({ id: 'assistant.sidebar.notePlaceholder', defaultMessage: 'note-name.md', description: "Placeholder of the New Note dialog's name box: an example file name (lower case, a dash, .md). Keep .md." }),
   folderPlaceholder: msg({ id: 'assistant.sidebar.folderPlaceholder', defaultMessage: 'folder-name', description: "Placeholder of the New Folder dialog's name box (Shared Notes): an example folder name (lower case, a dash)." }),
-  folderMessage: msg({ id: 'assistant.sidebar.folderMessage', defaultMessage: 'Folder inside .hive/shared', description: 'Shared Notes, New Folder. Keep .hive/shared as it is.' }),
-  noteMessage: msg({ id: 'assistant.sidebar.noteMessage', defaultMessage: 'Markdown note inside .hive/shared. Agents can read it through the Combwork MCP tools.', description: 'Shared Notes, New Note. Keep .hive/shared as it is.' }),
+  folderMessage: msg({ id: 'assistant.sidebar.folderMessage', defaultMessage: 'Folder inside .combwork/shared', description: 'Shared Notes, New Folder. Keep .combwork/shared as it is.' }),
+  noteMessage: msg({ id: 'assistant.sidebar.noteMessage', defaultMessage: 'Markdown note inside .combwork/shared. Agents can read it through the Combwork MCP tools.', description: 'Shared Notes, New Note. Keep .combwork/shared as it is.' }),
   create: msg({ id: 'assistant.sidebar.create', defaultMessage: 'Create', description: "New Note's, New Folder's and New MCP Server's button." }),
   createFailed: msg({ id: 'assistant.sidebar.createFailed', defaultMessage: 'Could not create', description: 'An error notice: a shared note or folder.' }),
   newNoteHere: msg({ id: 'assistant.sidebar.newNoteHere', defaultMessage: 'New Note Here', description: "A shared notes folder's right-click menu." }),
@@ -98,18 +98,18 @@ const M = {
   delete: msg({ id: 'assistant.sidebar.delete', defaultMessage: 'Delete', description: "A shared note's right-click menu." }),
   deleteFolder: msg({ id: 'assistant.sidebar.deleteFolder', defaultMessage: 'Delete folder', description: 'A button on a shared notes folder.' }),
   deleteNote: msg({ id: 'assistant.sidebar.deleteNote', defaultMessage: 'Delete note', description: "A trash button beside a shared note: deletes it." }),
-  notesTip: msg({ id: 'assistant.sidebar.notesTip', defaultMessage: "Notes, instructions and handovers stored in the workspace's .hive/shared folder. Shared across every project and session.", description: 'Tooltip on Shared Notes. Keep .hive/shared as it is.' }),
+  notesTip: msg({ id: 'assistant.sidebar.notesTip', defaultMessage: "Notes, instructions and handovers stored in the workspace's .combwork/shared folder. Shared across every project and session.", description: 'Tooltip on Shared Notes. Keep .combwork/shared as it is.' }),
   newNoteButton: msg({ id: 'assistant.sidebar.newNoteButton', defaultMessage: 'New Note…', description: "A button over the shared notes: creates a note." }),
   newFolderButton: msg({ id: 'assistant.sidebar.newFolderButton', defaultMessage: 'New Folder…', description: "A button over the shared notes: creates a folder." }),
-  openFolder: msg({ id: 'assistant.sidebar.openFolder', defaultMessage: 'Open Folder', description: "Shared Notes: a button that opens .hive/shared in Explorer." }),
+  openFolder: msg({ id: 'assistant.sidebar.openFolder', defaultMessage: 'Open Folder', description: "Shared Notes: a button that opens .combwork/shared in Explorer." }),
   workspaceNotes: msg({ id: 'assistant.sidebar.workspaceNotes', defaultMessage: 'Workspace notes', description: "The pinned first row of Shared Notes: the note Hive gives every agent when it starts (notes about this machine). Keep Workspace notes in English: it is the note's name (its file is Workspace notes.md) and what agents are told." }),
-  workspaceNotesTip: msg({ id: 'assistant.sidebar.workspaceNotesTip', defaultMessage: "Notes about this machine (a full path, a local tool's version) that every agent gets when it starts, on every coding agent and in any folder. Kept in .hive/shared, out of git.", description: 'Tooltip on the pinned Workspace notes row of Shared Notes. Keep .hive/shared as it is.' }),
+  workspaceNotesTip: msg({ id: 'assistant.sidebar.workspaceNotesTip', defaultMessage: "Notes about this machine (a full path, a local tool's version) that every agent gets when it starts, on every coding agent and in any folder. Kept in .combwork/shared, out of git.", description: 'Tooltip on the pinned Workspace notes row of Shared Notes. Keep .combwork/shared as it is.' }),
   noNotes: msg({ id: 'assistant.sidebar.noNotes', defaultMessage: 'No notes yet. Create one, or ask an agent to write a handover with the Combwork MCP tools.', description: "The Shared Notes sidebar when the workspace has no notes." }),
   openFirst: msg({ id: 'assistant.sidebar.openFirst', defaultMessage: 'Open a workspace first', description: 'A notice: adding a skill with no workspace open.' }),
   skills: msg({ id: 'assistant.sidebar.skills', defaultMessage: 'Skills', description: "The heading of the Skills sidebar: the workspace's Hive skills." }),
   newSkill: msg({ id: 'assistant.sidebar.newSkill', defaultMessage: 'New Skill…', description: "A button over the Hive skills: creates a skill." }),
   skillFromFile: msg({ id: 'assistant.sidebar.skillFromFile', defaultMessage: 'Add Skill from File (.md or .zip)…', description: 'The Skills sidebar: a button. Keep .md and .zip as they are.' }),
-  openSkillsFolder: msg({ id: 'assistant.sidebar.openSkillsFolder', defaultMessage: 'Open Combwork Skills Folder', description: 'The Skills sidebar: a button that opens .hive/skills in Explorer.' }),
+  openSkillsFolder: msg({ id: 'assistant.sidebar.openSkillsFolder', defaultMessage: 'Open Combwork Skills Folder', description: 'The Skills sidebar: a button that opens .combwork/skills in Explorer.' }),
   filterSkills: msg({ id: 'assistant.sidebar.filterSkills', defaultMessage: 'Filter skills', description: "The Skills sidebar's filter box, empty." }),
   hiveGroup: msg({ id: 'assistant.sidebar.hiveGroup', defaultMessage: 'Combwork', description: "The Skills sidebar: the section of the workspace's Hive skills. Usually kept as Hive." }),
   noWorkspaceSkills: msg({ id: 'assistant.sidebar.noWorkspaceSkills', defaultMessage: 'Open a workspace to manage Combwork skills.', description: 'The Skills sidebar with no workspace open.' }),
@@ -122,13 +122,13 @@ const M = {
   skillsHint: msg({ id: 'assistant.sidebar.skillsHint', defaultMessage: "Each goes to the project agents in every project, unless it's marked <b>Assistant</b> (only the Assistant gets it) or <b>Agents + Assistant</b>. A project's own skills, and your user and plugin skills, are in its <b>Skills</b> tab.", description: "Under the Skills sidebar's list. <b> is bold: the badges' words (Assistant, Agents + Assistant) and the tab's name, as they show." }),
   mcpServers: msg({ id: 'assistant.sidebar.mcpServers', defaultMessage: 'MCP Servers', description: "The heading of the MCP sidebar: the workspace's MCP servers." }),
   newServerTitle: msg({ id: 'assistant.sidebar.newServerTitle', defaultMessage: 'New MCP Server', description: "The title of the dialog that creates an MCP server." }),
-  newServerMessage: msg({ id: 'assistant.sidebar.newServerMessage', defaultMessage: 'Creates {file} in the workspace from a template you can edit.', description: 'New MCP Server. {file} is .hive/mcp/<name>.json, <name> standing for the name you type.' }),
+  newServerMessage: msg({ id: 'assistant.sidebar.newServerMessage', defaultMessage: 'Creates {file} in the workspace from a template you can edit.', description: 'New MCP Server. {file} is .combwork/mcp/<name>.json, <name> standing for the name you type.' }),
   serverNameRule: msg({ id: 'assistant.sidebar.serverNameRule', defaultMessage: 'Use letters, numbers, "-" and "_". "combwork" and "hive" are reserved.', description: "New MCP Server: a name that can't be used. Keep combwork and hive as they are (the built-in server's name and its old one, HI-2463)." }),
   createServerFailed: msg({ id: 'assistant.sidebar.createServerFailed', defaultMessage: 'Could not create server', description: "An error notice: New MCP Server couldn't create the server's file; the reason follows." }),
-  mcpTip: msg({ id: 'assistant.sidebar.mcpTipAdded', defaultMessage: "MCP servers deployed to the workspace (.hive/mcp) are available to every project and the Assistant, and run only where they are added: a project's MCP tab, the Assistant's view, or Add to… here. Changes apply to new sessions.", description: 'Tooltip on MCP Servers (HI-2059). Keep .hive/mcp as it is; "MCP tab" and "Add to…" as Hive shows them.' }),
+  mcpTip: msg({ id: 'assistant.sidebar.mcpTipAdded', defaultMessage: "MCP servers deployed to the workspace (.combwork/mcp) are available to every project and the Assistant, and run only where they are added: a project's MCP tab, the Assistant's view, or Add to… here. Changes apply to new sessions.", description: 'Tooltip on MCP Servers (HI-2059). Keep .combwork/mcp as it is; "MCP tab" and "Add to…" as Hive shows them.' }),
   newServer: msg({ id: 'assistant.sidebar.newServer', defaultMessage: 'New MCP Server…', description: "A button over the MCP servers: creates a server from a template." }),
   serverFromFile: msg({ id: 'assistant.sidebar.serverFromFile', defaultMessage: 'Add MCP Server from File (.json or .zip)…', description: 'The MCP sidebar: a button. Keep .json and .zip as they are.' }),
-  openMcpFolder: msg({ id: 'assistant.sidebar.openMcpFolder', defaultMessage: 'Open MCP Folder', description: 'The MCP sidebar: a button that opens .hive/mcp in Explorer.' }),
+  openMcpFolder: msg({ id: 'assistant.sidebar.openMcpFolder', defaultMessage: 'Open MCP Folder', description: 'The MCP sidebar: a button that opens .combwork/mcp in Explorer.' }),
   workspaceGroup: msg({ id: 'assistant.sidebar.workspaceGroup', defaultMessage: 'Workspace', description: "The MCP sidebar: the section of the workspace's servers." }),
   installedTab: msg({ id: 'assistant.sidebar.mcpInstalled', defaultMessage: 'Installed', description: "The MCP view's first tab (HI-545): the workspace's servers." }),
   catalogueTab: msg({ id: 'assistant.sidebar.mcpCatalogue', defaultMessage: 'Catalogue', description: "The MCP view's second tab (HI-545): servers from the MCP catalogues, to install." }),
@@ -619,7 +619,7 @@ function NotesPanel() {
       <div key={n.path}>
         <div
           className={cx('row', selected === n.path && 'selected')}
-          // Its path in .hive/shared (#1571): what a test finds a note or folder by, whatever the window's language.
+          // Its path in .combwork/shared (#1571): what a test finds a note or folder by, whatever the window's language.
           data-note={n.relPath}
           style={{ paddingLeft: 12 + depth * 14 }}
           onClick={() => (n.isDir ? setExpanded((e) => ({ ...e, [n.relPath]: !e[n.relPath] })) : set({ selectedNote: n.path }))}
@@ -674,7 +674,7 @@ function NotesPanel() {
           <IconButton icon="new-file" title={tr(M.newNoteButton)} onClick={() => void create(false)} />
           <IconButton icon="new-folder" title={tr(M.newFolderButton)} onClick={() => void create(true)} />
           <IconButton icon="refresh" title={tr(M.refresh)} onClick={load} />
-          <IconButton icon="folder-opened" title={tr(M.openFolder)} onClick={() => void call('app:openPath', `${wsPath}\\.hive\\shared`)} />
+          <IconButton icon="folder-opened" title={tr(M.openFolder)} onClick={() => void call('app:openPath', `${wsPath}\\.combwork\\shared`)} />
         </div>
       </div>
       <div className="pane-body">
@@ -818,7 +818,7 @@ function McpPanel() {
   const create = async (): Promise<void> => {
     const name = await prompt({
       title: tr(M.newServerTitle),
-      message: tr(M.newServerMessage, { file: '.hive/mcp/<name>.json' }),
+      message: tr(M.newServerMessage, { file: '.combwork/mcp/<name>.json' }),
       placeholder: tr(msg({ id: 'actions.mcp.namePlaceholder', defaultMessage: 'server-name', description: "Placeholder of the server's name box: an example name (lower case, a dash)." })),
       confirmLabel: tr(M.create),
       validate: (v) => (/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(v.trim()) && !isReservedServerName(v) ? null : tr(M.serverNameRule))

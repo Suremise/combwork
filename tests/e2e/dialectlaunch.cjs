@@ -22,7 +22,7 @@ const wsB = path.join(lib.WORK, 'dialectlaunch-ws-b')
 const claudeHome = path.join(lib.WORK, 'dialectlaunch-claude-home')
 const codexHome = path.join(lib.WORK, 'dialectlaunch-codex-home')
 const proj = path.join(ws, 'alpha')
-const dialects = path.join(ws, '.hive', 'dialects')
+const dialects = path.join(ws, '.combwork', 'dialects')
 const PORT = lib.port(47710)
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -166,7 +166,7 @@ function initialize(def) {
 
   // hive-mcp.js (Claude Code's contract comes from its instructions) and hive-progress get the chain's file.
   const launch = claudeLaunch()
-  const mcp = launch?.opts?.['--mcp-config'] ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers?.combwork : null
+  const mcp = launch?.opts?.['--mcp-config'] ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers?.hive : null
   const file = mcp?.env?.CW_DIALECT_FILE
   check("Clara's hive server is given its chain's file, and its shell too (for hive-progress)", !!file && fs.existsSync(file) && launch.env?.CW_DIALECT_FILE === file && mcp.env.CW_DIALECT === d1?.hash, JSON.stringify({ file, env: launch?.env }))
   const instructions = (await initialize(mcp))?.instructions ?? ''
@@ -223,8 +223,8 @@ function initialize(def) {
   // request names, whichever window has the focus, its early and error replies too; naming none of two, the Default.
   writeWorkspace('WS-HOST-1', 'A-ROUTE')
   check("workspace A's API chain follows its edit", !!(await until(async () => (await said(wsToken, { at: ws })).startsWith('A-ROUTE '), HUNG_MS)), await said(wsToken, { at: ws }))
-  fs.mkdirSync(path.join(wsB, '.hive', 'dialects'), { recursive: true })
-  fs.writeFileSync(path.join(wsB, '.hive', 'dialects', 'workspace.json'), dialectFile('Workspace', { 'api.http.noRoute': noRoute('B-ROUTE'), 'api.http.bodyJson': 'B-JSON' }))
+  fs.mkdirSync(path.join(wsB, '.combwork', 'dialects'), { recursive: true })
+  fs.writeFileSync(path.join(wsB, '.combwork', 'dialects', 'workspace.json'), dialectFile('Workspace', { 'api.http.noRoute': noRoute('B-ROUTE'), 'api.http.bodyJson': 'B-JSON' }))
   const next = app.waitForEvent('window')
   await inv('window:new')
   const second = await next

@@ -172,11 +172,11 @@ function mcp(config, msgs) {
   const update = list?.result?.tools?.find((t) => t.name === 'cw_update_task')
   check('cw_update_task describes reviewing, and takes review', /reviewing isn't working on it/.test(update?.inputSchema?.properties?.review?.description ?? '') && JSON.stringify(update?.inputSchema?.properties?.review?.enum) === '["start","passed","failed"]', JSON.stringify(update?.inputSchema?.properties?.review))
   // The reviewer's launch carries the review skill (its own copy, in its launch plugin).
-  const skillFile = path.join(alpha, '.hive', `launch-${reviewer.id}`, 'plugin', 'skills', 'review-agent-work', 'SKILL.md')
+  const skillFile = path.join(alpha, '.combwork', `launch-${reviewer.id}`, 'plugin', 'skills', 'review-agent-work', 'SKILL.md')
   // HI-2011: the review mechanics are in its reference file beside SKILL.md, copied with it.
   const otherTargets = path.join(path.dirname(skillFile), 'other-targets.md')
   check("the reviewer's launch has the review-agent-work skill", fs.existsSync(skillFile) && fs.existsSync(otherTargets) && /review: "start"/.test(fs.readFileSync(otherTargets, 'utf8')))
-  check('…but not the Assistant\'s coordinate-agents', !fs.existsSync(path.join(alpha, '.hive', `launch-${reviewer.id}`, 'plugin', 'skills', 'coordinate-agents')))
+  check('…but not the Assistant\'s coordinate-agents', !fs.existsSync(path.join(alpha, '.combwork', `launch-${reviewer.id}`, 'plugin', 'skills', 'coordinate-agents')))
 
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'All checks passed')

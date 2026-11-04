@@ -22,7 +22,7 @@ import { dialectsDir } from './dialects/store'
  * - a copy the user changed is kept as it is (the Skills, Modes and Dialects views offer Revert, and say when the copy
  *   came from an older version);
  * - an item the user deleted stays deleted (the views offer Restore).
- * `.hive/bundled.json` records which items the workspace has been given and the version each copy came from.
+ * `.combwork/bundled.json` records which items the workspace has been given and the version each copy came from.
  * bundledHistory.json lists every version Hive has shipped of each (scripts/bundled-history.mjs), oldest first.
  */
 
@@ -40,7 +40,7 @@ const SLOW_ITEM_MS = 500
  */
 export type BundledKind = 'skills' | 'modes' | 'dialects'
 
-/** What `.hive/bundled.json` holds: per item, the shipped version its copy was made from (null: not Hive's copy). */
+/** What `.combwork/bundled.json` holds: per item, the shipped version its copy was made from (null: not Hive's copy). */
 interface Manifest {
   skills: Record<string, { from: string | null }>
   modes: Record<string, { from: string | null }>
@@ -248,10 +248,10 @@ export async function syncBundled(opts: { fresh?: boolean } = {}): Promise<void>
 }
 
 /**
- * Until 0.9.3 the modes were personas, in .hive/personas (#1084): the folder is moved to .hive/modes as it is, the
+ * Until 0.9.3 the modes were personas, in .combwork/personas (#1084): the folder is moved to .combwork/modes as it is, the
  * user's edits and the copies bundled.json tracks with it, as the workspace opens (before its folders are watched, which
  * would hold them). One that can't be moved now (a file in it open) is used where it is (workspace.modesDir) and moved
- * the next time; one an older Hive made again beside .hive/modes is left alone.
+ * the next time; one an older Hive made again beside .combwork/modes is left alone.
  */
 async function moveLegacyModes(): Promise<void> {
   const from = join(workspace.hiveDir, LEGACY_MODES_DIR)
@@ -260,9 +260,9 @@ async function moveLegacyModes(): Promise<void> {
   try {
     // A moment's lock (an indexer, a virus scan) is waited out; a file held open fails it.
     await renameRetrying(from, to)
-    log.info("Moved the Assistant's modes from .hive/personas to .hive/modes")
+    log.info("Moved the Assistant's modes from .combwork/personas to .combwork/modes")
   } catch (e) {
-    log.warn('Could not move .hive/personas to .hive/modes: its modes are used where they are until the next time', e)
+    log.warn('Could not move .combwork/personas to .combwork/modes: its modes are used where they are until the next time', e)
   }
 }
 

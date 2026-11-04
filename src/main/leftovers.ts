@@ -29,7 +29,7 @@ export function importedBackup(name: string): { base: string; at: number } | nul
 }
 
 /**
- * One of Hive's stores: a folder (relative to a .hive) and the files Hive writes there. Only a temp file of one of those
+ * One of Hive's stores: a folder (relative to a .combwork) and the files Hive writes there. Only a temp file of one of those
  * files (`temp`), the migration's copy of one it migrated (`bak`), or the backup kept when one moved into the workspace
  * database (`imported`), is ever removed: the same suffix on anything else (the user's notes, attachments, a folder Hive
  * doesn't know) is never taken for one.
@@ -41,7 +41,7 @@ export interface Store {
   imported?: RegExp
 }
 
-/** The workspace's .hive: its settings and records, the board, metrics and the Assistant's home. */
+/** The workspace's .combwork: its settings and records, the board, metrics and the Assistant's home. */
 export const WORKSPACE_STORES: Store[] = [
   // The board's card files moved as their folder, `tasks` (#1017).
   { dir: '.', temp: /^(workspace|lanes|watches|project-names|handover-owners|bundled)\.json(\.bak)?$/i, bak: /^(lanes|watches)\.json$/i, imported: /^(tasks|lanes\.json|watches\.json)$/i },
@@ -54,7 +54,7 @@ export const WORKSPACE_STORES: Store[] = [
   { dir: join('assistant', 'archive'), temp: /^[\w-]+\.jsonl(\.gz)?$/i }
 ]
 
-/** A project's .hive: its settings, sessions and deliveries, and its transcript backups. */
+/** A project's .combwork: its settings, sessions and deliveries, and its transcript backups. */
 export const PROJECT_STORES: Store[] = [
   { dir: '.', temp: /^(project|sessions|deliveries|sync)\.json(\.bak)?$/i, imported: /^(sessions|deliveries)\.json$/i },
   { dir: 'sessions', temp: /^[\w-]+\.jsonl(\.gz)?$/i },
@@ -62,7 +62,7 @@ export const PROJECT_STORES: Store[] = [
 ]
 
 /**
- * Whether a store's folder is where it says, inside its .hive: the .hive and every folder down to it a real folder, never
+ * Whether a store's folder is where it says, inside its .combwork: the .combwork and every folder down to it a real folder, never
  * a link or junction (which would make a folder outside it look like Hive's store).
  */
 async function plainDir(hive: string, dir: string): Promise<boolean> {
@@ -85,9 +85,9 @@ export interface Swept {
 
 /**
  * Removes what Hive's writes left in its stores (#1016): temp files of its atomic writes a crash left (older than a day)
- * and the project-id migration's `*.before-ids.bak` copies (older than a week). Each root is a .hive with its stores;
+ * and the project-id migration's `*.before-ids.bak` copies (older than a week). Each root is a .combwork with its stores;
  * only the files each store names are looked at, in that folder only (not its subfolders), and only in a store that is a
- * real folder inside its .hive, never one reached through a link or junction, and never a link to a file. What can't be removed (held
+ * real folder inside its .combwork, never one reached through a link or junction, and never a link to a file. What can't be removed (held
  * open) is left for the next open. Stops when `signal` is aborted, checked again just before each removal.
  * The backups kept when a store moved into the workspace database (#1111: the board's `tasks` folder, metrics.json…) go
  * two weeks after the move, by the time in their name, to the Recycle Bin (`trash`, given for tests), a folder whole.
@@ -141,7 +141,7 @@ export async function sweepLeftovers(roots: { hive: string; stores: Store[] }[],
 }
 
 /**
- * The sweep for a workspace as it opens: its .hive and its projects' (hidden ones too), told in the log once. The
+ * The sweep for a workspace as it opens: its .combwork and its projects' (hidden ones too), told in the log once. The
  * workspace and its lifetime are taken together before anything is awaited: if it closes or the window opens another
  * meanwhile, nothing more is removed, and nothing of the next workspace's is ever looked at.
  */

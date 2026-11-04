@@ -4,7 +4,7 @@ import { basename, join } from 'path'
 
 /**
  * The workspace presence marker (#1207, SPEC §16.17): from 1.0 every Hive with a workspace open keeps
- * `.hive/open/<profile>.json` (its pid and a heartbeat), removed as it closes. A marker whose heartbeat is older than
+ * `.combwork/open/<profile>.json` (its pid and a heartbeat), removed as it closes. A marker whose heartbeat is older than
  * STALE_MS, or whose process is gone, is stale (a Hive that crashed). Migrations and the merge queue's lock read it as a
  * second sign that another Hive has the workspace open, beside SQLite's lock (a 0.9 Hive writes none).
  */
@@ -53,6 +53,32 @@ const alive = (pid: number): boolean => {
     // EPERM: it runs, as another user.
     return (e as NodeJS.ErrnoException).code === 'EPERM'
   }
+}
+
+/**
+ * The fresh markers of any other process (HI-2462, the folder move): as othersPresent, but by the process, not the
+ * marker's name, so another process of the same profile (whose marker this one's own write replaces) counts too.
+ */
+export function othersPresentByProcess(hiveDir: string, now = Date.now()): PresenceMarker[] {
+  let names: string[]
+  try {
+    names = readdirSync(join(hiveDir, PRESENCE_DIR))
+  } catch {
+    return []
+  }
+  const out: PresenceMarker[] = []
+  for (const f of names) {
+    if (!f.endsWith('.json')) continue
+    try {
+      const m = JSON.parse(readFileSync(join(hiveDir, PRESENCE_DIR, f), 'utf8')) as Partial<PresenceMarker>
+      const beat = Date.parse(String(m.heartbeat))
+      if (typeof m.pid !== 'number' || m.pid === process.pid || !Number.isFinite(beat) || now - beat > STALE_MS || !alive(m.pid)) continue
+      out.push(m as PresenceMarker)
+    } catch {
+      // Being written, or not a marker: not a Hive's.
+    }
+  }
+  return out
 }
 
 /** The fresh markers of other profiles: their heartbeat recent and their process running. */

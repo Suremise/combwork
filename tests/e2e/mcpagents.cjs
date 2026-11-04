@@ -27,9 +27,9 @@ const check = (name, ok, extra = '') => {
   fs.mkdirSync(proj, { recursive: true })
   fs.mkdirSync(shots, { recursive: true })
   // Two servers, both on in the workspace (they never run: the fake Claude Code only records its --mcp-config).
-  fs.mkdirSync(path.join(ws, '.hive', 'mcp'), { recursive: true })
-  for (const n of ['notes', 'sandbox']) fs.writeFileSync(path.join(ws, '.hive', 'mcp', `${n}.json`), JSON.stringify({ description: `The ${n} server`, command: 'node', args: [`${n}.js`] }))
-  fs.writeFileSync(path.join(ws, '.hive', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes', 'sandbox'] } }))
+  fs.mkdirSync(path.join(ws, '.combwork', 'mcp'), { recursive: true })
+  for (const n of ['notes', 'sandbox']) fs.writeFileSync(path.join(ws, '.combwork', 'mcp', `${n}.json`), JSON.stringify({ description: `The ${n} server`, command: 'node', args: [`${n}.js`] }))
+  fs.writeFileSync(path.join(ws, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes', 'sandbox'] } }))
   const env = lib.fakeClaude(userData, home, [proj, ws])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -98,14 +98,14 @@ const check = (name, ok, extra = '') => {
       for (const l of lines.map((x) => JSON.parse(x))) {
         const f = l.opts?.['--mcp-config']
         const servers = f && fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')).mcpServers : null
-        if (servers?.combwork?.env?.HIVE_AGENT_ID === agentId) return servers
+        if (servers?.hive?.env?.HIVE_AGENT_ID === agentId) return servers
       }
       return null
     }
     const b = await lib.until(() => launched(builder.id), 30000)
     const t = await lib.until(() => launched(tester.id), 30000)
-    check("Builder's launch has both servers", !!b?.notes && !!b?.sandbox && !!b?.combwork, JSON.stringify(Object.keys(b ?? {})))
-    check("Tester's launch has only sandbox, and the hive server", !t?.notes && !!t?.sandbox && !!t?.combwork, JSON.stringify(Object.keys(t ?? {})))
+    check("Builder's launch has both servers", !!b?.notes && !!b?.sandbox && !!b?.hive, JSON.stringify(Object.keys(b ?? {})))
+    check("Tester's launch has only sandbox, and the hive server", !t?.notes && !!t?.sandbox && !!t?.hive, JSON.stringify(Object.keys(t ?? {})))
 
     // --- The API changes the choice; a running agent is told to restart; ["*"] puts all back.
     // Changes through the Agent API are the Assistant's: started (in the workspace folder) for its token.

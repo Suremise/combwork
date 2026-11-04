@@ -56,7 +56,7 @@
   },
   "service.attachments.notOwn": {
     "text": "{folder} is a link or not a folder of the project's own, so Combwork keeps no attachments in it.",
-    "note": "An error keeping a pasted or dropped file for a session: its folder {folder} (in the project's .hive) is a link or leads elsewhere, so Hive writes nothing through it.",
+    "note": "An error keeping a pasted or dropped file for a session: its folder {folder} (in the project's .combwork) is a link or leads elsewhere, so Hive writes nothing through it.",
     "audience": "both"
   },
   "service.benchmarks.allPinned": {
@@ -535,18 +535,18 @@
     "audience": "both"
   },
   "service.hiveVcs.cantList": {
-    "text": "Git couldn't list the files it tracks in .hive.",
-    "note": "An error untracking the project's .hive folder from git: git couldn't list them. Keep .hive as it is (a folder name).",
+    "text": "Git couldn't list the files it tracks in .combwork.",
+    "note": "An error untracking the project's .combwork folder from git: git couldn't list them. Keep .combwork as it is (a folder name).",
     "audience": "both"
   },
   "service.hiveVcs.cantListWhy": {
-    "text": "Git couldn't list the files it tracks in .hive ({problem}).",
-    "note": "An error untracking the project's .hive folder from git: git can't run; {problem} says why (\"Git isn't installed\"). Keep .hive as it is (a folder name).",
+    "text": "Git couldn't list the files it tracks in .combwork ({problem}).",
+    "note": "An error untracking the project's .combwork folder from git: git can't run; {problem} says why (\"Git isn't installed\"). Keep .combwork as it is (a folder name).",
     "audience": "both"
   },
   "service.hiveVcs.changed": {
-    "text": "The files git tracks in .hive changed since you were shown them: nothing was untracked. Look again.",
-    "note": "An error untracking the project's .hive folder from git: the list of its tracked files changed after Hive showed it, so nothing changed. Keep .hive as it is.",
+    "text": "The files git tracks in .combwork changed since you were shown them: nothing was untracked. Look again.",
+    "note": "An error untracking the project's .combwork folder from git: the list of its tracked files changed after Hive showed it, so nothing changed. Keep .combwork as it is.",
     "audience": "both"
   },
   "service.hiveVcs.exitCode": {
@@ -556,12 +556,12 @@
   },
   "service.hiveVcs.noRepo": {
     "text": "No git repository holds this project.",
-    "note": "An error untracking the project's .hive folder (Hive's own files) from git: the project isn't in a git repository.",
+    "note": "An error untracking the project's .combwork folder (Hive's own files) from git: the project isn't in a git repository.",
     "audience": "both"
   },
   "service.hiveVcs.rmFailed": {
     "text": "git rm --cached failed: {why}",
-    "note": "An error untracking the project's .hive folder from git: the git command (git rm --cached: keep it) failed; {why} is git's own first line, or why git can't run.",
+    "note": "An error untracking the project's .combwork folder from git: the git command (git rm --cached: keep it) failed; {why} is git's own first line, or why git can't run.",
     "audience": "both"
   },
   "service.intent.noWorkflow": {

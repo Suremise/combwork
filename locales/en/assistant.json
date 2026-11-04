@@ -545,7 +545,7 @@
   },
   "assistant.modes.newMessage": {
     "defaultMessage": "Creates {file} in the workspace, to describe in your own words how the Assistant should work.",
-    "description": "The New Mode dialog. {file} is .hive/modes/<name>.md, <name> standing for the name you type."
+    "description": "The New Mode dialog. {file} is .combwork/modes/<name>.md, <name> standing for the name you type."
   },
   "assistant.modes.newTitle": {
     "defaultMessage": "New Mode",
@@ -624,8 +624,8 @@
     "description": "Under a mode of Hive's own that was deleted from the workspace."
   },
   "assistant.modes.tip": {
-    "defaultMessage": "A mode is how the Assistant works: what it puts first and how it hands things back, in a Markdown file in the workspace (.hive/modes). The panel's mode menu switches between them at once, keeping the conversation; Settings → Assistant sets the default.",
-    "description": "Tooltip on the Modes section of the Assistant view. Keep .hive/modes as it is."
+    "defaultMessage": "A mode is how the Assistant works: what it puts first and how it hands things back, in a Markdown file in the workspace (.combwork/modes). The panel's mode menu switches between them at once, keeping the conversation; Settings → Assistant sets the default.",
+    "description": "Tooltip on the Modes section of the Assistant view. Keep .combwork/modes as it is."
   },
   "assistant.modes.updateBadge": {
     "defaultMessage": "Update available",
@@ -1144,8 +1144,8 @@
     "description": "The Skills sidebar's filter box, empty."
   },
   "assistant.sidebar.folderMessage": {
-    "defaultMessage": "Folder inside .hive/shared",
-    "description": "Shared Notes, New Folder. Keep .hive/shared as it is."
+    "defaultMessage": "Folder inside .combwork/shared",
+    "description": "Shared Notes, New Folder. Keep .combwork/shared as it is."
   },
   "assistant.sidebar.folderPlaceholder": {
     "defaultMessage": "folder-name",
@@ -1200,8 +1200,8 @@
     "description": "The heading of the MCP sidebar: the workspace's MCP servers."
   },
   "assistant.sidebar.mcpTipAdded": {
-    "defaultMessage": "MCP servers deployed to the workspace (.hive/mcp) are available to every project and the Assistant, and run only where they are added: a project's MCP tab, the Assistant's view, or Add to… here. Changes apply to new sessions.",
-    "description": "Tooltip on MCP Servers (HI-2059). Keep .hive/mcp as it is; \"MCP tab\" and \"Add to…\" as Hive shows them."
+    "defaultMessage": "MCP servers deployed to the workspace (.combwork/mcp) are available to every project and the Assistant, and run only where they are added: a project's MCP tab, the Assistant's view, or Add to… here. Changes apply to new sessions.",
+    "description": "Tooltip on MCP Servers (HI-2059). Keep .combwork/mcp as it is; \"MCP tab\" and \"Add to…\" as Hive shows them."
   },
   "assistant.sidebar.needYou": {
     "defaultMessage": "{count, plural, one {# agent needs you} other {# agents need you}}",
@@ -1245,7 +1245,7 @@
   },
   "assistant.sidebar.newServerMessage": {
     "defaultMessage": "Creates {file} in the workspace from a template you can edit.",
-    "description": "New MCP Server. {file} is .hive/mcp/<name>.json, <name> standing for the name you type."
+    "description": "New MCP Server. {file} is .combwork/mcp/<name>.json, <name> standing for the name you type."
   },
   "assistant.sidebar.newServerTitle": {
     "defaultMessage": "New MCP Server",
@@ -1292,16 +1292,16 @@
     "description": "The Skills sidebar with no workspace open."
   },
   "assistant.sidebar.noteMessage": {
-    "defaultMessage": "Markdown note inside .hive/shared. Agents can read it through the Combwork MCP tools.",
-    "description": "Shared Notes, New Note. Keep .hive/shared as it is."
+    "defaultMessage": "Markdown note inside .combwork/shared. Agents can read it through the Combwork MCP tools.",
+    "description": "Shared Notes, New Note. Keep .combwork/shared as it is."
   },
   "assistant.sidebar.notePlaceholder": {
     "defaultMessage": "note-name.md",
     "description": "Placeholder of the New Note dialog's name box: an example file name (lower case, a dash, .md). Keep .md."
   },
   "assistant.sidebar.notesTip": {
-    "defaultMessage": "Notes, instructions and handovers stored in the workspace's .hive/shared folder. Shared across every project and session.",
-    "description": "Tooltip on Shared Notes. Keep .hive/shared as it is."
+    "defaultMessage": "Notes, instructions and handovers stored in the workspace's .combwork/shared folder. Shared across every project and session.",
+    "description": "Tooltip on Shared Notes. Keep .combwork/shared as it is."
   },
   "assistant.sidebar.off": {
     "defaultMessage": "Off",
@@ -1317,15 +1317,15 @@
   },
   "assistant.sidebar.openFolder": {
     "defaultMessage": "Open Folder",
-    "description": "Shared Notes: a button that opens .hive/shared in Explorer."
+    "description": "Shared Notes: a button that opens .combwork/shared in Explorer."
   },
   "assistant.sidebar.openMcpFolder": {
     "defaultMessage": "Open MCP Folder",
-    "description": "The MCP sidebar: a button that opens .hive/mcp in Explorer."
+    "description": "The MCP sidebar: a button that opens .combwork/mcp in Explorer."
   },
   "assistant.sidebar.openSkillsFolder": {
     "defaultMessage": "Open Combwork Skills Folder",
-    "description": "The Skills sidebar: a button that opens .hive/skills in Explorer."
+    "description": "The Skills sidebar: a button that opens .combwork/skills in Explorer."
   },
   "assistant.sidebar.openWorkspace": {
     "defaultMessage": "Open Workspace",
@@ -1480,8 +1480,8 @@
     "description": "The pinned first row of Shared Notes: the note Hive gives every agent when it starts (notes about this machine). Keep Workspace notes in English: it is the note's name (its file is Workspace notes.md) and what agents are told."
   },
   "assistant.sidebar.workspaceNotesTip": {
-    "defaultMessage": "Notes about this machine (a full path, a local tool's version) that every agent gets when it starts, on every coding agent and in any folder. Kept in .hive/shared, out of git.",
-    "description": "Tooltip on the pinned Workspace notes row of Shared Notes. Keep .hive/shared as it is."
+    "defaultMessage": "Notes about this machine (a full path, a local tool's version) that every agent gets when it starts, on every coding agent and in any folder. Kept in .combwork/shared, out of git.",
+    "description": "Tooltip on the pinned Workspace notes row of Shared Notes. Keep .combwork/shared as it is."
   },
   "assistant.skills.add": {
     "defaultMessage": "Add",
@@ -1621,7 +1621,7 @@
   },
   "assistant.skills.fileMessage": {
     "defaultMessage": "Adds {file} to {where}. A .md becomes the skill's SKILL.md; a .zip is unpacked as the skill's folder.",
-    "description": "The Add Skill from File dialog. {file} is the file chosen; {where} where it goes (\"the workspace (.hive/skills)\"). Keep .md, .zip and SKILL.md as they are."
+    "description": "The Add Skill from File dialog. {file} is the file chosen; {where} where it goes (\"the workspace (.combwork/skills)\"). Keep .md, .zip and SKILL.md as they are."
   },
   "assistant.skills.fileTitle": {
     "defaultMessage": "Add Skill from File",
@@ -1661,7 +1661,7 @@
   },
   "assistant.skills.newMessage": {
     "defaultMessage": "Creates {file} in {where}. Use lowercase letters, numbers and dashes.",
-    "description": "The New Skill dialog. {file} is <name>/SKILL.md, <name> standing for the name you type; {where} where it goes (\"the workspace (.hive/skills)\")."
+    "description": "The New Skill dialog. {file} is <name>/SKILL.md, <name> standing for the name you type; {where} where it goes (\"the workspace (.combwork/skills)\")."
   },
   "assistant.skills.newTitle": {
     "defaultMessage": "New Skill",
@@ -1792,8 +1792,8 @@
     "description": "Under Copied … to the workspace, for a project's own skill: the project's copy stays. {provider} is Claude Code, Codex…"
   },
   "assistant.skills.tipHive": {
-    "defaultMessage": "Combwork skills live in the workspace (.hive/skills). Each goes to the project agents (every agent in every project, of every provider), to the Assistant, or to both, as the audience in its SKILL.md says (the project agents if it says none). Combwork copies them for each session when it starts, so edits reach new sessions. Add, edit and delete them in the Skills view.",
-    "description": "Tooltip on the Hive skills. Keep .hive/skills, SKILL.md and audience as they are."
+    "defaultMessage": "Combwork skills live in the workspace (.combwork/skills). Each goes to the project agents (every agent in every project, of every provider), to the Assistant, or to both, as the audience in its SKILL.md says (the project agents if it says none). Combwork copies them for each session when it starts, so edits reach new sessions. Add, edit and delete them in the Skills view.",
+    "description": "Tooltip on the Hive skills. Keep .combwork/skills, SKILL.md and audience as they are."
   },
   "assistant.skills.tipLocal": {
     "defaultMessage": "Skills in the project folder for one provider (.claude/skills for Claude Code, .agents/skills for Codex). That provider's agents load them in this project. You manage them: add, edit and delete them here.",
@@ -1824,7 +1824,7 @@
     "description": "A banner over the Hive skills and a Hive skill being edited. <b> is bold."
   },
   "assistant.skills.whereHive": {
-    "defaultMessage": "the workspace (.hive/skills)",
+    "defaultMessage": "the workspace (.combwork/skills)",
     "description": "Where a skill is added, inside New Skill and Add Skill from File: the Hive skills. Lower case: it is part of a sentence."
   },
   "assistant.skills.whereLocal": {
@@ -2624,8 +2624,8 @@
     "description": "Where to keep a template: a project, in a list."
   },
   "assistant.templates.tip": {
-    "defaultMessage": "A template is a project's agents (their roles in the workflow and settings) and layout, saved under a name. Combwork's own are read-only: duplicate one to change it. The workspace's are for every project, a project's are its own (kept in its .hive, out of git). Export one to share it as a file.",
-    "description": "Tooltip on Templates (the Templates view and a project's Templates tab). Keep .hive as it is. Glossary: workflow role."
+    "defaultMessage": "A template is a project's agents (their roles in the workflow and settings) and layout, saved under a name. Combwork's own are read-only: duplicate one to change it. The workspace's are for every project, a project's are its own (kept in its .combwork, out of git). Export one to share it as a file.",
+    "description": "Tooltip on Templates (the Templates view and a project's Templates tab). Keep .combwork as it is. Glossary: workflow role."
   },
   "assistant.templates.title": {
     "defaultMessage": "Templates",

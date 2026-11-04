@@ -29,7 +29,7 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 const until = (fn, ms) => lib.until(fn, ms, 200)
-const dbFile = path.join(fx.ws, '.hive', 'hive.db')
+const dbFile = path.join(fx.ws, '.combwork', 'hive.db')
 
 /** The workspace's board as Hive 0.9.3 left it: its two schema steps, no cards. */
 function board09() {
@@ -91,8 +91,8 @@ const log = () => {
   board09()
   // The project as 0.9 left it: a project.json with no platform recorded (1.0 records it as it makes one), so the
   // upgrade gives it its options, and leaves its merge style and commit message to be asked (HI-1697).
-  fs.mkdirSync(path.join(fx.alpha, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(fx.alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+  fs.mkdirSync(path.join(fx.alpha, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(fx.alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   // Opened as the user opens it: the ask shows, nothing is pre-answered (no HIVE_TEST_BOARD_UPGRADE), options kept for after.
   let h = await q.startHive(fx, { port: PORT, keepOptions: true })
   try {
@@ -139,7 +139,7 @@ const log = () => {
     // No restart: "Hive merges" into integration, and a card approved now goes to the queue. The upgrade left the merge
     // style and commit message unchosen (HI-1697): the queue asks under For you before it merges, and merges as answered.
     await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { commitMessage: undefined }) })
-    const projectJson = () => JSON.parse(fs.readFileSync(path.join(fx.alpha, '.hive', 'project.json'), 'utf8'))
+    const projectJson = () => JSON.parse(fs.readFileSync(path.join(fx.alpha, '.combwork', 'project.json'), 'utf8'))
     check('the upgrade marked the project: its merge style and commit message are to be asked (a save keeping them keeps it)', projectJson().workflow?.mergeAsk === true, JSON.stringify(projectJson().workflow))
     let reviewer = await q.agent(fx, h, 'R1')
     check('the reviewer has its token', !!reviewer.token)

@@ -39,7 +39,7 @@ const write = (file: string, text: string): void => {
   mkdirSync(join(file, '..'), { recursive: true })
   writeFileSync(file, text)
 }
-const backup = (id: string): string => join(p, '.hive', 'sessions', `${id}.jsonl`)
+const backup = (id: string): string => join(p, '.combwork', 'sessions', `${id}.jsonl`)
 const cliFile = (id: string): string => join(cli, `${id}.jsonl`)
 /** A kept usage, priced as Hive kept them before the history. */
 const keptUsage = (sid: string, output: number): SessionUsage => {
@@ -59,9 +59,9 @@ describe('the usage history of a workspace', () => {
   const noUsage = newId()
 
   beforeAll(async () => {
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
     // An old Hive's usage-cache.json, which the history replaces.
     mkdirSync(join(base, 'profile'), { recursive: true })
     writeFileSync(join(base, 'profile', 'usage-cache.json'), '{"version":"0.9.3","entries":[]}')
@@ -72,7 +72,7 @@ describe('the usage history of a workspace', () => {
     // Sessions as an older Hive left them: records (one whose transcripts went, with its kept usage) and a deleted one's usage.
     const at = new Date(T0).toISOString()
     write(
-      join(p, '.hive', 'sessions.json'),
+      join(p, '.combwork', 'sessions.json'),
       JSON.stringify({
         version: 1,
         sessions: [

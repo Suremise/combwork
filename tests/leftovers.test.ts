@@ -42,8 +42,8 @@ function put(file: string, now: number, ageFromNow?: number): string {
 describe('sweeping the leftovers (#1016)', () => {
   it("sends a move's backups to the Recycle Bin two weeks after the move, by the time in their name, and nothing else (#1111)", async () => {
     const ws = tempDir('hive-leftovers-imported-')
-    const hive = join(ws, '.hive')
-    const project = join(ws, 'alpha', '.hive')
+    const hive = join(ws, '.combwork')
+    const project = join(ws, 'alpha', '.combwork')
     const moved = Date.parse('2026-10-01T12:00:00.000Z')
     const now = moved + IMPORTED_AGE_MS + HOUR
     const name = (base: string, at = moved): string => `${base}.imported-${new Date(at).toISOString().replace(/[:.]/g, '-')}`
@@ -82,7 +82,7 @@ describe('sweeping the leftovers (#1016)', () => {
   })
 
   it("removes old temp files and the migration's old backups, and nothing else", async () => {
-    const hive = join(tempDir('hive-leftovers-'), '.hive')
+    const hive = join(tempDir('hive-leftovers-'), '.combwork')
     // Files made now are eight days old at `now`: older than both limits. Ones dated an hour before `now` are new.
     const now = Date.now() + BAK_AGE_MS + 24 * HOUR
     const gone = [
@@ -128,9 +128,9 @@ describe('sweeping the leftovers (#1016)', () => {
     expect((await sweepLeftovers([{ hive, stores: WORKSPACE_STORES }], { now })).removed).toEqual([])
   })
 
-  it("sweeps the workspace's .hive and each project's, hidden ones too, and says what went in one line", async () => {
+  it("sweeps the workspace's .combwork and each project's, hidden ones too, and says what went in one line", async () => {
     const ws = tempDir('hive-leftovers-ws-')
-    const files = [join(ws, '.hive', 'tasks', '9.json.before-ids.bak'), join(ws, 'alpha', '.hive', 'sessions.json.12-1.tmp'), join(ws, 'beta', '.hive', 'deliveries.json.12-ab12cd34.tmp')].map((f) => put(f, 0))
+    const files = [join(ws, '.combwork', 'tasks', '9.json.before-ids.bak'), join(ws, 'alpha', '.combwork', 'sessions.json.12-1.tmp'), join(ws, 'beta', '.combwork', 'deliveries.json.12-ab12cd34.tmp')].map((f) => put(f, 0))
     // Opened eight days after they were made (only Date is faked: the file calls run as they do).
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(Date.now() + BAK_AGE_MS + 24 * HOUR)
@@ -147,7 +147,7 @@ describe('sweeping the leftovers (#1016)', () => {
   it("never removes anything of a workspace switched away from while its projects were listed, nor looks at the next one's (round 1)", async () => {
     const a = tempDir('hive-leftovers-a-')
     const b = tempDir('hive-leftovers-b-')
-    const files = [join(a, '.hive', 'tasks', '1.json.12-1.tmp'), join(a, 'alpha', '.hive', 'sessions.json.12-2.tmp'), join(b, '.hive', 'tasks', '1.json.12-3.tmp'), join(b, 'beta', '.hive', 'sessions.json.12-4.tmp')].map((f) => put(f, 0))
+    const files = [join(a, '.combwork', 'tasks', '1.json.12-1.tmp'), join(a, 'alpha', '.combwork', 'sessions.json.12-2.tmp'), join(b, '.combwork', 'tasks', '1.json.12-3.tmp'), join(b, 'beta', '.combwork', 'sessions.json.12-4.tmp')].map((f) => put(f, 0))
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(Date.now() + BAK_AGE_MS + 24 * HOUR)
     for (const at of ['shown', 'hidden'] as const) {
@@ -170,7 +170,7 @@ describe('sweeping the leftovers (#1016)', () => {
     }
   })
 
-  it('never follows a link or junction out of the .hive: a linked store, a linked folder above one, or a linked .hive (round 2)', async () => {
+  it('never follows a link or junction out of the .combwork: a linked store, a linked folder above one, or a linked .combwork (round 2)', async () => {
     const base = tempDir('hive-leftovers-links-')
     const now = Date.now() + BAK_AGE_MS + 24 * HOUR
     // Folders elsewhere, with old files named as a store's would be.
@@ -179,13 +179,13 @@ describe('sweeping the leftovers (#1016)', () => {
     const viaTasksBak = outside('tasks', '1.json.before-ids.bak')
     const viaMetrics = outside('metrics', join('benchmarks', 'run.json.12-2.tmp'))
     const viaHive = outside('hive', join('tasks', '2.json.12-3.tmp'))
-    const ws = join(base, 'ws', '.hive')
+    const ws = join(base, 'ws', '.combwork')
     mkdirSync(ws, { recursive: true })
     junction(join(base, 'elsewhere', 'tasks'), join(ws, 'tasks')) // the store itself linked
     junction(join(base, 'elsewhere', 'metrics'), join(ws, 'metrics')) // a folder above metrics/benchmarks linked
-    const linkedHive = join(base, 'linked', '.hive')
+    const linkedHive = join(base, 'linked', '.combwork')
     mkdirSync(dirname(linkedHive), { recursive: true })
-    junction(join(base, 'elsewhere', 'hive'), linkedHive) // the .hive itself linked
+    junction(join(base, 'elsewhere', 'hive'), linkedHive) // the .combwork itself linked
     // A real store beside them is still swept.
     const real = put(join(ws, 'lanes.json.12-4.tmp'), now)
     const swept = await sweepLeftovers([{ hive: ws, stores: WORKSPACE_STORES }, { hive: linkedHive, stores: WORKSPACE_STORES }], { now })
@@ -195,7 +195,7 @@ describe('sweeping the leftovers (#1016)', () => {
   })
 
   it("a project's stores are only its settings, sessions, deliveries and transcript backups", async () => {
-    const hive = join(tempDir('hive-leftovers-project-'), '.hive')
+    const hive = join(tempDir('hive-leftovers-project-'), '.combwork')
     const now = Date.now() + BAK_AGE_MS + 24 * HOUR
     // A backup compressed, or decompressed to archive it, part way when Hive stopped (#1110).
     const gone = [put(join(hive, 'project.json.1-1.tmp'), now), put(join(hive, 'sessions.json.bak.1-2.tmp'), now), put(join(hive, 'sessions', 'abc-123.jsonl.1-3.tmp'), now), put(join(hive, 'sessions', 'abc-123.jsonl.gz.1-7.tmp'), now), put(join(hive, 'archive', 'abc-123.jsonl.1-8.tmp'), now)]
@@ -206,7 +206,7 @@ describe('sweeping the leftovers (#1016)', () => {
   })
 
   it('stops when the workspace closes', async () => {
-    const hive = join(tempDir('hive-leftovers-closed-'), '.hive')
+    const hive = join(tempDir('hive-leftovers-closed-'), '.combwork')
     const now = Date.now() + BAK_AGE_MS + 24 * HOUR
     const f = put(join(hive, 'tasks', '1.json.4242-1.tmp'), now)
     const life = new AbortController()

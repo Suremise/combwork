@@ -35,8 +35,8 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     [beta, [{ id: 'b-one', name: 'Beta One' }]]
   ]) {
     lib.gitProject(dir)
-    fs.mkdirSync(path.join(dir, '.hive'), { recursive: true })
-    fs.writeFileSync(path.join(dir, '.hive', 'project.json'), JSON.stringify({ version: 2, agents }))
+    fs.mkdirSync(path.join(dir, '.combwork'), { recursive: true })
+    fs.writeFileSync(path.join(dir, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents }))
   }
 
   const { app, page } = await lib.launch({ userData, env: { ...env, HIVE_TEST_CLI_HOME_CONNECTION: '0' }, viewport: { width: 1400, height: 900 } })

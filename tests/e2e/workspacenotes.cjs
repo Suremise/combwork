@@ -25,7 +25,7 @@ const copilotDir = path.join(lib.WORK, 'workspacenotes-copilot')
 const apiLog = path.join(lib.WORK, 'workspacenotes-copilot-api.jsonl')
 const proj = path.join(ws, 'alpha')
 const other = path.join(ws, 'beta')
-const noteFile = path.join(ws, '.hive', 'shared', 'Workspace notes.md')
+const noteFile = path.join(ws, '.combwork', 'shared', 'Workspace notes.md')
 const note = (edition) => `# Workspace notes\n\nNOTE-ALL-${edition}: node is C:\\tools\\node22\\node.exe here.\n\n## alpha\nNOTE-ALPHA-${edition}\n\n## beta\nNOTE-BETA-${edition}\n`
 let failed = 0
 const check = (name, ok, extra = '') => {

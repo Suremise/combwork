@@ -11,7 +11,7 @@ import { msg } from '../shared/i18n'
 import { hiveError } from './hiveError'
 
 /**
- * Keeping a project's .hive (sessions, transcript backups, launch settings: this machine's, not the project's) out of
+ * Keeping a project's .combwork (sessions, transcript backups, launch settings: this machine's, not the project's) out of
  * version control (#345). Hive adds it to git's .git/info/exclude, never to a tracked .gitignore, for the repository
  * that holds the project: its own, or one in a folder above it (a workspace kept in git). It does so when a project is
  * set up, at every refresh and before every launch, so a repository made later (`git init`) is covered too. Where it
@@ -79,22 +79,22 @@ export function literalPattern(part: string): string {
   return part.replace(/[\\[\]*?]/g, (c) => `\\${c}`)
 }
 
-/** The exclude line for a project's .hive in a repository whose working folder is `root`: anchored at the project. */
+/** The exclude line for a project's .combwork in a repository whose working folder is `root`: anchored at the project. */
 export function excludeLine(root: string, projectPath: string): string {
   const rel = relative(root, projectPath).split(/[\\/]/).filter(Boolean).map(literalPattern).join('/')
   return rel ? `/${rel}/${HIVE_DIR}/` : `/${HIVE_DIR}/`
 }
 
-/** Whether exclude-file text has the line (or, for a repository's own .hive, the unanchored form). */
+/** Whether exclude-file text has the line (or, for a repository's own .combwork, the unanchored form). */
 export function hasExcludeLine(text: string, line: string): boolean {
   return text.split(/\r?\n/).some((l) => l.trim() === line || (line === `/${HIVE_DIR}/` && l.trim() === `${HIVE_DIR}/`))
 }
 
-/** What git said of whether it ignores a project's .hive, kept until its exclude file changes or for a minute. */
+/** What git said of whether it ignores a project's .combwork, kept until its exclude file changes or for a minute. */
 const ignoredCache = new Map<string, { at: number; stamp: string; ignored: boolean }>()
 
 /**
- * Whether git ignores the project's .hive, as git itself says (`git check-ignore --no-index`: by the ignore rules
+ * Whether git ignores the project's .combwork, as git itself says (`git check-ignore --no-index`: by the ignore rules
  * alone, whatever is tracked; a `.gitignore` rule can bring it back). Null when git can't be asked (not installed).
  */
 async function gitIgnores(projectPath: string, excludeFile: string): Promise<boolean | null> {
@@ -117,8 +117,8 @@ async function gitIgnores(projectPath: string, excludeFile: string): Promise<boo
 }
 
 /**
- * Adds the project's .hive to the info/exclude of the git repository holding it, if it isn't there, then asks git
- * whether it ignores it now (a line Hive wrote isn't proof: a `.gitignore` rule can bring .hive back). Returns that, the
+ * Adds the project's .combwork to the info/exclude of the git repository holding it, if it isn't there, then asks git
+ * whether it ignores it now (a line Hive wrote isn't proof: a `.gitignore` rule can bring .combwork back). Returns that, the
  * repository's working folder, whether Hive added the line and whether git confirmed it (`unconfirmed`: git couldn't be
  * asked, missing say, #346); null when no git repository holds the project.
  */
@@ -161,11 +161,11 @@ function indexOf(folder: string): string | null {
   }
 }
 
-/** What git said is tracked under a project's .hive, kept until the repository's index changes (#364). */
+/** What git said is tracked under a project's .combwork, kept until the repository's index changes (#364). */
 const trackedCache = new Map<string, { stamp: string; files: string[] | null }>()
 
 /**
- * Files under the project's .hive that git tracks (#364): committed before Hive excluded it (an exclude rule only keeps
+ * Files under the project's .combwork that git tracks (#364): committed before Hive excluded it (an exclude rule only keeps
  * untracked files out, so git goes on committing changes to these). `git ls-files` in the project, asked again only
  * when the repository's index changes (a commit, `git rm --cached`), not at every refresh, or with `fresh`. Null when git
  * can't say (not kept: asked again next time).
@@ -198,27 +198,27 @@ export async function trackedHiveFiles(projectPath: string, root: string, opts: 
 const RM_CHUNK = 100
 
 /**
- * Untracks the files under the project's .hive the user was shown (#364), and only those: git is asked afresh what it
+ * Untracks the files under the project's .combwork the user was shown (#364), and only those: git is asked afresh what it
  * tracks there, and if that isn't exactly the confirmed list (a file staged or untracked since), nothing changes. Then
  * `git rm --cached` on those literal paths alone (`--literal-pathspecs`, never the folder, so nothing added meanwhile is
  * touched), which stages their removal and leaves them on disk; the user commits it. Returns how many.
  */
 export async function untrackHive(projectPath: string, confirmed: string[]): Promise<number> {
   const found = vcsOf(projectPath)
-  if (found?.kind !== 'git') throw hiveError(msg({ id: 'service.hiveVcs.noRepo', defaultMessage: 'No git repository holds this project.', description: "An error untracking the project's .hive folder (Hive's own files) from git: the project isn't in a git repository." }))
+  if (found?.kind !== 'git') throw hiveError(msg({ id: 'service.hiveVcs.noRepo', defaultMessage: 'No git repository holds this project.', description: "An error untracking the project's .combwork folder (Hive's own files) from git: the project isn't in a git repository." }))
   const now = await trackedHiveFiles(projectPath, found.root, { fresh: true })
   if (now === null) {
     const problem = gitProblemData(gitTool())
     throw problem
-      ? hiveError(msg({ id: 'service.hiveVcs.cantListWhy', defaultMessage: "Git couldn't list the files it tracks in .hive ({problem}).", description: "An error untracking the project's .hive folder from git: git can't run; {problem} says why (\"Git isn't installed\"). Keep .hive as it is (a folder name)." }), { problem })
-      : hiveError(msg({ id: 'service.hiveVcs.cantList', defaultMessage: "Git couldn't list the files it tracks in .hive.", description: "An error untracking the project's .hive folder from git: git couldn't list them. Keep .hive as it is (a folder name)." }))
+      ? hiveError(msg({ id: 'service.hiveVcs.cantListWhy', defaultMessage: "Git couldn't list the files it tracks in .combwork ({problem}).", description: "An error untracking the project's .combwork folder from git: git can't run; {problem} says why (\"Git isn't installed\"). Keep .combwork as it is (a folder name)." }), { problem })
+      : hiveError(msg({ id: 'service.hiveVcs.cantList', defaultMessage: "Git couldn't list the files it tracks in .combwork.", description: "An error untracking the project's .combwork folder from git: git couldn't list them. Keep .combwork as it is (a folder name)." }))
   }
   const shown = new Set(Array.isArray(confirmed) ? confirmed.filter((f) => typeof f === 'string') : [])
-  if (now.length !== shown.size || now.some((f) => !shown.has(f))) throw hiveError(msg({ id: 'service.hiveVcs.changed', defaultMessage: 'The files git tracks in .hive changed since you were shown them: nothing was untracked. Look again.', description: "An error untracking the project's .hive folder from git: the list of its tracked files changed after Hive showed it, so nothing changed. Keep .hive as it is." }), undefined, { kind: 'conflict' })
+  if (now.length !== shown.size || now.some((f) => !shown.has(f))) throw hiveError(msg({ id: 'service.hiveVcs.changed', defaultMessage: 'The files git tracks in .combwork changed since you were shown them: nothing was untracked. Look again.', description: "An error untracking the project's .combwork folder from git: the list of its tracked files changed after Hive showed it, so nothing changed. Keep .combwork as it is." }), undefined, { kind: 'conflict' })
   try {
     for (let i = 0; i < now.length; i += RM_CHUNK) {
       const r = await git(projectPath, ['--literal-pathspecs', 'rm', '--cached', '--quiet', '--', ...now.slice(i, i + RM_CHUNK)])
-      if (!r.ok) throw hiveError(msg({ id: 'service.hiveVcs.rmFailed', defaultMessage: 'git rm --cached failed: {why}', description: "An error untracking the project's .hive folder from git: the git command (git rm --cached: keep it) failed; {why} is git's own first line, or why git can't run." }), { why: gitProblemData(gitTool()) ?? (r.err.split(/\r?\n/)[0] || withValues(msg({ id: 'service.hiveVcs.exitCode', defaultMessage: 'exit code {code}', description: 'Why a git command failed when git said nothing: the number it exited with.' }), { code: r.code })) })
+      if (!r.ok) throw hiveError(msg({ id: 'service.hiveVcs.rmFailed', defaultMessage: 'git rm --cached failed: {why}', description: "An error untracking the project's .combwork folder from git: the git command (git rm --cached: keep it) failed; {why} is git's own first line, or why git can't run." }), { why: gitProblemData(gitTool()) ?? (r.err.split(/\r?\n/)[0] || withValues(msg({ id: 'service.hiveVcs.exitCode', defaultMessage: 'exit code {code}', description: 'Why a git command failed when git said nothing: the number it exited with.' }), { code: r.code })) })
     }
   } finally {
     trackedCache.delete(projectPath.toLowerCase())
@@ -254,7 +254,7 @@ export function syncServiceOf(path: string, roots: [string, string][]): string |
 
 let roots: { at: number; list: [string, string][] } | null = null
 
-/** Whether the project's .hive is kept out of version control, ensuring it for git first (at each refresh). */
+/** Whether the project's .combwork is kept out of version control, ensuring it for git first (at each refresh). */
 export async function hiveVcs(projectPath: string): Promise<HiveVcs> {
   // Sync folders change rarely: read them at most once a minute.
   if (!roots || Date.now() - roots.at > 60_000) roots = { at: Date.now(), list: syncRoots() }

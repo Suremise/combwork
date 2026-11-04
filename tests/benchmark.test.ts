@@ -682,7 +682,7 @@ describe('kept comparisons (main/benchmarks.ts)', async () => {
     mkdirSync(join(path, 'alpha'), { recursive: true })
     const w = createWorkspaceService()
     await w.open(path)
-    return { w, path, ctx: () => kept.benchContext(w), dir: join(path, '.hive', 'metrics', 'benchmarks') }
+    return { w, path, ctx: () => kept.benchContext(w), dir: join(path, '.combwork', 'metrics', 'benchmarks') }
   }
   const file = (name: string, textValue: string): string => {
     const f = join(base, `${name}-${++n}.json`)
@@ -770,7 +770,7 @@ describe('kept comparisons (main/benchmarks.ts)', async () => {
     await expect(kept.selectBenchmarks(ctxA, WS, null, null)).rejects.toThrow(/closed or switched/)
     if ('ask' in ask) expect(await kept.importBenchmark(kept.benchContext(A.w), { kind: 'project', project: 'alpha' }, { token: ask.ask.token, useProjectPart: true })).toMatchObject({ error: expect.stringMatching(/no longer waiting/) })
     expect((await kept.listBenchmarks(kept.benchContext(A.w), WS)).entries).toEqual([])
-    expect(existsSync(join(B, '.hive', 'metrics', 'benchmarks'))).toBe(false)
+    expect(existsSync(join(B, '.combwork', 'metrics', 'benchmarks'))).toBe(false)
     // Queued changes whose workspace closes before their turn: refused too.
     const ctxB = kept.benchContext(A.w)
     const first = kept.importBenchmark(ctxB, WS, { path: file('b', fixture('baseline')) })
@@ -928,7 +928,7 @@ describe('kept comparisons: damage and closing mid-change (#117 round 2)', async
     mkdirSync(join(path, 'alpha'), { recursive: true })
     const w = createWorkspaceService()
     await w.open(path)
-    return { w, path, ctx: () => kept.benchContext(w), dir: join(path, '.hive', 'metrics', 'benchmarks') }
+    return { w, path, ctx: () => kept.benchContext(w), dir: join(path, '.combwork', 'metrics', 'benchmarks') }
   }
   const file = (name: string, textValue: string): string => {
     const f = join(base, `${name}-${++n}.json`)
@@ -1090,7 +1090,7 @@ describe('kept comparisons: damage and closing mid-change (#117 round 2)', async
     expect(existsSync(join(A.dir, `${ids[0]}.json`))).toBe(true)
     expect(readdirSync(A.dir).filter((x) => /^[0-9a-f]{12}\.json$/.test(x)).length).toBe(BENCHMARK_LIMITS.kept)
     expect(readdirSync(A.dir).some((x) => /staged/.test(x))).toBe(false)
-    expect(existsSync(join(B, '.hive', 'metrics', 'benchmarks'))).toBe(false)
+    expect(existsSync(join(B, '.combwork', 'metrics', 'benchmarks'))).toBe(false)
     await disposeWorkspaceService(A.w)
   })
 })
@@ -1107,7 +1107,7 @@ describe('kept comparisons: bounds that hold under failing removals; quarantine 
     mkdirSync(join(path, 'alpha'), { recursive: true })
     const w = createWorkspaceService()
     await w.open(path)
-    return { w, path, ctx: () => kept.benchContext(w), dir: join(path, '.hive', 'metrics', 'benchmarks') }
+    return { w, path, ctx: () => kept.benchContext(w), dir: join(path, '.combwork', 'metrics', 'benchmarks') }
   }
   const entryOf = (r: any) => {
     if (!('entry' in r)) throw new Error(JSON.stringify(r))
@@ -1215,7 +1215,7 @@ describe('kept comparisons: Windows rename retries stop when the workspace goes 
     mkdirSync(join(path, 'alpha'), { recursive: true })
     const w = createWorkspaceService()
     await w.open(path)
-    return { w, path, ctx: () => kept.benchContext(w), dir: join(path, '.hive', 'metrics', 'benchmarks') }
+    return { w, path, ctx: () => kept.benchContext(w), dir: join(path, '.combwork', 'metrics', 'benchmarks') }
   }
   const entryOf = (r: any) => {
     if (!('entry' in r)) throw new Error(JSON.stringify(r))
@@ -1263,7 +1263,7 @@ describe('kept comparisons: Windows rename retries stop when the workspace goes 
       await A.w.open(B)
       h.release()
       await expect(importing).rejects.toThrow(/closed or switched/)
-      expect(existsSync(join(B, '.hive', 'metrics', 'benchmarks'))).toBe(false)
+      expect(existsSync(join(B, '.combwork', 'metrics', 'benchmarks'))).toBe(false)
       h.restore()
       // Back in A: the unfinished add is rolled back on the first read; only the first comparison is kept.
       await A.w.close()

@@ -3,7 +3,7 @@ import { carryLegacyAgentFields, legacyWorktree, type LegacyAgentFields, type Na
 import { basename, dirname, join, resolve, sep } from 'path'
 import { mkdir, readdir, readFile, stat, writeFile } from 'original-fs/promises'
 import { existsSync, statSync, watch, type FSWatcher as RootWatcher } from 'original-fs'
-import { boardWrite, closeBoard, inBoardWrite, untilBoardOpenable } from './boardStore'
+import { boardFile, boardWrite, closeBoard, inBoardWrite, untilBoardOpenable } from './boardStore'
 import { closeJournal, untilJournalOpenable } from './journal'
 import { AsyncLocalStorage } from 'async_hooks'
 import type { BrowserWindow } from 'electron'
@@ -40,10 +40,12 @@ import { gitProblem } from './gitTool'
 import { duplicateAgentNames, suggestAgentName } from '../shared/agentNames'
 import { NO_PROJECT_IDS, isProjectId, settleProjectIds, type ProjectIdEntry, type ProjectIdIndex } from '../shared/projectIds'
 import { migrateProjectPreferences } from '../shared/workflow/preferences'
+import { classify, finishMove, moveFolders, type MoveOptions } from './combworkMove'
+import { movedPathOf } from '../shared/hiveFolderMove'
 
 const log = createLogger('workspace')
 
-/** The workspace's dialect files (dialects, HI-2065), in .hive: as dialects/store.ts's dialectsDir names it. */
+/** The workspace's dialect files (dialects, HI-2065), in .combwork: as dialects/store.ts's dialectsDir names it. */
 const DIALECTS_DIR = 'dialects'
 
 /**
@@ -61,7 +63,7 @@ function loadedConfig(raw: unknown): WorkspaceConfig {
 export const projectViewKey = (cfg: Pick<ProjectConfig, 'id'>, projectPath: string): string => (cfg.id ? `id:${cfg.id}` : `path:${resolve(projectPath).toLowerCase()}`)
 /** A project's read for the window this slow is logged with its parts' times (HI-1694). */
 const SLOW_PROJECT_READ_MS = 1000
-/** What the board keeps in .hive (#1017): its database and the files beside it, the cards' old folders, backups and the deleted cards' staging. */
+/** What the board keeps in .combwork (#1017): its database and the files beside it, the cards' old folders, backups and the deleted cards' staging. */
 const BOARD_FILES = /^(hive\.db(-wal|-shm|-journal)?|tasks|tasks\..+|backups|deleted-cards)$/
 /** How often a workspace root whose folder went is tried again (#964). */
 const ROOT_WATCH_RETRY_MS = 3000
@@ -73,7 +75,7 @@ const M = {
   gitFound: msg({ id: 'service.workspace.platformGitFound', defaultMessage: '{project} is a Git repository now. Combwork goes on treating it as a project without version control until you switch it in its Version Control tab.', description: 'A notice: someone ran git init in a project Hive treats as having no version control. Hive does not switch it by itself: the Version Control tab offers the switch (glossary 2.1: Version Control).' }),
   repositoryGone: msg({ id: 'service.workspace.platformRepositoryGone', defaultMessage: "{project}'s Git repository is gone. Git's rules hold, so its cards can't move on until the repository is back or you switch the project to None in its Version Control tab.", description: "A notice: the .git folder of a project Hive treats as a Git project was removed or moved. Hive doesn't switch it by itself: the Version Control tab offers the switch to None (glossary 2.1)." }),
   platformInvalidTitle: msg({ id: 'service.workspace.platformInvalidTitle', defaultMessage: 'Unknown version control setting in {project}', description: "A notice's title: the project {project}'s settings file names a version control Hive doesn't have." }),
-  platformInvalid: msg({ id: 'service.workspace.platformInvalid', defaultMessage: "{project}'s project.json names a version control Combwork doesn't know (platform: {value}). Until it says \"git\" or \"none\", Combwork uses what it finds in the folder.", description: 'A notice: the platform setting in the project {project}\'s .hive/project.json is {value}, which is not one Hive has (only "git" and "none" are: keep them as they are, they are setting values).' }),
+  platformInvalid: msg({ id: 'service.workspace.platformInvalid', defaultMessage: "{project}'s project.json names a version control Combwork doesn't know (platform: {value}). Until it says \"git\" or \"none\", Combwork uses what it finds in the folder.", description: 'A notice: the platform setting in the project {project}\'s .combwork/project.json is {value}, which is not one Hive has (only "git" and "none" are: keep them as they are, they are setting values).' }),
   otherFound: msg({ id: 'service.workspace.platformOtherFound', defaultMessage: "{vcs} was found in {project}. Combwork doesn't support it yet, and goes on treating the project as a Git project until you switch it to None in its Version Control tab.", description: 'A notice: another version control system ({vcs}: Mercurial, Jujutsu…) was found in a project Hive treats as a Git project. Hive does not switch it by itself: the Version Control tab offers the switch to None (glossary 2.1).' }),
   platformSettled: msg({ id: 'service.workspace.platformSettled', defaultMessage: 'Settled: nothing to change now', description: "What the notice that a project's version control changed says once it no longer applies (HI-2320): the project was switched, or its folder is back as it was. Shown in place of its button." }),
   openVc: msg({ id: 'service.workspace.platformOpen', defaultMessage: 'Open Version Control', description: "A button on the notice that a project's version control changed: shows the project's Version Control tab, where Hive offers the switch (glossary 2.1)." })
@@ -89,15 +91,15 @@ function platformNotice(project: string, p: ProjectPlatform): { title: string; m
   return { title: tr(M.platformTitle, { project }), message }
 }
 
-// i18n-ignore: the .hive folder's README, a file committed with the workspace
-const WORKSPACE_README = `# .hive
+// i18n-ignore: the .combwork folder's README, a file committed with the workspace
+const WORKSPACE_README = `# .combwork
 
 This folder is managed by [Hive](https://github.com/) and is meant to be committed.
 
 - \`shared/\` — notes, instructions and handovers shared across AI sessions and projects.
 - \`skills/\` — Hive skills (one folder per skill, each with a \`SKILL.md\`). Every agent in every project gets them.
 - \`mcp/\` — MCP server definitions (one \`<name>.json\` per server). Add them to projects in Hive.
-- \`workspace.json\` — the workspace's settings, among them the MCP servers added for the Hive Assistant (a project's are in its \`.hive/project.json\`).
+- \`workspace.json\` — the workspace's settings, among them the MCP servers added for the Hive Assistant (a project's are in its \`.combwork/project.json\`).
 - \`hive.db\` — the task board (Hive's database). It is this machine's, like the Assistant's sessions: \`.gitignore\` keeps it out of git.
 - \`usage.db\` — what each session used (the usage history the Overviews read). It is this machine's too, kept out of git.
 
@@ -105,7 +107,7 @@ MCP definitions must not contain secrets. Reference environment variables instea
 `
 
 /** The usage history's lines of BOARD_GITIGNORE (#1106), added to the .gitignore Hive wrote before them. */
-const USAGE_IGNORE = '# What each session used: the usage history (#1106)\nusage.db\nusage.db-*\n' // i18n-ignore: the .hive folder's .gitignore, a file committed with the workspace
+const USAGE_IGNORE = '# What each session used: the usage history (#1106)\nusage.db\nusage.db-*\n' // i18n-ignore: the .combwork folder's .gitignore, a file committed with the workspace
 
 /** Adds the usage history's lines to the .gitignore Hive wrote (only its own: one the user wrote is theirs). */
 async function addUsageIgnore(file: string): Promise<void> {
@@ -115,7 +117,7 @@ async function addUsageIgnore(file: string): Promise<void> {
   await writeFile(file, `${text}${text.endsWith('\n') ? '' : nl}${USAGE_IGNORE.replace(/\n/g, nl)}`).catch(() => undefined)
 }
 
-// i18n-ignore: the .hive folder's .gitignore, a file committed with the workspace
+// i18n-ignore: the .combwork folder's .gitignore, a file committed with the workspace
 const BOARD_GITIGNORE = `# The task board's database and what moving it from files left (added by Hive, #1017)
 hive.db
 hive.db-*
@@ -195,7 +197,7 @@ export class WorkspaceService {
   private place: string | null = null
   private wsConfig: WorkspaceConfig = structuredClone(DEFAULT_WORKSPACE_CONFIG)
   private watcher: FSWatcher | null = null
-  /** .hive's own top, watched natively (watchHive). */
+  /** .combwork's own top, watched natively (watchHive). */
   private hiveTop: RootWatcher | null = null
   private rootWatcher: RootWatcher | null = null
   private refreshTimer: NodeJS.Timeout | null = null
@@ -204,7 +206,7 @@ export class WorkspaceService {
   /** Scheduled refreshes running now, until each has finished (refreshesSettled waits for them too, #1143 round 2). */
   private scheduledRuns = new Set<Promise<void>>()
   private static liveProvider: LiveProvider = async (p, cfg) => ({ live: null, restartNeeded: false, agents: projectAgents(cfg).map((a) => ({ ...a, live: null, restartNeeded: false, resume: null, place: { folder: p, is: 'project' as const, name: null, branch: null } })) })
-  /** Called each time a workspace opens, in its context; `fresh` when Hive set the folder up just now (it had no .hive). */
+  /** Called each time a workspace opens, in its context; `fresh` when Hive set the folder up just now (it had no .combwork). */
   static onOpened: ((fresh: boolean, after: AfterOpen) => Promise<unknown>) | null = null
   /** Brings an opening workspace's bundled skills and modes up to date, in its context, after the open (HI-1705: bundled.ts). */
   static bringItemsUpToDate: ((fresh: boolean) => Promise<void>) | null = null
@@ -458,6 +460,11 @@ export class WorkspaceService {
       parts.push(`${what} ${Math.round(now - mark)} ms`)
       mark = now
     }
+    // Before anything reads it (HI-2462): its `.hive` folders, and its projects', move to `.combwork` (combworkMove.ts).
+    const openGen = this.generation
+    const moveOpts = { signal: this.life.signal, stillOurs: () => this.generation === openGen && this.path === abs }
+    const folderMove = await moveFolders(abs, moveOpts)
+    if (folderMove.moved) done('its .hive folders moved to .combwork') // i18n-ignore: a part of a log line's timing
     const fresh = !existsSync(join(abs, HIVE_DIR))
     await this.ensureWorkspaceStructure()
     this.wsConfig = loadedConfig(await readKeptJson(join(this.hiveDir, 'workspace.json'), {}, { holder: this }))
@@ -473,7 +480,7 @@ export class WorkspaceService {
     })
     // Every window's recent list: this one first, and open here (#144).
     emit({ type: 'recent-changed' })
-    done('its .hive folder and settings') // i18n-ignore: a part of a log line's timing
+    done('its .combwork folder and settings') // i18n-ignore: a part of a log line's timing
     // The Assistant's home set up meanwhile (HI-1705): it needs nothing of the projects'.
     const assistant = (async () => {
       try {
@@ -500,6 +507,12 @@ export class WorkspaceService {
       // Every project has its id (#508) before the board, lanes and watches are read by it.
       await this.projectIds().catch((e) => log.warn('reading the project ids', e))
       done('their ids') // i18n-ignore: a part of a log line's timing
+      // The folder move's phases that need the board and the projects (HI-2462), before any session starts: one that
+      // fails refuses the open, and the next open finishes it.
+      if (folderMove.late) {
+        await this.finishFolderMove(moveOpts)
+        done("the folder move's cards and folders") // i18n-ignore: a part of a log line's timing
+      }
       // Before any session starts with them: MCP settings from before #1093 move to its model.
       await this.migrateMcpModel().catch((e) => log.warn('moving the MCP settings to the workspace and project switches', e))
       // Before the Assistant can start (HI-1472): its own MCP choices, from the old Advanced switch or none.
@@ -516,7 +529,7 @@ export class WorkspaceService {
     done('the Assistant') // i18n-ignore: a part of a log line's timing
     // Its bundled skills and modes brought up to date once the window has the workspace, not before (HI-1705: hashing each
     // one's copies on every open was most of an ordinary open's file reads, queued behind other windows' work); none if
-    // the open fails. A launch waits for it (itemsUpToDate), and .hive is watched only once it is done: a watched folder
+    // the open fails. A launch waits for it (itemsUpToDate), and .combwork is watched only once it is done: a watched folder
     // can't be swapped on Windows.
     const gen = this.generation
     // What the open starts in the background, each timed, in a line of its own once all have ended (HI-1705).
@@ -579,7 +592,7 @@ export class WorkspaceService {
   async close(): Promise<void> {
     this.mcpMoving.done()
     // Its skills and modes still being brought up to date (HI-1705) finish first: they are written into this workspace's
-    // .hive, by the path this service has until it closes. Only while they are going (HI-1747): an await of nothing would
+    // .combwork, by the path this service has until it closes. Only while they are going (HI-1747): an await of nothing would
     // let in what starts before the abort below, which a close with no closing tasks has always refused at once.
     if (this.itemsSyncing) await this.itemsSynced
     if (this.path) {
@@ -706,7 +719,7 @@ export class WorkspaceService {
   }
 
   /**
-   * Watches the .hive folder, once the open has brought its skills and modes up to date (HI-1705). With the workspace root
+   * Watches the .combwork folder, once the open has brought its skills and modes up to date (HI-1705). With the workspace root
    * (watchRoot, from the open), that is all that is watched: the root without listing or stat-ing what is in it, since
    * chokidar stats every entry it lists through Electron's fs, which opens and holds an .asar file (#246). A folder
    * appearing, going or renamed there reads the project list again (a project's own folder changing reports 'change').
@@ -716,8 +729,8 @@ export class WorkspaceService {
     const assistantHome = this.assistantHome.toLowerCase()
     const mcpDir = this.mcpDir.toLowerCase() + sep
     const hiveDir = this.hiveDir.toLowerCase() + sep
-    // Only the folders whose files are shown (HI-1797): chokidar read .hive's own listing again, and filtered each entry,
-    // on every change at its top, and the board's database files there change with every board write. .hive itself is
+    // Only the folders whose files are shown (HI-1797): chokidar read .combwork's own listing again, and filtered each entry,
+    // on every change at its top, and the board's database files there change with every board write. .combwork itself is
     // watched natively below, for workspace.json and for one of these folders appearing.
     const folders = ['shared', 'skills', 'mcp', MODES_DIR, LEGACY_MODES_DIR, DIALECTS_DIR]
     const watched = new Set(folders.filter((f) => existsSync(join(this.hiveDir, f))))
@@ -726,7 +739,7 @@ export class WorkspaceService {
       {
         depth: 5,
         ignoreInitial: true,
-        // The Assistant's home changes with every launch; nothing in it is shown from the file system. In .hive/mcp only
+        // The Assistant's home changes with every launch; nothing in it is shown from the file system. In .combwork/mcp only
         // the definitions (<name>.json) are: a server's own folder (added from a .zip, #550) isn't watched, since a watched
         // folder inside it would stop Windows moving the folder (Replace, Delete). The board is in its database (#1017),
         // told by Hive's own writes: neither the database's files nor the cards' old folders and backups are watched.
@@ -766,7 +779,7 @@ export class WorkspaceService {
     const chokidarWatcher = this.watcher
     chokidarWatcher.on('all', (evt, p) => told(this.path ? p.slice(this.path.length + 1).replace(/\\/g, '/') : ''))
     chokidarWatcher.on('error', (e) => log.warn('watcher error', e))
-    // .hive's own top, natively: each event only a name compared (the database's files change at every write).
+    // .combwork's own top, natively: each event only a name compared (the database's files change at every write).
     // workspace.json changed reads the config again; one of the folders above appearing is watched from then on, and
     // tells its change (what is in it is new).
     try {
@@ -780,10 +793,10 @@ export class WorkspaceService {
         chokidarWatcher.add(join(this.hiveDir, f))
         told(`${HIVE_DIR}/${f}`)
       })
-      top.on('error', (e) => log.warn('watcher error (.hive)', e))
+      top.on('error', (e) => log.warn('watcher error (.combwork)', e))
       this.hiveTop = top
     } catch (e) {
-      log.warn('watching .hive', e)
+      log.warn('watching .combwork', e)
     }
   }
 
@@ -1269,12 +1282,42 @@ export class WorkspaceService {
     return next!
   }
 
-  /** Creates <project>/.hive with defaults and excludes it from git. Idempotent. */
+  /** Creates <project>/.combwork with defaults and excludes it from git. Idempotent. */
+  /**
+   * The folder move's late phases (HI-2462, combworkMove.ts): the cards' paths, rewritten in a worker, and each moved
+   * project's agents' folders that were inside its old `.hive` (slots, copies, homes) recorded at their new place.
+   */
+  private async finishFolderMove(o: MoveOptions = {}): Promise<void> {
+    const path = this.path
+    if (!path) return
+    const { projectFolders, relocateFolder } = await import('./projectFolders')
+    await finishMove(
+      path,
+      {
+        boardFile: boardFile(path),
+        relocateFolders: async (projectPath, moves) => {
+          for (const f of await projectFolders(this, projectPath)) {
+            const to = movedPathOf(f.folder, moves)
+            if (to && !(await relocateFolder(this, projectPath, f, to))) return false
+          }
+          return true
+        }
+      },
+      o
+    )
+  }
+
   async ensureProject(projectPath: string): Promise<void> {
+    // A project that came into the open workspace with a `.hive` of its own (copied in, restored): moved first (HI-2462),
+    // so a fresh `.combwork` never strands its settings. The open's own move did every project there was then.
+    if (this.path && !this.isAssistantHome(projectPath) && (await classify(this.path, projectPath, 'project', null)) === 'planned') {
+      const moved = await moveFolders(this.path, { only: projectPath })
+      if (moved.late) await this.finishFolderMove()
+    }
     const h = join(projectPath, HIVE_DIR)
     // Never the project's own folder (HI-2045): each folder and file is made only inside one that is there, so a project
     // deleted or moved out meanwhile, at any step (as when a refresh that listed it before reads it after), fails with
-    // ENOENT rather than coming back as a bare `.hive`. The Assistant's home is Hive's, made with its parents.
+    // ENOENT rather than coming back as a bare `.combwork`. The Assistant's home is Hive's, made with its parents.
     const made = (dir: string): Promise<void> =>
       mkdir(dir).then(
         () => undefined,
@@ -1301,12 +1344,12 @@ export class WorkspaceService {
     return gitDirOf(projectPath)
   }
 
-  /** Adds the project's .hive to the info/exclude of the git repository holding it (its own, or one above), if it isn't (#345). */
+  /** Adds the project's .combwork to the info/exclude of the git repository holding it (its own, or one above), if it isn't (#345). */
   async ensureGitExclude(projectPath: string): Promise<void> {
     const r = await ensureHiveExcluded(projectPath)
-    if (r?.added) log.info(`Excluded .hive from git in ${userText(r.root)}`)
-    // The line is there whatever git can do; git missing only means it couldn't confirm a .gitignore doesn't bring .hive back (#346).
-    if (r?.unconfirmed) log.info(`Git couldn't confirm .hive is ignored in ${userText(r.root)}${gitProblem() ? ` (${gitProblem()})` : ''}`)
+    if (r?.added) log.info(`Excluded .combwork from git in ${userText(r.root)}`)
+    // The line is there whatever git can do; git missing only means it couldn't confirm a .gitignore doesn't bring .combwork back (#346).
+    if (r?.unconfirmed) log.info(`Git couldn't confirm .combwork is ignored in ${userText(r.root)}${gitProblem() ? ` (${gitProblem()})` : ''}`)
   }
 
   async branch(projectPath: string): Promise<string | null> {
@@ -1454,7 +1497,7 @@ export class WorkspaceService {
 
   /**
    * Where a session host's records are kept (#1061): its workspace's database (a project's workspace is its parent folder,
-   * the Assistant's home is the workspace's `.hive/assistant`), under the project's stable id (#508), so they follow a
+   * the Assistant's home is the workspace's `.combwork/assistant`), under the project's stable id (#508), so they follow a
    * rename; the Assistant's under `assistant`, a folder with no id yet under its name. With its old sessions.json, moved in
    * the first time.
    */
@@ -1605,7 +1648,7 @@ export class WorkspaceService {
       took('its MCP servers', this.unmanagedMcp(projectPath)), // i18n-ignore: a part of a log line's timing
       took('removed data', removedData(projectPath)), // i18n-ignore: a part of a log line's timing
       // Ensured at each refresh, so a repository made later (git init) gets it too (#345).
-      this.isAssistantHome(projectPath) ? undefined : took('.hive in git', hiveVcs(projectPath).catch(() => undefined)) // i18n-ignore: a part of a log line's timing
+      this.isAssistantHome(projectPath) ? undefined : took('.combwork in git', hiveVcs(projectPath).catch(() => undefined)) // i18n-ignore: a part of a log line's timing
     ])
     const info: ProjectInfo = {
       name: basename(projectPath),

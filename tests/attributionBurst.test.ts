@@ -52,14 +52,14 @@ function manyCommits(repo: string, branch: string, n: number, trailer: (i: numbe
 /** A workspace whose project `p` is a git repository on main, worked in by its agents in the folder itself (Solo). */
 async function workspace(name: string): Promise<{ w: WS; repo: string }> {
   const repo = join(base, name, 'p')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
   git(repo, ['init', '-q', '-b', 'main'])
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(repo, ['config', k, v])
-  writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+  writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
   writeFileSync(join(repo, 'a.txt'), 'one\n')
   git(repo, ['add', '-A'])
   git(repo, ['commit', '-qm', 'initial'])
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Other' }] }))
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Other' }] }))
   const w = createWorkspaceService()
   await w.open(join(base, name))
   opened.push(w)

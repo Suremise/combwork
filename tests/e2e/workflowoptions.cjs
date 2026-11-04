@@ -34,7 +34,7 @@ const check = (name, ok, extra = '') => {
 
 /** Writes to the workspace's board from outside Combwork, as another process would (the upgrade's marks, a lane's rows). */
 function board(sql, ...args) {
-  const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { timeout: 5000 })
   try {
     db.prepare(sql).run(...args)
   } finally {
@@ -97,15 +97,15 @@ async function theForm(page, app, inv) {
   // Its own commit identity: G12 shows it (never the machine's global one).
   for (const [k, v] of [['user.name', 'Pat Builder'], ['user.email', 'pat@example.invalid']]) lib.git(project, ['config', k, v])
   // As the upgrade leaves a project: today's way of working (Not checked, a reviewer agent: it has one), no preset.
-  fs.mkdirSync(path.join(project, '.hive'), { recursive: true })
+  fs.mkdirSync(path.join(project, '.combwork'), { recursive: true })
   const upgraded = { review: 'agent', reviewers: 1, noSelfReview: true, preChecks: [], sameness: 'change', finish: 'notChecked', style: 'merge', target: '', strict: false, mergeChecks: [], okBefore: { mode: 'never', labels: [] }, folder: 'project', identity: null, stopOwnRuns: false, dependenciesDone: false, slotsUpToDate: false, sharedFolderWarning: false, excluded: ['node_modules', '.venv'], commands: {} }
-  fs.writeFileSync(path.join(project, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1 (reviewer)' }], workflow: { platform: 'git', preset: null, options: upgraded } }))
+  fs.writeFileSync(path.join(project, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1 (reviewer)' }], workflow: { platform: 'git', preset: null, options: upgraded } }))
   // A project without version control, for None's groups and the contradictions only it can have.
   fs.mkdirSync(notes, { recursive: true })
   fs.writeFileSync(path.join(notes, 'README.md'), '# Notes\n')
   // Its preset chosen, so the presets notice names only web.
-  fs.mkdirSync(path.join(notes, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(notes, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [], workflow: { platform: 'none', preset: 'solo', options: {} } }))
+  fs.mkdirSync(path.join(notes, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(notes, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [], workflow: { platform: 'none', preset: 'solo', options: {} } }))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -123,7 +123,7 @@ async function theForm(page, app, inv) {
     await lib.openWorkspace(inv, page, ws)
     const f = await theForm(page, app, inv)
     const { section, row, groups, choice, preview, save, reasons, values, dialog, applyChoice, saveAll, reopen, discard, themes } = f
-    const projectJson = (p = project) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8'))
+    const projectJson = (p = project) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'project.json'), 'utf8'))
     const saved = () => projectJson().workflow?.options ?? {}
 
     // A board made by 1.0 has no notice; one upgraded from 0.9 (cards from before it) has, once.
@@ -658,7 +658,7 @@ async function theForm(page, app, inv) {
     const sameness = async (value) => {
       await g.row('sameness').locator('select').selectOption(value)
       await g.saveAll()
-      return lib.until(() => JSON.parse(fs.readFileSync(path.join(fx.alpha, '.hive', 'project.json'), 'utf8')).workflow?.options?.sameness === value, HUNG_MS)
+      return lib.until(() => JSON.parse(fs.readFileSync(path.join(fx.alpha, '.combwork', 'project.json'), 'utf8')).workflow?.options?.sameness === value, HUNG_MS)
     }
     const reviewer = await q.agent(fx, h, 'R1')
     check('G4: Same change saved from the tab', !!(await sameness('change')))

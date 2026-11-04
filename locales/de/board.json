@@ -588,7 +588,7 @@
   "board.overview.stalled": "Festgefahren",
   "board.overview.waitingForReview": "Warten auf Review",
   "board.panel.allProjects": "Alle Projekte",
-  "board.panel.info": "Die Karten des Arbeitsbereichs, in .hive/tasks. Agenten und der Assistent lesen, ändern und verschieben sie mit Combworks Tools (fertige Arbeit kommt nach Review); archivieren oder löschen kannst nur du sie.",
+  "board.panel.info": "Die Karten des Arbeitsbereichs, in .combwork/tasks. Agenten und der Assistent lesen, ändern und verschieben sie mit Combworks Tools (fertige Arbeit kommt nach Review); archivieren oder löschen kannst nur du sie.",
   "board.panel.refresh": "Aktualisieren",
   "board.panel.stalledInfo": "Karten in „In Arbeit“, an denen niemand arbeitet: Kein Agent hat sie, oder ihr Agent wurde entfernt oder läuft nicht. Außerdem Karten in „In Arbeit“ oder Review, die ein Agent in einer Kartenschleife verlassen hat, ohne auf sie zu warten.",
   "board.panel.workspace": "Arbeitsbereich",

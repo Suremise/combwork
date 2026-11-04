@@ -49,11 +49,11 @@ describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", a
 
   it('the settings tools read and change the open workspace’s, saved in its workspace.json; an old loops is moved in, an override of the new kind kept', async () => {
     const path = join(base, 'ws')
-    mkdirSync(join(path, 'alpha', '.hive'), { recursive: true })
-    mkdirSync(join(path, '.hive'), { recursive: true })
-    writeFileSync(join(path, 'alpha', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(path, 'alpha', '.combwork'), { recursive: true })
+    mkdirSync(join(path, '.combwork'), { recursive: true })
+    writeFileSync(join(path, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     // Saved by a build from before HI-1766: Card loop rounds 4 and wait 2, and Git's wait already set the new way.
-    writeFileSync(join(path, '.hive', 'workspace.json'), JSON.stringify({ loops: { rounds: 4, waitHours: 2 }, workflow: { git: { loopWaitHours: 5 } } }))
+    writeFileSync(join(path, '.combwork', 'workspace.json'), JSON.stringify({ loops: { rounds: 4, waitHours: 2 }, workflow: { git: { loopWaitHours: 5 } } }))
     const w = createWorkspaceService()
     await w.open(path)
     expect(w.config.workflow).toEqual({ none: { loopRounds: 4, loopWaitHours: 2 }, git: { loopRounds: 4, loopWaitHours: 5 } })
@@ -73,7 +73,7 @@ describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", a
       const inherit = await applySetting(entryOf('workspace.workflow.git.loopWaitHours'), null, null)
       expect([inherit.old, inherit.new]).toEqual([5, 'inherit'])
     })
-    const saved = JSON.parse(readFileSync(join(path, '.hive', 'workspace.json'), 'utf8'))
+    const saved = JSON.parse(readFileSync(join(path, '.combwork', 'workspace.json'), 'utf8'))
     expect(saved.workflow).toEqual({ none: { loopRounds: 7, loopWaitHours: 3 }, git: { loopRounds: 4 } })
     expect('loops' in saved).toBe(false)
     await disposeWorkspaceService(w)
@@ -88,9 +88,9 @@ describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", a
     const { setWorkflowOptions, workflowForm } = await import('../src/main/workflow/optionsForm')
     const path = join(base, 'ws-legacy')
     const old = { version: 2, platform: 'none', agents: [], loopRounds: 4, loopWakes: false, fileLocks: 'warn' }
-    const file = (p: string) => join(path, p, '.hive', 'project.json')
+    const file = (p: string) => join(path, p, '.combwork', 'project.json')
     for (const p of ['tool', 'form']) {
-      mkdirSync(join(path, p, '.hive'), { recursive: true })
+      mkdirSync(join(path, p, '.combwork'), { recursive: true })
       writeFileSync(file(p), JSON.stringify(old))
     }
     const w = createWorkspaceService()
@@ -131,8 +131,8 @@ describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", a
     mkdirSync(profile, { recursive: true })
     advanced.load(profile)
     const path = join(base, 'ws-advanced')
-    mkdirSync(join(path, 'alpha', '.hive'), { recursive: true })
-    writeFileSync(join(path, 'alpha', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(path, 'alpha', '.combwork'), { recursive: true })
+    writeFileSync(join(path, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     const w = createWorkspaceService()
     await w.open(path)
     try {
@@ -212,7 +212,7 @@ describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", a
         await applySetting(entryOf('advanced.showDeveloperFeatures'), false, null)
         await applySetting(reply, null, null)
       })
-      expect(JSON.parse(readFileSync(join(path, '.hive', 'workspace.json'), 'utf8')).advanced).toEqual({ 'hive.progress.lanesShown': 6 })
+      expect(JSON.parse(readFileSync(join(path, '.combwork', 'workspace.json'), 'utf8')).advanced).toEqual({ 'hive.progress.lanesShown': 6 })
     } finally {
       advanced.stop()
       await disposeWorkspaceService(w)

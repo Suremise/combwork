@@ -10,7 +10,7 @@ import { gitignoreName, initAbout, type GitInitCheck } from '../../src/shared/gi
 import { englishText } from '../../src/shared/advanced'
 import { hiveVcsText } from '../../src/shared/hiveVcsText'
 
-// #804: the `git` area (the Git tab, Initialise repository, the .hive notice, and what the shared git modules say). Its
+// #804: the `git` area (the Git tab, Initialise repository, the .combwork notice, and what the shared git modules say). Its
 // messages are read from the English catalogue (tests/i18nCatalogues.test.ts checks it is current); the sentences that
 // were glued together or pluralised by hand read as they did in English; and what main's errors carry stays English
 // whatever the window's language, as agents read it too.
@@ -157,17 +157,17 @@ describe('the sentences once built by hand read as before, in English', () => {
     expect(gitignoreName('minimal')).toBe('a minimal .gitignore')
     expect(gitignoreName('dotnet')).toBe('a .NET .gitignore')
     expect(initAbout('alpha', check({ resume: true, empty: true, hasGitignore: true }))).toBe(
-      'alpha is a git repository with no commits yet, and worktrees need one. This keeps its .hive out of git and commits nothing yet (an empty first commit) as the first commit. Its own .gitignore is kept.'
+      'alpha is a git repository with no commits yet, and worktrees need one. This keeps its .combwork out of git and commits nothing yet (an empty first commit) as the first commit. Its own .gitignore is kept.'
     )
     expect(initAbout('alpha', check({ hasGitignore: true, parentRepo: 'D:\\ws' }))).toBe(
-      'Makes alpha a git repository on a branch called main, keeps its .hive out of git, and commits everything in the folder as the first commit, so agents can work in worktrees at once. Its own .gitignore is kept. It is inside the git repository in D:\\ws: a repository inside another is usually a mistake, and that one will no longer see the files here as its own.'
+      'Makes alpha a git repository on a branch called main, keeps its .combwork out of git, and commits everything in the folder as the first commit, so agents can work in worktrees at once. Its own .gitignore is kept. It is inside the git repository in D:\\ws: a repository inside another is usually a mistake, and that one will no longer see the files here as its own.'
     )
   })
 
-  it('the .hive notice', () => {
-    expect(hiveVcsText({ state: 'excluded', tracked: 1 })?.title).toBe('1 file in .hive is committed to git')
+  it('the .combwork notice', () => {
+    expect(hiveVcsText({ state: 'excluded', tracked: 1 })?.title).toBe('1 file in .combwork is committed to git')
     expect(hiveVcsText({ state: 'not-excluded', tracked: 3 })?.detail).toBe(
-      "Excluding .hive keeps new files out of git, but these were committed before, so git still tracks them and commits their changes. Run `git rm -r --cached .hive` in the project folder, then commit: the files stay on disk. Combwork couldn't exclude .hive either: a rule in a .gitignore may bring it back."
+      "Excluding .combwork keeps new files out of git, but these were committed before, so git still tracks them and commits their changes. Run `git rm -r --cached .combwork` in the project folder, then commit: the files stay on disk. Combwork couldn't exclude .combwork either: a rule in a .gitignore may bring it back."
     )
     expect(tr(m('git.hiveVcs.titleSentence'), { title: 'X' })).toBe('X.')
     expect(tr(m('git.hiveVcs.untrackTitle'), { count: 1 })).toBe('Untrack this file?')

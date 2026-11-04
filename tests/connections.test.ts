@@ -62,18 +62,18 @@ beforeAll(async () => {
   advanced.load(join(base, 'profile'))
   mkdirSync(join(home, 'projects'), { recursive: true })
   mkdirSync(join(userHome, '.claude'), { recursive: true })
-  mkdirSync(join(wsPath, 'alpha', '.hive'), { recursive: true })
-  writeFileSync(join(wsPath, 'alpha', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }] }))
+  mkdirSync(join(wsPath, 'alpha', '.combwork'), { recursive: true })
+  writeFileSync(join(wsPath, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }] }))
   // A project templates are loaded into (HI-1769), its agents replaced each time.
-  mkdirSync(join(wsPath, 'gamma', '.hive'), { recursive: true })
-  writeFileSync(join(wsPath, 'gamma', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+  mkdirSync(join(wsPath, 'gamma', '.combwork'), { recursive: true })
+  writeFileSync(join(wsPath, 'gamma', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   // Projects whose own model, effort and context move onto their agents (HI-1770), each test its own.
   // A project whose agents change connection (HI-1771).
-  mkdirSync(join(wsPath, 'api1', '.hive'), { recursive: true })
-  writeFileSync(join(wsPath, 'api1', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'k', name: 'Api K', provider: 'claude-code', model: 'opus', effort: 'high', use200kContext: true, lastSessionId: 's-1' }] }))
+  mkdirSync(join(wsPath, 'api1', '.combwork'), { recursive: true })
+  writeFileSync(join(wsPath, 'api1', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'k', name: 'Api K', provider: 'claude-code', model: 'opus', effort: 'high', use200kContext: true, lastSessionId: 's-1' }] }))
   for (const name of ['mv1', 'mv2', 'mv3', 'mv4', 'mv5', 'mv6', 'mv7', 'mv8', 'mv9']) {
-    mkdirSync(join(wsPath, name, '.hive'), { recursive: true })
-    writeFileSync(join(wsPath, name, '.hive', 'project.json'), JSON.stringify({ version: 2, providers: { 'claude-code': { model: 'haiku', effort: 'high', permissionMode: 'inherit', extraArgs: '', use200kContext: 'on' }, codex: { model: 'gpt-5', effort: 'low', permissionMode: 'inherit', extraArgs: '', use200kContext: 'inherit' } }, agents: [{ id: 'own', name: `${name} Own`, provider: 'claude-code', model: 'opus', use200kContext: false }, { id: 'none', name: `${name} None`, provider: 'claude-code' }, { id: 'cx', name: `${name} Codex`, provider: 'codex' }] }))
+    mkdirSync(join(wsPath, name, '.combwork'), { recursive: true })
+    writeFileSync(join(wsPath, name, '.combwork', 'project.json'), JSON.stringify({ version: 2, providers: { 'claude-code': { model: 'haiku', effort: 'high', permissionMode: 'inherit', extraArgs: '', use200kContext: 'on' }, codex: { model: 'gpt-5', effort: 'low', permissionMode: 'inherit', extraArgs: '', use200kContext: 'inherit' } }, agents: [{ id: 'own', name: `${name} Own`, provider: 'claude-code', model: 'opus', use200kContext: false }, { id: 'none', name: `${name} None`, provider: 'claude-code' }, { id: 'cx', name: `${name} Codex`, provider: 'codex' }] }))
   }
   config.settings.providers['claude-code'].enabled = true
   providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe' })) as never
@@ -301,8 +301,8 @@ describe('a launch on a connection (connectionForLaunch)', () => {
     const b = await signedInConnection('Work', 'work@example.com')
     // The most recently opened workspace's recorded default was Work, though Personal is first in the list.
     const recent = join(base, 'order-recent')
-    mkdirSync(join(recent, '.hive'), { recursive: true })
-    writeFileSync(join(recent, '.hive', 'workspace.json'), JSON.stringify({ version: 1, connections: { 'claude-code': { on: [a.id, b.id], default: b.id } } }))
+    mkdirSync(join(recent, '.combwork'), { recursive: true })
+    writeFileSync(join(recent, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, connections: { 'claude-code': { on: [a.id, b.id], default: b.id } } }))
     const was = config.get().recentWorkspaces
     config.update((c) => {
       c.recentWorkspaces = [recent]
@@ -329,7 +329,7 @@ describe('a launch on a connection (connectionForLaunch)', () => {
       expect(c.id).toBe(b.id)
       c.release()
       await opened
-      expect(JSON.parse(readFileSync(join(fresh, '.hive', 'workspace.json'), 'utf8')).connections).toEqual({ 'claude-code': { on: [b.id] } })
+      expect(JSON.parse(readFileSync(join(fresh, '.combwork', 'workspace.json'), 'utf8')).connections).toEqual({ 'claude-code': { on: [b.id] } })
       expect(accounts.hiveAccounts().map((x) => x.id)).toEqual([b.id, a.id])
     } finally {
       accounts.accountTestHooks.beforeOrderRead = undefined
@@ -575,7 +575,7 @@ describe('a choice saved while starting: the last look at its own choice, skills
     const b = await signedInConnection('Work', 'work@example.com')
     await here(() => updateAgent(alpha, 'a-one', { connection: a.id }))
     // The project's lock held, so the save of Work waits on it (queued), not yet written.
-    const file = join(alpha, '.hive', 'project.json')
+    const file = join(alpha, '.combwork', 'project.json')
     const lock = deferred()
     const holding = withFileLock(file, () => lock.p)
     const saving = here(() => updateAgent(alpha, 'a-one', { connection: b.id }))
@@ -607,8 +607,8 @@ describe('a choice saved while starting: the last look at its own choice, skills
     const b = await signedInConnection('Work', 'work@example.com')
     await here(() => updateAgent(alpha, 'a-one', { connection: a.id }))
     const ws2Path = join(base, 'ws-others')
-    mkdirSync(join(ws2Path, 'beta', '.hive'), { recursive: true })
-    writeFileSync(join(ws2Path, 'beta', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b-one', name: 'Beta One' }] }))
+    mkdirSync(join(ws2Path, 'beta', '.combwork'), { recursive: true })
+    writeFileSync(join(ws2Path, 'beta', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b-one', name: 'Beta One' }] }))
     const w2 = createWorkspaceService()
     await w2.open(ws2Path)
     try {
@@ -796,7 +796,7 @@ describe('what an agent row names (connectionOf, HI-1769; HI-2108: connections)'
 
 describe('an agent’s own connection, checked with the write that saves it (HI-1769)', () => {
   const alpha = join(wsPath, 'alpha')
-  const projectJson = join(alpha, '.hive', 'project.json')
+  const projectJson = join(alpha, '.combwork', 'project.json')
   const agentsOf = async (p: string) => (await w.projectConfig(p)).agents
   const deferred = () => {
     let done!: () => void
@@ -873,7 +873,7 @@ describe('an agent’s own connection, checked with the write that saves it (HI-
 
 describe('templates’ connections (HI-1769; HI-2106: dropped as they are read; HI-2109: chosen when loaded)', () => {
   const gamma = join(wsPath, 'gamma')
-  const tplDir = join(wsPath, '.hive', 'templates')
+  const tplDir = join(wsPath, '.combwork', 'templates')
   /** A template from before HI-2106: T1 on Personal (its id), T2 on a connection this machine never had, T3 on none of its own. */
   function writeTemplate(file: string, personal: string) {
     mkdirSync(tplDir, { recursive: true })
@@ -956,7 +956,7 @@ describe('model, effort and context from the connection (HI-1770)', () => {
     const p = join(wsPath, 'mv1')
     await here(() => moves.ensureMigrated(p))
     const once = await w.projectConfig(p)
-    const file = JSON.parse(readFileSync(join(p, '.hive', 'project.json'), 'utf8'))
+    const file = JSON.parse(readFileSync(join(p, '.combwork', 'project.json'), 'utf8'))
     expect('providers' in file || 'defaultProvider' in file || 'model' in file).toBe(false)
     for (const x of file.agents) expect(Object.keys(x).filter((k) => ['model', 'effort', 'permissionMode', 'use200kContext'].includes(k))).toEqual([])
     // HI-1770's move as its launch would have made it, then the connection with what it launched with.
@@ -1002,7 +1002,7 @@ describe('model, effort and context from the connection (HI-1770)', () => {
   it("a launch waits on the migration held on the project's lock, then starts with the agent's connection", async () => {
     await signedInConnection('Personal', 'me@example.com')
     const p = join(wsPath, 'mv3')
-    const file = join(p, '.hive', 'project.json')
+    const file = join(p, '.combwork', 'project.json')
     let release!: () => void
     const held = withFileLock(file, () => new Promise<void>((r) => (release = r)))
     const agent = (await w.projectConfig(p)).agents.find((a) => a.id === 'none')!
@@ -1089,14 +1089,14 @@ describe('model, effort and context from the connection (HI-1770)', () => {
   it("config.json that can't be saved: nothing published, the project's old fields kept and unmarked; the next run migrates", async () => {
     await signedInConnection('Personal', 'me@example.com')
     const p = join(wsPath, 'mv9')
-    const before = readFileSync(join(p, '.hive', 'project.json'), 'utf8')
+    const before = readFileSync(join(p, '.combwork', 'project.json'), 'utf8')
     const save = vi.spyOn(config, 'saveNow').mockResolvedValue(false)
     try {
       expect(await outcome(here(() => moves.ensureMigrated(p)))).toMatch(/config\.json couldn't be saved/)
     } finally {
       save.mockRestore()
     }
-    expect(readFileSync(join(p, '.hive', 'project.json'), 'utf8')).toBe(before)
+    expect(readFileSync(join(p, '.combwork', 'project.json'), 'utf8')).toBe(before)
     expect((await w.projectConfig(p)).migrations?.accounts1).toBeUndefined()
     await here(() => moves.ensureMigrated(p))
     expect(await savedConnection(p, 'none')).toMatchObject({ model: 'haiku', effort: 'high' })
@@ -1252,7 +1252,7 @@ describe('the Agent API and connections (HI-1771)', () => {
   it('a change of CLI racing a start (by provider alone, and by a connection on another CLI): refused under the lock, the agent unchanged', async () => {
     await signedInConnection('Personal', 'me@example.com')
     const p = join(wsPath, 'api1')
-    const file = join(p, '.hive', 'project.json')
+    const file = join(p, '.combwork', 'project.json')
     const enabled = config.settings.providers.codex.enabled
     config.settings.providers.codex.enabled = true
     try {
@@ -1285,7 +1285,7 @@ describe('the Agent API and connections (HI-1771)', () => {
   it('a change of CLI decided from the agent read before the write: changed meanwhile, refused whole', async () => {
     const p = join(wsPath, 'api1')
     await here(() => moves.ensureMigrated(p))
-    const file = join(p, '.hive', 'project.json')
+    const file = join(p, '.combwork', 'project.json')
     let release!: () => void
     const held = withFileLock(file, () => new Promise<void>((r) => (release = r)))
     const saving = here(() => updateAgent(p, 'k', { provider: 'codex' }))
@@ -1359,20 +1359,20 @@ describe('connections as Settings → Accounts & Connections changes them (HI-21
     const a = await signedInConnection('Personal', 'me@example.com')
     const c = accounts.addConnection(a.id, { name: 'Used' })
     const p = join(wsPath, 'cr1')
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, migrations: { accounts1: { at: '' } }, agents: [{ id: 'u1', name: 'Builder', provider: 'claude-code', connection: c.id }] }))
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, migrations: { accounts1: { at: '' } }, agents: [{ id: 'u1', name: 'Builder', provider: 'claude-code', connection: c.id }] }))
     try {
       await w.refresh()
       expect(accounts.connectionUsers().get(c.id)).toEqual([{ projectPath: expect.any(String), project: 'cr1', agentId: 'u1', agent: 'Builder' }])
       const row = here(() => accounts.accountsView()).connectionRows.find((r) => r.id === c.id)
       expect(row?.users.map((u) => u.agent)).toEqual(['Builder'])
       expect(await outcome(Promise.resolve().then(() => accounts.removeConnection(c.id)))).toMatch(/Still in use, so Used was kept: Builder \(cr1\)/)
-      writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, migrations: { accounts1: { at: '' } }, agents: [] }))
+      writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, migrations: { accounts1: { at: '' } }, agents: [] }))
       await w.refresh()
       await accounts.removeConnection(c.id)
       expect(accounts.getConnection(c.id)).toBeUndefined()
     } finally {
-      writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+      writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     }
     // One order for every CLI (decision A): a Codex account moved above Claude Code's.
     const x = await accounts.addAccount('codex', 'Codex One')
@@ -1384,13 +1384,13 @@ describe('connections as Settings → Accounts & Connections changes them (HI-21
 
   describe("remove reads each project's agents as saved, under the lock their writes take (HR1, round 1)", () => {
     const p = join(wsPath, 'cr2')
-    const file = join(p, '.hive', 'project.json')
+    const file = join(p, '.combwork', 'project.json')
     // Its own project id in every write (HI-2130): one written without it is given one by the workspace's id check (the
     // root watch's, or any projectIds read), which takes this file's lock, a third waiter in the queue these cases count.
     const id = 'p-2130c0ffee02'
     const agentOn = (connection?: string) => ({ version: 2, id, migrations: { accounts1: { at: '' } }, agents: [{ id: 'g1', name: 'Gamma', provider: 'claude-code', ...(connection ? { connection } : {}) }] })
     beforeAll(async () => {
-      mkdirSync(join(p, '.hive'), { recursive: true })
+      mkdirSync(join(p, '.combwork'), { recursive: true })
       writeFileSync(file, JSON.stringify(agentOn()))
       await w.refresh()
       // As Hive's start sets it (initConnections).

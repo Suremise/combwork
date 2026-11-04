@@ -36,17 +36,17 @@ const check = (name, ok, extra = '') => {
 }
 const until = (fn, ms) => lib.until(fn, ms, 200)
 
-/** A project's .hive/project.json, as Hive keeps it. */
+/** A project's .combwork/project.json, as Hive keeps it. */
 function writeProject(dir, cfg) {
-  fs.mkdirSync(path.join(dir, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(dir, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [], ...cfg }))
+  fs.mkdirSync(path.join(dir, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(dir, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [], ...cfg }))
 }
 
 ;(async () => {
   q.prepare(fx)
-  lib.gitProject(gamma, { 'g.txt': 'g\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(gamma, { 'g.txt': 'g\n', '.gitignore': '.combwork/\n' })
   writeProject(gamma, { platform: 'git', workflow: { platform: 'git', preset: null, options: GAMMA } })
-  lib.gitProject(delta, { 'd.txt': 'd\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(delta, { 'd.txt': 'd\n', '.gitignore': '.combwork/\n' })
   writeProject(delta, { platform: 'git', workflow: { platform: 'git', preset: null, options: {} } })
   fs.rmSync(outer, { recursive: true, force: true })
   fs.mkdirSync(inner, { recursive: true })

@@ -51,8 +51,8 @@ describe("a reviewer's mark a close left ends as the workspace opens again (#139
 
   beforeAll(async () => {
     for (const ws of [wsA, wsB, wsC, wsD]) {
-      mkdirSync(join(ws, 'alpha', '.hive'), { recursive: true })
-      writeFileSync(join(ws, 'alpha', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Coder' }, { id: 'r1', name: 'Reviewer' }, { id: 't1', name: 'Third' }] }))
+      mkdirSync(join(ws, 'alpha', '.combwork'), { recursive: true })
+      writeFileSync(join(ws, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Coder' }, { id: 'r1', name: 'Reviewer' }, { id: 't1', name: 'Third' }] }))
     }
     mkdirSync(join(base, 'profile'), { recursive: true })
     Object.assign(sessions, { liveFor: (p: string, id: string) => (running.has(`${p}#${id}`.toLowerCase()) ? ({ projectPath: p, agentId: id } as never) : null) })

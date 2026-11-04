@@ -50,7 +50,7 @@ const starts = () => lines(started)
   for (const d of [userData, ws, `${ws}.worktrees`, claudeHome, codexHome, tools]) fs.rmSync(d, { recursive: true, force: true })
   for (const d of [claudeHome, codexHome, tools]) fs.mkdirSync(d, { recursive: true })
   fs.writeFileSync(path.join(codexHome, 'config.toml'), '[windows]\nsandbox = "unelevated"\n')
-  lib.gitProject(alpha, { 'a.ts': 'export const a = 1\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'a.ts': 'export const a = 1\n', '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   // The check: records where it ran, passes.
   const script = path.join(tools, 'check.js')

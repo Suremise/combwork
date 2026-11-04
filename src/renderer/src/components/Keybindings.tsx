@@ -102,7 +102,7 @@ interface Row {
 
 /**
  * Keyboard shortcuts editor. Global: every command, stored in Settings. Project: the Project and
- * Session commands, stored in the project's .hive/project.json over the global ones.
+ * Session commands, stored in the project's .combwork/project.json over the global ones.
  */
 export function KeybindingsEditor({ project }: { project?: ProjectInfo }) {
   const settings = useStore((s) => s.settings)

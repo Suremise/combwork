@@ -100,9 +100,9 @@ const post = (url, token, body) =>
   await page.mouse.click(600, 650)
   await sleep(300)
   await page.keyboard.press('Control+V')
-  await lib.until(async () => { const d = path.join(proj, '.hive', 'attachments', l.sessionId); return fs.existsSync(d) && fs.readdirSync(d).length > 0 && /\[Image|image #|\.png/i.test((await text(a1.id)).slice(-600)) }, 15000) // the pasted image saved, and shown by Codex
+  await lib.until(async () => { const d = path.join(proj, '.combwork', 'attachments', l.sessionId); return fs.existsSync(d) && fs.readdirSync(d).length > 0 && /\[Image|image #|\.png/i.test((await text(a1.id)).slice(-600)) }, 15000) // the pasted image saved, and shown by Codex
   const t1 = await text(a1.id)
-  const imgDir = path.join(proj, '.hive', 'attachments', l.sessionId)
+  const imgDir = path.join(proj, '.combwork', 'attachments', l.sessionId)
   const saved = fs.existsSync(imgDir) ? fs.readdirSync(imgDir) : []
   check('image saved under the session', saved.length > 0, saved.join(','))
   check('Codex shows the pasted image', /\[Image|image #|\.png/i.test(t1.slice(-600)), t1.slice(-300))

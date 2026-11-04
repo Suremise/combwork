@@ -1,5 +1,5 @@
 // A project renamed or moved within its workspace (#514). Whose a record is goes by the project's stable id, never a
-// name alone: Hive records each project's names by id (.hive/project-names.json: renames found by id, so a swap is two
+// name alone: Hive records each project's names by id (.combwork/project-names.json: renames found by id, so a swap is two
 // renames, and a copy, given an id of its own, brings none of it along), handovers and kept comparisons are owned by id
 // (recorded as they are written, worked out once for older ones from what they say), and what keeps a project by its
 // folder's name or path follows each rename once (each place saves the last rename it followed with its data, so a
@@ -41,19 +41,19 @@ beforeAll(() => {
 afterEach(() => vi.restoreAllMocks())
 
 type WS = InstanceType<typeof WorkspaceService>
-const projectJson = (p: string): Record<string, unknown> => JSON.parse(readFileSync(join(p, '.hive', 'project.json'), 'utf8'))
-const journal = (ws: string): NameJournal => JSON.parse(readFileSync(join(ws, '.hive', 'project-names.json'), 'utf8'))
+const projectJson = (p: string): Record<string, unknown> => JSON.parse(readFileSync(join(p, '.combwork', 'project.json'), 'utf8'))
+const journal = (ws: string): NameJournal => JSON.parse(readFileSync(join(ws, '.combwork', 'project-names.json'), 'utf8'))
 function project(ws: string, name: string, extra: Record<string, unknown> = {}, sessions: string[] = []): string {
   const p = join(ws, name)
-  mkdirSync(join(p, '.hive'), { recursive: true })
-  writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [], ...extra }))
-  writeFileSync(join(p, '.hive', 'sessions.json'), JSON.stringify({ version: 1, sessions: sessions.map((id) => ({ id, agent: 'claude-code', name: id, createdAt: '2026-10-01T00:00:00.000Z', lastActiveAt: '2026-10-01T00:00:00.000Z', archived: false })) }))
+  mkdirSync(join(p, '.combwork'), { recursive: true })
+  writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [], ...extra }))
+  writeFileSync(join(p, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: sessions.map((id) => ({ id, agent: 'claude-code', name: id, createdAt: '2026-10-01T00:00:00.000Z', lastActiveAt: '2026-10-01T00:00:00.000Z', archived: false })) }))
   return p
 }
 /** A handover as an older Hive wrote it (no owner recorded): its name's project slug, and its header. */
 function oldHandover(ws: string, file: string, projectName: string, session?: string): void {
-  mkdirSync(join(ws, '.hive', 'shared', 'handovers'), { recursive: true })
-  writeFileSync(join(ws, '.hive', 'shared', 'handovers', file), `# Handover\n\n- **Project:** ${projectName}\n${session ? `- **Session:** ${session}\n` : ''}- **Date:** 2026-10-01 10:00 (2026-10-01T10:00:00Z)\n\nWhere things stand.\n`)
+  mkdirSync(join(ws, '.combwork', 'shared', 'handovers'), { recursive: true })
+  writeFileSync(join(ws, '.combwork', 'shared', 'handovers', file), `# Handover\n\n- **Project:** ${projectName}\n${session ? `- **Session:** ${session}\n` : ''}- **Date:** 2026-10-01 10:00 (2026-10-01T10:00:00Z)\n\nWhere things stand.\n`)
 }
 /** Bounds a wait for the projects' names to be followed (in the background, after each read): only a hung run takes this long. */
 const HUNG_MS = 15_000
@@ -88,7 +88,7 @@ describe('a project renamed: found by its id (#514)', () => {
     const alpha = project(ws, 'alpha')
     let w = await open(ws)
     const id = (await w.projectIds()).byPath.get(alpha.toLowerCase())!
-    expect(await until(w, () => existsSync(join(ws, '.hive', 'project-names.json')))).toBe(true)
+    expect(await until(w, () => existsSync(join(ws, '.combwork', 'project-names.json')))).toBe(true)
     expect(journal(ws).projects[id]).toEqual({ name: 'alpha', former: [] })
     await disposeWorkspaceService(w)
     await move(alpha, join(ws, 'gamma'))
@@ -176,7 +176,7 @@ describe('handovers and kept comparisons are owned by id (#514)', () => {
     oldHandover(ws, '2026-10-02-hive-website-notes.md', 'hive-website', 'sess-web')
     oldHandover(ws, '2026-10-03-hive-plan.md', 'hive')
     const w = await open(ws)
-    await until(w, () => existsSync(join(ws, '.hive', 'project-names.json')))
+    await until(w, () => existsSync(join(ws, '.combwork', 'project-names.json')))
     // Its conversation tells (sessions.json); the other can't be known yet: nobody's, never hive's.
     expect(await handovers(w, 'website')).toEqual(['2026-10-02-hive-website-notes.md'])
     expect(await handovers(w, 'hive')).toEqual(['2026-10-03-hive-plan.md'])
@@ -194,7 +194,7 @@ describe('handovers and kept comparisons are owned by id (#514)', () => {
     let w = await open(ws)
     const comparison = await keepFor(w, 'alpha')
     // As kept before owners: no owner, and its choice by name.
-    const indexFile = join(ws, '.hive', 'metrics', 'benchmarks', 'index.json')
+    const indexFile = join(ws, '.combwork', 'metrics', 'benchmarks', 'index.json')
     const index = JSON.parse(readFileSync(indexFile, 'utf8'))
     for (const e of index.entries) delete e.owner
     index.selected = { 'project:alpha': { run: comparison } }
@@ -222,7 +222,7 @@ describe('what keeps a project by name or path follows a rename, once (#514)', (
     const alpha = project(ws, 'alpha')
     const beta = project(ws, 'beta')
     let w = await open(ws)
-    await until(w, () => existsSync(join(ws, '.hive', 'project-names.json')))
+    await until(w, () => existsSync(join(ws, '.combwork', 'project-names.json')))
     const ids = await w.projectIds()
     const a = ids.byPath.get(alpha.toLowerCase())!
     config.update((c) => {
@@ -259,7 +259,7 @@ describe('what keeps a project by name or path follows a rename, once (#514)', (
     const ws = newWs()
     const alpha = project(ws, 'alpha')
     const w = await open(ws)
-    await until(w, () => existsSync(join(ws, '.hive', 'project-names.json')))
+    await until(w, () => existsSync(join(ws, '.combwork', 'project-names.json')))
     config.update((c) => {
       c.ui.skillsProvider = { ...c.ui.skillsProvider, [alpha.toLowerCase()]: 'codex' }
     })
@@ -289,7 +289,7 @@ describe('what keeps a project by name or path follows a rename, once (#514)', (
     const ws = newWs()
     const alpha = project(ws, 'alpha')
     const w = await open(ws)
-    expect(await until(w, () => existsSync(join(ws, '.hive', 'project-names.json')))).toBe(true)
+    expect(await until(w, () => existsSync(join(ws, '.combwork', 'project-names.json')))).toBe(true)
     const id = (await w.projectIds()).byPath.get(alpha.toLowerCase())!
     config.update((c) => {
       c.ui.skillsProvider = { ...c.ui.skillsProvider, [alpha.toLowerCase()]: 'codex' }
@@ -344,11 +344,11 @@ describe('at the edges: a switched workspace, a name taken again, a failed write
       project(B, 'beta', { id: 'p-333333333333' })
       oldHandover(A, '2026-10-01-alpha-a.md', 'alpha')
       oldHandover(B, '2026-10-01-beta-b.md', 'beta')
-      const ownersB = join(B, '.hive', 'handover-owners.json')
+      const ownersB = join(B, '.combwork', 'handover-owners.json')
       const before = { version: 1, owners: { '2026-10-01-beta-b.md': 'p-333333333333' } }
       writeFileSync(ownersB, JSON.stringify(before))
       const w = await open(A)
-      const ownersA = join(A, '.hive', 'handover-owners.json')
+      const ownersA = join(A, '.combwork', 'handover-owners.json')
       // A's record held (another adoption writing it): this one waits for it.
       let release!: () => void
       let held!: () => void
@@ -382,7 +382,7 @@ describe('at the edges: a switched workspace, a name taken again, a failed write
     const alpha = project(ws, 'alpha', {}, ['session-original'])
     let w = await open(ws)
     const id = (await w.projectIds()).byPath.get(alpha.toLowerCase())!
-    await until(w, () => existsSync(join(ws, '.hive', 'project-names.json')))
+    await until(w, () => existsSync(join(ws, '.combwork', 'project-names.json')))
     await disposeWorkspaceService(w)
     await move(alpha, join(ws, 'gamma'))
     project(ws, 'alpha')
@@ -395,7 +395,7 @@ describe('at the edges: a switched workspace, a name taken again, a failed write
     expect(await handovers(w, 'gamma')).toEqual(['2026-10-01-alpha-original.md'])
     expect(await handovers(w, 'alpha')).toEqual([])
     // The ones that can't be known stay nobody's (asked again later), never the new alpha's.
-    const owners = JSON.parse(readFileSync(join(ws, '.hive', 'handover-owners.json'), 'utf8')).owners
+    const owners = JSON.parse(readFileSync(join(ws, '.combwork', 'handover-owners.json'), 'utf8')).owners
     expect(Object.keys(owners)).toEqual(['2026-10-01-alpha-original.md'])
     await disposeWorkspaceService(w)
   })
@@ -406,11 +406,11 @@ describe('at the edges: a switched workspace, a name taken again, a failed write
     project(ws, 'website', { lastPath: join(ws, 'website'), agents: [{ id: 'site-builder', name: 'Builder', provider: 'claude-code' }] })
     project(ws, 'hive')
     oldHandover(ws, '2026-10-01-hive-website-old.md', 'hive-website')
-    mkdirSync(join(ws, '.hive', 'tasks'), { recursive: true })
-    writeFileSync(join(ws, '.hive', 'tasks', '1.json'), JSON.stringify({ number: 1, title: 'Old card', project: 'hive-website', agent: 'site-builder', column: 'done', archived: true, history: [], comments: [] }))
+    mkdirSync(join(ws, '.combwork', 'tasks'), { recursive: true })
+    writeFileSync(join(ws, '.combwork', 'tasks', '1.json'), JSON.stringify({ number: 1, title: 'Old card', project: 'hive-website', agent: 'site-builder', column: 'done', archived: true, history: [], comments: [] }))
     const w = await open(ws)
-    await until(w, () => existsSync(join(ws, '.hive', 'project-names.json')))
-    const owners = join(ws, '.hive', 'handover-owners.json')
+    await until(w, () => existsSync(join(ws, '.combwork', 'project-names.json')))
+    const owners = join(ws, '.combwork', 'handover-owners.json')
     const real = fsutil.writeKeptJson
     // Every write of the handovers' owners fails, for now (the record of names and the cards are written).
     const spy = vi.spyOn(fsutil, 'writeKeptJson').mockImplementation(async (file, data) => {
@@ -437,10 +437,10 @@ describe('at the edges: a switched workspace, a name taken again, a failed write
     const alpha = project(ws, 'alpha')
     const w = await open(ws)
     const id = (await w.projectIds()).byPath.get(alpha.toLowerCase())!
-    await until(w, () => existsSync(join(ws, '.hive', 'project-names.json')))
+    await until(w, () => existsSync(join(ws, '.combwork', 'project-names.json')))
     w.config.hiddenProjects = [{ name: 'alpha', mode: 'hidden', at: '2026-10-01T00:00:00.000Z' }]
     await w.saveWorkspaceConfig()
-    const file = join(ws, '.hive', 'workspace.json')
+    const file = join(ws, '.combwork', 'workspace.json')
     const real = fsutil.writeKeptJson
     let fails = 1
     const spy = vi.spyOn(fsutil, 'writeKeptJson').mockImplementation(async (f, data) => {
@@ -471,7 +471,7 @@ describe('at the edges: a switched workspace, a name taken again, a failed write
     w = await open(ws)
     expect(await until(w, async () => (await handovers(w, 'gamma')).length === 1)).toBe(true)
     const date = file.match(/(\d{4}-\d{2}-\d{2})-alpha-plan\.md$/)![1]
-    const ownersFile = join(ws, '.hive', 'handover-owners.json')
+    const ownersFile = join(ws, '.combwork', 'handover-owners.json')
     const owners = (): Record<string, string> => JSON.parse(readFileSync(ownersFile, 'utf8')).owners
     // Renamed while the record is held, with an adoption waiting too: both wait, and neither loses it.
     let release!: () => void
@@ -489,12 +489,12 @@ describe('at the edges: a switched workspace, a name taken again, a failed write
     expect(await handovers(w, 'gamma')).toEqual([`${date}-alpha-renamed-plan.md`])
     expect(await handovers(w, 'alpha')).toEqual([])
     // Only its case.
-    await inWorkspace(w, () => notes.renameNote(join(ws, '.hive', 'shared', 'handovers', `${date}-alpha-renamed-plan.md`), `${date}-alpha-Renamed-Plan.md`))
+    await inWorkspace(w, () => notes.renameNote(join(ws, '.combwork', 'shared', 'handovers', `${date}-alpha-renamed-plan.md`), `${date}-alpha-Renamed-Plan.md`))
     expect(owners()).toEqual({ [`${date}-alpha-Renamed-Plan.md`]: id })
     expect(await handovers(w, 'gamma')).toEqual([`${date}-alpha-Renamed-Plan.md`])
     expect(await handovers(w, 'alpha')).toEqual([])
     // Its extension's case, and another type for a while, there and back: still gamma's.
-    const dir = join(ws, '.hive', 'shared', 'handovers')
+    const dir = join(ws, '.combwork', 'shared', 'handovers')
     const final = `${date}-alpha-plan.md`
     let name = `${date}-alpha-Renamed-Plan.md`
     for (const next of [`${date}-alpha-plan.MD`, `${date}-alpha-plan.txt`, final]) {

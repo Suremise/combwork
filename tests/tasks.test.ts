@@ -1,4 +1,4 @@
-// The task board (.hive/tasks) and removing projects: who may change what, card numbers and order, and what Hide,
+// The task board (.combwork/tasks) and removing projects: who may change what, card numbers and order, and what Hide,
 // Remove from Hive and Delete do with a project's cards, handovers and folder (and what restoring brings back).
 // The board's own rules, with the workflow rules off (Settings → Advanced): enforced, agents' moves are intents (#1268,
 // tests/agentMoves.test.ts) and the user's and the Assistant's go through the card's rules (#1265, tests/gates.test.ts).
@@ -45,13 +45,13 @@ const HUNG_MS = 10000
 
 function project(ws: string, name: string, agents: { id: string; name: string }[] = []): string {
   const p = join(ws, name)
-  mkdirSync(join(p, '.hive'), { recursive: true })
-  writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents }))
+  mkdirSync(join(p, '.combwork'), { recursive: true })
+  writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents }))
   return p
 }
 
 function handover(ws: string, file: string, projectName: string): void {
-  writeFileSync(join(ws, '.hive', 'shared', 'handovers', file), `# Title\n\n- **Project:** ${projectName}\n\nBody\n`)
+  writeFileSync(join(ws, '.combwork', 'shared', 'handovers', file), `# Title\n\n- **Project:** ${projectName}\n\nBody\n`)
 }
 
 async function open(path: string): Promise<WS> {
@@ -240,7 +240,7 @@ describe('task board', () => {
   })
 
   it("refuses a project agent moving another agent's card in Doing on to Review or Done; its own, and everyone else, may", async () => {
-    const projectJson = join(wsPath, 'alpha', '.hive', 'project.json')
+    const projectJson = join(wsPath, 'alpha', '.combwork', 'project.json')
     const saved = readFileSync(projectJson, 'utf8')
     // Its id kept (#508): Hive never drops it, and without it the project's cards would be no project's.
     writeFileSync(projectJson, JSON.stringify({ version: 2, id: JSON.parse(saved).id, agents: [{ id: 'a1', name: 'Agent 1' }, { id: 'a2', name: 'Agent 2' }] }))
@@ -314,7 +314,7 @@ describe('task board', () => {
     expect(said).toEqual(['Given to Agent 1', 'Moved to Doing'])
 
     // Another agent's card, out of Doing (so nobody was working on it): taken, from each column, and said so.
-    const projectJson = join(wsPath, 'alpha', '.hive', 'project.json')
+    const projectJson = join(wsPath, 'alpha', '.combwork', 'project.json')
     const saved = readFileSync(projectJson, 'utf8')
     // Its id kept (#508): Hive never drops it, and without it the project's cards would be no project's.
     writeFileSync(projectJson, JSON.stringify({ version: 2, id: JSON.parse(saved).id, agents: [{ id: 'a1', name: 'Agent 1' }, { id: 'a2', name: 'Agent 2' }] }))
@@ -1531,19 +1531,19 @@ describe('removing projects', () => {
     // "remove-me-too" starts with "remove-me": its handover isn't this project's.
     expect(info.handovers).toEqual(['handovers/2026-10-01-remove-me-plan.md'])
     await run(() => removal.removeProject(join(wsPath, 'remove-me'), 'remove'))
-    const packed = join(wsPath, 'remove-me', '.hive', 'removed')
+    const packed = join(wsPath, 'remove-me', '.combwork', 'removed')
     expect(readdirSync(join(packed, 'handovers'))).toEqual(['2026-10-01-remove-me-plan.md'])
     expect(existsSync(join(packed, 'cards.json'))).toBe(true)
-    expect(existsSync(join(wsPath, '.hive', 'shared', 'handovers', '2026-10-01-remove-me-plan.md'))).toBe(false)
-    expect(existsSync(join(wsPath, '.hive', 'shared', 'handovers', '2026-10-01-remove-me-too-other.md'))).toBe(true)
+    expect(existsSync(join(wsPath, '.combwork', 'shared', 'handovers', '2026-10-01-remove-me-plan.md'))).toBe(false)
+    expect(existsSync(join(wsPath, '.combwork', 'shared', 'handovers', '2026-10-01-remove-me-too-other.md'))).toBe(true)
     expect((await run(() => tasks.getTask(c.number))).archivedFor).toBe('project-removed')
     expect(w.hiddenProjects().find((h) => h.name === 'remove-me')?.mode).toBe('removed')
     // Its sessions' records go with the folder (#1061): written into it, out of the workspace's database.
-    expect(JSON.parse(readFileSync(join(wsPath, 'remove-me', '.hive', 'sessions.json'), 'utf8')).sessions.map((x: { id: string }) => x.id)).toEqual(['kept-session'])
+    expect(JSON.parse(readFileSync(join(wsPath, 'remove-me', '.combwork', 'sessions.json'), 'utf8')).sessions.map((x: { id: string }) => x.id)).toEqual(['kept-session'])
 
     const r = await run(() => removal.restoreProject('remove-me'))
     expect(r).toEqual({ handovers: 1, cards: 1 })
-    expect(existsSync(join(wsPath, '.hive', 'shared', 'handovers', '2026-10-01-remove-me-plan.md'))).toBe(true)
+    expect(existsSync(join(wsPath, '.combwork', 'shared', 'handovers', '2026-10-01-remove-me-plan.md'))).toBe(true)
     expect(existsSync(packed)).toBe(false)
     // The same card back, not a copy.
     expect((await run(() => tasks.getTask(c.number))).archived).toBe(false)
@@ -1576,7 +1576,7 @@ describe('removing projects', () => {
       expect(cards.map((x) => x.number).sort()).toEqual([2, 3])
       const second = cards.find((x) => x.title === 'Second')!
       expect(second.blockedBy).toEqual([cards.find((x) => x.title === 'First')!.number])
-      expect(existsSync(join(other, '.hive', 'shared', 'handovers', '2026-10-01-remove-me-too-other.md'))).toBe(true)
+      expect(existsSync(join(other, '.combwork', 'shared', 'handovers', '2026-10-01-remove-me-too-other.md'))).toBe(true)
     } finally {
       await disposeWorkspaceService(w3)
     }
@@ -1588,7 +1588,7 @@ describe('removing projects', () => {
     const keep = await run(() => tasks.createTask({ title: 'Stays', project: 'keep', links: [c.number] }, user))
     await run(() => removal.removeProject(join(wsPath, 'delete-me'), 'delete'))
     expect(existsSync(join(wsPath, 'delete-me'))).toBe(false)
-    expect(existsSync(join(wsPath, '.hive', 'shared', 'handovers', '2026-10-01-delete-me-x.md'))).toBe(false)
+    expect(existsSync(join(wsPath, '.combwork', 'shared', 'handovers', '2026-10-01-delete-me-x.md'))).toBe(false)
     await expect(run(() => tasks.getTask(c.number))).rejects.toThrow(/Unknown task/)
     expect((await run(() => tasks.getTask(keep.number))).links).toEqual([])
     expect(await names()).not.toContain('delete-me')
@@ -1606,7 +1606,7 @@ describe('removing projects', () => {
     writeFileSync(join(tree, 'b.txt'), 'b')
     git(tree, 'add', 'b.txt')
     git(tree, 'commit', '-q', '-m', 'b')
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a2', name: 'Agent 2', worktree: { path: tree, branch: 'hive/agent-2', base: 'main' } }] }))
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a2', name: 'Agent 2', worktree: { path: tree, branch: 'hive/agent-2', base: 'main' } }] }))
     await w.refresh()
     const info = await run(() => removal.removalInfo(p))
     expect(info.worktrees).toEqual([expect.objectContaining({ agent: 'Agent 2', ahead: 1 })])
@@ -1635,12 +1635,12 @@ describe('removal and board under faults', () => {
     git(p, 'commit', '-q', '-m', 'a')
     const tree = join(`${wsPath}.worktrees`, name, 'agent-2')
     git(p, 'worktree', 'add', '-q', '-b', 'hive/agent-2', tree, 'main')
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a2', name: 'Agent 2', worktree: { path: tree, branch: 'hive/agent-2', base: 'main' } }] }))
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a2', name: 'Agent 2', worktree: { path: tree, branch: 'hive/agent-2', base: 'main' } }] }))
     return { p, tree }
   }
   beforeEach(async () => {
     wsPath = newWorkspacePath('ws-faults')
-    mkdirSync(join(wsPath, '.hive', 'shared', 'handovers'), { recursive: true })
+    mkdirSync(join(wsPath, '.combwork', 'shared', 'handovers'), { recursive: true })
     w = await open(wsPath)
   })
   afterEach(async () => disposeWorkspaceService(w))
@@ -1688,7 +1688,7 @@ describe('removal and board under faults', () => {
     const unrelated = `${wsPath}-unrelated-folder`
     mkdirSync(unrelated, { recursive: true })
     writeFileSync(join(unrelated, 'keep.txt'), 'not yours')
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a9', name: 'Odd', worktree: { path: unrelated, branch: 'x', base: 'main' } }] }))
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a9', name: 'Odd', worktree: { path: unrelated, branch: 'x', base: 'main' } }] }))
     await w.refresh()
     const r = await run(() => removal.removeProject(p, 'delete'))
     expect(existsSync(p)).toBe(false)
@@ -1713,7 +1713,7 @@ describe('removal and board under faults', () => {
       shell.trashItem = trash
     }
     expect(existsSync(p)).toBe(true)
-    expect(existsSync(join(wsPath, '.hive', 'shared', 'handovers', '2026-10-01-locked-notes.md'))).toBe(true)
+    expect(existsSync(join(wsPath, '.combwork', 'shared', 'handovers', '2026-10-01-locked-notes.md'))).toBe(true)
     expect((await run(() => tasks.getTask(c.number))).title).toBe('Stays')
     expect(await names()).toContain('locked')
   })
@@ -1741,7 +1741,7 @@ describe('removal and board under faults', () => {
     await w.projectIds({ fresh: true })
     expect((await run(() => removal.removalInfo(p))).handovers).toEqual([])
     await run(() => removal.removeProject(p, 'delete'))
-    expect(existsSync(join(wsPath, '.hive', 'shared', 'handovers', '2026-10-01-baz-qux-old-plan.md'))).toBe(true)
+    expect(existsSync(join(wsPath, '.combwork', 'shared', 'handovers', '2026-10-01-baz-qux-old-plan.md'))).toBe(true)
   })
 
   it('restores a packed handover beside a different note that took its name', async () => {
@@ -1750,10 +1750,10 @@ describe('removal and board under faults', () => {
     await w.refresh()
     await run(() => removal.removeProject(p, 'remove'))
     // Meanwhile another note gets the same name.
-    writeFileSync(join(wsPath, '.hive', 'shared', 'handovers', '2026-10-01-clash-plan.md'), '# A different plan\n\n- **Project:** clash\n')
+    writeFileSync(join(wsPath, '.combwork', 'shared', 'handovers', '2026-10-01-clash-plan.md'), '# A different plan\n\n- **Project:** clash\n')
     const r = await run(() => removal.restoreProject('clash'))
     expect(r.handovers).toBe(1)
-    const dirNow = join(wsPath, '.hive', 'shared', 'handovers')
+    const dirNow = join(wsPath, '.combwork', 'shared', 'handovers')
     expect(readFileSync(join(dirNow, '2026-10-01-clash-plan.md'), 'utf8')).toMatch(/A different plan/)
     expect(readFileSync(join(dirNow, '2026-10-01-clash-plan-restored.md'), 'utf8')).toMatch(/Body/)
   })

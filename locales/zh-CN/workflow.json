@@ -153,7 +153,7 @@
   "workflow.option.dependenciesDone.desc": "等待其他卡片的卡片，要等它们的工作合入后才能开始。",
   "workflow.option.dependenciesDone.none": "卡片仅在所等待的卡片完成后开始",
   "workflow.option.dependenciesDone.title": "卡片仅在所等待的卡片合并后开始",
-  "workflow.option.excluded.desc": "整个项目文件夹，但不包括这些文件夹和文件（始终不包括 .hive）。",
+  "workflow.option.excluded.desc": "整个项目文件夹，但不包括这些文件夹和文件（始终不包括 .combwork）。",
   "workflow.option.excluded.title": "工作包含哪些内容",
   "workflow.option.fileLocks.desc": "当智能体试图编辑同一文件夹中另一个智能体正在编辑的文件时如何处理。",
   "workflow.option.fileLocks.title": "文件锁",

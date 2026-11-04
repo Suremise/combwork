@@ -48,20 +48,20 @@ let n = 0
 async function workspace(options?: object): Promise<WS> {
   const root = join(base, `ws-${++n}`)
   const repo = join(root, 'p')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
   let agents: object[] = [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }]
   if (options) {
     const wt = join(root, 'p-card')
     writeFileSync(join(repo, 'a.txt'), 'one\n')
     git(repo, 'init', '-q', '-b', 'main')
     for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(repo, 'config', k, v)
-    writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+    writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
     git(repo, 'add', '-A')
     git(repo, 'commit', '-qm', 'initial')
     git(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
     agents = [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }]
   }
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, ...(options ? { workflow: { platform: 'git', preset: null, options } } : {}) }))
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents, ...(options ? { workflow: { platform: 'git', preset: null, options } } : {}) }))
   const w = createWorkspaceService()
   await w.open(root)
   opened.push(w)

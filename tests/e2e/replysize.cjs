@@ -384,8 +384,8 @@ const prose = (seed, n) => {
   // Who each listing is about: an agent's lists what its project's agents get (not the Assistant's skills); the
   // Assistant's lists them all with who gets each, and with a project what that project's agents get.
   for (const [name, audience] of [['for-assistant', 'assistant'], ['for-both', 'all'], ['for-default', null]]) {
-    fs.mkdirSync(path.join(ws, '.hive', 'skills', name), { recursive: true })
-    fs.writeFileSync(path.join(ws, '.hive', 'skills', name, 'SKILL.md'), `---\nname: ${name}\ndescription: The ${name} skill.\n${audience ? `metadata:\n  audience: ${audience}\n` : ''}---\n`)
+    fs.mkdirSync(path.join(ws, '.combwork', 'skills', name), { recursive: true })
+    fs.writeFileSync(path.join(ws, '.combwork', 'skills', name, 'SKILL.md'), `---\nname: ${name}\ndescription: The ${name} skill.\n${audience ? `metadata:\n  audience: ${audience}\n` : ''}---\n`)
   }
   const has = (list, re) => new RegExp(re, 'm').test(list)
   const agentSkills = tool('cw_list_skills', {}).text
@@ -395,7 +395,7 @@ const prose = (seed, n) => {
   const projectSkills = tool('cw_list_skills', { project: 'alpha' }, 'assistant').text
   check("skills (Assistant, a project): what that project's agents get", !has(projectSkills, '^for-assistant ') && has(projectSkills, '^for-both ') && has(projectSkills, '^for-default '), projectSkills.slice(0, 400))
   check('skills: the descriptions say a listing, not what a session loaded', /not of what a running session loaded/.test(toolDescription('cw_list_skills')) && /for agents \(not those for the Assistant alone\)/.test(toolDescription('cw_list_skills')) && /user and plugin skills/.test(toolDescription('cw_list_skills', 'assistant')))
-  for (const name of ['for-assistant', 'for-both', 'for-default']) fs.rmSync(path.join(ws, '.hive', 'skills', name), { recursive: true, force: true })
+  for (const name of ['for-assistant', 'for-both', 'for-default']) fs.rmSync(path.join(ws, '.combwork', 'skills', name), { recursive: true, force: true })
   // A long card's latest feedback without its whole thread; the board a page at a time.
   const newest = JSON.parse(measure('cw_read_task (comments: 2)', tool('cw_read_task', { number: target, comments: 2 })))
   check('comments=2: the description and the newest two, with a count of the rest', newest.description.length > 1000 && newest.comments.length === 2 && newest.commentsOmitted === read.comments.length + 2 - 2 && newest.comments.at(-1).text === 'Done: see the branch.', JSON.stringify({ n: newest.comments?.length, omitted: newest.commentsOmitted }))
@@ -661,7 +661,7 @@ const prose = (seed, n) => {
   }
   check('an unknown skill is 404', (await api('GET', '/v1/skills/no-such-skill')).status === 404)
   // A big skill: its listing says it's cut short, and a file over the limit is 413 without being sent.
-  const bulky = path.join(ws, '.hive', 'skills', 'bulky')
+  const bulky = path.join(ws, '.combwork', 'skills', 'bulky')
   fs.mkdirSync(path.join(bulky, 'refs'), { recursive: true })
   fs.writeFileSync(path.join(bulky, 'SKILL.md'), '---\nname: bulky\ndescription: Many files\n---\n\nSee refs.\n')
   for (let i = 0; i < 230; i++) fs.writeFileSync(path.join(bulky, 'refs', `r${String(i).padStart(3, '0')}.md`), 'r')

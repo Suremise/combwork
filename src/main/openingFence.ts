@@ -59,9 +59,9 @@ export const admittedCount = (): number => admitted.size
 export const isAdmitted = (place: string): boolean => admitted.has(place)
 
 /**
- * The workspace a database file is of: the folder holding its nearest `.hive` (by real path; a file not made yet by its
- * nearest existing folder's real location). Only the nearest: a database in a `.hive` of its own further down (under the
- * Assistant's home, say) is that folder's, never the workspace's above it. Null: in no `.hive`. `real`: the file is
+ * The workspace a database file is of: the folder holding its nearest `.combwork` (by real path; a file not made yet by its
+ * nearest existing folder's real location). Only the nearest: a database in a `.combwork` of its own further down (under the
+ * Assistant's home, say) is that folder's, never the workspace's above it. Null: in no `.combwork`. `real`: the file is
  * already its real location (`realPath`), not resolved again (HI-1887: each usage history request's).
  */
 export function ownerOf(file: string, real = false): string | null {

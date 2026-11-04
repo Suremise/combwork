@@ -10,7 +10,7 @@
  *   first-run     scenarios 1 and 2: the first screen, no-CLI banners, Provider Setup's three providers, both themes
  *   cli-appears   scenario 3: Claude Code turned on, a stand-in installer puts the e2e fake on the user PATH, and
  *                 Provider Setup's "Check again" finds it without restarting Hive
- *   workspace     scenario 6: a new workspace in the fresh install (its .hive, views and status), for the fresh-install comparison
+ *   workspace     scenario 6: a new workspace in the fresh install (its .combwork, views and status), for the fresh-install comparison
  *   mark          scenario 4, before the upgrade: change two settings (user name, theme)
  *   after-upgrade scenario 4, after it: those settings kept, the version, a screenshot
  */
@@ -203,7 +203,7 @@ const steps = {
     fs.mkdirSync(path.join(ws, 'demo'), { recursive: true })
     fs.writeFileSync(path.join(ws, 'demo', 'README.md'), '# demo\n')
     await inv('workspace:open', ws)
-    const opened = await until(async () => (await page.locator('.welcome').count()) === 0 && fs.existsSync(path.join(ws, '.hive')), 30_000)
+    const opened = await until(async () => (await page.locator('.welcome').count()) === 0 && fs.existsSync(path.join(ws, '.combwork')), 30_000)
     check('6.workspace-opens', 'A new workspace opens (an empty folder with one project folder)', opened, 'still on the welcome screen')
     const tree = (dir, depth) => {
       if (!fs.existsSync(dir)) return null
@@ -213,12 +213,12 @@ const steps = {
     // once the open has brought the bundled skills and modes up to date. Not set up within the bound: the check fails,
     // and what is there is kept apart (hiveNotSetUp), never recorded as the workspace's.
     const status = await workspaceSetUp(() => api('/v1/status'), ws)
-    const now = tree(path.join(ws, '.hive'), 3)
+    const now = tree(path.join(ws, '.combwork'), 3)
     if (status) res.facts.hive = now
     else res.facts.hiveNotSetUp = now
-    res.facts.projectHive = tree(path.join(ws, 'demo', '.hive'), 1)
-    try { res.facts.workspaceJson = JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'workspace.json'), 'utf8')) } catch { /* recorded as missing */ }
-    check('6.hive-folder', 'Hive creates the workspace\'s .hive folder and sets it up (its status lists its Hive skills)', status && Array.isArray(res.facts.hive), status ? 'no .hive folder' : `Hive didn't say the workspace was set up within 60 s (GET /v1/status): ${JSON.stringify(now).slice(0, 300)}`)
+    res.facts.projectHive = tree(path.join(ws, 'demo', '.combwork'), 1)
+    try { res.facts.workspaceJson = JSON.parse(fs.readFileSync(path.join(ws, '.combwork', 'workspace.json'), 'utf8')) } catch { /* recorded as missing */ }
+    check('6.hive-folder', 'Hive creates the workspace\'s .combwork folder and sets it up (its status lists its Hive skills)', status && Array.isArray(res.facts.hive), status ? 'no .combwork folder' : `Hive didn't say the workspace was set up within 60 s (GET /v1/status): ${JSON.stringify(now).slice(0, 300)}`)
     res.facts.status = status && { workspace: status.workspace, workspaces: status.workspaces, providers: status.providers && Object.keys(status.providers) }
     res.facts.projects = await api('/v1/projects').catch(e => ({ error: String(e) }))
     res.facts.views = {}

@@ -40,7 +40,7 @@ let n = 0
 /** A workspace with a project of two agents (alpha: B1, R1), as the pause reads it. */
 function workspace(): { path: string; info: () => unknown } {
   const path = join(base, `ws-${++n}`)
-  mkdirSync(join(path, '.hive'), { recursive: true })
+  mkdirSync(join(path, '.combwork'), { recursive: true })
   const alpha = join(path, 'alpha')
   return { path, info: () => ({ projects: [{ name: 'alpha', path: alpha, config: { agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] } }] }) }
 }
@@ -111,13 +111,13 @@ describe('one answer, for this running Hive only (HI-2156)', () => {
     const old = JSON.stringify({ pauseId: 'p-old', since: '2026-10-30T15:05:44.452Z', by: 'user' })
     writeFileSync(join(dir, 'team-pause.json'), old)
     writeFileSync(join(dir, 'team-pause-closing.json'), JSON.stringify({ reason: 'quit', at: '', pauses: [] }))
-    writeFileSync(join(w.path, '.hive', 'team-pause.json'), old)
+    writeFileSync(join(w.path, '.combwork', 'team-pause.json'), old)
     tp.clearSavedPauses()
     expect(tp.appPause()).toBeNull()
     expect(tp.teamPauseOf(ws(w))).toBeNull()
     expect(() => refuseWhileTeamPaused(ws(w))).not.toThrow()
     expect((await scanWorkspace(ws(w))).pause).toBeNull()
-    await vi.waitFor(() => expect([join(dir, 'team-pause.json'), join(dir, 'team-pause-closing.json'), join(w.path, '.hive', 'team-pause.json')].filter((f) => existsSync(f))).toEqual([]), { timeout: 10_000 })
+    await vi.waitFor(() => expect([join(dir, 'team-pause.json'), join(dir, 'team-pause-closing.json'), join(w.path, '.combwork', 'team-pause.json')].filter((f) => existsSync(f))).toEqual([]), { timeout: 10_000 })
   })
 
   it("the user's pause: status and lane starts agree; the Assistant's resume lifts it in its workspace, and it ends with the last workspace it held", async () => {

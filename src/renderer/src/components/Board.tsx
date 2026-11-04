@@ -1723,7 +1723,7 @@ export function BoardPanel() {
     <>
       <div className="pane-header">
         {tr(TASK_BOARD)}
-        <InfoTip text={tr(msg({ id: 'board.panel.info', defaultMessage: "The workspace's cards, in .hive/tasks. Agents and the Assistant read, change and move them through Combwork's tools (finished work goes to Review); only you archive or delete them.", description: "The (i) beside the Board sidebar's title. Keep .hive/tasks as it is (a folder). Review is a board column." }))} />
+        <InfoTip text={tr(msg({ id: 'board.panel.info', defaultMessage: "The workspace's cards, in .combwork/tasks. Agents and the Assistant read, change and move them through Combwork's tools (finished work goes to Review); only you archive or delete them.", description: "The (i) beside the Board sidebar's title. Keep .combwork/tasks as it is (a folder). Review is a board column." }))} />
         <div className="actions">
           <IconButton icon="add" title={readOnly ?? tr(NEW_CARD_TIP)} disabled={!!readOnly} onClick={() => set({ taskOpen: { project: chosen ?? '' } })} />
           <IconButton icon="refresh" title={tr(msg({ id: 'board.panel.refresh', defaultMessage: 'Refresh', description: "Tooltip on the Board sidebar's refresh button: reads the cards again." }))} onClick={() => void loadTasks()} />

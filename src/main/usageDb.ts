@@ -7,7 +7,7 @@ import type { UsageRow, UsageTimeline } from '../shared/usageTimeline'
 import { transaction, type Migration } from './db'
 
 /**
- * The usage history's database (#1106): `.hive/usage.db`, beside the workspace's `hive.db`, under each session host's
+ * The usage history's database (#1106): `.combwork/usage.db`, beside the workspace's `hive.db`, under each session host's
  * scope (a project's id, `assistant` for the Assistant), as its session records are (#1061). Its own file (Darren, 20
  * Oct), so the usage worker's commits never wait on a board change held across awaits, never look like another
  * process's change to the board's poll, and an older Hive still opens `hive.db` for writing. Only the usage worker opens

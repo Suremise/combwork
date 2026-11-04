@@ -31,7 +31,7 @@ const check = (name, ok, extra = '') => {
 }
 const git = (cwd, args) => execFileSync('git', args, { cwd, env: lib.gitEnv(), encoding: 'utf8' }).trim()
 const branches = (cwd) => git(cwd, ['for-each-ref', '--format=%(refname:short)', 'refs/heads']).split(/\r?\n/)
-const configOf = (project) => JSON.parse(fs.readFileSync(path.join(project, '.hive', 'project.json'), 'utf8'))
+const configOf = (project) => JSON.parse(fs.readFileSync(path.join(project, '.combwork', 'project.json'), 'utf8'))
 const agentsOf = (project) => configOf(project).agents
 const samePath = (a, b) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
 
@@ -70,7 +70,7 @@ const samePath = (a, b) => path.resolve(a).toLowerCase() === path.resolve(b).toL
   const proj = path.join(tools, 'juniper')
   // JB4's worktree is gone after the move (its branch kept): Recreate makes it again, on its branch renamed in the same Repair.
   fs.rmSync(path.join(`${tools}.worktrees`, 'juniper', 'jb4'), { recursive: true, force: true })
-  const cfgFile = path.join(proj, '.hive', 'project.json')
+  const cfgFile = path.join(proj, '.combwork', 'project.json')
   const wt = (agent) => agentsOf(proj).find((a) => a.name === agent).worktree
 
   {

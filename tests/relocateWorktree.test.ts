@@ -92,7 +92,7 @@ const treeOf = (a: string): string => (a === 'x1' ? wt('x1') : wt(`h${a}`))
 
 function writeProject(): void {
   const agent = (id: string) => ({ id, name: id.toUpperCase(), provider: 'claude-code', workflowRole: 'builder', worktree: { path: treeOf(id), branch: `hive/h${id}`, base: 'main' } })
-  writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id: projectId, agents: AGENTS.map(agent) }))
+  writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id: projectId, agents: AGENTS.map(agent) }))
 }
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(ws, fn)
 const cwdOf = async (id: string): Promise<string> => ((await run(() => workspace.sessionsFile(project))).sessions.find((s) => s.id === id)?.cwd ?? '').toLowerCase()
@@ -147,10 +147,10 @@ function realRenamer(hooks: Parameters<typeof worktreeRenamer>[2] = {}): Renamer
 
 beforeAll(async () => {
   gitRepo(project)
-  commit(project, { '.gitignore': '.hive/\n', 'a.txt': 'a\n' }, 'first')
+  commit(project, { '.gitignore': '.combwork/\n', 'a.txt': 'a\n' }, 'first')
   for (const a of AGENTS) sh(project, 'worktree', 'add', '-q', '-b', `hive/h${a}`, treeOf(a))
   sh(project, 'worktree', 'add', '-q', '-b', 'hive/x1', treeOf('x1'))
-  mkdirSync(join(project, '.hive'), { recursive: true })
+  mkdirSync(join(project, '.combwork'), { recursive: true })
   writeProject()
   await ws.open(wsPath)
   projectId = (await ws.projectConfig(project)).id ?? 'p1'

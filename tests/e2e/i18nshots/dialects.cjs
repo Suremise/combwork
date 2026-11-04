@@ -17,9 +17,9 @@ async function shown(ctx, locator, what) {
 /** The test copy shown, its contract area open and its first line expanded. */
 async function openCopy(ctx) {
   const { page } = ctx
-  const dir = path.join(ctx.workspace, '.hive', 'dialects', 'claude-code')
+  const dir = path.join(ctx.workspace, '.combwork', 'dialects', 'claude-code')
   fs.mkdirSync(dir, { recursive: true })
-  fs.writeFileSync(path.join(ctx.workspace, '.hive', 'dialects', ...COPY.split('/')), JSON.stringify({ name: 'Shots copy', texts: { 'gone.text': { text: 'old', why: 'shots' }, 'contract.agent.folder': { text: 'Mine', why: 'shots' } } }, null, 2))
+  fs.writeFileSync(path.join(ctx.workspace, '.combwork', 'dialects', ...COPY.split('/')), JSON.stringify({ name: 'Shots copy', texts: { 'gone.text': { text: 'old', why: 'shots' }, 'contract.agent.folder': { text: 'Mine', why: 'shots' } } }, null, 2))
   await ctx.command('view.dialects')
   await (await shown(ctx, page.locator(`.dialect-row[data-dialect="${COPY}"]`), 'the test copy in the Dialects view')).click()
   const pane = await shown(ctx, page.locator(`.dialect-detail[data-dialect-file="${COPY}"]`), "the test copy's page")
@@ -35,7 +35,7 @@ async function close(ctx) {
   const discard = page.locator('[data-dialect-discard]')
   if (await discard.count()) await discard.first().click()
   await ctx.command('view.projects')
-  fs.rmSync(path.join(ctx.workspace, '.hive', 'dialects', ...COPY.split('/')), { force: true })
+  fs.rmSync(path.join(ctx.workspace, '.combwork', 'dialects', ...COPY.split('/')), { force: true })
 }
 
 module.exports = {

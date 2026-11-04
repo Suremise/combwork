@@ -254,7 +254,7 @@ const check = (name, ok, extra = '') => {
     // connection: one in Autopilot launches in Copilot's default meanwhile.
     const modeOfC = () => {
       const saved = JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8'))
-      const conn = JSON.parse(fs.readFileSync(path.join(proj2, '.hive', 'project.json'), 'utf8')).agents?.find((x) => x.id === c.id)?.connection
+      const conn = JSON.parse(fs.readFileSync(path.join(proj2, '.combwork', 'project.json'), 'utf8')).agents?.find((x) => x.id === c.id)?.connection
       return saved.connections?.find((x) => x.id === conn)?.permissionMode ?? 'default'
     }
     await inv('settings:update', { providers: { copilot: { enableDangerousMode: true } } })

@@ -35,7 +35,7 @@ let store: InstanceType<typeof SlotStore>
 function writeProject(): void {
   const agent = (id: string, role: string, worktree = true) => ({ id, name: id.toUpperCase(), provider: 'claude-code', workflowRole: role, ...(worktree ? { worktree: { path: wt(`h${id}`), branch: `hive/h${id}`, base: 'main' } } : {}) })
   const agents = [agent('b1', 'builder'), agent('b2', 'builder'), agent('b3', 'builder'), agent('b4', 'builder'), agent('r1', 'reviewer'), agent('b5', 'builder', false)]
-  writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id: projectId, agents }))
+  writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id: projectId, agents }))
 }
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(ws, fn)
 const carried = () => store.slots().flatMap((s) => (store.openLease(s.name)?.kind === 'carried' ? [{ slot: s.name, folder: s.folder, agent: store.openLease(s.name)!.agent, lease: store.openLease(s.name)!.id }] : []))
@@ -48,10 +48,10 @@ let laneId = ''
 
 beforeAll(async () => {
   gitRepo(project)
-  commit(project, { '.gitignore': '.hive/\n', 'a.txt': 'a\n' }, 'first')
+  commit(project, { '.gitignore': '.combwork/\n', 'a.txt': 'a\n' }, 'first')
   // Every agent's 0.9 worktree but b4's (deleted since: not adopted).
   for (const a of ['b1', 'b2', 'b3', 'r1']) sh(project, 'worktree', 'add', '-q', '-b', `hive/h${a}`, wt(`h${a}`))
-  mkdirSync(join(project, '.hive'), { recursive: true })
+  mkdirSync(join(project, '.combwork'), { recursive: true })
   writeProject()
   await ws.open(wsPath)
   projectId = (await ws.projectConfig(project)).id ?? 'p1'
@@ -137,9 +137,9 @@ describe("agents' worktrees become slots (#1441)", () => {
     } finally {
       other.conn.close()
     }
-    const cfg = JSON.parse(readFileSync(join(project, '.hive', 'project.json'), 'utf8'))
+    const cfg = JSON.parse(readFileSync(join(project, '.combwork', 'project.json'), 'utf8'))
     cfg.agents.find((a: { id: string }) => a.id === 'b5').worktree = { path: wt('hb5'), branch: 'hive/hb5', base: 'main' }
-    writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify(cfg))
+    writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify(cfg))
     await boardWrite(ws, async () => boardWriteOp(ws, (db) => db.prepare("DELETE FROM board_meta WHERE key = 'slot_migration'").run()))
     await migrateSlots(ws)
     expect(carried().filter((x) => x.agent === 'b5')).toHaveLength(1)
@@ -168,7 +168,7 @@ describe("agents' worktrees become slots (#1441)", () => {
   })
 
   it("a worktree missing at the upgrade (or made since) stays its agent's folder, and is adopted once it's there", async () => {
-    const b4 = folderAgent(JSON.parse(readFileSync(join(project, '.hive', 'project.json'), 'utf8')).agents.find((a: { id: string }) => a.id === 'b4'))
+    const b4 = folderAgent(JSON.parse(readFileSync(join(project, '.combwork', 'project.json'), 'utf8')).agents.find((a: { id: string }) => a.id === 'b4'))
     expect(await run(() => slotsMigrated(project, 'b4'))).toBe(false)
     expect(launchFolder(await run(() => folderFacts(project)), b4, 'build').toLowerCase()).toBe(wt('hb4').toLowerCase())
     sh(project, 'worktree', 'add', '-q', '-b', 'hive/hb4', wt('hb4'))
@@ -195,7 +195,7 @@ describe("Darren's workspace's shape, and solo agents (#1441)", () => {
   const before: Record<string, string> = {}
   let dStore: InstanceType<typeof SlotStore>
   let soloStore: InstanceType<typeof SlotStore>
-  const cfgFile = (p: string) => join(p, '.hive', 'project.json')
+  const cfgFile = (p: string) => join(p, '.combwork', 'project.json')
   const builder = (n: number) => ({ id: `hb${n}`, name: `HB${n}`, provider: 'claude-code', workflowRole: 'builder', worktree: { path: join(dTrees, 'hive', `hb${n}`), branch: `hive/hb${n}`, base: 'main' } })
   const reviewer = (n: number) => ({ id: `hr${n}`, name: `HR${n}`, provider: 'codex', workflowRole: 'reviewer' })
   const agentsOf = (p: string): { id: string }[] => JSON.parse(readFileSync(cfgFile(p), 'utf8')).agents
@@ -208,12 +208,12 @@ describe("Darren's workspace's shape, and solo agents (#1441)", () => {
   const defOf = (p: string, id: string) => folderAgent(agentsOf(p).find((a) => a.id === id) as never)
 
   beforeAll(async () => {
-    mkdirSync(join(plain, '.hive'), { recursive: true })
+    mkdirSync(join(plain, '.combwork'), { recursive: true })
     writeFileSync(cfgFile(plain), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, agents: bareAgents() }))
     for (const p of [hive, solo, bare]) {
       gitRepo(p)
-      commit(p, { '.gitignore': '.hive/\n', 'a.txt': 'a\n' }, 'first')
-      mkdirSync(join(p, '.hive'), { recursive: true })
+      commit(p, { '.gitignore': '.combwork/\n', 'a.txt': 'a\n' }, 'first')
+      mkdirSync(join(p, '.combwork'), { recursive: true })
     }
     for (const n of [1, 2, 3, 4, 5, 6]) sh(hive, 'worktree', 'add', '-q', '-b', `hive/hb${n}`, join(dTrees, 'hive', `hb${n}`))
     commit(join(dTrees, 'hive', 'hb4'), { 'b.txt': 'unmerged\n' }, 'unmerged')

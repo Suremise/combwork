@@ -29,7 +29,7 @@ const check = (name, ok, extra = '') => {
 
 /** Writes to the workspace's board from outside Hive, as the upgrade would have (its marks). */
 function board(sql, ...args) {
-  const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { timeout: 5000 })
   try {
     db.prepare(sql).run(...args)
   } finally {
@@ -41,8 +41,8 @@ function board(sql, ...args) {
   for (const d of [userData, ws, outer]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(alpha)
   // As the upgrade leaves a Git project: its options, no preset chosen (the presets notice names it).
-  fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [], workflow: { platform: 'git', preset: null, options: {} } }))
+  fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [], workflow: { platform: 'git', preset: null, options: {} } }))
   fs.mkdirSync(plain, { recursive: true })
   fs.writeFileSync(path.join(plain, 'notes.md'), '# Notes\n')
   // A workspace kept in git, its project a subfolder of that repository.
@@ -130,7 +130,7 @@ function board(sql, ...args) {
     await shots('none', page.locator('.vc-view'))
 
     // --- Git chosen before the folder is a repository (HI-1905): Git's page, only Initialise repository…, nothing saved.
-    const plainSaved = () => (fs.existsSync(path.join(plain, '.hive', 'project.json')) ? fs.readFileSync(path.join(plain, '.hive', 'project.json'), 'utf8') : null)
+    const plainSaved = () => (fs.existsSync(path.join(plain, '.combwork', 'project.json')) ? fs.readFileSync(path.join(plain, '.combwork', 'project.json'), 'utf8') : null)
     const savedBefore = plainSaved()
     const linkBefore = (await text(link)).trim()
     await head.locator('[data-platform="git"]').click()

@@ -4,16 +4,16 @@ import { utf8Bytes } from './metrics'
 /**
  * Workspace notes (#1433, #873, SPEC §16.10.7): one shared note per workspace for what is true of this machine (a
  * full-path command, a local tool's version), which no committed file should hold. It lives in the workspace's
- * git-excluded `.hive/shared`, and Hive delivers it inline at each launch, after the session contract, to every agent
+ * git-excluded `.combwork/shared`, and Hive delivers it inline at each launch, after the session contract, to every agent
  * on every CLI, in whichever folder it works (a slot, a worktree, the project folder): a git-ignored file in the project
  * reaches only some of them. A `## <project name>` section is that project's alone; the rest is everyone's.
  */
 
-/** The note's path in `.hive/shared` (as the notes tools and the Agent API name it). */
+/** The note's path in `.combwork/shared` (as the notes tools and the Agent API name it). */
 export const WORKSPACE_NOTES_PATH = 'Workspace notes.md' // i18n-ignore: a file name, the same in every language
 
 /** The note's file in a workspace (Windows paths, as the window names a shared note's file). */
-export const workspaceNotesPath = (workspacePath: string): string => `${workspacePath.replace(/[\\/]+$/, '')}\\.hive\\shared\\${WORKSPACE_NOTES_PATH}`
+export const workspaceNotesPath = (workspacePath: string): string => `${workspacePath.replace(/[\\/]+$/, '')}\\.combwork\\shared\\${WORKSPACE_NOTES_PATH}`
 
 /** The note's name in agents' text: the shared note they read for the rest of a cut note (its file's name, never translated). */
 const NOTE_NAME = WORKSPACE_NOTES_PATH.replace(/\.md$/, '')

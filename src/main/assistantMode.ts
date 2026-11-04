@@ -52,7 +52,7 @@ registerSource('mode', {
 })
 
 /**
- * Makes a mode (a file in .hive/modes) this workspace's Assistant's. Returns whether a running Assistant was told now, will be
+ * Makes a mode (a file in .combwork/modes) this workspace's Assistant's. Returns whether a running Assistant was told now, will be
  * when it is idle, or wasn't running (the mode applies when it starts); 'saved' too for a switch a newer one overtook
  * (the newer one is saved and told, and says so).
  */
@@ -64,7 +64,7 @@ export async function switchMode(modeId: string, save = true): Promise<'told' | 
   switches.set(key, rev)
   const current = (): boolean => revision(key) === rev
   const mode = await readMode(modeId)
-  if (!mode) throw hiveError(msg({ id: 'content.mode.unknown', defaultMessage: 'There is no mode "{mode}" in this workspace.', description: "An error switching the Hive Assistant's mode: the workspace has no mode (a file in .hive/modes) called {mode}." }), { mode: modeId }, { kind: 'notFound' })
+  if (!mode) throw hiveError(msg({ id: 'content.mode.unknown', defaultMessage: 'There is no mode "{mode}" in this workspace.', description: "An error switching the Hive Assistant's mode: the workspace has no mode (a file in .combwork/modes) called {mode}." }), { mode: modeId }, { kind: 'notFound' })
   if (!current()) return 'saved'
   // save=false: the choice is already saved (Assistant Settings, which can also choose "the default").
   if (save) {

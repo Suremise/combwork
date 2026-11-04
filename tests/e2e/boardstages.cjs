@@ -38,12 +38,12 @@ const nothingToArchive = (dialog) => {
   // beta: Git with no review (Committed is done, the project folder); notes: no version control.
   const beta = path.join(fx.ws, 'beta')
   const notes = path.join(fx.ws, 'notes')
-  lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.hive/\n' })
-  fs.mkdirSync(path.join(beta, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(beta, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [], workflow: { platform: 'git', preset: null, options: { review: 'none', finish: 'committed', folder: 'project' } } }))
-  fs.mkdirSync(path.join(notes, '.hive'), { recursive: true })
+  lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.combwork/\n' })
+  fs.mkdirSync(path.join(beta, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(beta, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [], workflow: { platform: 'git', preset: null, options: { review: 'none', finish: 'committed', folder: 'project' } } }))
+  fs.mkdirSync(path.join(notes, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(notes, 'plan.md'), '# Plan\n')
-  fs.writeFileSync(path.join(notes, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [], workflow: { platform: 'none', preset: null, options: {} } }))
+  fs.writeFileSync(path.join(notes, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [], workflow: { platform: 'none', preset: null, options: {} } }))
   const h = await q.startHive(fx, { port: PORT })
   try {
     const { page, inv } = h

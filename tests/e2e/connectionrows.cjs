@@ -27,9 +27,9 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
   fs.mkdirSync(userData, { recursive: true })
   const env = lib.fakeClaude(userData, home, [alpha])
   lib.gitProject(alpha)
-  fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
+  fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
   // Three: a connection this machine doesn't have (removed since, or from another machine).
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }, { id: 'a-two', name: 'Two' }, { id: 'a-three', name: 'Three', connection: 'a-gone' }] }))
+  fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }, { id: 'a-two', name: 'Two' }, { id: 'a-three', name: 'Three', connection: 'a-gone' }] }))
 
   const { app, page } = await lib.launch({ userData, env: { ...env, HIVE_TEST_CLI_HOME_CONNECTION: '0' }, viewport: { width: 1400, height: 900 } })
   try {
@@ -121,7 +121,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     // --- A template: Two's connection named beside its id. Max 2 removed, then the template loaded into alpha again.
     await inv('connections:move', max1.id, 0)
     await inv('templates:save', alpha, 'workspace', 'Rows', false)
-    const saved = JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'templates', 'rows.json'), 'utf8'))
+    const saved = JSON.parse(fs.readFileSync(path.join(ws, '.combwork', 'templates', 'rows.json'), 'utf8'))
     check('the template is saved without connections (HI-2106)', saved.agents.every((a) => !('connection' in a) && !('connectionName' in a)), JSON.stringify(saved.agents))
     await inv('agents:update', alpha, 'a-two', { connection: null })
     await inv('connections:remove', max2.id)

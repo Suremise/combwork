@@ -236,8 +236,8 @@ describe('the state view in a workspace', () => {
 
   beforeAll(async () => {
     process.env.HIVE_TEST_TRASH_DIR = join(base, 'trash')
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] }))
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     // Everything on (preferences too), then narrowed below.
@@ -338,7 +338,7 @@ describe('the state view in a workspace', () => {
     await service.setJournalSettings(w, { enabled: false })
     expect(await service.journalSuggestion(w)).toBe(service.JOURNAL_SUGGESTION)
     expect(await service.journalSuggestion(w)).toBeNull()
-    expect(JSON.parse(readFileSync(join(wsPath, '.hive', 'workspace.json'), 'utf8')).journalSuggested).toBe(true)
+    expect(JSON.parse(readFileSync(join(wsPath, '.combwork', 'workspace.json'), 'utf8')).journalSuggested).toBe(true)
     await service.setJournalSettings(w, { enabled: true })
     expect(await service.journalSuggestion(w)).toBeNull()
   })

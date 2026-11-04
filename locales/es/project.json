@@ -333,7 +333,7 @@
   "project.settings.offLower": "desactivado",
   "project.settings.on": "Activado",
   "project.settings.onLower": "activado",
-  "project.settings.openHive": "Abrir la carpeta .hive",
+  "project.settings.openHive": "Abrir la carpeta .combwork",
   "project.settings.overrides": "Reemplaza el valor global predeterminado",
   "project.settings.reset": "Restablecer",
   "project.settings.resetButton": "Restablecer valores predeterminados",

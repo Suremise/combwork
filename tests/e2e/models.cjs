@@ -164,7 +164,7 @@ const check = (name, ok, extra = '') => {
   await modelOf('Writer').hover()
   check('…and the tooltip says it was chosen as Opus', !!(await lib.until(async () => (await page.locator('.tip', { hasText: 'Opus 5.5 · chosen as Opus' }).count()) > 0, HUNG_MS)))
   // The Assistant's model is its connection's (HI-2108): set as an agent's is (lib.setLaunch), onto a connection on its account.
-  const assistantHome = path.join(ws, '.hive', 'assistant')
+  const assistantHome = path.join(ws, '.combwork', 'assistant')
   await lib.setLaunch(inv, assistantHome, 'assistant', { model: 'opus' })
   if ((await page.locator('.assistant-panel').count()) === 0) await page.locator('.assistant-rail').click()
   const assistantModel = async () => (await page.locator('.assistant-footer .foot-model').innerText().catch(() => '')).split(' · ')[0].trim()

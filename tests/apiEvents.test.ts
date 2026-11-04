@@ -58,7 +58,7 @@ describe('apiEventFor', () => {
   })
 
   it("sends the Assistant's actions without what they quote, and not to agents", () => {
-    const home = join(ws, '.hive', 'assistant')
+    const home = join(ws, '.combwork', 'assistant')
     const action = { id: 'x', at: '2026-10-11T00:00:00Z', text: 'Gave B1 in alpha a task: the secret prompt', brief: 'Gave B1 in alpha a task', ok: true }
     const sent = apiEventFor({ type: 'assistant-activity', projectPath: home, action }, null)
     expect(sent).toEqual({ type: 'assistant-activity', workspacePath: ws, action: { id: 'x', at: action.at, text: 'Gave B1 in alpha a task', ok: true } })
@@ -69,7 +69,7 @@ describe('apiEventFor', () => {
   })
 
   it("sends the Assistant's action's kind and targets (#763), and nothing else it holds", () => {
-    const home = join(ws, '.hive', 'assistant')
+    const home = join(ws, '.combwork', 'assistant')
     const agentB1 = { id: 'a1', name: 'B1' }
     const action = {
       id: 'x', at: 't', text: 'Left B1 in alpha a message (m3) for #12 round 1: the secret message', brief: 'Left B1 in alpha a message (m3) for #12 round 1', ok: true,

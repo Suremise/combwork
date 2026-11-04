@@ -47,9 +47,9 @@ const transcripts = () => {
 
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`]) fs.rmSync(d, { recursive: true, force: true })
-  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
-  lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.combwork/\n' })
   const env = lib.fakeClaude(userData, home, [alpha, beta, ws, slotA, slotB])
   // B1 follows Hive's notices as a model does: cw_inbox, then the ack.
   fs.writeFileSync(path.join(home, 'fake-follow-notices.txt'), '')

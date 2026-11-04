@@ -32,7 +32,7 @@ const renameState = () => {
 const identity = (stat) => `${stat.dev}:${stat.ino}`
 
 ;(async () => {
-  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   const env = lib.fakeClaude(userData, home, [alpha, ws, slotA])
   const cfgFile = path.join(userData, 'config.json')
@@ -60,7 +60,7 @@ const identity = (stat) => `${stat.dev}:${stat.ino}`
     const first = await inv('lanes:start', alpha, { builder: b1.id, reviewer: r1.id, cards: [c1] })
     check('first lane is lent slot-a', first.slot === 'slot-a', JSON.stringify(first))
     check('fake CLI runs in slot-a and owns its writer', !!(await until(async () => same((await live())?.cwd, slotA) && ['ready', 'finished'].includes((await live())?.status) && !!(await slot())?.writer, HUNG_MS)))
-    const file = path.join(slotA, '.hive', 'external.lock')
+    const file = path.join(slotA, '.combwork', 'external.lock')
     fs.mkdirSync(path.dirname(file), { recursive: true })
     fd = fs.openSync(file, 'w')
     const before = identity(fs.fstatSync(fd, { bigint: true }))

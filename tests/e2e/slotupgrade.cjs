@@ -60,7 +60,7 @@ const isIn = (dir, rev, ref) => {
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`]) fs.rmSync(d, { recursive: true, force: true })
   // 0.9's layout: alpha with B1's worktree hb1 (on hive/hb1, from integration), R1 in the project folder; solo with Me's.
-  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   lib.git(alpha, ['branch', 'integration'])
   // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
@@ -69,7 +69,7 @@ const isIn = (dir, rev, ref) => {
   lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hb1', hb1, 'integration'])
   for (const o of others) lib.git(alpha, ['worktree', 'add', '-q', '-b', `hive/hb${o.n}`, o.tree, 'integration'])
   lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hr2', hr2, 'integration'])
-  lib.gitProject(solo, { 's.txt': 's\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(solo, { 's.txt': 's\n', '.gitignore': '.combwork/\n' })
   lib.git(solo, ['branch', '-M', 'main'])
   lib.git(solo, ['worktree', 'add', '-q', '-b', 'hive/me', meTree, 'main'])
   const agents = {
@@ -83,8 +83,8 @@ const isIn = (dir, rev, ref) => {
     [solo]: [{ id: 'me', name: 'Me', provider: 'claude-code', worktree: { path: meTree, branch: 'hive/me', base: 'main' } }]
   }
   for (const [p, list] of Object.entries(agents)) {
-    fs.mkdirSync(path.join(p, '.hive'), { recursive: true })
-    fs.writeFileSync(path.join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: list }, null, 2))
+    fs.mkdirSync(path.join(p, '.combwork'), { recursive: true })
+    fs.writeFileSync(path.join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: list }, null, 2))
   }
   const env = lib.fakeClaude(userData, home, [alpha, solo, ws, hb1, slotA, slotB, meTree, hr2, ...others.map((o) => o.tree)])
   const cfgFile = path.join(userData, 'config.json')

@@ -21,8 +21,8 @@ const log = createLogger('gitInit')
 
 /**
  * Initialise repository (#701): makes a project folder that isn't a git repository one, from its Git tab. In order:
- * `git init -b main`; the project's .hive (and Hive's copies of skills) added to `.git/info/exclude` and git asked
- * whether it ignores .hive, before anything is staged, so .hive can never be in the first commit (#345); the starter
+ * `git init -b main`; the project's .combwork (and Hive's copies of skills) added to `.git/info/exclude` and git asked
+ * whether it ignores .combwork, before anything is staged, so .combwork can never be in the first commit (#345); the starter
  * .gitignore the user chose (never over one the folder has); the identity asked for, saved to this repository's config
  * only; everything staged and committed (an empty commit for an empty folder); then the workspace refreshed, so worktrees
  * work at once. Refused where another version control system keeps the folder, and inside another repository's working
@@ -52,7 +52,7 @@ async function repoIdentity(projectPath: string): Promise<GitIdentityPart> {
   return parseIdentity(await git(projectPath, ['config', '--get-regexp', IDENTITY]))
 }
 
-/** Whether the folder holds nothing but .hive (an empty first commit). */
+/** Whether the folder holds nothing but .combwork (an empty first commit). */
 async function isEmpty(projectPath: string): Promise<boolean> {
   const names = await readdir(projectPath).catch(() => [] as string[])
   return names.every((n) => n === HIVE_DIR || n === '.git')
@@ -121,17 +121,17 @@ export async function initRepo(projectPath: string, opts: GitInitOptions): Promi
       log.info(`Initialised a git repository in ${userText(projectPath)}`)
     }
 
-    // Before anything is staged: .hive is never in the first commit, whatever the folder's .gitignore says.
+    // Before anything is staged: .combwork is never in the first commit, whatever the folder's .gitignore says.
     let ex: Awaited<ReturnType<typeof ensureHiveExcluded>>
     try {
       ex = await ensureHiveExcluded(projectPath)
     } catch (e) {
-      throw stop(msg({ id: 'main.gitInit.failed.exclude', defaultMessage: "couldn't keep .hive out of git", description: "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .hive is a folder's name." }), errorText(e))
+      throw stop(msg({ id: 'main.gitInit.failed.exclude', defaultMessage: "couldn't keep .combwork out of git", description: "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .combwork is a folder's name." }), errorText(e))
     }
     if (!ex?.excluded)
       throw stop(
-        msg({ id: 'main.gitInit.failed.ignored', defaultMessage: "git still doesn't ignore .hive here (a rule in a .gitignore may bring it back), so nothing was committed", description: 'What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .hive and .gitignore are names.' }),
-        msg({ id: 'main.gitInit.fix.ignored', defaultMessage: 'fix that, then choose Make first commit in the Version Control tab', description: 'What to do after .hive was found not ignored by git (main.gitInit.failed.ignored). Make first commit is a button in the Version Control tab (glossary 2.1): use its name as shown.' })
+        msg({ id: 'main.gitInit.failed.ignored', defaultMessage: "git still doesn't ignore .combwork here (a rule in a .gitignore may bring it back), so nothing was committed", description: 'What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .combwork and .gitignore are names.' }),
+        msg({ id: 'main.gitInit.fix.ignored', defaultMessage: 'fix that, then choose Make first commit in the Version Control tab', description: 'What to do after .combwork was found not ignored by git (main.gitInit.failed.ignored). Make first commit is a button in the Version Control tab (glossary 2.1): use its name as shown.' })
       )
     await excludeCopies(projectPath).catch((e) => log.warn('excluding skill copies after git init', e))
 
@@ -169,13 +169,13 @@ export async function initRepo(projectPath: string, opts: GitInitOptions): Promi
 
     const add = await git(projectPath, ['add', '-A', '--', '.'])
     if (!add.ok) throw stop(msg({ id: 'main.gitInit.failed.stage', defaultMessage: "couldn't stage the folder's files", description: 'What failed in making a git repository, a clause (main.gitInit.stoppedAfter).' }), gitSaid(add))
-    // A last check that git's ignore did its job: nothing of .hive staged.
+    // A last check that git's ignore did its job: nothing of .combwork staged.
     const staged = await git(projectPath, ['diff', '--cached', '--name-only', '-z', '--', HIVE_DIR])
     if (!staged.ok || staged.out.replace(/\0/g, '')) {
       await git(projectPath, ['reset', '-q'])
       throw stop(
-        msg({ id: 'main.gitInit.failed.staged', defaultMessage: '.hive was staged, so nothing was committed', description: "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .hive is a folder's name." }),
-        msg({ id: 'main.gitInit.fix.staged', defaultMessage: 'check the .gitignore for a rule that brings .hive back', description: 'What to do after .hive was staged (main.gitInit.failed.staged).' })
+        msg({ id: 'main.gitInit.failed.staged', defaultMessage: '.combwork was staged, so nothing was committed', description: "What failed in making a git repository, a clause (main.gitInit.stoppedAfter). .combwork is a folder's name." }),
+        msg({ id: 'main.gitInit.fix.staged', defaultMessage: 'check the .gitignore for a rule that brings .combwork back', description: 'What to do after .combwork was staged (main.gitInit.failed.staged).' })
       )
     }
     const files = await git(projectPath, ['diff', '--cached', '--name-only', '-z'])
@@ -196,6 +196,6 @@ export async function initRepo(projectPath: string, opts: GitInitOptions): Promi
     await workspaceOf(projectPath)
       .refresh()
       .catch((e) => log.warn('refreshing after git init', e))
-    return shownText(withValues(msg({ id: 'main.gitInit.done', defaultMessage: '{steps}. .hive stays out of git. Agents can work in worktrees now.', description: "What making a git repository did. {steps} lists the steps (main.gitInit.step.*), its first capitalised. .hive is a folder's name." }), { steps: steps() }))
+    return shownText(withValues(msg({ id: 'main.gitInit.done', defaultMessage: '{steps}. .combwork stays out of git. Agents can work in worktrees now.', description: "What making a git repository did. {steps} lists the steps (main.gitInit.step.*), its first capitalised. .combwork is a folder's name." }), { steps: steps() }))
   })
 }

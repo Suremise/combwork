@@ -22,8 +22,8 @@ const check = (name, ok, extra = '') => {
 /** A project whose attachments are DIRS folders of one 100-byte file each. */
 function project(p) {
   for (let i = 0; i < DIRS; i++) {
-    fs.mkdirSync(path.join(p, '.hive', 'attachments', `d${i}`), { recursive: true })
-    fs.writeFileSync(path.join(p, '.hive', 'attachments', `d${i}`, 'f.png'), 'x'.repeat(100))
+    fs.mkdirSync(path.join(p, '.combwork', 'attachments', `d${i}`), { recursive: true })
+    fs.writeFileSync(path.join(p, '.combwork', 'attachments', `d${i}`, 'f.png'), 'x'.repeat(100))
   }
 }
 
@@ -60,10 +60,10 @@ function project(p) {
       }
       return real(p, ...rest)
     }
-  }, [alpha, beta].map((p) => path.join(p, '.hive', 'attachments').toLowerCase()))
+  }, [alpha, beta].map((p) => path.join(p, '.combwork', 'attachments').toLowerCase()))
   const reads = async () => {
     const r = await app.evaluate(() => globalThis.__storageGate.reads)
-    return { alpha: r[path.join(alpha, '.hive', 'attachments').toLowerCase()] ?? 0, beta: r[path.join(beta, '.hive', 'attachments').toLowerCase()] ?? 0 }
+    return { alpha: r[path.join(alpha, '.combwork', 'attachments').toLowerCase()] ?? 0, beta: r[path.join(beta, '.combwork', 'attachments').toLowerCase()] ?? 0 }
   }
   const hold = () => app.evaluate(() => void (globalThis.__storageGate.held = true))
   const release = () => app.evaluate(() => globalThis.__storageGate.release())

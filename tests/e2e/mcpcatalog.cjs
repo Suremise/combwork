@@ -40,8 +40,8 @@ function publish(dir, version, script, name = 'Test catalogue') {
 
 ;(async () => {
   for (const d of [userData, ws, share, share2]) fs.rmSync(d, { recursive: true, force: true })
-  fs.mkdirSync(path.join(proj, '.hive'), { recursive: true })
-  fs.mkdirSync(path.join(ws, '.hive', 'mcp'), { recursive: true })
+  fs.mkdirSync(path.join(proj, '.combwork'), { recursive: true })
+  fs.mkdirSync(path.join(ws, '.combwork', 'mcp'), { recursive: true })
   const source = publish(share, '1.0.0', 'server.js')
   const env = lib.fakeClaude(userData, path.join(lib.WORK, 'mcpcatalog-claude-home'), [proj])
   const cfgFile = path.join(userData, 'config.json')
@@ -61,7 +61,7 @@ function publish(dir, version, script, name = 'Test catalogue') {
       await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     }
     // Installed as demo-cat: a local demo has the name (the clash below).
-    const installed = () => JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'mcp', 'demo-cat.json'), 'utf8'))
+    const installed = () => JSON.parse(fs.readFileSync(path.join(ws, '.combwork', 'mcp', 'demo-cat.json'), 'utf8'))
     const cfgNow = () => JSON.parse(fs.readFileSync(cfgFile, 'utf8')).settings.mcpCatalogs
 
     // --- The Catalogue: a category per source, the one-time note, search and filter.
@@ -98,7 +98,7 @@ function publish(dir, version, script, name = 'Test catalogue') {
     await lib.until(async () => (await ask.count()) === 1, HUNG_MS)
     await ask.locator('input').fill('demo-cat')
     await ask.getByRole('button', { name: 'Install', exact: true }).click()
-    check('installed under the other name, with where it came from; the local demo untouched', !!(await lib.until(async () => fs.existsSync(path.join(ws, '.hive', 'mcp', 'demo-cat.json')) && installed().catalog?.version === '1.0.0', HUNG_MS)) && fs.existsSync(path.join(ws, '.hive', 'mcp', 'demo-cat', 'server.js')) && !JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'mcp', 'demo.json'), 'utf8')).catalog)
+    check('installed under the other name, with where it came from; the local demo untouched', !!(await lib.until(async () => fs.existsSync(path.join(ws, '.combwork', 'mcp', 'demo-cat.json')) && installed().catalog?.version === '1.0.0', HUNG_MS)) && fs.existsSync(path.join(ws, '.combwork', 'mcp', 'demo-cat', 'server.js')) && !JSON.parse(fs.readFileSync(path.join(ws, '.combwork', 'mcp', 'demo.json'), 'utf8')).catalog)
     const where = page.locator('.pane-body .row', { has: page.locator('.label', { hasText: /^demo-cat\s*$/ }) }).locator('.mcp-where')
     check('…its view opens on the Installed tab, added nowhere, with Add to…', !!(await lib.until(async () => (await where.innerText().catch(() => '')) === 'Not added anywhere' && (await page.locator('[data-action="mcp-places"]').count()) === 1, HUNG_MS)), await where.innerText().catch(() => ''))
 
@@ -107,7 +107,7 @@ function publish(dir, version, script, name = 'Test catalogue') {
     const places = page.getByRole('dialog', { name: 'Add demo-cat to…' })
     await places.getByRole('group', { name: 'Projects to add it to' }).getByRole('checkbox', { name: 'demo', exact: true }).check()
     await places.getByRole('button', { name: 'Save', exact: true }).click()
-    const projectMcp = () => JSON.parse(fs.readFileSync(path.join(proj, '.hive', 'project.json'), 'utf8')).mcp
+    const projectMcp = () => JSON.parse(fs.readFileSync(path.join(proj, '.combwork', 'project.json'), 'utf8')).mcp
     check('added to demo', !!(await lib.until(async () => (projectMcp().enabled ?? []).includes('demo-cat'), HUNG_MS)), JSON.stringify(projectMcp()))
     // Opening the Catalogue reads the catalogues; a search afterwards doesn't.
     await page.locator('[data-mcp-tab="catalogue"]').click()

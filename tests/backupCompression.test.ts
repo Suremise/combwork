@@ -49,7 +49,7 @@ const write = (file: string, text: string): void => {
   mkdirSync(join(file, '..'), { recursive: true })
   writeFileSync(file, text)
 }
-const backup = (id: string, archived = false): string => join(p, '.hive', archived ? 'archive' : 'sessions', `${id}.jsonl`)
+const backup = (id: string, archived = false): string => join(p, '.combwork', archived ? 'archive' : 'sessions', `${id}.jsonl`)
 const cliFile = (id: string): string => join(cli, `${id}.jsonl`)
 const gz = (file: string): string => gunzipSync(readFileSync(file + '.gz')).toString('utf8')
 
@@ -68,9 +68,9 @@ const lookup = async (_p: string, id: string) => (existsSync(cliFile(id)) ? { pa
 
 describe('compressed transcript backups', () => {
   beforeAll(async () => {
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     cliLookup.mockImplementation(lookup)
@@ -78,7 +78,7 @@ describe('compressed transcript backups', () => {
   beforeEach(async () => {
     trashed.length = 0
     config.settings.sessions.backupRetention = 'off'
-    for (const d of ['archive', 'sessions']) rmSync(join(p, '.hive', d), { recursive: true, force: true })
+    for (const d of ['archive', 'sessions']) rmSync(join(p, '.combwork', d), { recursive: true, force: true })
     await w.mutateSessions(p, (f) => {
       f.sessions = []
       f.deleted = []

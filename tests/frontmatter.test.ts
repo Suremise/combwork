@@ -84,16 +84,16 @@ describe('who gets which skill', () => {
   it('the Skills view, the role filters and a launch agree; a broken one reaches nobody and says why', async () => {
     const ws = join(base, 'ws')
     const proj = join(ws, 'proj')
-    mkdirSync(join(proj, '.hive'), { recursive: true })
-    writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+    mkdirSync(join(proj, '.combwork'), { recursive: true })
+    writeFileSync(join(proj, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
     const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
     const { hiveSkills } = await import('../src/main/skills')
     const { sessions } = await import('../src/main/sessions')
     const w = createWorkspaceService()
     await w.open(ws)
     const skill = (name: string, header: string) => {
-      mkdirSync(join(ws, '.hive', 'skills', name), { recursive: true })
-      writeFileSync(join(ws, '.hive', 'skills', name, 'SKILL.md'), head(`name: ${name}\ndescription: The ${name} skill.\n${header}`))
+      mkdirSync(join(ws, '.combwork', 'skills', name), { recursive: true })
+      writeFileSync(join(ws, '.combwork', 'skills', name, 'SKILL.md'), head(`name: ${name}\ndescription: The ${name} skill.\n${header}`))
     }
     skill('inline-assistant', 'metadata:\n  audience: assistant # only the Assistant')
     skill('flow-all', 'metadata: { audience: all }')

@@ -1396,7 +1396,7 @@
     "description": "What the setting \"Settings file\" does, under its title (Settings → Advanced)."
   },
   "settings.advanced.data.tip": {
-    "defaultMessage": "Project settings live in each project's .hive folder; workspace settings in the workspace .hive folder.",
+    "defaultMessage": "Project settings live in each project's .combwork folder; workspace settings in the workspace .combwork folder.",
     "description": "The info tip of the setting \"Settings file\" (Settings → Advanced): more on what it does and when it applies."
   },
   "settings.advanced.data.title": {
@@ -2748,7 +2748,7 @@
     "description": "What the setting \"Default mode\" does, under its title (Settings → Assistant)."
   },
   "settings.assistant.mode.tip": {
-    "defaultMessage": "Modes are Markdown files in each workspace (.hive/modes): edit them, or add your own, in the Assistant view (the crown on the left). The panel switches mode at once, keeping the conversation.",
+    "defaultMessage": "Modes are Markdown files in each workspace (.combwork/modes): edit them, or add your own, in the Assistant view (the crown on the left). The panel switches mode at once, keeping the conversation.",
     "description": "The info tip of the setting \"Default mode\" (Settings → Assistant): more on what it does and when it applies."
   },
   "settings.assistant.mode.title": {
@@ -3780,7 +3780,7 @@
     "description": "A kind of journal entry: how the user likes things done. Off by default."
   },
   "settings.journal.local": {
-    "defaultMessage": "Kept on this computer only, in .hive/assistant/journal.db, and never sent anywhere.",
+    "defaultMessage": "Kept on this computer only, in .combwork/assistant/journal.db, and never sent anywhere.",
     "description": "A note under the journal settings (privacy). Keep the file path as it is."
   },
   "settings.journal.mb": {
@@ -4488,7 +4488,7 @@
     "description": "A setting's title (Project Settings → General): the project's key, 2–4 letters such as AM that its cards are named by (AM-12)."
   },
   "settings.project.keybindings.desc": {
-    "defaultMessage": "Change one to give this project its own; Reset returns it to the global shortcut. Stored in the project’s .hive folder, which is not committed.",
+    "defaultMessage": "Change one to give this project its own; Reset returns it to the global shortcut. Stored in the project’s .combwork folder, which is not committed.",
     "description": "What the setting \"Shortcuts\" does, under its title (Project Settings → Keyboard Shortcuts)."
   },
   "settings.project.keybindings.title": {
@@ -4496,7 +4496,7 @@
     "description": "A setting's title (Project Settings → Keyboard Shortcuts)."
   },
   "settings.project.metadata.desc": {
-    "defaultMessage": "Stored in the project's .hive/project.json (excluded from git). Changes apply to new sessions; restart a running session to apply them.",
+    "defaultMessage": "Stored in the project's .combwork/project.json (excluded from git). Changes apply to new sessions; restart a running session to apply them.",
     "description": "What the setting \"Settings file\" does, under its title (Project Settings → Advanced)."
   },
   "settings.project.metadata.title": {
@@ -5068,7 +5068,7 @@
     "description": "A setting's title (Settings → Sessions)."
   },
   "settings.sessions.backupTranscripts.desc": {
-    "defaultMessage": "Copy each session's transcript into the project's .hive/sessions folder.",
+    "defaultMessage": "Copy each session's transcript into the project's .combwork/sessions folder.",
     "description": "What the setting \"Back up transcripts\" does, under its title (Settings → Sessions)."
   },
   "settings.sessions.backupTranscripts.tip": {
@@ -5192,7 +5192,7 @@
     "description": "What the setting \"Record performance metrics\" does, under its title (Settings → Sessions)."
   },
   "settings.sessions.recordPerformance.tip": {
-    "defaultMessage": "Only totals are kept: request and reply sizes, times and outcomes, the size of what each session was given, and the providers' own reported usage. Never prompts, replies, tokens or paths. Kept 30 days per workspace in .hive/metrics (git-ignored, this machine's). Turned off, nothing new is recorded; what was recorded stays until you reset it.",
+    "defaultMessage": "Only totals are kept: request and reply sizes, times and outcomes, the size of what each session was given, and the providers' own reported usage. Never prompts, replies, tokens or paths. Kept 30 days per workspace in .combwork/metrics (git-ignored, this machine's). Turned off, nothing new is recorded; what was recorded stays until you reset it.",
     "description": "The info tip of the setting \"Record performance metrics\" (Settings → Sessions): more on what it does and when it applies."
   },
   "settings.sessions.recordPerformance.title": {
@@ -5276,7 +5276,7 @@
     "description": "What the setting \"Usage cache size\" does, under its title (Settings → Sessions)."
   },
   "settings.sessions.usageCacheSize.tip": {
-    "defaultMessage": "What each session used is kept in the usage history, in the workspace's .hive folder: this cache only spares reading a transcript again while Combwork runs. The least recently used go first when it is full. {min, number} to {max, number}.",
+    "defaultMessage": "What each session used is kept in the usage history, in the workspace's .combwork folder: this cache only spares reading a transcript again while Combwork runs. The least recently used go first when it is full. {min, number} to {max, number}.",
     "description": "The info tip of the setting \"Usage cache size\" (Settings → Sessions): more on what it does and when it applies. {min} and {max} are the fewest and most transcripts it can be set to."
   },
   "settings.sessions.usageCacheSize.title": {
@@ -5504,7 +5504,7 @@
     "description": "What the setting \"Commands\" does, under its title (Settings → Workspace, HI-1954)."
   },
   "settings.workspace.commands.tip": {
-    "defaultMessage": "Saved in the workspace's .hive/workspace.json, which Combwork keeps out of version control. Only you can set them: the Assistant can't change them.",
+    "defaultMessage": "Saved in the workspace's .combwork/workspace.json, which Combwork keeps out of version control. Only you can set them: the Assistant can't change them.",
     "description": "The info tip of the setting \"Commands\" (Settings → Workspace, HI-1954). Keep the file path as it is."
   },
   "settings.workspace.commands.title": {
@@ -5516,7 +5516,7 @@
     "description": "What the setting \"Hidden and removed projects\" does, under its title (Settings → Workspace)."
   },
   "settings.workspace.hiddenProjects.tip": {
-    "defaultMessage": "Project → Remove Project… hides a project, removes it from Combwork (its folder keeps its handovers and cards in .hive/removed, so it can move to another workspace) or deletes it (to the Recycle Bin). Deleted projects are not listed here: restore the folder from the Recycle Bin and Combwork sees it as a new project.",
+    "defaultMessage": "Project → Remove Project… hides a project, removes it from Combwork (its folder keeps its handovers and cards in .combwork/removed, so it can move to another workspace) or deletes it (to the Recycle Bin). Deleted projects are not listed here: restore the folder from the Recycle Bin and Combwork sees it as a new project.",
     "description": "The info tip of the setting \"Hidden and removed projects\" (Settings → Workspace): more on what it does and when it applies."
   },
   "settings.workspace.hiddenProjects.title": {

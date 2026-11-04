@@ -13,7 +13,7 @@ import type { WorkspaceService } from './workspace'
  * 0.9's agent templates at the upgrade to 1.0 (#1436; Darren's 19 Oct decision on #1123: "existing templates are wiped",
  * a clean cut-over; the Assistant's scope call of 23 Oct: copy only). 1.0 doesn't use them: the lists skip a version-1
  * file and an import of one is refused (`readTemplate`). The user's saved ones, the workspace's and each project's, are
- * **copied** into the 0.9 board backup's folder (`.hive/backups/templates-0.9`, beside the copy of hive.db the upgrade
+ * **copied** into the 0.9 board backup's folder (`.combwork/backups/templates-0.9`, beside the copy of hive.db the upgrade
  * keeps, OP-37); the originals are never moved, deleted or rewritten. One quiet notice says so. The upgrade is one-way:
  * nothing puts them back.
  *
@@ -32,7 +32,7 @@ const log = createLogger('templates')
 const MARK = 'templates.v09'
 /** board_meta's notice to say once in the window: `due`, then `said`. */
 const NOTICE = 'templates.v09.notice'
-/** The folder in `.hive/backups` the copies go to: `workspace`, and `projects/<project id>` (ids follow a rename, #508). */
+/** The folder in `.combwork/backups` the copies go to: `workspace`, and `projects/<project id>` (ids follow a rename, #508). */
 export const V09_TEMPLATES = 'templates-0.9'
 /** Seams for unit tests: a failure where a run reads or writes, and the moment a copy is written but not yet published. */
 export const testHooks: { fail?: (op: 'scan' | 'read' | 'write', path: string) => void; beforePublish?: (part: string) => Promise<void> } = {}

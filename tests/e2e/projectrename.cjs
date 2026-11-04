@@ -17,7 +17,7 @@ const gamma = path.join(ws, 'gamma')
 const beta = path.join(ws, 'beta')
 const delta = path.join(ws, 'delta')
 const site = path.join(ws, 'site')
-const tasksDir = path.join(ws, '.hive', 'tasks')
+const tasksDir = path.join(ws, '.combwork', 'tasks')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -45,9 +45,9 @@ const rename = async (from, to) => {
   }
 }
 const project = (p, cfg = {}, sessions = []) => {
-  fs.mkdirSync(path.join(p, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [], ...cfg }))
-  fs.writeFileSync(path.join(p, '.hive', 'sessions.json'), JSON.stringify({ version: 1, sessions }))
+  fs.mkdirSync(path.join(p, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [], ...cfg }))
+  fs.writeFileSync(path.join(p, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions }))
 }
 /** A card as Hive saved them before projects had ids (no projectId). */
 const oldCard = (n, proj, agent) =>
@@ -66,8 +66,8 @@ const oldCard = (n, proj, agent) =>
   oldCard(2, 'old-site', null)
   fs.writeFileSync(path.join(tasksDir, 'board.json'), JSON.stringify({ version: 1, next: 3 }))
   // #514: a handover of alpha's, as Hive writes them (its name's project slug and its header).
-  fs.mkdirSync(path.join(ws, '.hive', 'shared', 'handovers'), { recursive: true })
-  fs.writeFileSync(path.join(ws, '.hive', 'shared', 'handovers', '2026-10-01-alpha-plan.md'), '# Plan\n\n- **Project:** alpha\n- **Date:** 2026-10-01 10:00 (2026-10-01T10:00:00Z)\n\nWhere it stands.\n')
+  fs.mkdirSync(path.join(ws, '.combwork', 'shared', 'handovers'), { recursive: true })
+  fs.writeFileSync(path.join(ws, '.combwork', 'shared', 'handovers', '2026-10-01-alpha-plan.md'), '# Plan\n\n- **Project:** alpha\n- **Date:** 2026-10-01 10:00 (2026-10-01T10:00:00Z)\n\nWhere it stands.\n')
   lib.enableProviders(userData)
   const env = { HIVE_API_PORT: lib.port(47866) }
 
@@ -79,13 +79,13 @@ const oldCard = (n, proj, agent) =>
   const todo = await r.inv('tasks:create', { title: 'Next for Builder', project: 'alpha', agent: 'Builder' })
   const old = await r.inv('tasks:create', { title: 'An archived one', project: 'alpha', agent: 'Builder' })
   await r.inv('tasks:archive', old.number, true)
-  const id = readJson(path.join(alpha, '.hive', 'project.json')).id
+  const id = readJson(path.join(alpha, '.combwork', 'project.json')).id
   check('the project has an id, in its own project.json', /^p-[0-9a-f]+$/.test(id ?? ''), String(id))
   check('its cards are saved with it', [doing, todo, old].every((c) => lib.readCard(ws, c.number).projectId === id))
   check('…and the board shows no id', !('projectId' in doing))
   check('cards saved before ids, by a project no longer there by that name, are left as they were', lib.readCard(ws, 1).projectId === undefined)
   // #1017: the cards' files moved into the board's database as it opened, the folder kept as a backup.
-  check("the cards' files are in the board now, their folder kept as a backup", fs.readdirSync(path.join(ws, '.hive')).some((f) => f.startsWith('tasks.imported-')) && !fs.existsSync(path.join(tasksDir, '1.json')))
+  check("the cards' files are in the board now, their folder kept as a backup", fs.readdirSync(path.join(ws, '.combwork')).some((f) => f.startsWith('tasks.imported-')) && !fs.existsSync(path.join(tasksDir, '1.json')))
   await r.app.close()
 
   // --- Renamed while Hive was closed.
@@ -104,7 +104,7 @@ const oldCard = (n, proj, agent) =>
   const handovers = async (name) => (await (await fetch(`http://127.0.0.1:${env.HIVE_API_PORT}/v1/shared/handovers?project=${name}`, { headers: { Authorization: `Bearer ${apiToken}` } })).json())
   check("the renamed project's latest handover is the one from before its rename", !!(await lib.until(async () => (await handovers('gamma'))[0]?.path === 'handovers/2026-10-01-alpha-plan.md', 10000)), JSON.stringify(await handovers('gamma')))
   check("…and the workspace's record of names has its rename, by its id", !!(await lib.until(() => {
-    const j = fs.existsSync(path.join(ws, '.hive', 'project-names.json')) ? readJson(path.join(ws, '.hive', 'project-names.json')) : null
+    const j = fs.existsSync(path.join(ws, '.combwork', 'project-names.json')) ? readJson(path.join(ws, '.combwork', 'project-names.json')) : null
     return j?.projects?.[id]?.name === 'gamma' && JSON.stringify(j.projects[id].former) === '["alpha"]'
   }, 10000)))
   check('the saved cards catch up when the workspace opens', !!(await lib.until(() => lib.readCard(ws, doing.number).project === 'gamma', 10000)))
@@ -133,7 +133,7 @@ const oldCard = (n, proj, agent) =>
   const websiteCards = (await cards()).filter((c) => c.number === 1 || c.number === 2)
   check("old-site's cards are site's, still archived, with their agent", websiteCards.every((c) => c.project === 'site' && c.archived) && websiteCards.find((c) => c.number === 1)?.agent === 'a-claude', JSON.stringify(websiteCards.map((c) => [c.project, c.archived, c.agent])))
   check('each says so in its history', websiteCards.every((c) => c.history.at(-1)?.what === 'Project: old-site → site (renamed or moved)'))
-  check('…and is saved with site’s id', lib.readCard(ws, 1).projectId === readJson(path.join(site, '.hive', 'project.json')).id)
+  check('…and is saved with site’s id', lib.readCard(ws, 1).projectId === readJson(path.join(site, '.combwork', 'project.json')).id)
   const again = await inv('workspace:moveRepair')
   check('Repair again changes nothing', again.done.length === 0 && again.failed.length === 0, JSON.stringify(again))
 

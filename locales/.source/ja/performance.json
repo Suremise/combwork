@@ -103,7 +103,7 @@
   "performance.compare.keepTip": "Keep what the Now view shows to compare with later: {what}.",
   "performance.compare.keeps": "{range, select, 24h {24 hours} 7d {7 days} other {30 days}}, {role, select, all {everyone} agent {project agents} assistant {the Assistant} api {scripts} viewer {viewer apps} other {{role}}}, every provider",
   "performance.compare.keptList": "Kept for comparison ({n, number})",
-  "performance.compare.keptListTip": "Kept in the workspace’s .hive/metrics/benchmarks (this machine’s), at most {max, number}: when full, the oldest unpinned one goes. Pin one to keep it.",
+  "performance.compare.keptListTip": "Kept in the workspace’s .combwork/metrics/benchmarks (this machine’s), at most {max, number}: when full, the oldest unpinned one goes. Pin one to keep it.",
   "performance.compare.keptLoadTarget": "the kept comparisons",
   "performance.compare.keptNotice": "Kept for comparison",
   "performance.compare.kind.export": "Performance view",

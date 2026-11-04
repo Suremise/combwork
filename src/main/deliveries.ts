@@ -56,7 +56,7 @@ import { scopeOfHost, withCardNames } from './projectKeys'
 
 /**
  * The delivery service (#647, plans/2026-10-12-messaging-redesign.md §3.1). Everything Hive has for an agent to read is a
- * delivery record (shared/deliveries.ts), saved in its session host's .hive/deliveries.json (a project's, or the
+ * delivery record (shared/deliveries.ts), saved in its session host's .combwork/deliveries.json (a project's, or the
  * Assistant's home's) with atomic writes, and restored when Hive starts. Every way into an agent makes one (#649): a
  * message, a task, a watch's or a loop's wake, the user's decisions, a mode notice, a lock's go-ahead, the carry-on after
  * a sign-in, a handover. This service alone offers them, to an idle agent by typing the doorbell (#650: Hive's fixed
@@ -267,7 +267,7 @@ const fileOf = (host: string): string => join(host, HIVE_DIR, 'deliveries.json')
 
 /**
  * Where a host's deliveries are kept (#1018): its workspace's database (a project's workspace is its parent folder; the
- * Assistant's home is the workspace's `.hive/assistant`), under the project's stable id (#508), so they follow a rename
+ * Assistant's home is the workspace's `.combwork/assistant`), under the project's stable id (#508), so they follow a rename
  * as its folder's file did; the Assistant's under `assistant`, and a folder with no id yet under its name.
  */
 async function hostPlace(host: string): Promise<{ workspace: string; scope: string }> {

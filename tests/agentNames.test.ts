@@ -73,7 +73,7 @@ describe('Hive keeps agent names unique across the workspace', () => {
   const beta = join(wsPath, 'beta')
   const plain = join(wsPath, 'plain')
   const git = (cwd: string, ...a: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { cwd, stdio: 'pipe' })
-  const cfgOf = (p: string) => JSON.parse(readFileSync(join(p, '.hive', 'project.json'), 'utf8'))
+  const cfgOf = (p: string) => JSON.parse(readFileSync(join(p, '.combwork', 'project.json'), 'utf8'))
   const names = (p: string): string[] => cfgOf(p).agents.map((a: AgentDef) => a.name)
   const ids = (p: string): string[] => cfgOf(p).agents.map((a: AgentDef) => a.id)
   let w: ReturnType<typeof createWorkspaceService>
@@ -83,20 +83,20 @@ describe('Hive keeps agent names unique across the workspace', () => {
 
   beforeAll(async () => {
     for (const p of [alpha, beta]) {
-      mkdirSync(join(p, '.hive'), { recursive: true })
+      mkdirSync(join(p, '.combwork'), { recursive: true })
       execFileSync('git', ['init', '-q', '-b', 'main', p])
       writeFileSync(join(p, 'a.txt'), 'a')
       git(p, 'add', '.')
       git(p, 'commit', '-qm', 'a')
     }
     // A folder that isn't a git repository.
-    mkdirSync(join(plain, '.hive'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [{ id: 'a1', name: 'B1', provider: 'claude-code' }, { id: 'a2', name: 'R1', provider: 'claude-code' }] }))
-    writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [{ id: 'b1', name: 'Old', provider: 'claude-code' }] }))
-    writeFileSync(join(plain, '.hive', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [] }))
-    mkdirSync(join(wsPath, '.hive', 'templates'), { recursive: true })
-    writeFileSync(join(wsPath, '.hive', 'templates', 'pair.json'), JSON.stringify({ version: 2, name: 'Pair', layout: 'auto', agents: [{ name: 'B1', role: 'builder', provider: 'claude-code' }, { name: 'R1', role: 'reviewer', provider: 'claude-code' }] }))
-    writeFileSync(join(wsPath, '.hive', 'templates', 'trees.json'), JSON.stringify({ version: 2, name: 'Trees', layout: 'auto', agents: [{ name: 'T1', role: 'builder', provider: 'claude-code' }, { name: 'Folder', role: 'reviewer', provider: 'claude-code' }] }))
+    mkdirSync(join(plain, '.combwork'), { recursive: true })
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [{ id: 'a1', name: 'B1', provider: 'claude-code' }, { id: 'a2', name: 'R1', provider: 'claude-code' }] }))
+    writeFileSync(join(beta, '.combwork', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [{ id: 'b1', name: 'Old', provider: 'claude-code' }] }))
+    writeFileSync(join(plain, '.combwork', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [] }))
+    mkdirSync(join(wsPath, '.combwork', 'templates'), { recursive: true })
+    writeFileSync(join(wsPath, '.combwork', 'templates', 'pair.json'), JSON.stringify({ version: 2, name: 'Pair', layout: 'auto', agents: [{ name: 'B1', role: 'builder', provider: 'claude-code' }, { name: 'R1', role: 'reviewer', provider: 'claude-code' }] }))
+    writeFileSync(join(wsPath, '.combwork', 'templates', 'trees.json'), JSON.stringify({ version: 2, name: 'Trees', layout: 'auto', agents: [{ name: 'T1', role: 'builder', provider: 'claude-code' }, { name: 'Folder', role: 'reviewer', provider: 'claude-code' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     config.settings.providers['claude-code'].enabled = true
@@ -202,7 +202,7 @@ describe('Hive keeps agent names unique across the workspace', () => {
     expect((await run(() => templates.templatePlan(plain, 'workspace', 'trees.json'))).blocked).toEqual([])
     expect((await run(() => templates.templatePlan(plain, 'workspace', 'pair.json', undefined, ['PB1', 'PR1']))).blocked).toEqual([])
     const fresh = join(wsPath, 'fresh')
-    mkdirSync(join(fresh, '.hive'), { recursive: true })
+    mkdirSync(join(fresh, '.combwork'), { recursive: true })
     execFileSync('git', ['init', '-q', '-b', 'main', fresh])
     expect((await run(() => templates.templatePlan(fresh, 'workspace', 'trees.json'))).blocked).toEqual([])
     // The new project made (a refresh writes its project.json) and given its id now, and the refreshes that scheduled run
@@ -223,7 +223,7 @@ describe('Hive keeps agent names unique across the workspace', () => {
       await run(() => w.refresh())
       expect(toasts).toEqual(["Two agents are called R1 | Agent names are unique across the workspace now, so each agent can be told apart. R1 is in alpha and beta: they keep working, but rename one of each, e.g. beta's R1 to BR1. | Rename beta's R1…"])
       // workspace.json is saved behind the refresh (#731: read once, it could still be the save before).
-      const flagged = () => JSON.parse(readFileSync(join(wsPath, '.hive', 'workspace.json'), 'utf8')).flaggedAgentNames
+      const flagged = () => JSON.parse(readFileSync(join(wsPath, '.combwork', 'workspace.json'), 'utf8')).flaggedAgentNames
       await vi.waitFor(() => expect(flagged()).toEqual(['r1']), { timeout: HUNG_MS })
       // Renamed: forgotten, so a new clash of that name is said again.
       await run(() => updateAgent(beta, 'dup', { name: 'BR1' }))

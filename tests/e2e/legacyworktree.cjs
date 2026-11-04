@@ -20,7 +20,7 @@ const alpha = path.join(ws, 'alpha')
 const root = path.join(`${ws}.worktrees`, 'alpha')
 const hb1 = path.join(root, 'hb1')
 const hb2 = path.join(root, 'hb2')
-const file = path.join(alpha, '.hive', 'project.json')
+const file = path.join(alpha, '.combwork', 'project.json')
 const PORT = Number(lib.port(47807))
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -35,11 +35,11 @@ const legacyBytes = () => Object.fromEntries(stored().map((a) => [a.id, JSON.str
 
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`]) fs.rmSync(d, { recursive: true, force: true })
-  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hb1', hb1, 'main'])
   lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hb2', hb2, 'main'])
-  fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
+  fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
   // As 0.9.3 wrote it (its field order too).
   const agents = [
     { id: 'b1', name: 'B1', provider: 'claude-code', worktree: { path: hb1, branch: 'hive/hb1', base: 'main' }, workflowRole: 'builder' },

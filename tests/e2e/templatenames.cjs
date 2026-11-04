@@ -59,7 +59,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await lib.waitForProvider(inv)
-    const agentsOf = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8')).agents ?? []
+    const agentsOf = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'project.json'), 'utf8')).agents ?? []
     const names = (p) => agentsOf(p).map((a) => a.name)
     const keys = async () => Object.fromEntries((await inv('project:keys')).map((k) => [path.basename(k.projectPath), k.key]))
     check('the projects have their keys: ambrosia AM, apiary AP', !!(await until(async () => JSON.stringify(await keys()) === JSON.stringify({ ambrosia: 'AM', apiary: 'AP' }), HUNG_MS)), JSON.stringify(await keys()))
@@ -132,10 +132,10 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     }
     check('Save Template offers "Use the project key in names", ticked, for names that follow the key', await save('AM team', true))
     await save('AM fixed', false)
-    const file = (f) => JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'templates', f), 'utf8'))
-    check('…ticked: patterns, and the pairs by numbered name', !!(await until(async () => fs.existsSync(path.join(ws, '.hive', 'templates', 'am-team.json')), HUNG_MS)) && JSON.stringify(file('am-team.json').agents.map((a) => a.name)) === JSON.stringify(['{key}-B{n}', '{key}-B{n}', '{key}-B{n}', '{key}-R{n}', '{key}-R{n}', '{key}-R{n}']) && file('am-team.json').pairs?.[0]?.builder === '{key}-B1', JSON.stringify(file('am-team.json').agents.map((a) => a.name)))
+    const file = (f) => JSON.parse(fs.readFileSync(path.join(ws, '.combwork', 'templates', f), 'utf8'))
+    check('…ticked: patterns, and the pairs by numbered name', !!(await until(async () => fs.existsSync(path.join(ws, '.combwork', 'templates', 'am-team.json')), HUNG_MS)) && JSON.stringify(file('am-team.json').agents.map((a) => a.name)) === JSON.stringify(['{key}-B{n}', '{key}-B{n}', '{key}-B{n}', '{key}-R{n}', '{key}-R{n}', '{key}-R{n}']) && file('am-team.json').pairs?.[0]?.builder === '{key}-B1', JSON.stringify(file('am-team.json').agents.map((a) => a.name)))
     // Written once the save is done (HI-1910: it reads the project's workflow first), never read before.
-    check('…unticked: fixed names', !!(await until(async () => fs.existsSync(path.join(ws, '.hive', 'templates', 'am-fixed.json')), HUNG_MS)) && JSON.stringify(file('am-fixed.json').agents.map((a) => a.name)) === JSON.stringify(team.map((n) => `AM-${n}`)))
+    check('…unticked: fixed names', !!(await until(async () => fs.existsSync(path.join(ws, '.combwork', 'templates', 'am-fixed.json')), HUNG_MS)) && JSON.stringify(file('am-fixed.json').agents.map((a) => a.name)) === JSON.stringify(team.map((n) => `AM-${n}`)))
 
     // --- The pattern template edited in the Templates view, its description only: shown with ambrosia's names, edited
     // as its patterns, saved with them and its pairs unchanged (HR3, #1440 round 1: the editor once saved the names shown).

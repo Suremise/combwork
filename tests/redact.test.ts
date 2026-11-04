@@ -204,7 +204,7 @@ describe('diagnostics redaction of the log', () => {
     const earlier: RedactContext = { ...ctx, folders: [...ctx.folders, 'D:\\Clients\\Confidential Workspace'], names: [...ctx.names, { name: 'PrivateProject', as: '<name>' }] }
     const lines = [
       `${T} [workspace] Opened workspace D:\\Clients\\Confidential Workspace`,
-      `${T} [workspace] Excluded .hive from git in D:\\Clients\\Confidential Workspace\\PrivateProject`,
+      `${T} [workspace] Excluded .combwork from git in D:\\Clients\\Confidential Workspace\\PrivateProject`,
       `${T} [worktrees] Removed worktree E:/elsewhere/thing/two`,
       `${T} [projects] Hid PrivateProject`
     ]
@@ -252,7 +252,7 @@ describe('diagnostics redaction of the log', () => {
   })
 
   it("an agent's launch arguments: by role, not by how they look", () => {
-    const claude = ['--session-id', '0b6f5d1e-6d5a-4c1f-9a4e-1c2d3e4f5a6b', '--name', 'Merger', '--settings', 'D:\\ws\\a\\.hive\\settings.json', '--model', 'opus', '--effort', 'high', '--permission-mode', 'auto', 'ConfidentialMerger']
+    const claude = ['--session-id', '0b6f5d1e-6d5a-4c1f-9a4e-1c2d3e4f5a6b', '--name', 'Merger', '--settings', 'D:\\ws\\a\\.combwork\\settings.json', '--model', 'opus', '--effort', 'high', '--permission-mode', 'auto', 'ConfidentialMerger']
     const out = redactLog(`${T} [pty] spawn x: claude.exe ${JSON.stringify(argsForLog(claude))}`, ctx)
     expect(out).not.toMatch(/Merger|\\ws\\/)
     expect(out).toContain('["--session-id","0b6f5d1e-6d5a-4c1f-9a4e-1c2d3e4f5a6b","--name","<text>","--settings","<path>","--model","opus","--effort","high","--permission-mode","auto","<text>"]')

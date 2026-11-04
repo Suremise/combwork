@@ -456,10 +456,10 @@ describe('the bundled dialect files', () => {
     const w = await opened(ws)
     try {
       await wsMod.inWorkspace(w, () => mod.syncBundled({ fresh: true }))
-      const dialects = join(ws, '.hive', 'dialects')
+      const dialects = join(ws, '.combwork', 'dialects')
       expect(readdirSync(join(dialects, 'claude-code')).sort()).toEqual(['Opus 5.5.json', 'cli.json'])
       expect(readFileSync(join(dialects, 'api', 'cli.json'), 'utf8')).toBe(JSON.stringify(file({}, { name: 'API' })))
-      const m = JSON.parse(readFileSync(join(ws, '.hive', 'bundled.json'), 'utf8'))
+      const m = JSON.parse(readFileSync(join(ws, '.combwork', 'bundled.json'), 'utf8'))
       expect(Object.keys(m.dialects).sort()).toEqual(['api/cli', 'claude-code/Opus 5.5', 'claude-code/cli'])
 
       // An untouched copy of the version before: updated.

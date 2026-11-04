@@ -49,13 +49,13 @@ let n = 0
 async function workspace(): Promise<{ ws: string; w: WS; repo: string }> {
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }, { id: 'a3', name: 'Gone', worktree: { path: join(ws, 'nowhere'), branch: 'gone', base: 'main' } }] }))
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }, { id: 'a3', name: 'Gone', worktree: { path: join(ws, 'nowhere'), branch: 'gone', base: 'main' } }] }))
   git(repo, 'init', '-q', '-b', 'main')
   git(repo, 'config', 'user.name', 'Test')
   git(repo, 'config', 'user.email', 'test@example.com')
   git(repo, 'config', 'core.autocrlf', 'false')
-  writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+  writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
   writeFileSync(join(repo, 'README.md'), 'hello\n')
   git(repo, 'add', '-A')
   git(repo, 'commit', '-qm', 'initial')
@@ -317,7 +317,7 @@ describe('recording facts, round 2 (#1216)', () => {
   it("Started names the project's ruleset (its options compiled and stored); a no-code card's submission has no revision", async () => {
     const { ws, w, repo } = await workspace()
     const options = allOff('git')
-    const cfgFile = join(ws, 'p', '.hive', 'project.json')
+    const cfgFile = join(ws, 'p', '.combwork', 'project.json')
     writeFileSync(cfgFile, JSON.stringify({ ...JSON.parse(readFileSync(cfgFile, 'utf8')), workflow: { platform: 'git', preset: 'none', options } }))
     await w.refresh()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Docs only', project: 'p' }, user))).number

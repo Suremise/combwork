@@ -3,7 +3,7 @@
 // quits, so `npm run dist` couldn't replace it. Storage, the Files tab (listing, watch, find, read), Changes, Attachments and
 // image previews (a path inside an archive is refused; a real folder named art.asar is just a folder, #261) go over a project and an agent's worktree with .asar files in
 // them, then each file is deleted from outside Hive.
-// The workspace watcher still notices projects coming and going and .hive changes. Dev build, throwaway profile and
+// The workspace watcher still notices projects coming and going and .combwork changes. Dev build, throwaway profile and
 // workspace.
 // Dev build only (#1580): it starts this checkout's Electron itself, and Tree is a 0.9 worktree agent
 // (agents:testLegacy, refused by a packaged build), whose worktree holds a build.
@@ -169,7 +169,7 @@ const deleteFromOutside = (file) => {
   }
   check("… and the project's build folder too, while Files watches the project", !distGone, distGone)
 
-  // The workspace watcher: projects coming and going (the root), and .hive changes.
+  // The workspace watcher: projects coming and going (the root), and .combwork changes.
   const eventsOf = (type) => page.evaluate((t) => window.__events.filter((e) => e.type === t), type)
   const hasProject = (name) => async () => (await eventsOf('workspace-changed')).some((e) => e.workspace?.projects?.some((p) => p.name === name))
   fs.mkdirSync(beta)
@@ -178,8 +178,8 @@ const deleteFromOutside = (file) => {
   fs.rmSync(beta, { recursive: true })
   const gone = await lib.until(async () => (await eventsOf('workspace-changed')).some((e) => e.workspace && !e.workspace.projects.some((p) => p.name === 'beta')), 10000)
   check('… and goes when it is deleted', !!gone)
-  fs.mkdirSync(path.join(ws, '.hive', 'shared'), { recursive: true })
-  fs.writeFileSync(path.join(ws, '.hive', 'shared', 'outside.md'), '# Written outside Hive\n')
+  fs.mkdirSync(path.join(ws, '.combwork', 'shared'), { recursive: true })
+  fs.writeFileSync(path.join(ws, '.combwork', 'shared', 'outside.md'), '# Written outside Hive\n')
   check('a shared note written outside Hive is noticed', !!(await lib.until(async () => (await eventsOf('notes-changed')).length > 0, 10000)))
 
   await page.screenshot({ path: path.join(lib.WORK, 'asarfiles.png') })

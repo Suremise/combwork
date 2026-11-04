@@ -178,6 +178,28 @@ export async function withRepoLock<T>(folder: string, fn: () => Promise<T>, opts
 }
 
 /**
+ * Runs fn holding a lock of the same kind in another folder (HI-2462: the folder move's, `<workspace>\.combwork-move.lock`):
+ * across processes by the core's row, in this one by withFileLock on its file. A live holder in another process isn't
+ * waited for beyond `waitMs`: `busy` is called with it and its answer thrown, and nothing of fn runs. The file stays
+ * after the release (its row gone): a lock's file is never removed, so every contender opens the same one.
+ */
+export async function withNamedLock<T>(dir: string, file: string, fn: () => Promise<T>, o: { waitMs: number; busy: (h: RepoLockHolder) => Error }): Promise<T> {
+  return withFileLock(join(dir, file), async () => {
+    const got = (await thread.ask({ type: 'take', dir, profile: profile(), waitMs: o.waitMs, noticeAfterMs: o.waitMs + 1, file })) as TakeAnswer
+    if ('timedOut' in got) throw o.busy(got.timedOut)
+    try {
+      return await fn()
+    } finally {
+      try {
+        await thread.ask({ type: 'release', dir, token: got.token, file })
+      } catch (e) {
+        log.warn(`releasing the lock ${userText(join(dir, file))}`, e)
+      }
+    }
+  })
+}
+
+/**
  * Runs fn holding the repository locks of several folders' repositories (#1642 round 5: a workflow options write, which
  * can change the target of every project it reaches, taken as Clean Up Merged Branches takes it, across Hives): each
  * repository once, always in the same order (its git folder's path), so no two takers wait on each other. A folder in

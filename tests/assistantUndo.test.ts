@@ -48,11 +48,11 @@ const onModel = async (id: string, model: string): Promise<string> => {
 }
 
 beforeAll(async () => {
-  mkdirSync(join(alpha, '.hive'), { recursive: true })
-  writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'A1' }, { id: 'r1', name: 'R1' }] }))
+  mkdirSync(join(alpha, '.combwork'), { recursive: true })
+  writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'A1' }, { id: 'r1', name: 'R1' }] }))
   // Another project, for a card moved to it (round 3).
-  mkdirSync(join(wsPath, 'beta', '.hive'), { recursive: true })
-  writeFileSync(join(wsPath, 'beta', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
+  mkdirSync(join(wsPath, 'beta', '.combwork'), { recursive: true })
+  writeFileSync(join(wsPath, 'beta', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
   advanced.load(join(base, 'profile'))
   // No version control chosen: the board's moves are plain (the rules' own undo, an override, is the runtime's to test).
   await advanced.set(ENFORCE, false)

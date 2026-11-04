@@ -29,7 +29,7 @@ describe('skills read', () => {
       [
         tool('Skill', { skill: 'hive:work-on-card' }, 'Launching skill: hive:work-on-card'),
         tool('Script', script, SKILL_TEXT('review-agent-work')),
-        tool('Read', { file_path: 'C:\\w\\.hive\\launch-a\\plugin\\skills\\handover\\SKILL.md' }, `1\t---\n2\tname: handover\n3\tdescription: x`),
+        tool('Read', { file_path: 'C:\\w\\.combwork\\launch-a\\plugin\\skills\\handover\\SKILL.md' }, `1\t---\n2\tname: handover\n3\tdescription: x`),
         { kind: 'assistant', text: 'Done.' }
       ],
       SKILLS
@@ -89,7 +89,7 @@ describe("a skill's reference files read (skillRefsRead)", () => {
 
   it("counts Claude Code's Read, Copilot's view, and a Codex script with the file escaped in its result: the reference, not the skill", () => {
     const numbered = BODY.split('\n').map((l, i) => `${String(i + 1).padStart(6)}\t${l}`).join('\n')
-    const claude = observe([tool('Read', { file_path: 'C:\\p\\.hive\\launch-a\\plugin\\skills\\card-loop\\builder.md' }, numbered)], NAMES, REFS)
+    const claude = observe([tool('Read', { file_path: 'C:\\p\\.combwork\\launch-a\\plugin\\skills\\card-loop\\builder.md' }, numbered)], NAMES, REFS)
     expect(claude).toMatchObject({ skillsRead: [], skillRefsRead: ['card-loop/builder.md'] })
     const copilot = observe([tool('view', { path: '.agents/skills/hive-card-loop/builder.md' }, `1. ${HEAD}\n2.\n3. ## Builder`)], NAMES, REFS)
     expect(copilot.skillRefsRead).toEqual(['card-loop/builder.md'])
@@ -1180,7 +1180,7 @@ describe("forgetting Claude Code's memory of a scenario's folders (HI-2260)", ()
       return d
     }
     const alpha = project(path.join(root, 'ws', 'alpha'))
-    const assistant = project(path.join(root, 'ws', '.hive', 'assistant'))
+    const assistant = project(path.join(root, 'ws', '.combwork', 'assistant'))
     const other = project(`${root}2`)
     const removed = forgetClaudeMemory(home, root)
     expect(removed.sort()).toEqual([path.join(alpha, 'memory'), path.join(assistant, 'memory')].sort())

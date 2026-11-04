@@ -67,8 +67,8 @@ async function shots(inv, page, name) {
   fs.mkdirSync(marks, { recursive: true })
   for (const w of [ws, other]) lib.gitProject(path.join(w, 'alpha'))
   // The open point, as Settings would have saved it: Prep, Server (needed), Seed.
-  fs.mkdirSync(path.join(ws, '.hive'), { recursive: true })
-  const wsFile = path.join(ws, '.hive', 'workspace.json')
+  fs.mkdirSync(path.join(ws, '.combwork'), { recursive: true })
+  const wsFile = path.join(ws, '.combwork', 'workspace.json')
   fs.writeFileSync(wsFile, JSON.stringify({ version: 1, commands: commandsFor([ids.proj, ids.prep, ids.server, ids.seed]) }))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')

@@ -12,7 +12,7 @@ import type { StoredText } from '../shared/types'
 
 const log = createLogger('journal')
 
-// The windows showing a workspace's journal browser (#1033) follow its changes: its Assistant home is `<workspace>/.hive/assistant`.
+// The windows showing a workspace's journal browser (#1033) follow its changes: its Assistant home is `<workspace>/.combwork/assistant`.
 onJournalChange((home) => emit({ type: 'journal-changed', workspacePath: join(home, '..', '..') }))
 // agent-protocol: who a journal entry or delivery is from: Combwork's own name (HI-2463)
 const HIVE = { kind: 'hive', name: 'Combwork' } as const
@@ -82,7 +82,7 @@ function pruneNow(ws: WorkspaceService, s: JournalSettings): void {
 /** Tells the workspace's Assistant something (an inbox notice), if the workspace has one. */
 async function tellAssistant(ws: WorkspaceService, body: string): Promise<void> {
   const home = ws.assistantHome
-  if (!existsSync(join(home, '.hive', 'project.json'))) return
+  if (!existsSync(join(home, HIVE_DIR, 'project.json'))) return
   // Loaded when used: sessions.ts reads the settings here, and deliveries.ts needs sessions loaded first.
   const { createDelivery } = await import('./deliveries')
   await createDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body }).catch((e) => log.warn('telling the Assistant its journal settings changed', e))

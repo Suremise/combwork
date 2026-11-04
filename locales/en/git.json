@@ -253,99 +253,99 @@
   },
   "git.hiveVcs.checking": {
     "defaultMessage": "Checking…",
-    "description": "The Untrack… button while Hive lists the files git tracks in .hive."
+    "description": "The Untrack… button while Hive lists the files git tracks in .combwork."
   },
   "git.hiveVcs.dismiss": {
     "defaultMessage": "Don't show this here again (Project Settings still says so)",
-    "description": "Tooltip on the × of the .hive notice in the Overview."
+    "description": "Tooltip on the × of the .combwork notice in the Overview."
   },
   "git.hiveVcs.exclude": {
     "defaultMessage": "Exclude",
-    "description": "Button in the .hive notice: adds .hive to the git repository's exclude file."
+    "description": "Button in the .combwork notice: adds .combwork to the git repository's exclude file."
   },
   "git.hiveVcs.excludeFailed": {
-    "defaultMessage": "Couldn't exclude .hive",
-    "description": "Title of an error notification: Exclude in the .hive notice failed."
+    "defaultMessage": "Couldn't exclude .combwork",
+    "description": "Title of an error notification: Exclude in the .combwork notice failed."
   },
   "git.hiveVcs.excludedDone": {
-    "defaultMessage": "{project}: .hive excluded from git",
-    "description": "Notification after Exclude in the .hive notice. {project} is the project's name."
+    "defaultMessage": "{project}: .combwork excluded from git",
+    "description": "Notification after Exclude in the .combwork notice. {project} is the project's name."
   },
   "git.hiveVcs.excluding": {
     "defaultMessage": "Excluding…",
     "description": "The Exclude button while it runs."
   },
   "git.hiveVcs.ignoredBut": {
-    "defaultMessage": "Git ignores this project's .hive, but {synced} {why}",
-    "description": "The notice when git ignores .hive but a sync service copies it. {synced} and {why} are the sentences about the service and about what .hive holds."
+    "defaultMessage": "Git ignores this project's .combwork, but {synced} {why}",
+    "description": "The notice when git ignores .combwork but a sync service copies it. {synced} and {why} are the sentences about the service and about what .combwork holds."
   },
   "git.hiveVcs.more": {
     "defaultMessage": "… and {count, plural, one {# more} other {# more}}",
     "description": "Last line of a long list of files: how many more are not listed."
   },
   "git.hiveVcs.noVcs": {
-    "defaultMessage": "No git repository holds this project; if you make one, Combwork excludes .hive there by itself. With another version control system, add .hive to its ignore list.",
+    "defaultMessage": "No git repository holds this project; if you make one, Combwork excludes .combwork there by itself. With another version control system, add .combwork to its ignore list.",
     "description": "The notice for a project in no git repository."
   },
   "git.hiveVcs.notExcluded": {
-    "defaultMessage": "Combwork adds it to the git repository's .git/info/exclude, but git doesn't ignore it: Combwork couldn't write that file, or a .gitignore rule brings .hive back.",
-    "description": "The notice when git does not ignore .hive. Followed by why it matters."
+    "defaultMessage": "Combwork adds it to the git repository's .git/info/exclude, but git doesn't ignore it: Combwork couldn't write that file, or a .gitignore rule brings .combwork back.",
+    "description": "The notice when git does not ignore .combwork. Followed by why it matters."
   },
   "git.hiveVcs.notExcludedTitle": {
-    "defaultMessage": ".hive isn't excluded from version control",
-    "description": "Title of the notice when the project's .hive isn't kept out of version control. No full stop: the notice adds it."
+    "defaultMessage": ".combwork isn't excluded from version control",
+    "description": "Title of the notice when the project's .combwork isn't kept out of version control. No full stop: the notice adds it."
   },
   "git.hiveVcs.otherVcs": {
-    "defaultMessage": "This project is in a {vcs} working copy, which Combwork doesn't set up: add .hive to its ignore list.",
+    "defaultMessage": "This project is in a {vcs} working copy, which Combwork doesn't set up: add .combwork to its ignore list.",
     "description": "The notice for a project kept in another version control system. {vcs} is its name (Subversion, Mercurial…)."
   },
   "git.hiveVcs.synced": {
-    "defaultMessage": "{service} copies the project folder, .hive included: exclude .hive in {service} if it lets you, or keep the project in a folder it doesn't sync.",
+    "defaultMessage": "{service} copies the project folder, .combwork included: exclude .combwork in {service} if it lets you, or keep the project in a folder it doesn't sync.",
     "description": "When the project is in a sync service's folder. {service} is its name (OneDrive, Dropbox…)."
   },
   "git.hiveVcs.syncedTitle": {
-    "defaultMessage": ".hive is synced by {service}",
-    "description": "Title of the notice when the project's .hive is in a sync service's folder. {service} is its name (OneDrive, Dropbox…). No full stop: the notice adds it."
+    "defaultMessage": ".combwork is synced by {service}",
+    "description": "Title of the notice when the project's .combwork is in a sync service's folder. {service} is its name (OneDrive, Dropbox…). No full stop: the notice adds it."
   },
   "git.hiveVcs.titleSentence": {
     "defaultMessage": "{title}.",
-    "description": "The .hive notice's title as the first sentence of the notice, in bold: {title} with the full stop your language ends a sentence with."
+    "description": "The .combwork notice's title as the first sentence of the notice, in bold: {title} with the full stop your language ends a sentence with."
   },
   "git.hiveVcs.trackedDetail": {
-    "defaultMessage": "Excluding .hive keeps new files out of git, but {count, plural, one {this one was committed before, so git still tracks it and commits its changes} other {these were committed before, so git still tracks them and commits their changes}}. Run `git rm -r --cached .hive` in the project folder, then commit: the files stay on disk.{notExcluded, select, yes { Combwork couldn't exclude .hive either: a rule in a .gitignore may bring it back.} other {}}",
-    "description": "Under \"n files in .hive are committed to git\". Keep the git command as it is."
+    "defaultMessage": "Excluding .combwork keeps new files out of git, but {count, plural, one {this one was committed before, so git still tracks it and commits its changes} other {these were committed before, so git still tracks them and commits their changes}}. Run `git rm -r --cached .combwork` in the project folder, then commit: the files stay on disk.{notExcluded, select, yes { Combwork couldn't exclude .combwork either: a rule in a .gitignore may bring it back.} other {}}",
+    "description": "Under \"n files in .combwork are committed to git\". Keep the git command as it is."
   },
   "git.hiveVcs.trackedTitle": {
-    "defaultMessage": "{count, plural, one {# file in .hive is committed to git} other {# files in .hive are committed to git}}",
-    "description": "Title of the notice in a project's Overview and Project Settings: files in the project's .hive folder were committed to git. Keep .hive. No full stop: the notice adds it."
+    "defaultMessage": "{count, plural, one {# file in .combwork is committed to git} other {# files in .combwork are committed to git}}",
+    "description": "Title of the notice in a project's Overview and Project Settings: files in the project's .combwork folder were committed to git. Keep .combwork. No full stop: the notice adds it."
   },
   "git.hiveVcs.untrack": {
     "defaultMessage": "Untrack",
-    "description": "Button in the confirmation: stops git tracking .hive's files."
+    "description": "Button in the confirmation: stops git tracking .combwork's files."
   },
   "git.hiveVcs.untrackButton": {
     "defaultMessage": "Untrack…",
-    "description": "Button in the .hive notice: stops git tracking .hive's files, after a confirmation."
+    "description": "Button in the .combwork notice: stops git tracking .combwork's files, after a confirmation."
   },
   "git.hiveVcs.untrackFailed": {
-    "defaultMessage": "Couldn't untrack .hive",
+    "defaultMessage": "Couldn't untrack .combwork",
     "description": "Title of an error notification."
   },
   "git.hiveVcs.untrackMessage": {
     "defaultMessage": "{count, plural, one {Combwork runs git rm --cached on it in {project}, and nothing else: git stops tracking it and stages its removal from the repository. The file stays on disk. Commit afterwards to finish.} other {Combwork runs git rm --cached on them in {project}, and nothing else: git stops tracking them and stages their removal from the repository. The files stay on disk. Commit afterwards to finish.}}",
-    "description": "The confirmation before untracking .hive's files, above the list of them. {project} is the project's name. Keep git rm --cached as it is."
+    "description": "The confirmation before untracking .combwork's files, above the list of them. {project} is the project's name. Keep git rm --cached as it is."
   },
   "git.hiveVcs.untrackTitle": {
     "defaultMessage": "{count, plural, one {Untrack this file?} other {Untrack these # files?}}",
-    "description": "Title of the confirmation before Hive stops git tracking files in the project's .hive."
+    "description": "Title of the confirmation before Hive stops git tracking files in the project's .combwork."
   },
   "git.hiveVcs.untracked": {
-    "defaultMessage": "{project}: .hive untracked",
-    "description": "Notification after untracking .hive's files. {project} is the project's name."
+    "defaultMessage": "{project}: .combwork untracked",
+    "description": "Notification after untracking .combwork's files. {project} is the project's name."
   },
   "git.hiveVcs.untrackedDetail": {
     "defaultMessage": "Commit the change to finish (git commit). The files are still on disk.",
-    "description": "Under \"{project}: .hive untracked\". Keep git commit as it is."
+    "description": "Under \"{project}: .combwork untracked\". Keep git commit as it is."
   },
   "git.hiveVcs.untracking": {
     "defaultMessage": "Untracking…",
@@ -353,7 +353,7 @@
   },
   "git.hiveVcs.why": {
     "defaultMessage": "It holds this computer's sessions, transcript backups and launch settings, which don't belong in commits or shared copies.",
-    "description": "Why .hive should be kept out of version control and sync services: what Hive keeps there. Follows the notice's first sentence."
+    "description": "Why .combwork should be kept out of version control and sync services: what Hive keeps there. Follows the notice's first sentence."
   },
   "git.identity.about": {
     "defaultMessage": "{hasGlobal, select, yes {Who {project}'s commits are made as, agents' too (git config --local). Leave both empty to use your global identity ({global}). On GitHub, its no-reply address keeps your email private.} other {Who {project}'s commits are made as, agents' too (git config --local). Leave both empty to use your global identity. On GitHub, its no-reply address keeps your email private.}}",
@@ -500,7 +500,7 @@
     "description": "The dialog's button: makes the repository's first commit."
   },
   "git.init.makes": {
-    "defaultMessage": "Makes {name} a git repository on a branch called main, keeps its .hive out of git, and commits {empty, select, yes {nothing yet (an empty first commit)} other {everything in the folder}} as the first commit, so agents can work in worktrees at once.",
+    "defaultMessage": "Makes {name} a git repository on a branch called main, keeps its .combwork out of git, and commits {empty, select, yes {nothing yet (an empty first commit)} other {everything in the folder}} as the first commit, so agents can work in worktrees at once.",
     "description": "The Initialise repository dialog: what it will do. {name} is the project; {empty} is yes when its folder has nothing to commit. Keep main (the branch name)."
   },
   "git.init.namePlaceholder": {
@@ -528,7 +528,7 @@
     "description": "Button on the Git tab of a project inside another repository: opens the Initialise dialog."
   },
   "git.init.resume": {
-    "defaultMessage": "{name} is a git repository with no commits yet, and worktrees need one. This keeps its .hive out of git and commits {empty, select, yes {nothing yet (an empty first commit)} other {everything in the folder}} as the first commit.{gitignore, select, yes { Its own .gitignore is kept.} other {}}",
+    "defaultMessage": "{name} is a git repository with no commits yet, and worktrees need one. This keeps its .combwork out of git and commits {empty, select, yes {nothing yet (an empty first commit)} other {everything in the folder}} as the first commit.{gitignore, select, yes { Its own .gitignore is kept.} other {}}",
     "description": "Make the first commit dialog, for a repository with no commit. {name} is the project; {empty} is yes when its folder has nothing to commit; {gitignore} is yes when it has a .gitignore of its own."
   },
   "git.init.starterGitignore": {
@@ -932,7 +932,7 @@
     "description": "The Version Control tab's section with the project's workflow options (glossary 2.1: workflow)."
   },
   "git.setup.howTo": {
-    "defaultMessage": "To use them, make it a repository: Initialise makes it one on a branch called main, keeps its .hive out of git, and commits its files, so agents can work in worktrees at once. Then add a remote under Branches & remotes to push it.",
+    "defaultMessage": "To use them, make it a repository: Initialise makes it one on a branch called main, keeps its .combwork out of git, and commits its files, so agents can work in worktrees at once. Then add a remote under Branches & remotes to push it.",
     "description": "The Git tab of a project that isn't a git repository. Initialise and Branches & remotes are a button and a section: keep them as they are named there. Keep main (the branch name)."
   },
   "git.setup.learnMore": {
@@ -1304,11 +1304,11 @@
     "description": "A version control system’s name, in the choice atop the Version Control tab (glossary 2.1: keep)."
   },
   "git.vc.initHint": {
-    "defaultMessage": "Initialise repository… makes this folder a Git repository on a branch called main, keeps its .hive out of git and commits its files.",
+    "defaultMessage": "Initialise repository… makes this folder a Git repository on a branch called main, keeps its .combwork out of git and commits its files.",
     "description": "Under the header of the Version Control tab of a project whose folder has no repository, beside the button. Initialise repository… is the button’s name: keep it as translated there. Keep main (the branch name)."
   },
   "git.vc.initOwnHint": {
-    "defaultMessage": "Initialise its own repository… makes this folder a Git repository of its own on a branch called main, keeps its .hive out of git and commits its files.",
+    "defaultMessage": "Initialise its own repository… makes this folder a Git repository of its own on a branch called main, keeps its .combwork out of git and commits its files.",
     "description": "Git’s page in the Version Control tab of a project inside another repository, under its buttons. Initialise its own repository… is the button’s name: keep it as translated there. Keep main (the branch name)."
   },
   "git.vc.insideRepo": {

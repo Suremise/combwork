@@ -30,8 +30,8 @@ let n = 0
 
 async function workspace(): Promise<WS> {
   const root = join(base, `ws-${++n}`)
-  mkdirSync(join(root, 'p', '.hive'), { recursive: true })
-  writeFileSync(join(root, 'p', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+  mkdirSync(join(root, 'p', '.combwork'), { recursive: true })
+  writeFileSync(join(root, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   const w = createWorkspaceService()
   await w.open(root)
   opened.push(w)
@@ -156,7 +156,7 @@ describe("the Assistant's queued board changes, revoked before they're written (
     expect(checks).toBe(2)
     expect(cardCount(w)).toBe(before)
     expect(attachmentRows(w)).toBe(0)
-    const folder = join(w.path!, 'p', '.hive', 'attachments', 'cards')
+    const folder = join(w.path!, 'p', '.combwork', 'attachments', 'cards')
     const files = existsSync(folder) ? readdirSync(folder, { recursive: true, withFileTypes: true }).filter((d) => d.isFile()) : []
     expect(files).toEqual([])
   })

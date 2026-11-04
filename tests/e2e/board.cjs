@@ -446,7 +446,7 @@ const check = (name, ok, extra = '') => {
   // An agent with a long name on its own worktree (#1316): Remove Project's table shows its name and branch whole.
   const longName = 'ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEF'
   await inv('agents:testLegacy', path.join(ws, 'delta'), { location: 'new-worktree', name: longName })
-  const longBranch = JSON.parse(fs.readFileSync(path.join(ws, 'delta', '.hive', 'project.json'), 'utf8')).agents.find((a) => a.name === longName)?.worktree?.branch
+  const longBranch = JSON.parse(fs.readFileSync(path.join(ws, 'delta', '.combwork', 'project.json'), 'utf8')).agents.find((a) => a.name === longName)?.worktree?.branch
   let d = await removeVia('delta', 'Hide')
   // What it touches is a table (#1316): a thing and what happens to it, for the choice made; the folder by its name, its
   // full path behind it (on hover, and copied whole). Each choice shown in both themes, then back to Hide.

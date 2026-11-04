@@ -76,8 +76,8 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
   const open = async (cfg: Record<string, unknown> = {}) => {
     const path = join(base, `ws-${++n}`)
     const alpha = join(path, 'alpha')
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }], ...cfg }))
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }], ...cfg }))
     const w = createWorkspaceService()
     await w.open(path)
     return { w, alpha }
@@ -537,7 +537,7 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     await settled()
     expect(loopWakes.pendingLoopWakes()).toEqual([])
     expect(st.typed).toEqual([])
-    expect(JSON.parse(readFileSync(join(alpha, '.hive', 'project.json'), 'utf8')).loopWakes).toBe(false)
+    expect(JSON.parse(readFileSync(join(alpha, '.combwork', 'project.json'), 'utf8')).loopWakes).toBe(false)
     await disposeWorkspaceService(w)
   })
 

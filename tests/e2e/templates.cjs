@@ -116,7 +116,7 @@ const check = (name, ok, extra = '') => {
   await dialog.locator('input[type="checkbox"]').first().check()
   await page.screenshot({ path: path.join(lib.WORK, 'templates-1-save.png') })
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()
-  const file = path.join(ws, '.hive', 'templates', 'pair.json')
+  const file = path.join(ws, '.combwork', 'templates', 'pair.json')
   check('Save Template… keeps the agents, roles and layout for the workspace', !!(await lib.until(async () => fs.existsSync(file), 5000)) && /"role": "builder"/.test(fs.readFileSync(file, 'utf8')) && /"layout": "columns3"/.test(fs.readFileSync(file, 'utf8')))
   check('without sessions, ids or paths', !/lastSessionId|"id"|templates-ws/.test(fs.readFileSync(file, 'utf8')))
   // The same name again: asks before replacing.
@@ -159,8 +159,8 @@ const check = (name, ok, extra = '') => {
 
   // A CLI it suggests that's off (HI-2109): only a suggestion, so never a refusal (the agents still run and their work is
   // still there here: it's those that refuse it).
-  fs.mkdirSync(path.join(ws, '.hive', 'templates'), { recursive: true })
-  fs.writeFileSync(path.join(ws, '.hive', 'templates', 'codex-pair.json'), JSON.stringify({ version: 2, name: 'Codex pair', savedAt: new Date().toISOString(), layout: 'auto', agents: [{ name: 'Coder', role: 'builder', provider: 'codex' }] }))
+  fs.mkdirSync(path.join(ws, '.combwork', 'templates'), { recursive: true })
+  fs.writeFileSync(path.join(ws, '.combwork', 'templates', 'codex-pair.json'), JSON.stringify({ version: 2, name: 'Codex pair', savedAt: new Date().toISOString(), layout: 'auto', agents: [{ name: 'Coder', role: 'builder', provider: 'codex' }] }))
   await loadMenu()
   await item('Codex pair').click()
   await shown(blocked, 'blocked')
@@ -237,7 +237,7 @@ const check = (name, ok, extra = '') => {
 
   // The warning gives each new agent's role in the workflow (its note, and the agent it's paired with: #1436), marks the
   // agents a new one of the same name replaces, and gives each new agent's settings. Cancelled: nothing made.
-  fs.writeFileSync(path.join(ws, '.hive', 'templates', 'trees.json'), JSON.stringify({ version: 2, name: 'Trees', savedAt: new Date().toISOString(), layout: 'columns2', agents: [{ name: 'Builder', role: 'builder', provider: 'claude-code', model: 'opus', effort: 'high' }, { name: 'Helper', role: 'reviewer', note: 'checks UI', provider: 'claude-code' }], pairs: [{ builder: 'Builder', reviewer: 'Helper' }] }))
+  fs.writeFileSync(path.join(ws, '.combwork', 'templates', 'trees.json'), JSON.stringify({ version: 2, name: 'Trees', savedAt: new Date().toISOString(), layout: 'columns2', agents: [{ name: 'Builder', role: 'builder', provider: 'claude-code', model: 'opus', effort: 'high' }, { name: 'Helper', role: 'reviewer', note: 'checks UI', provider: 'claude-code' }], pairs: [{ builder: 'Builder', reviewer: 'Helper' }] }))
   await inv('workspace:refresh')
   const branchesBeforeTrees = lib.git(beta, ['branch', '--list'])
   await loadMenu()
@@ -283,11 +283,11 @@ const check = (name, ok, extra = '') => {
   await themed('dark')
   await treesWarn.getByRole('button', { name: 'Cancel' }).click()
   check('cancelled: nothing changed', JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["Builder","Reviewer"]' && lib.git(beta, ['branch', '--list']) === branchesBeforeTrees)
-  fs.rmSync(path.join(ws, '.hive', 'templates', 'trees.json'))
+  fs.rmSync(path.join(ws, '.combwork', 'templates', 'trees.json'))
   // #511: twelve agents, builders and reviewers (as Darren's 6Bx6R): one row each, in the template's order; the table
   // scrolls down in its box and never sideways. Both themes. Cancelled.
   const twelve = ['HB1', 'HB2', 'HB3', 'HR1', 'HR2', 'HR3', 'HB4', 'HB5', 'HB6', 'HR4', 'HR5', 'HR6']
-  fs.writeFileSync(path.join(ws, '.hive', 'templates', 'twelve.json'), JSON.stringify({ version: 2, name: 'Twelve', savedAt: new Date().toISOString(), layout: 'grid', agents: twelve.map((name) => ({ name, role: name.startsWith('HB') ? 'builder' : 'reviewer', provider: 'claude-code' })) }))
+  fs.writeFileSync(path.join(ws, '.combwork', 'templates', 'twelve.json'), JSON.stringify({ version: 2, name: 'Twelve', savedAt: new Date().toISOString(), layout: 'grid', agents: twelve.map((name) => ({ name, role: name.startsWith('HB') ? 'builder' : 'reviewer', provider: 'claude-code' })) }))
   await inv('workspace:refresh')
   await loadMenu()
   await item('Twelve').click()
@@ -304,7 +304,7 @@ const check = (name, ok, extra = '') => {
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
   await twelveWarn.getByRole('button', { name: 'Cancel' }).click()
-  fs.rmSync(path.join(ws, '.hive', 'templates', 'twelve.json'))
+  fs.rmSync(path.join(ws, '.combwork', 'templates', 'twelve.json'))
 
   // --- + Add ▾ → Add Agent from Template (#975): one agent, the others left alone; Builder's name is taken, so "Builder 2".
   const addButton = strip.locator('.add-menu')
@@ -448,7 +448,7 @@ const check = (name, ok, extra = '') => {
   await shown(dialog, 'dialog')
   await dialog.locator('input.input').fill('Alpha trees')
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()
-  const alphaTrees = path.join(alpha, '.hive', 'templates', 'alpha-trees.json')
+  const alphaTrees = path.join(alpha, '.combwork', 'templates', 'alpha-trees.json')
   check("alpha's own template saved, its agents' roles and no worktree, path or branch", !!(await lib.until(async () => fs.existsSync(alphaTrees), 5000)) && /"name": "Tree",\s*"role": "builder"/.test(fs.readFileSync(alphaTrees, 'utf8')) && !/worktree|hive\/templates-ws/.test(fs.readFileSync(alphaTrees, 'utf8')))
   // alpha's Tree renamed after saving (its worktree stays), so the template's Tree is free in beta; its other two aren't.
   await inv('agents:update', alpha, srcTree.id, { name: 'Alpha tree' })

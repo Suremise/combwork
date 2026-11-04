@@ -89,7 +89,7 @@ const BOTH = ['handover', 'pick-up', 'split-work', 'workspace-note', 'use-cw-api
   await inv('session:start', proj, { agentId: claude.id })
   await inv('session:start', proj, { agentId: codex.id })
   check('both agents start', !!(await ready(proj, claude.id)) && !!(await ready(proj, codex.id)))
-  const plugin = path.join(proj, '.hive', `launch-${claude.id}`, 'plugin', 'skills')
+  const plugin = path.join(proj, '.combwork', `launch-${claude.id}`, 'plugin', 'skills')
   const claudeSkills = fs.readdirSync(plugin).sort()
   check('Claude Code: the skills for agents, in its own launch folder', [...AGENT_ONLY, ...BOTH].every((n) => claudeSkills.includes(n)) && !ASSISTANT_ONLY.some((n) => claudeSkills.includes(n)), claudeSkills.join(','))
   const codexDir = path.join(proj, '.agents', 'skills')
@@ -108,10 +108,10 @@ const BOTH = ['handover', 'pick-up', 'split-work', 'workspace-note', 'use-cw-api
   check("…which doesn't make it look in need of a restart (a restart can't change it)", (await agentNow())?.restartNeeded === false)
 
   // --- A changed skill reaches the next launch, swapped in whole, and the agent is told to restart.
-  const src = path.join(ws, '.hive', 'skills', 'work-on-card', 'SKILL.md')
+  const src = path.join(ws, '.combwork', 'skills', 'work-on-card', 'SKILL.md')
   fs.appendFileSync(src, '\nEDITED FOR THIS TEST\n')
-  fs.mkdirSync(path.join(ws, '.hive', 'skills', 'work-on-card', 'references'), { recursive: true })
-  fs.writeFileSync(path.join(ws, '.hive', 'skills', 'work-on-card', 'references', 'board.md'), 'A reference.\n')
+  fs.mkdirSync(path.join(ws, '.combwork', 'skills', 'work-on-card', 'references'), { recursive: true })
+  fs.writeFileSync(path.join(ws, '.combwork', 'skills', 'work-on-card', 'references', 'board.md'), 'A reference.\n')
   // HI-2268: the window shows it by itself (the skills folder's watch refreshes it), before anything here refreshes it.
   const banner = page.locator('.banner.warn', { hasText: 'changed since' })
   check("the window's restart banner shows for the edited skill, with no refresh asked for", !!(await until(async () => (await banner.count()) === 1, HUNG_MS)))

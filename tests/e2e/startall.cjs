@@ -386,7 +386,7 @@ const check = (name, ok, extra = '') => {
   const archiveText = await archiveDialog.innerText()
   const archiveTable = await tableOf(archiveDialog)
   check('Archive lists them as a table too, saying each session is archived', archiveTable.rows.Worker?.[3]?.text === 'Stopped (will be interrupted), then its session archived, then a new one' && Object.keys(archiveTable.rows).length === 3, JSON.stringify(archiveTable.rows))
-  check('Archive asks once, listing the agents with sessions, the working one flagged', /Worker — Working.*\(will be interrupted\)/.test(archiveText) && /Idle — /.test(archiveText) && /Stopped — /.test(archiveText) && /\.hive\/archive/.test(archiveText), archiveText)
+  check('Archive asks once, listing the agents with sessions, the working one flagged', /Worker — Working.*\(will be interrupted\)/.test(archiveText) && /Idle — /.test(archiveText) && /Stopped — /.test(archiveText) && /\.combwork\/archive/.test(archiveText), archiveText)
   await archiveDialog.getByRole('button', { name: 'Archive and start new' }).click()
   const renewed = await until(async () => {
     const l = await Promise.all([w, i, s].map((a) => live(a.id)))
@@ -396,7 +396,7 @@ const check = (name, ok, extra = '') => {
   const after = await sessions()
   const archivedIds = Object.values(current).filter((id) => after.some((x) => x.id === id && x.archived))
   check("each agent's session was archived", archivedIds.length === 3, JSON.stringify(after.map((x) => [x.id.slice(0, 8), x.archived])))
-  check('in .hive/archive', fs.existsSync(path.join(alpha, '.hive', 'archive')) && fs.readdirSync(path.join(alpha, '.hive', 'archive'), { recursive: true }).length > 0)
+  check('in .combwork/archive', fs.existsSync(path.join(alpha, '.combwork', 'archive')) && fs.readdirSync(path.join(alpha, '.combwork', 'archive'), { recursive: true }).length > 0)
   check('no failure notice', (await page.locator('.toast.error').count()) === 0)
 
   // --- The counts follow the agents (#275): Idle and Stopped stop (after an exchange, so each has a session to resume).

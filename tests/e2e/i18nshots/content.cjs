@@ -36,9 +36,9 @@ async function showView(ctx, command, hook) {
   if (!(await ctx.page.locator(hook).count())) await ctx.command(command)
 }
 
-const skillDir = (ctx) => path.join(ctx.workspace, '.hive', 'skills', 'broken-header')
-const mcpFile = (ctx) => path.join(ctx.workspace, '.hive', 'mcp', 'not-a-server.json')
-const templateFile = (ctx) => path.join(ctx.workspace, '.hive', 'templates', 'aardvark.json')
+const skillDir = (ctx) => path.join(ctx.workspace, '.combwork', 'skills', 'broken-header')
+const mcpFile = (ctx) => path.join(ctx.workspace, '.combwork', 'mcp', 'not-a-server.json')
+const templateFile = (ctx) => path.join(ctx.workspace, '.combwork', 'templates', 'aardvark.json')
 
 /** A Hive skill whose header names an audience Hive doesn't know: its Not given badge, hovered, says why in the window's language. */
 async function skillProblem(ctx) {

@@ -85,7 +85,7 @@ vi.mock('../src/main/lanes', () => ({ listLanes: async () => [] }))
 vi.mock('../src/main/teamPause', () => ({ pausedFor: () => (h.paused ? { pauseId: 'p1', since: '', by: 'user' } : null) }))
 vi.mock('../src/main/tasks', () => ({ allTasks: () => h.tasks ?? Promise.resolve([]) }))
 vi.mock('../src/main/deliveries', () => ({ createDelivery: async () => null, leaveDelivery: async () => null, roundOf: () => 1 }))
-vi.mock('../src/main/assistantControl', () => ({ assistantHome: (ws: string) => join(ws, '.hive', 'assistant') }))
+vi.mock('../src/main/assistantControl', () => ({ assistantHome: (ws: string) => join(ws, '.combwork', 'assistant') }))
 // The notices' offers (HI-2320), as notify.ts keeps them: resolved once, its buttons dropped while it is open.
 vi.mock('../src/main/notify', () => ({
   resolveOffer: (offer: string, outcome: string) => {

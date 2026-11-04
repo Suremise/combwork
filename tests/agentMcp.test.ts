@@ -69,19 +69,19 @@ describe('a launch', () => {
   const server = (name: string): McpServerDef => ({ command: 'node', args: [`\${HIVE_MCP_DIR}/${name}/server.js`] })
 
   it('passes each agent only its servers, for every provider; the Assistant still gets none', async () => {
-    mkdirSync(join(proj, '.hive'), { recursive: true })
-    mkdirSync(join(ws, '.hive', 'mcp'), { recursive: true })
-    for (const n of ['notes', 'sandbox', 'github', 'idle']) writeFileSync(join(ws, '.hive', 'mcp', `${n}.json`), JSON.stringify(server(n)))
+    mkdirSync(join(proj, '.combwork'), { recursive: true })
+    mkdirSync(join(ws, '.combwork', 'mcp'), { recursive: true })
+    for (const n of ['notes', 'sandbox', 'github', 'idle']) writeFileSync(join(ws, '.combwork', 'mcp', `${n}.json`), JSON.stringify(server(n)))
     // A hand-made server under Hive's reserved name: the CLIs pre-approve hive's tools, so it never reaches a launch (#1166).
-    writeFileSync(join(ws, '.hive', 'mcp', 'hive.json'), JSON.stringify({ command: 'impostor' }))
+    writeFileSync(join(ws, '.combwork', 'mcp', 'hive.json'), JSON.stringify({ command: 'impostor' }))
     // On in the workspace: notes, sandbox, github; github turned off in the project; idle off everywhere.
-    writeFileSync(join(ws, '.hive', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes', 'sandbox', 'github', 'hive'] } }))
+    writeFileSync(join(ws, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes', 'sandbox', 'github', 'hive'] } }))
     const agents = [
       { id: 'a-all', name: 'Builder', provider: 'claude-code' },
       { id: 'a-only', name: 'Tester', provider: 'claude-code', mcpServers: ['sandbox', 'github', 'idle'] },
       { id: 'a-none', name: 'Reviewer', provider: 'claude-code', mcpServers: [] }
     ]
-    writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, mcp: { disabled: ['github'] } }))
+    writeFileSync(join(proj, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents, mcp: { disabled: ['github'] } }))
     const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
     const { sessions } = await import('../src/main/sessions')
     const w = createWorkspaceService()
@@ -145,8 +145,8 @@ describe('saving it', () => {
   it('an agent added with a choice keeps it; a change sets or clears it (null: all again)', async () => {
     const ws = join(base, 'ws-save')
     const proj = join(ws, 'proj')
-    mkdirSync(join(proj, '.hive'), { recursive: true })
-    writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1', provider: 'claude-code' }] }))
+    mkdirSync(join(proj, '.combwork'), { recursive: true })
+    writeFileSync(join(proj, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1', provider: 'claude-code' }] }))
     const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
     const { addAgent, updateAgent } = await import('../src/main/projectAgents')
     const w = createWorkspaceService()

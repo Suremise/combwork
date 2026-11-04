@@ -693,7 +693,7 @@ function withProject(raw: Record<string, unknown>, project: string, projectId: s
  * out) whose name is a project of the workspace gets that project's id, and a card whose project was renamed or moved
  * since gets its name now. A card with an id no project has (its project removed or gone) is left as it is, and so is one
  * saved before ids under a name no project has (Repair can give those to their project). In one board change, every
- * field kept (the cards' files as they were before 0.9 are kept in `.hive/tasks.imported-<time>`, #1017). Run each time
+ * field kept (the cards' files as they were before 0.9 are kept in `.combwork/tasks.imported-<time>`, #1017). Run each time
  * the workspace opens, and again once its board is upgraded to 1.0 (#1621: until then it takes no writes, and is skipped);
  * it changes nothing the second time.
  */
@@ -794,7 +794,7 @@ function setAsideDoc(text: string | null): Record<string, unknown> | null {
 }
 
 /**
- * The cards an older Hive saved after the board moved to its database, set aside in `.hive/tasks.set-aside` (#1017's
+ * The cards an older Hive saved after the board moved to its database, set aside in `.combwork/tasks.set-aside` (#1017's
  * downgrade, #1044): what the Review… dialog lists, oldest number first. A file that isn't a card is listed as unreadable.
  */
 export async function setAsideCards(ws: WorkspaceService = workspace): Promise<SetAsideCard[]> {

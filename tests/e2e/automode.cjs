@@ -12,7 +12,7 @@ const path = require('path')
 const userData = path.join(lib.WORK, 'automode-profile')
 const ws = path.join(lib.WORK, 'automode-ws')
 const claudeHome = path.join(lib.WORK, 'automode-claude-home')
-const home = path.join(ws, '.hive', 'assistant')
+const home = path.join(ws, '.combwork', 'assistant')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++

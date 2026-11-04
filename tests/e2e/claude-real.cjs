@@ -22,7 +22,7 @@ const userData = path.join(lib.WORK, 'claude-real-profile')
 const ws = path.join(lib.WORK, 'claude-real-ws')
 const wtRoot = `${ws}.worktrees`
 const proj = path.join(ws, 'demo')
-const home = path.join(ws, '.hive', 'assistant')
+const home = path.join(ws, '.combwork', 'assistant')
 let failed = 0
 const check = (name, ok, extra = '') => {
   lib.checked(ok)

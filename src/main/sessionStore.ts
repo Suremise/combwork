@@ -15,7 +15,7 @@ const log = createLogger('sessions')
 
 /**
  * A session host's records (#1061: a project's, the Assistant's), in its workspace's database rather than its
- * `.hive/sessions.json`, which was rewritten whole (746 KB on the hive project) at every change of a record. Since 1.0
+ * `.combwork/sessions.json`, which was rewritten whole (746 KB on the hive project) at every change of a record. Since 1.0
  * (#1211) in their own tables (schema/sessionDeliveryTables.ts): `sessions` (a record a row, under the host's scope: its project
  * id, `assistant` for the Assistant), the cards each worked on in `session_cards`, the deleted sessions' ids and kept usage
  * in `sessions_deleted` and `sessions_deleted_usage`, each in its order. A change writes only the rows it changed. The

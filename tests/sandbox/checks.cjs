@@ -15,7 +15,7 @@
  * folder (not a drive root), which is mapped read-only at C:\build. This checkout's tests folder (the scripts in
  * tests\sandbox\inside and the e2e fake CLIs) and its playwright-core are mapped read-only too; Node is this one's folder.
  * --server (or WSB_SERVER) is the server's server.js; by default the copy Hive installed from the MCP catalogue in the
- * workspace holding <hive> (<workspace>\.hive\mcp\windows-sandbox), else a hive-mcp checkout beside <hive>
+ * workspace holding <hive> (<workspace>\.combwork\mcp\windows-sandbox), else a hive-mcp checkout beside <hive>
  * (<hive>\..\mcp\servers\windows-sandbox). The server keeps its run folders in %LOCALAPPDATA%\hive-test\sandbox.
  * Exit code: 0 all checks passed, 1 a check failed (or a Sandbox's cleanup wasn't confirmed), 2 not run (also when the
  * Sandbox's App Control policy, e.g. Smart App Control, refuses an installer: see NotRun).
@@ -50,7 +50,7 @@ const SANDBOX_ROOT = path.join(process.env.LOCALAPPDATA || os.homedir(), 'hive-t
 const INSIDE = 'C:\\tools\\hive-tests\\sandbox\\inside'
 /** Where the windows-sandbox server.js is looked for without --server or WSB_SERVER: the workspace's installed copy, a hive-mcp checkout beside the repo. */
 function serverCandidates(hive) {
-  return [path.join(hive, '..', '.hive', 'mcp', 'windows-sandbox', 'server.js'), path.join(hive, '..', 'mcp', 'servers', 'windows-sandbox', 'server.js')]
+  return [path.join(hive, '..', '.combwork', 'mcp', 'windows-sandbox', 'server.js'), path.join(hive, '..', 'mcp', 'servers', 'windows-sandbox', 'server.js')]
 }
 
 // The installer's name: Combwork-Setup since HI-2458, Hive-Setup before (a previous release's, kept in dist).

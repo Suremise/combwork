@@ -401,7 +401,7 @@ export async function gitStatus(projectPath: string, base?: string): Promise<Git
   const parts = r.out.split('\0').filter(Boolean)
   for (let i = 0; i + 1 < parts.length; i += 2) {
     const file = parts[i + 1]
-    if (!file.startsWith('.hive/')) files.push({ path: file, status: parts[i][0], staged: false })
+    if (!file.startsWith('.combwork/')) files.push({ path: file, status: parts[i][0], staged: false })
   }
   const real = await withoutStatOnly(projectPath, mb, files, inWorktree)
   const seen = new Set(real.map((f) => f.path))
@@ -456,7 +456,7 @@ async function workingStatus(projectPath: string): Promise<{ status: GitStatus; 
     const file = p.slice(3)
     if (x === 'R' || x === 'C') i++ // the next entry is the original path
     if (y !== ' ') inWorktree.add(file)
-    if (file.startsWith('.hive/')) continue
+    if (file.startsWith('.combwork/')) continue
     const code = x === '?' ? '?' : y !== ' ' ? y : x
     status.files.push({ path: file, status: code, staged: x !== ' ' && x !== '?' })
   }

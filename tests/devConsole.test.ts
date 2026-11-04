@@ -498,7 +498,7 @@ describe('DevConsole', () => {
 
 describe('mayRead', () => {
   const wsOf = (p: string): string | null => (p.toLowerCase().startsWith(ws.toLowerCase()) ? ws : p.toLowerCase().startsWith(join('C:\\', 'elsewhere').toLowerCase()) ? join('C:\\', 'elsewhere') : null)
-  const assistantHome = sessionSourceId(join(ws, '.hive', 'assistant'), 'assistant')
+  const assistantHome = sessionSourceId(join(ws, '.combwork', 'assistant'), 'assistant')
 
   it('a project agent reads its own session only', () => {
     const me = { kind: 'agent' as const, projectPath: alpha, agentId: 'a1' }

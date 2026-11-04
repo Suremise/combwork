@@ -1,7 +1,7 @@
 // One workspace operation at a time per window (HI-1694, HR2's round 1 finding). A window's open claims it where the open
 // begins to change it, after any folder picker or agents' stop: a request that outlasted one of those, or a second open,
 // or a close, while another holds the window is refused, saying why; the window keeps the open it was doing, and the
-// opening view shows it until it is done. The open is held part way (main's mkdir in its .hive folder waits), and the
+// opening view shows it until it is done. The open is held part way (main's mkdir in its .combwork folder waits), and the
 // folder picker is a stand-in that answers when the suite says. Dev build, throwaway profile and workspaces.
 const lib = require('./lib.cjs')
 const fs = require('fs')

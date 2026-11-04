@@ -30,8 +30,8 @@ describe("agents' worktrees follow the newest config read, in whatever order rea
   const tree = (name: string) => join(trees, name)
   const withTree = (path: string) => ({ version: 2, layout: 'auto', agents: [{ id: 'a1', name: 'B1', provider: 'claude-code', worktree: { path, branch: 'hive/b1', base: 'main' } }] })
   const project = (ws: string, name: string, worktree: string) => {
-    mkdirSync(join(ws, name, '.hive'), { recursive: true })
-    writeFileSync(join(ws, name, '.hive', 'project.json'), JSON.stringify(withTree(worktree)))
+    mkdirSync(join(ws, name, '.combwork'), { recursive: true })
+    writeFileSync(join(ws, name, '.combwork', 'project.json'), JSON.stringify(withTree(worktree)))
   }
   const moveTo = (name: string) => (c: ProjectConfig) => ({ agents: c.agents.map((a) => ({ ...a, worktree: { path: tree(name), branch: 'hive/b1', base: 'main' } })) })
   const routed = (path: string) => ({ project: w.projectForRoot(path), owned: w.ownsRoot(join(path, 'src').toLowerCase()), allowed: (() => { try { w.assertRoot(path); return true } catch { return false } })() })
@@ -97,7 +97,7 @@ describe("agents' worktrees follow the newest config read, in whatever order rea
     try {
       const first = older(() => w.projectInfo(alpha()))
       await hold.held()
-      writeFileSync(join(alpha(), '.hive', 'project.json'), JSON.stringify(withTree(tree('new'))))
+      writeFileSync(join(alpha(), '.combwork', 'project.json'), JSON.stringify(withTree(tree('new'))))
       expect(legacyWorktree((await run(() => w.projectInfo(alpha()))).agents[0])?.path).toBe(tree('new'))
       hold.release()
       // What it read is from before: it says so to its caller, and routes nothing.

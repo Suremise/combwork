@@ -51,8 +51,8 @@ const check = (name, ok, extra = '') => {
     [gamma, [b1, r1], { review: 'agent', noSelfReview: true, finish: 'notChecked', folder: 'project' }]
   ]
   for (const [dir, agents, options] of projects) {
-    fs.mkdirSync(path.join(dir, '.hive'), { recursive: true })
-    fs.writeFileSync(path.join(dir, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, ...(options ? { workflow: { platform: 'git', preset: null, options } } : {}) }))
+    fs.mkdirSync(path.join(dir, '.combwork'), { recursive: true })
+    fs.writeFileSync(path.join(dir, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents, ...(options ? { workflow: { platform: 'git', preset: null, options } } : {}) }))
   }
   // Alpha's cards start in its pool's slots since P7 (#1548: B1 started in slot-a, untrusted, sat on its trust screen).
   const slots = ['slot-a', 'slot-b', 'slot-c', 'slot-d'].map((s) => path.join(`${ws}.worktrees`, 'alpha', s))

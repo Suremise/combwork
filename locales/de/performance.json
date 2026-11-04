@@ -103,7 +103,7 @@
   "performance.compare.keepTip": "Speichern, was die Ansicht „Jetzt“ zeigt, um es später zu vergleichen: {what}.",
   "performance.compare.keeps": "{range, select, 24h {24 Stunden} 7d {7 Tage} other {30 Tage}}, {role, select, all {alle} agent {Projekt-Agenten} assistant {der Assistent} api {Skripte} viewer {Lese-Apps} other {{role}}}, alle Anbieter",
   "performance.compare.keptList": "Zum Vergleich gespeichert ({n, number})",
-  "performance.compare.keptListTip": "Gespeichert in .hive/metrics/benchmarks des Arbeitsbereichs (nur auf diesem Rechner), höchstens {max, number}: Ist die Liste voll, fällt der älteste nicht angeheftete weg. Hefte einen an, um ihn zu behalten.",
+  "performance.compare.keptListTip": "Gespeichert in .combwork/metrics/benchmarks des Arbeitsbereichs (nur auf diesem Rechner), höchstens {max, number}: Ist die Liste voll, fällt der älteste nicht angeheftete weg. Hefte einen an, um ihn zu behalten.",
   "performance.compare.keptLoadTarget": "die gespeicherten Vergleiche",
   "performance.compare.keptNotice": "Zum Vergleich gespeichert",
   "performance.compare.kind.export": "Leistungsansicht",

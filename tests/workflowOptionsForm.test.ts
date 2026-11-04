@@ -65,17 +65,17 @@ const user = { kind: 'user' } as const
 async function workspace(opts: { project?: unknown; preset?: string | null; workspace?: unknown; scripts?: Record<string, string>; name?: string } = {}): Promise<{ ws: string; w: WS; repo: string }> {
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, opts.name ?? 'p')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
-  mkdirSync(join(ws, '.hive'), { recursive: true })
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
+  mkdirSync(join(ws, '.combwork'), { recursive: true })
   git(repo, 'init', '-q', '-b', 'main')
   for (const [k, v] of [['user.name', 'Pat Builder'], ['user.email', 'pat@example.com'], ['core.autocrlf', 'false']]) git(repo, 'config', k, v)
-  writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+  writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
   if (opts.scripts) writeFileSync(join(repo, 'package.json'), JSON.stringify({ name: 'p', scripts: opts.scripts }))
   git(repo, 'add', '-A')
   git(repo, 'commit', '-qm', 'initial')
   const agents = [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }]
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents, ...(opts.project ? { workflow: { platform: 'git', preset: opts.preset ?? null, options: opts.project } } : {}) }))
-  if (opts.workspace) writeFileSync(join(ws, '.hive', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: [], model: 2 }, workflow: opts.workspace }))
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents, ...(opts.project ? { workflow: { platform: 'git', preset: opts.preset ?? null, options: opts.project } } : {}) }))
+  if (opts.workspace) writeFileSync(join(ws, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: [], model: 2 }, workflow: opts.workspace }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
@@ -750,7 +750,7 @@ describe("workflow defaults at Hive's and the workspace's level (#1422)", () => 
     const f = await levels.setLevelOptions(w, 'workspace', 'git', { preset: null, options: { style: 'squash', dependenciesDone: true } })
     expect(f.own).toEqual({ style: 'squash', dependenciesDone: true })
     expect(f.origins).toMatchObject({ style: 'workspace', review: 'platform' })
-    expect(read(join(ws, '.hive', 'workspace.json')).workflow).toEqual({ git: { style: 'squash', dependenciesDone: true } })
+    expect(read(join(ws, '.combwork', 'workspace.json')).workflow).toEqual({ git: { style: 'squash', dependenciesDone: true } })
     // The project sets neither: it inherits them, the workspace named as where they come from.
     expect((await form.workflowForm(w, repo)).origins).toMatchObject({ style: 'workspace', dependenciesDone: 'workspace' })
     // Inherit: the option left out goes back to the level below (here, every rule off).
@@ -793,7 +793,7 @@ describe("workflow defaults at Hive's and the workspace's level (#1422)", () => 
     const check = await levels.checkLevelChange(w, 'workspace', 'git', change)
     expect(check.problems).toEqual([{ kind: 'inheritor', project: 'p', problem: { kind: 'contradiction', id: 'committedNeedsFolder' } }])
     await expect(levels.setLevelOptions(w, 'workspace', 'git', change)).rejects.toThrow(/Project p inherits these options[\s\S]*needs everyone in the project folder/)
-    expect(read(join(ws, '.hive', 'workspace.json')).workflow).toBeUndefined()
+    expect(read(join(ws, '.combwork', 'workspace.json')).workflow).toBeUndefined()
     expect((await form.workflowForm(w, repo)).options.folder).toBe('project')
     // The level's own contradictions are refused as a project's are.
     await expect(levels.setLevelOptions(w, 'workspace', 'git', { preset: null, options: { finish: 'hiveMerges', folder: 'project' } })).rejects.toThrow(/each card needs its own folder/)
@@ -1065,7 +1065,7 @@ describe("G15 saved before P7: the one-time step (#1445)", () => {
       const a = settleSlotsUpToDate(w, { afterProject: async () => { reached(); if (how === 'stopped') throw new Error('stopped'); await gate } })
       await written
       // The file holds the change and its record together, as one write did.
-      const onDisk = JSON.parse(readFileSync(join(repo, '.hive', 'project.json'), 'utf8'))
+      const onDisk = JSON.parse(readFileSync(join(repo, '.combwork', 'project.json'), 'utf8'))
       expect([onDisk.workflow.options.slotsUpToDate, onDisk.stepsDone], how).toEqual([true, [SLOTS_UP_TO_DATE_STEP]])
       expect(boardValue(w, SLOTS_UP_TO_DATE_STEP), how).toBeNull()
       // The user saves G15 Off, and another run (a second Hive, or the next open) goes over the workspace.
@@ -1083,7 +1083,7 @@ describe("G15 saved before P7: the one-time step (#1445)", () => {
   it('a run that failed part way leaves the projects it settled alone when it runs again', async () => {
     const { w, repo, ws } = await workspace({})
     const second = join(ws, 'q')
-    mkdirSync(join(second, '.hive'), { recursive: true })
+    mkdirSync(join(second, '.combwork'), { recursive: true })
     await w.refresh()
     const { platform: _p, ...pairOptions } = (await form.workflowForm(w, repo)).presets.find((x) => x.id === 'pair')!.options
     for (const folder of [repo, second]) await w.mutateProjectConfig(folder, (c) => ({ workflow: { ...c.workflow, platform: 'git', preset: 'pair', options: { ...pairOptions, slotsUpToDate: false } } }))
@@ -1147,7 +1147,7 @@ describe("G19's default, the branch's own message (HI-1997)", () => {
     const cfg = await w.projectConfig(repo)
     expect(cfg.workflow!.options).not.toHaveProperty('commitMessage')
     expect(cfg.stepsDone).toContain(COMMIT_MESSAGE_STEP)
-    const wsFile = JSON.parse(readFileSync(join(ws, '.hive', 'workspace.json'), 'utf8'))
+    const wsFile = JSON.parse(readFileSync(join(ws, '.combwork', 'workspace.json'), 'utf8'))
     expect(wsFile.workflow.git).toEqual({ review: 'agent' })
     expect(wsFile.stepsDone).toContain(COMMIT_MESSAGE_STEP)
     expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).not.toBeNull()
@@ -1180,13 +1180,13 @@ describe("G19's default, the branch's own message (HI-1997)", () => {
       await settleCommitMessageDefault(w)
       // The project's own Hive's is written first; the workspace's stays, as the save failed, and nothing is marked.
       expect((await w.projectConfig(repo)).workflow).toMatchObject({ commitMessageChosen: true, options: { commitMessage: 'hive' } })
-      expect(JSON.parse(readFileSync(join(ws, '.hive', 'workspace.json'), 'utf8')).workflow.git.commitMessage).toBe('hive')
+      expect(JSON.parse(readFileSync(join(ws, '.combwork', 'workspace.json'), 'utf8')).workflow.git.commitMessage).toBe('hive')
       expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).toBeNull()
     } finally {
       save.mockRestore()
     }
     await settleCommitMessageDefault(w)
-    expect(JSON.parse(readFileSync(join(ws, '.hive', 'workspace.json'), 'utf8')).workflow.git).not.toHaveProperty('commitMessage')
+    expect(JSON.parse(readFileSync(join(ws, '.combwork', 'workspace.json'), 'utf8')).workflow.git).not.toHaveProperty('commitMessage')
     expect((await form.workflowForm(w, repo)).options.commitMessage).toBe('hive')
     expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).not.toBeNull()
   })
@@ -1209,7 +1209,7 @@ describe("G19's default, the branch's own message (HI-1997)", () => {
       save.mockRestore()
     }
     await settleCommitMessageDefault(w)
-    const wsFile = JSON.parse(readFileSync(join(ws, '.hive', 'workspace.json'), 'utf8'))
+    const wsFile = JSON.parse(readFileSync(join(ws, '.combwork', 'workspace.json'), 'utf8'))
     expect(wsFile.workflow.git).not.toHaveProperty('commitMessage')
     expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).not.toBeNull()
     // Back on Git: its own Hive's, over the workspace's defaults as they are now.
@@ -1225,7 +1225,7 @@ describe("G19's default, the branch's own message (HI-1997)", () => {
       expect(await settleCommitMessageDefault(w)).toBe(1)
       expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).toBeNull()
       expect((await w.projectConfig(repo)).stepsDone).toContain(COMMIT_MESSAGE_STEP)
-      expect(JSON.parse(readFileSync(join(ws, '.hive', 'workspace.json'), 'utf8')).workflow.git.commitMessage).toBe('hive')
+      expect(JSON.parse(readFileSync(join(ws, '.combwork', 'workspace.json'), 'utf8')).workflow.git.commitMessage).toBe('hive')
       // Hive's chosen on the project before the retry: the project's record keeps the retry off it.
       await w.mutateProjectConfig(repo, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, commitMessage: 'hive' } } }))
     } finally {
@@ -1233,7 +1233,7 @@ describe("G19's default, the branch's own message (HI-1997)", () => {
     }
     expect(await settleCommitMessageDefault(w)).toBe(0)
     expect((await w.projectConfig(repo)).workflow!.options.commitMessage).toBe('hive')
-    expect(JSON.parse(readFileSync(join(ws, '.hive', 'workspace.json'), 'utf8')).workflow.git).not.toHaveProperty('commitMessage')
+    expect(JSON.parse(readFileSync(join(ws, '.combwork', 'workspace.json'), 'utf8')).workflow.git).not.toHaveProperty('commitMessage')
     expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).not.toBeNull()
   })
 
@@ -1307,7 +1307,7 @@ describe("Slots and copies: one setting saved at a time (#1445, HR5's round 1)",
       // The workspace's none (an empty value) is kept over Hive's, in workspace.json.
       await setSlotDefault(w, 'workspace', 'copy', '')
       expect(await projectSlotCopy(w, repo)).toEqual({ value: '', origin: 'workspace' })
-      expect(JSON.parse(readFileSync(join(w.path!, '.hive', 'workspace.json'), 'utf8')).slotDefaults).toEqual({ copy: '' })
+      expect(JSON.parse(readFileSync(join(w.path!, '.combwork', 'workspace.json'), 'utf8')).slotDefaults).toEqual({ copy: '' })
       // The project's own wins over both; its Inherit gives the workspace's back.
       await setSlotSetting(w, repo, 'copy', 'p.env')
       expect(await projectSlotCopy(w, repo)).toEqual({ value: 'p.env', origin: 'project' })

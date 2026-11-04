@@ -30,8 +30,8 @@ function gate(): { held: Promise<void>; release: () => void } {
 describe("a closed workspace's deliveries", () => {
   beforeAll(async () => {
     for (const ws of [wsA, wsB]) {
-      mkdirSync(join(ws, 'proj', '.hive'), { recursive: true })
-      writeFileSync(join(ws, 'proj', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
+      mkdirSync(join(ws, 'proj', '.combwork'), { recursive: true })
+      writeFileSync(join(ws, 'proj', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
     }
     mkdirSync(join(base, 'profile'), { recursive: true })
     // No agent runs: nothing is typed, deliveries only wait.

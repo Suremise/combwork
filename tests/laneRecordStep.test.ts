@@ -223,10 +223,10 @@ describe('the one lane record step (#1291)', () => {
 describe("lanes.ts's saves keep the runtime's part of a lane (#1291)", () => {
   async function workspace(): Promise<{ ws: string; w: WS }> {
     const ws = join(base, `ws-${++n}`)
-    mkdirSync(join(ws, 'p', '.hive'), { recursive: true })
+    mkdirSync(join(ws, 'p', '.combwork'), { recursive: true })
     // `hive`: the builder the runtime's own lane gets (FactStore.startLane), one of the project's agents here, so lanes.ts's
     // refresh 300 ms after a save never abandons that lane as an agent's no longer in its project (#1399: a loaded run).
-    writeFileSync(join(ws, 'p', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'b2', name: 'B2' }, { id: 'hive', name: 'Hive' }] }))
+    writeFileSync(join(ws, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'b2', name: 'B2' }, { id: 'hive', name: 'Hive' }] }))
     const w = createWorkspaceService()
     await w.open(ws)
     opened.push(w)

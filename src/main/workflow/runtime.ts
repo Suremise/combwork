@@ -1491,7 +1491,7 @@ export class Workflow {
     // The card's declared paths (None) are its data: what the evidence and the revision are read with (args, else the
     // pre-fill), written with the submission.
     const setPaths = args.paths ?? (card.kind === 'code' && o.platform === 'none' && !card.paths ? this.prefill(card) : null)
-    // Submit's paths as declare paths' (#1511): none under `.hive`, `.git` or an excluded folder.
+    // Submit's paths as declare paths' (#1511): none under `.combwork`, `.git` or an excluded folder.
     const bad = args.paths && o.platform === 'none' ? this.excludedPath(args.paths) : null
     if (bad) return { rule: 'paths.excluded', values: { card: card.key, ...bad } }
     if (setPaths) card = { ...card, paths: setPaths }
@@ -2581,7 +2581,7 @@ export class Workflow {
   async declarePaths(ref: unknown, actor: Actor, paths: string[], commit?: () => void): Promise<{ prefill: string[]; unclaimed: string[]; revision: string | null } | Refusal> {
     const card0 = this.resolve(ref, actor)
     if (isRefusal(card0)) return card0
-    // A card's paths narrow the deliverables, never widen them (#1511): none under `.hive`, `.git` or an excluded folder.
+    // A card's paths narrow the deliverables, never widen them (#1511): none under `.combwork`, `.git` or an excluded folder.
     const bad = this.excludedPath(paths)
     if (bad) return refusal('paths.excluded', { card: card0.key, ...bad }, null)
     const card = await this.locked(() => {
@@ -2592,7 +2592,7 @@ export class Workflow {
     return { prefill: this.prefill(card), unclaimed: await this.unclaimed(card), revision: isUnknown(rev) ? null : rev.revision }
   }
 
-  /** The first declared path under `.hive`, `.git` or an excluded folder (#1511), with that folder; null when none is. */
+  /** The first declared path under `.combwork`, `.git` or an excluded folder (#1511), with that folder; null when none is. */
   private excludedPath(paths: readonly string[]): { path: string; folder: string } | null {
     for (const path of paths) {
       const folder = this.none.excludedPart(path)

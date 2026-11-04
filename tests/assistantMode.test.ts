@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // main/assistantMode.ts with its services stood in for: what the Assistant is told when (#259, #334). A gate holds a
 // mode read or a prompt being typed, so a switch can land in the middle of a resume's check or of a delivery.
 const st = vi.hoisted(() => ({
-  home: 'C:\\ws\\.hive\\assistant',
+  home: 'C:\\ws\\.combwork\\assistant',
   live: null as { runId: string; status: string; sessionId: string } | null,
   saved: 'launch',
   record: undefined as string | undefined,

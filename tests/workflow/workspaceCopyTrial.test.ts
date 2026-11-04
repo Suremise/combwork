@@ -38,24 +38,24 @@ describe.skipIf(!SRC)('the slots migration on a copy of a 0.9 workspace (#1441)'
     const dst = join(base, basename(SRC))
     const at = (p: string): string => (under(p, SRC) ? dst + p.slice(SRC.length) : p)
     // The workspace's own files, read-only.
-    mkdirSync(join(dst, '.hive'), { recursive: true })
-    copyFileSync(join(SRC, '.hive', 'workspace.json'), join(dst, '.hive', 'workspace.json'))
-    const src = new DatabaseSync(join(SRC, '.hive', 'hive.db'), { readOnly: true })
+    mkdirSync(join(dst, '.combwork'), { recursive: true })
+    copyFileSync(join(SRC, '.combwork', 'workspace.json'), join(dst, '.combwork', 'workspace.json'))
+    const src = new DatabaseSync(join(SRC, '.combwork', 'hive.db'), { readOnly: true })
     try {
-      await backup(src, join(dst, '.hive', 'hive.db'))
+      await backup(src, join(dst, '.combwork', 'hive.db'))
     } finally {
       src.close()
     }
     // Each project: a scratch clone (objects shared with the original, read only), its project.json, its agents'
     // worktrees made again at the copy's layout, at the commit each is at now.
-    const projects = readdirSync(SRC, { withFileTypes: true }).filter((d) => d.isDirectory() && existsSync(join(SRC, d.name, '.hive', 'project.json'))).map((d) => d.name)
+    const projects = readdirSync(SRC, { withFileTypes: true }).filter((d) => d.isDirectory() && existsSync(join(SRC, d.name, '.combwork', 'project.json'))).map((d) => d.name)
     const made: Record<string, string[]> = {}
     for (const name of projects) {
       const from = join(SRC, name)
       const to = join(dst, name)
       if (existsSync(join(from, '.git'))) git(base, 'clone', '-q', '--shared', '--no-checkout', from, to)
-      mkdirSync(join(to, '.hive'), { recursive: true })
-      const cfg = JSON.parse(readFileSync(join(from, '.hive', 'project.json'), 'utf8')) as { agents?: { name: string; worktree?: { path: string; branch: string } }[] }
+      mkdirSync(join(to, '.combwork'), { recursive: true })
+      const cfg = JSON.parse(readFileSync(join(from, '.combwork', 'project.json'), 'utf8')) as { agents?: { name: string; worktree?: { path: string; branch: string } }[] }
       for (const a of cfg.agents ?? []) {
         const w = a.worktree
         if (!w?.path) continue
@@ -66,7 +66,7 @@ describe.skipIf(!SRC)('the slots migration on a copy of a 0.9 workspace (#1441)'
         }
         w.path = at(w.path)
       }
-      writeFileSync(join(to, '.hive', 'project.json'), JSON.stringify(cfg, null, 2))
+      writeFileSync(join(to, '.combwork', 'project.json'), JSON.stringify(cfg, null, 2))
     }
     report.push(`copied: ${projects.join(', ')}; worktrees made: ${JSON.stringify(made)}`)
 

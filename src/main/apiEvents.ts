@@ -196,7 +196,7 @@ export function apiEventFor(event: HiveEvent, agent: StreamScope | null): Record
     case 'assistant-activity': {
       if (agent) return null
       const a = event.action
-      // Its home is <workspace>\.hive\assistant.
+      // Its home is <workspace>\.combwork\assistant.
       const workspacePath = dirname(dirname(event.projectPath))
       // A refusal's reason in Hive's own words (#763), never its error's text, which can quote what was sent.
       return { type: event.type, workspacePath, action: { id: a.id, at: a.at, text: a.brief ?? a.text, ok: a.ok, ...(a.ok ? {} : { error: a.reason ?? publicReason(undefined) }), ...(a.revertOf ? { revertOf: a.revertOf } : {}), ...activityFields(a) } }

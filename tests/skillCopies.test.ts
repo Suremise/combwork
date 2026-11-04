@@ -246,8 +246,8 @@ describe('the switch: Slots only, Everywhere, Never (#1431)', () => {
     const { closeAllBoards } = await import('../src/main/boardStore')
     const { copyBook, initSkillCopies, removeCopiesIn, sessionEnded, sweepIdleCopies, idleCopies } = await import('../src/main/skillCopies')
     const w = world('deploy')
-    mkdirSync(join(w.project, '.hive'), { recursive: true })
-    writeFileSync(join(w.project, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+    mkdirSync(join(w.project, '.combwork'), { recursive: true })
+    writeFileSync(join(w.project, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
     const ws = createWorkspaceService()
     await ws.open(w.root)
     const busy = new Set<string>()
@@ -319,11 +319,11 @@ describe('choosing the skills delivered (#1431)', () => {
     const { sessions } = await import('../src/main/sessions')
     const { closeAllBoards } = await import('../src/main/boardStore')
     const w = world()
-    mkdirSync(join(w.project, '.hive'), { recursive: true })
-    writeFileSync(join(w.project, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+    mkdirSync(join(w.project, '.combwork'), { recursive: true })
+    writeFileSync(join(w.project, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
     for (const name of ['deploy', 'notes', 'helper']) {
-      mkdirSync(join(w.root, '.hive', 'skills', name), { recursive: true })
-      writeFileSync(join(w.root, '.hive', 'skills', name, 'SKILL.md'), `---\nname: ${name}\ndescription: The ${name} skill.\n${name === 'helper' ? 'metadata:\n  audience: assistant\n' : ''}---\n\n# ${name}\n`)
+      mkdirSync(join(w.root, '.combwork', 'skills', name), { recursive: true })
+      writeFileSync(join(w.root, '.combwork', 'skills', name, 'SKILL.md'), `---\nname: ${name}\ndescription: The ${name} skill.\n${name === 'helper' ? 'metadata:\n  audience: assistant\n' : ''}---\n\n# ${name}\n`)
     }
     const ws = createWorkspaceService()
     await ws.open(w.root)
@@ -342,7 +342,7 @@ describe('choosing the skills delivered (#1431)', () => {
 
       // The copies follow the launch's skills: the one switched off goes from Hive's copies at the next launch.
       const book = memBook()
-      const all = ['deploy', 'notes'].map((name) => ({ name, sourcePath: join(w.root, '.hive', 'skills', name) }))
+      const all = ['deploy', 'notes'].map((name) => ({ name, sourcePath: join(w.root, '.combwork', 'skills', name) }))
       await sync(w.slot, w.project, all, book)
       await sync(w.slot, w.project, all.filter((s) => s.name !== 'notes'), book)
       expect([existsSync(w.copy(w.slot, 'deploy')), existsSync(w.copy(w.slot, 'notes'))]).toEqual([true, false])

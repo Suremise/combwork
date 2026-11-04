@@ -8,7 +8,7 @@ import { workspaceOf } from './workspace'
 
 const log = createLogger('notes')
 
-/** The note's file in a workspace's `.hive/shared`. */
+/** The note's file in a workspace's `.combwork/shared`. */
 export const workspaceNotesFile = (sharedDir: string): string => join(sharedDir, WORKSPACE_NOTES_PATH)
 
 /**

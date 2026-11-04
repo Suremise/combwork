@@ -21,7 +21,7 @@ const CHOICES: { id: ProjectRemoval; label: Msg; icon: string; summary: Msg }[] 
     id: 'remove',
     label: msg({ id: 'workspace.removal.remove', defaultMessage: 'Remove from Combwork', description: "Remove Project: a choice, and the dialog's button for it." }),
     icon: 'export',
-    summary: msg({ id: 'workspace.removal.removeSummary', defaultMessage: 'The folder stays on disk, and its handovers and cards are packed into it (.hive/removed), so you can move it elsewhere. Combwork offers them back wherever it sees the folder again.', description: 'Remove Project: what Remove from Hive does. Keep .hive/removed as it is.' })
+    summary: msg({ id: 'workspace.removal.removeSummary', defaultMessage: 'The folder stays on disk, and its handovers and cards are packed into it (.combwork/removed), so you can move it elsewhere. Combwork offers them back wherever it sees the folder again.', description: 'Remove Project: what Remove from Hive does. Keep .combwork/removed as it is.' })
   },
   {
     id: 'delete',

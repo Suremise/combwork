@@ -65,8 +65,8 @@ beforeEach(async () => {
   // A workspace of its own, its project's file as it was before HI-1749: its view in it.
   const wsPath = join(base, `ws-${++n}`)
   alpha = join(wsPath, 'alpha')
-  file = join(alpha, '.hive', 'project.json')
-  mkdirSync(join(alpha, '.hive'), { recursive: true })
+  file = join(alpha, '.combwork', 'project.json')
+  mkdirSync(join(alpha, '.combwork'), { recursive: true })
   writeFileSync(file, JSON.stringify({ version: 2, id: ID, agents: [], chime: 'on', sessionView: 'tiles', layout: 'columns2', placement: { columns2: [null, null] } }))
   w = createWorkspaceService()
   await w.open(wsPath)

@@ -19,7 +19,7 @@ const homes: string[] = []
 const dismissals: (() => void)[] = []
 const home = (): string => {
   const ws = join(base, `ws-${++n}`)
-  const h = join(ws, '.hive', 'assistant')
+  const h = join(ws, '.combwork', 'assistant')
   homes.push(h)
   dismissals.push(admitted(ws))
   return h

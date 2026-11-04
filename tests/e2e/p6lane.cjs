@@ -39,7 +39,7 @@ const slash = (p) => p.replace(/\\/g, '/')
 const alpha = fx.alpha
 const beta = path.join(fx.ws, 'beta')
 const gamma = path.join(fx.ws, 'gamma')
-const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8'))
+const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'project.json'), 'utf8'))
 
 ;(async () => {
   q.prepare(fx)
@@ -486,7 +486,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     await shootSections('git-pair', ['workflow', 'changes', 'history', 'branches', 'queue'])
 
     // ===== beta: added with one agent; Solo; S44 through the tab.
-    lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.hive/\n' })
+    lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.combwork/\n' })
     await inv('workspace:refresh')
     let s = await q.agent(fx, h, 'S1', { project: beta })
     check('beta: its notice opens the step at Git', await fromNotice('beta'))
@@ -522,7 +522,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     await showTab('pulse')
 
     // ===== gamma: all off in the tab, G16 on, two agents in the project folder (S11, S39).
-    lib.gitProject(gamma, { 'g.txt': 'g\n', '.gitignore': '.hive/\n' })
+    lib.gitProject(gamma, { 'g.txt': 'g\n', '.gitignore': '.combwork/\n' })
     await inv('workspace:refresh')
     const g1 = await q.agent(fx, h, 'G1', { project: gamma })
     const g2 = await q.agent(fx, h, 'G2', { project: gamma })

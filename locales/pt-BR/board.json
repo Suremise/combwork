@@ -588,7 +588,7 @@
   "board.overview.stalled": "Travados",
   "board.overview.waitingForReview": "Aguardando revisão",
   "board.panel.allProjects": "Todos os projetos",
-  "board.panel.info": "Os cartões do espaço de trabalho, em .hive/tasks. Os agentes e o Assistente os leem, alteram e movem pelas ferramentas do Combwork (o trabalho terminado vai para Revisão); só você os arquiva ou exclui.",
+  "board.panel.info": "Os cartões do espaço de trabalho, em .combwork/tasks. Os agentes e o Assistente os leem, alteram e movem pelas ferramentas do Combwork (o trabalho terminado vai para Revisão); só você os arquiva ou exclui.",
   "board.panel.refresh": "Atualizar",
   "board.panel.stalledInfo": "Cartões em Fazendo em que ninguém está trabalhando: nenhum agente está com eles, ou o agente foi removido ou não está em execução. Também cartões em Fazendo ou Revisão que um agente de um ciclo de cartões deixou sem esperar por eles.",
   "board.panel.workspace": "Espaço de trabalho",

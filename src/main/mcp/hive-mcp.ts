@@ -72,11 +72,11 @@ const T = {
   'listProjects.description': agentMsg({ id: 'tool.listProjects.description', text: "The workspace's projects, a line each: on or off, branch, agents and their status. cw_project_status gives one in full." }),
   'projectStatus.description': agentMsg({ id: 'tool.projectStatus.description', text: 'One project as JSON: its settings, workflow options in force, agents (folder, role, session) and builder and reviewer pairs.' }),
   'sessionUsage.description': agentMsg({ id: 'tool.sessionUsage.description', text: 'Token usage, cache use and compaction history for a project session (the live one by default), as JSON. days=true adds its usage by day.' }),
-  'listSharedNotes.description': agentMsg({ id: 'tool.listSharedNotes.description', text: "The workspace's shared notes and handovers (.hive/shared): a path and date a line. cw_read_shared_note reads one." }),
-  'readSharedNote.description': agentMsg({ id: 'tool.readSharedNote.description', text: 'Read a shared note by its path relative to .hive/shared (e.g. "handovers/2026-01-01-auth.md"), with its revision.' }),
+  'listSharedNotes.description': agentMsg({ id: 'tool.listSharedNotes.description', text: "The workspace's shared notes and handovers (.combwork/shared): a path and date a line. cw_read_shared_note reads one." }),
+  'readSharedNote.description': agentMsg({ id: 'tool.readSharedNote.description', text: 'Read a shared note by its path relative to .combwork/shared (e.g. "handovers/2026-01-01-auth.md"), with its revision.' }),
   'docOutline.description': agentMsg({ id: 'tool.docOutline.description', text: 'A Markdown document\'s headings, each with its slug and size, to read only the sections you need (cw_read_section). path: a file of your project ("docs/PLAN.md") or a shared note ("shared:i18n.md").' }),
   'readSection.description': agentMsg({ id: 'tool.readSection.description', text: 'One section of a Markdown document, with its subsections. path: as for cw_doc_outline; heading: "#" and its slug from the outline, or its text; none: the whole document. (detail: use-cw-api, tools.md)' }),
-  'writeSharedNote.description': agentMsg({ id: 'tool.writeSharedNote.description', text: 'Create or overwrite a shared note (.hive/shared); append=true adds to its end. expectedRevision: written only if unchanged since you read it. "Workspace notes.md" is the user\'s and the Assistant\'s to write.' }),
+  'writeSharedNote.description': agentMsg({ id: 'tool.writeSharedNote.description', text: 'Create or overwrite a shared note (.combwork/shared); append=true adds to its end. expectedRevision: written only if unchanged since you read it. "Workspace notes.md" is the user\'s and the Assistant\'s to write.' }),
   'readLatestHandover.description': agentMsg({ id: 'tool.readLatestHandover.description', text: 'The newest handover for a project (this one by default), as its text.' }),
   'createHandover.description': agentMsg({ id: 'tool.createHandover.description', text: 'Save a handover in the shared notes for a project (this one by default). Combwork writes its header: content starts at the first heading.' }),
   'notify.description': agentMsg({ id: 'tool.notify.description', text: 'Show the user a notification in Combwork. About one agent or one card: give it as target, and a click opens it.' }),
@@ -611,7 +611,7 @@ const tools: Tool[] = [
       const r = (await api('POST', '/v1/shared/handovers', { title: a.title, content: a.content, project: a.project || PROJECT, ...(process.env.HIVE_AGENT_ID ? { agent: process.env.HIVE_AGENT_ID, agentProject: PROJECT } : {}) })) as { path: string; suggest?: string }
       // Its path in the shared notes, as cw_read_shared_note takes it; for the Assistant with its journal off, once,
       // the journal to suggest (#1032).
-      return say(T['createHandover.reply.saved'], { path: r.path.replace(/\\/g, '/').replace(/^.*\/\.hive\/shared\//, ''), hasSuggest: r.suggest ? 'yes' : 'no', suggest: r.suggest ?? '' })
+      return say(T['createHandover.reply.saved'], { path: r.path.replace(/\\/g, '/').replace(/^.*\/\.combwork\/shared\//, ''), hasSuggest: r.suggest ? 'yes' : 'no', suggest: r.suggest ?? '' })
     }
   },
   {

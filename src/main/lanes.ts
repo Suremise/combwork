@@ -41,14 +41,14 @@ import { teamPauseOf } from './teamPause'
 const log = createLogger('lanes')
 
 /**
- * Lanes (#483): the card loops a workspace runs, kept in its `.hive/lanes.json` beside the board. The builder's card-loop
+ * Lanes (#483): the card loops a workspace runs, kept in its `.combwork/lanes.json` beside the board. The builder's card-loop
  * registers its lane (start), the reviewer's joins it by the builder's name, the Assistant can start one when it briefs
  * a pair. Hive follows the board for the rest: a lane is paused while its current card is blocked, ends when every card
  * is Done (or its builder ends it after the merge), and is abandoned when its builder or reviewer is removed.
  *
  * Bookkeeping, never a gate: nothing here refuses or holds up work on a card, and a loop with no lane runs as before.
  * Changes to a workspace's lanes happen under their lock, read and written whole. They are kept in the workspace database
- * (#1212: a row a lane in its typed tables, storeTables.ts), moved in from `.hive/lanes.json` the first time.
+ * (#1212: a row a lane in its typed tables, storeTables.ts), moved in from `.combwork/lanes.json` the first time.
  */
 
 /** The lanes' file before #1018 (moved in at the first open, then kept as a backup); its path is also the lanes' lock. */

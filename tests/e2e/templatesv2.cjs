@@ -35,13 +35,13 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
   for (const d of [claudeHome, shots, files]) fs.mkdirSync(d, { recursive: true })
   lib.gitProject(alpha)
   lib.git(alpha, ['branch', '-M', 'main'])
-  fs.mkdirSync(path.join(alpha, '.hive', 'templates'), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-old', name: 'Old', provider: 'claude-code' }] }))
+  fs.mkdirSync(path.join(alpha, '.combwork', 'templates'), { recursive: true })
+  fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-old', name: 'Old', provider: 'claude-code' }] }))
   // 0.9's templates, as an upgraded workspace has them: the workspace's (with its kept copy) and alpha's own.
-  fs.mkdirSync(path.join(ws, '.hive', 'templates'), { recursive: true })
-  fs.writeFileSync(path.join(ws, '.hive', 'templates', 'old-pair.json'), v09('Old pair'))
-  fs.writeFileSync(path.join(ws, '.hive', 'templates', 'old-pair.json.bak'), v09('Old pair'))
-  fs.writeFileSync(path.join(alpha, '.hive', 'templates', 'mine.json'), v09('Mine'))
+  fs.mkdirSync(path.join(ws, '.combwork', 'templates'), { recursive: true })
+  fs.writeFileSync(path.join(ws, '.combwork', 'templates', 'old-pair.json'), v09('Old pair'))
+  fs.writeFileSync(path.join(ws, '.combwork', 'templates', 'old-pair.json.bak'), v09('Old pair'))
+  fs.writeFileSync(path.join(alpha, '.combwork', 'templates', 'mine.json'), v09('Mine'))
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), alpha.toLowerCase()]))
   // Claude Code only: Codex stays turned off, so Hive's templates' reviewers start on Claude Code's connection (HI-2109: Codex is only their suggestion).
   lib.enableProviders(userData)
@@ -69,12 +69,12 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
 
     // --- 0.9's templates copied as the workspace opens in 1.0, into the 0.9 backup's folder, said once; the originals
     // stay (#1436, the Assistant's scope call: copy only).
-    const originals = [path.join(ws, '.hive', 'templates'), path.join(alpha, '.hive', 'templates')].map((d) => Object.fromEntries(fs.readdirSync(d).map((f) => [f, fs.readFileSync(path.join(d, f), 'utf8')])))
-    const backup = path.join(ws, '.hive', 'backups', 'templates-0.9')
+    const originals = [path.join(ws, '.combwork', 'templates'), path.join(alpha, '.combwork', 'templates')].map((d) => Object.fromEntries(fs.readdirSync(d).map((f) => [f, fs.readFileSync(path.join(d, f), 'utf8')])))
+    const backup = path.join(ws, '.combwork', 'backups', 'templates-0.9')
     const listed = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir).sort() : [])
     const projectsDir = path.join(backup, 'projects')
     check("0.9's templates are copied into the backup's folder (the workspace's, and alpha's by its id; no .bak)", !!(await until(async () => JSON.stringify(listed(path.join(backup, 'workspace'))) === '["old-pair.json"]' && listed(projectsDir).length === 1 && JSON.stringify(listed(path.join(projectsDir, listed(projectsDir)[0]))) === '["mine.json"]', HUNG_MS)), JSON.stringify([listed(path.join(backup, 'workspace')), listed(projectsDir)]))
-    check('…the originals left as they were, byte for byte', JSON.stringify([path.join(ws, '.hive', 'templates'), path.join(alpha, '.hive', 'templates')].map((d) => Object.fromEntries(fs.readdirSync(d).map((f) => [f, fs.readFileSync(path.join(d, f), 'utf8')])))) === JSON.stringify(originals))
+    check('…the originals left as they were, byte for byte', JSON.stringify([path.join(ws, '.combwork', 'templates'), path.join(alpha, '.combwork', 'templates')].map((d) => Object.fromEntries(fs.readdirSync(d).map((f) => [f, fs.readFileSync(path.join(d, f), 'utf8')])))) === JSON.stringify(originals))
     await page.locator('.activitybar .activity-btn[aria-label="Notifications"]').click()
     const notice = page.locator('.notif-panel .notif-item', { hasText: 'Your 0.9 agent templates aren’t used in 1.0' })
     check('one quiet notice says so, in the Notifications panel', !!(await until(async () => (await notice.count()) === 1, HUNG_MS)) && /1\.0 templates don’t pin agents to worktrees, so the Combwork templates take their place\. A copy of the 2 templates is kept with the 0\.9 board backup\./.test(await notice.innerText()), await page.locator('.notif-panel').innerText().catch(() => ''))
@@ -101,7 +101,7 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
 
     // --- Export… and Duplicate… of Hive's own, clicked (HR3's round 1, 2), while the workspace has another template in
     // a file of the same name: the Hive one is the one exported and copied; the workspace's is left as it is.
-    const sameFile = path.join(ws, '.hive', 'templates', 'team-3x3.json')
+    const sameFile = path.join(ws, '.combwork', 'templates', 'team-3x3.json')
     const mine = JSON.stringify({ version: 2, name: 'Mine', savedAt: '2026-10-22T10:00:00.000Z', layout: 'auto', agents: [{ name: 'Solo one', role: 'builder', provider: 'claude-code' }] }, null, 2)
     fs.writeFileSync(sameFile, mine)
     await sidebar.locator('[aria-label="Refresh"]').click()
@@ -120,7 +120,7 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     await dup.locator('select').selectOption({ label: 'The workspace (every project)' })
     await dup.getByRole('button', { name: 'Duplicate', exact: true }).click()
     const copy = sidebar.locator('.template-row[data-scope="workspace"][aria-label="Team 3×3"]')
-    check("Duplicate… copies Hive's Team 3×3 into the workspace, as its own file", !!(await until(async () => (await copy.count()) === 1, HUNG_MS)) && fs.readdirSync(path.join(ws, '.hive', 'templates')).some((f) => f !== 'team-3x3.json' && f.endsWith('.json') && JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'templates', f), 'utf8')).name === 'Team 3×3'), JSON.stringify(fs.readdirSync(path.join(ws, '.hive', 'templates'))))
+    check("Duplicate… copies Hive's Team 3×3 into the workspace, as its own file", !!(await until(async () => (await copy.count()) === 1, HUNG_MS)) && fs.readdirSync(path.join(ws, '.combwork', 'templates')).some((f) => f !== 'team-3x3.json' && f.endsWith('.json') && JSON.parse(fs.readFileSync(path.join(ws, '.combwork', 'templates', f), 'utf8')).name === 'Team 3×3'), JSON.stringify(fs.readdirSync(path.join(ws, '.combwork', 'templates'))))
     check("…the workspace's own file of that name untouched", fs.readFileSync(sameFile, 'utf8') === mine)
     await sidebar.locator('.template-row[data-scope="hive"][aria-label="Team 3×3"]').click()
     await until(async () => (await detail.count()) === 1, HUNG_MS)
@@ -131,9 +131,9 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     await app.evaluate(({ dialog }, f) => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [f] })
     }, old)
-    const wsBefore = JSON.stringify(listed(path.join(ws, '.hive', 'templates')))
+    const wsBefore = JSON.stringify(listed(path.join(ws, '.combwork', 'templates')))
     await sidebar.locator('[aria-label="Import Template…"]').click()
-    check('importing a 0.9 template is refused, saying why', !!(await until(async () => (await page.locator('.toast').allInnerTexts()).some((t) => /Could not import the template[\s\S]*This template is from Combwork 0\.9 and can't be loaded in 1\.0\. Recreate it from your agents with Save as Template\./.test(t)), HUNG_MS)) && JSON.stringify(listed(path.join(ws, '.hive', 'templates'))) === wsBefore, (await page.locator('.toast').allInnerTexts()).join(' | '))
+    check('importing a 0.9 template is refused, saying why', !!(await until(async () => (await page.locator('.toast').allInnerTexts()).some((t) => /Could not import the template[\s\S]*This template is from Combwork 0\.9 and can't be loaded in 1\.0\. Recreate it from your agents with Save as Template\./.test(t)), HUNG_MS)) && JSON.stringify(listed(path.join(ws, '.combwork', 'templates'))) === wsBefore, (await page.locator('.toast').allInnerTexts()).join(' | '))
 
     // --- Team 3×3 into alpha from the view: six agents named from its key, paired, in a grid, none in a worktree.
     const branches = lib.git(alpha, ['branch', '--list'])

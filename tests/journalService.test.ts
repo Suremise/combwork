@@ -35,8 +35,8 @@ describe('the journal in a workspace', () => {
     // The Assistant reads an inbox (its CLI would say so as it starts).
     deliveries.setReadsInboxForTests(() => true)
     const p = join(wsPath, 'alpha')
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] }))
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -68,7 +68,7 @@ describe('the journal in a workspace', () => {
     expect(service.journalStatus(w)).toEqual({ settings: DEFAULT_JOURNAL, bytes: 0, entries: 0 })
     const s = await service.setJournalSettings(w, { scope: ['decision', 'event', 'preference'], capMB: null })
     expect(s).toEqual({ ...DEFAULT_JOURNAL, scope: ['decision', 'event', 'preference'], capMB: null })
-    expect(JSON.parse(readFileSync(join(wsPath, '.hive', 'workspace.json'), 'utf8')).journal).toEqual(s)
+    expect(JSON.parse(readFileSync(join(wsPath, '.combwork', 'workspace.json'), 'utf8')).journal).toEqual(s)
     // Told: the scope changed while it may be running.
     expect((await told()).at(-1)).toMatch(/scope changed: store only decision, event, preference entries/)
   })
@@ -79,7 +79,7 @@ describe('the journal in a workspace', () => {
     expect(a.enabled).toBe(false)
     expect(b).toMatchObject({ enabled: false, capMB: 20 })
     expect(service.journalSettingsOf(w)).toEqual({ ...before, enabled: false, capMB: 20 })
-    expect(JSON.parse(readFileSync(join(wsPath, '.hive', 'workspace.json'), 'utf8')).journal).toMatchObject({ enabled: false, capMB: 20 })
+    expect(JSON.parse(readFileSync(join(wsPath, '.combwork', 'workspace.json'), 'utf8')).journal).toMatchObject({ enabled: false, capMB: 20 })
     // Told once that it went off (the cap's save changed nothing it tells).
     expect((await told()).filter((t) => /journal is off/.test(t))).toHaveLength(1)
     await Promise.all([service.setJournalSettings(w, { enabled: true }), service.setJournalSettings(w, { scope: before.scope, capMB: before.capMB })])

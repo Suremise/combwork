@@ -36,8 +36,8 @@ function pathWithoutGit() {
   fs.mkdirSync(path.dirname(tree), { recursive: true })
   lib.git(repo, ['worktree', 'add', '-q', '-b', 'hive/wt', tree, main])
   // A worktree agent, as Add Agent would have saved it: merged and clean, so Remove All's box would delete it with git.
-  fs.mkdirSync(path.join(repo, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-wt', name: 'Treeling', provider: 'claude-code', worktree: { path: tree, branch: 'hive/wt', base: main } }] }))
+  fs.mkdirSync(path.join(repo, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-wt', name: 'Treeling', provider: 'claude-code', worktree: { path: tree, branch: 'hive/wt', base: main } }] }))
   lib.enableProviders(userData)
   const hidden = pathWithoutGit()
   check('the test copy gets a PATH without git', !hidden.toLowerCase().includes('\\git\\cmd'))

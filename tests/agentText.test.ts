@@ -140,8 +140,8 @@ describe('say', () => {
     })
     expect(said).toBe('for a1')
     expect(await inRequestScope(null, async () => say(M, { name: 'x', n: 1 }))).toBe('for the API')
-    expect(inRequestScope({ projectPath: 'C:\\ws\\.hive\\assistant', agentId: 'assistant' }, () => say(M, { name: 'x', n: 1 }))).toBe('for assistant')
-    expect(asked).toEqual([{ kind: 'session', session: alpha }, { kind: 'api' }, { kind: 'session', session: { projectPath: 'C:\\ws\\.hive\\assistant', agentId: 'assistant' } }])
+    expect(inRequestScope({ projectPath: 'C:\\ws\\.combwork\\assistant', agentId: 'assistant' }, () => say(M, { name: 'x', n: 1 }))).toBe('for assistant')
+    expect(asked).toEqual([{ kind: 'session', session: alpha }, { kind: 'api' }, { kind: 'session', session: { projectPath: 'C:\\ws\\.combwork\\assistant', agentId: 'assistant' } }])
     // Outside a scope: the process's chain (hive-mcp.js), else the Default.
     expect(say(M, { name: 'x', n: 1 })).toBe('process')
     expect(currentChain()?.texts['test.thing.case']).toBe('process')

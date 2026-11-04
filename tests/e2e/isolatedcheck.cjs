@@ -61,9 +61,9 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
   for (const d of [claudeHome, tools, shots]) fs.mkdirSync(d, { recursive: true })
   // Every read of the agents' input recorded, for typeLine.
   lib.logFakeInput(claudeHome)
-  lib.gitProject(alpha, { 'a.ts': 'export const a = 1\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'a.ts': 'export const a = 1\n', '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
-  lib.gitProject(beta, { 'b.ts': 'export const b = 1\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(beta, { 'b.ts': 'export const b = 1\n', '.gitignore': '.combwork/\n' })
   lib.git(beta, ['branch', '-M', 'main'])
   // A copy's setup the test holds (the first copy's): until setup-go.txt exists, bounded against a hang.
   const setupScript = path.join(tools, 'setup.js')

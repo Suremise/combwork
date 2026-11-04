@@ -34,7 +34,7 @@ const slash = (p) => p.replace(/\\/g, '/')
 ;(async () => {
   q.prepare(fx)
   // The project's packages (S13): left-pad declared and used; node_modules ignored. main only: the target.
-  for (const [file, text] of Object.entries({ 'package.json': '{"dependencies":{"left-pad":"1"}}\n', 'index.js': "require('left-pad')\n", '.gitignore': '.hive/\nnode_modules/\n' })) fs.writeFileSync(path.join(fx.alpha, file), text)
+  for (const [file, text] of Object.entries({ 'package.json': '{"dependencies":{"left-pad":"1"}}\n', 'index.js': "require('left-pad')\n", '.gitignore': '.combwork/\nnode_modules/\n' })) fs.writeFileSync(path.join(fx.alpha, file), text)
   lib.git(fx.alpha, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'add', '-A'])
   lib.git(fx.alpha, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'packages'])
   // The setup command: node_modules from package.json's dependencies, from scratch (as npm ci would).

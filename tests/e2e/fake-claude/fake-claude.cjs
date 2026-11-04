@@ -1442,7 +1442,7 @@ async function main() {
   // Its MCP servers connect as it starts, beside its session (#865): the launch's hive server, through the real server,
   // which tells Hive. With fake-mcp-hold-<agent> in its home, not until the test makes fake-mcp-go-<agent>, as a
   // resumed Claude Code connects them after its SessionStart.
-  const hive = opts['--mcp-config'] ? JSON.parse(fs.readFileSync(opts['--mcp-config'], 'utf8')).mcpServers?.combwork : null
+  const hive = opts['--mcp-config'] ? JSON.parse(fs.readFileSync(opts['--mcp-config'], 'utf8')).mcpServers?.hive : null
   const held = take('fake-mcp-hold')
     ? (async () => {
         while (!take('fake-mcp-go')) await sleep(100)

@@ -106,7 +106,7 @@ describe("the grant of the project's copies folder (extraDirs)", () => {
     expect(args({ extraDirs: [] })).not.toContain('--add-dir')
   })
 
-  it("Claude Code: a session outside its project folder (a slot's) may read its launch plugin, in the project's .hive (HI-2274)", () => {
+  it("Claude Code: a session outside its project folder (a slot's) may read its launch plugin, in the project's .combwork (HI-2274)", () => {
     const args = (o: Partial<LaunchContext>): string[] => claudeCode.buildCommand('C:\\bin\\claude.exe', context(o)).args
     const project = join(base, 'proj')
     const plugin = join(claudeCode.launchDir(project, 'a-1'), 'plugin')

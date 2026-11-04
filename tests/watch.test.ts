@@ -541,8 +541,8 @@ describe('watches (main/watches.ts)', async () => {
   const open = async () => {
     const path = join(base, `ws-${++n}`)
     const alpha = join(path, 'alpha')
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }] }))
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }] }))
     const w = createWorkspaceService()
     await w.open(path)
     return { w, path, alpha }
@@ -769,8 +769,8 @@ describe('watches (main/watches.ts)', async () => {
   it("a watch's label names its card by key, read outside any request too (HI-1688)", async () => {
     const path = join(base, `ws-${++n}`)
     for (const p of ['alpha', 'beta']) {
-      mkdirSync(join(path, p, '.hive'), { recursive: true })
-      writeFileSync(join(path, p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }] }))
+      mkdirSync(join(path, p, '.combwork'), { recursive: true })
+      writeFileSync(join(path, p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }] }))
     }
     const w = createWorkspaceService()
     await w.open(path)
@@ -1770,8 +1770,8 @@ describe('watches (main/watches.ts)', async () => {
       await w.open(other)
       release()
       await expect(registering).rejects.toThrow(/closed/)
-      expect(existsSync(join(other, '.hive', 'watches.json'))).toBe(false)
-      expect(existsSync(join(path, '.hive', 'watches.json'))).toBe(false)
+      expect(existsSync(join(other, '.combwork', 'watches.json'))).toBe(false)
+      expect(existsSync(join(path, '.combwork', 'watches.json'))).toBe(false)
     } finally {
       release()
       watches.testHooks.afterLoad = undefined
@@ -1827,8 +1827,8 @@ describe('watches (main/watches.ts)', async () => {
   it("two projects' wakes with the same delivery id (each project's m1): a receipt ends only its own project's watch (#649 round 2)", async () => {
     const { w, path, alpha } = await open()
     const beta = join(path, 'beta')
-    mkdirSync(join(beta, '.hive'), { recursive: true })
-    writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Bee' }] }))
+    mkdirSync(join(beta, '.combwork'), { recursive: true })
+    writeFileSync(join(beta, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Bee' }] }))
     await w.refresh()
     const st = { typed: [] as string[], taken: new Map<string, number>([['a1', 0], ['b1', 0]]), status: new Map<string, string>([['a1', 'watching'], ['b1', 'watching']]) }
     const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
@@ -2017,7 +2017,7 @@ describe('watches (main/watches.ts)', async () => {
     const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha' }, user))
     expect(c.number).toBe(tc.number)
     expect(template.projectPath).toBe(alpha)
-    const file = join(path, '.hive', 'watches.json')
+    const file = join(path, '.combwork', 'watches.json')
     const bad = { id: 'bad', projectPath: alpha, agentId: 'a2', cond: { cards: [c.number], changes: ['column'] }, limitAt: new Date(Date.now() + 100000).toISOString() }
     // In another folder, saved before ids or with an id no project of this workspace has (#508: one with alpha's id is alpha's).
     const elsewhere = { ...template, id: 'far', agentId: 'a3', projectPath: join(path, '..', 'not-here', 'alpha') }
@@ -2028,9 +2028,9 @@ describe('watches (main/watches.ts)', async () => {
     writeFileSync(file, text)
     // Moved in (in the background) before the change it waits for.
     await vi.waitFor(() => expect(watches.watchFor(alpha, 'a1')).not.toBeNull(), { timeout: HUNG_MS })
-    const backups = () => readdirSync(join(path, '.hive')).filter((f) => f.startsWith('watches.json.imported-'))
+    const backups = () => readdirSync(join(path, '.combwork')).filter((f) => f.startsWith('watches.json.imported-'))
     expect(existsSync(file)).toBe(false)
-    expect(backups().map((f) => readFileSync(join(path, '.hive', f), 'utf8'))).toEqual([text])
+    expect(backups().map((f) => readFileSync(join(path, '.combwork', f), 'utf8'))).toEqual([text])
     await inWorkspace(w, () => tasks.commentTask(c.number, 'Ready', user))
     await expect(watches.evaluateWatches(w)).resolves.toBeUndefined()
     await watches.settled()
@@ -2043,8 +2043,8 @@ describe('watches (main/watches.ts)', async () => {
     watches.forgetWatches(w)
     await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['comment'] })
     expect(existsSync(file)).toBe(false)
-    expect(readdirSync(join(path, '.hive')).some((f) => f.startsWith('watches.json.damaged-'))).toBe(false)
-    expect(backups().map((f) => readFileSync(join(path, '.hive', f), 'utf8')).sort()).toEqual([text, '{ not json'].sort())
+    expect(readdirSync(join(path, '.combwork')).some((f) => f.startsWith('watches.json.damaged-'))).toBe(false)
+    expect(backups().map((f) => readFileSync(join(path, '.combwork', f), 'utf8')).sort()).toEqual([text, '{ not json'].sort())
     expect(savedOf(path)).toHaveLength(1)
     await disposeWorkspaceService(w)
   })
@@ -2057,7 +2057,7 @@ describe('watches (main/watches.ts)', async () => {
     const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha' }, user))
     await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['comment'] })
     const saved = savedOf(path)
-    const id = JSON.parse(readFileSync(join(alpha, '.hive', 'project.json'), 'utf8')).id
+    const id = JSON.parse(readFileSync(join(alpha, '.combwork', 'project.json'), 'utf8')).id
     expect(saved[0].projectId).toBe(id)
     const foreign = join(path, '..', 'not-here', 'alpha')
     await putSaved(path, [{ ...saved[0], projectPath: foreign }])
@@ -2079,7 +2079,7 @@ describe('watches (main/watches.ts)', async () => {
     fake(alpha)
     const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha' }, user))
     await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['comment'] })
-    const id = JSON.parse(readFileSync(join(alpha, '.hive', 'project.json'), 'utf8')).id
+    const id = JSON.parse(readFileSync(join(alpha, '.combwork', 'project.json'), 'utf8')).id
     expect(savedOf(path)[0].projectId).toBe(id)
     // Renamed while Hive was closed: read back, the watch is the project's under its new name.
     await disposeWorkspaceService(w)
@@ -2114,8 +2114,8 @@ describe('watches (main/watches.ts)', async () => {
     await disposeWorkspaceService(w)
     // alpha leaves the workspace, and a new alpha comes, with an agent of the same id.
     await moveFolder(alpha, join(path, '..', `${basename(path)}-alpha-elsewhere`))
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Someone else' }] }))
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Someone else' }] }))
     fake(alpha)
     const w2 = createWorkspaceService()
     await w2.open(path)
@@ -2146,7 +2146,7 @@ describe('watches (main/watches.ts)', async () => {
     const report = await repairMove(w2)
     expect(report.failed).toEqual([])
     expect(watches.watchFor(gamma, 'a1')?.cards).toEqual([c.number])
-    const id = JSON.parse(readFileSync(join(gamma, '.hive', 'project.json'), 'utf8')).id
+    const id = JSON.parse(readFileSync(join(gamma, '.combwork', 'project.json'), 'utf8')).id
     expect(savedOf(path)[0]).toMatchObject({ projectPath: gamma, projectId: id })
     await disposeWorkspaceService(w2)
   })
@@ -2252,7 +2252,7 @@ describe('watches (main/watches.ts)', async () => {
       g.release()
       await expect(registering).rejects.toThrow(/closed/)
       expect(savedOf(path)).toEqual(before)
-      expect(existsSync(join(path, '.hive', 'watches.json'))).toBe(false)
+      expect(existsSync(join(path, '.combwork', 'watches.json'))).toBe(false)
     } finally {
       g.release()
       watches.testHooks.afterRead = undefined
@@ -2264,7 +2264,7 @@ describe('watches (main/watches.ts)', async () => {
     const { w, path, alpha } = await open()
     fake(alpha)
     const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha' }, user))
-    const file = join(path, '.hive', 'watches.json')
+    const file = join(path, '.combwork', 'watches.json')
     writeFileSync(file, '{ damaged original')
     watches.testHooks.rename = async () => {
       throw Object.assign(new Error('file locked'), { code: 'EACCES' })
@@ -2277,7 +2277,7 @@ describe('watches (main/watches.ts)', async () => {
     }
     // Once it can be set aside, it is, and the watch is kept.
     await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['comment'] })
-    expect(readdirSync(join(path, '.hive')).some((f) => f.startsWith('watches.json.damaged-'))).toBe(true)
+    expect(readdirSync(join(path, '.combwork')).some((f) => f.startsWith('watches.json.damaged-'))).toBe(true)
     expect(watches.watchFor(alpha, 'a1')).not.toBeNull()
     await disposeWorkspaceService(w)
     // The locked file is tried 20 times with a growing pause (about 2.2 s): more than the default 5 s on a loaded machine.
@@ -2287,7 +2287,7 @@ describe('watches (main/watches.ts)', async () => {
     const { w, path, alpha } = await open()
     fake(alpha)
     const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha' }, user))
-    const file = join(path, '.hive', 'watches.json')
+    const file = join(path, '.combwork', 'watches.json')
     mkdirSync(join(file, 'inside'), { recursive: true })
     await expect(watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['comment'] })).rejects.toThrow(/Could not read the card watches/)
     expect(existsSync(join(file, 'inside'))).toBe(true)
@@ -2295,7 +2295,7 @@ describe('watches (main/watches.ts)', async () => {
     // One byte over the limit: read only up to it, and set aside.
     writeFileSync(file, `{"version":1,"watches":[],"invalid":["${'x'.repeat(1024 * 1024)}"]}`)
     await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['comment'] })
-    expect(readdirSync(join(path, '.hive')).some((f) => f.startsWith('watches.json.too-big-'))).toBe(true)
+    expect(readdirSync(join(path, '.combwork')).some((f) => f.startsWith('watches.json.too-big-'))).toBe(true)
     expect(savedOf(path)).toHaveLength(1)
     await disposeWorkspaceService(w)
   })
@@ -2383,7 +2383,7 @@ describe('watches (main/watches.ts)', async () => {
       await disposeWorkspaceService(w)
     }
   })
-  const keptAside = (path: string) => readdirSync(join(path, '.hive')).filter((f) => f.startsWith('watches.json.kept-aside-'))
+  const keptAside = (path: string) => readdirSync(join(path, '.combwork')).filter((f) => f.startsWith('watches.json.kept-aside-'))
 
   it('a watch taken near the 1 MB limit can still fire, be typed and end: entries kept aside move out to make room', async () => {
     const { w, path, alpha } = await open()
@@ -2402,7 +2402,7 @@ describe('watches (main/watches.ts)', async () => {
     // The entry moved, whole, to a file of its own.
     const aside = keptAside(path)
     expect(aside).toHaveLength(1)
-    expect(JSON.parse(readFileSync(join(path, '.hive', aside[0]), 'utf8')).invalid).toEqual(seed.invalid)
+    expect(JSON.parse(readFileSync(join(path, '.combwork', aside[0]), 'utf8')).invalid).toEqual(seed.invalid)
     await inWorkspace(w, () => tasks.commentTask(c.number, 'Ready', user))
     await evaluated(w)
     expect(st.typed).toHaveLength(1)
@@ -2459,7 +2459,7 @@ describe('watches (main/watches.ts)', async () => {
     const kept = savedOf(path)
     const aside = keptAside(path)
     expect(aside).toHaveLength(1)
-    const moved = JSON.parse(readFileSync(join(path, '.hive', aside[0]), 'utf8')).watches
+    const moved = JSON.parse(readFileSync(join(path, '.combwork', aside[0]), 'utf8')).watches
     // Nothing lost: every watch is in one file or the other, the last ones moved.
     expect(kept.length + moved.length).toBe(count)
     expect(moved.at(-1).agentId).toBe(`b${String(count - 1).padStart(3, '0')}`)

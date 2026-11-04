@@ -70,16 +70,16 @@ async function workspace(at?: string): Promise<{ w: WS; repo: string; wt: string
   const repo = join(ws, 'p')
   const wt = join(ws, 'p-card')
   if (!at) {
-    mkdirSync(join(repo, '.hive'), { recursive: true })
+    mkdirSync(join(repo, '.combwork'), { recursive: true })
     writeFileSync(join(repo, 'a.txt'), 'one\n')
     git(repo, 'init', '-q', '-b', 'main')
     for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(repo, 'config', k, v)
-    writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+    writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
     git(repo, 'add', '-A')
     git(repo, 'commit', '-qm', 'initial')
     git(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
     const agents = [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }]
-    writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options: HIVE_MERGES } }))
+    writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options: HIVE_MERGES } }))
   }
   const w = createWorkspaceService()
   await w.open(ws)

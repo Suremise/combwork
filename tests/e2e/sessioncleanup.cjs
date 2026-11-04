@@ -45,7 +45,7 @@ const write = (file, text) => {
   // Written long ago: a transcript changed in the last few seconds counts as still being written.
   fs.utimesSync(file, old, old)
 }
-const backup = (sid, archived = false) => path.join(alpha, '.hive', archived ? 'archive' : 'sessions', `${sid}.jsonl`)
+const backup = (sid, archived = false) => path.join(alpha, '.combwork', archived ? 'archive' : 'sessions', `${sid}.jsonl`)
 // Hive's copy, plain or compressed (#1110: an ended or archived session's is compressed).
 const kept = (sid, archived = false) => fs.existsSync(backup(sid, archived)) || fs.existsSync(backup(sid, archived) + '.gz')
 const cliFile = (sid) => path.join(claudeHome, 'projects', alpha.replace(/[^a-zA-Z0-9]/g, '-'), `${sid}.jsonl`)

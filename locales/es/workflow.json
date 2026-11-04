@@ -153,7 +153,7 @@
   "workflow.option.dependenciesDone.desc": "Una tarjeta que espera a otras no puede empezar antes de que el trabajo de estas esté incorporado.",
   "workflow.option.dependenciesDone.none": "Las tarjetas empiezan solo cuando las tarjetas que esperan están hechas",
   "workflow.option.dependenciesDone.title": "Las tarjetas empiezan solo cuando las tarjetas que esperan están fusionadas",
-  "workflow.option.excluded.desc": "Toda la carpeta del proyecto, salvo estas carpetas y archivos (.hive siempre).",
+  "workflow.option.excluded.desc": "Toda la carpeta del proyecto, salvo estas carpetas y archivos (.combwork siempre).",
   "workflow.option.excluded.title": "Qué es el trabajo",
   "workflow.option.fileLocks.desc": "Qué pasa cuando un agente intenta editar un archivo que está editando otro agente en la misma carpeta.",
   "workflow.option.fileLocks.title": "Bloqueos de archivos",

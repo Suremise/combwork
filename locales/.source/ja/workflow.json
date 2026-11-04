@@ -160,7 +160,7 @@
   "workflow.option.dependenciesDone.desc": "A card that waits for others can’t start before their work is in.",
   "workflow.option.dependenciesDone.none": "Cards start only when the cards they wait for are done",
   "workflow.option.dependenciesDone.title": "Cards start only when the cards they wait for are merged",
-  "workflow.option.excluded.desc": "The whole project folder, apart from these folders and files (.hive always).",
+  "workflow.option.excluded.desc": "The whole project folder, apart from these folders and files (.combwork always).",
   "workflow.option.excluded.title": "What the work is",
   "workflow.option.fileLocks.desc": "What happens when an agent tries to edit a file another agent in the same folder is editing.",
   "workflow.option.fileLocks.title": "File locks",

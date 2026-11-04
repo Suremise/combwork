@@ -588,7 +588,7 @@
   "board.overview.stalled": "Utknięte",
   "board.overview.waitingForReview": "Do recenzji",
   "board.panel.allProjects": "Wszystkie projekty",
-  "board.panel.info": "Karty obszaru roboczego, w .hive/tasks. Agenci i Asystent czytają je, zmieniają i przenoszą narzędziami Combwork (skończona praca trafia do Recenzji); tylko Ty je archiwizujesz lub usuwasz.",
+  "board.panel.info": "Karty obszaru roboczego, w .combwork/tasks. Agenci i Asystent czytają je, zmieniają i przenoszą narzędziami Combwork (skończona praca trafia do Recenzji); tylko Ty je archiwizujesz lub usuwasz.",
   "board.panel.refresh": "Odśwież",
   "board.panel.stalledInfo": "Karty w kolumnie Aktywne, nad którymi nikt nie pracuje: nie mają agenta albo ich agent został usunięty lub nie działa. Także karty w kolumnie Aktywne lub Recenzja, które agent z pętli kart zostawił, nie czekając na nie.",
   "board.panel.workspace": "Obszar roboczy",

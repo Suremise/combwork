@@ -30,7 +30,7 @@ const claudeSignedIn = () => fs.existsSync(path.join(CLAUDE_TEST_HOME, '.credent
  * `--dialect <file>` (dialects, HI-2439; plans/2026-11-03-dialects-design.md, section 6): a dialect file for the
  * provider's CLI, checked against the schema as Hive checks one (src/main/dialects/format.ts, loaded in plain Node), and
  * the chain it gives in the model slot (its files and hash, as the launch record will hold them). Each trial's workspace
- * gets it as a test copy in `.hive/dialects/<CLI>/` (placeDialect). Null with no --dialect: the shipped files, all
+ * gets it as a test copy in `.combwork/dialects/<CLI>/` (placeDialect). Null with no --dialect: the shipped files, all
  * empty, so the Default. Throws, saying why, for a file that isn't a dialect.
  * The run's agents pick it (their Dialect setting, HI-2443), so Hive pins it in their chain at launch and their launch
  * record shows it.
@@ -54,10 +54,10 @@ function dialectForRun(file, providerKey) {
   return { source: path.resolve(file), path: at, text: dialectFileText(copy), overrides: Object.keys(texts).length, outdated: outdated.map((o) => `${o.id} (${o.problem})`), files: chain.files, hash: chain.hash }
 }
 
-/** Puts a run's dialect (dialectForRun) into a scenario workspace: `.hive/dialects/<CLI>/<label>.json`. */
+/** Puts a run's dialect (dialectForRun) into a scenario workspace: `.combwork/dialects/<CLI>/<label>.json`. */
 function placeDialect(dialect, ws) {
   if (!dialect) return
-  const dest = path.join(ws, '.hive', 'dialects', ...dialect.path.split('/'))
+  const dest = path.join(ws, '.combwork', 'dialects', ...dialect.path.split('/'))
   fs.mkdirSync(path.dirname(dest), { recursive: true })
   fs.writeFileSync(dest, dialect.text)
 }
@@ -609,7 +609,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       modelLog: standIn ? modelLog : null,
       ws,
       alpha,
-      skillsDir: path.join(ws, '.hive', 'skills'),
+      skillsDir: path.join(ws, '.combwork', 'skills'),
       agents: { coder, implementer },
       cards: {},
       /** A card: { title, description, project (alpha), column, agent ('coder' | 'implementer'), labels, comments: [text] }. */

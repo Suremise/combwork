@@ -3,7 +3,7 @@ import { config } from './config'
 
 /**
  * Always on Top, per window: a window keeps its pin while it shows a workspace, and the pin is remembered by workspace
- * in Hive's own config.json (a desk preference, so never in the workspace's .hive settings, which travel with it). A
+ * in Hive's own config.json (a desk preference, so never in the workspace's .combwork settings, which travel with it). A
  * window with no workspace, or showing one never pinned, is not on top.
  */
 const key = (workspacePath: string): string => workspacePath.toLowerCase()

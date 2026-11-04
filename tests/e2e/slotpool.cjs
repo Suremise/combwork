@@ -25,7 +25,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
 ;(async () => {
   q.prepare(fx)
   // warm/ is where the setup writes (git-ignored, so a slot it ran in stays clean).
-  fs.writeFileSync(path.join(fx.alpha, '.gitignore'), '.hive/\nwarm/\n')
+  fs.writeFileSync(path.join(fx.alpha, '.gitignore'), '.combwork/\nwarm/\n')
   lib.git(fx.alpha, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qam', 'ignore warm'])
   const go = path.join(fx.tools, 'slot-go.txt')
   const setup = path.join(fx.tools, 'setup.js')

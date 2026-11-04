@@ -2,7 +2,7 @@
 // build ignores.
 // Card attachments (HI-1700): an image pasted into a card dialog's comment box is a draft (a chip, a link at the caret,
 // nothing stored), and Post keeps it with the card: shown inline in the comment and in the card's Attachments list, kept
-// in the project's .hive/attachments/cards/<number>, and listed by path in the card's JSON (the Agent API, as
+// in the project's .combwork/attachments/cards/<number>, and listed by path in the card's JSON (the Agent API, as
 // cw_read_task reads it). It stays through a move to Doing, archiving and back, and moves with the card to another
 // project. A session's file is copied to a card from the Attachments tab (Attach to a card, the menu a pane's chip uses
 // too). The tab's two tabs (HI-1841): Pane attachments and Card attachments, each its count and its own kind filters,
@@ -39,7 +39,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   fs.mkdirSync(shots, { recursive: true })
   for (const p of [alpha, beta]) fs.mkdirSync(p, { recursive: true })
   // A session's pasted file in alpha, for Attach to a card from the Attachments tab.
-  const sessionFile = path.join(alpha, '.hive', 'attachments', 'run-1', '2026-10-26_12-00-00_session-shot.png')
+  const sessionFile = path.join(alpha, '.combwork', 'attachments', 'run-1', '2026-10-26_12-00-00_session-shot.png')
   fs.mkdirSync(path.dirname(sessionFile), { recursive: true })
   fs.writeFileSync(sessionFile, lib.samplePng(48, 32))
   // The fake Claude Code, for the Assistant's session (its token, for a refused change).
@@ -86,7 +86,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     })
     check('Post keeps it with the card', !!kept, JSON.stringify(kept))
     const file = kept ? kept[0] : null
-    check("…in the project's .hive/attachments/cards/<number>", !!file && file.path.toLowerCase().startsWith(path.join(alpha, '.hive', 'attachments', 'cards', String(n)).toLowerCase() + path.sep) && fs.existsSync(file.path), file?.path)
+    check("…in the project's .combwork/attachments/cards/<number>", !!file && file.path.toLowerCase().startsWith(path.join(alpha, '.combwork', 'attachments', 'cards', String(n)).toLowerCase() + path.sep) && fs.existsSync(file.path), file?.path)
     const shown = dialog.locator('.task-comment .markdown img')
     check('…shown inline in the comment', !!(await until(async () => (await shown.count()) === 1 && (await shown.evaluate((img) => img.complete && img.naturalWidth > 0)))))
     check("…and listed in the card's Attachments", !!(await until(async () => (await dialog.locator('[data-section="attachments"] .card-attachment').count()) === 1)))
@@ -152,8 +152,8 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     await inv('tasks:archive', n, false)
     await inv('tasks:update', n, { project: 'beta' })
     const moved = await inv('cards:attachments', n)
-    check('a move to another project takes it along', moved.length === 1 && moved[0].path.toLowerCase().startsWith(path.join(beta, '.hive', 'attachments', 'cards').toLowerCase()) && fs.existsSync(moved[0].path), JSON.stringify(moved.map((x) => x.path)))
-    check('…and the old folder goes', !!(await until(async () => !fs.existsSync(path.join(alpha, '.hive', 'attachments', 'cards', String(n))))))
+    check('a move to another project takes it along', moved.length === 1 && moved[0].path.toLowerCase().startsWith(path.join(beta, '.combwork', 'attachments', 'cards').toLowerCase()) && fs.existsSync(moved[0].path), JSON.stringify(moved.map((x) => x.path)))
+    check('…and the old folder goes', !!(await until(async () => !fs.existsSync(path.join(alpha, '.combwork', 'attachments', 'cards', String(n))))))
 
     // --- A session's file copied to a card from the Attachments tab; its tabs (HI-1841).
     const other = await inv('tasks:create', { title: 'Session shot belongs here', project: 'alpha' })
@@ -327,7 +327,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     const shot = path.join(alpha, 'docs', 'shot.png')
     fs.mkdirSync(path.dirname(shot), { recursive: true })
     fs.writeFileSync(shot, lib.samplePng(32, 32))
-    const staged = () => [alpha, beta, ws].flatMap((h) => { const d = path.join(h, '.hive', 'attachments', 'cards', '.staging'); return fs.existsSync(d) ? fs.readdirSync(d) : [] })
+    const staged = () => [alpha, beta, ws].flatMap((h) => { const d = path.join(h, '.combwork', 'attachments', 'cards', '.staging'); return fs.existsSync(d) ? fs.readdirSync(d) : [] })
     const outside = path.join(ws, '..', 'cardattach-outside')
     const traversal = await post({ title: 'Outside', project: '../cardattach-outside', attachments: [shot] })
     check('a card for a path, not a project, is refused before anything is copied', traversal.status >= 400 && !fs.existsSync(outside) && staged().length === 0, JSON.stringify({ status: traversal.status, outside: fs.existsSync(outside), staged: staged() }))

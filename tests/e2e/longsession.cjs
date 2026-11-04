@@ -25,7 +25,7 @@ const check = (name, ok, extra = '') => {
   fs.mkdirSync(claudeHome, { recursive: true })
   lib.gitProject(alpha)
   // The handover the new conversation reads (the fake CLI can't write one with Hive's tools).
-  const hdir = path.join(ws, '.hive', 'shared', 'handovers')
+  const hdir = path.join(ws, '.combwork', 'shared', 'handovers')
   fs.mkdirSync(hdir, { recursive: true })
   fs.writeFileSync(path.join(hdir, '2026-10-01-alpha-long-work.md'), '# Long work\n\n- **Project:** alpha\n\nCarry on with the tests.\n')
   lib.enableProviders(userData)

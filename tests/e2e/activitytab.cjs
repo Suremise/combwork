@@ -56,8 +56,8 @@ function transcript(sid, startMin) {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(alpha)
-  fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: AGENTS }))
+  fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: AGENTS }))
   // The fake Claude Code; as it starts it leaves two processes running in its launch's job (#507's linger).
   const claude = lib.fakeClaude(userData, claudeHome, [alpha])
   fs.writeFileSync(path.join(claudeHome, 'fake-linger-at-start.txt'), '2')

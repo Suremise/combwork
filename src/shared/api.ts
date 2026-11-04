@@ -445,9 +445,9 @@ export interface HiveRequests {
   'queue:remove': (n: number, reason?: string) => TaskCard
   /** Retry merge (the user's override): requeues a returned card's unchanged revision, once. */
   'queue:retry': (n: number, reason?: string) => TaskCard
-  /** Adds the project's .hive to its git repository's info/exclude (#345); refuses where no git repository holds it. */
+  /** Adds the project's .combwork to its git repository's info/exclude (#345); refuses where no git repository holds it. */
   'project:excludeHive': (projectPath: string) => WorkspaceInfo
-  /** The files under the project's .hive git tracks (#364), for the confirmation before untracking them. */
+  /** The files under the project's .combwork git tracks (#364), for the confirmation before untracking them. */
   'project:hiveTracked': (projectPath: string) => string[]
   /** `git rm --cached` of exactly the files confirmed (#364), refused if git tracks others now: their removal staged, the files left on disk. */
   'project:untrackHive': (projectPath: string, files: string[]) => WorkspaceInfo
@@ -632,11 +632,11 @@ export interface HiveRequests {
   /** Switches running agents whose settings now say a different mode (after "Switch now"). */
   /** `offer`: from Switch Now's notice (HI-2320), which then says what happened. */
   'session:applyModes': (offer?: string) => { switched: string[]; skipped: string[] }
-  /** Saves the clipboard image into .hive/attachments/<sessionId> and gives its path; null if the clipboard has no image. */
+  /** Saves the clipboard image into .combwork/attachments/<sessionId> and gives its path; null if the clipboard has no image. */
   'session:pasteImage': (projectPath: string, agentId?: string) => string | null
   /** How each file would be attached to the agent's session (#387): copied or by path, its size and kind. Nothing changes. */
   'session:planAttach': (projectPath: string, sources: string[], agentId?: string) => AttachmentPlan[]
-  /** Attaches files to the agent's running session: copies those planAttach says into .hive/attachments/<sessionId>; the paths to paste. */
+  /** Attaches files to the agent's running session: copies those planAttach says into .combwork/attachments/<sessionId>; the paths to paste. */
   'session:attach': (projectPath: string, sources: string[], agentId?: string) => Attached[]
 
   /** Adds an agent to the project (the user's: up to 24, past Maximum agents, #562, HI-2001), creating its worktree if asked, or reusing one (#456: `reuse` says how). */
@@ -791,7 +791,7 @@ export interface HiveRequests {
   /** A listed skill's files (HI-2011), relative with "/", SKILL.md among them; `projectPath`: its project's tab. */
   'skills:files': (skillPath: string, projectPath?: string) => { files: string[]; truncated: boolean }
 
-  // The Dialects view (HI-2444), in the window's workspace; paths are a dialect file's in .hive/dialects ("claude-code/Opus 5.5.json").
+  // The Dialects view (HI-2444), in the window's workspace; paths are a dialect file's in .combwork/dialects ("claude-code/Opus 5.5.json").
   /** Every agent text a dialect can override (the Default beneath every file), by area: read once. */
   'dialects:catalogue': () => DialectCatalogue
   /** The workspace's dialect files: the Workspace file, each CLI's folder, the API's. */
@@ -888,7 +888,7 @@ export interface HiveRequests {
   'assistant:changes': () => AssistantChangeGroup[]
   /** The user undoes one of the Assistant's changes, or a message's: what each put back, and what it left and why. */
   'assistant:undo': (sel: { change?: string; group?: string }) => AssistantUndoResult[]
-  /** Switches this workspace's Assistant to a mode (a file in .hive/modes): told at once if it runs, else when it starts (#259). */
+  /** Switches this workspace's Assistant to a mode (a file in .combwork/modes): told at once if it runs, else when it starts (#259). */
   'assistant:switchMode': (modeId: string, save?: boolean) => 'told' | 'later' | 'saved'
   /** This window's workspace's merge slots: those held or waited for (#350). */
   'mergeSlots:list': () => MergeSlotInfo[]
@@ -1056,7 +1056,7 @@ export interface HiveRequests {
   'git:createTag': (projectPath: string, name: string, message: string, pushTo?: string) => string
   /** This repository's own user.name and user.email; empty removes it (the global one applies). */
   'git:setIdentity': (projectPath: string, name: string, email: string) => string
-  /** Initialise repository (#701): whether it can be done, and what the dialog asks; then git init on main, .hive excluded first, a starter .gitignore, the first commit. */
+  /** Initialise repository (#701): whether it can be done, and what the dialog asks; then git init on main, .combwork excluded first, a starter .gitignore, the first commit. */
   'git:initCheck': (projectPath: string) => GitInitCheck
   'git:init': (projectPath: string, opts: GitInitOptions) => string
 

@@ -55,7 +55,7 @@ let w: ReturnType<typeof createWorkspaceService>
 const run = <T>(fn: () => T | Promise<T>): Promise<T> => inWorkspace(w, async () => fn())
 
 beforeAll(async () => {
-  mkdirSync(join(proj, '.hive'), { recursive: true })
+  mkdirSync(join(proj, '.combwork'), { recursive: true })
   mkdirSync(join(proj, 'sub'), { recursive: true })
   writeFileSync(join(proj, 'a.txt'), 'a\n')
   writeFileSync(join(proj, 'sub', 'a.txt'), 'b\n')
@@ -63,7 +63,7 @@ beforeAll(async () => {
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com']]) git(proj, 'config', k, v)
   git(proj, 'add', 'a.txt')
   git(proj, 'commit', '-qm', 'a')
-  writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+  writeFileSync(join(proj, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   w = createWorkspaceService()
   await w.open(wsPath)
 })

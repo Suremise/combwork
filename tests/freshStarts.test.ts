@@ -63,8 +63,8 @@ describe('Start Fresh and the nudge (main/freshStarts.ts)', async () => {
   const open = async (own?: 'on' | 'off') => {
     const path = join(base, `ws-${++n}`)
     const alpha = join(path, 'alpha')
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, ...(own ? { suggestFreshStart: own } : {}), agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }, { id: 'a3', name: 'Idle' }] }))
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, ...(own ? { suggestFreshStart: own } : {}), agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }, { id: 'a3', name: 'Idle' }] }))
     const w = createWorkspaceService()
     await w.open(path)
     const states = new Map<string, FreshNow | null>([

@@ -119,7 +119,7 @@ const until = async (fn, ms = 10000) => {
   // submitting it, #1274) and Done only once merged (#170). The session's Hive instructions say both too, with "or when the
   // user asks", for a session without the skill (tests/guidance.test.ts checks those).
   check('the card prompt points to the work-on-card skill', typeof prompt === 'string' && prompt.includes('Use the work-on-card skill.'), String(prompt))
-  const skill = path.join(alpha, '.hive', `launch-${agent.id}`, 'plugin', 'skills', 'work-on-card', 'SKILL.md')
+  const skill = path.join(alpha, '.combwork', `launch-${agent.id}`, 'plugin', 'skills', 'work-on-card', 'SKILL.md')
   // HI-2011: finishing after review is in its reference file beside SKILL.md, copied with it.
   const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
   const skillText = read(skill)

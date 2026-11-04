@@ -1,6 +1,6 @@
-// What a workspace's .hive watch tells (HI-1797): a shared note, a skill and a mode changing, a folder of them made after
+// What a workspace's .combwork watch tells (HI-1797): a shared note, a skill and a mode changing, a folder of them made after
 // the workspace opened, and workspace.json changed by hand, each tell their change; the board's database files, which
-// change with every board write, tell nothing (chokidar watched .hive whole, and read its listing again at each).
+// change with every board write, tell nothing (chokidar watched .combwork whole, and read its listing again at each).
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
@@ -16,8 +16,8 @@ const { createWorkspaceService, disposeWorkspaceService } = await import('../src
 const store = await import('../src/main/boardStore')
 
 const ws = join(base, 'ws')
-mkdirSync(join(ws, 'p', '.hive'), { recursive: true })
-writeFileSync(join(ws, 'p', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+mkdirSync(join(ws, 'p', '.combwork'), { recursive: true })
+writeFileSync(join(ws, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
 const w = createWorkspaceService()
 await w.open(ws)
 afterAll(async () => {
@@ -27,7 +27,7 @@ afterAll(async () => {
 
 const events: string[] = []
 vi.spyOn(w, 'emit').mockImplementation((e: HiveEvent) => void events.push(e.type))
-const hive = join(ws, '.hive')
+const hive = join(ws, '.combwork')
 /** Waits for an event of this type after `from` (the watch's events come a moment after the write). */
 const told = (type: string, from: number): Promise<void> => vi.waitFor(() => expect(events.slice(from)).toContain(type), { timeout: 10_000, interval: 50 })
 /** Writes `file` until an event of this type is told: a watch starts (or takes a new folder) a moment after it is asked to. */
@@ -43,7 +43,7 @@ const toldOnceWatched = (type: string, file: string): Promise<void> => {
   )
 }
 
-describe("a workspace's .hive watch (HI-1797)", () => {
+describe("a workspace's .combwork watch (HI-1797)", () => {
   it('tells a shared note, a skill and a modes folder made after it opened, and reads workspace.json again', async () => {
     mkdirSync(join(hive, 'shared'), { recursive: true })
     // The watch is up once a note's change is told.

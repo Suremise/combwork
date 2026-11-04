@@ -2,8 +2,8 @@
 // build so it goes into the workspace's journal as Hive's own entry (src/main/buildFacts.ts). A failed build never gets
 // here: both scripts exit first. Through the Agent API (POST /v1/builds) when Hive can be reached: the session's
 // CW_API_URL and token (an agent running the build has them; a script can set them). Otherwise, or when Hive doesn't
-// answer, a marker file in the workspace's .hive/builds, which Hive picks up when the workspace next opens. The
-// workspace is CW_WORKSPACE, else the nearest folder above the main checkout with a .hive/workspace.json.
+// answer, a marker file in the workspace's .combwork/builds, which Hive picks up when the workspace next opens. The
+// workspace is CW_WORKSPACE, else the nearest folder above the main checkout with a .combwork/workspace.json.
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { request } from 'http'
 import { dirname, join } from 'path'
@@ -42,13 +42,13 @@ export function installerOf(lines) {
 /** The workspace a checkout's builds are recorded in, or null. */
 export function workspaceOf(root, env = process.env) {
   const named = env.CW_WORKSPACE
-  if (named && existsSync(join(named, '.hive', 'workspace.json'))) return named
+  if (named && existsSync(join(named, '.combwork', 'workspace.json'))) return named
   let dir = checkoutOf(root)?.main ?? root
   for (;;) {
     const up = dirname(dir)
     if (up === dir) return null
     dir = up
-    if (existsSync(join(dir, '.hive', 'workspace.json'))) return dir
+    if (existsSync(join(dir, '.combwork', 'workspace.json'))) return dir
   }
 }
 
@@ -114,7 +114,7 @@ export function postBuild(fact, { url, token, workspace }, timeoutMs = 10_000) {
 
 /** Leaves the fact for Hive as a marker in the workspace (written whole: a temp file renamed). Returns its path. */
 export function leaveBuild(fact, workspace) {
-  const dir = join(workspace, '.hive', BUILD_MARKERS_DIR)
+  const dir = join(workspace, '.combwork', BUILD_MARKERS_DIR)
   mkdirSync(dir, { recursive: true })
   const name = `${fact.builtAt.replace(/[:.]/g, '-')}-${randomBytes(4).toString('hex')}`
   const file = join(dir, `${name}.json`)

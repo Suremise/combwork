@@ -62,7 +62,7 @@ const ancestor = (x, y) => {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(h.app, page, { width: 1500, height: 950 })
     await page.getByText('alpha', { exact: true }).first().click()
-    const projectJson = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8'))
+    const projectJson = () => JSON.parse(fs.readFileSync(path.join(alpha, '.combwork', 'project.json'), 'utf8'))
 
     // --- Pair (Hive merges), strict on, through Version Control → Workflow (#1355, #1352).
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()

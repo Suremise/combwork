@@ -40,9 +40,9 @@ describe("a card's context", () => {
   beforeEach(async () => {
     const ws = tempDir('hive-cardcontext-ws-')
     alpha = join(ws, 'alpha')
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
     mkdirSync(join(alpha, 'docs'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     writeFileSync(join(alpha, 'docs', 'PLAN.md'), PLAN)
     w = createWorkspaceService()
     await w.open(ws)
@@ -106,9 +106,9 @@ describe('references that no longer resolve (#819)', () => {
   beforeEach(async () => {
     const ws = tempDir('hive-cardcontext-819-')
     alpha = join(ws, 'alpha')
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
     mkdirSync(join(alpha, 'docs'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     writeFileSync(join(alpha, 'docs', 'PLAN.md'), PLAN)
     w = createWorkspaceService()
     await w.open(ws)
@@ -180,8 +180,8 @@ describe('references that no longer resolve (#819)', () => {
   })
 
   it("a start's check made before the list changed is never saved over it (edited, cleared, or the card moved)", async () => {
-    mkdirSync(join(alpha, '..', 'beta', '.hive'), { recursive: true })
-    writeFileSync(join(alpha, '..', 'beta', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(alpha, '..', 'beta', '.combwork'), { recursive: true })
+    writeFileSync(join(alpha, '..', 'beta', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     await w.refresh()
     const c = await run(() => tasks.createTask({ title: 'T', project: 'alpha', context: ['docs/PLAN.md#gone'] }, user))
     // The start checked this list (it doesn't resolve)…

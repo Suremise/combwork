@@ -163,7 +163,7 @@ node tests/scenarios/measure.cjs              # what sessions are given about Hi
 ```
 
 **A dialect** (HI-2439; plans/2026-11-03-dialects-design.md, section 6): `--dialect <file>` puts a dialect file in the
-model slot of every agent of the provider's CLI, as a test copy in each scenario workspace's `.hive/dialects/<CLI>/`.
+model slot of every agent of the provider's CLI, as a test copy in each scenario workspace's `.combwork/dialects/<CLI>/`.
 The file is checked against the schema first, as Hive checks one (`src/main/dialects/format.ts`): one that isn't a
 dialect stops the run; outdated overrides are listed and fall through. `results.json` (its `meta` and each result) and
 `summary.md` record the chain's files and hash, and the benchmark's label names it, so Performance → Compare tells a

@@ -34,7 +34,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
   q.prepare(fx)
   // A second project, also on Hive merges (its queue's card shows, empty): the project filter has both.
   const beta = path.join(fx.ws, 'beta')
-  lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.combwork/\n' })
   lib.git(beta, ['branch', '-M', 'main'])
   lib.git(beta, ['branch', 'integration'])
   const h = await q.startHive(fx, { port: PORT })

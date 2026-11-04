@@ -29,7 +29,7 @@ export interface CleanupSession {
 
 export interface CleanupFacts {
   sessions: CleanupSession[]
-  /** The folders in .hive/attachments: a session id, or run-<launch> for a launch that had no id yet. */
+  /** The folders in .combwork/attachments: a session id, or run-<launch> for a launch that had no id yet. */
   attachmentFolders: { name: string; path: string; bytes: number }[]
   /** Session ids and run-<launch> names of what is running now. */
   liveNames: Set<string>
@@ -89,12 +89,12 @@ export interface PurgeFacts {
   assistant?: boolean
   sessions: PurgeSession[]
   /**
-   * The files of .hive/sessions and .hive/archive (`folder`) named for a session: its backups (`backup`: an active or
+   * The files of .combwork/sessions and .combwork/archive (`folder`) named for a session: its backups (`backup`: an active or
    * archived copy, compressed or not) and what is left of one (a spare, a half-made or set-aside copy). Nothing else
    * there is Hive's per session.
    */
   files: (PurgeFile & { id: string; folder: 'sessions' | 'archive'; backup: boolean })[]
-  /** The folders in .hive/attachments (a session id, or run-<launch> for a launch that had no id yet) and their plain files. */
+  /** The folders in .combwork/attachments (a session id, or run-<launch> for a launch that had no id yet) and their plain files. */
   attachmentFolders: { name: string; path: string; files: PurgeFile[] }[]
   /** Old usage kept for deleted sessions (deletedUsage, from before the usage history), with its size. */
   deletedUsage: { id: string; name: string; bytes: number }[]

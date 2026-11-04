@@ -35,13 +35,14 @@ import {
   type TrendPoint
 } from '../shared/metrics'
 import type { LaunchWorkflow } from '../shared/workflow/roles'
+import { HIVE_DIR } from '../shared/defaults'
 
 /**
  * Hive's performance metrics, one store per open workspace (shared/metrics.ts has the contract). Recording is a few
  * map updates into the current hour's bucket; nothing is read from disk on the request path. Buckets are hourly for 7
- * days, then folded into days, kept 30 days, and saved (debounced) in the workspace's database (#1019: `.hive/hive.db`,
+ * days, then folded into days, kept 30 days, and saved (debounced) in the workspace's database (#1019: `.combwork/hive.db`,
  * a bucket and its series in their typed tables since #1212, storeTables.ts, so a save writes the buckets that changed, the hour under way, and appends a new
- * one; `.hive/metrics/metrics.json` before, moved in by the first save), which is git-ignored and machine-local. Every dimension comes from a fixed set (route templates, Hive's tool names, provider ids), each
+ * one; `.combwork/metrics/metrics.json` before, moved in by the first save), which is git-ignored and machine-local. Every dimension comes from a fixed set (route templates, Hive's tool names, provider ids), each
  * bucket has caps on projects and series, the store has a cap on buckets whichever way the clock moves, and the file
  * has a size cap: what doesn't fit is dropped and counted. The saved file is untrusted input: size-checked before it
  * is read and checked field by field. Nothing stores a prompt, a body, a token, a URL or a path.
@@ -745,7 +746,7 @@ const fileKey = (file: string): string => (process.platform === 'win32' ? resolv
 // The workspace's database replaced (the upgrade to 1.0, a restore): its store reads what the file has now.
 // Under every spelling of the workspace, by the place each store's handle recorded as it entered (#1456).
 onDbReplaced((workspacePath, place) => {
-  const key = fileKey(join(workspacePath, '.hive', 'metrics', 'metrics.json'))
+  const key = fileKey(join(workspacePath, HIVE_DIR, 'metrics', 'metrics.json'))
   for (const store of new Set([...byFile].filter(([k, o]) => k === key || o.place === place).map(([, o]) => o.store))) store.reread()
 })
 /** Saves started by a workspace closing, still going (quitting waits for them). */
@@ -784,7 +785,7 @@ export function metricsHandle(w: WorkspaceService | null | undefined): MetricsHa
   const had = stores.get(w)
   if (had && had.lifetime === w.lifetime) return had
   const lifetime = w.lifetime
-  const file = join(w.path, '.hive', 'metrics', 'metrics.json')
+  const file = join(w.path, HIVE_DIR, 'metrics', 'metrics.json')
   const key = fileKey(file)
   // The same file's store if one is still here (saving after its workspace closed): reused, under this lifetime.
   const shared = byFile.get(key)

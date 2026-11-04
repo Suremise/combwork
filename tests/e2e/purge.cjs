@@ -20,7 +20,7 @@ const ws = path.join(lib.WORK, 'purge-ws')
 const claudeHome = path.join(lib.WORK, 'purge-claude-home')
 const alpha = path.join(ws, 'alpha')
 const beta = path.join(ws, 'beta')
-const hiveOf = (p) => path.join(p, '.hive')
+const hiveOf = (p) => path.join(p, '.combwork')
 const cliDirOf = (p) => path.join(claudeHome, 'projects', p.replace(/[^a-zA-Z0-9]/g, '-'))
 let failed = 0
 const check = (name, ok, extra = '') => {

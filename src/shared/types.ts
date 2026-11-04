@@ -307,7 +307,7 @@ export type AssistantPanelSide = 'right' | 'left'
 export interface AssistantSettings {
   /** '' follows the default provider. */
   provider: ProviderId | ''
-  /** The mode new conversations use (a file in the workspace's .hive/modes, without .md). */
+  /** The mode new conversations use (a file in the workspace's .combwork/modes, without .md). */
   mode: string
   /** What the Assistant may do beyond looking (see AssistantControl). */
   control: AssistantControl
@@ -463,7 +463,7 @@ export interface AssistantProviderSettings {
   use200kContext: '' | 'on' | 'off'
 }
 
-/** A mode the Hive Assistant can take: a Markdown file of instructions in the workspace's .hive/modes. */
+/** A mode the Hive Assistant can take: a Markdown file of instructions in the workspace's .combwork/modes. */
 export interface ModeInfo {
   /** The file name without .md. */
   id: string
@@ -588,9 +588,9 @@ export interface AppConfig {
   consoleWindow?: WindowState
   /** The windows open when Hive last quit, each with its workspace (null: the welcome page), reopened at start. */
   windows?: (WindowState & { workspace: string | null })[]
-  /** Per workspace (lowercased path): the last project rename (#514, `.hive/project-names.json`'s number) its view preferences and Working on follow. */
+  /** Per workspace (lowercased path): the last project rename (#514, `.combwork/project-names.json`'s number) its view preferences and Working on follow. */
   renamesApplied?: Record<string, number>
-  /** Always on Top: the workspaces (lowercased paths) whose window was left pinned. This machine's, never in .hive. */
+  /** Always on Top: the workspaces (lowercased paths) whose window was left pinned. This machine's, never in .combwork. */
   alwaysOnTop?: Record<string, true>
   /**
    * Moved workspaces whose records here by folder (the window's pin, the close command's runs) are still to follow them
@@ -617,7 +617,7 @@ export interface AppConfig {
     skillsFold?: Record<string, { hive?: boolean; provider?: boolean }>
     /** Each project's Sessions tree branches the user opened (true) or folded (false), by project path in lower case (#239). */
     sessionsTree?: Record<string, Record<string, boolean>>
-    /** The .hive version control notice each project's Overview no longer shows (#345): the situation dismissed (`hiveVcsKey`), by project path in lower case. */
+    /** The .combwork version control notice each project's Overview no longer shows (#345): the situation dismissed (`hiveVcsKey`), by project path in lower case. */
     hiveVcsNotice?: Record<string, string>
     /** The connections notice's entries dismissed (HI-1770): `<project path in lower case>|<moved entry's id>`. */
     connectionsNoticeDismissed?: string[]
@@ -1096,13 +1096,13 @@ export interface SlotDefaults {
 /** A project folder Hive leaves out of the workspace, until it's restored in Settings → Workspace. */
 export interface HiddenProject {
   name: string
-  /** hidden: everything left where it is. removed: its workspace files were packed into the folder's .hive/removed. */
+  /** hidden: everything left where it is. removed: its workspace files were packed into the folder's .combwork/removed. */
   mode: 'hidden' | 'removed'
   at: string
 }
 
 // ---------------------------------------------------------------------------
-// Task board: one per workspace, a card per file in .hive/tasks.
+// Task board: one per workspace, a card per file in .combwork/tasks.
 // ---------------------------------------------------------------------------
 
 /** On Hold, Todo, Doing, Review, Passed, Done (#170): Passed is reviewed and waiting to be merged, Done is merged. */
@@ -1242,7 +1242,7 @@ export interface ArchiveBatch {
 }
 
 /**
- * A card an older Hive saved after the board moved to its database (#1017), set aside in `.hive/tasks.set-aside` for the
+ * A card an older Hive saved after the board moved to its database (#1017), set aside in `.combwork/tasks.set-aside` for the
  * user to review (#1044): added as a new card or discarded. Its fields are as the older Hive saved them.
  */
 export interface SetAsideCard {
@@ -1428,7 +1428,7 @@ export interface ProjectRemovalInfo {
   folders?: { of: ProjectFolderOf; path: string; kept: string | null; blocksDelete?: string }[]
 }
 
-/** A project folder holding what Remove from Hive packed into its .hive/removed. */
+/** A project folder holding what Remove from Hive packed into its .combwork/removed. */
 export interface RemovedData {
   at: string
   workspace: string
@@ -2579,24 +2579,24 @@ export interface ProjectInfo {
   unmanagedMcp: string[]
   /** The folder holds what Remove from Hive packed (handovers, board cards), which Hive offers to restore. */
   removedData?: RemovedData | null
-  /** Whether its .hive is kept out of version control (#345); absent for the Assistant's home. */
+  /** Whether its .combwork is kept out of version control (#345); absent for the Assistant's home. */
   hiveVcs?: HiveVcs
   /** Its version control platform, capabilities and detection (SPEC §16.3); absent for the Assistant's home. */
   platform?: ProjectPlatform
 }
 
 /**
- * Whether a project's .hive (this machine's sessions, transcript backups and launch settings) is kept out of version
+ * Whether a project's .combwork (this machine's sessions, transcript backups and launch settings) is kept out of version
  * control (#345). `excluded`: in the info/exclude of the git repository holding it (Hive adds it there itself);
  * `not-excluded`: a git repository Hive couldn't add it to; `other-vcs`: another system (`vcs` names it), which Hive
  * doesn't configure; `none`: no version control holds the folder. `sync` names a sync service whose folder holds it
- * (OneDrive, Dropbox), which copies .hive whatever version control does.
+ * (OneDrive, Dropbox), which copies .combwork whatever version control does.
  */
 export interface HiveVcs {
   state: 'excluded' | 'not-excluded' | 'other-vcs' | 'none'
   vcs?: string
   sync?: string
-  /** Files under .hive git tracks (#364): committed before it was excluded, so git goes on committing their changes. */
+  /** Files under .combwork git tracks (#364): committed before it was excluded, so git goes on committing their changes. */
   tracked?: number
 }
 
@@ -2606,7 +2606,7 @@ export interface WorkspaceInfo {
   config: WorkspaceConfig
   projects: ProjectInfo[]
   /**
-   * The Hive Assistant, the workspace's overseer: a session host like a project (its home is .hive/assistant,
+   * The Hive Assistant, the workspace's overseer: a session host like a project (its home is .combwork/assistant,
    * never listed as a project) with one agent, working in the workspace folder.
    */
   assistant: ProjectInfo | null
@@ -2906,7 +2906,7 @@ export interface McpFileServer {
   def: McpServerDef
   runs: string[]
   secretWarnings: string[]
-  /** The files a .zip unpacks to .hive/mcp/<name>/ (none for a .json). */
+  /** The files a .zip unpacks to .combwork/mcp/<name>/ (none for a .json). */
   files: number
   /** A server of this name exists already. */
   exists: boolean
@@ -3145,16 +3145,16 @@ export interface ProjectStorage {
   path: string
   name: string
   assistant?: boolean
-  /** Transcript backups (.hive/sessions). */
+  /** Transcript backups (.combwork/sessions). */
   sessions: number
-  /** Archived sessions' backups (.hive/archive). */
+  /** Archived sessions' backups (.combwork/archive). */
   archive: number
   /** What the backups and the archive hold before compression (#1110: a compressed backup's own size), when any is. */
   sessionsRaw?: number
   archiveRaw?: number
-  /** Files pasted or dropped into sessions (.hive/attachments, but its cards' folder). */
+  /** Files pasted or dropped into sessions (.combwork/attachments, but its cards' folder). */
   attachments: number
-  /** Files kept with cards (HI-1700: .hive/attachments/cards), when there are any; never cleaned up. */
+  /** Files kept with cards (HI-1700: .combwork/attachments/cards), when there are any; never cleaned up. */
   cardAttachments?: number
   /**
    * The folders agents work in (#1451): each of the project's slots on disk (`slot`, and the agent it is lent to now, if
@@ -3322,7 +3322,7 @@ export interface TranscriptTool {
 export interface TranscriptImageRef {
   /** Pass to transcript:image to get the picture. */
   id: number
-  /** Where the image was pasted from, when Claude Code recorded it (e.g. .hive/images/…). */
+  /** Where the image was pasted from, when Claude Code recorded it (e.g. .combwork/images/…). */
   path: string | null
 }
 
@@ -3486,7 +3486,7 @@ export interface FileEntry {
   isDir: boolean
   size: number
   modified: string
-  /** Ignored by git, or Hive's own .hive folder — shown dimmed. */
+  /** Ignored by git, or Hive's own .combwork folder — shown dimmed. */
   ignored: boolean
 }
 
@@ -3501,7 +3501,7 @@ export interface FileContent {
   bom: boolean
 }
 
-/** A file pasted or dropped into a session (#387), kept in its host's .hive/attachments/<sessionId>. */
+/** A file pasted or dropped into a session (#387), kept in its host's .combwork/attachments/<sessionId>. */
 export interface SessionAttachment {
   path: string
   name: string
@@ -3510,7 +3510,7 @@ export interface SessionAttachment {
   kind: AttachmentKind
 }
 
-/** What was pasted or dropped into one session, from <project>/.hive/attachments/<sessionId>, newest first. */
+/** What was pasted or dropped into one session, from <project>/.combwork/attachments/<sessionId>, newest first. */
 export interface SessionAttachmentGroup {
   sessionId: string
   name: string | null

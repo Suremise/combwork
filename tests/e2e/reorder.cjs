@@ -47,7 +47,7 @@ const check = (name, ok, extra = '') => {
     return v
   }
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-  const saved = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8')).agents.map((a) => a.name).join(',')
+  const saved = () => JSON.parse(fs.readFileSync(path.join(alpha, '.combwork', 'project.json'), 'utf8')).agents.map((a) => a.name).join(',')
   const paneNames = async () => (await page.locator('.pane-header-bar .agent-name').allInnerTexts()).join(',')
 
   await page.getByText('alpha', { exact: true }).first().click()

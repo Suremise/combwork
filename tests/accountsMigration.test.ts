@@ -277,7 +277,7 @@ describe('the full upgrade of an rc.12-shaped profile (HI-2106)', () => {
 
   it('so does the Assistant', () => {
     expect(after(assistant.agents[0], ws, store, settings)).toEqual(was.assistant)
-    // Its mode (a file in .hive/modes) isn't a launch setting: it stays.
+    // Its mode (a file in .combwork/modes) isn't a launch setting: it stays.
     expect(assistant.agents[0].mode).toBe('coordinator')
   })
 

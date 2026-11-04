@@ -29,19 +29,19 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8'))
+const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'project.json'), 'utf8'))
 
 ;(async () => {
   for (const d of [userData, ws, upgradedWs, shots]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(shots, { recursive: true })
   // A Git folder put in the workspace with its agents, as one copied in or added by the Assistant: no workflow yet.
-  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
-  fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'Builder' }, { id: 'r1', name: 'Reviewer' }] }))
+  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.combwork/\n' })
+  fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'Builder' }, { id: 'r1', name: 'Reviewer' }] }))
   // An upgraded workspace: its project kept today's way of working (the options the upgrade wrote, no preset).
-  lib.gitProject(old, { 'o.txt': 'o\n', '.gitignore': '.hive/\n' })
-  fs.mkdirSync(path.join(old, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(old, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [], workflow: { platform: 'git', preset: null, options: { review: 'none', finish: 'notChecked', folder: 'project' } } }))
+  lib.gitProject(old, { 'o.txt': 'o\n', '.gitignore': '.combwork/\n' })
+  fs.mkdirSync(path.join(old, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(old, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [], workflow: { platform: 'git', preset: null, options: { review: 'none', finish: 'notChecked', folder: 'project' } } }))
 
   let { app, page } = await lib.launch({ userData, viewport: { width: 1400, height: 900 } })
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
@@ -276,7 +276,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
 
     // --- An upgraded workspace: no step, no notice, only the old presets notice.
     await lib.openWorkspace(inv, page, upgradedWs)
-    const db = new DatabaseSync(path.join(upgradedWs, '.hive', 'hive.db'), { timeout: 5000 })
+    const db = new DatabaseSync(path.join(upgradedWs, '.combwork', 'hive.db'), { timeout: 5000 })
     try {
       db.prepare("INSERT INTO board_meta (key, value) VALUES ('adoption_upto', '3') ON CONFLICT (key) DO UPDATE SET value = excluded.value").run()
     } finally {

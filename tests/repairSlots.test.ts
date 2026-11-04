@@ -70,16 +70,16 @@ function writeProject(p: string): void {
     { id: 'r1', name: 'R1', provider: 'claude-code', workflowRole: 'reviewer', worktree: { path: join(trees, 'hr1'), branch: 'hive/hr1', base: 'main' } },
     { id: 'b2', name: 'B2', provider: 'claude-code', workflowRole: 'builder' }
   ]
-  writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, ...(projectId ? { id: projectId } : {}), agents }))
+  writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, ...(projectId ? { id: projectId } : {}), agents }))
 }
 
 beforeAll(async () => {
   const p = join(wsAt(before), 'alpha')
   gitRepo(p)
-  commit(p, { '.gitignore': '.hive/\n', 'a.txt': 'a\n' }, 'first')
+  commit(p, { '.gitignore': '.combwork/\n', 'a.txt': 'a\n' }, 'first')
   for (const n of ['hb1', 'hr1']) sh(p, 'worktree', 'add', '-q', '-b', `hive/${n}`, join(treesAt(before), n))
   sh(p, 'worktree', 'add', '-q', '--detach', join(treesAt(before), 'copies', 'copy-1'))
-  mkdirSync(join(p, '.hive'), { recursive: true })
+  mkdirSync(join(p, '.combwork'), { recursive: true })
   writeProject(p)
   await ws.open(wsAt(before))
   projectId = (await ws.projectConfig(p)).id!
@@ -217,14 +217,14 @@ describe('Repair cut short after a folder was published (#1447, HR1 round 1 find
   beforeAll(async () => {
     const p = join(root, 'before', 'ws', 'omega')
     gitRepo(p)
-    commit(p, { '.gitignore': '.hive/\n', 'o.txt': 'o\n' }, 'first')
+    commit(p, { '.gitignore': '.combwork/\n', 'o.txt': 'o\n' }, 'first')
     sh(p, 'worktree', 'add', '-q', '-b', 'hive/ho1', join(treesOf(join(root, 'before')), 'ho1'))
-    mkdirSync(join(p, '.hive'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
     const agents = [{ id: 'o1', name: 'O1', provider: 'claude-code', workflowRole: 'builder', worktree: { path: join(treesOf(join(root, 'before')), 'ho1'), branch: 'hive/ho1', base: 'main' } }]
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, agents }))
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, agents }))
     await w2.open(join(root, 'before', 'ws'))
     const id = (await w2.projectConfig(p)).id
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id, agents }))
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id, agents }))
     await w2.refresh()
     await run2(() => workspace.upsertSession(p, { id: 's-o1', agent: 'claude-code', agentId: 'o1', cwd: join(treesOf(join(root, 'before')), 'ho1'), name: 's-o1', lastActiveAt: new Date().toISOString() }))
     await migrateSlots(w2)
@@ -351,19 +351,19 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
     const p = join(ws.path!, name)
     const trees = join(`${ws.path!}.worktrees`, name)
     gitRepo(p)
-    commit(p, { '.gitignore': '.hive/\n', 'g.txt': 'g\n' }, 'first')
+    commit(p, { '.gitignore': '.combwork/\n', 'g.txt': 'g\n' }, 'first')
     const home = join(trees, 'hr')
     sh(p, 'worktree', 'add', '-q', '-b', 'hive/hr', home)
-    mkdirSync(join(p, '.hive'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
     const agents = [
       { id: 'g1', name: 'G1', provider: 'claude-code', workflowRole: 'builder' },
       { id: 'g2', name: 'G2', provider: 'claude-code', workflowRole: 'builder' },
       { id: 'gr', name: 'GR', provider: 'claude-code', workflowRole: 'reviewer', worktree: { path: home, branch: 'hive/hr', base: 'main' } }
     ]
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, agents }))
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, agents }))
     await ws.refresh()
     const id = (await ws.projectConfig(p)).id
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id, agents }))
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id, agents }))
     await migrateSlots(ws)
     const pool = await run(() => poolFor(ws, p))
     const a = await pool.lend({ card: cards[0], agent: 'g1' }, { install: false })
@@ -415,7 +415,7 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
 
   // Another Hive on the same workspace (HR1's round 2): its own connection to hive.db, its own holder.
   const otherHive = { pid: 990_001, started: 1 }
-  const dbFile = (): string => join(ws.path!, '.hive', 'hive.db')
+  const dbFile = (): string => join(ws.path!, '.combwork', 'hive.db')
   const reservation = (id: string): string | undefined => boardRead(ws, (db) => (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(deleteKey(id)) as { value: string } | undefined)?.value)
   const opsOf = (id: string): (string | null)[] => boardRead(ws, (db) => [...(db.prepare('SELECT op FROM slots WHERE project = ?').all(id) as { op: string | null }[]), ...(db.prepare('SELECT op FROM copies WHERE project = ?').all(id) as { op: string | null }[])].map((r) => r.op))
   /** A free review copy of the project's, made for real, its row as #1435's pool keeps it. */

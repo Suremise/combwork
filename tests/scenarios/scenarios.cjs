@@ -2861,7 +2861,7 @@ module.exports.SCENARIOS = [
       const id = Number(/Entry #(\d+)/.exec(reply)?.[1])
       if (!id) throw new Error(`setup: the journal entry wasn't written: ${reply}`)
       const { DatabaseSync } = require('node:sqlite')
-      const db = new DatabaseSync(require('path').join(c.ws, '.hive', 'assistant', 'journal.db'))
+      const db = new DatabaseSync(require('path').join(c.ws, '.combwork', 'assistant', 'journal.db'))
       db.prepare('UPDATE entries SET at = ? WHERE id = ?').run(new Date(Date.now() - 6 * 86_400_000).toISOString(), id)
       db.close()
       c.entry = id
@@ -4121,7 +4121,7 @@ const MODES = [
 ]
 const launchedIn = (c, name) => {
   const fs = require('fs')
-  const file = require('path').join(c.ws, '.hive', 'assistant', '.hive', 'launch-assistant', 'instructions.md')
+  const file = require('path').join(c.ws, '.combwork', 'assistant', '.combwork', 'launch-assistant', 'instructions.md')
   if (fs.existsSync(file) && fs.readFileSync(file, 'utf8').includes(`# Your mode: ${name}`)) return true
   // fake-copilot: what Copilot sent its model (the stand-in's log), whose system prompt carries the launch's instructions.
   if (c.modelLog && fs.existsSync(c.modelLog) && fs.readFileSync(c.modelLog, 'utf8').includes(`# Your mode: ${name}`)) return true

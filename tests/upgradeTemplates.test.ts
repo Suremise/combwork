@@ -62,10 +62,10 @@ const files = (dir: string): string[] => (existsSync(dir) ? readdirSync(dir).map
  */
 async function workspace09(): Promise<{ ws: string; wsTemplates: string; pTemplates: string }> {
   const ws = join(base, `ws-${++n}`)
-  const wsTemplates = join(ws, '.hive', 'templates')
-  const pTemplates = join(ws, 'p', '.hive', 'templates')
+  const wsTemplates = join(ws, '.combwork', 'templates')
+  const pTemplates = join(ws, 'p', '.combwork', 'templates')
   mkdirSync(pTemplates, { recursive: true })
-  writeFileSync(join(ws, 'p', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+  writeFileSync(join(ws, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
   const w = await open(ws)
   await inWorkspace(w, () => tasks.createTask({ title: 'From 0.9', project: 'p' }, { kind: 'user' }))
   await close(w)
@@ -115,7 +115,7 @@ describe("0.9's agent templates at the upgrade to 1.0 (#1436)", () => {
     expect([snapshot(wsTemplates), snapshot(pTemplates)]).toEqual(before)
     const id = (await w.projectIds()).byPath.get(join(ws, 'p').toLowerCase())!
     expect(await step.backupFiles(ws)).toEqual(['workspace/pair.json', 'workspace/team.json', `projects/${id}/mine.json`].sort())
-    expect(readFileSync(join(ws, '.hive', 'backups', step.V09_TEMPLATES, 'workspace', 'pair.json'), 'utf8')).toBe(v1('Pair'))
+    expect(readFileSync(join(ws, '.combwork', 'backups', step.V09_TEMPLATES, 'workspace', 'pair.json'), 'utf8')).toBe(v1('Pair'))
     // 1.0 lists only its own: the 0.9 files aren't listed, loaded, added from or deleted.
     const listed = await inWorkspace(w, () => templates.listTemplates(join(ws, 'p')))
     expect(listed.filter((t) => t.scope !== 'hive').map((t) => t.file).sort()).toEqual(['damaged.json', 'new.json'])
@@ -185,7 +185,7 @@ describe("0.9's agent templates at the upgrade to 1.0 (#1436)", () => {
     writeFileSync(join(wsTemplates, 'pair.json'), v1('Pair, edited in 0.9'))
     await unmark(w)
     expect(await inWorkspace(w, () => step.copyV09Templates(w))).toBe(1)
-    const kept = join(ws, '.hive', 'backups', step.V09_TEMPLATES, 'workspace')
+    const kept = join(ws, '.combwork', 'backups', step.V09_TEMPLATES, 'workspace')
     expect(files(kept)).toEqual(['pair-2.json', 'pair.json', 'team.json'])
     expect([readFileSync(join(kept, 'pair.json'), 'utf8'), readFileSync(join(kept, 'pair-2.json'), 'utf8')]).toEqual([v1('Pair'), v1('Pair, edited in 0.9')])
     await close(w)
@@ -210,7 +210,7 @@ describe("0.9's agent templates at the upgrade to 1.0 (#1436)", () => {
     }
     step.testHooks.fail = undefined
     // A copy a crash left half written: never a template's name, so harmless, and left alone (it may be another run's).
-    const kept = join(ws, '.hive', 'backups', step.V09_TEMPLATES, 'workspace')
+    const kept = join(ws, '.combwork', 'backups', step.V09_TEMPLATES, 'workspace')
     mkdirSync(kept, { recursive: true })
     writeFileSync(join(kept, '.team.json.0123456789ab.part'), '{"version": 1, "na')
     await inWorkspace(w, () => step.copyV09Templates(w))
@@ -221,15 +221,15 @@ describe("0.9's agent templates at the upgrade to 1.0 (#1436)", () => {
 
   it('a workspace made in 1.0 has nothing to copy: marked done, nothing said', async () => {
     const ws = join(base, `ws-${++n}`)
-    mkdirSync(join(ws, 'p', '.hive'), { recursive: true })
-    writeFileSync(join(ws, 'p', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(ws, 'p', '.combwork'), { recursive: true })
+    writeFileSync(join(ws, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     const w = await open(ws)
     const said = notices(w)
     expect(await inWorkspace(w, () => step.copyV09Templates(w))).toBe(0)
     expect(store.boardValue(w, 'templates.v09')).toBe('0')
     await step.sayV09TemplatesOnce(w)
     expect(said).toEqual([])
-    expect(existsSync(join(ws, '.hive', 'backups', step.V09_TEMPLATES))).toBe(false)
+    expect(existsSync(join(ws, '.combwork', 'backups', step.V09_TEMPLATES))).toBe(false)
     await close(w)
   })
 })

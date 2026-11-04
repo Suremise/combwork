@@ -48,7 +48,7 @@ const call = (m: Record<string, unknown>): Promise<unknown> => handleRequest({ i
 
 async function setup() {
   const dir = tempDir('hive-usage-worker-')
-  const file = join(dir, '.hive', 'usage.db')
+  const file = join(dir, '.combwork', 'usage.db')
   const transcript = join(dir, 'abc.jsonl')
   await call({ type: 'config', advanced: {}, providers: DEFAULT_SETTINGS.providers, hiveVersion: '9.9.9-test' })
   const job = (o: Partial<IngestJob> = {}): IngestJob => ({ scope: 'p1', session: 'abc', provider: 'claude-code', agentId: 'a1', path: transcript, holds: [], holdsKey: null, keepState: 'now', ...o })

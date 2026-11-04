@@ -180,7 +180,7 @@ describe('Hive keeps to it', () => {
   const wsPath = join(base, 'ws')
   const alpha = join(wsPath, 'alpha')
   const beta = join(wsPath, 'beta')
-  const cfgOf = (p: string) => JSON.parse(readFileSync(join(p, '.hive', 'project.json'), 'utf8'))
+  const cfgOf = (p: string) => JSON.parse(readFileSync(join(p, '.combwork', 'project.json'), 'utf8'))
   const count = (p: string): number => cfgOf(p).agents.length
   let w: ReturnType<typeof createWorkspaceService>
   const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
@@ -194,12 +194,12 @@ describe('Hive keeps to it', () => {
 
   beforeAll(async () => {
     for (const [p, n, prefix] of [[alpha, 12, 'a'], [beta, 3, 'b']] as const) {
-      mkdirSync(join(p, '.hive'), { recursive: true })
-      writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: agentsOf(n, prefix) }))
+      mkdirSync(join(p, '.combwork'), { recursive: true })
+      writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: agentsOf(n, prefix) }))
     }
-    mkdirSync(join(wsPath, '.hive', 'templates'), { recursive: true })
+    mkdirSync(join(wsPath, '.combwork', 'templates'), { recursive: true })
     const crewOf = (n: number, prefix = 'T') => Array.from({ length: n }, (_, i) => ({ name: `${prefix}${i + 1}`, role: 'builder', provider: 'claude-code' }))
-    const write = (file: string, t: object) => writeFileSync(join(wsPath, '.hive', 'templates', file), JSON.stringify({ version: 2, layout: 'auto', ...t }))
+    const write = (file: string, t: object) => writeFileSync(join(wsPath, '.combwork', 'templates', file), JSON.stringify({ version: 2, layout: 'auto', ...t }))
     write('crew.json', { name: 'Crew', agents: crewOf(14) })
     // HI-2058: a template's own Maximum agents (20, for 12 agents), one with no maximum, one whose maximum is under its agents.
     write('twenty.json', { name: 'Twenty', agents: crewOf(12, 'W'), workflow: { none: { preset: null, options: { maxAgents: 20 } } } })

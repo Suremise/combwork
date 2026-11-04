@@ -20,7 +20,7 @@ const userData = path.join(lib.WORK, 'connectionapi-profile')
 const home = path.join(lib.WORK, 'connectionapi-claude-home')
 const ws = path.join(lib.WORK, 'connectionapi-ws')
 const alpha = path.join(ws, 'alpha')
-const assistantHome = path.join(ws, '.hive', 'assistant')
+const assistantHome = path.join(ws, '.combwork', 'assistant')
 const accountsRoot = path.join(userData, 'accounts')
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -38,8 +38,8 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   lib.gitProject(alpha)
-  fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }] }))
+  fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }] }))
 
   const { app, page } = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_CLI_HOME_CONNECTION: '0' }, viewport: { width: 1400, height: 900 } })
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])

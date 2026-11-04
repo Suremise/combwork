@@ -41,7 +41,7 @@ const assistantOnly = bundledForAssistant.length + 1
   const { app, page, inv } = await lib.launch({ userData, viewport: { width: 1300, height: 850 } })
   page.on('pageerror', (e) => console.log('FAIL page error', e.message))
   await lib.openWorkspace(inv, page, ws)
-  const skillsDir = path.join(ws, '.hive', 'skills')
+  const skillsDir = path.join(ws, '.combwork', 'skills')
   skill(skillsDir, 'weekly-report', 'assistant')
   skill(skillsDir, 'both-ways', 'all')
   skill(skillsDir, 'plain')

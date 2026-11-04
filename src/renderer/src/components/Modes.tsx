@@ -11,15 +11,15 @@ import { Icon, IconButton, Tooltip } from './ui'
 import { msg, tr } from '@shared/i18n'
 
 /**
- * The Hive Assistant's modes: the workspace's Markdown files in .hive/modes, each how the
+ * The Hive Assistant's modes: the workspace's Markdown files in .combwork/modes, each how the
  * Assistant works, in its own words. Listed in the sidebar and edited in the main area; Hive's own four can be restored.
  */
 
-export const MODES_TIP = msg({ id: 'assistant.modes.tip', defaultMessage: "A mode is how the Assistant works: what it puts first and how it hands things back, in a Markdown file in the workspace (.hive/modes). The panel's mode menu switches between them at once, keeping the conversation; Settings → Assistant sets the default.", description: 'Tooltip on the Modes section of the Assistant view. Keep .hive/modes as it is.' })
+export const MODES_TIP = msg({ id: 'assistant.modes.tip', defaultMessage: "A mode is how the Assistant works: what it puts first and how it hands things back, in a Markdown file in the workspace (.combwork/modes). The panel's mode menu switches between them at once, keeping the conversation; Settings → Assistant sets the default.", description: 'Tooltip on the Modes section of the Assistant view. Keep .combwork/modes as it is.' })
 
 const M = {
   newTitle: msg({ id: 'assistant.modes.newTitle', defaultMessage: 'New Mode', description: "The title of the dialog that creates an Assistant mode (a Markdown file)." }),
-  newMessage: msg({ id: 'assistant.modes.newMessage', defaultMessage: 'Creates {file} in the workspace, to describe in your own words how the Assistant should work.', description: 'The New Mode dialog. {file} is .hive/modes/<name>.md, <name> standing for the name you type.' }),
+  newMessage: msg({ id: 'assistant.modes.newMessage', defaultMessage: 'Creates {file} in the workspace, to describe in your own words how the Assistant should work.', description: 'The New Mode dialog. {file} is .combwork/modes/<name>.md, <name> standing for the name you type.' }),
   namePlaceholder: msg({ id: 'assistant.modes.namePlaceholder', defaultMessage: 'Mode name', description: "The New Mode dialog: the name box's placeholder." }),
   create: msg({ id: 'assistant.modes.create', defaultMessage: 'Create', description: 'The New Mode dialog: its button.' }),
   lettersOrNumbers: msg({ id: 'assistant.modes.lettersOrNumbers', defaultMessage: 'Use letters or numbers.', description: "The New Mode dialog: a name with neither letters nor numbers can't be used." }),
@@ -53,7 +53,7 @@ const M = {
 export async function createMode(): Promise<void> {
   const name = await prompt({
     title: tr(M.newTitle),
-    message: tr(M.newMessage, { file: '.hive/modes/<name>.md' }),
+    message: tr(M.newMessage, { file: '.combwork/modes/<name>.md' }),
     placeholder: tr(M.namePlaceholder),
     confirmLabel: tr(M.create),
     validate: (v) => (/[a-z0-9]/i.test(v) ? null : tr(M.lettersOrNumbers))

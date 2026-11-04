@@ -327,7 +327,7 @@ describe('saving and loading templates', () => {
   const alpha = join(wsPath, 'alpha')
   const beta = join(wsPath, 'beta')
   const git = (cwd: string, ...a: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { cwd, stdio: 'pipe' })
-  const cfgOf = (p: string) => JSON.parse(readFileSync(join(p, '.hive', 'project.json'), 'utf8'))
+  const cfgOf = (p: string) => JSON.parse(readFileSync(join(p, '.combwork', 'project.json'), 'utf8'))
   /** A project's layout, as this user's view of it has it (HI-1749: not in project.json). */
   const layoutOf = async (p: string) => (await run(() => w.projectConfig(p))).layout
   let legacyNo = 0
@@ -342,7 +342,7 @@ describe('saving and loading templates', () => {
     git(p, 'worktree', 'add', '-q', '-b', branch, path, 'main')
     const cfg = cfgOf(p)
     const def: StoredAgent = { id: `a-legacy${legacyNo}`, name, provider: 'claude-code', worktree: { path, branch, base: 'main' }, ...(cfg.worktreeSetup?.trim() ? { needsSetup: true } : {}) }
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ ...cfg, agents: [...cfg.agents, def] }))
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ ...cfg, agents: [...cfg.agents, def] }))
     return def
   }
   const names = (p: string) => cfgOf(p).agents.map((a: StoredAgent) => a.name)
@@ -354,14 +354,14 @@ describe('saving and loading templates', () => {
   const held: (() => void)[] = []
   beforeAll(async () => {
     for (const p of [alpha, beta]) {
-      mkdirSync(join(p, '.hive'), { recursive: true })
+      mkdirSync(join(p, '.combwork'), { recursive: true })
       execFileSync('git', ['init', '-q', '-b', 'main', p])
       writeFileSync(join(p, 'a.txt'), 'a')
       git(p, 'add', '.')
       git(p, 'commit', '-qm', 'a')
     }
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, layout: 'columns2', agents: [{ id: 'a1', name: 'Builder', role: 'builder', provider: 'claude-code', model: 'opus' }, { id: 'a2', name: 'Reviewer', provider: 'claude-code' }] }))
-    writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [{ id: 'b1', name: 'Old', provider: 'claude-code' }] }))
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, layout: 'columns2', agents: [{ id: 'a1', name: 'Builder', role: 'builder', provider: 'claude-code', model: 'opus' }, { id: 'a2', name: 'Reviewer', provider: 'claude-code' }] }))
+    writeFileSync(join(beta, '.combwork', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [{ id: 'b1', name: 'Old', provider: 'claude-code' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     providersOn()
@@ -396,11 +396,11 @@ describe('saving and loading templates', () => {
     // Another name whose file name would be the same: a file of its own.
     const other = await run(() => templates.saveTemplate(alpha, 'workspace', 'pair!'))
     expect('saved' in other && other.saved.file).toBe('pair-2.json')
-    expect(existsSync(join(wsPath, '.hive', 'templates', 'pair.json.bak'))).toBe(true)
+    expect(existsSync(join(wsPath, '.combwork', 'templates', 'pair.json.bak'))).toBe(true)
   })
 
   it('a damaged template is recovered from its copy; one past saving is listed with why it cannot be used', async () => {
-    const dir = join(wsPath, '.hive', 'templates')
+    const dir = join(wsPath, '.combwork', 'templates')
     writeFileSync(join(dir, 'pair.json'), '{ damaged')
     const old = new Date(Date.now() - 60_000) // damaged a while ago, not a save stalled a moment ago (#1601)
     utimesSync(join(dir, 'pair.json'), old, old)
@@ -459,7 +459,7 @@ describe('saving and loading templates', () => {
     await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', before, undefined, B, { roles: { builders: 'c-cc' }, agents: { Tester: 'c-cc' } } as never))).rejects.toThrow(/don't fit its agents: role builders and agent Tester/)
     // The template changed after the dialog showed it (HR3's round 2): Reviewer renamed, so its choice names none of its
     // agents now and is refused; never given to the agent in its place.
-    const file = join(wsPath, '.hive', 'templates', 'pair-2.json')
+    const file = join(wsPath, '.combwork', 'templates', 'pair-2.json')
     const kept = readFileSync(file, 'utf8')
     const t = JSON.parse(kept)
     writeFileSync(file, JSON.stringify({ ...t, agents: [t.agents[0], { ...t.agents[1], name: 'Checker' }], pairs: [{ builder: t.agents[0].name, reviewer: 'Checker' }] }))
@@ -590,8 +590,8 @@ describe('saving and loading templates', () => {
   })
 
   gitIt('staged, then published at once: a failure part-way leaves the project as it was, and no worktree is made', async () => {
-    mkdirSync(join(alpha, '.hive', 'templates'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'templates', 'trees.json'), JSON.stringify(v2({ name: 'Trees', layout: 'rows2', agents: [{ name: 'Tree A', provider: 'claude-code' }, { name: 'Tree B', provider: 'claude-code', role: 'reviewer', note: 'checks' }] })))
+    mkdirSync(join(alpha, '.combwork', 'templates'), { recursive: true })
+    writeFileSync(join(alpha, '.combwork', 'templates', 'trees.json'), JSON.stringify(v2({ name: 'Trees', layout: 'rows2', agents: [{ name: 'Tree A', provider: 'claude-code' }, { name: 'Tree B', provider: 'claude-code', role: 'reviewer', note: 'checks' }] })))
     // The project's own one-time accounts migration (HI-2106), which a load's agents wait on, first.
     await run(() => ensureMigrated(alpha))
     const before = cfgOf(alpha)
@@ -767,8 +767,8 @@ describe('saving and loading templates', () => {
     const imported = await run(() => templates.importTemplate(later, where))
     const t = 'imported' in imported ? imported.imported : null
     expect(t?.agents.map((a) => a.provider)).toEqual(['claude-code', 'gemini'])
-    expect(readFileSync(join(wsPath, '.hive', 'templates', t!.file), 'utf8')).not.toMatch(/author|someone/)
-    expect(readFileSync(join(wsPath, '.hive', 'templates', t!.file), 'utf8')).not.toMatch(/g-1|model/)
+    expect(readFileSync(join(wsPath, '.combwork', 'templates', t!.file), 'utf8')).not.toMatch(/author|someone/)
+    expect(readFileSync(join(wsPath, '.combwork', 'templates', t!.file), 'utf8')).not.toMatch(/g-1|model/)
     // Only a suggestion (HI-2109): G gets the first connection usable here, never a refusal.
     const plan = await run(() => templates.templatePlan(beta, 'workspace', t!.file))
     expect([plan.blocked, plan.create.map((a) => a.provider)]).toEqual([[], ['claude-code', 'gemini']])
@@ -777,7 +777,7 @@ describe('saving and loading templates', () => {
   gitIt("a project's template loads into another project (from the Templates view), every agent in that project's folder (#268, #1436)", async () => {
     // alpha has a worktree agent of its own (from 0.9); beta has a setup command (which a load no longer runs: no worktrees).
     const source = legacyAgent(alpha, 'Alpha tree', 'hive/tree-a')
-    writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfgOf(beta), worktreeSetup: 'npm install' }))
+    writeFileSync(join(beta, '.combwork', 'project.json'), JSON.stringify({ ...cfgOf(beta), worktreeSetup: 'npm install' }))
     const ids = cfgOf(beta).agents.map((a: StoredAgent) => a.id)
     const branches = git(beta, 'branch', '--list').toString()
     const trees = git(beta, 'worktree', 'list', '--porcelain').toString()
@@ -847,7 +847,7 @@ describe('saving and loading templates', () => {
   })
 
   it('edits a template where it is kept (#271): agents added, changed, reordered and removed, its name, description and layout; checked first; refused if it changed meanwhile or the name is taken', async () => {
-    const dir = join(alpha, '.hive', 'templates')
+    const dir = join(alpha, '.combwork', 'templates')
     writeFileSync(join(dir, 'edit-me.json'), JSON.stringify(v2({ name: 'Edit me', savedAt: '2026-10-06T10:00:00.000Z', layout: 'auto', agents: [{ name: 'One', provider: 'claude-code' }, { name: 'Two', provider: 'claude-code', role: 'reviewer' }, { name: 'Three', provider: 'claude-code' }], pairs: [{ builder: 'One', reviewer: 'Two' }], suggestedPreset: 'pair' })))
     const ref = { scope: 'project' as const, project: alpha, file: 'edit-me.json' }
     const edited = {
@@ -911,12 +911,12 @@ describe('saving and loading templates', () => {
     expect(pending(), state(keeperGone)).toContain(placeKey(keeper.worktree!.path))
     // Its setup done: removed, its worktree kept, nothing remembered.
     const done = legacyAgent(beta, 'Done')
-    writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfgOf(beta), agents: cfgOf(beta).agents.map((a: StoredAgent) => (a.id === done.id ? { ...a, needsSetup: false } : a)) }))
+    writeFileSync(join(beta, '.combwork', 'project.json'), JSON.stringify({ ...cfgOf(beta), agents: cfgOf(beta).agents.map((a: StoredAgent) => (a.id === done.id ? { ...a, needsSetup: false } : a)) }))
     const doneGone = await run(() => removeAgent(beta, done.id, { deleteWorktree: false }))
     expect(pending(), state(doneGone)).not.toContain(placeKey(done.worktree!.path))
     // A worktree another agent still works in is that agent's: nothing is remembered for it.
     const shared = legacyAgent(beta, 'Sharer')
-    writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfgOf(beta), agents: [...cfgOf(beta).agents, { ...shared, id: 'a-twin', name: 'Twin' }] }))
+    writeFileSync(join(beta, '.combwork', 'project.json'), JSON.stringify({ ...cfgOf(beta), agents: [...cfgOf(beta).agents, { ...shared, id: 'a-twin', name: 'Twin' }] }))
     const sharedGone = await run(() => removeAgent(beta, shared.id, { deleteWorktree: false }))
     expect(pending(), state(sharedGone)).not.toContain(placeKey(shared.worktree!.path))
     // Remove All (#291): one with work of its own is kept, so remembered; a merged, clean one is deleted, and forgotten.
@@ -929,7 +929,7 @@ describe('saving and loading templates', () => {
     expect(pending(), state(busyGone)).toContain(placeKey(busy.worktree!.path))
     const neat = legacyAgent(beta, 'Neat')
     // (Listed, as a worktree kept from before would be: deleting it takes it off the list.)
-    writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfgOf(beta), setupPending: [...(cfgOf(beta).setupPending ?? []), neat.worktree!.path] }))
+    writeFileSync(join(beta, '.combwork', 'project.json'), JSON.stringify({ ...cfgOf(beta), setupPending: [...(cfgOf(beta).setupPending ?? []), neat.worktree!.path] }))
     expect(pending(), state()).toContain(placeKey(neat.worktree!.path))
     const neatGone = await run(() => removeAgent(beta, neat.id, { deleteWorktree: 'merged-clean', mergedInto: 'main' }))
     expect(neatGone.worktree?.deleted, `kept, and why (HI-1812): ${state(neatGone)}`).toBe(true)
@@ -968,7 +968,7 @@ describe('saving and loading templates', () => {
       writeFileSync(f, JSON.stringify(v2({ name, agents: [{ name: 'A', provider: 'claude-code' }] })))
       return f
     }
-    const wsDir = join(wsPath, '.hive', 'templates')
+    const wsDir = join(wsPath, '.combwork', 'templates')
     const namesIn = (d: string): string[] => readdirSync(d).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(d, f), 'utf8')).name).sort()
     // Two names whose file name is the same ("concurrent-one.json"): two files, both kept.
     const [one, two] = await Promise.all([run(() => templates.importTemplate(file('Concurrent One'), { scope: 'workspace' })), run(() => templates.importTemplate(file('Concurrent One!'), { scope: 'workspace' }))])
@@ -1004,7 +1004,7 @@ describe("a template's workflow (HI-1910)", () => {
   const gitB = join(wsPath, 'gitb')
   const plain = join(wsPath, 'plain')
   const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
-  const fileOf = (name: string) => JSON.parse(readFileSync(join(wsPath, '.hive', 'templates', name), 'utf8'))
+  const fileOf = (name: string) => JSON.parse(readFileSync(join(wsPath, '.combwork', 'templates', name), 'utf8'))
   beforeAll(async () => {
     const repo = (p: string, who: string) => {
       execFileSync('git', ['init', '-q', '-b', 'main', p])
@@ -1014,14 +1014,14 @@ describe("a template's workflow (HI-1910)", () => {
       execFileSync('git', ['add', '.'], { cwd: p })
       execFileSync('git', ['commit', '-qm', 'a'], { cwd: p })
     }
-    for (const p of [gitA, gitB, plain]) mkdirSync(join(p, '.hive'), { recursive: true })
+    for (const p of [gitA, gitB, plain]) mkdirSync(join(p, '.combwork'), { recursive: true })
     repo(gitA, 'A')
     repo(gitB, 'B')
     // A: Team, made its own: its target, commands, identity, stage names and loops. B: its own target and one command.
     const a = { review: 'agent', noSelfReview: true, preChecks: ['lint', 'unit'], commands: { lint: 'npm run lint', unit: 'npm test' }, target: 'stable-line', identity: { name: 'A Person', email: 'a@example.com' }, stageNames: { review: 'Checking' }, loopRounds: 4, fileLocks: 'block' }
-    writeFileSync(join(gitA, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'wa1', name: 'WA-B1', workflowRole: 'builder', provider: 'claude-code' }], workflow: { platform: 'git', preset: 'team', options: a } }))
-    writeFileSync(join(gitB, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [], workflow: { platform: 'git', preset: null, options: { target: 'main', commands: { lint: 'pnpm lint' } } } }))
-    writeFileSync(join(plain, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'wp1', name: 'WP-B1', workflowRole: 'builder', provider: 'claude-code' }] }))
+    writeFileSync(join(gitA, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'wa1', name: 'WA-B1', workflowRole: 'builder', provider: 'claude-code' }], workflow: { platform: 'git', preset: 'team', options: a } }))
+    writeFileSync(join(gitB, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [], workflow: { platform: 'git', preset: null, options: { target: 'main', commands: { lint: 'pnpm lint' } } } }))
+    writeFileSync(join(plain, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'wp1', name: 'WP-B1', workflowRole: 'builder', provider: 'claude-code' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     providersOn()
@@ -1059,9 +1059,9 @@ describe("a template's workflow (HI-1910)", () => {
     expect(wf.overlay!.missingCommands).toEqual(['unit'])
     expect(JSON.stringify(wf)).not.toMatch(/stable-line|npm run lint|A Person|a@example\.com/)
     // Nothing is saved by the plan, nor by the load: B's options are as they were.
-    const before = readFileSync(join(gitB, '.hive', 'project.json'), 'utf8')
+    const before = readFileSync(join(gitB, '.combwork', 'project.json'), 'utf8')
     await run(() => templates.loadTemplate(gitB, 'workspace', 'team-a.json', [], undefined, ['WB-B1']))
-    expect(JSON.parse(readFileSync(join(gitB, '.hive', 'project.json'), 'utf8')).workflow).toEqual(JSON.parse(before).workflow)
+    expect(JSON.parse(readFileSync(join(gitB, '.combwork', 'project.json'), 'utf8')).workflow).toEqual(JSON.parse(before).workflow)
   })
 
   it("a Git-only template in a project with no version control needs Git first; one with both uses None's there, and says it has Git's", async () => {
@@ -1098,12 +1098,12 @@ describe("a template's workflow (HI-1910)", () => {
   it('a load returns the workflow section it read, for the window to check against the one it showed', async () => {
     await run(() => templates.saveTemplate(gitA, 'workspace', 'Rounds'))
     const plan = await run(() => templates.templatePlan(gitB, 'workspace', 'rounds.json'))
-    const f = join(wsPath, '.hive', 'templates', 'rounds.json')
+    const f = join(wsPath, '.combwork', 'templates', 'rounds.json')
     const t = JSON.parse(readFileSync(f, 'utf8'))
     // Changed after the plan was shown: the load reads it as it is now, and says so.
     t.workflow.git.options.loopRounds = 8
     writeFileSync(f, JSON.stringify(t))
-    const ids = JSON.parse(readFileSync(join(gitB, '.hive', 'project.json'), 'utf8')).agents.map((a: { id: string }) => a.id)
+    const ids = JSON.parse(readFileSync(join(gitB, '.combwork', 'project.json'), 'utf8')).agents.map((a: { id: string }) => a.id)
     const r = await run(() => templates.loadTemplate(gitB, 'workspace', 'rounds.json', ids, undefined, ['RD-B1']))
     expect(plan.workflow?.section?.options.loopRounds).toBe(4)
     expect(r.workflow?.options.loopRounds).toBe(8)

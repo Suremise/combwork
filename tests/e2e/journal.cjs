@@ -20,7 +20,7 @@ const check = (name, ok, extra = '') => {
 }
 const saved = () => {
   try {
-    return JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'workspace.json'), 'utf8')).journal ?? null
+    return JSON.parse(fs.readFileSync(path.join(ws, '.combwork', 'workspace.json'), 'utf8')).journal ?? null
   } catch {
     return null
   }
@@ -116,7 +116,7 @@ const saved = () => {
     await page.screenshot({ path: path.join(lib.WORK, 'journal-delete.png') })
     await ask.getByRole('button', { name: 'Delete', exact: true }).click()
     check('…then it is gone: no journal yet', !!(await lib.until(async () => /No journal yet/.test(await panel.innerText()), HUNG_MS)))
-    check('…its file in the trash', !!(await lib.until(() => lib.trashed(path.join('journal-ws', '.hive', 'assistant', 'journal.db')).length >= 1, HUNG_MS)))
+    check('…its file in the trash', !!(await lib.until(() => lib.trashed(path.join('journal-ws', '.combwork', 'assistant', 'journal.db')).length >= 1, HUNG_MS)))
     check('the settings stay as they were', saved()?.enabled === true && saved()?.scope?.includes('preference'))
   } finally {
     await app.close()

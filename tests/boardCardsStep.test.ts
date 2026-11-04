@@ -50,8 +50,8 @@ async function close(w: WS): Promise<void> {
 /** A workspace folder with a project `p`. */
 function workspace(): string {
   const ws = join(base, `ws-${++n}`)
-  mkdirSync(join(ws, 'p', '.hive'), { recursive: true })
-  writeFileSync(join(ws, 'p', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+  mkdirSync(join(ws, 'p', '.combwork'), { recursive: true })
+  writeFileSync(join(ws, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
   return ws
 }
 
@@ -242,20 +242,20 @@ describe('the cards step (#1209)', () => {
     await close(w)
     const file = store.boardFile(ws)
     const version = versionOf(file)
-    const copies = readdirSync(join(ws, '.hive', 'backups')).sort()
+    const copies = readdirSync(join(ws, '.combwork', 'backups')).sort()
     w = await open(ws)
     const second = await readers(w, numbers, join(base, `export-${n}-2`))
     await close(w)
     expect(versionOf(file)).toBe(version)
-    expect(readdirSync(join(ws, '.hive', 'backups')).sort()).toEqual(copies)
+    expect(readdirSync(join(ws, '.combwork', 'backups')).sort()).toEqual(copies)
     expect(second).toEqual(first)
   })
 
   it('a new workspace takes the step with no cards, and moves its card files straight into the tables', async () => {
     const ws = workspace()
-    mkdirSync(join(ws, '.hive', 'tasks'), { recursive: true })
-    writeFileSync(join(ws, '.hive', 'tasks', '7.json'), JSON.stringify(ODD[901]).replace('"number":901', '"number":7'))
-    writeFileSync(join(ws, '.hive', 'tasks', 'board.json'), JSON.stringify({ version: 1, next: 8 }))
+    mkdirSync(join(ws, '.combwork', 'tasks'), { recursive: true })
+    writeFileSync(join(ws, '.combwork', 'tasks', '7.json'), JSON.stringify(ODD[901]).replace('"number":901', '"number":7'))
+    writeFileSync(join(ws, '.combwork', 'tasks', 'board.json'), JSON.stringify({ version: 1, next: 8 }))
     const w = await open(ws)
     const doc = await inWorkspace(w, () => store.cardDoc(w, 7))
     expect(JSON.stringify(doc)).toBe(JSON.stringify(ODD[901]).replace('"number":901', '"number":7'))
@@ -267,7 +267,7 @@ describe('the cards step (#1209)', () => {
   it.skipIf(!golden)("a live board's copy: every reader gives the same bytes after the upgrade", { timeout: 600_000 }, async () => {
     const ws = workspace()
     const file = store.boardFile(ws)
-    mkdirSync(join(ws, '.hive'), { recursive: true })
+    mkdirSync(join(ws, '.combwork'), { recursive: true })
     copyFileSync(golden!, file)
     if (existsSync(`${golden}-wal`)) copyFileSync(`${golden}-wal`, `${file}-wal`)
     // Every card number of the copy, read on a connection of its own.
@@ -306,8 +306,8 @@ describe('the board read on one snapshot (#1209 round 1)', () => {
 
   async function board(): Promise<{ ws: string; w: WS; a: number; b: number }> {
     const ws = workspace()
-    mkdirSync(join(ws, 'q', '.hive'), { recursive: true })
-    writeFileSync(join(ws, 'q', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a2', name: 'Agent 2' }] }))
+    mkdirSync(join(ws, 'q', '.combwork'), { recursive: true })
+    writeFileSync(join(ws, 'q', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a2', name: 'Agent 2' }] }))
     const w = await open(ws)
     const [a, b] = await inWorkspace(w, async () => {
       const first = await tasks.createTask({ title: 'Old title', project: 'p', agent: 'a1' }, user)

@@ -164,12 +164,12 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
   await p2.locator('.titlebar-pin').click()
   check('pinning and unpinning the second leaves the first on', (await lib.until(() => both(p2, false), 5000)) && (await both(p1, true)))
 
-  // --- Remembered by workspace, in Hive's own config (never the workspace's .hive).
+  // --- Remembered by workspace, in Hive's own config (never the workspace's .combwork).
   await lib.until(() => (JSON.parse(fs.readFileSync(cfgFile, 'utf8')).alwaysOnTop ?? {})[wsA.toLowerCase()] === true, 5000)
   const saved = JSON.parse(fs.readFileSync(cfgFile, 'utf8')).alwaysOnTop ?? {}
   check("config.json remembers A's pin only", saved[wsA.toLowerCase()] === true && !(wsB.toLowerCase() in saved), JSON.stringify(saved))
-  const inHive = [wsA, wsB].some((ws) => fs.readdirSync(path.join(ws, '.hive'), { recursive: true }).some((f) => /alwaysOnTop/.test(fs.statSync(path.join(ws, '.hive', String(f))).isFile() ? fs.readFileSync(path.join(ws, '.hive', String(f)), 'utf8') : '')))
-  check("…and no workspace's .hive does", !inHive)
+  const inHive = [wsA, wsB].some((ws) => fs.readdirSync(path.join(ws, '.combwork'), { recursive: true }).some((f) => /alwaysOnTop/.test(fs.statSync(path.join(ws, '.combwork', String(f))).isFile() ? fs.readFileSync(path.join(ws, '.combwork', String(f)), 'utf8') : '')))
+  check("…and no workspace's .combwork does", !inHive)
 
   // --- The welcome page is off; the workspace's pin comes back with it.
   await inv1('workspace:close')

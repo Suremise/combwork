@@ -1,7 +1,7 @@
 // Screenshot cases for the `git` area (#804): the Git tab without a repository and its Initialise dialog, History
 // (commits and tags), Branches & remotes (upstream, branches, remotes, worktrees, commit identity), its forms (each
 // checked to follow a change of language while it is open), the failed-load and failed-refresh notes, the status
-// bar's tooltip and the .hive notice with its Untrack dialog, reached for the i18nshots route (#756's design, section
+// bar's tooltip and the .combwork notice with its Untrack dialog, reached for the i18nshots route (#756's design, section
 // 4) with locale-independent means only: git run on the project, IPC failures (HIVE_TEST_FAIL_IPC), the
 // language-changed event, command ids and structural hooks (data-section, data-action, data-git-*, classes), never
 // English text. See tests/e2e/i18nshots.cjs for ctx.
@@ -204,17 +204,17 @@ async function statusBar(ctx) {
   return null
 }
 
-/** The .hive notice in Project Settings: a file in .hive committed to git. */
+/** The .combwork notice in Project Settings: a file in .combwork committed to git. */
 async function hiveNotice(ctx) {
   const { page, inv, project } = ctx
   await page.mouse.move(5, 5)
-  fs.mkdirSync(path.join(project, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(project, '.hive', 'committed.txt'), 'by mistake\n')
-  git(ctx, 'add', '-f', '.hive/committed.txt')
-  git(ctx, 'commit', '-qm', 'Commit a file in .hive')
+  fs.mkdirSync(path.join(project, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(project, '.combwork', 'committed.txt'), 'by mistake\n')
+  git(ctx, 'add', '-f', '.combwork/committed.txt')
+  git(ctx, 'commit', '-qm', 'Commit a file in .combwork')
   await inv('workspace:refresh')
   await ctx.command('project.tab.settings')
-  return shown(ctx, page.locator('.hive-vcs-notice').first(), 'the .hive notice')
+  return shown(ctx, page.locator('.hive-vcs-notice').first(), 'the .combwork notice')
 }
 
 /** Its Untrack… asks first, listing the files. */
