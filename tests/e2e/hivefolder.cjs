@@ -103,8 +103,8 @@ function folders() {
     // Shown as the window shows an image (hive-img:, which the page's policy allows for images).
     const shown = (p) => page.evaluate((src) => new Promise((res) => {
       const img = new Image()
-      img.onload = () => res(img.naturalWidth)
-      img.onerror = () => res(0)
+      img.addEventListener('load', () => res(img.naturalWidth), { once: true })
+      img.addEventListener('error', () => res(0), { once: true })
       img.src = `hive-img://img/${encodeURIComponent(src)}`
     }), p)
     const width = await shown(shot('.hive'))
