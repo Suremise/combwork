@@ -133,7 +133,24 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main', style: 'merge', preChecks: [], mergeChecks: [], okBefore: { mode: 'never', labels: [] } } })
     const card = await inv('tasks:create', { title: 'Keep the broker slot across restarts', project: 'alpha' })
     await inv('tasks:start', card.number, { kind: 'agent', agentId: b1.id })
-    const s1 = await until(async () => ((await idle(b1.id)) ? live(b1.id) : null), HUNG_MS)
+    // A new session can report ready before it takes the task wake. Observe this card's prompt and reply, its turn
+    // over, and the fake's finished screen before typing anything else (HI-2479 review: hidden-linger was dropped).
+    const prompts = lib.fakePrompts(inv, key, () => live(b1.id), { home, hungMs: HUNG_MS })
+    const initialPrompt = await until(async () => {
+      const s = await live(b1.id)
+      if (!s?.sessionId) return null
+      const transcript = await inv('transcript:read', alpha, s.sessionId).catch(() => null)
+      return transcript?.items.find((item) => item.kind === 'user' && item.text.includes(card.key))?.text ?? null
+    }, HUNG_MS)
+    const initialTurn = initialPrompt && await prompts.over({ text: initialPrompt, before: null, items: 0 })
+    check(`${card.key}'s initial task prompt was consumed and answered, with its turn over`, !!initialTurn)
+    if (!initialTurn) throw new Error('the initial card prompt was not answered')
+    const s1 = await until(async () => {
+      const s = await live(b1.id)
+      return s?.turn?.id === initialTurn && await idle(b1.id) && await prompts.takesPrompts() ? s : null
+    }, HUNG_MS)
+    check('the initial card turn is idle and its finished screen takes the broker prompt', !!s1, JSON.stringify(s1))
+    if (!s1) throw new Error('the initial card turn did not finish before the broker prompt')
     check('B1 runs in slot-a', s1?.slot === 'slot-a', JSON.stringify(s1))
     const lent = await slotA()
     check(`${card.key} is lent slot-a for B1`, !!lent?.lease?.id && lent.lease.card === card.number && lent.lease.agent === b1.id, JSON.stringify(lent))
