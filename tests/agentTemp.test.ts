@@ -158,4 +158,10 @@ describe('withAgentTemp', () => {
     expect(out).toEqual({ Path: 'C:\\x', CLAUDE_CODE_TMPDIR: 'C:\\mine', TEMP: 'D:\\t\\alpha-1\\a-1', TMP: 'D:\\t\\alpha-1\\a-1', TMPDIR: 'D:\\t\\alpha-1\\a-1' })
     expect(env.temp).toBe('C:\\Users\\u\\AppData\\Local\\Temp')
   })
+  it("reaches Copilot's launch: its environment step keeps them, stripping only its token variables", async () => {
+    const { copilotEnv } = await import('../src/main/providers/copilot/home')
+    const out = copilotEnv(withAgentTemp({ GH_TOKEN: 'x', TEMP: 'C:\\old' }, 'D:\\t\\p-1\\c-1'), true, true)
+    expect(out).toMatchObject({ TEMP: 'D:\\t\\p-1\\c-1', TMP: 'D:\\t\\p-1\\c-1', TMPDIR: 'D:\\t\\p-1\\c-1' })
+    expect(out.GH_TOKEN).toBeUndefined()
+  })
 })
