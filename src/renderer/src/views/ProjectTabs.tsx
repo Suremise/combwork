@@ -1484,7 +1484,7 @@ export function ProjectSkillsTab({ project }: { project: ProjectInfo }) {
 
   return (
     <div className="split">
-      <div className="split-list" style={{ width: listWidth }}>
+      <div className="split-list skills-list" style={{ width: listWidth }}>
         <PaneResizer paneKey="projectSkills" max={600} />
         <div className="pane-header" style={{ paddingLeft: 14 }}>
           {tr(C.skillsHeading)}

@@ -26,6 +26,7 @@
 
 ### Fixed
 
+- **Files and Skills read in a narrow window** (HI-2533). With nothing selected, a project's Files and Skills tabs explain what to do beside their list, but in a narrow window (900 px with the sidebar open) the list took most of the room and the explanation became a thin column, a word or two a line. The list now gives way so the explanation keeps a readable width, and empty messages elsewhere keep less padding at their sides when space is short.
 - **Folder lists in Settings keep what you type** (HI-2538). Card attachments: more folders and Agents' temp folder take folders separated by semicolons, but the box and the Assistant showed a space after each semicolon that you hadn't typed. The box now shows the folders `;` apart, as you typed them, and `a; b` and `a;b` are the same list. Only a semicolon separates folders: a comma is kept as part of a folder's name.
 - **Settings' sections can be chosen from the keyboard** (HI-2532). Tab skipped the list of sections in Settings and Project Settings, so only the mouse could change section. Tab now reaches it, the arrow keys, Home and End move through the sections, and Enter or Space opens one.
 - **Settings section names cut short show in full on hover** (HI-2531). In a narrow window, Settings and Project Settings cut long section names ("Accounts & C…", "Keyboard Sho…"); hovering one now shows its whole name in a tooltip, and the list keeps its compact rows.
