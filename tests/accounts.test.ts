@@ -1156,9 +1156,12 @@ describe("a workspace's accounts", () => {
       // Fresh, and of the login as it is now: asked again after the rewrite, not the answer read during it.
       expect(await accounts.confirmAccount(a.id)).toMatchObject({ fresh: true, observed: { email: 'else@example.com' } })
       expect(n).toBeGreaterThanOrEqual(2)
-      // Rewritten during every check: never fresh.
+      // Rewritten during every check: never fresh. Each rewrite a length of its own (HI-2505): the stamp is the file's id,
+      // size and write time, never its text, and two rewrites of one size back to back (each check's comes right after the
+      // one before) can share a write time, so a same-size rewrite could leave the stamp as it was.
+      let rewrites = 0
       status.set(folderOf(a), async () => {
-        writeFileSync(join(folderOf(a), '.credentials.json'), `{"token":"${Math.random()}${Date.now()}"}`)
+        writeFileSync(join(folderOf(a), '.credentials.json'), `{"token":"${'x'.repeat(++rewrites)}"}`)
         accounts.accountFolderEvent(a.id, null)
         return { ok: true, loggedIn: true, email: 'moving@example.com', orgId: 'org-1' }
       })
