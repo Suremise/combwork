@@ -205,7 +205,7 @@ export function OneLineTitle({ text, className }: { text: string; className?: st
 export function OneLineDesc({ text, className }: { text: string | null | undefined; className?: string }) {
   const [ref, clipped] = useClipped<HTMLDivElement>()
   return (
-    <div ref={ref} className={cx('desc one-line-desc', className)}>
+    <div ref={ref} className={cx(/* i18n-ignore: class names */ 'desc one-line-desc', className)}>
       <Tooltip content={clipped && text ? text : null}>{text}</Tooltip>
     </div>
   )
