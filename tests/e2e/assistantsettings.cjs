@@ -267,7 +267,7 @@ const check = (name, ok, extra = '') => {
   check('it resets the API prices', await say('hive cw_update_setting {"id":"claude-code.prices","value":null}'))
   check("…and the removed model has Hive's price again", (await removedNow()) === '[]', await removedNow())
   const reset = panel.locator('.assistant-action', { hasText: 'API prices' }).first()
-  const putBack = /claude-opus-4-8: removed → claude-opus-4-8: Hive's price/
+  const putBack = /claude-opus-4-8: removed → claude-opus-4-8: Combwork's price/
   const resetText = await showsText('the prices reset', reset, putBack)
   check('…listed as the model put back', putBack.test(resetText), resetText)
   await reset.getByRole('button', { name: /^Undo: / }).click()
