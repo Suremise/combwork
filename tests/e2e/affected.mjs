@@ -565,7 +565,7 @@ export const AREAS = [
   { paths: ['src/main/dialects/', 'tests/e2e/dialectlaunch.cjs'], suites: ['dialectlaunch', 'agentguidance', 'dialectsview'] },
   // The Dialects view (HI-2444): its list, a file's texts and layers, Save's checks, the JSON tab, the file actions,
   // Agent Settings' Dialect.
-  { paths: ['src/renderer/src/components/Dialects.tsx', 'src/shared/dialects.ts', 'tests/e2e/dialectsview.cjs'], suites: ['dialectsview'] },
+  { paths: ['src/renderer/src/components/Dialects.tsx', 'src/renderer/src/components/dialectOnTip.ts', 'src/shared/dialects.ts', 'tests/e2e/dialectsview.cjs'], suites: ['dialectsview'] },
   // Bundled into the Docs view (About's licence pages, Release Notes, the Agent API reference).
   { paths: ['docs/', 'CHANGELOG.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'scripts/licenses.mjs', 'scripts/licenseText.mjs', 'scripts/thirdPartyNotices.mjs', 'scripts/notices/'], suites: ['about'] },
   // The i18n screenshot route (#769): its case files (each area's, found by name), the translations it shows (every
