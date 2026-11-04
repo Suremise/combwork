@@ -84,7 +84,7 @@ async function endFromOutside(app, outlives) {
   const root = id && list.find((p) => p.pid === id.pid && Math.abs(p.started - id.started) <= 1)
   const byPid = new Map(list.map((p) => [p.pid, p]))
   let top = byPid.get(outlives)
-  for (let up = top && byPid.get(top.parent); up && up.started <= top.started && /hive-progress/i.test(up.commandLine); up = byPid.get(up.parent)) top = up
+  for (let up = top && byPid.get(top.parent); up && up.started <= top.started && /(hive|cw)-progress/i.test(up.commandLine); up = byPid.get(up.parent)) top = up
   const kept = new Set(top ? [top.pid, ...descendantsIn(list, top.pid).map((d) => d.pid)] : [])
   const ended = root && !kept.has(root.pid) ? endAsCrash(list, { pid: root.pid, started: root.started }, descendantsIn(list, root.pid).filter((p) => !kept.has(p.pid))) : 0
   const exited = await Promise.race([gone, new Promise((r) => setTimeout(() => r(false), HUNG_MS))])
@@ -213,7 +213,7 @@ const notice = (page) => page.evaluate(() => [...document.querySelectorAll('.toa
       // The node, and the hive-progress run as one item named by its title (cmd, hive-progress and its node).
       const said = /(\d+) processes the agents started are still running: ([^\n]*)/.exec(text)
       check('the notice says Hive closed unexpectedly, and what the agents started that is still running', !!said && /node [^,]*linger/.test(said[2]), text)
-      check('…the hive-progress run as one item, named by its title, with how many of its processes run', !!said && /Left running \((\d+) processes\)/.test(said[2]) && Number(/Left running \((\d+)/.exec(said[2])[1]) >= 2 && !/hive-progress|cmd /.test(said[2]), text)
+      check('…the hive-progress run as one item, named by its title, with how many of its processes run', !!said && /Left running \((\d+) processes\)/.test(said[2]) && Number(/Left running \((\d+)/.exec(said[2])[1]) >= 2 && !/(hive|cw)-progress|cmd /.test(said[2]), text)
       const launch = await apiGet(`/v1/projects/site/agents/Website/launches/${encodeURIComponent(runId)}`)
       check('the Agent API says the launch the run was started in has ended', launch.body?.running === false, JSON.stringify(launch))
       check("…not the stranger's process, whose pid a record names with another start time", !!text && !/old-server/.test(text), text)

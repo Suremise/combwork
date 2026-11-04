@@ -355,7 +355,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
     return tip
   }
   const why = await tipFor(blocked)
-  check('…with the reason as its tooltip', /Neither Claude Code nor Hive has its transcript/.test(why), why)
+  check('…with the reason as its tooltip', /Neither Claude Code nor Combwork has its transcript/.test(why), why)
   await branch('Codex').first().click()
   await lib.until(async () => (await names()).includes('Review rm'), 5000)
   await row('Review rm').click()

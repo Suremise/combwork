@@ -87,7 +87,7 @@ function board(sql, ...args) {
     // None can always be chosen (#1419): its tooltip says what clicking it does; vcswitch switches.
     check('Git is chosen, None can be chosen', !!(await lib.until(async () => (await head.locator('[data-platform="git"][aria-checked="true"]').count()) === 1 && (await head.locator('[data-platform="none"]').getAttribute('aria-disabled')) === 'false', HUNG_MS)), await text(head))
     const tip = await lib.hoverTip(page, head.locator('[data-platform="none"]'), (t) => /from its next card/.test(t))
-    check("None's tooltip says it switches from the next card, asking first", tip === 'Switch this project to None, from its next card. Hive shows what changes first.', tip)
+    check("None's tooltip says it switches from the next card, asking first", tip === 'Switch this project to None, from its next card. Combwork shows what changes first.', tip)
     check('the fact line names the repository root', !!(await lib.until(async () => (await text(fact)) === `This folder is a Git repository at ${alpha}.`, HUNG_MS)), await text(fact))
     check('the workflow link says no preset is chosen', !!(await lib.until(async () => (await text(link)).trim() === 'Workflow: Git · no preset chosen', HUNG_MS)), await text(link))
     check('the five sections, Workflow first', JSON.stringify(await sections()) === JSON.stringify(['workflow', 'changes', 'history', 'branches', 'queue']), JSON.stringify(await sections()))

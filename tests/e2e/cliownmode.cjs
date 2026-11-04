@@ -99,7 +99,7 @@ const check = (name, ok, extra = '') => {
     check("its hooks' mode is recorded as seen, and its mode stays the CLI's own", !!(await lib.until(async () => (await live())?.modeObserved === 'manual', HUNG_MS)) && (await live())?.permissionMode === 'cli-own', JSON.stringify(await live().then((l) => l && { mode: l.permissionMode, seen: l.modeObserved })))
     check("the running agent's badge says CLI's own", /CLI's own/.test(await badge.innerText()), await badge.innerText())
     const tip = await lib.hoverTip(page, badge, (t) => /the CLI's own screen shows the one it is in/.test(t), HUNG_MS)
-    check("its tooltip says the CLI's screen shows the mode", /Permission mode of the running session: CLI's own\. Hive passed no mode, so the CLI's own screen shows the one it is in\./.test(tip), tip)
+    check("its tooltip says the CLI's screen shows the mode", /Permission mode of the running session: CLI's own\. Combwork passed no mode, so the CLI's own screen shows the one it is in\./.test(tip), tip)
     await page.mouse.move(5, 5)
 
     // A conversation of its own (a prompt taken), stopped and resumed: resumed on the CLI's own setting, with no flag again.
@@ -122,7 +122,7 @@ const check = (name, ok, extra = '') => {
     check("…and its badge says CLI's own", !!(await lib.until(async () => /CLI's own/.test(await badge.innerText()), HUNG_MS)), await badge.innerText())
 
     await badge.click()
-    check("the running agent's menu says why no mode switches live", !!(await lib.until(async () => (await items.allInnerTexts()).some((t) => /Hive can't switch this session's mode\s*It started in the CLI's own setting/.test(t)), HUNG_MS)), JSON.stringify(await items.allInnerTexts()))
+    check("the running agent's menu says why no mode switches live", !!(await lib.until(async () => (await items.allInnerTexts()).some((t) => /Combwork can't switch this session's mode\s*It started in the CLI's own setting/.test(t)), HUNG_MS)), JSON.stringify(await items.allInnerTexts()))
     const modes = (await items.allInnerTexts()).filter((t) => /^(Manual|Accept edits|Plan|Auto)\b/.test(t))
     check('…and every mode there restarts the session', modes.length === 4 && modes.every((t) => /Restarts the session/.test(t)), JSON.stringify(modes))
     await shots('running-menu')

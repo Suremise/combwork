@@ -119,7 +119,7 @@ const check = (name, ok, extra = '') => {
   await inv('transcript:export', alpha, st.sessionId, asShown)
   const md = fs.existsSync(exportFile) ? fs.readFileSync(exportFile, 'utf8') : ''
   // (Each message's time is checked in core.test.ts: this session has none yet.)
-  check('…in an export: its title and "exported from Hive"', md.startsWith(`# ${asShown}`) && /exported from Hive \d{2}\/\d{2}\/\d{4} \d{1,2}:\d{2} (AM|PM)/.test(md), md.slice(0, 300))
+  check('…in an export: its title and "exported from Combwork"', md.startsWith(`# ${asShown}`) && /exported from Combwork \d{2}\/\d{2}\/\d{4} \d{1,2}:\d{2} (AM|PM)/.test(md), md.slice(0, 300))
   // The Overview's session details: when it started and was last active.
   await page.keyboard.press('Alt+2')
   const startedCell = page.locator('tr', { has: page.locator('td', { hasText: /^Started$/ }) }).locator('td').nth(1)
