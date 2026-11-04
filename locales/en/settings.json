@@ -1419,6 +1419,10 @@
     "defaultMessage": "{title} takes a field name: letters, digits and _ (not starting with a digit).",
     "description": "Why an advanced setting's new value isn't taken: it must be a field name of a CLI's data. {title} is the setting's title."
   },
+  "settings.advanced.error.folder": {
+    "defaultMessage": "{title} takes one folder's full path (C:\\…, \\\\server\\…, or starting with a variable such as %LOCALAPPDATA%).",
+    "description": "Why an advanced setting's new value (one folder) isn't taken. {title} is the setting's title. C:\\…, \\\\server\\… and %LOCALAPPDATA% are written as Windows writes them: keep them."
+  },
   "settings.advanced.error.folders": {
     "defaultMessage": "{title} takes up to {most} folders, each a full path (C:\\…, \\\\server\\…, or starting with a variable such as %LOCALAPPDATA%), separated by semicolons.",
     "description": "Why an advanced setting's new value (a list of folders) isn't taken. {title} is the setting's title; {most} a number of folders. C:\\…, \\\\server\\… and %LOCALAPPDATA% are written as Windows writes them: keep them."
@@ -1454,6 +1458,14 @@
   "settings.advanced.hive.accounts.usageMoves.title": {
     "defaultMessage": "Move agents at a usage threshold",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive. An account in Settings → Accounts & Connections can move its agents to another account when it has used a share of its plan's limit."
+  },
+  "settings.advanced.hive.agents.tempFolder.desc": {
+    "defaultMessage": "A folder for agents' own temporary files (Claude Code's scratchpad, and what Codex, Copilot and their shells write to the temp folder), instead of Windows' Temp folder: each agent and the Assistant get a folder of their own in it, made at launch, and kept. A full path (%LOCALAPPDATA% and other variables at the start are filled in), never inside a project or a slot. Empty: the system's Temp folder, as before. Sessions started afterwards take it.",
+    "description": "What the advanced setting \"Agents' temp folder\" does (Settings → Advanced, under Hive). Scratchpad is Claude Code's word for its working folder. %LOCALAPPDATA% is a Windows variable: keep it."
+  },
+  "settings.advanced.hive.agents.tempFolder.title": {
+    "defaultMessage": "Agents' temp folder",
+    "description": "An advanced setting's title (Settings → Advanced), followed by a folder: where agents' own temporary files go instead of Windows' Temp folder."
   },
   "settings.advanced.hive.assistant.startView.desc": {
     "defaultMessage": "While the Assistant's journal is on, Combwork gives it a short view of the workspace when it starts and after each compaction: what is under way and waiting, and the journal's recent entries. Turned off, it gets none from its next start or compaction on, a running Assistant too, and reads what it needs with its tools.",
@@ -2174,6 +2186,10 @@
   "settings.advanced.takes.field": {
     "defaultMessage": "A field name.",
     "description": "What an advanced setting takes (Settings → Advanced): the name of a field in a CLI's data."
+  },
+  "settings.advanced.takes.folder": {
+    "defaultMessage": "A folder's full path (a variable such as %LOCALAPPDATA% at the start is filled in).",
+    "description": "What an advanced setting takes (Settings → Advanced): one folder. %LOCALAPPDATA% is a Windows variable: keep it."
   },
   "settings.advanced.takes.folders": {
     "defaultMessage": "Folders, each a full path, separated by semicolons (a variable such as %LOCALAPPDATA% at the start is filled in).",

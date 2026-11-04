@@ -45,12 +45,15 @@ const ALLOWED: Record<string, string[]> = {
   'e2e/evidence.cjs': ['function clearDir(target, { board = {}, temp = os.tmpdir(), testRoot = runContext.TEST_ROOT, homes = [runContext.CODEX_HOME, runContext.CLAUDE_TEST_HOME] } = {}) {']
 }
 const OWN = ['tempDir.ts', 'runTemp.mts', 'tempDir.test.ts']
+// Files whose subject is the temp variables Hive gives agents (HI-2496: Agents' temp folder): TEMP, TMP and TMPDIR are
+// the data they check, never where they put files (those come from tempDir() and lib.WORK).
+const DATA = ['agentTemp.test.ts', 'e2e/agenttemp.cjs']
 
 /** Where these files name the temp folder themselves (os.tmpdir, TEMP or TMP), other than ALLOWED: `file:line` each. */
 function rawTempUses(files: { name: string; text: string }[]): string[] {
   const found: string[] = []
   for (const { name, text } of files) {
-    if (OWN.includes(name)) continue
+    if (OWN.includes(name) || DATA.includes(name)) continue
     text.split(/\r?\n/).forEach((line, i) => {
       if (/^\s*(\/\/|\*|\/\*)/.test(line)) return
       if (!/\btmpdir\b|\benv\s*(\.\s*(TEMP|TMP)\b|\[\s*['"`](TEMP|TMP)['"`])/i.test(line)) return

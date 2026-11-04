@@ -641,7 +641,7 @@
   },
   "workspace.mcpView.dir": {
     "defaultMessage": "Use {variable} to point at server code stored in `.combwork/mcp`.",
-    "description": "An MCP server's view, beside its editor (Markdown). {variable} is ${HIVE_MCP_DIR}."
+    "description": "An MCP server's view, beside its editor (Markdown). {variable} is ${CW_MCP_DIR}."
   },
   "workspace.mcpView.format": {
     "defaultMessage": "**Format** — one server per file, in Claude Code's .mcp.json format (Combwork converts it for other providers) plus an optional `description`:",

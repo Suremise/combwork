@@ -715,6 +715,18 @@
     "defaultMessage": "That session is a {kind} {provider} ran for another session, not a conversation: it can't be resumed.",
     "description": "Resuming a session is refused: the coding agent ran it for another session (a guardian review). {kind} is the coding agent's name for it, as it came; {provider} the coding agent's name (Codex)."
   },
+  "session.start.tempInside": {
+    "defaultMessage": "Agents' temp folder, {folder}, is inside {inside}, a project's or Combwork's own folder. Choose another in Settings → Advanced, or empty it to use the system's Temp folder.",
+    "description": "Starting an agent failed (HI-2496): the folder in Settings → Advanced → Agents' temp folder is inside a project, a slot or Combwork's own folders. {folder} is the agent's folder in it; {inside} the folder it is inside."
+  },
+  "session.start.tempNotMade": {
+    "defaultMessage": "The agent's temp folder, {folder}, couldn't be made: {why} Fix Agents' temp folder in Settings → Advanced, or empty it to use the system's Temp folder.",
+    "description": "Starting an agent failed (HI-2496): its folder in Settings → Advanced → Agents' temp folder couldn't be created. {folder} is that folder; {why} the system's reason, in English."
+  },
+  "session.start.tempUnset": {
+    "defaultMessage": "Agents' temp folder, {folder}, starts with a variable that isn't set. Fix it in Settings → Advanced, or empty it to use the system's Temp folder.",
+    "description": "Starting an agent failed (HI-2496): the folder in Settings → Advanced → Agents' temp folder starts with a %VARIABLE% Windows doesn't have. {folder} is the folder as written."
+  },
   "session.start.turnedOff": {
     "defaultMessage": "{provider} was turned off while {agent} was starting.",
     "description": "Starting an agent failed: its coding agent was turned off in Settings meanwhile. {provider} is the coding agent's name, {agent} the agent's."

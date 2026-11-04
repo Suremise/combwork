@@ -615,6 +615,12 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     const env = { ...ctx.env }
     if (!ctx.allowBackgroundSessions) env.CLAUDE_CODE_DISABLE_AGENT_VIEW = '1'
     if (ctx.use200kContext) env.CLAUDE_CODE_DISABLE_1M_CONTEXT = '1'
+    // Agents' temp folder (HI-2496): its scratchpad and temp files there, over a CLAUDE_CODE_TMPDIR it inherited (Claude
+    // Code reads that before TEMP). Not set, nothing changes: the user's own CLAUDE_CODE_TMPDIR stays.
+    if (ctx.tempDir) {
+      for (const k of Object.keys(env)) if (k.toUpperCase() === 'CLAUDE_CODE_TMPDIR') delete env[k]
+      env.CLAUDE_CODE_TMPDIR = ctx.tempDir
+    }
     return { file: s.file, args: s.args, env }
   }
 

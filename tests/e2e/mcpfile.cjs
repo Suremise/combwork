@@ -121,7 +121,7 @@ const check = (name, ok, extra = '') => {
   await add.locator('input').fill('notes-2')
   await add.getByRole('button', { name: 'Add' }).click()
   check('it is added under the new name', !!(await lib.until(async () => !!(await server('notes-2')), HUNG_MS)))
-  check('running its own folder', (await server('notes-2'))?.def?.args?.[0] === '${HIVE_MCP_DIR}/notes-2/server.js' && fs.existsSync(path.join(mcpDir, 'notes-2', 'server.js')))
+  check('running its own folder', (await server('notes-2'))?.def?.args?.[0] === '${CW_MCP_DIR}/notes-2/server.js' && fs.existsSync(path.join(mcpDir, 'notes-2', 'server.js')))
   check('and the first is untouched', (await server('notes'))?.def?.args?.[0] === '${HIVE_MCP_DIR}/notes/server.js')
 
   // --- Add to… asks first, showing what it runs and the projects, ticked where it is added; Save adds and removes.
@@ -157,7 +157,7 @@ const check = (name, ok, extra = '') => {
 
   // --- Search and filter in the MCP view.
   const search = page.locator('.sidebar [data-mcp-search]')
-  const listed = async () => (await page.locator('.pane-body .row .label').allInnerTexts()).map((t) => t.trim()).filter((t) => t !== 'hive')
+  const listed = async () => (await page.locator('.pane-body .row .label').allInnerTexts()).map((t) => t.trim()).filter((t) => t !== 'combwork') // the built-in server (HI-2463)
   await search.fill('note')
   check('searching "note" lists notes and notes-2', !!(await lib.until(async () => JSON.stringify((await listed()).sort()) === '["notes","notes-2"]', HUNG_MS)), JSON.stringify(await listed()))
   await page.locator('.sidebar [data-mcp-filter]').selectOption('nowhere')
@@ -180,7 +180,7 @@ const check = (name, ok, extra = '') => {
   await picker.locator('[data-mcp-search]').fill('2')
   check('…searching finds notes-2', !!(await lib.until(async () => (await picker.locator('.mcp-picker-row').count()) === 1, HUNG_MS)))
   await pickRow('notes-2').click()
-  check('…chosen, it shows what it runs and the folder', !!(await lib.until(async () => (await picker.locator('[data-mcp-runs="notes-2"]').innerText().catch(() => '')).includes('Runs: node ${HIVE_MCP_DIR}/notes-2/server.js'), HUNG_MS)))
+  check('…chosen, it shows what it runs and the folder', !!(await lib.until(async () => (await picker.locator('[data-mcp-runs="notes-2"]').innerText().catch(() => '')).includes('Runs: node ${CW_MCP_DIR}/notes-2/server.js'), HUNG_MS)))
   await themed('7-picker')
   await picker.getByRole('button', { name: 'Add', exact: true }).click()
   check('…Add adds it to other, and only there', !!(await lib.until(async () => (await tabRow('notes-2').count()) === 1, HUNG_MS)) && (projectMcp(other).enabled ?? []).includes('notes-2') && !(projectMcp(proj).enabled ?? []).includes('notes-2'), JSON.stringify([projectMcp(proj), projectMcp(other)]))

@@ -92,12 +92,20 @@ export async function listMcp(places = false): Promise<McpServerInfo[]> {
   return out
 }
 
+/**
+ * The variable a definition points at the workspace's MCP folder with (HI-2503): `${CW_MCP_DIR}`, and `${HIVE_MCP_DIR}`
+ * as definitions installed before the rename (and the catalogue up to v1.1.1) still write it. What Combwork writes uses
+ * the new one.
+ */
+export const MCP_DIR_VAR = '${CW_MCP_DIR}'
+const MCP_DIR_VARIABLE = /\$\{(?:CW|HIVE)_MCP_DIR\}/g
+
 /** Converts a stored definition into the entry written to launch/mcp.json. */
 export function toLaunchDef(def: McpServerDef, mcpDir: string): McpServerDef {
   // Hive's own fields (its description and tags, HI-2059, and the catalogue it came from, HI-545) aren't the CLIs'.
   const { description: _description, tags: _tags, catalog: _catalog, ...rest } = def
   const dir = mcpDir.replace(/\\/g, '/')
-  const expand = (v: string): string => v.replace(/\$\{HIVE_MCP_DIR\}/g, dir)
+  const expand = (v: string): string => v.replace(MCP_DIR_VARIABLE, () => dir)
   const out: McpServerDef = { ...rest }
   if (typeof out.command === 'string') out.command = expand(out.command)
   if (Array.isArray(out.args)) out.args = out.args.map((a) => (typeof a === 'string' ? expand(a) : a))
@@ -399,14 +407,14 @@ export async function deleteMcp(name: string): Promise<void> {
   })
 }
 
-/** Whether a definition runs what is in `${HIVE_MCP_DIR}/<folder>/` (its command, arguments, environment or folder). */
+/** Whether a definition runs what is in `${CW_MCP_DIR}/<folder>/` (its command, arguments, environment or folder). */
 function usesFolder(def: McpServerDef, folder: string): boolean {
   return mcpValues(def).some((v) => folderRef(folder).test(v))
 }
 
 const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-/** `${HIVE_MCP_DIR}/<folder>` followed by a slash or the end, either slash, any case (Windows paths). */
-const folderRef = (folder: string): RegExp => new RegExp(`\\$\\{HIVE_MCP_DIR\\}[\\\\/]${escapeRe(folder)}(?=[\\\\/]|$|["'\\s])`, 'gi')
+/** `${CW_MCP_DIR}/<folder>` (or the old `${HIVE_MCP_DIR}`) followed by a slash or the end, either slash, any case (Windows paths). */
+const folderRef = (folder: string): RegExp => new RegExp(`\\$\\{(?:CW|HIVE)_MCP_DIR\\}[\\\\/]${escapeRe(folder)}(?=[\\\\/]|$|["'\\s])`, 'gi')
 
 /** The strings of a definition that can name its files. */
 function mcpValues(def: McpServerDef): string[] {
@@ -417,8 +425,14 @@ function mcpValues(def: McpServerDef): string[] {
 // Add MCP Server from File (#550): a .json definition, or a .zip of a server's folder with its definition.
 // ---------------------------------------------------------------------------
 
-/** The definition a server .zip carries, the first found: Hive's own name, then the mcp repo's example (USER_GUIDE). */
-export const MCP_ZIP_DEFINITIONS = ['hive-mcp.json', 'hive-mcp.example.json']
+/**
+ * The definition a server .zip carries, the first found: Combwork's own name, then the mcp repo's example (USER_GUIDE);
+ * then the same before the rename (HI-2503), as the catalogue up to v1.1.1 and older zips name them. The others beside
+ * the one read are definitions too, never copied into the server's folder.
+ */
+export const MCP_ZIP_DEFINITIONS = ['combwork-mcp.json', 'combwork-mcp.example.json', 'hive-mcp.json', 'hive-mcp.example.json']
+/** The names a refusal suggests: the current ones. */
+const MCP_ZIP_DEFINITIONS_SHOWN = MCP_ZIP_DEFINITIONS.slice(0, 2)
 /** Limits, so a mistaken pick (a big archive) fails quickly instead of filling the disk. */
 const MCP_ZIP_MAX_FILES = 5000
 const MCP_ZIP_MAX_BYTES = 200 * 1024 * 1024
@@ -499,7 +513,7 @@ export function serverFromZip(data: Uint8Array): { def: McpServerDef; files: Map
     const tops = new Set(names.map((n) => norm(n).split('/')[0]))
     const top = tops.size === 1 ? [...tops][0] : null
     found = top ? at(`${top}/`) : undefined
-    if (!top || !found) throw hiveError(msg({ id: 'content.mcp.zipNoDefinition', defaultMessage: 'No {files} found. A server .zip has its definition at its top level, or inside one folder.', description: 'An error adding an MCP server from a .zip without a definition where Hive looks. {files} are the file names it looks for, joined with "or".' }), { files: { list: MCP_ZIP_DEFINITIONS, type: 'disjunction' } })
+    if (!top || !found) throw hiveError(msg({ id: 'content.mcp.zipNoDefinition', defaultMessage: 'No {files} found. A server .zip has its definition at its top level, or inside one folder.', description: 'An error adding an MCP server from a .zip without a definition where Hive looks. {files} are the file names it looks for, joined with "or".' }), { files: { list: MCP_ZIP_DEFINITIONS_SHOWN, type: 'disjunction' } })
     prefix = `${top}/`
     folder = top
   }
@@ -512,7 +526,9 @@ export function serverFromZip(data: Uint8Array): { def: McpServerDef; files: Map
   }
   const def = checkMcpDef(raw)
   const files = new Map<string, Uint8Array>()
-  for (const n of names) if (n !== defEntry) files.set(norm(n).slice(prefix.length), entries[n])
+  // A zip carrying the definition under both names (the mcp repo's move to Combwork's, HI-2503) copies neither.
+  const definitions = new Set(MCP_ZIP_DEFINITIONS.map((d) => prefix + d))
+  for (const n of names) if (!definitions.has(norm(n))) files.set(norm(n).slice(prefix.length), entries[n])
   return { def, files, folder }
 }
 
@@ -525,7 +541,7 @@ function serverName(raw: string): string {
 /** A definition's references to its zip's folder, moved to the name it is added as. */
 export function retarget(def: McpServerDef, from: string, to: string): McpServerDef {
   if (from === to) return def
-  const move = (v: string): string => v.replace(folderRef(from), `\${HIVE_MCP_DIR}/${to}`)
+  const move = (v: string): string => v.replace(folderRef(from), () => `${MCP_DIR_VAR}/${to}`)
   const out: McpServerDef = { ...def }
   if (typeof out.command === 'string') out.command = move(out.command)
   if (typeof out.cwd === 'string') out.cwd = move(out.cwd)

@@ -87,6 +87,14 @@
     "defaultMessage": "Builders and reviewers",
     "description": "A tip's title. Glossary: builder, reviewer."
   },
+  "tips.agentsTempFolder.text": {
+    "defaultMessage": "Agents write scripts and other temporary files to Windows' Temp folder as they work. Set Settings → Advanced → Agents' temp folder to a folder of your own, such as one you exclude from antivirus scans, and each agent gets a folder there instead.",
+    "description": "A tip (HI-2496). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Agents' temp folder is an advanced setting's title)."
+  },
+  "tips.agentsTempFolder.title": {
+    "defaultMessage": "Keep agents' temp files out of Windows' Temp",
+    "description": "A tip's title (HI-2496)."
+  },
   "tips.allKeysToCli.text": {
     "defaultMessage": "In an agent's pane, Combwork's shortcuts take their keys. Turn on Settings → Advanced → All keys go to the CLI to send every key to the CLI instead, but the command palette's (Show All Commands), so every command is still in reach.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

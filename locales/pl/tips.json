@@ -21,6 +21,8 @@
   "tips.agentStates.title": "Agenci w jednym spojrzeniu",
   "tips.agentWorkflowRole.text": "Rola w przepływie pracy każdego agenta, w jego ustawieniach, mówi, czy wykonuje karty, recenzuje je, czy jedno i drugie. „Uruchom tor” proponuje według niej wykonawców i recenzentów.",
   "tips.agentWorkflowRole.title": "Wykonawcy i recenzenci",
+  "tips.agentsTempFolder.text": "Agenci podczas pracy zapisują skrypty i inne pliki tymczasowe w folderze Temp systemu Windows. Ustaw Ustawienia → Zaawansowane → Folder tymczasowy agentów na własny folder, np. wyłączony ze skanowania antywirusowego, a każdy agent dostanie folder tam.",
+  "tips.agentsTempFolder.title": "Trzymaj pliki tymczasowe agentów poza folderem Temp systemu Windows",
   "tips.allKeysToCli.text": "W panelu agenta skróty Combwork przejmują swoje klawisze. Włącz Ustawienia → Zaawansowane → Wszystkie klawisze trafiają do CLI, by wysyłać każdy klawisz do CLI, poza klawiszem palety poleceń (Pokaż wszystkie polecenia), by każde polecenie było w zasięgu.",
   "tips.allKeysToCli.title": "Oddaj wszystkie klawisze CLI agenta",
   "tips.alwaysOnTop.text": "Pinezka na pasku tytułu (lub Ctrl+Alt+O) trzyma okno nad innymi aplikacjami, a pod nim mogą działać testy albo emulator. Każde okno ma własne ustawienie, zapamiętane dla jego obszaru roboczego.",

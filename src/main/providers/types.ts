@@ -98,6 +98,11 @@ export interface LaunchContext {
   /** The first task, given on the command line so the CLI starts on it (e.g. from the Hive Assistant). */
   initialPrompt?: string
   env: Record<string, string>
+  /**
+   * Its own folder in Agents' temp folder (HI-2496), made, and already TEMP, TMP and TMPDIR in `env`; null or missing: the
+   * system Temp. A CLI with a temp variable of its own (Claude Code's CLAUDE_CODE_TMPDIR) sets it in its adapter.
+   */
+  tempDir?: string | null
   /** The connection's folder this launch runs on (HI-1757: its homeEnv's value in `env`), absent when it runs on the CLI's own home. */
   connectionHome?: string
   /** The user lets sessions move into the CLI's own background service (see capabilities.backgroundSessions). */

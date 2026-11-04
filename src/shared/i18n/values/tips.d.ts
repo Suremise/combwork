@@ -23,6 +23,8 @@ interface HiveMessageValues {
   'tips.agentStates.title': undefined
   'tips.agentWorkflowRole.text': undefined
   'tips.agentWorkflowRole.title': undefined
+  'tips.agentsTempFolder.text': undefined
+  'tips.agentsTempFolder.title': undefined
   'tips.allKeysToCli.text': undefined
   'tips.allKeysToCli.title': undefined
   'tips.alwaysOnTop.text': undefined

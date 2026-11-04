@@ -61,7 +61,7 @@ const M = {
   ok: msg({ id: 'workspace.skillView.ok', defaultMessage: 'OK', description: 'The Skills view, under a skill that no longer exists: closes it.' }),
   mcpFormat: msg({ id: 'workspace.mcpView.format', defaultMessage: "**Format** — one server per file, in Claude Code's .mcp.json format (Combwork converts it for other providers) plus an optional `description`:", description: "An MCP server's view, beside its editor (Markdown: keep ** and the backticks). An example follows." }),
   mcpRemote: msg({ id: 'workspace.mcpView.remote', defaultMessage: 'Remote servers use `"type": "http"` and `"url"`. Reference secrets as environment variables — this folder is meant to be committed.', description: "An MCP server's view, beside its editor (Markdown: keep the backticks and what is in them)." }),
-  mcpDir: msg({ id: 'workspace.mcpView.dir', defaultMessage: 'Use {variable} to point at server code stored in `.combwork/mcp`.', description: "An MCP server's view, beside its editor (Markdown). {variable} is ${HIVE_MCP_DIR}." }),
+  mcpDir: msg({ id: 'workspace.mcpView.dir', defaultMessage: 'Use {variable} to point at server code stored in `.combwork/mcp`.', description: "An MCP server's view, beside its editor (Markdown). {variable} is ${CW_MCP_DIR}." }),
   selectMcp: msg({ id: 'workspace.mcpView.select', defaultMessage: 'Select an MCP server to edit its definition.', description: 'The MCP view with no server selected.' }),
   builtIn: msg({ id: 'workspace.mcpView.builtIn', defaultMessage: 'Built-in Combwork MCP server', description: "The heading of the built-in hive server's page." }),
   builtInText: msg({ id: 'workspace.mcpView.builtInText', defaultMessage: 'Every session started from Combwork gets a <code>combwork</code> MCP server that connects to the Agent API{hasUrl, select, yes { at {url}} other {}}. Turn it off in Settings → Agent API.', description: "The built-in server's page. <code> is the server's name: keep combwork as it is (HI-2463)." }),
@@ -329,7 +329,7 @@ const MCP_EXAMPLE = `\`\`\`json
 
 /** The format help beside an MCP server's editor, worded when shown. */
 // Each its own paragraph: a single line break is a space in Markdown, which Chinese and Japanese don't put between sentences (#893).
-const mcpHelp = (): string => [tr(M.mcpFormat), MCP_EXAMPLE, tr(M.mcpRemote), tr(M.mcpDir, { variable: '`${HIVE_MCP_DIR}`' })].join('\n\n')
+const mcpHelp = (): string => [tr(M.mcpFormat), MCP_EXAMPLE, tr(M.mcpRemote), tr(M.mcpDir, { variable: '`${CW_MCP_DIR}`' })].join('\n\n')
 
 export function McpView() {
   const selected = useStore((s) => s.selectedMcp)

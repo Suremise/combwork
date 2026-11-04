@@ -356,6 +356,7 @@ interface HiveMessageValues {
   'settings.advanced.error.boolean': { title: string | number }
   'settings.advanced.error.choice': { title: string | number; choices: string | number }
   'settings.advanced.error.field': { title: string | number }
+  'settings.advanced.error.folder': { title: string | number }
   'settings.advanced.error.folders': { title: string | number; most: string | number }
   'settings.advanced.error.list': { title: string | number }
   'settings.advanced.error.matchesAll': { title: string | number }
@@ -365,6 +366,8 @@ interface HiveMessageValues {
   'settings.advanced.error.text': { title: string | number }
   'settings.advanced.hive.accounts.usageMoves.desc': undefined
   'settings.advanced.hive.accounts.usageMoves.title': undefined
+  'settings.advanced.hive.agents.tempFolder.desc': undefined
+  'settings.advanced.hive.agents.tempFolder.title': undefined
   'settings.advanced.hive.assistant.startView.desc': undefined
   'settings.advanced.hive.assistant.startView.title': undefined
   'settings.advanced.hive.cards.attachmentFolders.desc': undefined
@@ -545,6 +548,7 @@ interface HiveMessageValues {
   'settings.advanced.takes.boolean': undefined
   'settings.advanced.takes.choice': { choices: string | number }
   'settings.advanced.takes.field': undefined
+  'settings.advanced.takes.folder': undefined
   'settings.advanced.takes.folders': undefined
   'settings.advanced.takes.list': undefined
   'settings.advanced.takes.number': { unit: string; min: string | number; max: string | number }

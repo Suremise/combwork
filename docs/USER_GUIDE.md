@@ -1465,7 +1465,7 @@ MCP servers give agents extra tools. Each server is a JSON file in `Workspace/.c
 
 Reference secrets with environment variables (`${NAME}`), never literal values — Combwork warns when a definition looks like it contains one. Sessions get the environment Combwork was started with, so after setting a variable (for example in Windows' *Edit environment variables for your account*), quit Combwork completely, including from the tray, and open it again.
 
-A server can be a program Combwork starts (`command`, `args`, `env`, as above) or one reached over HTTP (`"type": "http"`, `"url"` and optional `"headers"`), the same fields as in Claude Code's `.mcp.json`. To keep a server's own code with the workspace, put it in a folder next to its definition, for example `.combwork/mcp/notes/server.js`, and refer to it as `${HIVE_MCP_DIR}`, which Combwork replaces with the path of the `.combwork/mcp` folder: `"args": ["${HIVE_MCP_DIR}/notes/server.js"]`. Keep build output and `node_modules` out of git there.
+A server can be a program Combwork starts (`command`, `args`, `env`, as above) or one reached over HTTP (`"type": "http"`, `"url"` and optional `"headers"`), the same fields as in Claude Code's `.mcp.json`. To keep a server's own code with the workspace, put it in a folder next to its definition, for example `.combwork/mcp/notes/server.js`, and refer to it as `${CW_MCP_DIR}`, which Combwork replaces with the path of the `.combwork/mcp` folder: `"args": ["${CW_MCP_DIR}/notes/server.js"]`. Definitions written before Hive became Combwork use `${HIVE_MCP_DIR}`, which still works. Keep build output and `node_modules` out of git there.
 
 A server you add or change is used by sessions started afterwards; restart a running session to give it the change.
 
@@ -1514,7 +1514,7 @@ By default every agent in a project gets all the servers added to its project. T
 **Add MCP Server from File** (the file icon in the MCP view's header) adds a server someone gave you, as **Add Skill from File** does for skills:
 
 - a **`.json`** definition, in the format above: it becomes `.combwork/mcp/<name>.json`;
-- a **`.zip`** of a server's folder: its code is unpacked to `.combwork/mcp/<name>/` and its definition becomes `.combwork/mcp/<name>.json`. The definition is a file named `hive-mcp.json` (or `hive-mcp.example.json`) at the top of the zip, or inside one folder at its top. It refers to the server's code through `${HIVE_MCP_DIR}`, for example `"args": ["${HIVE_MCP_DIR}/notes/server.js"]` for a zip of a `notes` folder holding `hive-mcp.json` and `server.js`. Added under another name, Combwork changes those references to the new folder.
+- a **`.zip`** of a server's folder: its code is unpacked to `.combwork/mcp/<name>/` and its definition becomes `.combwork/mcp/<name>.json`. The definition is a file named `combwork-mcp.json` (or `combwork-mcp.example.json`) at the top of the zip, or inside one folder at its top; zips made before the rename name it `hive-mcp.json` (or `hive-mcp.example.json`), which still works, and a zip with both uses the Combwork one. It refers to the server's code through `${CW_MCP_DIR}`, for example `"args": ["${CW_MCP_DIR}/notes/server.js"]` for a zip of a `notes` folder holding `combwork-mcp.json` and `server.js`. Added under another name, Combwork changes those references to the new folder.
 
 Before adding it, Combwork shows the name it will have (the file's or the folder's, which you can change) and **what it runs**: the command and its arguments, or the address it connects to, and the names of its environment variables and headers (a `${NAME}` reference shown as itself, never a value). A name already in use asks whether to **Replace** that server (the old one goes to the Recycle Bin) or choose another name. It is added to the workspace **added nowhere**, so nothing runs until you add it to a project (its **MCP** tab's **Add Server…**, or **Add to…** in its view), which shows what it runs again (see [Adding servers where they're needed](#adding-servers-where-theyre-needed)). Replacing a server adds the new one added nowhere too, even where the old one was added. A server's view shows what it runs above its definition, and deleting a server added from a `.zip` also moves its folder to the Recycle Bin.
 
@@ -1869,6 +1869,19 @@ Combwork's developer console shows what each coding agent's CLI sends Combwork (
 - **Usage history: keep full detail for** (14 days) is how long after a session ends the usage history keeps when each of its requests happened, to the second. After that it keeps 1-hour steps, so `.combwork/usage.db` stays small; totals and costs don't change (see **Usage history** under [Long conversations](#long-conversations)).
 - **Help → Copy Diagnostics** lists which values you changed (their names, not what you changed them to).
 - The Assistant can explain them and, if you let it change settings, change them when you ask.
+
+#### Agents' temp folder <a id="agents-temp-folder"></a>
+
+Agents write temporary files as they work: Claude Code keeps its working scripts in a *scratchpad*, and Codex, Copilot and the commands they run write to the temp folder. By default that is Windows' Temp folder (`%TEMP%`), which antivirus scans like any other, and which you may not want to exclude, as downloads and installers land there too.
+
+**Settings → Advanced → Agents' temp folder** gives agents a folder of your own instead, such as one you already exclude from scanning ([Antivirus scanning](#antivirus-scanning)): a full path, and `%LOCALAPPDATA%` or another variable at the start is filled in. Set it for the open workspace only, or for all of Combwork. Empty, the default, agents use the system's Temp folder as before.
+
+- Each agent, and the Assistant, gets a folder of its own in it, `<folder>\<project>-<code>\<agent id>` (the code tells apart projects with the same name), made when it starts. Combwork starts it with `TEMP`, `TMP` and `TMPDIR` set to that folder, and Claude Code also with `CLAUDE_CODE_TMPDIR`, so its scratchpad goes there.
+- It applies to agents started afterwards: restart a running agent to move it.
+- It can't be inside a workspace's folder, a project, a slot or Combwork's own folders: an agent that would start with such a folder doesn't start, and says why, as it does when the folder can't be made. Its files never go back to Windows' Temp folder unasked.
+- What moves is what each CLI puts in its temp folder: Claude Code's scratchpad, and what Codex, Copilot and their commands write to `%TEMP%`. A CLI's own caches and helper files elsewhere stay where the CLI keeps them (Codex's helpers under its home, for one), and a `CLAUDE_CODE_TMPDIR` set in Claude Code's own settings file still wins there.
+- Combwork never deletes anything in it: an agent resumed later finds its scratchpad where it left it. To tidy up, stop the agents, then delete the folders you no longer want in Explorer.
+- Only you can change it: the Assistant can read and explain it, but not set it, as it moves the Assistant's own files too.
 
 #### Combwork's changes to the CLIs <a id="hives-changes-to-the-clis"></a>
 

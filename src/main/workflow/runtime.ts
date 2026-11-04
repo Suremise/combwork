@@ -1377,7 +1377,10 @@ export class Workflow {
     // After a queue failure: the same approved, unstale revision goes straight back into the queue (no review, no round).
     const last = s.entries.at(-1)
     // (A decision's cancel isn't a queue failure: the builder resubmits as usual, with a note for the same revision.)
-    if (from === 'active' && o.finish === 'hiveMerges' && card.kind === 'code' && last && (last.state === 'failed' || (last.state === 'cancelled' && last.cancelled !== 'decision')) && !s.stale) {
+    // Only while that failure is the newest thing on the card (HI-2504): once a submission came after it (the builder's
+    // fix of a conflict, reviewed and failed, say), the failure was answered, and its revision is resubmitted as usual.
+    const returnedSince = !!last && last.seq > (s.latest?.id ?? 0)
+    if (from === 'active' && o.finish === 'hiveMerges' && card.kind === 'code' && last && returnedSince && (last.state === 'failed' || (last.state === 'cancelled' && last.cancelled !== 'decision')) && !s.stale) {
       // The same evidence protocol as an ordinary submit: taken before the revision is read, checked at the write.
       const evidence = await this.evidenceOf(card, s, o)
       const now = await this.revisionNow(card, s)

@@ -21,6 +21,8 @@
   "tips.agentStates.title": "Read your agents at a glance",
   "tips.agentWorkflowRole.text": "Each agent's Role in the workflow, in Agent Settings, says whether it builds cards, reviews them, or either. Start Lane offers builders and reviewers by it.",
   "tips.agentWorkflowRole.title": "Builders and reviewers",
+  "tips.agentsTempFolder.text": "Agents write scripts and other temporary files to Windows' Temp folder as they work. Set Settings → Advanced → Agents' temp folder to a folder of your own, such as one you exclude from antivirus scans, and each agent gets a folder there instead.",
+  "tips.agentsTempFolder.title": "Keep agents' temp files out of Windows' Temp",
   "tips.allKeysToCli.text": "In an agent's pane, Combwork's shortcuts take their keys. Turn on Settings → Advanced → All keys go to the CLI to send every key to the CLI instead, but the command palette's (Show All Commands), so every command is still in reach.",
   "tips.allKeysToCli.title": "Give every key to the agent's CLI",
   "tips.alwaysOnTop.text": "The pin in the title bar (or Ctrl+Alt+O) keeps the window above your other apps, so a test run or an emulator can work underneath. Each window has its own, remembered for its workspace.",

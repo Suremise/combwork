@@ -21,6 +21,8 @@
   "tips.agentStates.title": "Tus agentes de un vistazo",
   "tips.agentWorkflowRole.text": "El Rol en el flujo de trabajo de cada agente, en Configuración del agente, dice si trabaja en las tarjetas, las revisa o ambas cosas. Iniciar carril ofrece autores y revisores según ese rol.",
   "tips.agentWorkflowRole.title": "Autores y revisores",
+  "tips.agentsTempFolder.text": "Los agentes escriben scripts y otros archivos temporales en la carpeta Temp de Windows mientras trabajan. Indica en Configuración → Avanzado → Carpeta temporal de los agentes una carpeta propia, como una que excluyas del análisis antivirus, y cada agente tendrá allí una carpeta en su lugar.",
+  "tips.agentsTempFolder.title": "Saca los archivos temporales de los agentes de la carpeta Temp de Windows",
   "tips.allKeysToCli.text": "En el panel de un agente, los atajos de Combwork toman sus teclas. Activa Configuración → Avanzado → Todas las teclas van a la CLI para enviar todas las teclas a la CLI, salvo la de la paleta de comandos (Mostrar todos los comandos), para que todos los comandos sigan a mano.",
   "tips.allKeysToCli.title": "Da todas las teclas a la CLI del agente",
   "tips.alwaysOnTop.text": "La chincheta de la barra de título (o Ctrl+Alt+O) mantiene la ventana por encima de tus otras aplicaciones, para que una ejecución de pruebas o un emulador funcione debajo. Cada ventana tiene la suya, recordada para su espacio de trabajo.",

@@ -27,6 +27,7 @@ export const SUITES = [
   { name: 'agents24' },
   { name: 'agentslots' },
   { name: 'agentstable' },
+  { name: 'agenttemp' },
   { name: 'agentview', needs: ['claude'], claudeHome: 'own' },
   { name: 'agentwatch' },
   { name: 'antivirus' },

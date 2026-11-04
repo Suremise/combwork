@@ -1329,6 +1329,11 @@
     "note": "Why an advanced setting's new value isn't taken: it must be a field name of a CLI's data. {title} is the setting's title.",
     "audience": "both"
   },
+  "settings.advanced.error.folder": {
+    "text": "{title} takes one folder's full path (C:\\…, \\\\server\\…, or starting with a variable such as %LOCALAPPDATA%).",
+    "note": "Why an advanced setting's new value (one folder) isn't taken. {title} is the setting's title. C:\\…, \\\\server\\… and %LOCALAPPDATA% are written as Windows writes them: keep them.",
+    "audience": "both"
+  },
   "settings.advanced.error.folders": {
     "text": "{title} takes up to {most} folders, each a full path (C:\\…, \\\\server\\…, or starting with a variable such as %LOCALAPPDATA%), separated by semicolons.",
     "note": "Why an advanced setting's new value (a list of folders) isn't taken. {title} is the setting's title; {most} a number of folders. C:\\…, \\\\server\\… and %LOCALAPPDATA% are written as Windows writes them: keep them.",
@@ -1372,6 +1377,16 @@
   "settings.advanced.hive.accounts.usageMoves.title": {
     "text": "Move agents at a usage threshold",
     "note": "An advanced setting's title (Settings → Advanced), listed under Hive. An account in Settings → Accounts & Connections can move its agents to another account when it has used a share of its plan's limit.",
+    "audience": "both"
+  },
+  "settings.advanced.hive.agents.tempFolder.desc": {
+    "text": "A folder for agents' own temporary files (Claude Code's scratchpad, and what Codex, Copilot and their shells write to the temp folder), instead of Windows' Temp folder: each agent and the Assistant get a folder of their own in it, made at launch, and kept. A full path (%LOCALAPPDATA% and other variables at the start are filled in), never inside a project or a slot. Empty: the system's Temp folder, as before. Sessions started afterwards take it.",
+    "note": "What the advanced setting \"Agents' temp folder\" does (Settings → Advanced, under Hive). Scratchpad is Claude Code's word for its working folder. %LOCALAPPDATA% is a Windows variable: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.hive.agents.tempFolder.title": {
+    "text": "Agents' temp folder",
+    "note": "An advanced setting's title (Settings → Advanced), followed by a folder: where agents' own temporary files go instead of Windows' Temp folder.",
     "audience": "both"
   },
   "settings.advanced.hive.assistant.startView.desc": {
@@ -2259,6 +2274,11 @@
     "note": "What an advanced setting takes (Settings → Advanced): the name of a field in a CLI's data.",
     "audience": "both"
   },
+  "settings.advanced.takes.folder": {
+    "text": "A folder's full path (a variable such as %LOCALAPPDATA% at the start is filled in).",
+    "note": "What an advanced setting takes (Settings → Advanced): one folder. %LOCALAPPDATA% is a Windows variable: keep it.",
+    "audience": "both"
+  },
   "settings.advanced.takes.folders": {
     "text": "Folders, each a full path, separated by semicolons (a variable such as %LOCALAPPDATA% at the start is filled in).",
     "note": "What an advanced setting takes (Settings → Advanced): a list of folders. %LOCALAPPDATA% is a Windows variable: keep it.",
@@ -2552,6 +2572,10 @@
   "settings.agent.sensitive.agentApi": {
     "text": "The Agent API decides what other programs can do through Combwork: only the user can change it, in {path}.",
     "note": "Why the Assistant can't change an Agent API setting (#186). {path} is where the user changes it (Settings → …)."
+  },
+  "settings.agent.sensitive.agentTempFolder": {
+    "text": "It decides where agents and the Assistant itself write their temporary files: only the user can change it, in {path}.",
+    "note": "Why the Assistant can't change Agents' temp folder (HI-2496): it redirects every agent's file writes, its own launch's too. {path} is where the user changes it."
   },
   "settings.agent.sensitive.assistantPermissions": {
     "text": "These are the Assistant's own permissions: only the user can change it, in {path}.",
