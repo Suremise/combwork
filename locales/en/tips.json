@@ -691,6 +691,14 @@
     "defaultMessage": "Several setups on one sign-in",
     "description": "A tip's title (HI-2107): connections, several on one account."
   },
+  "tips.connectionTags.text": {
+    "defaultMessage": "Give connections on both accounts the same tag, such as Builders or Assistant (the Tag box in a connection's dialog): when a usage move sends agents to the other account, each goes to the connection with its tag, and the Assistant moves too.",
+    "description": "A tip (HI-2530). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Builders and Assistant are example tags."
+  },
+  "tips.connectionTags.title": {
+    "defaultMessage": "Tag connections so moved agents keep their kind",
+    "description": "A tip's title (HI-2530): a connection's tag (a free-text label, such as Builders) lets a usage move put each agent on the same kind of connection on the other account."
+  },
   "tips.connectionTrust.text": {
     "defaultMessage": "A new connection's Set Up asks Claude Code once, in the workspace folder, to trust every project in it. Codex agents never ask: each trusts its own folder for that launch (Settings → Advanced → Codex).",
     "description": "A tip (HI-1871): how a new connection's coding agent CLIs come to trust the workspace's folders. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Set Up is a button)."

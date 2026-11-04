@@ -180,7 +180,7 @@ export const API = {
     noneNamed: agentMsg({ id: 'api.connection.noneNamed', text: 'No connection named "{name}", and none has that id.' }),
     noneNamedUsable: agentMsg({ id: 'api.connection.noneNamedUsable', text: 'No connection named "{name}" is usable in this workspace, and none has that id. cw_connection lists them.' }),
     noneNamedUsableShort: agentMsg({ id: 'api.connection.noneNamedUsableShort', text: 'No connection named "{name}" is usable in this workspace, and none has that id.' }),
-    nothingToChange: agentMsg({ id: 'api.connection.nothingToChange', text: 'Nothing to change: give name, model, effort, mode, context200k or extraArgs.' }),
+    nothingToChange: agentMsg({ id: 'api.connection.nothingToChange', text: 'Nothing to change: give name, model, effort, mode, context200k, extraArgs or tag.' }),
     oldFields: agentMsg({ id: 'api.connection.oldFields', text: 'An agent no longer takes {fields}: it runs on a connection, which holds its model, effort, context and mode, and its CLI follows from it. Pass connection (its id or name). {on} cw_connection lists every one, and makes one when the user agrees.' }),
     severalAccounts: agentMsg({ id: 'api.connection.severalAccounts', text: 'Several accounts are named "{name}": use its id ({ids}).' }),
     severalNamed: agentMsg({ id: 'api.connection.severalNamed', text: 'Several connections are named "{name}": use its id ({ids}).' })

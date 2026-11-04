@@ -172,6 +172,8 @@
   "tips.connectionOrder.title": "Uporządkuj swoje konta",
   "tips.connectionSetups.text": "Dodaj połączenie pod kontem w Ustawienia → Konta i połączenia tworzy kolejną konfigurację na tym samym logowaniu, np. „Claude · Wysoki” obok „Claude · Średni”. Agenci wybierają połączenie, więc jedna edycja zmienia każdego agenta, który na nim działa.",
   "tips.connectionSetups.title": "Kilka konfiguracji na jednym logowaniu",
+  "tips.connectionTags.text": "Nadaj połączeniom na obu kontach tę samą etykietę, np. Builders albo Assistant (pole Etykieta w oknie połączenia): gdy przeniesienie wysyła agentów na drugie konto, każdy przechodzi na połączenie ze swoją etykietą, a Asystent też się przenosi.",
+  "tips.connectionTags.title": "Oznacz połączenia etykietami, by przeniesieni agenci zachowali swój rodzaj",
   "tips.connectionTrust.text": "Skonfiguruj nowe połączenie pyta Claude Code raz, w folderze obszaru roboczego, czy zaufać każdemu projektowi w nim. Agenci Codex nigdy nie pytają: każdy ufa własnemu folderowi na to uruchomienie (Ustawienia → Zaawansowane → Codex).",
   "tips.connectionTrust.title": "Zaufaj obszarowi roboczemu jedną odpowiedzią",
   "tips.connections.text": "Ustawienia → Konta i połączenia przechowuje kilka logowań Claude Code i Codex albo serwer, taki jak Ollama na tym komputerze. Każdy obszar roboczy wybiera, które konta są włączone, a każdy agent działa na połączeniu, które wybrał: wybierz inne w Ustawieniach agenta.",

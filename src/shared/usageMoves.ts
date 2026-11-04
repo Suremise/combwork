@@ -1,5 +1,5 @@
 import type { Account, Connection, PlanLimit, PlanUsage, UsageMoveLimit, UsageMoveRecord, UsageMoveRule } from './types'
-import { connectionsOn } from './accounts'
+import { cleanTag, connectionsOn, sameTag } from './accounts'
 
 /**
  * Usage moves (HI-2195, SPEC §11.2): an account's rule moves its agents to another account's connections when one of its
@@ -47,11 +47,22 @@ export function periodRecord(kept: UsageMoveRecord | undefined, l: Pick<PlanLimi
 /** Whether a rule is the one a record fired with (HR1: a rule changed since drops what that firing queued). */
 export const sameRule = (a: UsageMoveRule | undefined, b: UsageMoveRule | undefined): boolean => !!a && !!b && a.percent === b.percent && a.limit === b.limit && a.to === b.to
 
-/** The connection an agent moves to: the same name on the target account (any case), else its first connection. */
-export function matchConnection(name: string, target: string, connections: readonly Connection[]): Connection | undefined {
+/** Which rule matched an agent's connection on the target (HI-2530), said in the move's notice. */
+export type MatchedBy = 'tag' | 'name' | 'default'
+
+/**
+ * The connection an agent moves to (HI-2530): the first on the target account with the same tag as the one it is on
+ * (any case and spacing; an untagged connection skips this), else the same name (any case), else the target's first
+ * connection, its default. Undefined only when the target has none.
+ */
+export function matchConnection(from: Pick<Connection, 'name' | 'tag'>, target: string, connections: readonly Connection[]): { connection: Connection; by: MatchedBy } | undefined {
   const on = connectionsOn(target, connections)
-  const key = name.trim().toLowerCase()
-  return on.find((c) => c.name.trim().toLowerCase() === key) ?? on[0]
+  const byTag = cleanTag(from.tag) ? on.find((c) => sameTag(c.tag, from.tag)) : undefined
+  if (byTag) return { connection: byTag, by: 'tag' }
+  const key = from.name.trim().toLowerCase()
+  const byName = on.find((c) => c.name.trim().toLowerCase() === key)
+  if (byName) return { connection: byName, by: 'name' }
+  return on[0] ? { connection: on[0], by: 'default' } : undefined
 }
 
 /** Why a usage move's target can't take an account's agents anywhere (an account off in one workspace is that workspace's). */

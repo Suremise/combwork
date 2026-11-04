@@ -19,6 +19,7 @@ interface HiveMessageValues {
   'settings.accounts.connection.remove': undefined
   'settings.accounts.connection.removeMessage': undefined
   'settings.accounts.connection.removeTitle': { name: string | number }
+  'settings.accounts.connection.tagTip': undefined
   'settings.accounts.copilotAs': { account: string | number }
   'settings.accounts.copilotNotSignedIn': undefined
   'settings.accounts.defaults.failed': undefined
@@ -777,6 +778,9 @@ interface HiveMessageValues {
   'settings.connection.summary.effort': undefined
   'settings.connection.summary.mode': undefined
   'settings.connection.summary.model': undefined
+  'settings.connection.tag': undefined
+  'settings.connection.tagHint': undefined
+  'settings.connection.tagPlaceholder': undefined
   'settings.connection.usedBy': { users: string | number }
   'settings.connection.userIn': { agent: string | number; project: string | number }
   'settings.connections.add.addServer': undefined

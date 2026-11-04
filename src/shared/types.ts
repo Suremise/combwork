@@ -815,6 +815,11 @@ export interface Connection {
   permissionMode?: PermissionMode
   /** Extra command-line arguments, as typed (split at launch: splitArgs). */
   extraArgs?: string
+  /**
+   * A free-text tag of the user's (HI-2530: "Builders", "Assistant"), trimmed, never empty. Combwork reads no meaning
+   * into it: a usage move only compares it (any case) to match an agent to the same-tagged connection on the target.
+   */
+  tag?: string
 }
 
 /** What a connection launches with (HI-2106): two connections on one account with the same values are the same setup. */

@@ -19,10 +19,10 @@ vi.mock('electron', () => ({
   }
 }))
 
-const H = vi.hoisted(() => ({ advanced: true as boolean, notices: [] as { title: string; api?: string }[] }))
+const H = vi.hoisted(() => ({ advanced: true as boolean, notices: [] as { title: string; api?: string; message?: string }[], firstUsable: null as { provider: string } | null }))
 vi.mock('../src/main/advanced', () => ({ advanced: { get: (id: string) => (id === 'cw.accounts.usageMoves' ? H.advanced : undefined) } }))
 // Told once through tell() (HI-2320): what it tells, by its title and its English one.
-vi.mock('../src/main/notify', () => ({ tell: (t: { title: string; apiTitle?: string }) => void H.notices.push({ title: t.title, api: t.apiTitle }) }))
+vi.mock('../src/main/notify', () => ({ tell: (t: { title: string; apiTitle?: string; message?: string }) => void H.notices.push({ title: t.title, api: t.apiTitle, message: t.message }) }))
 vi.mock('../src/main/planUsage', () => ({ connectionLoginNow: () => null }))
 vi.mock('../src/main/accounts', async () => {
   const { config } = await import('../src/main/config')
@@ -31,6 +31,8 @@ vi.mock('../src/main/accounts', async () => {
     allConnections: () => config.get().connections ?? [],
     accountById: (id: string | null | undefined) => (config.get().accounts ?? []).find((a) => a.id === id),
     getConnection: (id: string | null | undefined) => (config.get().connections ?? []).find((c) => c.id === id),
+    // The first usable account here (decision A): what an Assistant naming no CLI launches on (HR3 on HI-2530).
+    firstUsableAccount: () => H.firstUsable,
     onConnectionSignedIn: () => undefined
   }
 })
@@ -38,7 +40,7 @@ vi.mock('../src/main/accounts', async () => {
 // A workspace with one project, its agents in memory, and updateAgent's lock and check as the real one's.
 const PROJECT = 'C:\\ws\\proj'
 const pc: ProjectConfig = { id: 'p-1', agents: [] } as unknown as ProjectConfig
-// The workspace's Hive Assistant, on Anthropic-1 too: never moved (the Assistant's check of HI-2195's screenshots).
+// The workspace's Assistant: on Anthropic-3 unless a test puts it on Anthropic-1, where it moves too (HI-2530).
 const assistantPc: ProjectConfig = { agents: [] } as unknown as ProjectConfig
 let lock: Promise<unknown> = Promise.resolve()
 // A write held at the lock (HR1's round 1): `gate` set, each write waits for it once it has the lock; `atLock` counts them.
@@ -55,7 +57,7 @@ const ws = {
     const run = lock.then(async () => {
       G.atLock++
       if (G.gate) await G.gate
-      const current = pc.agents.find((a) => a.id === id)!
+      const current = (p === ws.assistantHome ? assistantPc : pc).agents.find((a) => a.id === id)!
       check?.(current)
       Object.assign(current, patch)
       return current
@@ -129,7 +131,7 @@ const weekly = (used: number, resetsAt = ahead(48)): PlanLimit => ({ id: 'seven_
 const fiveHour = (used: number, resetsAt = ahead(2)): PlanLimit => ({ id: 'five_hour', label: '5-hour', windowMinutes: 300, usedPercent: used, resetsAt })
 
 const account = (id: string, name: string, extra: Partial<Account> = {}): Account => ({ id, provider: 'claude-code', name, createdAt: '2026-10-01T00:00:00Z', observed: { at: '2026-10-31T00:00:00Z', loggedIn: true }, ...extra })
-const conn = (id: string, acc: string, name: string): Connection => ({ id, account: acc, name })
+const conn = (id: string, acc: string, name: string, tag?: string): Connection => ({ id, account: acc, name, ...(tag !== undefined ? { tag } : {}) })
 const RULE: UsageMoveRule = { percent: 98, limit: 'weekly', to: 'a2' }
 
 describe('the rules (shared/usageMoves.ts)', () => {
@@ -154,9 +156,25 @@ describe('the rules (shared/usageMoves.ts)', () => {
   })
   it('matches the same name on the target (any case), else its first connection', () => {
     const cs = [conn('c1', 'a1', 'Builder'), conn('c2', 'a2', 'Main'), conn('c3', 'a2', 'builder ')]
-    expect(U.matchConnection('Builder', 'a2', cs)?.id).toBe('c3')
-    expect(U.matchConnection('Reviewer', 'a2', cs)?.id).toBe('c2')
-    expect(U.matchConnection('Builder', 'a3', cs)).toBeUndefined()
+    expect(U.matchConnection({ name: 'Builder' }, 'a2', cs)).toEqual({ connection: cs[2], by: 'name' })
+    expect(U.matchConnection({ name: 'Reviewer' }, 'a2', cs)).toEqual({ connection: cs[1], by: 'default' })
+    expect(U.matchConnection({ name: 'Builder' }, 'a3', cs)).toBeUndefined()
+  })
+  it('matches the same tag first (HI-2530): any case and spacing, the first in order of several, then name, then the first', () => {
+    // The target: its first is Main (untagged), then two tagged Builders, then one named like the source but tagged otherwise.
+    const cs = [conn('m', 'a2', 'Main'), conn('b1', 'a2', 'Opus builders', 'Builders'), conn('b2', 'a2', 'Sonnet builders', 'builders'), conn('n', 'a2', 'Anthropic-1 · Builders', 'Reviewers'), conn('as', 'a2', 'Helper', '  ASSISTANT ')]
+    const id = (from: { name: string; tag?: string }) => U.matchConnection(from, 'a2', cs)
+    // Tag beats name: the source's name is on the target too, under another tag.
+    expect(id({ name: 'Anthropic-1 · Builders', tag: 'Builders' })).toEqual({ connection: cs[1], by: 'tag' })
+    // Case and spacing don't matter; of several with the tag, the first in order.
+    expect(id({ name: 'x', tag: '  bUILDERS' })).toEqual({ connection: cs[1], by: 'tag' })
+    expect(id({ name: 'x', tag: 'assistant' })).toEqual({ connection: cs[4], by: 'tag' })
+    // A tag the target hasn't: by name, else the first.
+    expect(id({ name: 'anthropic-1 · builders', tag: 'Testers' })).toEqual({ connection: cs[3], by: 'name' })
+    expect(id({ name: 'Nowhere', tag: 'Testers' })).toEqual({ connection: cs[0], by: 'default' })
+    // No tag, or a blank one: the tag step is skipped, even with untagged connections on the target.
+    expect(id({ name: 'Nowhere' })).toEqual({ connection: cs[0], by: 'default' })
+    expect(id({ name: 'Nowhere', tag: '   ' })).toEqual({ connection: cs[0], by: 'default' })
   })
   it("a target that can't take them says why: gone, signed out, no connections, or full itself", () => {
     const a1 = account('a1', 'One')
@@ -262,6 +280,7 @@ describe('usageMoves.ts', () => {
     G.atLock = 0
     H.advanced = true
     H.notices.length = 0
+    H.firstUsable = null
     for (const s of [S.running, S.busy]) s.clear()
     S.quits.length = 0
     S.resumed.length = 0
@@ -274,7 +293,7 @@ describe('usageMoves.ts', () => {
       c.usageMoves = {}
     })
     pc.agents = [agent('idle', 'c1b'), agent('busy', 'c1b'), agent('stopped'), agent('other', 'c3')]
-    assistantPc.agents = [{ ...agent('assistant', 'c1'), name: 'Assistant' }]
+    assistantPc.agents = [{ ...agent('assistant', 'c3'), name: 'Assistant' }]
     for (const id of ['idle', 'busy']) S.running.add(key(id))
     S.busy.add(key('busy'))
   })
@@ -303,15 +322,111 @@ describe('usageMoves.ts', () => {
     expect(pc.agents.map((a) => a.connection)).toEqual(['c2b', 'c2b', 'c2', 'c3'])
   })
 
-  it("never moves the Hive Assistant: its connection is the user's (Settings → Assistant)", async () => {
-    S.running.add(`${ws.assistantHome}#assistant`)
+  it('moves the Assistant too (HI-2530), only once its turn is over, to the same-tagged connection, and never back', async () => {
+    const home = `${ws.assistantHome}#assistant`
+    config.update((c) => {
+      c.connections = [...c.connections!.filter((x) => x.account !== 'a2'), conn('c2', 'a2', 'Main'), conn('c2b', 'a2', 'Builder'), conn('c2a', 'a2', 'Anthropic-2 · Assistant', 'Assistant'), conn('c1a', 'a1', 'Anthropic-1 · Assistant', 'assistant'), conn('c1x', 'a1', 'Solo')]
+    })
+    assistantPc.agents = [{ ...agent('assistant', 'c1a'), name: 'Assistant' }]
+    // On a connection whose name and tag the target hasn't: its first.
+    pc.agents.find((a) => a.id === 'stopped')!.connection = 'c1x'
+    S.running.add(home)
+    S.busy.add(home)
     setUsage('a1', [weekly(99)])
     await settle()
     await vi.waitFor(() => expect(S.resumed).toContain(key('idle')), { timeout: HUNG_MS })
-    expect(assistantPc.agents[0].connection).toBe('c1')
-    expect(S.quits.some((k) => k.includes('assistant'))).toBe(false)
+    // Mid-turn: queued, nothing written or typed yet.
+    expect(usageMovesPending()).toContain('assistant:c:\\ws/assistant')
+    expect(assistantPc.agents[0].connection).toBe('c1a')
+    expect(S.quits).not.toContain(home)
+    // The notice names it with the others, and how each was matched.
+    expect(H.notices.map((n) => n.api)).toEqual(['4 agents move from Anthropic-1 to Anthropic-2'])
+    expect(H.notices[0].message).toContain('Assistant (by tag Assistant)')
+    expect(H.notices[0].message).toContain('idle (by name)')
+    expect(H.notices[0].message).toContain('stopped (to its first connection)')
+    // Its turn over: moved to the same-tagged connection, and resumed there.
+    S.busy.delete(home)
+    S.looks.get(home)?.()
+    await vi.waitFor(() => expect(assistantPc.agents[0].connection).toBe('c2a'), { timeout: HUNG_MS })
+    await vi.waitFor(() => expect(S.resumed).toContain(home), { timeout: HUNG_MS })
+    // A reverse rule within the period never moves it back (HR1's guard), as for agents.
+    config.update((c) => (c.accounts = c.accounts!.map((a) => (a.id === 'a2' ? { ...a, usageMove: { percent: 98, limit: 'weekly', to: 'a1' } } : a))))
+    setUsage('a2', [weekly(99)])
+    await settle()
+    expect(assistantPc.agents[0].connection).toBe('c2a')
+  })
+
+  it("an Assistant naming no CLI or connection is moved by its launch CLI's rules only: the first usable account's (HR3)", async () => {
+    // A new workspace's Assistant (HI-2108): it launches on the first usable account's CLI, here Codex's.
+    assistantPc.agents = [{ id: 'assistant', name: 'Assistant' } as AgentDef]
+    H.firstUsable = { provider: 'codex' }
+    setUsage('a1', [weekly(99)])
+    await settle()
+    await vi.waitFor(() => expect(S.resumed).toContain(key('idle')), { timeout: HUNG_MS })
+    expect(assistantPc.agents[0].connection).toBeUndefined()
     expect(usageMovesPending().some((k) => k.startsWith('assistant:'))).toBe(false)
     expect(H.notices.map((n) => n.api)).toEqual(['3 agents move from Anthropic-1 to Anthropic-2'])
+  })
+
+  it('…and moved when that first usable account is the rule’s CLI, onto the target’s matching connection (HR3)', async () => {
+    assistantPc.agents = [{ id: 'assistant', name: 'Assistant' } as AgentDef]
+    H.firstUsable = { provider: 'claude-code' }
+    setUsage('a1', [weekly(99)])
+    await settle()
+    // Not running: written at once, to Anthropic-2's first (its connection resolved as Anthropic-1's first, Main: by name).
+    await vi.waitFor(() => expect(assistantPc.agents[0].connection).toBe('c2'), { timeout: HUNG_MS })
+    expect(H.notices[0]?.message).toContain('Assistant (by name)')
+  })
+
+  it("an Assistant inheriting a CLI other than Settings' automatic one keeps it when moved: written with its connection (HR3 round 1)", async () => {
+    const { agentProvider } = await import('../src/shared/providers')
+    const { resolveAgentConnection } = await import('../src/shared/accounts')
+    // The automatic CLI (no provider named) is Claude Code here; the Assistant inherits Codex, the first usable account's.
+    expect(agentProvider({}, config.settings)).toBe('claude-code')
+    const was = ws.config.connections
+    ws.config.connections = { ...was, codex: { on: ['k1', 'k2'], default: 'k1' } } as typeof was
+    try {
+      config.update((c) => {
+        c.accounts = [...c.accounts!, account('k1', 'Codex-1', { provider: 'codex', usageMove: { percent: 98, limit: 'weekly', to: 'k2' } }), account('k2', 'Codex-2', { provider: 'codex' })]
+        c.connections = [...c.connections!, conn('kc1', 'k1', 'Codex-1'), conn('kc2', 'k2', 'Codex-2')]
+      })
+      assistantPc.agents = [{ id: 'assistant', name: 'Assistant' } as AgentDef]
+      H.firstUsable = { provider: 'codex' }
+      setUsage('k1', [weekly(99)])
+      await settle()
+      await vi.waitFor(() => expect(assistantPc.agents[0].connection).toBe('kc2'), { timeout: HUNG_MS })
+      // Its CLI written with the connection: its next launch (sessions.effective: a connection named, so its own
+      // provider) resolves as Codex on Codex-2, not as Claude Code dropping the Codex connection.
+      const saved = assistantPc.agents[0]
+      expect(saved.provider).toBe('codex')
+      const cli = agentProvider(saved, config.settings)
+      const launch = resolveAgentConnection(ws.config, cli, saved.connection, config.get().accounts!, config.get().connections!)
+      expect(cli).toBe('codex')
+      expect(launch.ok && launch.account.id).toBe('k2')
+      expect(launch.ok && launch.connection.id).toBe('kc2')
+      // Project agents keep whatever provider they had: only the inheriting Assistant is pinned.
+      expect(pc.agents.every((a) => a.provider === 'claude-code')).toBe(true)
+    } finally {
+      ws.config.connections = was
+    }
+  })
+
+  it('the Assistant, chosen by the user while its move waits, stays where the user put it (HI-2530)', async () => {
+    const home = `${ws.assistantHome}#assistant`
+    assistantPc.agents = [{ ...agent('assistant', 'c1'), name: 'Assistant' }]
+    S.running.add(home)
+    S.busy.add(home)
+    setUsage('a1', [weekly(99)])
+    await settle()
+    expect(usageMovesPending()).toContain('assistant:c:\\ws/assistant')
+    // Settings → Assistant's choice (projectAgents.updateAgent's note) drops it; its turn ends with nothing written.
+    noteManualChoice(ws.assistantHome, { ...assistantPc.agents[0] })
+    expect(usageMovesPending()).not.toContain('assistant:c:\\ws/assistant')
+    S.busy.delete(home)
+    S.looks.get(home)?.()
+    await lock
+    expect(assistantPc.agents[0].connection).toBe('c1')
+    expect(S.quits).not.toContain(home)
   })
 
   it('a manual choice on the same account while busy wins, through another report and a restart (HR1)', async () => {

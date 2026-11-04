@@ -87,6 +87,7 @@ const M = {
   removeConnectionMessage: msg({ id: 'settings.accounts.connection.removeMessage', defaultMessage: 'Only this setup goes: its account and its other connections stay.', description: "The message of the dialog confirming a connection's removal (HI-2107)." }),
   connectionFailed: msg({ id: 'settings.accounts.connection.failed', defaultMessage: "Couldn't change the connection", description: "An error's title: duplicating or removing a connection failed (Settings → Accounts & Connections, HI-2107)." }),
   base: msg({ id: 'settings.accounts.connection.base', defaultMessage: 'First', description: "A mark on an account's first connection (HI-2107): the one a new agent on that account gets first. Keep it short." }),
+  tagTip: msg({ id: 'settings.accounts.connection.tagTip', defaultMessage: "Its tag: a usage move puts agents on another account's connection with the same tag.", description: "The tooltip of a connection's tag on its row (Settings → Accounts & Connections, HI-2530). The tag is a free-text label of the user's (\"Builders\")." }),
   baseTip: msg({ id: 'settings.accounts.connection.baseTip', defaultMessage: 'The first of its account: what a new agent gets when this account is first in the order and on here.', description: 'The tooltip of "First" on a connection (HI-2107).' })
 }
 
@@ -232,6 +233,11 @@ export function AccountsSettings() {
               <span className="connection-name">
                 {c.name}
                 {i === 0 && rows.length > 1 && <span className="connection-base" title={tr(M.baseTip)}>{tr(M.base)}</span>}
+                {c.tag && (
+                  <span className="connection-tag" data-tag title={tr(M.tagTip)}>
+                    <Icon name="tag" /> {c.tag}
+                  </span>
+                )}
               </span>
               <span className="connection-summary muted" data-summary>
                 {connectionSummary(c, a, settings)}

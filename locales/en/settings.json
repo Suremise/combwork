@@ -71,6 +71,10 @@
     "defaultMessage": "Remove the connection {name}?",
     "description": "Title of the dialog confirming a connection's removal ({name}, its name; HI-2107)."
   },
+  "settings.accounts.connection.tagTip": {
+    "defaultMessage": "Its tag: a usage move puts agents on another account's connection with the same tag.",
+    "description": "The tooltip of a connection's tag on its row (Settings → Accounts & Connections, HI-2530). The tag is a free-text label of the user's (\"Builders\")."
+  },
   "settings.accounts.copilotAs": {
     "defaultMessage": "Signed in: {account}",
     "description": "GitHub Copilot's account (HI-2107): who its PC-wide sign-in is ({account}, a GitHub user name)."
@@ -332,8 +336,8 @@
     "description": "An entry of the list in an account's usage move (\"When it reaches 98% of its 5-hour limit…\", HI-2195): its plan's rolling 5-hour usage limit."
   },
   "settings.accounts.usageMove.how": {
-    "defaultMessage": "Each agent moves to the connection with the same name there, or its first one, once its turn is over, and resumes its conversation. The Assistant stays where it is (Settings → Assistant). Combwork moves them once per limit period and never back: move one back by choosing its connection.",
-    "description": "Under an account's usage move when it is on (Settings → Accounts & Connections, HI-2195): what happens."
+    "defaultMessage": "Each agent, and the Assistant, moves to the connection there with the same tag, else the same name, else its first one, once its turn is over, and resumes its conversation. Combwork moves them once per limit period and never back: move one back by choosing its connection.",
+    "description": "Under an account's usage move when it is on (Settings → Accounts & Connections, HI-2195; HI-2530: the Assistant moves too, and a connection's tag, a free-text label of the user's, is matched first): what happens."
   },
   "settings.accounts.usageMove.limitLabel": {
     "defaultMessage": "Which limit",
@@ -3102,6 +3106,18 @@
   "settings.connection.summary.model": {
     "defaultMessage": "Model: CLI default",
     "description": "In a connection's summary line (Settings → Accounts & Connections, HI-2107): no model chosen, the CLI's own default runs."
+  },
+  "settings.connection.tag": {
+    "defaultMessage": "Tag",
+    "description": "Label of a connection's tag in its dialog (HI-2530): an optional free-text label of the user's, such as \"Builders\", that a usage move matches connections by. Not a workflow role."
+  },
+  "settings.connection.tagHint": {
+    "defaultMessage": "Optional, any text. When a usage move sends this account's agents to another account, each goes to the connection there with the same tag, else the same name, else its first.",
+    "description": "Under the tag box in a connection's dialog (HI-2530): what the tag is for. A usage move is an account's rule (Settings → Accounts & Connections) moving its agents and the Assistant to another account at a usage limit."
+  },
+  "settings.connection.tagPlaceholder": {
+    "defaultMessage": "None, or e.g. Builders",
+    "description": "The placeholder of the empty tag box in a connection's dialog (HI-2530). \"Builders\" is an example tag, any word the user likes."
   },
   "settings.connection.usedBy": {
     "defaultMessage": "In use: {users}. Running ones are offered Restart once you save (Switch Now for a new permission mode).",

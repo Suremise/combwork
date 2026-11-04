@@ -236,6 +236,7 @@ const R = {
   releasedWriter: agentMsg({ id: 'reply.release.releasedWriter', text: "Released {slot} in {project}: {agent}'s ended run no longer holds it{ended, select, yes {, its listed processes ended first} other {}}.", note: "cw_release_slot release of a writer's slot." }),
   context200k: agentMsg({ id: 'reply.connection.context200k', text: '200K', note: "A connection's value: the 200K context window." }),
   connectionArgs: agentMsg({ id: 'reply.connection.args', text: 'args {args}', note: "A connection's extra arguments for its CLI." }),
+  connectionTag: agentMsg({ id: 'reply.connection.tag', text: 'tag {tag}', note: "A connection's free-text tag (HI-2530), which a usage move matches by." }),
   cliDefaults: agentMsg({ id: 'reply.connection.cliDefaults', text: "the CLI's defaults", note: 'A connection with no values of its own.' }),
   connectionRow: agentMsg({ id: 'reply.connection.row', text: '{name} (id {id}) on {account}, {cli}: {values}{unusable, select, yes {. Not usable here: its account is off} other {}}', note: 'cw_connection list (HI-2108): a connection, its account and CLI, its values, and whether it is usable here.' }),
   unknownCli: agentMsg({ id: 'reply.connection.unknownCli', text: 'unknown CLI', note: "A connection whose CLI isn't known." }),
@@ -1388,11 +1389,12 @@ export interface ConnectionPublic {
   context200k?: boolean
   mode?: string
   extraArgs?: string
+  tag?: string
   usable?: false
 }
 
 /** A connection's values, short: "opus · high · 200K · plan", or "the CLI's defaults". */
-const connectionValuesText = (c: ConnectionPublic): string => [c.model, c.effort, c.context200k ? say(R.context200k) : '', c.mode, c.extraArgs ? say(R.connectionArgs, { args: c.extraArgs }) : ''].filter(Boolean).join(' · ') || say(R.cliDefaults)
+const connectionValuesText = (c: ConnectionPublic): string => [c.model, c.effort, c.context200k ? say(R.context200k) : '', c.mode, c.extraArgs ? say(R.connectionArgs, { args: c.extraArgs }) : '', c.tag ? say(R.connectionTag, { tag: c.tag }) : ''].filter(Boolean).join(' · ') || say(R.cliDefaults)
 
 /**
  * cw_connection list (HI-2108): one row per connection, by account, those not usable here marked; then the accounts with

@@ -172,6 +172,8 @@
   "tips.connectionOrder.title": "给账号排序",
   "tips.connectionSetups.text": "“设置”→“账号与连接”中账号下的“添加连接”会在同一个登录上再建一套设置，比如在“Claude · Medium”旁边加一个“Claude · High”。智能体选择的是连接，所以改一次就会影响使用它的每个智能体。",
   "tips.connectionSetups.title": "一个登录，多套设置",
+  "tips.connectionTags.text": "为两个账号上的连接设置相同的标签，例如 Builders 或 Assistant（连接对话框中的“标签”框）：当按用量转移把智能体转到另一个账号时，每个智能体都转到带有其标签的连接，助手也会一起转移。",
+  "tips.connectionTags.title": "给连接加标签，让转移后的智能体保持原有类型",
   "tips.connectionTrust.text": "新连接的“初始设置”只会在工作区文件夹中询问 Claude Code 一次，以信任其中的每个项目。Codex 智能体从不询问：每个智能体在该次启动中信任自己的文件夹（“设置”→“高级”→“Codex”）。",
   "tips.connectionTrust.title": "一次回答即可信任整个工作区",
   "tips.connections.text": "“设置”→“账号与连接”可保存多个 Claude Code 和 Codex 登录，或本机上的 Ollama 等服务器。每个工作区选择启用哪些账号，每个智能体使用它所选的连接运行：可在“智能体设置”中另选一个。",

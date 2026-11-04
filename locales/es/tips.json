@@ -172,6 +172,8 @@
   "tips.connectionOrder.title": "Ordena tus cuentas",
   "tips.connectionSetups.text": "Agregar conexión, bajo una cuenta en Configuración → Cuentas y conexiones, crea otra configuración con el mismo inicio de sesión, por ejemplo “Claude · Alto” junto a “Claude · Medio”. Los agentes eligen una conexión, así que un solo cambio afecta a todos los agentes que la usan.",
   "tips.connectionSetups.title": "Varias configuraciones con un inicio de sesión",
+  "tips.connectionTags.text": "Da la misma etiqueta a conexiones de ambas cuentas, como Builders o Assistant (el campo Etiqueta del diálogo de una conexión): cuando un traslado por uso manda agentes a la otra cuenta, cada uno pasa a la conexión con su etiqueta, y el Asistente también se mueve.",
+  "tips.connectionTags.title": "Etiqueta las conexiones para que los agentes trasladados mantengan su tipo",
   "tips.connectionTrust.text": "Configurar una conexión nueva pregunta a Claude Code una sola vez, en la carpeta del espacio de trabajo, si confía en cada proyecto que contiene. Los agentes de Codex nunca preguntan: cada uno confía en su propia carpeta para ese inicio (Configuración → Avanzado → Codex).",
   "tips.connectionTrust.title": "Confía en un espacio de trabajo con una sola respuesta",
   "tips.connections.text": "Configuración → Cuentas y conexiones guarda varios inicios de sesión de Claude Code y Codex, o un servidor como Ollama en este PC. Cada espacio de trabajo elige qué cuentas están activadas, y cada agente se ejecuta con la conexión que eligió: elige otra en la Configuración del agente.",

@@ -172,6 +172,8 @@
   "tips.connectionOrder.title": "Put your accounts in order",
   "tips.connectionSetups.text": "Add Connection under an account in Settings → Accounts & Connections makes another setup on the same sign-in, say \"Claude · High\" beside \"Claude · Medium\". Agents choose a connection, so one edit changes every agent on it.",
   "tips.connectionSetups.title": "Several setups on one sign-in",
+  "tips.connectionTags.text": "Give connections on both accounts the same tag, such as Builders or Assistant (the Tag box in a connection's dialog): when a usage move sends agents to the other account, each goes to the connection with its tag, and the Assistant moves too.",
+  "tips.connectionTags.title": "Tag connections so moved agents keep their kind",
   "tips.connectionTrust.text": "A new connection's Set Up asks Claude Code once, in the workspace folder, to trust every project in it. Codex agents never ask: each trusts its own folder for that launch (Settings → Advanced → Codex).",
   "tips.connectionTrust.title": "Trust a workspace in one answer",
   "tips.connections.text": "Settings → Accounts & Connections keeps several Claude Code and Codex sign-ins, or a server such as Ollama on this PC. Each workspace chooses which accounts are on, and each agent runs on the connection it chose: pick another in Agent Settings.",

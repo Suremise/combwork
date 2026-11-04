@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Account, AppSettings, Connection, EffortLevel, PermissionMode, ProviderId } from '@shared/types'
-import type { ConnectionPatch, ConnectionRow, ConnectionsView } from '@shared/accounts'
+import { TAG_MAX, type ConnectionPatch, type ConnectionRow, type ConnectionsView } from '@shared/accounts'
 import type { MovedNotice } from '@shared/connectionDefaults'
 import { modeCaveat, modeOption, offeredModes, permissionLabel, providerDescriptor } from '@shared/providers'
 import { effortName, modelCaps } from '@shared/models'
@@ -30,6 +30,9 @@ const M = {
   context200k: msg({ id: 'settings.connection.context200k', defaultMessage: '200K', description: "A choice of a connection's context: a 200K-token window, which compacts sooner. 200K is a number of tokens." }),
   mode: msg({ id: 'settings.connection.mode', defaultMessage: 'Permission mode', description: "Label of a connection's permission mode in its dialog (HI-2107)." }),
   args: msg({ id: 'settings.connection.args', defaultMessage: 'Extra arguments', description: "Label of a connection's extra command-line arguments in its dialog (HI-2107)." }),
+  tag: msg({ id: 'settings.connection.tag', defaultMessage: 'Tag', description: "Label of a connection's tag in its dialog (HI-2530): an optional free-text label of the user's, such as \"Builders\", that a usage move matches connections by. Not a workflow role." }),
+  tagPlaceholder: msg({ id: 'settings.connection.tagPlaceholder', defaultMessage: 'None, or e.g. Builders', description: "The placeholder of the empty tag box in a connection's dialog (HI-2530). \"Builders\" is an example tag, any word the user likes." }),
+  tagHint: msg({ id: 'settings.connection.tagHint', defaultMessage: "Optional, any text. When a usage move sends this account's agents to another account, each goes to the connection there with the same tag, else the same name, else its first.", description: "Under the tag box in a connection's dialog (HI-2530): what the tag is for. A usage move is an account's rule (Settings → Accounts & Connections) moving its agents and the Assistant to another account at a usage limit." }),
   argsHint: msg({ id: 'settings.connection.argsHint', defaultMessage: 'Added to {cli} when an agent on it starts.', description: "Under a connection's extra arguments: they are added to the coding agent CLI's command line ({cli}: its command, such as claude)." }),
   cliDefault: msg({ id: 'settings.provider.cliDefault', defaultMessage: '{provider} default', description: "The first choice of a model or effort list: the CLI's own default. {provider} is its name." }),
   cliDefaultIs: msg({ id: 'settings.provider.cliDefaultIs', defaultMessage: '{provider} default ({which})', description: "The first choice of a model or effort list: the CLI's own default, and which model or level that is. {provider} is its name." }),
@@ -146,6 +149,7 @@ function ConnectionForm({ account: a, row, settings, onClose }: { account: Accou
   const [ctx, setCtx] = useState(!!row?.use200kContext)
   const [mode, setMode] = useState<string>(row?.permissionMode ?? '')
   const [args, setArgs] = useState(row?.extraArgs ?? '')
+  const [tag, setTag] = useState(row?.tag ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const cliModel = server ? (serverDefaultModel(a.server?.models ?? []) ?? null) : (info?.defaultModel ?? null)
@@ -158,7 +162,7 @@ function ConnectionForm({ account: a, row, settings, onClose }: { account: Accou
     if (!name.trim()) return setError(tr(M.needName))
     setBusy(true)
     setError(null)
-    const patch: ConnectionPatch & { name: string } = { name, model: model || null, permissionMode: (mode || null) as PermissionMode | null, extraArgs: args.trim() || null }
+    const patch: ConnectionPatch & { name: string } = { name, model: model || null, permissionMode: (mode || null) as PermissionMode | null, extraArgs: args.trim() || null, tag: tag.trim() || null }
     if (!server) {
       patch.effort = (effort || null) as EffortLevel | null
       if (p.capabilities.contextLimit) patch.use200kContext = ctx || null
@@ -193,6 +197,12 @@ function ConnectionForm({ account: a, row, settings, onClose }: { account: Accou
       <div className="agent-form connection-form" data-connection-form={row?.id ?? 'new'}>
         <label htmlFor="connection-name">{tr(M.name)}</label>
         <input id="connection-name" className="input" autoFocus value={name} placeholder={tr(M.namePlaceholder)} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void save()} />
+        {/* Its tag (HI-2530): free text, only compared by a usage move. */}
+        <label htmlFor="connection-tag">{tr(M.tag)}</label>
+        <div>
+          <input id="connection-tag" className="input" data-connection-tag value={tag} maxLength={TAG_MAX} placeholder={tr(M.tagPlaceholder)} onChange={(e) => setTag(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void save()} />
+          <div className="hint">{tr(M.tagHint)}</div>
+        </div>
         <label>{tr(M.model)}</label>
         <ModelPicker provider={cli} connection={a} value={model} base={{ value: '', label: cliModel ? tr(M.cliDefaultIs, { provider: server ? a.name : p.name, which: server ? cliModel : modelLabel(cliModel, cli) }) : tr(M.cliDefault, { provider: server ? a.name : p.name }) }} onChange={setModel} />
         {!server && (
