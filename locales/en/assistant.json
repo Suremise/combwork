@@ -1732,8 +1732,8 @@
     "description": "What a skill that ships with Hive (coordinate-agents) is for: under its name in the Skills view and a project's Skills tab. Keep Hive Assistant as Hive names it."
   },
   "assistant.skills.shipped.generalist": {
-    "defaultMessage": "General work done well: understand first, change carefully, prove it works, report honestly. Use when no other skill fits.",
-    "description": "What a skill that ships with Hive (generalist) is for: under its name in the Skills view and a project's Skills tab. It is for work outside the board's skills, such as whatever the user asks an agent in its pane."
+    "defaultMessage": "General work: understand first, change carefully, prove it works, report honestly. Use when no other skill fits, not for a Combwork inbox line.",
+    "description": "What a skill that ships with Hive (generalist) is for: under its name in the Skills view and a project's Skills tab. It is for work outside the board's skills, such as whatever the user asks an agent in its pane. A Combwork inbox line is the line Combwork types into an agent's session when its inbox has something (\"[CW] New in your inbox…\"): that work names its own skill."
   },
   "assistant.skills.shipped.handover": {
     "defaultMessage": "Write a handover so a later session or another agent can carry on cold. Use when asked to wrap up for later, hand over or stop for the day. Readying a branch to merge is merge-ready.",

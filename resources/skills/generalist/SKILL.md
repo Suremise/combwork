@@ -1,6 +1,6 @@
 ---
 name: generalist
-description: "General work done well: understand first, change carefully, prove it works, report honestly. Use when no other skill fits."
+description: "General work: understand first, change carefully, prove it works, report honestly. Use when no other skill fits, not for a Combwork inbox line."
 metadata:
   audience: agents
 ---

@@ -432,7 +432,7 @@
   "assistant.skills.shipped.boardHygiene": "以助手的身份整理看板：重复卡片、未记录的回答、已过时的受阻原因。用于被要求整理看板时。",
   "assistant.skills.shipped.cardLoop": "以构建者或评审者的身份依次处理卡片，等待时不消耗资源。用于被要求以构建者或评审者身份处理或评审卡片（一张或多张），或被给定轮数时。",
   "assistant.skills.shipped.coordinateAgents": "以助手的身份在工作区的智能体之间安排工作：卡片、任务说明、启动智能体、等待、交接、停滞的卡片。用于被要求让智能体开始工作、开始或继续一张卡片，或检查进度时。",
-  "assistant.skills.shipped.generalist": "把一般工作做好：先理解，谨慎修改，证明它可行，如实汇报。用于没有其他技能适用时。",
+  "assistant.skills.shipped.generalist": "一般工作：先理解，谨慎修改，证明它可行，如实汇报。用于没有其他技能适用时，不用于 Combwork 收件箱提示行。",
   "assistant.skills.shipped.handover": "撰写交接说明，让之后的会话或其他智能体无需上下文也能接着做。用于被要求收尾留待以后、交接或今天到此为止时。让分支准备好合并请用 merge-ready。",
   "assistant.skills.shipped.journal": "在日志开启时以助手的身份记日志：写什么、回忆、取代旧条目、每周摘要和范围。用于发生值得记住的事、凭记忆做决定之前，或被要求交接时。",
   "assistant.skills.shipped.licenceAudit": "审核所发布内容的许可证：依赖项、内置的第三方文件、安装程序组件。用于发布版本或添加素材时。",
