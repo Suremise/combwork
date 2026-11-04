@@ -183,7 +183,7 @@
   "workspace.mcpView.toolReadNote": "Read a shared note",
   "workspace.mcpView.toolSessionUsage": "Token use, cache and compactions for a session",
   "workspace.mcpView.toolWriteNote": "Create, overwrite or append to a shared note",
-  "workspace.mcpView.tryAsking": "Try asking an agent: *\"Write a handover for the next session using the hive tools.\"*",
+  "workspace.mcpView.tryAsking": "Try asking an agent: *\"Write a handover for the next session using the Combwork tools.\"*",
   "workspace.mcpView.whatItDoes": "What it does",
   "workspace.mcpView.whatItRuns": "What it runs",
   "workspace.move.branchesBanner": "{count, plural, one {An agent's branch is still named after an old folder; Repair renames it.} other {# agents' branches are still named after an old folder; Repair renames them.}}",
