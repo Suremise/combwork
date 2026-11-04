@@ -16,6 +16,8 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
 const crash = vi.hoisted(() => ({ from: '' }))
+/** A read of one file held until released (HR1's round-3 race: a cold reader paused at its last marker read). */
+const gate = vi.hoisted(() => ({ path: '', armed: false, entered: null as null | (() => void), release: null as null | (() => void) }))
 vi.mock('fs/promises', async (orig) => {
   const fs = await orig<typeof import('fs/promises')>()
   return {
@@ -26,6 +28,15 @@ vi.mock('fs/promises', async (orig) => {
         crash.from = ''
         throw new Error('crash immediately after native rename')
       }
+    },
+    readFile: async (...args: Parameters<typeof fs.readFile>) => {
+      const bytes = await fs.readFile(...args)
+      if (gate.armed && String(args[0]).toLowerCase() === gate.path.toLowerCase()) {
+        gate.armed = false
+        gate.entered?.()
+        await new Promise<void>((r) => (gate.release = r))
+      }
+      return bytes
     }
   }
 })
@@ -169,6 +180,38 @@ describe("HR1's round 2: readers use the published map", () => {
     expect(await movedPath(ws, join(ws, 'e', '.hive', 'z'))).toBe(join(ws, 'e', '.combwork', 'z'))
     moveStats.derives = 0
     expect(await movedPath(ws, join(ws, 'e', '.hive', 'z'))).toBe(join(ws, 'e', '.combwork', 'z'))
+    expect(moveStats.derives).toBe(0)
+  })
+})
+
+describe("HR1's round 3: a reader overtaken by a move", () => {
+  it("an older cold reader can't replace the map a move published while it read", async () => {
+    const ws = join(base, 'reader-race')
+    const a = join(ws, 'a')
+    const b = join(ws, 'b')
+    const marker = { kind: 'combwork-move', version: 1, id: 'race', from: '.hive' }
+    json(join(ws, '.combwork', 'workspace.json'), {})
+    json(join(ws, '.combwork', MARK_FILE), marker)
+    json(join(a, '.combwork', 'project.json'), {})
+    json(join(a, '.combwork', MARK_FILE), marker)
+    gate.path = join(a, '.combwork', MARK_FILE)
+    gate.armed = true
+    const entered = new Promise<void>((r) => (gate.entered = r))
+    const older = movedFolders(ws)
+    await entered
+    try {
+      json(join(b, '.hive', 'project.json'), { id: 'p-b' })
+      await moveFolders(ws, { only: b })
+      expect(await movedPath(ws, join(b, '.hive', 'x'))).toBe(join(b, '.combwork', 'x'))
+    } finally {
+      gate.release?.()
+      // The older reader gets the map the move published, not its own.
+      expect((await older).some((m) => m.from.toLowerCase() === join(b, '.hive').toLowerCase())).toBe(true)
+    }
+    expect(await movedPath(ws, join(b, '.hive', 'x'))).toBe(join(b, '.combwork', 'x'))
+    // And the snapshot stays the move's: no derive for later lookups.
+    moveStats.derives = 0
+    expect(await movedPath(ws, join(b, '.hive', 'y'))).toBe(join(b, '.combwork', 'y'))
     expect(moveStats.derives).toBe(0)
   })
 })

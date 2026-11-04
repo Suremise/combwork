@@ -188,9 +188,20 @@ export const moveStats = { derives: 0 }
  * Folders move only through those boundaries, so between them the snapshot is what the folders say.
  */
 const snapshots = new Map<string, FolderMove[]>()
+/**
+ * Moves on with every publication and every invalidation, of any workspace (HR1's round 3): a reader that derived the
+ * map from the folders publishes it only when nothing was published or dropped while it read, so a reader overtaken by
+ * a move (a late project's, already ended) never puts back an older map. One number: bounded whatever the workspaces.
+ */
+let epoch = 0
 const publish = (ws: string, moves: FolderMove[]): void => {
+  epoch++
   snapshots.set(lower(ws), moves)
   if (snapshots.size > 50) snapshots.delete(snapshots.keys().next().value!)
+}
+const invalidate = (ws: string): void => {
+  epoch++
+  snapshots.delete(lower(ws))
 }
 
 /** A map's hash: its moves sorted, lower case. */
@@ -209,10 +220,15 @@ async function doneHash(ws: string): Promise<string | null> {
 export async function movedFolders(ws: string): Promise<FolderMove[]> {
   const kept = snapshots.get(lower(ws))
   if (kept) return kept
+  const seen = epoch
   const moves = await deriveMoves(ws)
-  // Only when no move is under way meanwhile: one that is drops it and publishes its own.
-  if (!chains.has(lower(ws))) publish(ws, moves)
-  return moves
+  // Kept only when nothing was published or dropped while it read and no move is under way: else the map a move
+  // published meanwhile is the authority, and this reader's older one is neither kept nor given.
+  if (epoch === seen && !chains.has(lower(ws))) {
+    publish(ws, moves)
+    return moves
+  }
+  return snapshots.get(lower(ws)) ?? moves
 }
 
 /** Where a path stored before the move is now, through its workspace's map; null when it didn't move. */
@@ -303,7 +319,7 @@ export function moveFolders(ws: string, o: MoveOptions & { only?: string } = {})
 
 async function moveNow(ws: string, o: MoveOptions & { only?: string }): Promise<MoveOutcome> {
   // A move under way: readers derive the map until it publishes its own.
-  snapshots.delete(lower(ws))
+  invalidate(ws)
   const all = await hostsOf(ws)
   const hosts = o.only ? all.filter((h) => lower(h.host) === lower(o.only!)) : all
   let planned = 0
