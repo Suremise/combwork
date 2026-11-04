@@ -230,11 +230,17 @@ const SETUP = {
  */
 export function NoConnectionBanner({ cli, where = 'project' }: { cli: ProviderId; where?: 'project' | 'assistant' }) {
   return (
-    <div className="banner warn" data-connection-setup={where}>
-      <Icon name="plug" /> {tr(where === 'assistant' ? SETUP.assistant : SETUP.text, { cli: providerDescriptor(cli).name })}
-      <button className="btn small primary" onClick={openConnections}>
-        {tr(SETUP.add)}
-      </button>
+    // The wrap-banner layout (HI-2535): in a narrow pane the button goes under the message, not beside a thin column of it.
+    <div className="banner warn wrap-banner" data-connection-setup={where}>
+      <span className="wrap-banner-text">
+        <Icon name="plug" />
+        <span className="grow">{tr(where === 'assistant' ? SETUP.assistant : SETUP.text, { cli: providerDescriptor(cli).name })}</span>
+      </span>
+      <span className="wrap-banner-actions">
+        <button className="btn small primary" onClick={openConnections}>
+          {tr(SETUP.add)}
+        </button>
+      </span>
     </div>
   )
 }
