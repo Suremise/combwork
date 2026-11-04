@@ -1678,6 +1678,8 @@ describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
     const pass = settleSlotCards(ws, e.project)
     try {
       await vi.waitFor(() => expect(lanes).toHaveBeenCalledOnce(), { timeout: HUNG_MS })
+      // A coalesced request must not admit the old pass again under the stopped service's generation.
+      expect(settleSlotCards(ws, e.project)).toBe(pass)
       stopSlotCards()
       release()
       await pass
@@ -1685,6 +1687,7 @@ describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
       expect(heldRetryOf(e.home, e.project)).toBeNull()
       expect(lend).not.toHaveBeenCalled()
       expect(state.waitingLooks).toBe(0)
+      expect(lanes).toHaveBeenCalledOnce()
       expect(state.logged.filter((l) => l.startsWith('warn'))).toEqual([])
     } finally {
       release()

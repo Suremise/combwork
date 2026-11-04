@@ -895,13 +895,14 @@ export function settleSlotCards(ws: WorkspaceService, projectPath: string): Prom
   // Admission owns the token: an earlier step may still be awaiting when the service stops (HI-2469).
   const life = ws.lifetime
   const generation = holdGeneration
+  const current = (): boolean => !ended(ws) && !life.aborted && ws.lifetime === life && generation === holdGeneration
   const pass = { again: false, done: Promise.resolve() }
   pass.done = withoutWriteFence(async () => {
     try {
       do {
         pass.again = false
         await settleOnce(ws, projectPath, life, generation).catch((e) => failedStep(`settling the slots of ${userText(projectPath)}`, e)) // i18n-ignore: a log line (failedStep logs it)
-      } while (pass.again && !ended(ws) && !life.aborted && ws.lifetime === life && generation === holdGeneration)
+      } while (pass.again && current())
     } finally {
       passes.delete(key)
     }
