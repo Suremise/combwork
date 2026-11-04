@@ -255,7 +255,7 @@
   "panes.watch.cards": "Aguardando {cards}",
   "panes.watch.cardsInto": "Aguardando {cards} → {column}",
   "panes.watch.lanes": "Aguardando {lanes, select, all {todas as raias em execução} one {{lane}} other {{n, plural, one {# raia} other {# raias}}}}{cards, select, none {} other { e {cards}}}",
-  "panes.watch.oneLane": "{kind, select, named {a raia {name}} both {a raia {name} de {builder}} builder {a raia de {builder}} other {a raia {name}}}",
+  "panes.watch.oneLane": "{kind, select, named {a raia {name}} both {a raia {name} de {builder}} builder {a raia de {builder}} other {uma raia}}",
   "panes.watchCancel.failed": "Não foi possível cancelar a observação",
   "panes.watchCell.agents": "Fim de {agents}",
   "panes.watchCell.cardsInto": "{cards} → {column}",

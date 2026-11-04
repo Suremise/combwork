@@ -324,8 +324,8 @@
     "note": "HI-1990: a builder's Done wake when its next card can't start yet."
   },
   "wake.lane.oneLane": {
-    "text": "{kind, select, named {lane {name}} both {{builder}'s lane {name}} builder {{builder}'s lane} other {lane {name}}}",
-    "note": "HI-2522: one lane as a lane watch's label and limit line name it, never by its lane-… id alone. kind: named (name: its name), both (another lane has that name: builder, its builder's name, too), builder (it has no name: its builder's lane), or none (a watch from before HI-2522: name is its id)."
+    "text": "{kind, select, named {lane {name}} both {{builder}'s lane {name}} builder {{builder}'s lane} other {a lane}}",
+    "note": "HI-2522: one lane as a lane watch's label and limit line name it, never by its lane-… id. kind: named (name: its name), both (another lane has that name: builder, its builder's name, too), builder (it has no name: its builder's lane), or none (a lane not known: a watch from before HI-2522 on a lane no longer listed)."
   },
   "wake.lane.passed": {
     "text": "{card} passed review{by}",

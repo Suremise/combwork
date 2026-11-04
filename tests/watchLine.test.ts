@@ -21,11 +21,11 @@ describe("a watching agent's status names its cards by key (HI-1679)", () => {
 
   it('a lane watch keeps the cards it also follows by key; an agent watch names its agents', () => {
     namedBy(keyed, () => {
-      // HI-2522: by its name; a watch from before, with no titles, by its id.
+      // HI-2522: by its name; a lane not known (no title, round 1 finding) as "a lane", never by its id.
       expect(watchStatus(watch({ cards: [1168], lanes: ['lane-e1d9ff'], laneTitles: { 'lane-e1d9ff': { name: 'combwork screenshots', builder: 'WB1' } } }))).toBe('Waiting on lane combwork screenshots and HI-1168')
       expect(watchStatus(watch({ cards: [], lanes: ['lane-e1d9ff'], laneTitles: { 'lane-e1d9ff': { name: 'combwork screenshots', builder: 'WB1', twin: true } } }))).toBe("Waiting on WB1's lane combwork screenshots")
       expect(watchStatus(watch({ cards: [], lanes: ['lane-e1d9ff'], laneTitles: { 'lane-e1d9ff': { name: null, builder: 'WB1' } } }))).toBe("Waiting on WB1's lane")
-      expect(watchStatus(watch({ cards: [1168], lanes: ['lane-e1d9ff'] }))).toBe('Waiting on lane lane-e1d9ff and HI-1168')
+      expect(watchStatus(watch({ cards: [1168], lanes: ['lane-e1d9ff'] }))).toBe('Waiting on a lane and HI-1168')
       expect(watchStatus(watch({ agents: ['HB4', 'HR4'] }))).toBe('Waiting for HB4, HR4 to finish')
     })
   })

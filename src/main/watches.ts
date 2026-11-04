@@ -423,6 +423,23 @@ function load(ws: WorkspaceService): Promise<Store> {
         list.push({ ...rec, scope: scopeFor(ws, rec.projectPath) })
       }
     }
+    // HI-2522 round 1 finding: a watch on named lanes saved before HI-2522 has no titles, so its label would name each lane
+    // by its id: they are taken from the lanes as they are now, in its view, and kept. One no longer listed is "a lane".
+    const untitled = list.filter((r) => r.lanes && r.lanes.ids !== 'all' && r.lanes.ids.some((id) => !r.laneTitles?.[id]))
+    if (untitled.length) {
+      const all = await listLanes(ws, { all: true }).catch((e: unknown) => {
+        log.warn('reading the lanes to name old lane watches', e)
+        return null
+      })
+      if (!open()) throw closedError()
+      for (const r of all ? untitled : []) {
+        const missing = (r.lanes!.ids as string[]).filter((id) => !r.laneTitles?.[id])
+        const found = laneTitlesOf(missing,all!.filter((l) => r.scope === null || same(l.project, r.scope)))
+        if (!Object.keys(found).length) continue
+        r.laneTitles = { ...r.laneTitles, ...found }
+        migrated = true
+      }
+    }
     // What was migrated is saved at the next tick.
     const store: Store = { ws, path, life, list, invalid, dirty: migrated || stamped || gone.size > 0, queue: Promise.resolve(), delivering: new Map(), woke: new Map(), wokeAgents: new Map(), wokeLanes: new Map(), wokeReplies: new Map(), gen, place }
     // Read back too big for every watch to end (a hand edit, an older build): room is made, nothing is lost.

@@ -7,13 +7,15 @@ import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { LANE_CARD_CHANGES, LANE_DEFAULT_EVENTS, MERGE_STALL_MS, blockNewsAt, keepAsked, laneHits, laneWakeLine, mergeStallReason, readLaneCards, readLaneCondition, readSavedLaneMark, type LaneMark, type LaneNow } from '../src/shared/laneWatch'
+import { LANE_CARD_CHANGES, LANE_DEFAULT_EVENTS, MERGE_STALL_MS, blockNewsAt, keepAsked, laneHits, laneLimitLine, laneWakeLine, mergeStallReason, readLaneCards, readLaneCondition, readSavedLaneMark, type LaneMark, type LaneNow } from '../src/shared/laneWatch'
 import { WAKE_MAX_BYTES, type CardChange } from '../src/shared/watch'
 import { taskWaitText } from '../src/shared/toolReplies'
 import { REVIEW_WAIT_STALL_MS } from '../src/shared/tasks'
 import { IDLE_WATCH_STALL_MS } from '../src/shared/idleWatch'
 import { tempDir } from './tempDir'
 import { putStoreDocs, storeDocs } from './storeDocs'
+import { tr } from '../src/shared/i18n'
+import { watchText } from '../src/shared/agentWatch'
 import { follow } from './followDoorbell'
 import { LANE_NEXT_STALL_MS, laneNextWaitReason, replyWaitReason, RETURN_STALL_MS, returnedWaitReason, setStallRuns, STALE_STALL_MS, staleWaitReason } from '../src/main/cardStall'
 import type { ProgressRun } from '../src/shared/types'
@@ -1440,6 +1442,31 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     const short = laneWakeLine([hit])
     expect(short).toMatch(/^\[CW\] Lane combwork screenshots: #\d+ is blocked\./)
     expect(short).not.toContain(named.id)
+    await disposeWorkspaceService(w)
+  })
+
+  it('HI-2522 round 1 finding: a watch on named lanes saved before HI-2522 (no titles) is read back naming each lane, in its label, the window and its limit line; never an id', async () => {
+    const { w, alpha, home } = await open()
+    fake(alpha, home)
+    const [a] = await newCards(w, 'b1', 1)
+    const named = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)', name: 'combwork screenshots' })).lane
+    const readBack = async (id: string) => {
+      await watches.registerLaneWatch(w, home, 'assistant', { ids: [id], events: ['failed'] })
+      // Saved as a build from before HI-2522 saved it: no titles.
+      const saved = storeDocs(w.path!, 'watches')
+      const { laneTitles: _t, ...old } = saved[0] as Record<string, unknown>
+      await putStoreDocs(w.path!, 'watches', [old])
+      watches.forgetWatches(w)
+      await vi.waitFor(() => expect(watches.watchFor(home, 'assistant')).not.toBeNull(), { timeout: HUNG_MS })
+      return watches.watchFor(home, 'assistant')!
+    }
+    const was = await readBack(named.id)
+    expect(was.label).toBe('Waiting on lane combwork screenshots')
+    expect(watchText(was, tr, (l) => l.join(', '))).toBe('Waiting on lane combwork screenshots')
+    expect(laneLimitLine({ ids: [named.id], events: [] }, 90, [], [], was.laneTitles)).toMatch(/^\[CW\] Nothing to tell on lane combwork screenshots in 1\.5 h/)
+    // Kept: saved again with its titles at the next tick.
+    await watches.tick()
+    await vi.waitFor(() => expect((storeDocs(w.path!, 'watches')[0] as { laneTitles?: unknown }).laneTitles).toEqual({ [named.id]: { name: 'combwork screenshots', builder: 'B1' } }), { timeout: HUNG_MS })
     await disposeWorkspaceService(w)
   })
 

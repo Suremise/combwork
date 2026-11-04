@@ -255,7 +255,7 @@
   "panes.watch.cards": "正在等待 {cards}",
   "panes.watch.cardsInto": "正在等待 {cards} → {column}",
   "panes.watch.lanes": "正在等待{lanes, select, all {所有运行中的通道} one {{lane}} other { {n, plural, other {# 个通道}}}}{cards, select, none {} other {和 {cards}}}",
-  "panes.watch.oneLane": "{kind, select, named {通道 {name}} both {{builder} 的通道 {name}} builder {{builder} 的通道} other {通道 {name}}}",
+  "panes.watch.oneLane": "{kind, select, named {通道 {name}} both {{builder} 的通道 {name}} builder {{builder} 的通道} other {一个通道}}",
   "panes.watchCancel.failed": "无法取消监视",
   "panes.watchCell.agents": "{agents} 结束",
   "panes.watchCell.cardsInto": "{cards} → {column}",

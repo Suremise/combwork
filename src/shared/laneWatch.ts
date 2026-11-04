@@ -46,7 +46,7 @@ const T = {
     text: 'Nothing to tell on {lanes, select, all {the running lanes} one {{lane}} other {{n} lanes}}{also, select, yes { or {list}} other {}} in {hours, select, yes {{time} h} other {{time} min}}: your lane watch has ended. Check them (cw_lane list{agents, select, yes {, cw_agent_activity} other {}}), then watch again, or tell the user (cw_notify) if one seems stuck.',
     note: 'Typed when a lane watch\'s limit passes with nothing to tell. lanes: all, one (lane: as wake.lane.oneLane names it, HI-2522) or some (n: how many); also: yes with the cards and agents beside them (list); hours: yes when time is in hours ("1.5"), else minutes; agents: yes when it follows agents (HI-1987).'
   }),
-  oneLane: agentMsg({ id: 'wake.lane.oneLane', text: "{kind, select, named {lane {name}} both {{builder}'s lane {name}} builder {{builder}'s lane} other {lane {name}}}", note: "HI-2522: one lane as a lane watch's label and limit line name it, never by its lane-… id alone. kind: named (name: its name), both (another lane has that name: builder, its builder's name, too), builder (it has no name: its builder's lane), or none (a watch from before HI-2522: name is its id)." }),
+  oneLane: agentMsg({ id: 'wake.lane.oneLane', text: "{kind, select, named {lane {name}} both {{builder}'s lane {name}} builder {{builder}'s lane} other {a lane}}", note: "HI-2522: one lane as a lane watch's label and limit line name it, never by its lane-… id. kind: named (name: its name), both (another lane has that name: builder, its builder's name, too), builder (it has no name: its builder's lane), or none (a lane not known: a watch from before HI-2522 on a lane no longer listed)." }),
   badCards: agentMsg({ id: 'wake.lane.badCards', text: 'cards must be card numbers (no repeats), or [] for none', note: "A lane watch's refusal: its cards argument isn't a list of card numbers." }),
   tooManyCards: agentMsg({ id: 'wake.lane.tooManyCards', text: 'at most {max} cards', note: "A lane watch's refusal: too many cards beside its lanes. max: the most." }),
   badChanges: agentMsg({ id: 'wake.lane.badChanges', text: 'changes must be any of {changes}', note: 'A lane watch\'s refusal: its changes argument names none it knows. changes: those it takes ("comment, column, …").' }),
@@ -375,10 +375,11 @@ const lanesOf = (cond: LaneWatchCondition, titles?: Readonly<Record<string, Lane
 
 /**
  * How a lane is named in a watch's label (HI-2522), as wake.lane.oneLane and the window's panes.watch.oneLane take it:
- * by its name (its builder's too when another lane has it), else as its builder's lane; a watch from before, by its id.
+ * by its name (its builder's too when another lane has it), else as its builder's lane; one not known (a watch from
+ * before HI-2522 on a lane no longer listed) as "a lane", never by its id (round 1 finding).
  */
 export const laneTitleArgs = (id: string, t: LaneTitle | null | undefined): { kind: 'named' | 'both' | 'builder' | 'none'; name: string; builder: string } =>
-  !t ? { kind: 'none', name: id, builder: '' } : t.name ? { kind: t.twin ? 'both' : 'named', name: t.name, builder: t.builder } : { kind: 'builder', name: '', builder: t.builder }
+  !t ? { kind: 'none', name: '', builder: '' } : t.name ? { kind: t.twin ? 'both' : 'named', name: t.name, builder: t.builder } : { kind: 'builder', name: '', builder: t.builder }
 
 /**
  * Each lane's title (HI-2522) from the lanes in the watcher's view: its name and builder, and whether another lane there

@@ -1024,8 +1024,8 @@
     "description": "A watching agent's status (its pane): it waits on card loops (lanes): all of them, one ({lane}: the lane as panes.watch.oneLane names it, \"lane combwork screenshots\") or {n}; then any cards it also watches ({cards}: \"#4, #5\"; none: leave that branch empty)."
   },
   "panes.watch.oneLane": {
-    "defaultMessage": "{kind, select, named {lane {name}} both {{builder}'s lane {name}} builder {{builder}'s lane} other {lane {name}}}",
-    "description": "One card loop (lane) a watching agent waits on, in its status (panes.watch.lanes's {lane}). kind: named ({name}: the lane's name), both (another lane has that name, so its builder's name {builder} is said too), builder (the lane has no name: {builder}'s lane), other (a watch from an older version: {name} is the lane's internal id)."
+    "defaultMessage": "{kind, select, named {lane {name}} both {{builder}'s lane {name}} builder {{builder}'s lane} other {a lane}}",
+    "description": "One card loop (lane) a watching agent waits on, in its status (panes.watch.lanes's {lane}). kind: named ({name}: the lane's name), both (another lane has that name, so its builder's name {builder} is said too), builder (the lane has no name: {builder}'s lane), other (a lane no longer known, from an older version: just \"a lane\")."
   },
   "panes.watchCancel.failed": {
     "defaultMessage": "Could not cancel the watch",

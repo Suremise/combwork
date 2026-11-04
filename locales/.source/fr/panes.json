@@ -276,7 +276,7 @@
   "panes.watch.cards": "Waiting for {cards}",
   "panes.watch.cardsInto": "Waiting for {cards} → {column}",
   "panes.watch.lanes": "Waiting on {lanes, select, all {all running lanes} one {{lane}} other {{n, plural, one {# lane} other {# lanes}}}}{cards, select, none {} other { and {cards}}}",
-  "panes.watch.oneLane": "{kind, select, named {lane {name}} both {{builder}'s lane {name}} builder {{builder}'s lane} other {lane {name}}}",
+  "panes.watch.oneLane": "{kind, select, named {lane {name}} both {{builder}'s lane {name}} builder {{builder}'s lane} other {a lane}}",
   "panes.watchCancel.failed": "Could not cancel the watch",
   "panes.watchCell.agents": "{agents} to finish",
   "panes.watchCell.cardsInto": "{cards} → {column}",
