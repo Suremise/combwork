@@ -25,6 +25,7 @@ const { apiErrorReply } = await import('../src/main/servers')
 const { allOff } = await import('../src/shared/workflow/options')
 const { foldCard } = await import('../src/shared/workflow/facts')
 const { workBadges } = await import('../src/main/workflow/cardWork')
+const { GIT_HEAVY_MS } = await import('./workflow/harness')
 
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
@@ -300,19 +301,20 @@ describe('a move is decided whole, and a refused one leaves nothing (#1265 round
 
 // HR2's round 2: a drag planned from Todo into the shared project folder; G13 for the card's builder, read again at the write.
 describe('planning edges (#1265 round 3)', () => {
-  it('a Todo card starting in the shared project folder (no builder, or one without a worktree) stops after its start: nothing to submit', async () => {
-    for (const agent of [undefined, 'a2']) {
-      const { w } = await workspace(PAIR)
-      const card = await create(w)
-      if (agent) await update(w, card, { agent })
-      const r = await inWorkspace(w, () => tasks.moveTask(card, 'review', { confirm: true }))
-      expect(r).toMatchObject({ moved: { column: 'doing' }, stopped: { rule: 'submit.empty' } })
-      expect(facts(w, card).find((f) => f.kind === 'Started')).toMatchObject({ data: { folder: 'project' } })
-      expect(kinds(w, card)).not.toContain('Submitted')
-    }
+  // HI-2494: each independent case builds a real Git workspace; keep one lifecycle per test instead of two.
+  it.each([['no builder', undefined], ['a builder without a worktree', 'a2']] as const)('a Todo card starting in the shared project folder (%s) stops after its start: nothing to submit', async (_what, agent) => {
+    const { w } = await workspace(PAIR)
+    const card = await create(w)
+    if (agent) await update(w, card, { agent })
+    const r = await inWorkspace(w, () => tasks.moveTask(card, 'review', { confirm: true }))
+    expect(r).toMatchObject({ moved: { column: 'doing' }, stopped: { rule: 'submit.empty' } })
+    expect(facts(w, card).find((f) => f.kind === 'Started')).toMatchObject({ data: { folder: 'project' } })
+    expect(kinds(w, card)).not.toContain('Submitted')
   })
 
-  it("G13: the card's builder's running work counts for the user's, the Assistant's and an agent's submission, read again at the write", async () => {
+  // GIT_HEAVY_MS (HI-2494, HI-2453's policy): 41 real Git commands across setup and the three submission paths;
+  // 97% of its 2.0 s isolated time was Git. It exceeded 20 s in the import-selected run at sustained ~100% CPU.
+  it("G13: the card's builder's running work counts for the user's, the Assistant's and an agent's submission, read again at the write", { timeout: GIT_HEAVY_MS }, async () => {
     const service = await import('../src/main/workflow/service')
     const { w, wt, repo } = await workspace({ ...PAIR, stopOwnRuns: true })
     const commitWork = (file: string): void => {
