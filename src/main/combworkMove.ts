@@ -113,29 +113,51 @@ const markText = (id: string): string => JSON.stringify({ kind: MARK_KIND, versi
 
 /**
  * Whether a host's `.combwork` is one Combwork moved there from its `.hive` (s65, HR1's approval): the folder is the
- * host's own (a real folder at its place, not a link) and holds Combwork's marker, as Combwork writes it.
+ * host's own (a real folder at its place, not a link) and holds Combwork's marker, as Combwork writes it. The marker is
+ * read first (HI-2510): a host without one, every host of a workspace that never had a `.hive`, costs that one call.
  */
 async function movedHost(host: string): Promise<boolean> {
   const dir = current(host)
   try {
+    const m = JSON.parse(await readFile(join(dir, MARK_FILE), 'utf8')) as { kind?: unknown; version?: unknown; id?: unknown }
+    if (!(m.kind === MARK_KIND && m.version === 1 && typeof m.id === 'string' && m.id.length > 0)) return false
     const st = await lstat(dir)
     if (st.isSymbolicLink() || !st.isDirectory()) return false
-    const [realDir, realHost] = [await realpath(dir), await realpath(host)]
-    if (realDir.toLowerCase() !== join(realHost, HIVE_DIR).toLowerCase()) return false
-    const m = JSON.parse(await readFile(join(dir, MARK_FILE), 'utf8')) as { kind?: unknown; version?: unknown; id?: unknown }
-    return m.kind === MARK_KIND && m.version === 1 && typeof m.id === 'string' && m.id.length > 0
+    const [realDir, realHost] = await Promise.all([realpath(dir), realpath(host)])
+    return realDir.toLowerCase() === join(realHost, HIVE_DIR).toLowerCase()
   } catch {
     return false
   }
 }
 
-/** What a host's folders are now. */
-export async function classify(ws: string, host: string, kind: HostKind): Promise<HostState> {
+/** A host as one look at it saw it (HI-2510): whether its `.combwork` was Combwork's move, looked at once per step. */
+interface Looked {
+  host: string
+  kind: HostKind
+  marked: boolean
+}
+
+/** How many hosts are looked at together: a workspace of many projects never makes a burst of file calls. */
+const LOOK_AT_ONCE = 8
+
+/** Each host looked at once, a few at a time (HI-2510: an open no longer waits on each host's calls in turn). */
+async function lookAt(hosts: { host: string; kind: HostKind }[]): Promise<Looked[]> {
+  const out: Looked[] = []
+  let next = 0
+  const lane = async (): Promise<void> => {
+    for (let i = next++; i < hosts.length; i = next++) out[i] = { ...hosts[i], marked: existsSync(current(hosts[i].host)) && (await movedHost(hosts[i].host)) }
+  }
+  await Promise.all(Array.from({ length: Math.min(LOOK_AT_ONCE, hosts.length) }, lane))
+  return out
+}
+
+/** What a host's folders are now. `marked`: whether its `.combwork` holds the marker, when the caller has just looked. */
+export async function classify(ws: string, host: string, kind: HostKind, marked?: boolean): Promise<HostState> {
   const oldDir = legacy(host)
   const newDir = current(host)
   const hasOld = existsSync(oldDir)
   const hasNew = existsSync(newDir)
-  if (hasNew && (await movedHost(host))) return 'moved'
+  if (hasNew && (marked ?? (await movedHost(host)))) return 'moved'
   if (!hasOld) return 'current'
   // The workspace's own folder is the workspace; a project or the Assistant's home must really be inside it.
   if (kind !== 'workspace' && !under(realPath(host), realPath(ws))) return 'link'
@@ -163,17 +185,22 @@ export const treeOf = (ws: string): string => dataFolder(ws, 'workspace')
  */
 export async function deriveMoves(ws: string): Promise<FolderMove[]> {
   ws = resolve(ws)
+  return movesOf(ws, await lookAt(await hostsOf(ws)))
+}
+
+/** The map from one look at every host of the workspace (deriveMoves, or the open's own look: HI-2510). */
+async function movesOf(ws: string, looked: Looked[]): Promise<FolderMove[]> {
   moveStats.derives++
   const out: FolderMove[] = []
-  // One host at a time, asynchronously: bounded work, never a burst of file calls.
-  const wsMoved = await movedHost(ws)
-  for (const h of await hostsOf(ws)) {
+  const wsMoved = looked.some((h) => h.kind === 'workspace' && h.marked)
+  for (const h of looked) {
     if (h.kind === 'assistant') {
+      // The home in the workspace's `.combwork`: the host looked at whenever that folder is there (treeOf), else none.
       const home = join(current(ws), ASSISTANT_DIR)
-      if (!(await movedHost(home))) continue
+      if (!(lower(h.host) === lower(home) ? h.marked : await movedHost(home))) continue
       out.push({ from: legacy(home), to: current(home) })
       if (wsMoved) out.push({ from: join(legacy(ws), ASSISTANT_DIR, LEGACY_HIVE_DIR), to: current(home) })
-    } else if (await movedHost(h.host)) out.push({ from: legacy(h.host), to: current(h.host) })
+    } else if (h.marked) out.push({ from: legacy(h.host), to: current(h.host) })
   }
   return out
 }
@@ -301,8 +328,8 @@ function warn(host: string, state: HostState): void {
 }
 
 /** A `.hive` made again beside a moved `.combwork` (an older Hive opened it since): said once, left as it is. */
-async function warnRecreated(ws: string, hosts: { host: string; kind: HostKind }[]): Promise<void> {
-  for (const h of hosts) if ((await movedHost(h.host)) && existsSync(legacy(h.host)) && (await plainFolder(h.host, legacy(h.host)).catch(() => false)) && ours(legacy(h.host), h.kind)) warn(h.host, 'both')
+async function warnRecreated(hosts: Looked[]): Promise<void> {
+  for (const h of hosts) if (h.marked && existsSync(legacy(h.host)) && (await plainFolder(h.host, legacy(h.host)).catch(() => false)) && ours(legacy(h.host), h.kind)) warn(h.host, 'both')
 }
 
 const lockBusy = (h: { profile: string }): HiveError => hiveError(M.busy, { profile: h.profile }, { kind: 'conflict' })
@@ -320,18 +347,21 @@ export function moveFolders(ws: string, o: MoveOptions & { only?: string } = {})
 async function moveNow(ws: string, o: MoveOptions & { only?: string }): Promise<MoveOutcome> {
   // A move under way: readers derive the map until it publishes its own.
   invalidate(ws)
-  const all = await hostsOf(ws)
+  // One look at every host, a few at a time (HI-2510): what each host is, the warnings and the map all come from it, so
+  // an ordinary open (nothing to move, or moved before) waits on about two file calls in turn, not on each host's.
+  const all = await lookAt(await hostsOf(ws))
   const hosts = o.only ? all.filter((h) => lower(h.host) === lower(o.only!)) : all
   let planned = 0
+  // In turn: a host with no `.hive` needs no file call here (classify), and one with a `.hive` is a first open's, rare.
   for (const h of hosts) {
-    const s = await classify(ws, h.host, h.kind)
+    const s = await classify(ws, h.host, h.kind, h.marked)
     if (s === 'both' || s === 'link') warn(h.host, s)
     if (s === 'planned') planned++
   }
-  await warnRecreated(ws, hosts)
+  await warnRecreated(hosts)
   // Nothing to rename, and the rewrites finished for the map as it is: no lock, nothing written.
   if (!planned) {
-    const moves = await deriveMoves(ws)
+    const moves = await movesOf(ws, all)
     if (!moves.length || (await doneHash(ws)) === mapHash(moves)) {
       publish(ws, moves)
       return { late: false, moved: 0 }

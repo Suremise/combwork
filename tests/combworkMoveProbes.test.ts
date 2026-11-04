@@ -18,6 +18,8 @@ import { tempDir } from './tempDir'
 const crash = vi.hoisted(() => ({ from: '' }))
 /** A read of one file held until released (HR1's round-3 race: a cold reader paused at its last marker read). */
 const gate = vi.hoisted(() => ({ path: '', armed: false, entered: null as null | (() => void), release: null as null | (() => void) }))
+/** The marker reads (HI-2510): how many, and the most under way at once. */
+const marks = vi.hoisted(() => ({ reads: 0, now: 0, most: 0 }))
 vi.mock('fs/promises', async (orig) => {
   const fs = await orig<typeof import('fs/promises')>()
   return {
@@ -30,7 +32,12 @@ vi.mock('fs/promises', async (orig) => {
       }
     },
     readFile: async (...args: Parameters<typeof fs.readFile>) => {
-      const bytes = await fs.readFile(...args)
+      const mark = /[\\/]combwork-move-id$/i.test(String(args[0]))
+      if (mark) {
+        marks.reads++
+        marks.most = Math.max(marks.most, ++marks.now)
+      }
+      const bytes = await fs.readFile(...args).finally(() => mark && marks.now--)
       if (gate.armed && String(args[0]).toLowerCase() === gate.path.toLowerCase()) {
         gate.armed = false
         gate.entered?.()
@@ -43,7 +50,7 @@ vi.mock('fs/promises', async (orig) => {
 
 const base = tempDir('hi2462-probes-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
-const { MARK_FILE, MOVED_FILE, deriveMoves, finishMove, moveFolders, movedFolders, movedPath, moveStats, moveTestHooks } = await import('../src/main/combworkMove')
+const { MARK_FILE, MOVED_FILE, deriveMoves, finishMove, mapHash, moveFolders, movedFolders, movedPath, moveStats, moveTestHooks } = await import('../src/main/combworkMove')
 const { cardsTestHooks, rewriteCards } = await import('../src/main/hiveMoveWorker')
 
 const json = (p: string, v: unknown): void => {
@@ -150,6 +157,32 @@ describe("HR1's round-1 probes against the derived map", () => {
     } finally {
       other.close()
       db.close()
+    }
+  })
+})
+
+describe('HI-2510: an ordinary open looks at each host once', () => {
+  it("each host's marker is read once per open, several together, whether nothing moved or everything did", async () => {
+    const ws = join(base, 'ordinary-open')
+    json(join(ws, '.combwork', 'workspace.json'), { version: 1 })
+    const projects = ['a', 'b', 'c', 'd', 'e']
+    for (const p of projects) json(join(ws, p, '.combwork', 'project.json'), { id: p })
+    // The workspace, its Assistant's home and each project.
+    const hosts = 2 + projects.length
+    json(join(ws, '.combwork', 'assistant', '.combwork', 'project.json'), {})
+    for (const fresh of [true, false]) {
+      if (!fresh) {
+        // As a move leaves them: every host marked, the rewrites finished for the map.
+        const marker = { kind: 'combwork-move', version: 1, id: 'all', from: '.hive' }
+        for (const h of [ws, join(ws, '.combwork', 'assistant'), ...projects.map((p) => join(ws, p))]) json(join(h, '.combwork', MARK_FILE), marker)
+        const moves = await deriveMoves(ws)
+        expect(moves.length).toBe(hosts + 1)
+        json(join(ws, '.combwork', MOVED_FILE), { version: 2, hash: mapHash(moves), moves })
+      }
+      Object.assign(marks, { reads: 0, now: 0, most: 0 })
+      expect(await moveFolders(ws)).toEqual({ late: false, moved: 0 })
+      expect(marks.reads).toBe(hosts)
+      expect(marks.most).toBeGreaterThan(1)
     }
   })
 })
