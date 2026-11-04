@@ -4379,7 +4379,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<voi
     m.authenticated = true
     m.skip = true
     // agent-protocol: the app's name
-    return send(res, 200, { ok: true, app: 'Hive', version: app.getVersion() })
+    return send(res, 200, { ok: true, app: 'Combwork', version: app.getVersion() })
   }
   const bearer = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '')
   const ownWorkspace = bearer ? assistant.assistantForToken(bearer) : null
@@ -4422,7 +4422,7 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
   if (url.pathname === '/v1/health') {
     m.skip = true
     // agent-protocol: the app's name
-    return send(res, 200, { ok: true, app: 'Hive', version: app.getVersion() })
+    return send(res, 200, { ok: true, app: 'Combwork', version: app.getVersion() })
   }
 
   // A viewer changes nothing: whatever the route (a wait that holds a watch, a report), only a GET is served. Refused
