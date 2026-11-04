@@ -48,8 +48,9 @@ const VIEWS = [
   { name: 'Skills', slug: 'skills', ready: ['.pane-body .row.skill-row'], loading: ['.pane-body .pane-empty .codicon-loading'] },
   // The servers list in the sidebar: "No MCP servers yet…" shows only once mcp:list has replied (none in a fresh one).
   { name: 'MCP Servers', slug: 'mcp-servers', ready: ['.pane-body .pane-empty:has-text("No MCP servers yet")'], loading: [] },
-  // The Assistant's conversations, once session:list has replied ("Loading…" meanwhile): the sessions tree.
-  { name: 'Hive Assistant', slug: 'hive-assistant', ready: ['.sessions-list .sessions-tree'], loading: ['.main-area .empty-state .codicon-loading'] }
+  // The Assistant's conversations, once session:list has replied ("Loading…" meanwhile): the sessions tree. Its
+  // button is "Assistant" since HI-2458 ("Hive Assistant" before).
+  { name: 'Assistant', slug: 'assistant', ready: ['.sessions-list .sessions-tree'], loading: ['.main-area .empty-state .codicon-loading'] }
 ]
 /** The view is shown and loaded: `count(selector)` counts matches in the window. Gives true, or null when ms pass. */
 function viewReady(view, count, ms = 20_000, every = 250) {

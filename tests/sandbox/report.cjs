@@ -32,7 +32,7 @@ const REQUIRED = {
       s3: { scenario: 3, ids: ['3.on-not-found', '3.banner-none-installed', '3.setup-not-installed', '3.user-path', '3.check-again-finds', '3.setup-found', '3.api-installed', '3.banner-gone'], facts: [] },
       s6: { scenario: 6, ids: ['6.workspace-opens', '6.hive-folder', '6.views'], facts: ['hive', 'views'] }
     },
-    shots: ['s1-desktop.jpg', 's1-installed-apps.jpg', 's1-start-dark.png', 's1-start-light.png', 's1-agent-setup-dark.png', 's1-agent-setup-light.png', 's3-missing-dark.png', 's3-found-dark.png', 's3-found-light.png', 's6-workspace.png', 's6-workspace-overview.png', 's6-skills.png', 's6-mcp-servers.png', 's6-hive-assistant.png', 's5-desktop.jpg']
+    shots: ['s1-desktop.jpg', 's1-installed-apps.jpg', 's1-start-dark.png', 's1-start-light.png', 's1-agent-setup-dark.png', 's1-agent-setup-light.png', 's3-missing-dark.png', 's3-found-dark.png', 's3-found-light.png', 's6-workspace.png', 's6-workspace-overview.png', 's6-skills.png', 's6-mcp-servers.png', 's6-assistant.png', 's5-desktop.jpg']
   },
   upgrade: overPrevious(4, 's4'),
   manual: overPrevious(7, 's7'),
