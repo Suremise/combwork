@@ -58,7 +58,7 @@
   "dialects.note": "Nota",
   "dialects.onFailed": "Não foi possível ligar ou desligar {name}",
   "dialects.onSwitch": "{name} ligado",
-  "dialects.onTip": "Ligado: os textos dele valem. Desligado: o lugar dele na cadeia fica vazio, então os textos dele passam para a camada de baixo. Vale a partir do próximo início de cada agente.",
+  "dialects.onTip": "Ligado: os textos dele valem. Desligado: {to, select, cli {ele volta para o arquivo do {name}} workspace {ele volta para o arquivo do Espaço de trabalho} other {ele volta para o Padrão do Combwork}}. As mudanças valem a partir do próximo início de cada agente.",
   "dialects.outdatedBadge": "{count, plural, one {# desatualizado} other {# desatualizados}}",
   "dialects.outdatedGroup": "Desatualizados",
   "dialects.override": "Alterar aqui",
