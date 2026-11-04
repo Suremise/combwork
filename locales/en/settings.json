@@ -5051,6 +5051,10 @@
     "defaultMessage": "Workspace",
     "description": "A section of Settings, in its list on the left."
   },
+  "settings.sections": {
+    "defaultMessage": "Settings sections",
+    "description": "The list of sections beside Settings and Project Settings (General, Providers, Agents…), for screen readers: its name as a list of tabs (HI-2532)."
+  },
   "settings.sessions.backupRetention.desc": {
     "defaultMessage": "How long Combwork keeps its backups of sessions the CLI still has. After that many days without activity they go to the Recycle Bin. A session whose only copy is Combwork's backup is never touched.",
     "description": "What the setting \"Keep transcript backups\" does, under its title (Settings → Sessions)."

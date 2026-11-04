@@ -1305,6 +1305,7 @@
   "settings.section.workflow.label": "Version Control",
   "settings.section.workspace.desc": "The open workspace's own: its projects that Combwork leaves out (hidden, or removed from Combwork with their handovers and cards packed into the folder), how much Combwork keeps for each project, and antivirus scanning. Its workflow defaults are in Version Control.",
   "settings.section.workspace.label": "Workspace",
+  "settings.sections": "Settings sections",
   "settings.sessions.backupRetention.desc": "How long Combwork keeps its backups of sessions the CLI still has. After that many days without activity they go to the Recycle Bin. A session whose only copy is Combwork's backup is never touched.",
   "settings.sessions.backupRetention.option.d180": "180 days",
   "settings.sessions.backupRetention.option.d30": "30 days",

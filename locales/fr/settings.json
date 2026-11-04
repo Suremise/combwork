@@ -1262,6 +1262,7 @@
   "settings.section.workflow.label": "Gestion de versions",
   "settings.section.workspace.desc": "Ce qui appartient à l’espace de travail ouvert : ses projets que Combwork laisse de côté (masqués, ou retirés de Combwork avec leurs passations et leurs cartes rangées dans leur dossier), ce que Combwork conserve pour chaque projet, et l’analyse antivirus. Ses valeurs par défaut de flux de travail sont dans Gestion de versions.",
   "settings.section.workspace.label": "Espace de travail",
+  "settings.sections": "Sections des paramètres",
   "settings.sessions.backupRetention.desc": "Durée pendant laquelle Combwork conserve ses sauvegardes des sessions que la CLI possède encore. Après ce nombre de jours sans activité, elles vont dans la Corbeille. Une session dont la seule copie est la sauvegarde de Combwork n’est jamais touchée.",
   "settings.sessions.backupRetention.option.d180": "180 jours",
   "settings.sessions.backupRetention.option.d30": "30 jours",

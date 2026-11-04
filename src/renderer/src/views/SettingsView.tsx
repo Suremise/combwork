@@ -16,7 +16,7 @@ import { ProviderIcon } from '../components/ProviderIcon'
 import * as actions from '../actions'
 import { call, errorMessage } from '../api'
 import { playChime } from '../chime'
-import { Icon, IconButton, InfoTip, SearchInput, SectionNavRow, Switch, Tooltip, usePlaceholderClipped } from '../components/ui'
+import { Icon, IconButton, InfoTip, SearchInput, SectionNav, Switch, Tooltip, usePlaceholderClipped } from '../components/ui'
 import { UpdateStatusRow } from '../components/Updates'
 import { KeybindingsEditor } from '../components/Keybindings'
 import { HiddenProjectsList } from '../components/ProjectRemoval'
@@ -1078,15 +1078,14 @@ export function SettingsView() {
         </label>
       </div>
       <div className="settings-body">
-        <div className="settings-nav">
-          {sections.map((s) => (
-            <SectionNavRow key={s.id} id={s.id} icon={navIcon(s)} label={sectionText(s).label} sub={!!s.provider} selected={!query && !modifiedOnly && section === s.id} onSelect={() => {
-                set({ settingsSection: s.id, settingsQuery: '' })
-                setModifiedOnly(false)
-              }}
-            />
-          ))}
-        </div>
+        <SectionNav
+          items={sections.map((s) => ({ id: s.id, icon: navIcon(s), label: sectionText(s).label, sub: !!s.provider }))}
+          selected={!query && !modifiedOnly ? section : null}
+          onSelect={(id) => {
+            set({ settingsSection: id as Section, settingsQuery: '' })
+            setModifiedOnly(false)
+          }}
+        />
         <div className="settings-content">
           {grouped.length === 0 && <div className="empty-state">{tr(msg({ id: 'settings.noMatch', defaultMessage: 'No settings match.', description: 'Settings when its search finds nothing.' }))}</div>}
           {grouped.map((g) => (

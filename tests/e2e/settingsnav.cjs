@@ -48,7 +48,55 @@ const HUNG_MS = 10000
       // A click on a row whose name is cut still opens its section.
       const id = await rows.nth(i).getAttribute('data-section')
       await rows.nth(i).click()
-      check(`${what}: a click on it opens its section`, await lib.until(async () => (await nav.locator('.row.selected').getAttribute('data-section').catch(() => null)) === id, HUNG_MS), id)
+      check(`${what}: a click on it opens its section`, await lib.until(async () => (await nav.evaluate((n) => n.querySelector('.row.selected')?.dataset.section ?? null)) === id, HUNG_MS), id)
+      await checkKeyboard(what, nav, all, i)
+    }
+
+    /** The keyboard in a section list (HI-2532): reached by Tab, arrows, Home and End choose, Enter and Space too. */
+    const checkKeyboard = async (what, nav, all, cutAt) => {
+      const rows = nav.locator('.row')
+      const ids = await rows.evaluateAll((els) => els.map((r) => r.dataset.section))
+      // Read at once: a locator's getAttribute waits for a row selected, and none is while a search shows them all.
+      const selected = () => nav.evaluate((n) => n.querySelector('.row.selected')?.dataset.section ?? null)
+      const focused = () => page.evaluate(() => { const a = document.activeElement; return a?.matches('.settings-nav .row:focus-visible') ? a.dataset.section : null })
+      const at = (id) => lib.until(async () => (await selected()) === id && (await focused()) === id, HUNG_MS)
+      const search = page.locator('.tab-body .settings-top input[type="search"], .tab-body .settings-top input.input').first()
+      check(`${what}: the list is a vertical tab list, its rows tabs`, (await nav.getAttribute('role')) === 'tablist' && (await nav.getAttribute('aria-orientation')) === 'vertical' && !!(await nav.getAttribute('aria-label')) && (await rows.evaluateAll((els) => els.every((r) => r.getAttribute('role') === 'tab'))))
+      check(`${what}: one row in the Tab order, the selected one`, JSON.stringify(await rows.evaluateAll((els) => els.filter((r) => r.tabIndex === 0).map((r) => r.dataset.section))) === JSON.stringify([await selected()]))
+      // Tab from the search box (past Modified only, in Settings) reaches the selected section.
+      const sel = await selected()
+      await search.click()
+      for (let n = 0; n < 3 && (await focused()) !== sel; n++) await page.keyboard.press('Tab')
+      check(`${what}: Tab from the search reaches the selected section`, (await focused()) === sel, `${await focused()} (${sel})`)
+      await page.keyboard.press('Home')
+      check(`${what}: Home chooses the first section`, !!(await at(ids[0])), await selected())
+      await page.keyboard.press('ArrowDown')
+      check(`${what}: Down chooses the next, the focus with it`, !!(await at(ids[1])), await selected())
+      await page.keyboard.press('ArrowUp')
+      check(`${what}: Up the one before`, !!(await at(ids[0])), await selected())
+      await page.keyboard.press('ArrowUp')
+      check(`${what}: Up on the first wraps to the last`, !!(await at(ids[ids.length - 1])), await selected())
+      await page.keyboard.press('Home')
+      await page.keyboard.press('End')
+      check(`${what}: End chooses the last`, !!(await at(ids[ids.length - 1])), await selected())
+      // A cut name, focused by the keyboard, shows in full (HI-2531's tooltip).
+      await page.keyboard.press('Home')
+      for (let n = 0; n < cutAt; n++) await page.keyboard.press('ArrowDown')
+      const tip = await lib.until(async () => { const t = await page.locator('.tip:visible').last().innerText({ timeout: 1000 }).catch(() => ''); return t === all[cutAt].text && t }, HUNG_MS)
+      check(`${what}: a cut name shows in full when the keyboard focuses it`, tip === all[cutAt].text, `${tip} (${all[cutAt].text})`)
+      // While a search shows every section, none is chosen: the first row is in the Tab order, and Enter or Space chooses.
+      await search.fill('a')
+      await lib.until(async () => (await selected()) === null, HUNG_MS)
+      check(`${what}: while searching, the first row is the one in the Tab order`, JSON.stringify(await rows.evaluateAll((els) => els.filter((r) => r.tabIndex === 0).map((r) => r.dataset.section))) === JSON.stringify([ids[0]]))
+      await rows.first().focus()
+      await page.keyboard.press('Enter')
+      check(`${what}: Enter chooses the focused section, ending the search`, !!(await lib.until(async () => (await selected()) === ids[0] && (await search.inputValue()) === '', HUNG_MS)), await selected())
+      await search.fill('a')
+      await lib.until(async () => (await selected()) === null, HUNG_MS)
+      await rows.nth(2).focus()
+      await page.keyboard.press(' ')
+      check(`${what}: Space chooses it too`, !!(await lib.until(async () => (await selected()) === ids[2] && (await search.inputValue()) === '', HUNG_MS)), await selected())
+      await page.screenshot({ path: path.join(scratch, `settingsnav-${what.toLowerCase().replace(/\s+/g, '-')}-keyboard.png`) })
     }
 
     await page.locator('.activitybar .activity-btn[aria-label="Settings"]').click()

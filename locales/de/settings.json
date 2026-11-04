@@ -1262,6 +1262,7 @@
   "settings.section.workflow.label": "Versionsverwaltung",
   "settings.section.workspace.desc": "Was dem offenen Arbeitsbereich selbst gehört: seine Projekte, die Combwork auslässt (ausgeblendet oder aus Combwork entfernt, mit ihren Übergaben und Karten in den Ordner gepackt), wie viel Combwork für jedes Projekt speichert, und der Virenschutz. Seine Workflow-Standards sind unter Versionsverwaltung.",
   "settings.section.workspace.label": "Arbeitsbereich",
+  "settings.sections": "Einstellungsbereiche",
   "settings.sessions.backupRetention.desc": "Wie lange Combwork seine Sicherungen von Sitzungen behält, die die CLI noch hat. Nach so vielen Tagen ohne Aktivität kommen sie in den Papierkorb. Eine Sitzung, deren einzige Kopie Combworks Sicherung ist, bleibt immer unangetastet.",
   "settings.sessions.backupRetention.option.d180": "180 Tage",
   "settings.sessions.backupRetention.option.d30": "30 Tage",

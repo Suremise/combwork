@@ -1262,6 +1262,7 @@
   "settings.section.workflow.label": "版本控制",
   "settings.section.workspace.desc": "当前工作区自己的设置：Combwork 不显示的项目（已隐藏，或已从 Combwork 中移除并将其交接和卡片打包进文件夹）、Combwork 为每个项目保存多少内容，以及防病毒扫描。它的工作流程默认值在“版本控制”中。",
   "settings.section.workspace.label": "工作区",
+  "settings.sections": "设置分区",
   "settings.sessions.backupRetention.desc": "Combwork 为 CLI 仍保有的会话保留备份的时长。超过这么多天没有活动后，备份会移到回收站。如果某个会话唯一的副本是 Combwork 的备份，则始终不会动它。",
   "settings.sessions.backupRetention.option.d180": "180 天",
   "settings.sessions.backupRetention.option.d30": "30 天",

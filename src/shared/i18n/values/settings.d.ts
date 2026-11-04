@@ -1264,6 +1264,7 @@ interface HiveMessageValues {
   'settings.section.workflow.label': undefined
   'settings.section.workspace.desc': undefined
   'settings.section.workspace.label': undefined
+  'settings.sections': undefined
   'settings.sessions.backupRetention.desc': undefined
   'settings.sessions.backupRetention.option.d180': undefined
   'settings.sessions.backupRetention.option.d30': undefined
