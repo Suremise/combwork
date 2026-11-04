@@ -26,6 +26,7 @@
 
 ### Fixed
 
+- **Text typed in Settings → Advanced isn't lost when another value changes** (HI-2537). A list box's text being typed was put back to its saved value whenever the advanced settings changed meanwhile: the workspace's own value saved, advanced.json edited, another window's change. Enter then saved nothing. The box now changes only when the value it shows does.
 - **Folder lists in Settings keep what you type** (HI-2538). Card attachments: more folders and Agents' temp folder take folders separated by semicolons, but the box and the Assistant showed a space after each semicolon that you hadn't typed. The box now shows the folders `;` apart, as you typed them, and `a; b` and `a;b` are the same list. Only a semicolon separates folders: a comma is kept as part of a folder's name.
 - **Settings' sections can be chosen from the keyboard** (HI-2532). Tab skipped the list of sections in Settings and Project Settings, so only the mouse could change section. Tab now reaches it, the arrow keys, Home and End move through the sections, and Enter or Space opens one.
 - **Settings section names cut short show in full on hover** (HI-2531). In a narrow window, Settings and Project Settings cut long section names ("Accounts & C…", "Keyboard Sho…"); hovering one now shows its whole name in a tooltip, and the list keeps its compact rows.
