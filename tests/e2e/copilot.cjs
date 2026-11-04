@@ -164,8 +164,8 @@ const check = (name, ok, extra = '') => {
     check('B: a hive tool runs without asking, and the turn finishes', hiveTurn.finished && !hiveTurn.asked, hiveTurn.seen.join(' → '))
     check('B: …no tool dialog on its screen', !/Do you want to use this tool\?/.test(await screen(b.id)))
     const listed = fs.readFileSync(apiLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
-    check('Copilot offered the hive tools, named hive-<tool>', listed.some((r) => (r.tools ?? []).includes('combwork-cw_list_projects')), JSON.stringify(listed[0]?.tools ?? []))
-    check("Hive's guidance reached Copilot's system prompt (the hive server's instructions)", listed.some((r) => /use the hive tools/i.test(r.system ?? '')))
+    check('Copilot offered the Combwork tools, named combwork-<tool>', listed.some((r) => (r.tools ?? []).includes('combwork-cw_list_projects')), JSON.stringify(listed[0]?.tools ?? []))
+    check("Combwork's guidance reached Copilot's system prompt (the combwork server's instructions)", listed.some((r) => /use the Combwork tools/i.test(r.system ?? '')))
     const bScreen = await screen(b.id)
     check('B: the hive tool ran, and not refused', /cw_list_projects/.test(bScreen) && !/✗\s*cw_list_projects/.test(bScreen), bScreen.split('\n').filter((l) => /cw_list_projects/.test(l)).join(' | '))
 
