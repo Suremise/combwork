@@ -274,6 +274,17 @@ describe('git', () => {
   })
 })
 
+describe("the lock's file", () => {
+  it('stays after the move, kept out of git when the workspace is in a repository', async () => {
+    const ws = workspace10()
+    git(ws, 'init', '-q', '-b', 'main')
+    await openMove(ws)
+    expect(existsSync(join(ws, MOVE_LOCK_FILE))).toBe(true)
+    expect(readFileSync(join(ws, '.git', 'info', 'exclude'), 'utf8')).toMatch(/^\/\.combwork-move\.lock$/m)
+    expect(git(ws, 'status', '--porcelain', '--untracked-files=all', '--', MOVE_LOCK_FILE)).toBe('')
+  })
+})
+
 describe('two processes racing for one workspace', () => {
   const tmp = tempDir('combworkmove-race-')
   const bundle = join(tmp, 'child.cjs')
@@ -285,9 +296,11 @@ describe('two processes racing for one workspace', () => {
       `
 const { appendFileSync, existsSync } = require('fs')
 const m = require(${JSON.stringify(join(__dirname, '..', 'src', 'main', 'combworkMove.ts'))})
-const [ws, out, barrier] = process.argv.slice(2)
+const [ws, out, barrier, stopAt] = process.argv.slice(2)
 const until = async (f) => { while (!f()) await new Promise((r) => setTimeout(r, 20)) }
 m.moveTestHooks.looked = async () => { appendFileSync(out, 'looked\\n'); await until(() => existsSync(barrier)) }
+// A stop at that step that never ends: the process is killed there, holding the lock (a crash mid-move).
+if (stopAt) m.moveTestHooks.after = async (step) => { if (step === stopAt) { appendFileSync(out, 'stopped\\n'); setInterval(() => {}, 60000); await new Promise(() => {}) } }
 m.moveFolders(ws).then((r) => appendFileSync(out, 'moved ' + r.moved + '\\n'), (e) => appendFileSync(out, 'refused ' + e.message + '\\n'))
 `
     )
@@ -295,6 +308,28 @@ m.moveFolders(ws).then((r) => appendFileSync(out, 'moved ' + r.moved + '\\n'), (
   }, 60_000)
   afterAll(() => {
     for (const c of children) if (c.exitCode === null) c.kill()
+  })
+
+  it('one killed mid-move, holding the lock: refused while it lives; then the next open takes over its dead row and finishes', async () => {
+    const ws = workspace10()
+    const barrier = join(tmp, `go${++n}`)
+    writeFileSync(barrier, '')
+    const out = join(tmp, `k${n}.txt`)
+    writeFileSync(out, '')
+    const child = spawn(process.execPath, [bundle, ws, out, barrier, 'renamed:workspace'], { env: { ...ctx.baseEnv(), HIVE_USER_DATA: join(tmp, `ud${n}`) }, stdio: 'ignore', windowsHide: true })
+    children.push(child)
+    await vi.waitFor(() => expect(readFileSync(out, 'utf8')).toContain('stopped'), WAIT)
+    // While it lives, its row holds: this open is refused, nothing changed.
+    await expect(moveFolders(ws)).rejects.toThrow(/Another Combwork is moving/)
+    expect(existsSync(join(ws, 'alpha', '.hive'))).toBe(true)
+    child.kill()
+    await new Promise((r) => (child.exitCode !== null ? r(undefined) : child.once('exit', () => r(undefined))))
+    await openMove(ws)
+    expect(existsSync(join(ws, 'alpha', '.combwork', 'project.json'))).toBe(true)
+    expect(existsSync(join(ws, '.hive'))).toBe(false)
+    expect(cardText(ws).d).toContain(`${ws}\\alpha\\.combwork\\attachments`)
+    // One plan from start to end: the dead one's, its marks kept.
+    expect(readFileSync(join(ws, 'alpha', '.combwork', MARK_FILE), 'utf8')).toBe(readFileSync(join(ws, '.combwork', MARK_FILE), 'utf8'))
   })
 
   it('both paused after seeing it unclaimed, released together: exactly one moves it, the other writes nothing', async () => {

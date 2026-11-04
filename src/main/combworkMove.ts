@@ -335,8 +335,31 @@ async function recordMoves(ws: string, moves: FolderMove[]): Promise<void> {
   await writeKeptJson(file, { version: 1, moves: list } satisfies MovedFile)
 }
 
+/**
+ * The lock's file kept out of git when the workspace is in a repository (HI-2462/s21: the file stays for good, its row
+ * released): its line in that repository's info/exclude, under Combwork's comment, anchored at the workspace. A failure
+ * only means git lists one more untracked file; the move goes on.
+ */
+export async function excludeMoveLock(ws: string): Promise<void> {
+  try {
+    const found = vcsOf(ws)
+    if (found?.kind !== 'git') return
+    const gd = await gitDirOf(found.root)
+    if (!gd) return
+    const f = join(gd, 'info', 'exclude')
+    const line = excludeLine(found.root, ws).replace(/\/\.combwork\/$/, `/${MOVE_LOCK_FILE}`)
+    const text = await readFile(f, 'utf8').catch(() => '')
+    if (text.split(/\r?\n/).some((l) => l.trim() === line)) return
+    await mkdir(join(gd, 'info'), { recursive: true })
+    await writeTextAtomic(f, `${text}${text && !text.endsWith('\n') ? '\n' : ''}# Combwork's folder move lock (added by Combwork)\n${line}\n`)
+  } catch (e) {
+    log.warn("keeping the folder move's lock file out of git", e)
+  }
+}
+
 async function movedUnderLock(ws: string, hosts: { host: string; kind: HostKind }[], o: MoveOptions & { only?: string }, stop: () => void): Promise<MoveOutcome> {
   stop()
+  await excludeMoveLock(ws)
   // Inside the lock, everything is looked at again: another process may have moved it meanwhile.
   for (const dir of [legacy(ws), current(ws)]) {
     const others = othersPresentByProcess(dir)
