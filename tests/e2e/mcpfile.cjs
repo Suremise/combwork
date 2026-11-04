@@ -157,7 +157,7 @@ const check = (name, ok, extra = '') => {
 
   // --- Search and filter in the MCP view.
   const search = page.locator('.sidebar [data-mcp-search]')
-  const listed = async () => (await page.locator('.pane-body .row .label').allInnerTexts()).map((t) => t.trim()).filter((t) => t !== 'hive')
+  const listed = async () => (await page.locator('.pane-body .row .label').allInnerTexts()).map((t) => t.trim()).filter((t) => t !== 'combwork') // the built-in server (HI-2463)
   await search.fill('note')
   check('searching "note" lists notes and notes-2', !!(await lib.until(async () => JSON.stringify((await listed()).sort()) === '["notes","notes-2"]', HUNG_MS)), JSON.stringify(await listed()))
   await page.locator('.sidebar [data-mcp-filter]').selectOption('nowhere')
