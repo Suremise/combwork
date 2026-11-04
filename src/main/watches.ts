@@ -19,7 +19,7 @@ import { dbGenerationAt, onDbReplaced } from './boardStore'
 import { coalesced } from './coalesce'
 import { createLogger, userText } from './logger'
 import { listLanes } from './lanes'
-import { keepAsked, LANE_ALWAYS_EVENTS, LANE_CARD_CHANGES, laneCardMark, laneHits, laneLimitLine, laneWakeLine, laneWatchLabel, mergeDue, mergeStallReason, newLaneBase, readSavedLaneCondition, readSavedLaneMark, verdictsOf, type LaneAgentHit, type LaneAsked, type LaneHit, type LaneMark, type LaneNow, type LaneWatchAgents, type LaneWatchCards, type LaneWatchCondition, type WaitHit } from '../shared/laneWatch'
+import { keepAsked, LANE_CARD_CHANGES, laneCardMark, laneOverPart, laneHits, laneLimitLine, laneWakeLine, laneWatchLabel, mergeDue, mergeStallReason, newLaneBase, withAlwaysEvents, readSavedLaneCondition, readSavedLaneMark, verdictsOf, type LaneAgentHit, type LaneAsked, type LaneHit, type LaneMark, type LaneNow, type LaneWatchAgents, type LaneWatchCards, type LaneWatchCondition, type WaitHit } from '../shared/laneWatch'
 import { cardStallIn, laneOrderView } from './cardStall'
 import { noteLoopWatch } from './loopCheck'
 import { isResuming } from './restartResume'
@@ -284,6 +284,8 @@ export const testHooks: {
   cardRead?: (n: number) => void
   /** HI-2197: a pause before a new conversation's end of an old watch cancels that watch's wake. */
   beforeWakeCancel?: () => Promise<void>
+  /** HI-2521: a pause in a lane watch's setup, after its lanes were read and before it is saved. */
+  afterLanesRead?: () => Promise<void>
 } = {}
 /** The same seams by their first name (round-one probes use it). */
 export const testPauses = testHooks
@@ -1879,7 +1881,9 @@ async function evaluateLanes(store: Store): Promise<void> {
   for (const rec of store.list.filter((r) => r.lanes && r.fired)) await deliver(store, rec)
 }
 
-export type LaneWatchResult = { watching: TaskWatchInfo; replaced?: string; cards?: LaneWatchCards; agents?: LaneWatchAgents }
+export type LaneWatching = { watching: TaskWatchInfo; replaced?: string; cards?: LaneWatchCards; agents?: LaneWatchAgents }
+/** `already` (HI-2521): the lanes it names that have ended or been abandoned, each told; no watch was started. */
+export type LaneWatchResult = LaneWatching | { already: string[]; replaced?: string }
 
 /**
  * Starts (or replaces) an agent's watch on lanes (#531): the lanes it names (each in its view, else an error), or every
@@ -1891,9 +1895,12 @@ export type LaneWatchResult = { watching: TaskWatchInfo; replaced?: string; card
  * out, the last lane watch's cards are kept (the one it replaces, or the one whose wake was read), less those since done
  * or gone; [] drops them. The reply says which (`cards`).
  */
+// A watch on every running lane names no lane that has ended: it is always a watch.
+export async function registerLaneWatch(ws: WorkspaceService, projectPath: string, agentId: string, asked: LaneWatchCondition & { ids: 'all' }, limitMinutes?: number, extra?: { cards?: number[]; changes?: WatchChange[]; agents?: AgentWatchCondition }): Promise<LaneWatching>
+export async function registerLaneWatch(ws: WorkspaceService, projectPath: string, agentId: string, asked: LaneWatchCondition, limitMinutes?: number, extra?: { cards?: number[]; changes?: WatchChange[]; agents?: AgentWatchCondition }): Promise<LaneWatchResult>
 export async function registerLaneWatch(ws: WorkspaceService, projectPath: string, agentId: string, asked: LaneWatchCondition, limitMinutes = WATCH_DEFAULT_LIMIT_MINUTES, extra: { cards?: number[]; changes?: WatchChange[]; agents?: AgentWatchCondition } = {}): Promise<LaneWatchResult> {
-  // A question for the user always counts (HI-1991), whoever made the condition.
-  const cond: LaneWatchCondition = { ...asked, events: [...new Set([...asked.events, ...LANE_ALWAYS_EVENTS])] }
+  // A question for the user always counts (HI-1991), whoever made the condition; so does named lanes' end (HI-2521).
+  const cond: LaneWatchCondition = { ...asked, events: withAlwaysEvents(asked.ids, asked.events) }
   // Waits for the user are new from here (#726 round 1 finding): taken before anything waits, so one that begins while
   // the lanes and cards are read is told, not taken as its baseline.
   const waitsFrom = latestWaitSeq()
@@ -1924,6 +1931,26 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
     const laneSince = told?.at ?? since
     const toldMarks = told ? Object.fromEntries(told.marks) : undefined
     const nows = await lanesNow(store, { scope, lanes: cond, laneSince, ...(toldMarks ? { laneMarks: toldMarks } : {}) })
+    await testHooks.afterLanesRead?.()
+    const old = recordOf(store, projectPath, agentId)
+    // HI-2521: a lane it names that has ended or been abandoned is the answer at once, as an agent not working is for an
+    // agent watch: no watch starts (it would start from the end, with nothing left to tell), and one it had ends.
+    const over = cond.ids === 'all' ? [] : nows.flatMap((n) => laneOverPart(n) ?? [])
+    if (over.length) {
+      const before = store.list
+      store.list = store.list.filter((x) => x !== old)
+      if (old) {
+        try {
+          await save(store)
+        } catch (e) {
+          store.list = before
+          throw new Error(say(T.notSaved, { error: (e as Error).message }), { cause: e })
+        }
+      }
+      stopDelivery(store, old)
+      log.info(`${userText(agentId)} asked to watch ${(cond.ids as string[]).join(', ')}: ended already`)
+      return { already: over, ...(old ? { replaced: infoOf(old).label } : {}) }
+    }
     const allLanes = await listLanes(ws, { all: true })
     const started = new Map(allLanes.map((l) => [l.id, l.startedAt]))
     // The watched lanes' own cards (#1531, #1346 item 3): listed as cards too, each wakes it on every move.
@@ -1936,7 +1963,6 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
       // Started since that wake: left unmarked, so the first check measures it from an empty start.
       else if (!(told && Date.parse(started.get(n.id) ?? '') > Date.parse(laneSince))) laneMarks[n.id] = keepAsked(null, n.mark, laneSince)
     }
-    const old = recordOf(store, projectPath, agentId)
     // The cards beside its lanes (#726): those named, else the last lane watch's (the one it replaces, or the one whose
     // wake was read), less those done or gone since (a card named must be one it may see).
     const last = old?.lanes ? (old.cond.cards.length ? { cards: old.cond.cards, changes: old.cond.changes } : undefined) : told?.cards
@@ -2022,7 +2048,9 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
     return { watching: infoOf(rec), ...(old ? { replaced: infoOf(old).label } : {}), ...(cardsOut ? { cards: cardsOut } : {}), ...(agentsOut ? { agents: agentsOut } : {}) }
   })
   sessions.watchChanged(projectPath, agentId)
-  // Checked once in place: an event since a wake, or while it was being set up, isn't missed.
+  if ('already' in result) return result
+  // Checked once in place: an event since a wake, or while it was being set up (a lane ending after its state was read
+  // above, HI-2521), isn't missed.
   inBackground('checking lane watches', evaluateLanes(store))
   if (result.agents?.now.length) inBackground('checking agent watches', evaluateAgents(store))
   return result
