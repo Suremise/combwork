@@ -378,6 +378,39 @@ describe('usageMoves.ts', () => {
     expect(H.notices[0]?.message).toContain('Assistant (by name)')
   })
 
+  it("an Assistant inheriting a CLI other than Settings' automatic one keeps it when moved: written with its connection (HR3 round 1)", async () => {
+    const { agentProvider } = await import('../src/shared/providers')
+    const { resolveAgentConnection } = await import('../src/shared/accounts')
+    // The automatic CLI (no provider named) is Claude Code here; the Assistant inherits Codex, the first usable account's.
+    expect(agentProvider({}, config.settings)).toBe('claude-code')
+    const was = ws.config.connections
+    ws.config.connections = { ...was, codex: { on: ['k1', 'k2'], default: 'k1' } } as typeof was
+    try {
+      config.update((c) => {
+        c.accounts = [...c.accounts!, account('k1', 'Codex-1', { provider: 'codex', usageMove: { percent: 98, limit: 'weekly', to: 'k2' } }), account('k2', 'Codex-2', { provider: 'codex' })]
+        c.connections = [...c.connections!, conn('kc1', 'k1', 'Codex-1'), conn('kc2', 'k2', 'Codex-2')]
+      })
+      assistantPc.agents = [{ id: 'assistant', name: 'Assistant' } as AgentDef]
+      H.firstUsable = { provider: 'codex' }
+      setUsage('k1', [weekly(99)])
+      await settle()
+      await vi.waitFor(() => expect(assistantPc.agents[0].connection).toBe('kc2'), { timeout: HUNG_MS })
+      // Its CLI written with the connection: its next launch (sessions.effective: a connection named, so its own
+      // provider) resolves as Codex on Codex-2, not as Claude Code dropping the Codex connection.
+      const saved = assistantPc.agents[0]
+      expect(saved.provider).toBe('codex')
+      const cli = agentProvider(saved, config.settings)
+      const launch = resolveAgentConnection(ws.config, cli, saved.connection, config.get().accounts!, config.get().connections!)
+      expect(cli).toBe('codex')
+      expect(launch.ok && launch.account.id).toBe('k2')
+      expect(launch.ok && launch.connection.id).toBe('kc2')
+      // Project agents keep whatever provider they had: only the inheriting Assistant is pinned.
+      expect(pc.agents.every((a) => a.provider === 'claude-code')).toBe(true)
+    } finally {
+      ws.config.connections = was
+    }
+  })
+
   it('the Assistant, chosen by the user while its move waits, stays where the user put it (HI-2530)', async () => {
     const home = `${ws.assistantHome}#assistant`
     assistantPc.agents = [{ ...agent('assistant', 'c1'), name: 'Assistant' }]

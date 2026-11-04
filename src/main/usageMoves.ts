@@ -57,6 +57,14 @@ interface Pending {
   by: MatchedBy
   tag?: string
   saved: string | undefined
+  /** Its own CLI as saved when queued (unset: it inherits one); checked again under the lock. */
+  savedProvider: ProviderId | undefined
+  /**
+   * The CLI written with its connection (HR3's round 1 on HI-2530): set only for an Assistant that inherits its CLI (no
+   * provider and no connection, so it launches on the first usable account's). Once it names a connection, sessions.ts
+   * reads its CLI from `provider` (else Settings' automatic one), so the move pins the CLI it was moved by.
+   */
+  pin?: ProviderId
   count: number
   /** Its switch ended or it was dropped (HR1's round 1): never written after, however long its write waited for the lock. */
   over?: boolean
@@ -184,11 +192,11 @@ async function commit(m: Pending): Promise<boolean> {
     return false
   }
   try {
-    await m.ws.updateAgent(m.projectPath, m.agentId, { connection: m.to }, (current) => {
+    await m.ws.updateAgent(m.projectPath, m.agentId, { connection: m.to, ...(m.pin ? { provider: m.pin } : {}) }, (current) => {
       // Everything again under the lock (HR1's round 1): a stop, a drop, the switch off or the rule or target changed
       // while this write waited for the lock writes nothing.
       if (!stillHolds(m)) throw new NoLongerHolds()
-      if (choiceCount(m.projectPath, m.agentId) !== m.count || current.connection !== m.saved) throw new KeptByUser()
+      if (choiceCount(m.projectPath, m.agentId) !== m.count || current.connection !== m.saved || (current.provider || undefined) !== m.savedProvider) throw new KeptByUser()
       const now = resolveAgentConnection(m.ws.config, acc.provider, current.connection, allAccounts(), allConnections())
       if (!now.ok || now.account.id !== acc.id) throw new KeptByUser()
     })
@@ -253,7 +261,7 @@ async function fire(acc: Account, rule: UsageMoveRule, l: PlanLimit, now: number
         if (movedOffWithinPeriod(key, target.id, records(), now)) continue
         const match = matchConnection(choice.connection, target.id, allConnections())
         if (!match) continue
-        const m: Pending = { ws, projectPath, agentId: a.id, name: a.name, account: acc.id, limit: l.id, firing: rec.firing, rule: { ...rule }, to: match.connection.id, by: match.by, ...(match.by === 'tag' && match.connection.tag ? { tag: match.connection.tag } : {}), saved: a.connection ?? undefined, count: choiceCount(projectPath, a.id) }
+        const m: Pending = { ws, projectPath, agentId: a.id, name: a.name, account: acc.id, limit: l.id, firing: rec.firing, rule: { ...rule }, to: match.connection.id, by: match.by, ...(match.by === 'tag' && match.connection.tag ? { tag: match.connection.tag } : {}), saved: a.connection ?? undefined, savedProvider: a.provider || undefined, ...(ws.isAssistantHome(projectPath) && !a.provider && !a.connection ? { pin: acc.provider } : {}), count: choiceCount(projectPath, a.id) }
         keys.set(m, key)
         pending.set(key, m)
         const r = inWorkspace(ws, () =>
