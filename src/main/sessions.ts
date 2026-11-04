@@ -64,7 +64,8 @@ import type {
   SkillInfo,
   SessionUsage,
   TaskWatchInfo,
-  ToastAction
+  ToastAction,
+  StartedSession
 } from '../shared/types'
 import { provider as providerAdapter, allProviders } from './providers'
 import { runSwitch, SlotHeld, SwitchIntents, type SwitchOp, type UsageIntent } from './connectionSwitch'
@@ -153,12 +154,12 @@ import { replyStart } from '../shared/tiles'
 import { observer } from './platform/observe'
 import { projectPreferences } from './workflow/preferences'
 import { driveExitKeys, type ExitKeysIO } from './exitKeys'
-import { movedPath } from './combworkMove'
+import { movedFolders, movedPath } from './combworkMove'
+import { freshReasonOf, SESSION_NAMES, type FreshReason } from '../shared/sessionFresh'
+import type { FolderMove } from '../shared/hiveFolderMove'
 
 const log = createLogger('sessions')
 
-/** The names a session's launches give it (SessionRecord.names, HI-2463): 2 is Combwork's (cw_ tools, [CW], cw-progress). */
-const SESSION_NAMES = 2 as const
 /** How long starts are quiet before the notice of conversations started fresh is shown (a restart resumes several at once). */
 const RENAMED_NOTICE_QUIET_MS = 5_000
 const RENAMED_FRESH = {
@@ -1006,6 +1007,11 @@ export interface StartOptions {
   purpose?: FolderPurpose
   /** Resume All and startup's resume (#1434): a conversation resumes only where it may now, never taking a free slot. */
   auto?: boolean
+  /**
+   * HI-2540: the user was asked before this resume whether to start a new conversation instead of one that can't
+   * continue (SessionListItem.fresh), and said yes: no notice afterwards. Starts no one asked about (a restart's) get it.
+   */
+  freshAsked?: boolean
 }
 
 /** Where a start runs: its folder, the slot lease it runs under, and whether it is another agent's 0.9 worktree. */
@@ -1732,7 +1738,7 @@ class SessionManager {
     const reads = scope ? launchReadsOf(scope) : new LaunchReads()
     // Its sessions, and its slots and leases (#1434: an agent's conversations in its slots, and whether each may resume
     // now), read at once (HI-1705).
-    const [file, facts] = await whenAll([workspace.sessionsFile(projectPath), folderFacts(projectPath).catch(() => null)])
+    const [file, facts, moves] = await whenAll([workspace.sessionsFile(projectPath), folderFacts(projectPath).catch(() => null), this.folderMoves(projectPath)])
     const records = file.sessions
     this.checkSubsOnce(projectPath, records)
     const openIds = new Set(this.projectStates(projectPath).map((s) => s.sessionId).filter(Boolean))
@@ -1760,6 +1766,8 @@ class SessionManager {
         const folder = workspace.isAssistantHome(projectPath) ? (workspaceOf(projectPath).path ?? projectPath) : projectPath
         const r = l ? null : resumeRecord(folder, a, records.filter((x) => recordProvider(x) === provider), openIds, ids, slotFolders)
         const hold = r && facts ? resumeHold(facts, folderAgent(a), r) : null
+        // A resume of it starts a new conversation (HI-2540): its Resume says so before it is pressed.
+        const fresh = r ? freshReasonOf(r, moves) : null
         // Its last conversation resumes in a retired home (#1441), though a new one starts elsewhere: its pane says so (#1552).
         const home = r && facts ? resumeHome(facts, r) : null
         // Its adopted worktree's slot (#1441), while it holds it carried.
@@ -1770,7 +1778,7 @@ class SessionManager {
         const shown = at ? shownPlace(shownFacts, folderAgent(a), at.now, at.branch, at.target) : { folder: projectPath, is: 'project' as const, name: null, branch: null }
         // Its 0.9 worktree's base, also for the slot it was carried into while that slot has no target (#1569).
         const place = (shown.is === 'legacy' || (shown.is === 'carried' && !shown.base)) && legacy?.base ? { ...shown, base: legacy.base } : shown
-        return { ...a, ...agentLaunchView(a, cfg), live: l?.state ?? null, restartNeeded, resume: r && { id: r.id, name: r.name, lastActiveAt: r.lastActiveAt, createdAt: r.createdAt, titleAtRename: r.titleAtRename, ...(hold ? { hold } : {}), ...(home ? { home } : {}) },...(carried ? { carriedSlot: carried } : {}), ...(held.has(a.id) ? { heldSlot: held.get(a.id) } : {}), place }
+        return { ...a, ...agentLaunchView(a, cfg), live: l?.state ?? null, restartNeeded, resume: r && { id: r.id, name: r.name, lastActiveAt: r.lastActiveAt, createdAt: r.createdAt, titleAtRename: r.titleAtRename, ...(hold ? { hold } : {}), ...(fresh ? { fresh } : {}), ...(home ? { home } : {}) },...(carried ? { carriedSlot: carried } : {}), ...(held.has(a.id) ? { heldSlot: held.get(a.id) } : {}), place }
     }))
     const primary = agents.find((a) => a.live)
     return { live: primary?.live ?? null, restartNeeded: primary?.restartNeeded ?? false, agents, folders: namedFolders(shownFacts) }
@@ -1863,7 +1871,7 @@ class SessionManager {
     return null
   }
 
-  async start(projectPath: string, opts: StartOptions): Promise<LiveSessionState> {
+  async start(projectPath: string, opts: StartOptions): Promise<StartedSession> {
     this.assertStartsAllowed(projectPath)
     projectPath = workspace.assertSessionHost(projectPath)
     // A start of the user's (not a switch's own resume) replaces a switch of connection waiting for that agent (HI-1755).
@@ -1905,8 +1913,10 @@ class SessionManager {
     pending.outcome = run
     try {
       const started = await run
-      if (freshFrom) this.renamedFresh(projectPath, agentId, freshFrom, freshWhy!)
-      return started
+      if (!freshFrom) return started
+      this.renamedFresh(projectPath, agentId, freshFrom, freshWhy!, !opts.freshAsked)
+      // Its caller says so (HI-2540: the Agent API's reply): a resume asked for, a new conversation started.
+      return { ...started, startedFresh: freshWhy! }
     } catch (e) {
       // Given up before any process of it ran: its slot's writer released now (#1434). One that ran is its exit's.
       if (!this.writers.get(pending.runId)?.spawned) this.settleWriterOf(pending.runId)
@@ -1919,21 +1929,18 @@ class SessionManager {
   }
 
   /**
-   * Why a conversation starts fresh rather than resume, or null when it resumes:
-   * - `renamed`: launched by Combwork before HI-2463 (its record has no `names`, but has what a launch of Combwork's
-   *   writes: the agent it ran as, or the folder it ran in): it remembers the old names. A session adopted from outside
-   *   (neither) never knew them, and resumes.
-   * - `moved` (HI-2462): the folder it ran in, as recorded (its transcript's key, never rewritten), lies inside a `.hive`
-   *   that moved to `.combwork`.
-   * A record that can't be read resumes as before.
+   * Why a conversation starts fresh rather than resume, or null when it resumes (freshReasonOf: the rule the window's
+   * lists read too, HI-2540). A record that can't be read resumes as before.
    */
-  private async freshReason(projectPath: string, sessionId: string): Promise<'renamed' | 'moved' | null> {
+  private async freshReason(projectPath: string, sessionId: string): Promise<FreshReason | null> {
     const rec = await workspace.sessionRecord(projectPath, sessionId).catch(() => undefined)
-    if (!rec) return null
-    if (rec.names !== SESSION_NAMES && !!(rec.agentId || rec.cwd)) return 'renamed'
-    // HI-2462: its recorded folder (where its transcript is filed, kept as it was) lies inside a folder that moved.
+    return rec ? freshReasonOf(rec, await this.folderMoves(projectPath)) : null
+  }
+
+  /** The folders that moved in a project's workspace (HI-2462), for freshReasonOf; none when it has no workspace or can't be read. */
+  private async folderMoves(projectPath: string): Promise<FolderMove[]> {
     const ws = workspaceFor(projectPath)?.path
-    return ws && rec.cwd && (await movedPath(ws, rec.cwd)) ? 'moved' : null
+    return ws ? movedFolders(ws).catch(() => []) : []
   }
 
   /** Fresh conversations started for ones from before HI-2463 or HI-2462's move, per workspace and reason, for one notice each. */
@@ -1944,8 +1951,10 @@ class SessionManager {
    * says how many once starts have been quiet for a moment (a restart resumes several at once), counting only those that
    * started.
    */
-  private renamedFresh(projectPath: string, agentId: string, oldSession: string, why: 'renamed' | 'moved'): void {
-    log.info(`${userText(agentId)} in ${userText(basename(projectPath))} started a new conversation: ${oldSession.slice(0, 8)} ${why === 'renamed' ? "was launched before the agents' names changed (HI-2463)" : 'ran in a folder that moved to .combwork (HI-2462)'}, and stays in Sessions`)
+  private renamedFresh(projectPath: string, agentId: string, oldSession: string, why: FreshReason, withNotice: boolean): void {
+    log.info(`${userText(agentId)} in ${userText(basename(projectPath))} started a new conversation${withNotice ? '' : ', as the user chose'}: ${oldSession.slice(0, 8)} ${why === 'renamed' ? "was launched before the agents' names changed (HI-2463)" : 'ran in a folder that moved to .combwork (HI-2462)'}, and stays in Sessions`)
+    // HI-2540: the user was asked first, so nothing to tell them afterwards.
+    if (!withNotice) return
     const path = workspaceFor(projectPath)?.path
     if (!path) return
     const ws = `${path}|${why}`
@@ -7623,6 +7632,8 @@ class SessionManager {
     // Read once for the whole list, not once per session.
     const ctx: ListContext = { records: file.sessions, cfg: await workspace.projectConfig(projectPath), stored: await usageHistory.storedUsage(projectPath).catch(() => new Map()) }
     const ttl = config.settings.sessions.cacheTtl
+    // Which start fresh when resumed (HI-2540), by the rule the start reads: the window asks before, not afterwards.
+    const moves = await this.folderMoves(projectPath)
     const items: SessionListItem[] = []
     // Records from before sub-sessions were told apart (a guardian review adopted then): found now, and kept on them.
     const found = new Map<string, SubSession>()
@@ -7646,9 +7657,11 @@ class SessionManager {
       const { keptUsage: _kept, ...fields } = rec
       const sub = rec.sub ?? (await this.recordSub(projectPath, rec, transcript, st?.mtimeMs))
       if (sub && !rec.sub) found.set(rec.id, sub)
+      const fresh = freshReasonOf(rec, moves)
       return {
         ...fields,
         ...(sub ? { sub } : {}),
+        ...(fresh ? { fresh } : {}),
         provider,
         source: 'hive',
         title: usage?.title ?? null,

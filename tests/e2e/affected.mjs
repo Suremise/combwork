@@ -504,6 +504,7 @@ export const AREAS = [
   { paths: ['src/main/loginItem.ts'], suites: ['packaged'] },
   { paths: ['src/shared/instructions.ts'], suites: ['skilldelivery'] },
   { paths: ['src/shared/resumeAll.ts'], suites: ['resumeall', 'signin'] },
+  { paths: ['src/shared/sessionFresh.ts', 'src/renderer/src/freshResume.ts'], suites: ['freshresume'] },
   { paths: ['src/shared/projectTabs.ts'], suites: ['tabstrip', 'startall', 'gitview'] },
   { paths: ['src/shared/startAll.ts'], suites: ['startall', 'removeall'] },
   { paths: ['src/shared/startFailure.ts'], suites: ['startfail'] },

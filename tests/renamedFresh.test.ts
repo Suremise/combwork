@@ -17,6 +17,9 @@ vi.mock('../src/main/events', async (orig) => ({
 }))
 
 const base = tempDir('renamedfresh-')
+// The session list (HI-2540) reads the CLIs' homes: this test's own, never the user's.
+process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
+process.env.CODEX_HOME = join(base, 'codex-home')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const { sessions } = await import('../src/main/sessions')
@@ -131,6 +134,38 @@ describe('a conversation from before the rename (HI-2463)', () => {
     } finally {
       vi.useRealTimers()
       internals.startReserved = launch
+    }
+  })
+
+  it('HI-2540: the window knows beforehand, by the rule the start reads; a start the user was asked about says so, with no notice', async () => {
+    // The list and the agents' resume targets: renamed (before HI-2463), moved (HI-2462, the test above), or neither.
+    const list = await run(() => sessions.list(project))
+    const fresh = (n: number) => list.find((x) => x.id === `00000000-0000-4000-8000-00000000000${n}`)?.fresh
+    expect([1, 2, 3, 4, 5, 6, 7].map(fresh)).toEqual(['renamed', 'renamed', undefined, undefined, 'renamed', 'moved', undefined])
+    const info = await run(async () => sessions.liveInfo(project, await ws.projectConfig(project)))
+    const resume = (id: string) => info.agents.find((a) => a.id === id)?.resume
+    expect(resume('b1')?.fresh).toBe('renamed')
+    // b3's is its conversation in the folder it works in (the project's): a current one.
+    expect(resume('b3')?.id).toBe('00000000-0000-4000-8000-000000000003')
+    expect(resume('b3')?.fresh).toBeUndefined()
+    expect(resume('b4')?.id).toBe('00000000-0000-4000-8000-000000000007')
+    expect(resume('b4')?.fresh).toBeUndefined()
+    told.toasts.length = 0
+    seen.launches.length = 0
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      // Asked first (the window's Start New Conversation): it starts fresh, carrying the agent's work, and says why.
+      const asked = await run(() => sessions.start(project, { agentId: 'b2', resumeId: '00000000-0000-4000-8000-000000000002', freshAsked: true }))
+      expect(asked.startedFresh).toBe('renamed')
+      expect(seen.launches).toEqual([{ agentId: 'b2', resumeId: undefined, prompt: undefined, keepWatch: true }])
+      // One that resumes says nothing of the kind.
+      const resumed = await run(() => sessions.start(project, { agentId: 'b4', resumeId: '00000000-0000-4000-8000-000000000007' }))
+      expect(resumed.startedFresh).toBeUndefined()
+      // No notice afterwards: the user was asked.
+      await vi.runAllTimersAsync()
+      expect(told.toasts).toEqual([])
+    } finally {
+      vi.useRealTimers()
     }
   })
 })

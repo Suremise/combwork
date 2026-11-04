@@ -11,6 +11,7 @@ import { allStopped, mostUrgent, projectAgentStates, projectStateShort, projectS
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import hexUrl from '../assets/icon.svg'
 import * as actions from '../actions'
+import { freshTip } from '../freshResume'
 import { call, errorMessage } from '../api'
 import { needsConnection, NoConnectionBanner, offeredConnections, useConnections } from '../components/ConnectionChoice'
 import { commandKeybinding, runCommand } from '../commands'
@@ -22,7 +23,7 @@ import { Icon, IconButton, Switch, Tooltip, useContextMenu, useFolds, type MenuE
 import { StateMark } from '../components/StateMark'
 import { ProjectAgentsTable, useAgentsText } from '../components/AgentsTable'
 import { agentProviderOf, notify, projectKey, set, setProjectTab, tileFocusOf, useFocusedAgent, useLanguage, useProjectStarting, useStarting, useStore, startingLabel, type ProjectTab } from '../store'
-import { carriesFiles, cx, formatKeybinding } from '../util'
+import { carriesFiles, cx, formatKeybinding, sessionLabel } from '../util'
 import { AttachmentsTab, FilesTab } from './FilesTab'
 import { VersionControl } from './VersionControl'
 import { MemoryTab, OverviewTab, ProjectMcpTab, ProjectSettingsTab, ProjectSkillsTab } from './ProjectTabs'
@@ -332,7 +333,7 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
         <>
           <Icon name="debug-disconnect" />
           <span className="grow">{tr(M.sessionEnded)}</span>
-          <button className="btn act-resume solid" disabled={!!startBlocked || !!starting} aria-busy={resuming || undefined} title={startBlocked ?? undefined} onClick={() => void actions.resumeLast(project.path)}>
+          <button className="btn act-resume solid" disabled={!!startBlocked || !!starting} aria-busy={resuming || undefined} title={startBlocked ?? (focused?.resume?.fresh ? freshTip(focused.resume.fresh, sessionLabel(focused.resume, project.name)) : undefined)} onClick={() => void actions.resumeLast(project.path)}>
             <Icon name={resuming ? 'loading' : 'debug-continue'} spin={resuming} /> {resuming ? startingLabel(starting) : tr(M.resume)}
           </button>
           <button className="btn act-start" disabled={!!startBlocked || !!starting} aria-busy={startingNew || undefined} title={startBlocked ?? undefined} onClick={() => void actions.newSession(project.path)}>

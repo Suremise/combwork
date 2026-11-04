@@ -12,6 +12,7 @@ import type { AgentInfo, AgentPatch, AssistantQuestion, Connection, ModeInfo, Pr
 import { shownText } from '@shared/advanced'
 import { withSnapshot } from '@shared/assistantChangeList'
 import * as actions from '../actions'
+import { freshShort, freshTip } from '../freshResume'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
 import { legacyOf, placeText, placeTip } from '../agentPlace'
@@ -443,7 +444,7 @@ function AssistantIdle({ project, a, ended }: { project: ProjectInfo; a: AgentIn
   const resuming = starting?.kind === 'resume'
   const startingNew = starting?.kind === 'start'
   const resume = a.resume ? (
-    <button className={cx(/* i18n-ignore: class names */ 'btn small', RESUME_TINT)} disabled={!!starting} aria-busy={resuming || undefined} onClick={() => void actions.resumeLast(project.path, AGENT)} title={tr(M.resumeTip, { name: sessionLabel(a.resume, SESSION_NAMES), when: timeAgo(a.resume.lastActiveAt) })}>
+    <button className={cx(/* i18n-ignore: class names */ 'btn small', RESUME_TINT)} disabled={!!starting} aria-busy={resuming || undefined} onClick={() => void actions.resumeLast(project.path, AGENT)} title={a.resume.fresh ? freshTip(a.resume.fresh, sessionLabel(a.resume, SESSION_NAMES)) : tr(M.resumeTip, { name: sessionLabel(a.resume, SESSION_NAMES), when: timeAgo(a.resume.lastActiveAt) })}>
       <Icon name={resuming ? 'loading' : 'debug-continue'} spin={resuming} /> {resuming ? startingLabel(starting) : tr(M.resume)}
     </button>
   ) : null
@@ -493,7 +494,7 @@ function useConversationPicker() {
     for (const s of all.slice(0, 12)) {
       items.push({
         label: sessionLabel(s, SESSION_NAMES),
-        detail: [timeAgo(s.lastActivity), s.id === open ? tr(M.openNow) : null, s.provider ? providerDescriptor(s.provider).name : null].filter(Boolean).join(' · '),
+        detail: [timeAgo(s.lastActivity), s.id === open ? tr(M.openNow) : null, s.fresh && s.id !== open ? freshShort() : null, s.provider ? providerDescriptor(s.provider).name : null].filter(Boolean).join(' · '),
         icon: s.id === open ? 'circle-filled' : 'history',
         disabled: s.id === open,
         onClick: () => void actions.resumeSession(project.path, s, AGENT)
@@ -554,7 +555,7 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
   }
   const start = (): void => void actions.newSession(project.path, AGENT)
   const resume = (): void => void actions.resumeLast(project.path, AGENT)
-  const resumeTip = a.resume ? tr(M.resumeTip, { name: sessionLabel(a.resume, SESSION_NAMES), when: timeAgo(a.resume.lastActiveAt) }) : ''
+  const resumeTip = a.resume?.fresh ? freshTip(a.resume.fresh, sessionLabel(a.resume, SESSION_NAMES)) : a.resume ? tr(M.resumeTip, { name: sessionLabel(a.resume, SESSION_NAMES), when: timeAgo(a.resume.lastActiveAt) }) : ''
   const stop = (): void => void actions.stopSession(project.path, AGENT)
   const compact = (): void => set({ compactFor: { project: project.path, agentId: AGENT } })
   const compacting = isCompacting(live)

@@ -18,6 +18,7 @@ import { serverAddedIn } from '@shared/agentMcp'
 import { shownText } from '@shared/advanced'
 import { fmt, tr } from '@shared/i18n'
 import { msg } from '@shared/i18n/msg'
+import { freshQuestion } from './freshResume'
 import { HAND_OVER_TEXT } from '@shared/handOver'
 import type { McpCatalogRow, McpServerInfo, ProjectInfo, ProviderId, SessionLayout, SessionListItem, SessionView, TemplateLoadPlan, ToastAction } from '@shared/types'
 import type { TemplateWorkflow } from '@shared/workflow/templateOptions'
@@ -588,7 +589,7 @@ export function agentsForSession(p: ProjectInfo, item: Pick<SessionListItem, 'cw
   return p.agents.filter((a) => sessionInAgentFolder(p.path, a, item))
 }
 
-type ResumeItem = Pick<SessionListItem, 'id' | 'recache' | 'title' | 'name' | 'agentId' | 'agentName' | 'cwd' | 'slot' | 'hold'> & { provider?: ProviderId }
+type ResumeItem = Pick<SessionListItem, 'id' | 'recache' | 'title' | 'name' | 'agentId' | 'agentName' | 'cwd' | 'slot' | 'hold' | 'fresh'> & { provider?: ProviderId }
 
 export async function resumeSession(path: string, item: ResumeItem, agentId?: string): Promise<void> {
   // Its buttons show it resuming from the click until it runs (#1177): under its agent, or, with none to run it yet,
@@ -632,7 +633,13 @@ async function resume(path: string, item: ResumeItem, held: string | null, agent
     notify('info', tr(msg({ id: 'actions.resume.alreadyOpen', defaultMessage: 'Already open', description: "A notification's title: the conversation is open in another agent." })), tr(msg({ id: 'actions.resume.alreadyOpenMessage', defaultMessage: 'This conversation is open in {agent}. An agent can only resume a session no other agent is running.', description: 'Under the notification that a conversation is open in another agent ({agent}).' }), { agent: holder.name }))
     return
   }
-  if (item.recache && !item.recache.warm && item.recache.tokens > 20000) {
+  if (item.fresh) {
+    // HI-2540: it can't continue, so a new conversation starts instead (main decides it by the same rule): asked now,
+    // never the re-cache question, whose re-cache wouldn't happen.
+    const assistant = isAssistantPath(path)
+    const ok = await confirm({ ...freshQuestion(item.fresh, { assistant, agent: agentOf(p, target)?.name ?? item.agentName ?? '' }), action: 'start' })
+    if (!ok) return
+  } else if (item.recache && !item.recache.warm && item.recache.tokens > 20000) {
     // The Hive Assistant's are conversations; an agent's are sessions.
     const what = isAssistantPath(path) ? 'conversation' : 'session'
     const choice = await choose({
@@ -654,7 +661,7 @@ async function resume(path: string, item: ResumeItem, held: string | null, agent
   // Its slot holds other work, or isn't as it left it (#1434): said with what can be done instead, before anything stops.
   if (item.hold && item.hold.is !== 'byHand') return heldResume(path, item, item.hold, target)
   if (!(await stopIfRunning(path, target, { what: 'resume' }, 'resume'))) return
-  const st = await attempt(tr(msg({ id: 'actions.session.resumeFailed', defaultMessage: 'Could not resume session', description: "An error's title: resuming a session failed." })), () => call('session:start', path, { resumeId: item.id, name: item.name, agentId: target }))
+  const st = await attempt(tr(msg({ id: 'actions.session.resumeFailed', defaultMessage: 'Could not resume session', description: "An error's title: resuming a session failed." })), () => call('session:start', path, { resumeId: item.id, name: item.name, agentId: target, ...(item.fresh ? { freshAsked: true } : {}) }))
   if (st) reveal(path, target)
 }
 
@@ -688,7 +695,7 @@ async function resumeLatest(path: string, id: string): Promise<void> {
   const a = agentOf(p, id)
   // Hive works out the session in the main process (AgentInfo.resume), skipping any open in another agent.
   const list = a?.resume ? await attempt(listFailed(), () => call('session:list', path)) : []
-  const last = a?.resume ? (list ?? []).find((s) => s.id === a.resume!.id) ?? { id: a.resume.id, name: a.resume.name, title: null, recache: null, agentId: id, cwd: legacyOf(a)?.path, provider: agentProviderOf(a) } : null
+  const last = a?.resume ? (list ?? []).find((s) => s.id === a.resume!.id) ?? { id: a.resume.id, name: a.resume.name, title: null, recache: null, agentId: id, cwd: legacyOf(a)?.path, provider: agentProviderOf(a), ...(a.resume.fresh ? { fresh: a.resume.fresh } : {}) } : null
   if (!last) {
     notify(
       'info',
@@ -783,7 +790,9 @@ async function resumeAll_(path: string): Promise<void> {
   const list = (await attempt(listFailed(), () => call('session:list', path))) ?? []
   const cold = stopped.flatMap((a) => {
     if (a.live) return []
-    const r = list.find((s) => s.id === a.resume!.id)?.recache
+    const s = list.find((x) => x.id === a.resume!.id)
+    // One that starts a new conversation (HI-2540) re-caches nothing.
+    const r = s && !s.fresh ? s.recache : null
     return r && !r.warm && r.tokens > 20000 ? [tr(msg({ id: 'actions.resumeAll.coldLine', defaultMessage: '• {agent} — about {tokens} tokens', description: "A line of Resume All's question: an agent ({agent}) whose prompt cache expired, and about how many tokens ({tokens}: \"120K\") resuming re-caches." }), { agent: a.name, tokens: formatTokens(r.tokens) })] : []
   })
   if (cold.length) {
