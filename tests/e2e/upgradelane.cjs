@@ -4,6 +4,9 @@
 // an adopted submission too), the Todo card none (from before 1.0), the project its options. The agents resume and the
 // loop carries on as on 0.9: every move is accepted, nothing refused, and every card passes, each finished by the
 // builder's report of its merge before the next starts (HI-1985: a carried-over lane goes on at Done, S40).
+// Since 1.1 the dev build first moves the workspace's .hive folders to .combwork as it opens it (HI-2462), and the 0.9
+// conversations start fresh, carrying their work, as any launched before the names agents see changed (HI-2463): the
+// 0.9 Hive's tools are still hive_*, served as `hive` (HI-2506).
 //
 // The 0.9 Hive is a packaged 0.9.x build: HIVE_E2E_HIVE09 (its win-unpacked folder), else the main checkout's
 // dist/win-unpacked when that is 0.9.x; with neither, the suite is skipped. Throwaway profiles, workspace and
@@ -22,7 +25,8 @@ const ws = path.join(lib.WORK, 'upgradelane-ws')
 const claudeHome = path.join(lib.WORK, 'upgradelane-claude')
 const spareHome = path.join(lib.WORK, 'upgradelane-claude-spare')
 const alpha = path.join(ws, 'alpha')
-const dbFile = path.join(ws, '.hive', 'hive.db')
+// The board as the dev build keeps it, once it has moved the workspace's .hive to .combwork (HI-2462).
+const dbFile = path.join(ws, '.combwork', 'hive.db')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -111,7 +115,8 @@ function driver(app, page) {
     open.delete(h)
     await h.app.close().catch(() => undefined)
   }
-  const lane = (body) => `hive cw_lane ${JSON.stringify(body)}`
+  // The 0.9 Hive's tool, by its name there (HI-2463 renamed it cw_lane in 1.1).
+  const lane = (body) => `hive hive_lane ${JSON.stringify(body)}`
   try {
     // 1. The 0.9 Hive runs the loop: c1 built and in Review, c2 in Doing, c3 still in Todo.
     const oldApp = await _electron.launch({ executablePath: old.exe, args: [], env: lib.hiveEnv({ HIVE_USER_DATA: oldProfile, ...claude }) })
@@ -140,6 +145,7 @@ function driver(app, page) {
     open.add(dev)
     d.page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(dev.inv, d.page, ws)
+    check("the workspace's .hive folders moved to .combwork as it opened (HI-2462)", fs.existsSync(dbFile) && !fs.existsSync(path.join(ws, '.hive')) && fs.existsSync(path.join(alpha, '.combwork', 'project.json')) && !fs.existsSync(path.join(alpha, '.hive')))
     const ask = d.page.locator('.dialog', { hasText: "Upgrade this workspace's board to 1.0?" })
     check('the dev build asks before upgrading', !!(await lib.until(async () => (await ask.count()) === 1, HUNG_MS)))
     await ask.getByRole('button', { name: 'Upgrade', exact: true }).click()
@@ -152,7 +158,7 @@ function driver(app, page) {
     check('c1 (Review): Adopted, and an adopted submission', adoptedKinds(n1).join() === 'Adopted,Submitted', kinds(n1).join())
     check('c2 (Doing): Adopted, with its builder', adoptedKinds(n2).join() === 'Adopted' && JSON.parse(rows("SELECT data FROM card_facts WHERE card = ? AND kind = 'Adopted'", n2)[0]?.data ?? '{}').builder === builder.id, kinds(n2).join())
     check('c3 (Todo): no facts, from before 1.0', kinds(n3).length === 0 && rows('SELECT pre_workflow FROM cards WHERE number = ?', n3)[0]?.pre_workflow === 1)
-    const cfg = JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8'))
+    const cfg = JSON.parse(fs.readFileSync(path.join(alpha, '.combwork', 'project.json'), 'utf8'))
     check('the project has its options as it works today: Git, a reviewer agent, its folder', cfg.platform === 'git' && cfg.workflow?.platform === 'git' && cfg.workflow?.options?.review === 'agent' && cfg.workflow?.options?.folder === 'project', JSON.stringify(cfg.workflow))
     check('nothing moved on the board', (await dev.column(n1)) === 'review' && (await dev.column(n2)) === 'doing' && (await dev.column(n3)) === 'todo')
 
@@ -174,9 +180,10 @@ function driver(app, page) {
     const sessions = await dev.inv('session:list', alpha)
     const sessionOf = (id) => sessions.find((x) => x.agentId === id && x.source === 'hive')?.id
     check("the 0.9 sessions are there, one per agent", !!sessionOf(builder.id) && !!sessionOf(reviewer.id), JSON.stringify(sessions.map((x) => [x.agentId, x.id])))
-    check('both agents resume', !!(await dev.start(reviewer.id, sessionOf(reviewer.id))) && !!(await dev.start(builder.id, sessionOf(builder.id))))
+    check('both agents start again from their 0.9 sessions', !!(await dev.start(reviewer.id, sessionOf(reviewer.id))) && !!(await dev.start(builder.id, sessionOf(builder.id))))
+    // Launched before the names agents see changed, a 0.9 conversation starts fresh, its work carried (HI-2463).
     const launches = jsonl('fake-launches.jsonl').slice(-2)
-    check('…each in its 0.9 conversation', launches.length === 2 && launches.every((l) => [sessionOf(builder.id), sessionOf(reviewer.id)].includes(l.opts['--resume'])), JSON.stringify(launches.map((l) => l.opts)))
+    check('…each in a new conversation, as one from before HI-2463 does', launches.length === 2 && launches.every((l) => !l.opts['--resume']), JSON.stringify(launches.map((l) => l.opts)))
     check('Hive wakes the reviewer for c1, which passes it', !!(await lib.until(async () => (await dev.column(n1)) === 'passed', HUNG_MS)))
     check('…the builder, woken by the verdict, sends c2 to Review, which passes', !!(await lib.until(async () => (await dev.column(n2)) === 'passed', HUNG_MS)))
     check('…and works c3, from before 1.0, as on 0.9, which passes', !!(await lib.until(async () => (await dev.column(n3)) === 'passed', HUNG_MS)))
