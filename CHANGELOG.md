@@ -26,6 +26,7 @@
 
 ### Fixed
 
+- **Stopped agents' panes no longer scroll sideways in German** (HI-2536). At 900 px with two panes side by side, Neue Sitzung and Fortsetzen didn't fit on one row and each pane got a horizontal scrollbar; the buttons now wrap, one above the other, when a pane is too narrow for both.
 - **The "No account is on" warning fits narrow panes** (HI-2535). In a narrow window, with the sidebar and the Assistant open, the warning in a project and in the Assistant's panel squeezed its message into a thin column of six or seven lines beside **Add an Account**. The button now goes under the message when there isn't room beside it.
 - **Performance's tables keep names readable in a narrow window** (HI-2534). At 900 px the Cards table squeezed a card's name to a word a line, and the Agent API table broke a route such as `/v1/progress` into fragments; a card's name now keeps a readable width and a route stays on one line, and the table scrolls sideways instead.
 - **Files and Skills read in a narrow window** (HI-2533). With nothing selected, a project's Files and Skills tabs explain what to do beside their list, but in a narrow window (900 px with the sidebar open) the list took most of the room and the explanation became a thin column, a word or two a line. The list now gives way so the explanation keeps a readable width, and empty messages elsewhere keep less padding at their sides when space is short.

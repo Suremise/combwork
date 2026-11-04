@@ -7490,8 +7490,12 @@ button.agent-place:hover {
   border-radius: 4px;
   font-size: 0.9em;
 }
+/* New Session and Resume wrap, centred, when the pane is narrower than both (HI-2536: German's "Neue Sitzung" and the
+   split "Fortsetzen" made a sideways scrollbar under each pane at 900 px); the split button stays whole. */
 .pane-placeholder .btns {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
   margin-top: 8px;
 }
