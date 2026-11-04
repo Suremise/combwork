@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { writeFileSync } from 'fs'
 import { join } from 'path'
-import { B1, B2, commit, moved, R1, R2, refusedBy, setup, sh, type Env } from './harness'
+import { B1, B2, commit, GIT_HEAVY_MS, moved, R1, R2, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { reconcile } from '../../src/main/workflow/reconcile'
 import { runCheck, blocks } from '../../src/main/workflow/checks'
@@ -666,7 +666,9 @@ describe('workflow scenarios, Git', () => {
     expect(await e.wf.move(other.key, 'review', 'user')).toMatchObject({ refused: true, rule: 'move.noStage' })
   })
 
-  it('S41: a card just started is never Done by observation; part of an Active card\'s work merged by hand is a mark; a Review card merged by hand → Done outside the rules', async () => {
+  // GIT_HEAVY_MS (HI-2453's decision, HI-2025's rule): three cards started in folders of their own, two merged by hand and
+  // each reconciled, 52 git processes, 7.9 s alone with no wait between them; past 20 s in HI-2499's run of 353 files.
+  it('S41: a card just started is never Done by observation; part of an Active card\'s work merged by hand is a mark; a Review card merged by hand → Done outside the rules', { timeout: GIT_HEAVY_MS }, async () => {
     const e = pair()
     const fresh = e.wf.createCard({ title: 'Just started' })
     moved(await e.wf.start(fresh.key, B1))
@@ -726,7 +728,9 @@ describe('workflow scenarios, Git', () => {
     expect(e.wf.state(card).stale?.why).toBe('change')
   })
 
-  it('S5 (Git): a decision wakes builder and reviewer; the verdict waits for it; after a pass it returns the card to Review; a submit on its way is refused', async () => {
+  // GIT_HEAVY_MS (HI-2453's decision, HI-2025's rule): two cards started, one submitted, reviewed and passed twice, 60 git
+  // processes, 8.2 s alone with no wait between them; past 20 s in HI-2499's run of 353 files (3 workers).
+  it('S5 (Git): a decision wakes builder and reviewer; the verdict waits for it; after a pass it returns the card to Review; a submit on its way is refused', { timeout: GIT_HEAVY_MS }, async () => {
     const e = pair()
     const { card } = await started(e)
     // The reviewer to wake is the card's lane's (#1291).
