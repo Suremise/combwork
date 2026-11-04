@@ -8,6 +8,8 @@
 // One taller than the screen, with line breaks, is cleared and the doorbell sent alone; with the fake's input not read
 // (fake-slow-input), nothing is typed until it reads again, then the same. Dev build only (the seam), throwaway profile,
 // workspace, CLAUDE_CONFIG_DIR and CODEX_HOME.
+// HI-2482: four comments on a watched card arrive together. Its existing settle produces one typed doorbell; further
+// board traffic while it is held before Enter must not erase it. The withdrawal checks above still reject stale lines.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const { execFile } = require('child_process')
@@ -139,6 +141,63 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
       const sent = wakes(a).slice(before)
       check(`${a.name}: …alone: one doorbell, nothing typed before it`, sent.length === 1 && sent[0].startsWith('[Hive] New in your inbox') && (sent[0].match(/\[Hive\]/g) ?? []).length === 1, JSON.stringify(sent))
       check(`${a.name}: …it reads and acks the message`, !!(await until(async () => (await delivery(a, m))?.state === 'acked' && (await idle(a.id)), HUNG_MS)), JSON.stringify(await delivery(a, m)))
+    }
+
+    // --- HI-2482: a burst on a watched card, with board traffic continuing after the doorbell has been typed.
+    const watched = await inv('tasks:create', { title: 'Burst of card events', project: 'alpha' })
+    const unrelated = await inv('tasks:create', { title: 'Unrelated board traffic', project: 'alpha' })
+    await lib.typeLine(inv, lib.ptyKey(alpha, claude.id), claudeHome, null,
+      `hive hive_wait_for_tasks ${JSON.stringify({ cards: [watched.key], changes: ['comment'], wake: true })}`, { live: () => live(claude.id) })
+    check('burst: Claude watches the card', !!(await until(async () => (await live(claude.id))?.status === 'watching', HUNG_MS)))
+    const burstBefore = wakes(claude).length
+    const burstHeld = logCount(/the line Hive typed is held before its Enter/)
+    const burstPutOff = logCount(/put off: It is no longer wanted/)
+    fs.writeFileSync(hold, '')
+    const burstAt = Date.now()
+    // These timers produce the burst over 1.35 s (test input, not a wait for success); every assertion polls a condition.
+    await Promise.all([0, 450, 900, 1350].map((after, i) => new Promise((resolve, reject) => {
+      setTimeout(() => inv('tasks:comment', watched.number, `Burst comment ${i + 1}`).then(resolve, reject), after)
+    })))
+    console.log(`burst: four watched-card events posted in ${Date.now() - burstAt} ms`)
+    check('burst: one doorbell is typed and held before Enter', !!(await until(() => logCount(/the line Hive typed is held before its Enter/) > burstHeld, HUNG_MS)))
+    await inv('tasks:comment', unrelated.number, 'Another card changes while the wake is typed')
+    await inv('tasks:comment', watched.number, 'The watched card changes again while the wake is typed')
+    fs.rmSync(hold, { force: true })
+    check('burst: the doorbell is sent and its inbox read', !!(await until(async () => wakes(claude).length > burstBefore && (await idle(claude.id)), HUNG_MS)))
+    check('burst: one typed line, no repeated erase and retry',
+      logCount(/the line Hive typed is held before its Enter/) === burstHeld + 1 && logCount(/put off: It is no longer wanted/) === burstPutOff && wakes(claude).length === burstBefore + 1,
+      JSON.stringify({ typed: logCount(/the line Hive typed is held before its Enter/) - burstHeld, putOff: logCount(/put off: It is no longer wanted/) - burstPutOff, sent: wakes(claude).slice(burstBefore) }))
+
+    // A loop's card-event doorbell (the reported line): HI-2486 already stopped unrelated board events invalidating
+    // it. Hold it across four such events, then withdraw a second review while its line is typed: that one must stop.
+    const builder = { ...(await lib.addAgent(inv, alpha, { name: 'Builder' })), name: 'Builder', provider: 'claude-code' }
+    await inv('session:start', alpha, { agentId: builder.id })
+    const loopCard = await inv('tasks:create', { title: 'Loop wake during a burst', project: 'alpha', agent: builder.id })
+    await inv('tasks:update', loopCard.number, { column: 'doing', agent: builder.id })
+    await lib.typeLine(inv, lib.ptyKey(alpha, builder.id), claudeHome, null,
+      `hive hive_lane ${JSON.stringify({ action: 'start', cards: [loopCard.key], reviewer: claude.name })}`, { live: () => live(builder.id) })
+    check('loop burst: its lane names Claude as reviewer', !!(await until(async () => (await inv('lanes:list')).some((l) => l.reviewer?.id === claude.id), HUNG_MS)))
+    for (const withdraw of [false, true]) {
+      const before = wakes(claude).length
+      const held = logCount(/the line Hive typed is held before its Enter/)
+      const putOff = logCount(/put off: It is no longer wanted/)
+      fs.writeFileSync(hold, '')
+      await inv('tasks:update', loopCard.number, { column: 'review' })
+      check(`loop burst: ${withdraw ? 'second' : 'first'} review doorbell is typed before Enter`, !!(await until(() => logCount(/the line Hive typed is held before its Enter/) > held, HUNG_MS)))
+      for (let i = 1; i <= 4; i++) await inv('tasks:comment', unrelated.number, `Unrelated event ${i}, withdrawal ${withdraw}`)
+      if (withdraw) {
+        await inv('tasks:update', loopCard.number, { column: 'doing' })
+        check('loop burst: the withdrawn review is put off before Enter', !!(await until(() => logCount(/put off: It is no longer wanted/) > putOff, HUNG_MS)))
+        check('loop burst: the stale card-event line was never sent', wakes(claude).length === before, JSON.stringify(wakes(claude).slice(before)))
+      }
+      fs.rmSync(hold, { force: true })
+      if (!withdraw) {
+        check('loop burst: the card-event doorbell is sent and read', !!(await until(async () => wakes(claude).length > before && (await idle(claude.id)), HUNG_MS)))
+        check('loop burst: unrelated events do not erase and retype the line',
+          logCount(/the line Hive typed is held before its Enter/) === held + 1 && logCount(/put off: It is no longer wanted/) === putOff && wakes(claude).length === before + 1 && wakes(claude)[before].includes('card event'),
+          JSON.stringify({ typed: logCount(/the line Hive typed is held before its Enter/) - held, putOff: logCount(/put off: It is no longer wanted/) - putOff, sent: wakes(claude).slice(before) }))
+        await inv('tasks:update', loopCard.number, { column: 'doing' })
+      }
     }
 
     // --- HI-1979: a draft the user left in Claude Code's input, which its Ctrl+U clears a row at a time. Hive types only
