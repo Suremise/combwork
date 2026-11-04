@@ -112,7 +112,7 @@ function stream(token) {
 
   // --- Discovery: the address, never a token.
   const found = await lib.until(readDiscovery, HUNG_MS)
-  check('the discovery file names the running API', found?.app === 'Hive' && found.url === BASE && found.port === PORT && found.api === API_VERSION && typeof found.pid === 'number', JSON.stringify({ found, API_VERSION }))
+  check('the discovery file names the running API', found?.app === 'Combwork' && found.url === BASE && found.port === PORT && found.api === API_VERSION && typeof found.pid === 'number', JSON.stringify({ found, API_VERSION }))
   const discoveryText = fs.readFileSync(discovery, 'utf8')
   check('…and holds no token', !/token"\s*:/i.test(discoveryText) && !discoveryText.includes(apiToken), discoveryText)
   check('its health check answers', (await fetch(`${found.url}/v1/health`).then((r) => r.json())).ok === true)
