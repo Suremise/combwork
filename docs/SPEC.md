@@ -755,6 +755,8 @@ What each CLI actually sends Hive, next to what Hive made of it (#366: the CLIs 
 
 ### 9.3 Advanced settings
 
+An asynchronous read of advanced.json applies only while no newer read, load or saved setting has superseded it (HI-2454). Stopping the store also invalidates pending reads, so an old watcher callback cannot restore values afterward.
+
 What Hive relies on that a CLI update can break, and timeouts and limits for power users, as named, documented defaults that can be overridden without a Hive release (#367; import and export are #683). The CLIs are what most often breaks Hive; the developer console (§9.2) shows what changed, and an override fixes it the same day. Remote updates of the defaults are not fetched (revisit after 0.7.0).
 
 - **The defaults** (`shared/advanced.ts`, `ADVANCED_DEFS`): each has an id (`<hive|provider>.<what>.<which>`, as advanced.json names it), a title, what it is for and what goes wrong when it's wrong, its kind and default, and who takes a change (at once, or sessions started afterwards). **Data only, never code**: a regular expression's source (its flags are part of the default), text found as it is, a field name, a list of names, or a whole number in a range. From the adapter audit:
