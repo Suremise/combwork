@@ -136,15 +136,15 @@ const check = (name, ok, extra = '') => {
       for (const l of lines.map((x) => JSON.parse(x)).reverse()) {
         const f = l.opts?.['--mcp-config']
         const servers = f && fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')).mcpServers : null
-        if (agentId === 'assistant' ? l.cwd?.toLowerCase() === ws.toLowerCase() : servers?.hive?.env?.HIVE_AGENT_ID === agentId) return servers
+        if (agentId === 'assistant' ? l.cwd?.toLowerCase() === ws.toLowerCase() : servers?.combwork?.env?.HIVE_AGENT_ID === agentId) return servers
       }
       return null
     }
     const a = await lib.until(() => launched('assistant'), 30000)
     const b = await lib.until(() => launched(agent.id), 30000)
     const c = await lib.until(() => launched(otherAgent.id), 30000)
-    check("the Assistant's launch has notes and the hive server, not sandbox", !!a?.notes && !!a?.hive && !a?.sandbox && !a?.extra, JSON.stringify(Object.keys(a ?? {})))
-    check("demo's agent has sandbox and the hive server, not notes or extra", !!b?.sandbox && !!b?.hive && !b?.notes && !b?.extra, JSON.stringify(Object.keys(b ?? {})))
+    check("the Assistant's launch has notes and the hive server, not sandbox", !!a?.notes && !!a?.combwork && !a?.sandbox && !a?.extra, JSON.stringify(Object.keys(a ?? {})))
+    check("demo's agent has sandbox and the hive server, not notes or extra", !!b?.sandbox && !!b?.combwork && !b?.notes && !b?.extra, JSON.stringify(Object.keys(b ?? {})))
     check("…without Hive's own fields (its tags)", !('tags' in (c?.notes ?? { tags: 1 })) && !('description' in (c?.notes ?? {})), JSON.stringify(c?.notes))
 
     // --- The Agent API: where each is added for the workspace's token; only its own project's for an agent's.

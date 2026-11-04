@@ -459,7 +459,7 @@
     "text": "One setting in full: where it is, its value and default, what it takes and does, and whether you may change it. project: for a project's setting."
   },
   "tool.readSharedNote.description": {
-    "text": "Read a shared note by its path relative to .combwork/shared (e.g. \"handovers/2026-01-01-auth.md\"), with its revision."
+    "text": "Read a shared note by path in .combwork/shared (e.g. \"handovers/2026-01-01-auth.md\"), with its revision."
   },
   "tool.readTask.arg.attachments": {
     "text": "All, when narrowed."

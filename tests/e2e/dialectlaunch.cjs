@@ -166,7 +166,7 @@ function initialize(def) {
 
   // hive-mcp.js (Claude Code's contract comes from its instructions) and hive-progress get the chain's file.
   const launch = claudeLaunch()
-  const mcp = launch?.opts?.['--mcp-config'] ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers?.hive : null
+  const mcp = launch?.opts?.['--mcp-config'] ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers?.combwork : null
   const file = mcp?.env?.CW_DIALECT_FILE
   check("Clara's hive server is given its chain's file, and its shell too (for hive-progress)", !!file && fs.existsSync(file) && launch.env?.CW_DIALECT_FILE === file && mcp.env.CW_DIALECT === d1?.hash, JSON.stringify({ file, env: launch?.env }))
   const instructions = (await initialize(mcp))?.instructions ?? ''

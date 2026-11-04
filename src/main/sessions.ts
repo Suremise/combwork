@@ -1828,6 +1828,11 @@ class SessionManager {
     // sub-session started in a removed agent's worktree, or the Assistant's workspace folder): those, and the host's
     // records and settings they come from, read only when its own folder hasn't it.
     const own = rec?.cwd ? [rec.cwd] : []
+    // The path the CLI reported, as recorded; if it was inside a folder that moved to .combwork (HI-2462: a CLI's home
+    // kept there) and isn't there now, where the move put it. Recorded folders (`cwd`) stay as they were: the CLI files
+    // its transcripts by them.
+    const ws = workspaceFor(projectPath)?.path
+    const recorded = rec?.transcriptPath && ws && !(await stat(rec.transcriptPath).then(() => true, () => false)) ? ((await movedPath(ws, rec.transcriptPath)) ?? rec.transcriptPath) : rec?.transcriptPath
     let others: string[] | undefined
     const othersOf = async (): Promise<string[]> => {
       if (others) return others
@@ -1845,11 +1850,11 @@ class SessionManager {
         continue
       }
       for (const f of own) {
-        const t = await adapter.transcriptPath(f, sessionId, rec?.transcriptPath)
+        const t = await adapter.transcriptPath(f, sessionId, recorded)
         if (t) return { path: t, provider: id }
       }
       for (const f of await othersOf()) {
-        const t = await adapter.transcriptPath(f, sessionId, rec?.transcriptPath)
+        const t = await adapter.transcriptPath(f, sessionId, recorded)
         if (t) return { path: t, provider: id }
       }
     }

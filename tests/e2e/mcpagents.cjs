@@ -98,14 +98,14 @@ const check = (name, ok, extra = '') => {
       for (const l of lines.map((x) => JSON.parse(x))) {
         const f = l.opts?.['--mcp-config']
         const servers = f && fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')).mcpServers : null
-        if (servers?.hive?.env?.HIVE_AGENT_ID === agentId) return servers
+        if (servers?.combwork?.env?.HIVE_AGENT_ID === agentId) return servers
       }
       return null
     }
     const b = await lib.until(() => launched(builder.id), 30000)
     const t = await lib.until(() => launched(tester.id), 30000)
-    check("Builder's launch has both servers", !!b?.notes && !!b?.sandbox && !!b?.hive, JSON.stringify(Object.keys(b ?? {})))
-    check("Tester's launch has only sandbox, and the hive server", !t?.notes && !!t?.sandbox && !!t?.hive, JSON.stringify(Object.keys(t ?? {})))
+    check("Builder's launch has both servers", !!b?.notes && !!b?.sandbox && !!b?.combwork, JSON.stringify(Object.keys(b ?? {})))
+    check("Tester's launch has only sandbox, and the hive server", !t?.notes && !!t?.sandbox && !!t?.combwork, JSON.stringify(Object.keys(t ?? {})))
 
     // --- The API changes the choice; a running agent is told to restart; ["*"] puts all back.
     // Changes through the Agent API are the Assistant's: started (in the workspace folder) for its token.
