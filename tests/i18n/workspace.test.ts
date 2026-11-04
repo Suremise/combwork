@@ -134,7 +134,7 @@ describe('the sentences once built by hand read as before, in English', () => {
     expect(changeOutcome('add', { started: false, cancelled: true }, null).message).toBe('The administrator prompt was declined: nothing changed.')
     expect(changeOutcome('add', { started: false, error: 'no shell' }, null).message).toBe("Windows couldn't start the administrator prompt: no shell")
     expect(changeOutcome('add', { started: true }, { ok: true, listed: true, exclusions: ['D:\\w'], requested: ['D:\\w'] }).message).toBe('Defender no longer scans this folder.')
-    expect(changeOutcome('remove', { started: true }, { ok: true, listed: true, exclusions: [], requested: ['D:\\a', 'D:\\b'] }).message).toBe('Removed 2 exclusions Hive added.')
+    expect(changeOutcome('remove', { started: true }, { ok: true, listed: true, exclusions: [], requested: ['D:\\a', 'D:\\b'] }).message).toBe('Removed 2 exclusions Combwork added.')
     expect(changeOutcome('add', { started: true }, { ok: true, listed: true, exclusions: [], requested: ['D:\\a'] }).message).toBe("Defender accepted the change but doesn't list one folder: your organisation's settings probably override local exclusions.")
     expect(folderPlan({ root: 'D:\\', trees: null, tests: null }, [])[0].unsafe).toBe('a whole drive')
     expect(tr(KIND_LABEL.worktrees)).toBe('Its worktrees')

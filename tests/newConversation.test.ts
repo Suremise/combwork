@@ -1,4 +1,4 @@
-// hive_prompt_agent with newConversation (#437): an idle agent's conversation ends and a new one starts on the task. The
+// cw_prompt_agent with newConversation (#437): an idle agent's conversation ends and a new one starts on the task. The
 // Assistant's authority (Settings → Assistant → Control, its own session) is checked again after the stop's await, so a
 // request whose permission ended meanwhile starts nothing; and nothing is stopped for a prompt Hive just typed.
 import { mkdirSync, writeFileSync } from 'fs'

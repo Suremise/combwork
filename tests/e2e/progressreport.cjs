@@ -292,9 +292,9 @@ const check = (name, ok, extra = '') => {
   const u2 = (await runs()).find((r) => !known.includes(r.id) && /^unit: 2 files$/.test(r.title))
   check('…and the next time, with an estimate', u2?.state === 'passed' && lib.hadEstimate(u2), JSON.stringify(u2))
   known = (await runs()).map((r) => r.id)
-  const off = await shell(builder.id, `set HIVE_PROGRESS=0&& ${unitCmd}`, 120000)
+  const off = await shell(builder.id, `set CW_PROGRESS=0&& ${unitCmd}`, 120000)
   await lib.sleep(1500) // A fixed wait on purpose: this checks that nothing is reported.
-  check('HIVE_PROGRESS=0: the tests run, nothing is reported', off?.code === 0 && (await runs()).every((r) => known.includes(r.id)), JSON.stringify((await runs()).filter((r) => !known.includes(r.id))))
+  check('CW_PROGRESS=0: the tests run, nothing is reported', off?.code === 0 && (await runs()).every((r) => known.includes(r.id)), JSON.stringify((await runs()).filter((r) => !known.includes(r.id))))
 
   // An earlier run of the suite, its time kept; then the run checked, with its estimate from that one.
   const aboutCmd = `${withTimings}cd /d "${root}" && node tests/e2e/run.mjs about`

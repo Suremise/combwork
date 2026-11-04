@@ -80,7 +80,7 @@ const cliFile = (sid) => path.join(claudeHome, 'projects', alpha.replace(/[^a-zA
     const file = sessionsOf(alpha)
     for (const k of Object.keys(S)) {
       const at = new Date(Date.now() - ages[k] * HOUR).toISOString()
-      file.sessions.push({ id: S[k], agent: 'claude-code', name: names[k], createdAt: at, lastActiveAt: at, archived: k === 'archived', agentId: claude.id, agentName: 'Claude' })
+      file.sessions.push({ id: S[k], agent: 'claude-code', name: names[k], createdAt: at, lastActiveAt: at, archived: k === 'archived', agentId: claude.id, agentName: 'Claude', names: 2 })
       write(cliFile(S[k]), claudeLines(S[k], ages[k], `Work of ${names[k]}`))
       write(backup(S[k], k === 'archived'), claudeLines(S[k], ages[k], `Work of ${names[k]}`))
     }

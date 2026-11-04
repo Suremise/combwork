@@ -12,10 +12,10 @@
 export const ALWAYS_LOAD_META = 'anthropic/alwaysLoad'
 
 /** The tools a project agent gets in full: those most agents call (HI-2190's Haiku trials: 31 to 72% of agent trials). */
-export const AGENT_ALWAYS_LOAD: readonly string[] = ['hive_inbox', 'hive_read_task', 'hive_list_tasks']
+export const AGENT_ALWAYS_LOAD: readonly string[] = ['cw_inbox', 'cw_read_task', 'cw_list_tasks']
 
 /** The Assistant's: an agent's, and the two it calls most of its own (54% and 37% of its trials). */
-export const ASSISTANT_ALWAYS_LOAD: readonly string[] = [...AGENT_ALWAYS_LOAD, 'hive_project_status', 'hive_agent_activity']
+export const ASSISTANT_ALWAYS_LOAD: readonly string[] = [...AGENT_ALWAYS_LOAD, 'cw_project_status', 'cw_agent_activity']
 
 /** The tools a session's role gets in full. */
 export const alwaysLoaded = (assistant: boolean): readonly string[] => (assistant ? ASSISTANT_ALWAYS_LOAD : AGENT_ALWAYS_LOAD)

@@ -99,7 +99,7 @@ const oldCard = (n, proj, agent) =>
   const mine = (list) => list.filter((c) => [doing.number, todo.number, old.number].includes(c.number))
   check("the renamed project's cards are its at once, archived ones too", mine(await cards()).every((c) => c.project === 'gamma') && mine(await cards()).length === 3, JSON.stringify(mine(await cards()).map((c) => c.project)))
   check('none is left under the old name', !(await cards()).some((c) => c.project === 'alpha'))
-  // #514: its handover from before the rename is still its latest (what hive_read_latest_handover reads).
+  // #514: its handover from before the rename is still its latest (what cw_read_latest_handover reads).
   const apiToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
   const handovers = async (name) => (await (await fetch(`http://127.0.0.1:${env.HIVE_API_PORT}/v1/shared/handovers?project=${name}`, { headers: { Authorization: `Bearer ${apiToken}` } })).json())
   check("the renamed project's latest handover is the one from before its rename", !!(await lib.until(async () => (await handovers('gamma'))[0]?.path === 'handovers/2026-10-01-alpha-plan.md', 10000)), JSON.stringify(await handovers('gamma')))

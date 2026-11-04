@@ -61,7 +61,7 @@
   "actions.mcp.add": "Agregar",
   "actions.mcp.addFailed": "No se pudo agregar el servidor",
   "actions.mcp.addTitle": "Agregar servidor MCP desde un archivo",
-  "actions.mcp.badName": "Usa letras, números, “-” y “_”. “hive” está reservado.",
+  "actions.mcp.badName": "Usa letras, números, “-” y “_”. “combwork” y “hive” están reservados.",
   "actions.mcp.copied": "Se copiaron al espacio de trabajo: {names}",
   "actions.mcp.copyFailed": "No se pudieron copiar los servidores MCP",
   "actions.mcp.deleteAdded": "{where}: al eliminarlo, también se quita de allí.",

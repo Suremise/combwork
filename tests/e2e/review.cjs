@@ -162,15 +162,15 @@ function mcp(config, msgs) {
   // --- What the agents' hive tools say, from the MCP server as the reviewer's mcp.json starts it.
   // In the launch's private folder in Hive's user data, not the project (#345).
   const mcpFile = path.join(lib.launchDir(userData, (await live(reviewer.id)).runId), 'mcp.json')
-  const server = JSON.parse(fs.readFileSync(mcpFile, 'utf8')).mcpServers.hive
+  const server = JSON.parse(fs.readFileSync(mcpFile, 'utf8')).mcpServers.combwork
   const [init, list] = await mcp(server, [
     { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } },
     { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }
   ]).then((r) => [r.find((x) => x.id === 1), r.find((x) => x.id === 2)])
   const instructions = init?.result?.instructions ?? ''
-  check("the agents' instructions tell reviewing from working on a card, and name the skill", /asked to review or check one, use review-agent-work/.test(instructions) && /\bhive_start_review then hive_verdict\b/.test(instructions), instructions.slice(0, 400))
-  const update = list?.result?.tools?.find((t) => t.name === 'hive_update_task')
-  check('hive_update_task describes reviewing, and takes review', /reviewing isn't working on it/.test(update?.inputSchema?.properties?.review?.description ?? '') && JSON.stringify(update?.inputSchema?.properties?.review?.enum) === '["start","passed","failed"]', JSON.stringify(update?.inputSchema?.properties?.review))
+  check("the agents' instructions tell reviewing from working on a card, and name the skill", /asked to review or check one, use review-agent-work/.test(instructions) && /\bcw_start_review then cw_verdict\b/.test(instructions), instructions.slice(0, 400))
+  const update = list?.result?.tools?.find((t) => t.name === 'cw_update_task')
+  check('cw_update_task describes reviewing, and takes review', /reviewing isn't working on it/.test(update?.inputSchema?.properties?.review?.description ?? '') && JSON.stringify(update?.inputSchema?.properties?.review?.enum) === '["start","passed","failed"]', JSON.stringify(update?.inputSchema?.properties?.review))
   // The reviewer's launch carries the review skill (its own copy, in its launch plugin).
   const skillFile = path.join(alpha, '.hive', `launch-${reviewer.id}`, 'plugin', 'skills', 'review-agent-work', 'SKILL.md')
   // HI-2011: the review mechanics are in its reference file beside SKILL.md, copied with it.

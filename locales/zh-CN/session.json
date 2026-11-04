@@ -141,6 +141,8 @@
   "session.purge.reading": "Combwork 正在读取它的会话记录（导出或搜索）。请稍后重试。",
   "session.purge.running": "它正在运行。",
   "session.purge.unread": "Combwork 无法记录此会话的用量，因此保留它。",
+  "session.renamedFresh.body": "{n, plural, other {# 个对话}}已重新开始：Combwork 重命名了智能体使用的工具，因此之前的对话无法继续。之前的对话保留在会话历史中，可以阅读。",
+  "session.renamedFresh.title": "智能体已开始新对话",
   "session.restartMode.didntStop": "{agent} 没有及时停止，因此没有以新模式重新启动。请在它停止后重试。",
   "session.setup.failed": "初始化命令以退出码 {code} 退出，输出在智能体的终端中。请修复后再次启动智能体，或跳过初始化直接启动。",
   "session.setup.failedTitle": "{project} · {agent}：初始化失败",

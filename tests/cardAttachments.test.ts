@@ -488,7 +488,7 @@ describe("a card's start prompt names its attachments (HI-1700)", () => {
     const prompt = taskPrompt(seven, true, { attachments: files })
     expect(prompt).toContain('See ![shot](C:/w/p/.hive/attachments/cards/7/f0.png).')
     expect(prompt).toContain('Its attachments (open them by path): C:/w/p/.hive/attachments/cards/7/f0.png, ')
-    expect(prompt).toContain('f9.png, and 2 more (hive_read_task lists them).')
+    expect(prompt).toContain('f9.png, and 2 more (cw_read_task lists them).')
     expect(prompt).not.toContain('f10.png')
     expect(taskPrompt(seven, true)).not.toContain('Its attachments')
   })

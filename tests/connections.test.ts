@@ -130,7 +130,7 @@ describe("the Agent API's connection arguments (HI-2108)", () => {
     // No account here to name: says where the user adds one.
     expect(() => refuseOldFields({ model: 'opus' }, undefined)).toThrow(/No account is on in this workspace: the user adds one in Settings → Accounts & Connections/)
   })
-  it("reads hive_connection's values: each '' or null back to the CLI's, a name never empty, context200k on or off", () => {
+  it("reads cw_connection's values: each '' or null back to the CLI's, a name never empty, context200k on or off", () => {
     expect(connectionValuesArg({ name: ' Fast ', model: 'haiku', effort: 'low', mode: 'plan', context200k: 'on', extraArgs: ' --verbose ' })).toEqual({ name: 'Fast', model: 'haiku', effort: 'low', permissionMode: 'plan', use200kContext: true, extraArgs: '--verbose' })
     expect(connectionValuesArg({ model: '', effort: null, context200k: 'off', extraArgs: '' })).toEqual({ model: null, effort: null, use200kContext: null, extraArgs: null })
     expect(connectionValuesArg({})).toEqual({})
@@ -139,7 +139,7 @@ describe("the Agent API's connection arguments (HI-2108)", () => {
   })
 })
 
-describe("hive_connection's change, checked at the moment of it (HI-2108 round 1)", () => {
+describe("cw_connection's change, checked at the moment of it (HI-2108 round 1)", () => {
   /** The Assistant's current launch token for the workspace, from its file (a new one each launch). */
   const tokenNow = (): string => readFileSync(control.assistantTokenFile(wsPath), 'utf8').match(/"token":\s*"([0-9a-f]+)"/)![1]
   const act = { kind: 'add-connection' as const }

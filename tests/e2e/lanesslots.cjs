@@ -55,7 +55,7 @@ const lines = (file) => {
   // The slots' setup (its run is Hive's), and the check the reviewer runs: each records where it ran.
   const setupLog = path.join(tools, 'setup.log')
   const setup = path.join(tools, 'setup.js')
-  fs.writeFileSync(setup, `require('fs').appendFileSync(${JSON.stringify(setupLog)}, process.env.HIVE_SLOT + '\\n')\n`)
+  fs.writeFileSync(setup, `require('fs').appendFileSync(${JSON.stringify(setupLog)}, process.env.CW_SLOT + '\\n')\n`)
   const checkLog = path.join(tools, 'check.log')
   const checkJs = path.join(tools, 'check.js')
   fs.writeFileSync(checkJs, `require('fs').appendFileSync(${JSON.stringify(checkLog)}, process.cwd() + '\\n')\n`)
@@ -90,8 +90,8 @@ const lines = (file) => {
     const tokenOf = async (id) => {
       const sessionId = await until(async () => (await live(id))?.sessionId, HUNG_MS)
       const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     const intent = async (token, n, name, body = {}) => {
       const res = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${encodeURIComponent(`#${n}`)}/${name}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })

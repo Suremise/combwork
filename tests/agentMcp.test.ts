@@ -41,7 +41,7 @@ describe("an agent's choice", () => {
     expect(cleanMcpServers([' notes', 'sandbox', 'notes'])).toEqual(['notes', 'sandbox'])
     expect(cleanMcpServers([])).toEqual([])
     expect(() => cleanMcpServers('notes')).toThrow("list of the project's server names")
-    expect(() => cleanMcpServers(['hive'])).toThrow('the built-in hive server is always given')
+    expect(() => cleanMcpServers(['hive'])).toThrow('the built-in combwork server is always given')
     expect(() => cleanMcpServers(['../x'])).toThrow("isn't an MCP server's name")
     expect(() => cleanMcpServers(Array.from({ length: 51 }, (_, i) => `s${i}`))).toThrow('at most 50')
     expect([isMcpServerName('windows-sandbox'), isMcpServerName('hive'), isMcpServerName('-x')]).toEqual([true, false, false])
@@ -92,7 +92,7 @@ describe('a launch', () => {
       // Only those it was given that the project has on: github is off here, idle off in the workspace.
       expect(await of('a-only')).toEqual(['sandbox'])
       expect(await of('a-none')).toEqual([])
-      expect((await sessions.effective(proj, agents[0] as never)).mcpServers.hive?.command).not.toBe('impostor')
+      expect((await sessions.effective(proj, agents[0] as never)).mcpServers.combwork?.command).not.toBe('impostor')
       // The choice changes the launch's signature, so a running agent is told to restart: two saved agents that differ
       // only in it (a resolution reads the agent as saved, HI-1770, so an unsaved variant can't stand in for one).
       const sig = async (a: object) => sessions.signature(await sessions.effective(proj, a as never))
@@ -130,7 +130,7 @@ describe('a launch', () => {
       mkdirSync(process.env.COPILOT_HOME!, { recursive: true })
       writeFileSync(join(process.env.COPILOT_HOME!, 'mcp-config.json'), JSON.stringify({ mcpServers: { notes: { command: 'node' } } }))
       const { copilot } = await import('../src/main/providers/copilot/adapter')
-      const copilotCtx = ctx({ privateDir: join(base, 'private-copilot'), env: { HIVE_HOOK_TOKEN: 't' } })
+      const copilotCtx = ctx({ privateDir: join(base, 'private-copilot'), env: { CW_HOOK_TOKEN: 't' } })
       await copilot.prepareLaunch(copilotCtx)
       expect(Object.keys(JSON.parse(readFileSync(join(copilotCtx.privateDir, 'mcp.json'), 'utf8')).mcpServers)).toEqual(['sandbox'])
       const copilotArgs = copilot.buildCommand('C:\\bin\\copilot.exe', copilotCtx).args

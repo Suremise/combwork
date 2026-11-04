@@ -126,7 +126,7 @@ async function tellAgents(ws: WorkspaceService, p: TeamPause): Promise<void> {
     projects.flatMap((proj) =>
       projectAgents(proj.config).flatMap((a) =>
         sessions.liveFor(proj.path, a.id)
-          ? [inWorkspace(ws, () => createDelivery(proj.path, { agentId: a.id, agentName: a.name, kind: 'control', from: { kind: 'hive', name: 'Hive' }, body: inDialectOf({ projectPath: proj.path, agentId: a.id }, teamPauseLine), source: 'team-pause', ref: p.pauseId, replace: true }))] // i18n-ignore: the product's name, as a delivery's sender
+          ? [inWorkspace(ws, () => createDelivery(proj.path, { agentId: a.id, agentName: a.name, kind: 'control', from: { kind: 'hive', name: 'Combwork' }, body: inDialectOf({ projectPath: proj.path, agentId: a.id }, teamPauseLine), source: 'team-pause', ref: p.pauseId, replace: true }))] // i18n-ignore: the product's name, as a delivery's sender
           : []
       )
     )

@@ -161,6 +161,7 @@ describe('a workspace', () => {
   const OLD_HANDOVER = '---\nname: handover\ndescription: An older handover skill.\n---\n\nOld text.\n'
   const OLD_OVERSEER = '---\nname: Overseer\ndescription: A lighthouse keeper.\nicon: 🗼\n---\n\nYou keep the light.\n'
   const OLD_COORDINATOR = '---\nname: Coordinator\ndescription: An older coordinator.\nicon: 🧭\n---\n\nOld text.\n'
+  const OLD_USE_HIVE_API = '---\nname: use-hive-api\ndescription: Hive\'s HTTP API.\n---\n\nAs shipped.\n'
   let mod: typeof import('../src/main/bundled')
   let wsMod: typeof import('../src/main/workspace')
   let skills: typeof import('../src/main/skills')
@@ -183,6 +184,10 @@ describe('a workspace', () => {
     writeFileSync(join(base, 'old-coordinator.md'), OLD_COORDINATOR)
     oldCoordinator = await contentHash(join(base, 'old-coordinator.md'))
     history.modes.coordinator = [oldCoordinator, ...history.modes.coordinator]
+    // A use-hive-api this Hive "shipped" before the skill was renamed use-cw-api (HI-2463).
+    mkdirSync(join(base, 'old-use-hive-api'), { recursive: true })
+    writeFileSync(join(base, 'old-use-hive-api', 'SKILL.md'), OLD_USE_HIVE_API)
+    history.skills['use-hive-api'] = [...(history.skills['use-hive-api'] ?? []), await contentHash(join(base, 'old-use-hive-api'))]
     vi.resetModules()
     vi.doMock('../src/main/bundledHistory.json', () => ({ default: history }))
     mod = await import('../src/main/bundled')
@@ -301,6 +306,31 @@ describe('a workspace', () => {
     } finally {
       await wsMod.disposeWorkspaceService(w)
     }
+  })
+
+  it('retires a skill shipped under a new name (HI-2463: use-hive-api is use-cw-api): a copy Combwork shipped goes, an edited one stays', async () => {
+    const make = (ws: string, text: string) => {
+      const dir = join(ws, '.hive', 'skills', 'use-hive-api')
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(join(dir, 'SKILL.md'), text)
+      return dir
+    }
+    // A version it shipped (its hash in the history, as each shipped version's is), and one the user edited since.
+    make(join(base, 'renamed-skill'), OLD_USE_HIVE_API)
+    const edited = make(join(base, 'renamed-skill-edited'), `${OLD_USE_HIVE_API}\nMy own notes.\n`)
+    for (const [ws, kept] of [[join(base, 'renamed-skill'), false], [join(base, 'renamed-skill-edited'), true]] as const) {
+      const w = await opened(ws)
+      try {
+        await wsMod.inWorkspace(w, () => mod.syncBundled())
+        expect(existsSync(join(ws, '.hive', 'skills', 'use-hive-api')), ws).toBe(kept)
+        expect(readFileSync(join(ws, '.hive', 'skills', 'use-cw-api', 'SKILL.md'), 'utf8')).toBe(readFileSync(join(RES, 'skills', 'use-cw-api', 'SKILL.md'), 'utf8'))
+        const m = JSON.parse(readFileSync(join(ws, '.hive', 'bundled.json'), 'utf8'))
+        expect(m.skills['use-hive-api'], ws).toBeUndefined()
+      } finally {
+        await wsMod.disposeWorkspaceService(w)
+      }
+    }
+    expect(readFileSync(join(edited, 'SKILL.md'), 'utf8')).toContain('My own notes.')
   })
 
   it('moves .hive/personas from before 0.9.3 to .hive/modes (#1084): edits kept, the copies still tracked, the chosen mode kept', async () => {
@@ -437,9 +467,9 @@ describe('a workspace', () => {
       expect(forAgents).toEqual(expect.arrayContaining(['my-own', 'work-on-card', 'review-agent-work', 'merge-ready', 'handover', 'split-work']))
       expect(forAgents).not.toContain('coordinate-agents')
       expect(forAssistant).toEqual(expect.arrayContaining(['coordinate-agents', 'split-work', 'handover', 'pick-up', 'workspace-note']))
-      // use-hive-api is for both (HI-2012): its tools.md has the hive tools' cases.
-      expect(forAgents).toContain('use-hive-api')
-      expect(forAssistant).toContain('use-hive-api')
+      // use-cw-api is for both (HI-2012): its tools.md has the hive tools' cases.
+      expect(forAgents).toContain('use-cw-api')
+      expect(forAssistant).toContain('use-cw-api')
       for (const n of ['my-own', 'work-on-card', 'review-agent-work', 'merge-ready']) expect(forAssistant).not.toContain(n)
     } finally {
       await wsMod.disposeWorkspaceService(w)
@@ -467,18 +497,18 @@ describe("Codex's copies of a session's skills", () => {
     const dir = join(cwd, '.agents', 'skills')
     const example = source('example', 'v2')
     // A crash after the old copy was renamed aside: its place is empty, the new copy half-made beside it.
-    mkdirSync(join(dir, '.hive-example.hive-old-1-1', 'references'), { recursive: true })
-    writeFileSync(join(dir, '.hive-example.hive-old-1-1', 'SKILL.md'), 'v1')
-    writeFileSync(join(dir, '.hive-example.hive-old-1-1', '.hive-copy'), JSON.stringify({ hash: 'old' }))
-    mkdirSync(join(dir, '.hive-example.hive-new-1-1'), { recursive: true })
+    mkdirSync(join(dir, '.cw-example.hive-old-1-1', 'references'), { recursive: true })
+    writeFileSync(join(dir, '.cw-example.hive-old-1-1', 'SKILL.md'), 'v1')
+    writeFileSync(join(dir, '.cw-example.hive-old-1-1', '.hive-copy'), JSON.stringify({ hash: 'old' }))
+    mkdirSync(join(dir, '.cw-example.hive-new-1-1'), { recursive: true })
     // And one for a skill the session no longer gets: it comes back as Hive's copy, then goes like any such copy (its
     // content still its marker's hash: unchanged since Hive made it, #1431).
-    mkdirSync(join(dir, '.hive-gone.hive-old-1-2'), { recursive: true })
-    writeFileSync(join(dir, '.hive-gone.hive-old-1-2', '.hive-copy'), JSON.stringify({ hash: await contentHash(join(dir, '.hive-gone.hive-old-1-2')) }))
+    mkdirSync(join(dir, '.cw-gone.hive-old-1-2'), { recursive: true })
+    writeFileSync(join(dir, '.cw-gone.hive-old-1-2', '.hive-copy'), JSON.stringify({ hash: await contentHash(join(dir, '.cw-gone.hive-old-1-2')) }))
     const out = await sync(cwd, [{ name: 'example', sourcePath: example }])
-    expect(readdirSync(dir).sort()).toEqual(['hive-example'])
-    expect(readFileSync(join(dir, 'hive-example', 'SKILL.md'), 'utf8')).toBe('v2')
-    expect(readFileSync(join(dir, 'hive-example', 'references', 'r.md'), 'utf8')).toBe('ref of example')
+    expect(readdirSync(dir).sort()).toEqual(['cw-example'])
+    expect(readFileSync(join(dir, 'cw-example', 'SKILL.md'), 'utf8')).toBe('v2')
+    expect(readFileSync(join(dir, 'cw-example', 'references', 'r.md'), 'utf8')).toBe('ref of example')
     expect(out.example).toEqual({ revision: await contentHash(example) })
   })
 
@@ -487,17 +517,17 @@ describe("Codex's copies of a session's skills", () => {
     const dir = join(cwd, '.agents', 'skills')
     const handover = source('handover', 'Hive handover')
     const held = source('held', 'held v1')
-    mkdirSync(join(dir, 'hive-handover'), { recursive: true })
-    writeFileSync(join(dir, 'hive-handover', 'SKILL.md'), 'MY OWN')
+    mkdirSync(join(dir, 'cw-handover'), { recursive: true })
+    writeFileSync(join(dir, 'cw-handover', 'SKILL.md'), 'MY OWN')
     let out = await sync(cwd, [{ name: 'handover', sourcePath: handover }, { name: 'held', sourcePath: held }])
     expect(out.handover).toEqual({ revision: null, problem: expect.stringMatching(/folder of the user's/), lasting: true })
-    expect(readFileSync(join(dir, 'hive-handover', 'SKILL.md'), 'utf8')).toBe('MY OWN')
-    const v1 = await contentHash(join(dir, 'hive-held'))
+    expect(readFileSync(join(dir, 'cw-handover', 'SKILL.md'), 'utf8')).toBe('MY OWN')
+    const v1 = await contentHash(join(dir, 'cw-held'))
     expect(out.held).toEqual({ revision: v1 })
     // The skill changes while a running session has a file of its copy open: that copy stays, and is reported as kept.
     writeFileSync(join(held, 'SKILL.md'), 'held v2')
     if (process.platform === 'win32') {
-      const handle = await open(join(dir, 'hive-held', 'SKILL.md'), 'r')
+      const handle = await open(join(dir, 'cw-held', 'SKILL.md'), 'r')
       try {
         out = await sync(cwd, [{ name: 'held', sourcePath: held }])
       } finally {
@@ -542,7 +572,7 @@ describe('links in skills Hive copies', () => {
     await sync(cwd, [{ name: 'example', sourcePath: src }])
     symlinkSync(target, join(src, 'references'), 'junction')
     const out = await sync(cwd, [{ name: 'example', sourcePath: src }])
-    const copy = join(cwd, '.agents', 'skills', 'hive-example')
+    const copy = join(cwd, '.agents', 'skills', 'cw-example')
     expect(readFileSync(join(copy, 'references', 'custom.md'), 'utf8')).toBe('My own reference.')
     expect(out.example).toEqual({ revision: await contentHash(src) })
     // Nothing changed since: the copy stays as it is, still the one asked for (no restart asked for again and again).
@@ -555,7 +585,7 @@ describe('links in skills Hive copies', () => {
     const src = join(base, 'users-src')
     mkdirSync(src, { recursive: true })
     writeFileSync(join(src, 'SKILL.md'), 'skill')
-    const theirs = join(cwd, '.agents', 'skills', 'hive-example')
+    const theirs = join(cwd, '.agents', 'skills', 'cw-example')
     mkdirSync(theirs, { recursive: true })
     writeFileSync(join(theirs, 'SKILL.md'), 'skill')
     symlinkSync(target, join(theirs, 'references'), 'junction')

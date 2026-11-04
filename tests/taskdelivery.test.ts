@@ -70,7 +70,7 @@ function idle(agentId: string): { status: string } {
   s.live.set(`${p.toLowerCase()}#${agentId}`, { state, adapter: claudeCode, screen: input.screen, transcriptMtime: '', defaultModel: false, modeTail: '', launchMode: null, configuredMode: null })
   return state
 }
-// Its doorbell (#650: the task's id, never its text, which the agent reads with hive_inbox).
+// Its doorbell (#650: the task's id, never its text, which the agent reads with cw_inbox).
 const prompted = (): boolean => pty.typed.join('').includes('New in your inbox: 1 task')
 const submitted = (): boolean => pty.typed.includes('\r')
 // A write of Backspaces only: how Hive takes back a line it stopped in Claude Code (HI-1974).

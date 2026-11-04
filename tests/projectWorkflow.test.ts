@@ -2,7 +2,7 @@
 // Assistant's settings tool set the platform, preset and options through `writeWorkflow`, and every other field of
 // `workflow` (`kept`, `presetAsked`, a field a later Hive adds) survives. Stage names (N5) through the same paths: a
 // rename is checked, applies at once (no lane or card keeps old rules, the ruleset id stays), and shows in
-// `workflow:stages` and `hive_project_status`.
+// `workflow:stages` and `cw_project_status`.
 import { execFileSync } from 'child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -95,7 +95,7 @@ describe("the workflow's writers keep its other fields", () => {
 })
 
 describe('stage names (N5) through the writers (#1417)', () => {
-  it("a rename through the tool shows in workflow:stages and hive_project_status, keeps the ruleset id, and a refused one gives its reason", async () => {
+  it("a rename through the tool shows in workflow:stages and cw_project_status, keeps the ruleset id, and a refused one gives its reason", async () => {
     const { platform: _p, ...pair } = preset('git', 'pair')
     const { w, repo } = await workspace({ platform: 'git', preset: 'pair', options: pair })
     const wf = (await workflowFor(w, repo))!

@@ -26,7 +26,7 @@ import { agentMsg, say, type AgentMsg } from './agentText'
  * on `yes`/`no`. Names, keys, paths and other messages' text come in as values.
  */
 const R = {
-  checksHint: agentMsg({ id: 'reply.checks.hint', text: 'before review: run one with hive-progress --check <name> --card "{card}" {isolated, select, yes {(--isolated: in a check copy at the card\'s revision; work-on-card)} other {(work-on-card)}}', note: "A code card's checks before review (HI-2276): how to run one, with <name> left for the agent to fill (a configured name is never quoted into a command, HR1's rounds 1 and 2). {card} is the card's key; isolated: its platform can make a check copy." }),
+  checksHint: agentMsg({ id: 'reply.checks.hint', text: 'before review: run one with cw-progress --check <name> --card "{card}" {isolated, select, yes {(--isolated: in a check copy at the card\'s revision; work-on-card)} other {(work-on-card)}}', note: "A code card's checks before review (HI-2276): how to run one, with <name> left for the agent to fill (a configured name is never quoted into a command, HR1's rounds 1 and 2). {card} is the card's key; isolated: its platform can make a check copy." }),
   commentsInvalid: agentMsg({ id: 'reply.read.commentsInvalid', text: 'comments must be a whole number from 0: "{raw}"', note: "GET /v1/tasks/{n}'s comments= (HI-2412) was not a whole number from 0. {raw} is what was given." }),
   place: agentMsg({ id: 'reply.card.place', text: '{column} ({position} of {of})', note: "Where a card is now: its column's name and its place in it (an ordinal such as 51st, of how many)." }),
   created: agentMsg({ id: 'reply.card.created', text: '{card} created in {place}{forProject, select, yes { for {project}} other {}}{givenTo, select, yes {, given to {agent}} other {}}: {title}{changed, select, yes {. {changes}} other {}}', note: 'A new card (reply: short): its name (key and number), where it is, its project and agent, its title and the changes made with it (joined by "; ").' }),
@@ -35,8 +35,8 @@ const R = {
   nextIntents: agentMsg({ id: 'reply.next.intents', text: 'Next on it: {tools}.', note: "What comes next on a card under its rules (#1530): the intent tools it can take (joined with reply.list.or). An agent follows it rather than infer the step from a column." }),
   nextReview: agentMsg({ id: 'reply.next.review', text: "Next: a reviewer's verdict.", note: 'What comes next on a card (#1530): it waits for a review.' }),
   nextUser: agentMsg({ id: 'reply.next.user', text: "Next: the user's OK, asked under For you: wait for it.", note: "What comes next on a card (#1530): the user's approval, asked under For you." }),
-  nextMerge: agentMsg({ id: 'reply.next.merge', text: 'Next: its builder merges it, then reports the merge (hive_report_merge).', note: 'What comes next on a card (#1530): its builder merges it.' }),
-  nextQueue: agentMsg({ id: 'reply.next.queue', text: "Next: Hive's merge queue merges it.", note: "What comes next on a card (#1530): Hive's merge queue merges it." }),
+  nextMerge: agentMsg({ id: 'reply.next.merge', text: 'Next: its builder merges it, then reports the merge (cw_report_merge).', note: 'What comes next on a card (#1530): its builder merges it.' }),
+  nextQueue: agentMsg({ id: 'reply.next.queue', text: "Next: Combwork's merge queue merges it.", note: "What comes next on a card (#1530): Hive's merge queue merges it." }),
   nextDone: agentMsg({ id: 'reply.next.done', text: 'Done: nothing more on it.', note: 'What comes next on a card (#1530): nothing, it is done.' }),
   warning: agentMsg({ id: 'reply.warning', text: 'Warning: {warning}', note: "A warning on a line of its own after a reply (an intent's, a refusal's). {warning} is its text." }),
   intentStill: agentMsg({ id: 'reply.intent.still', text: 'still {stage}', note: "An intent's reply when the card stayed in its stage (#1267). {stage} is the stage's id (active, review…)." }),
@@ -45,32 +45,32 @@ const R = {
   listNone: agentMsg({ id: 'reply.list.none', text: 'none', note: "An intent's empty list (start review's files, say)." }),
   or: agentMsg({ id: 'reply.list.or', text: '{a} or {b}', note: 'Two choices, or a list of them joined one by one ("a or b or c").' }),
   and: agentMsg({ id: 'reply.list.and', text: '{a} and {b}', note: 'Two items, or a list of them joined one by one ("a and b and c").' }),
-  askedNone: agentMsg({ id: 'reply.ask.assistantNone', text: "{card}: your request is on the card, but the Hive Assistant couldn't be given it; the user is told. Ask the user instead (hive_ask_user).", note: "hive_ask_assistant (HI-1866) when the request couldn't be delivered to the Assistant. {card} is the card's key." }),
-  asked: agentMsg({ id: 'reply.ask.assistant', text: '{card}: asked the Hive Assistant ({delivery} in its inbox). Its answer comes to your inbox.', note: "hive_ask_assistant (HI-1866): the request's id in the Assistant's inbox ({delivery}, m41)." }),
-  notifiedOpens: agentMsg({ id: 'reply.notify.opens', text: 'Notification shown; a click opens {opens}.', note: 'hive_notify (HI-1961): what a click on the notification opens (an agent or a card).' }),
-  notified: agentMsg({ id: 'reply.notify.shown', text: 'Notification shown.', note: 'hive_notify: the notification was shown.' }),
-  changesNoneFor: agentMsg({ id: 'reply.undo.noneForGroup', text: 'No changes of yours are kept for message {group}.', note: "hive_undo's list for one message (#1282) when none is kept. {group} is the message's group id." }),
-  changeUndone: agentMsg({ id: 'reply.undo.markUndone', text: '[undone]', note: "A mark after one of the Assistant's changes in hive_undo's list (#1282): it has been undone." }),
-  changeFinal: agentMsg({ id: 'reply.undo.markFinal', text: "[can't be undone: {why}]", note: "A mark after one of the Assistant's changes in hive_undo's list (#1282): it can't be undone, and why." }),
-  changesMore: agentMsg({ id: 'reply.undo.listMore', text: 'and {n} more: undo the group to undo them all.', note: "hive_undo's list of a message's changes, cut at 40: how many more." }),
-  changesNone: agentMsg({ id: 'reply.undo.none', text: 'No changes of yours are kept (they are kept 7 days).', note: "hive_undo's list when none of the Assistant's changes is kept (#1282)." }),
-  changeGroup: agentMsg({ id: 'reply.undo.group', text: '{group} (your message at {at}): {n, plural, one {{n} change} other {{n} changes}}, {left} to undo{hasCards, select, yes {; cards {cards}} other {}}', note: "A message's line in hive_undo's list (#1282): its group id, when, how many changes and how many are left to undo, and its cards." }),
+  askedNone: agentMsg({ id: 'reply.ask.assistantNone', text: "{card}: your request is on the card, but the Assistant couldn't be given it; the user is told. Ask the user instead (cw_ask_user).", note: "cw_ask_assistant (HI-1866) when the request couldn't be delivered to the Assistant. {card} is the card's key." }),
+  asked: agentMsg({ id: 'reply.ask.assistant', text: '{card}: asked the Assistant ({delivery} in its inbox). Its answer comes to your inbox.', note: "cw_ask_assistant (HI-1866): the request's id in the Assistant's inbox ({delivery}, m41)." }),
+  notifiedOpens: agentMsg({ id: 'reply.notify.opens', text: 'Notification shown; a click opens {opens}.', note: 'cw_notify (HI-1961): what a click on the notification opens (an agent or a card).' }),
+  notified: agentMsg({ id: 'reply.notify.shown', text: 'Notification shown.', note: 'cw_notify: the notification was shown.' }),
+  changesNoneFor: agentMsg({ id: 'reply.undo.noneForGroup', text: 'No changes of yours are kept for message {group}.', note: "cw_undo's list for one message (#1282) when none is kept. {group} is the message's group id." }),
+  changeUndone: agentMsg({ id: 'reply.undo.markUndone', text: '[undone]', note: "A mark after one of the Assistant's changes in cw_undo's list (#1282): it has been undone." }),
+  changeFinal: agentMsg({ id: 'reply.undo.markFinal', text: "[can't be undone: {why}]", note: "A mark after one of the Assistant's changes in cw_undo's list (#1282): it can't be undone, and why." }),
+  changesMore: agentMsg({ id: 'reply.undo.listMore', text: 'and {n} more: undo the group to undo them all.', note: "cw_undo's list of a message's changes, cut at 40: how many more." }),
+  changesNone: agentMsg({ id: 'reply.undo.none', text: 'No changes of yours are kept (they are kept 7 days).', note: "cw_undo's list when none of the Assistant's changes is kept (#1282)." }),
+  changeGroup: agentMsg({ id: 'reply.undo.group', text: '{group} (your message at {at}): {n, plural, one {{n} change} other {{n} changes}}, {left} to undo{hasCards, select, yes {; cards {cards}} other {}}', note: "A message's line in cw_undo's list (#1282): its group id, when, how many changes and how many are left to undo, and its cards." }),
   skippedChanged: agentMsg({ id: 'reply.undo.skipped.changed', text: 'changed since', note: 'Why an undo left a field: it changed since the Assistant changed it.' }),
   skippedGone: agentMsg({ id: 'reply.undo.skipped.gone', text: 'gone', note: 'Why an undo left a field: what it was on is gone.' }),
   skippedEnded: agentMsg({ id: 'reply.undo.skipped.ended', text: 'it has ended', note: 'Why an undo left a field: what it was on has ended.' }),
   skippedFailed: agentMsg({ id: 'reply.undo.skipped.failed', text: 'refused', note: 'Why an undo left a field: putting it back was refused.' }),
-  undoHead: agentMsg({ id: 'reply.undo.head', text: 'Undid {done} of {n, plural, one {{n} change} other {{n} changes}} in full.', note: "hive_undo's reply (#1282): how many changes were undone in full, of how many." }),
-  undoBefore: agentMsg({ id: 'reply.undo.before', text: '{name}: undone before.', note: 'hive_undo: this change had been undone before. {name} is its card or what it was.' }),
-  undoFinal: agentMsg({ id: 'reply.undo.final', text: "{name}: can't be undone: {final}", note: "hive_undo: this change can't be undone, and why." }),
-  undoPartial: agentMsg({ id: 'reply.undo.partial', text: '{name}: {putBack, select, yes {{undone} put back; } other {}}{skipped}.', note: 'hive_undo: what of this change was put back, and each field left (reply.undo.field, joined by ", ").' }),
-  undoField: agentMsg({ id: 'reply.undo.field', text: '{field} left ({why}{hasError, select, yes {: {error}} other {}})', note: 'hive_undo: a field left as it is, why (reply.undo.skipped.*) and the error if one was given.' }),
-  undoMore: agentMsg({ id: 'reply.undo.more', text: 'and {n} more left as they were.', note: "hive_undo's notes, cut at 40: how many more were left." }),
+  undoHead: agentMsg({ id: 'reply.undo.head', text: 'Undid {done} of {n, plural, one {{n} change} other {{n} changes}} in full.', note: "cw_undo's reply (#1282): how many changes were undone in full, of how many." }),
+  undoBefore: agentMsg({ id: 'reply.undo.before', text: '{name}: undone before.', note: 'cw_undo: this change had been undone before. {name} is its card or what it was.' }),
+  undoFinal: agentMsg({ id: 'reply.undo.final', text: "{name}: can't be undone: {final}", note: "cw_undo: this change can't be undone, and why." }),
+  undoPartial: agentMsg({ id: 'reply.undo.partial', text: '{name}: {putBack, select, yes {{undone} put back; } other {}}{skipped}.', note: 'cw_undo: what of this change was put back, and each field left (reply.undo.field, joined by ", ").' }),
+  undoField: agentMsg({ id: 'reply.undo.field', text: '{field} left ({why}{hasError, select, yes {: {error}} other {}})', note: 'cw_undo: a field left as it is, why (reply.undo.skipped.*) and the error if one was given.' }),
+  undoMore: agentMsg({ id: 'reply.undo.more', text: 'and {n} more left as they were.', note: "cw_undo's notes, cut at 40: how many more were left." }),
   batchChanged: agentMsg({ id: 'reply.batch.changed', text: '{n, plural, one {{n} card} other {{n} cards}} changed:', note: 'A batch change (reply: short): how many cards changed, each on a line below.' }),
   batchNone: agentMsg({ id: 'reply.batch.none', text: 'No card changed.', note: 'A batch change in which no card changed.' }),
   batchRefused: agentMsg({ id: 'reply.batch.refused', text: 'Refused, left as they were: {list}.', note: 'A batch change: the cards refused, each with why (joined by "; ").' }),
   batchRefusedRule: agentMsg({ id: 'reply.batch.refusedRule', text: 'Refused, left as it was: {named, select, yes {} other {{ref}: }}{error} ({rule})', note: "A batch change: a card refused by its rules (HI-2238), named first where its message doesn't name it, then the message and the rule; its next step and who can change it follow on lines of their own." }),
   reorder: agentMsg({ id: 'reply.reorder', text: '{column} now starts {cards}{more, select, yes {; its other {rest, plural, one {{rest} card} other {{rest} cards}} keep their order below} other {}}.', note: 'A reorder (reply: short): the cards now at the top of the column, and how many others keep their order.' }),
-  laneOrder: agentMsg({ id: 'reply.reorder.laneOrder', text: "{cards} {one, select, yes {is} other {are}} on {builder}'s lane ({lane}), which keeps its own order and takes {one, select, yes {it} other {them}} in that order. To change it: hive_lane start with its cards in the new order (applyNow: true to apply it now).", note: "HI-2267: put back or reordered on the board, a lane's card is still where its lane's own list has it. The Assistant, calling the tools without a skill, reordered the column and was told nothing of it." }),
+  laneOrder: agentMsg({ id: 'reply.reorder.laneOrder', text: "{cards} {one, select, yes {is} other {are}} on {builder}'s lane ({lane}), which keeps its own order and takes {one, select, yes {it} other {them}} in that order. To change it: cw_lane start with its cards in the new order (applyNow: true to apply it now).", note: "HI-2267: put back or reordered on the board, a lane's card is still where its lane's own list has it. The Assistant, calling the tools without a skill, reordered the column and was told nothing of it." }),
   statusIdle: agentMsg({ id: 'reply.agent.status.idle', text: 'idle', note: "An agent's status in a card row or project row: ready or finished." }),
   statusBackground: agentMsg({ id: 'reply.agent.status.background', text: 'waiting on background tasks', note: "An agent's status: its turn ended with background tasks running." }),
   statusWaiting: agentMsg({ id: 'reply.agent.status.waiting', text: 'waiting for the user', note: "An agent's status: it waits for the user." }),
@@ -78,53 +78,53 @@ const R = {
   statusSignin: agentMsg({ id: 'reply.agent.status.signin', text: 'waiting for the user to sign in', note: "An agent's status: its CLI's sign-in expired." }),
   backgroundTasks: agentMsg({ id: 'reply.agent.backgroundTasks', text: '{n, plural, one {{n} background task} other {{n} background tasks}}', note: "How many background tasks an agent runs, in a card row's agent." }),
   rowAgent: agentMsg({ id: 'reply.row.agent', text: '{name} ({state})', note: "A card row's agent: its name, its status and background tasks (joined by \", \")." }),
-  rowBlocked: agentMsg({ id: 'reply.row.blocked', text: 'blocked: {why}', note: "A card row (hive_list_tasks): why it is blocked." }),
+  rowBlocked: agentMsg({ id: 'reply.row.blocked', text: 'blocked: {why}', note: "A card row (cw_list_tasks): why it is blocked." }),
   rowAfter: agentMsg({ id: 'reply.row.after', text: 'after {cards}', note: 'A card row: the cards it waits for.' }),
   rowElsewhere: agentMsg({ id: 'reply.row.elsewhere', text: '{card} (another project)', note: "A card row: a card it waits for that is another project's." }),
   rowStalled: agentMsg({ id: 'reply.row.stalled', text: 'stalled: {why}', note: 'A card row: why it has stalled.' }),
   rowReviewing: agentMsg({ id: 'reply.row.reviewing', text: 'reviewing: {name}{stalled, select, yes { (stalled: {why})} other {}}', note: 'A card row: the agent reviewing it, and why that has stalled if it has.' }),
   rowComments: agentMsg({ id: 'reply.row.comments', text: '{n, plural, one {{n} comment} other {{n} comments}}', note: 'A card row: how many comments it has.' }),
-  listNoArchived: agentMsg({ id: 'reply.list.noArchived', text: 'No archived cards.', note: 'hive_list_tasks with archived when there are none.' }),
-  listNoCards: agentMsg({ id: 'reply.list.noCards', text: 'No cards.', note: 'hive_list_tasks when there are none.' }),
-  listPast: agentMsg({ id: 'reply.list.past', text: 'There are {n} cards: offset {offset} is past the last.', note: "hive_list_tasks's offset past the last card." }),
-  listPage: agentMsg({ id: 'reply.list.page', text: 'Cards {from}–{to} of {n}.', note: 'hive_list_tasks from an offset: which cards this page has.' }),
-  listColumn: agentMsg({ id: 'reply.list.column', text: '{archived, select, yes {Archived, last in {column} ({n}):} other {{column} ({n}, top first):}}', note: "A column's heading in hive_list_tasks: its name and how many cards it has (top first: a column's order is its priority)." }),
-  listRest: agentMsg({ id: 'reply.list.rest', text: '…and {n} more: offset {next} carries on.', note: 'hive_list_tasks cut at 200 rows: how many more, and the offset that carries on.' }),
-  listRead: agentMsg({ id: 'reply.list.read', text: 'hive_read_task gives a card in full.', note: "hive_list_tasks's last line." }),
+  listNoArchived: agentMsg({ id: 'reply.list.noArchived', text: 'No archived cards.', note: 'cw_list_tasks with archived when there are none.' }),
+  listNoCards: agentMsg({ id: 'reply.list.noCards', text: 'No cards.', note: 'cw_list_tasks when there are none.' }),
+  listPast: agentMsg({ id: 'reply.list.past', text: 'There are {n} cards: offset {offset} is past the last.', note: "cw_list_tasks's offset past the last card." }),
+  listPage: agentMsg({ id: 'reply.list.page', text: 'Cards {from}–{to} of {n}.', note: 'cw_list_tasks from an offset: which cards this page has.' }),
+  listColumn: agentMsg({ id: 'reply.list.column', text: '{archived, select, yes {Archived, last in {column} ({n}):} other {{column} ({n}, top first):}}', note: "A column's heading in cw_list_tasks: its name and how many cards it has (top first: a column's order is its priority)." }),
+  listRest: agentMsg({ id: 'reply.list.rest', text: '…and {n} more: offset {next} carries on.', note: 'cw_list_tasks cut at 200 rows: how many more, and the offset that carries on.' }),
+  listRead: agentMsg({ id: 'reply.list.read', text: 'cw_read_task gives a card in full.', note: "cw_list_tasks's last line." }),
   progress: agentMsg({ id: 'reply.progress', text: '{title}{steps}{state, select, stopped {, stopped reporting} eta {, about {left} left} other {}}', note: "An agent's open progress run in a project row: its title (clipped), its steps (\" 4/12\") and the time left, or that it stopped reporting." }),
-  projectHead: agentMsg({ id: 'reply.project.head', text: '{name} ({active, select, yes {on} other {off}}{hasBranch, select, yes {, {branch}} other {}})', note: 'A project row (hive_list_projects): its name (with its workspace when there are several), on or off, and its branch.' }),
+  projectHead: agentMsg({ id: 'reply.project.head', text: '{name} ({active, select, yes {on} other {off}}{hasBranch, select, yes {, {branch}} other {}})', note: 'A project row (cw_list_projects): its name (with its workspace when there are several), on or off, and its branch.' }),
   projectNoAgents: agentMsg({ id: 'reply.project.noAgents', text: '{head}: no agents', note: 'A project row for a project with no agents.' }),
   projectAgent: agentMsg({ id: 'reply.project.agent', text: '{name} [{tags}] {state}{hasBackground, select, yes { ({background} background)} other {}}{hasProgress, select, yes { (running {progress})} other {}}', note: "An agent in a project row: its name, its provider, role and branch, its status (or what it waits for), its background tasks and its progress run." }),
-  projectRead: agentMsg({ id: 'reply.project.read', text: "hive_project_status gives one project in full (its agents' ids and sessions, its settings).", note: "hive_list_projects's last line." }),
-  projectsNone: agentMsg({ id: 'reply.project.none', text: 'No projects.', note: 'hive_list_projects when there are none.' }),
-  notesRead: agentMsg({ id: 'reply.notes.read', text: 'hive_read_shared_note reads one.', note: "hive_list_shared_notes's last line." }),
-  notesNone: agentMsg({ id: 'reply.notes.none', text: 'No shared notes yet.', note: 'hive_list_shared_notes when there are none.' }),
+  projectRead: agentMsg({ id: 'reply.project.read', text: "cw_project_status gives one project in full (its agents' ids and sessions, its settings).", note: "cw_list_projects's last line." }),
+  projectsNone: agentMsg({ id: 'reply.project.none', text: 'No projects.', note: 'cw_list_projects when there are none.' }),
+  notesRead: agentMsg({ id: 'reply.notes.read', text: 'cw_read_shared_note reads one.', note: "cw_list_shared_notes's last line." }),
+  notesNone: agentMsg({ id: 'reply.notes.none', text: 'No shared notes yet.', note: 'cw_list_shared_notes when there are none.' }),
   noteHead: agentMsg({ id: 'reply.note.head', text: '{path}{hasRevision, select, yes { (revision {revision})} other {}}', note: "A note or handover read: its path and its revision (for a write's expectedRevision); its text follows as it is." }),
   noteAppended: agentMsg({ id: 'reply.note.appended', text: 'Appended {n, number} characters to {path}{hasRevision, select, yes { (revision {revision})} other {}}.', note: 'A note appended to: how much, and its new revision.' }),
   noteWrote: agentMsg({ id: 'reply.note.wrote', text: 'Wrote {path} ({n, number} characters{hasRevision, select, yes {, revision {revision}} other {}}).', note: 'A note written: how much, and its new revision.' }),
   thousands: agentMsg({ id: 'reply.size.thousands', text: '{n}k', note: 'A size in characters, short: 3.2k, 56k. {n} is the thousands, as the code rounds them.' }),
-  outlineNone: agentMsg({ id: 'reply.doc.noHeadings', text: '{path} ({size} characters) has no headings: read it whole.', note: 'hive_doc_outline (#817) for a document with no headings.' }),
-  outlineHead: agentMsg({ id: 'reply.doc.outline', text: '{path}: {n} headings, {size} characters. [slug] and size per section (subsections included):', note: "hive_doc_outline's first line (#817); a line per heading follows, with its slug in brackets." }),
-  outlineMore: agentMsg({ id: 'reply.doc.outlineMore', text: '… {n} more: depth={depth} lists fewer.', note: 'hive_doc_outline cut at 200 headings: how many more, and the depth that lists fewer.' }),
-  outlineRead: agentMsg({ id: 'reply.doc.outlineRead', text: 'hive_read_section reads one as #<slug>.', note: "hive_doc_outline's last line." }),
-  sectionHead: agentMsg({ id: 'reply.doc.section', text: '{path}#{slug} ({size, number} characters)', note: 'hive_read_section: where the section is and its size; its text follows as it is.' }),
-  docHead: agentMsg({ id: 'reply.doc.whole', text: '{path} ({size, number} characters)', note: 'hive_read_section with no heading (#818): the whole document and its size.' }),
-  sectionLong: agentMsg({ id: 'reply.doc.sectionLong', text: '{head}: long, so here is its text before its subsections, then their outline.', note: "hive_read_section for a long section: its own text, then its subsections' outline." }),
-  sectionRead: agentMsg({ id: 'reply.doc.sectionRead', text: 'hive_read_section reads one of them as #<slug>, or this whole section with full=true.', note: "hive_read_section's last line for a long section." }),
+  outlineNone: agentMsg({ id: 'reply.doc.noHeadings', text: '{path} ({size} characters) has no headings: read it whole.', note: 'cw_doc_outline (#817) for a document with no headings.' }),
+  outlineHead: agentMsg({ id: 'reply.doc.outline', text: '{path}: {n} headings, {size} characters. [slug] and size per section (subsections included):', note: "cw_doc_outline's first line (#817); a line per heading follows, with its slug in brackets." }),
+  outlineMore: agentMsg({ id: 'reply.doc.outlineMore', text: '… {n} more: depth={depth} lists fewer.', note: 'cw_doc_outline cut at 200 headings: how many more, and the depth that lists fewer.' }),
+  outlineRead: agentMsg({ id: 'reply.doc.outlineRead', text: 'cw_read_section reads one as #<slug>.', note: "cw_doc_outline's last line." }),
+  sectionHead: agentMsg({ id: 'reply.doc.section', text: '{path}#{slug} ({size, number} characters)', note: 'cw_read_section: where the section is and its size; its text follows as it is.' }),
+  docHead: agentMsg({ id: 'reply.doc.whole', text: '{path} ({size, number} characters)', note: 'cw_read_section with no heading (#818): the whole document and its size.' }),
+  sectionLong: agentMsg({ id: 'reply.doc.sectionLong', text: '{head}: long, so here is its text before its subsections, then their outline.', note: "cw_read_section for a long section: its own text, then its subsections' outline." }),
+  sectionRead: agentMsg({ id: 'reply.doc.sectionRead', text: 'cw_read_section reads one of them as #<slug>, or this whole section with full=true.', note: "cw_read_section's last line for a long section." }),
   bytes: agentMsg({ id: 'reply.attachment.bytes', text: '{n, number} bytes', note: "An attachment's size (HI-1751)." }),
-  attachmentFile: agentMsg({ id: 'reply.attachment.file', text: '{name}: {kind, select, binary {not text} pdf {a PDF} other {an image}} ({size}). Open it with your own file reading: {path}', note: "hive_read_attachment (HI-1751) for an image, a PDF or a binary file: its path, for the CLI's own reading." }),
-  attachmentRange: agentMsg({ id: 'reply.attachment.range', text: 'bytes {from, number}–{to, number} of {size}', note: 'hive_read_attachment: which bytes of the file this page is.' }),
-  attachmentText: agentMsg({ id: 'reply.attachment.text', text: '{name} ({where}{hasNext, select, yes {; more from offset {next}} other {}})', note: 'hive_read_attachment: which bytes this is, and the byte offset the next page starts at (to pass back as offset); the text follows as it is.' }),
-  levelHive: agentMsg({ id: 'reply.skill.level.hive', text: 'Hive', note: "Where a skill comes from in hive_list_skills: Hive's own." }),
+  attachmentFile: agentMsg({ id: 'reply.attachment.file', text: '{name}: {kind, select, binary {not text} pdf {a PDF} other {an image}} ({size}). Open it with your own file reading: {path}', note: "cw_read_attachment (HI-1751) for an image, a PDF or a binary file: its path, for the CLI's own reading." }),
+  attachmentRange: agentMsg({ id: 'reply.attachment.range', text: 'bytes {from, number}–{to, number} of {size}', note: 'cw_read_attachment: which bytes of the file this page is.' }),
+  attachmentText: agentMsg({ id: 'reply.attachment.text', text: '{name} ({where}{hasNext, select, yes {; more from offset {next}} other {}})', note: 'cw_read_attachment: which bytes this is, and the byte offset the next page starts at (to pass back as offset); the text follows as it is.' }),
+  levelHive: agentMsg({ id: 'reply.skill.level.hive', text: 'Combwork', note: "Where a skill comes from in cw_list_skills: Hive's own." }),
   levelMachine: agentMsg({ id: 'reply.skill.level.machine', text: 'user', note: "Where a skill comes from: the user's own, on this machine." }),
   levelPlugin: agentMsg({ id: 'reply.skill.level.plugin', text: 'plugin', note: 'Where a skill comes from: a plugin.' }),
   levelLocal: agentMsg({ id: 'reply.skill.level.local', text: 'local', note: "Where a skill comes from: the project's own." }),
   skillNobody: agentMsg({ id: 'reply.skill.nobody', text: 'given to nobody: {problem}', note: 'A Hive skill nobody gets (its header is broken or its audience unknown), and why.' }),
   skillFor: agentMsg({ id: 'reply.skill.for', text: 'for {audience, select, all {agents and the Assistant} assistant {the Assistant} other {agents}}', note: "Who a Hive skill is for." }),
-  skillLine: agentMsg({ id: 'reply.skill.line', text: '{name} ({where}): {description}', note: 'A skill in hive_list_skills: its name, where it comes from and who it is for, and what it is for.' }),
+  skillLine: agentMsg({ id: 'reply.skill.line', text: '{name} ({where}): {description}', note: 'A skill in cw_list_skills: its name, where it comes from and who it is for, and what it is for.' }),
   skillNoDescription: agentMsg({ id: 'reply.skill.noDescription', text: 'no description', note: 'A skill with no description.' }),
-  skillsNone: agentMsg({ id: 'reply.skill.none', text: 'No skills.', note: 'hive_list_skills when there are none.' }),
-  lanesLeft: agentMsg({ id: 'reply.wait.lanesLeft', text: 'This replaces your lane watch: {n, plural, one {1 running lane ({lanes}) is} other {{n} running lanes ({lanes}) are}} no longer followed. To follow them as well, watch them with this instead: hive_wait_for_tasks with lanes, and agents or cards.', note: 'HI-1987: a card or agent watch that replaces a lane watch while its lanes run says what it drops, and how to keep them.' }),
+  skillsNone: agentMsg({ id: 'reply.skill.none', text: 'No skills.', note: 'cw_list_skills when there are none.' }),
+  lanesLeft: agentMsg({ id: 'reply.wait.lanesLeft', text: 'This replaces your lane watch: {n, plural, one {1 running lane ({lanes}) is} other {{n} running lanes ({lanes}) are}} no longer followed. To follow them as well, watch them with this instead: cw_wait_for_tasks with lanes, and agents or cards.', note: 'HI-1987: a card or agent watch that replaces a lane watch while its lanes run says what it drops, and how to keep them.' }),
   waitKeptCards: agentMsg({ id: 'reply.wait.keptCards', text: 'It kept {cards} from your last lane watch (cards: [] for none).', note: 'A lane watch (#726): the cards beside its lanes it kept from the last lane watch.' }),
   waitReplaceCards: agentMsg({ id: 'reply.wait.replaceCards', text: 'Its cards replace {cards}.', note: "A lane watch: its cards replace the last lane watch's." }),
   waitNoLonger: agentMsg({ id: 'reply.wait.noLonger', text: 'It no longer watches {cards}.', note: "A lane watch: the last lane watch's cards it no longer watches." }),
@@ -134,15 +134,15 @@ const R = {
   waitNotFollowed: agentMsg({ id: 'reply.wait.notFollowed', text: 'Not followed, not working now: {agents}.', note: 'A lane watch: agents not followed for not working now, each with its state.' }),
   waitAlsoCards: agentMsg({ id: 'reply.wait.alsoCards', text: 'a change to {cards}', note: 'What else wakes a lane watch: a change to its cards.' }),
   waitAlsoAgents: agentMsg({ id: 'reply.wait.alsoAgents', text: '{agents} finishing, waiting for the user or stopping', note: 'What else wakes a lane watch: its agents.' }),
-  waitLane: agentMsg({ id: 'reply.wait.lane', text: '{watching}{events}. End your turn now: Hive types a line into this session on a lane event{hasAlso, select, yes { or {also}} other {}}, or at {limit} if none comes.', note: "A lane watch begun (#531): what it watches (and its events, when they aren't the default), and what wakes it." }),
+  waitLane: agentMsg({ id: 'reply.wait.lane', text: '{watching}{events}. End your turn now: Combwork types a line into this session on a lane event{hasAlso, select, yes { or {also}} other {}}, or at {limit} if none comes.', note: "A lane watch begun (#531): what it watches (and its events, when they aren't the default), and what wakes it." }),
   waitReplaced: agentMsg({ id: 'reply.wait.replaced', text: 'It replaces your watch ({watch}).', note: 'A watch begun: the watch it replaced.' }),
   theLimit: agentMsg({ id: 'reply.wait.theLimit', text: 'the limit', note: "When a watch ends if nothing comes, where its limit's time isn't known." }),
   waitGone: agentMsg({ id: 'reply.wait.gone', text: '{card} {archived, select, yes {was archived} other {was archived or deleted}}', note: 'A watched card that is gone.' }),
   waitMoved: agentMsg({ id: 'reply.wait.moved', text: '{card} is in {column} ({changes}{hasBy, select, yes {, by {by}} other {}})', note: 'A watched card that changed: its column, what changed, and who changed it.' }),
-  waitComment: agentMsg({ id: 'reply.wait.comment', text: '{change}; latest comment by {by}: "{line}"', note: "A watched card's change, with its latest comment's author and first line (hive_read_task with latestComment gives it all)." }),
-  waitEndTurnLower: agentMsg({ id: 'reply.wait.endTurnThen', text: 'end your turn: Hive types a line into this session when it changes, or at {limit} if nothing does.', note: 'HI-2245: after handing a card over first, what to do then.' }),
-  waitIdle: agentMsg({ id: 'reply.wait.idle', text: '{watching}. {idle} Hive types a line into this session when it changes, or at {limit} if nothing does.', note: "HI-2285: a lane's builder watching only its own card with nothing waiting on it carries on rather than end the turn." }),
-  waitEndTurn: agentMsg({ id: 'reply.wait.endTurn', text: 'End your turn now: Hive types a line into this session when it changes, or at {limit} if nothing does.', note: 'A card watch begun: end the turn, and what wakes it.' }),
+  waitComment: agentMsg({ id: 'reply.wait.comment', text: '{change}; latest comment by {by}: "{line}"', note: "A watched card's change, with its latest comment's author and first line (cw_read_task with latestComment gives it all)." }),
+  waitEndTurnLower: agentMsg({ id: 'reply.wait.endTurnThen', text: 'end your turn: Combwork types a line into this session when it changes, or at {limit} if nothing does.', note: 'HI-2245: after handing a card over first, what to do then.' }),
+  waitIdle: agentMsg({ id: 'reply.wait.idle', text: '{watching}. {idle} Combwork types a line into this session when it changes, or at {limit} if nothing does.', note: "HI-2285: a lane's builder watching only its own card with nothing waiting on it carries on rather than end the turn." }),
+  waitEndTurn: agentMsg({ id: 'reply.wait.endTurn', text: 'End your turn now: Combwork types a line into this session when it changes, or at {limit} if nothing does.', note: 'A card watch begun: end the turn, and what wakes it.' }),
   waitWatching: agentMsg({ id: 'reply.wait.watching', text: '{watching}. {step} Nothing runs meanwhile.', note: 'A card watch begun: what it waits for, then what to do (reply.wait.endTurn, or hand a card over first).' }),
   already: agentMsg({ id: 'reply.wait.already', text: 'Already: {what}.', note: 'A watch whose condition was met already: no watch started.' }),
   waitEnded: agentMsg({ id: 'reply.wait.ended', text: 'Your watch ({watch}) has ended.', note: 'HI-2195: a usage watch already met ends the watch before it.' }),
@@ -152,29 +152,29 @@ const R = {
   agentDropped: agentMsg({ id: 'reply.agentWatch.dropped', text: "It replaces your watch on {agents}: pass every agent you're following.", note: "#1346 item 6: the agents the earlier agent watch followed and this call doesn't." }),
   agentCardEnded: agentMsg({ id: 'reply.agentWatch.cardEnded', text: 'Your card watch ({watch}) has ended.', note: 'An agent watch met at once ends the card watch before it.' }),
   agentDroppedEnded: agentMsg({ id: 'reply.agentWatch.droppedEnded', text: "Your watch on {agents} has ended: watch again, passing every agent you're following.", note: 'An agent watch met at once ends the earlier one too (#1346 item 6).' }),
-  agentWatching: agentMsg({ id: 'reply.agentWatch.watching', text: '{watching}. End your turn now: Hive types a line into this session when one finishes, waits for the user or stops, or at {limit} if none does. Nothing runs meanwhile.', note: 'An agent watch begun (#416): end the turn, and what wakes it.' }),
-  settingNoMatch: agentMsg({ id: 'reply.setting.noMatch', text: 'No setting matches "{query}".', note: 'hive_list_settings with a query nothing matches.' }),
-  settingsNone: agentMsg({ id: 'reply.setting.none', text: 'No settings.', note: 'hive_list_settings with none.' }),
-  settingRow: agentMsg({ id: 'reply.setting.row', text: '{id} = {value}{hasDefault, select, yes { (default {def})} other {}}{readOnly, select, yes { [read-only]} other {}}', note: "A setting in hive_list_settings: its id, its value, its default when it differs, and whether it is read-only to the Assistant." }),
-  settingInherit: agentMsg({ id: 'reply.setting.inherit', text: 'Set to inherit:', note: "hive_list_settings (HI-1712): those set to inherit come last, under this line." }),
-  settingMore: agentMsg({ id: 'reply.setting.more', text: '… {n} more: offset {next} carries on.', note: 'hive_list_settings cut at 200: how many more, and the offset that carries on.' }),
-  settingHead: agentMsg({ id: 'reply.setting.head', text: '{title} ({id}){hasProject, select, yes { in {project}} other {}}: {value}{isDefault, select, yes { (the default)} other { (default {def})}}', note: "hive_read_setting's first line: the setting, its project, its value and its default." }),
-  settingWhere: agentMsg({ id: 'reply.setting.where', text: 'Where: {path}. Takes {takes}.', note: 'hive_read_setting: where the user finds it, and what it takes.' }),
-  settingShownAs: agentMsg({ id: 'reply.setting.shownAs', text: 'The user sees it as: {shownAs}.', note: "hive_read_setting (#767): where the user sees it, in the language Hive shows them." }),
-  settingHelps: agentMsg({ id: 'reply.setting.helps', text: 'When it helps: {helps}', note: 'hive_read_setting: when the setting helps.' }),
-  settingRestart: agentMsg({ id: 'reply.setting.restart', text: 'A change applies {restart}.', note: 'hive_read_setting: when a change applies.' }),
-  settingReadOnly: agentMsg({ id: 'reply.setting.readOnly', text: 'Read-only to you: {why}', note: "hive_read_setting: the Assistant can't change it, and why." }),
-  settingDocs: agentMsg({ id: 'reply.setting.docs', text: 'User guide: "{docs}".', note: "hive_read_setting: the user guide's section on it." }),
-  settingSame: agentMsg({ id: 'reply.setting.same', text: '{path}{hasProject, select, yes { ({project})} other {}} was already {value}: nothing changed.', note: 'hive_update_setting when the value was already so.' }),
-  settingChanged: agentMsg({ id: 'reply.setting.changed', text: "Changed {path}{hasProject, select, yes { in {project}} other {}} ({id}): {old} → {new}. {hasRestart, select, yes {It applies {restart}.} other {It applies now.}} The user can undo it in your panel's list.", note: "hive_update_setting's reply: what changed, old → new, and when it applies." }),
-  journalNoMatch: agentMsg({ id: 'reply.journal.noMatch', text: 'No entries match "{query}".', note: 'hive_journal_recall with a query nothing matches (#1031).' }),
-  journalNone: agentMsg({ id: 'reply.journal.none', text: 'No entries.', note: 'hive_journal_recall with no entries.' }),
+  agentWatching: agentMsg({ id: 'reply.agentWatch.watching', text: '{watching}. End your turn now: Combwork types a line into this session when one finishes, waits for the user or stops, or at {limit} if none does. Nothing runs meanwhile.', note: 'An agent watch begun (#416): end the turn, and what wakes it.' }),
+  settingNoMatch: agentMsg({ id: 'reply.setting.noMatch', text: 'No setting matches "{query}".', note: 'cw_list_settings with a query nothing matches.' }),
+  settingsNone: agentMsg({ id: 'reply.setting.none', text: 'No settings.', note: 'cw_list_settings with none.' }),
+  settingRow: agentMsg({ id: 'reply.setting.row', text: '{id} = {value}{hasDefault, select, yes { (default {def})} other {}}{readOnly, select, yes { [read-only]} other {}}', note: "A setting in cw_list_settings: its id, its value, its default when it differs, and whether it is read-only to the Assistant." }),
+  settingInherit: agentMsg({ id: 'reply.setting.inherit', text: 'Set to inherit:', note: "cw_list_settings (HI-1712): those set to inherit come last, under this line." }),
+  settingMore: agentMsg({ id: 'reply.setting.more', text: '… {n} more: offset {next} carries on.', note: 'cw_list_settings cut at 200: how many more, and the offset that carries on.' }),
+  settingHead: agentMsg({ id: 'reply.setting.head', text: '{title} ({id}){hasProject, select, yes { in {project}} other {}}: {value}{isDefault, select, yes { (the default)} other { (default {def})}}', note: "cw_read_setting's first line: the setting, its project, its value and its default." }),
+  settingWhere: agentMsg({ id: 'reply.setting.where', text: 'Where: {path}. Takes {takes}.', note: 'cw_read_setting: where the user finds it, and what it takes.' }),
+  settingShownAs: agentMsg({ id: 'reply.setting.shownAs', text: 'The user sees it as: {shownAs}.', note: "cw_read_setting (#767): where the user sees it, in the language Hive shows them." }),
+  settingHelps: agentMsg({ id: 'reply.setting.helps', text: 'When it helps: {helps}', note: 'cw_read_setting: when the setting helps.' }),
+  settingRestart: agentMsg({ id: 'reply.setting.restart', text: 'A change applies {restart}.', note: 'cw_read_setting: when a change applies.' }),
+  settingReadOnly: agentMsg({ id: 'reply.setting.readOnly', text: 'Read-only to you: {why}', note: "cw_read_setting: the Assistant can't change it, and why." }),
+  settingDocs: agentMsg({ id: 'reply.setting.docs', text: 'User guide: "{docs}".', note: "cw_read_setting: the user guide's section on it." }),
+  settingSame: agentMsg({ id: 'reply.setting.same', text: '{path}{hasProject, select, yes { ({project})} other {}} was already {value}: nothing changed.', note: 'cw_update_setting when the value was already so.' }),
+  settingChanged: agentMsg({ id: 'reply.setting.changed', text: "Changed {path}{hasProject, select, yes { in {project}} other {}} ({id}): {old} → {new}. {hasRestart, select, yes {It applies {restart}.} other {It applies now.}} The user can undo it in your panel's list.", note: "cw_update_setting's reply: what changed, old → new, and when it applies." }),
+  journalNoMatch: agentMsg({ id: 'reply.journal.noMatch', text: 'No entries match "{query}".', note: 'cw_journal_recall with a query nothing matches (#1031).' }),
+  journalNone: agentMsg({ id: 'reply.journal.none', text: 'No entries.', note: 'cw_journal_recall with no entries.' }),
   markEssential: agentMsg({ id: 'reply.journal.mark.essential', text: 'essential', note: "A journal entry's mark: importance 3." }),
   markImportant: agentMsg({ id: 'reply.journal.mark.important', text: 'important', note: "A journal entry's mark: importance 2." }),
-  markByHive: agentMsg({ id: 'reply.journal.mark.byHive', text: 'by Hive', note: "A journal entry's mark: Hive recorded it." }),
+  markByHive: agentMsg({ id: 'reply.journal.mark.byHive', text: 'by Combwork', note: "A journal entry's mark: Hive recorded it." }),
   markDetail: agentMsg({ id: 'reply.journal.mark.detail', text: 'detail', note: "A journal entry's mark: it has detail (hive_journal_get reads it)." }),
   markSuperseded: agentMsg({ id: 'reply.journal.mark.superseded', text: 'superseded by #{id}', note: "A journal entry's mark: the entry that superseded it." }),
-  journalHead: agentMsg({ id: 'reply.journal.head', text: '#{id} {kind}{hasProject, select, yes { · {project}} other {}}, {at}{byHive, select, yes {, by Hive} other {}}, importance {importance}{changed, select, yes {, changed {updatedAt}} other {}}', note: "A journal entry in full: its id, kind, project, when, who recorded it, its importance and when it changed." }),
+  journalHead: agentMsg({ id: 'reply.journal.head', text: '#{id} {kind}{hasProject, select, yes { · {project}} other {}}, {at}{byHive, select, yes {, by Combwork} other {}}, importance {importance}{changed, select, yes {, changed {updatedAt}} other {}}', note: "A journal entry in full: its id, kind, project, when, who recorded it, its importance and when it changed." }),
   journalWhy: agentMsg({ id: 'reply.journal.why', text: 'Why: {why}', note: "A journal entry's why." }),
   journalDigest: agentMsg({ id: 'reply.journal.digest', text: 'Digest of {of}.', note: 'A journal entry that digests others.' }),
   journalLinks: agentMsg({ id: 'reply.journal.links', text: 'Links: {links}', note: "A journal entry's links (type and ref)." }),
@@ -193,61 +193,61 @@ const R = {
   slotFree: agentMsg({ id: 'reply.slot.free', text: 'it is free', note: 'Who holds a merge slot: nobody.' }),
   slotNotHeld: agentMsg({ id: 'reply.slot.notHeld', text: "You don't hold the merge slot for {branch} ({holder}).", note: "A release of a slot the agent doesn't hold, and who does." }),
   slotStatus: agentMsg({ id: 'reply.slot.status', text: 'Merge slot for {branch}: {line}{hasWaiting, select, yes {; waiting: {waiting}} other {}}.', note: "A merge slot's status: who holds it, for how long, and who waits." }),
-  consoleNone: agentMsg({ id: 'reply.console.none', text: 'No developer console sources you can read.', note: 'hive_console (#636) with no sources.' }),
-  consoleRow: agentMsg({ id: 'reply.console.row', text: '{label}{hasProvider, select, yes { ({provider})} other {}}: {capturing, select, yes {captured, {events} events} other {not captured}} [{args}]', note: 'A developer console source: its label, its provider, whether an open console captures it, and the arguments hive_console takes for it.' }),
-  consoleMore: agentMsg({ id: 'reply.console.more', text: 'Sources {from}–{to} of {total}: offset={to} for more.', note: 'hive_console sources, one page: which, and the offset for more.' }),
-  consoleNotCaptured: agentMsg({ id: 'reply.console.notCaptured', text: "not captured: the developer console isn't open on it (Hive captures only while the user has it open), so there is nothing to read.", note: 'A read of a source no open console captures: there is nothing to read, and why.' }),
+  consoleNone: agentMsg({ id: 'reply.console.none', text: 'No developer console sources you can read.', note: 'cw_console (#636) with no sources.' }),
+  consoleRow: agentMsg({ id: 'reply.console.row', text: '{label}{hasProvider, select, yes { ({provider})} other {}}: {capturing, select, yes {captured, {events} events} other {not captured}} [{args}]', note: 'A developer console source: its label, its provider, whether an open console captures it, and the arguments cw_console takes for it.' }),
+  consoleMore: agentMsg({ id: 'reply.console.more', text: 'Sources {from}–{to} of {total}: offset={to} for more.', note: 'cw_console sources, one page: which, and the offset for more.' }),
+  consoleNotCaptured: agentMsg({ id: 'reply.console.notCaptured', text: "not captured: the developer console isn't open on it (Combwork captures only while the user has it open), so there is nothing to read.", note: 'A read of a source no open console captures: there is nothing to read, and why.' }),
   consoleGone: agentMsg({ id: 'reply.console.gone', text: 'Not in its buffer now: {events}.', note: 'Events asked for in full that are no longer kept.' }),
   consoleNoEvents: agentMsg({ id: 'reply.console.noEvents', text: '{label}: captured by the open console; no events{hasNewest, select, yes { after #{newest}} other { yet}}.', note: 'A read with no events (after the one given).' }),
   consoleCut: agentMsg({ id: 'reply.console.cut', text: '[cut]', note: "A console event's mark: its summary was cut." }),
   consoleNewer: agentMsg({ id: 'reply.console.newer', text: '{n} more after these.', note: 'A read of events: how many more after these.' }),
   consoleOlder: agentMsg({ id: 'reply.console.older', text: '{n} earlier not shown.', note: 'A read of events: how many earlier ones are not shown.' }),
-  consoleNext: agentMsg({ id: 'reply.console.next', text: "Next: since={newest}. seq=[n] gives an event's raw payload and what Hive made of it.", note: 'A read of events: the since for the next one, and how to read one in full.' }),
+  consoleNext: agentMsg({ id: 'reply.console.next', text: "Next: since={newest}. seq=[n] gives an event's raw payload and what Combwork made of it.", note: 'A read of events: the since for the next one, and how to read one in full.' }),
   queuePaused: agentMsg({ id: 'reply.queue.paused', text: 'paused ({reason}{by, select, user {, by the user} assistant {, by the Assistant} other {}}{hasCard, select, yes {, at {card}} other {}}{hasFiles, select, yes {: {files}} other {}})', note: "A merge queue's state (#1353): paused, why, by whom, at which card and on which files." }),
   queueRunBy: agentMsg({ id: 'reply.queue.runBy', text: 'run by {by}', note: "A merge queue's state: another Hive runs it." }),
   queueRunning: agentMsg({ id: 'reply.queue.running', text: 'running', note: "A merge queue's state: running." }),
   queueEmpty: agentMsg({ id: 'reply.queue.empty', text: 'empty', note: "A merge queue's state: nothing in it." }),
-  queueHead: agentMsg({ id: 'reply.queue.head', text: 'Merge queue for {target} in {project}: {state}.', note: "hive_queue list's line for a target's queue." }),
+  queueHead: agentMsg({ id: 'reply.queue.head', text: 'Merge queue for {target} in {project}: {state}.', note: "cw_queue list's line for a target's queue." }),
   queueHow: agentMsg({ id: 'reply.queue.how', text: "to {purpose}, in the {place, select, project {project folder} other {target's folder}}: {command}", note: "A merge queue stopped part way (#1351): a command that settles it, what for and where to run it. Joined by \"; \", its first letter made a capital." }),
   queueFilesMore: agentMsg({ id: 'reply.queue.filesMore', text: '{files}, {n} more', note: 'A list cut short (files, processes): those shown, and how many more.' }),
   queueStuck: agentMsg({ id: 'reply.queue.stuck', text: 'Stopped part way ({phase}): {hasBranch, select, yes {the folder is on {branch}} other {the folder has no branch}}, {target} at {ref} (expected {expected}, result {result}){hasFiles, select, yes {; files {files}} other {}}.', note: 'An advance into the checked-out target left part way (#1351): where it stands; how to settle it follows.' }),
   queueTesting: agentMsg({ id: 'reply.queue.testing', text: 'Testing: {key} {title} at {revision}{hasStep, select, yes { ({step})} other {}}.', note: 'The entry the merge queue is testing, and its step.' }),
   queueQueued: agentMsg({ id: 'reply.queue.queued', text: 'Queued: {entries}{hasMore, select, yes {; {more} more} other {}}.', note: 'The entries waiting in the merge queue, in order.' }),
-  queueMerged: agentMsg({ id: 'reply.queue.merged', text: '{key} merged ({result}{outside, select, yes {, outside Hive} other {}})', note: 'A recent outcome of the merge queue: merged, at which commit.' }),
+  queueMerged: agentMsg({ id: 'reply.queue.merged', text: '{key} merged ({result}{outside, select, yes {, outside Combwork} other {}})', note: 'A recent outcome of the merge queue: merged, at which commit.' }),
   queueReturned: agentMsg({ id: 'reply.queue.returned', text: '{key} returned ({reason}{transient, select, yes {, transient} other {}}{hasFiles, select, yes {: {files}} other {}})', note: 'A recent outcome of the merge queue: returned, why, and its files.' }),
   queueCancelled: agentMsg({ id: 'reply.queue.cancelled', text: '{key} cancelled ({reason})', note: 'A recent outcome of the merge queue: cancelled, why.' }),
   queueRecent: agentMsg({ id: 'reply.queue.recent', text: 'Recent: {outcomes}.', note: "The merge queue's latest outcomes, newest first." }),
-  queuesNone: agentMsg({ id: 'reply.queue.none', text: 'No merge queue in {project}: no card has been queued, and none is paused.', note: 'hive_queue list with no queue.' }),
+  queuesNone: agentMsg({ id: 'reply.queue.none', text: 'No merge queue in {project}: no card has been queued, and none is paused.', note: 'cw_queue list with no queue.' }),
   queueStillPaused: agentMsg({ id: 'reply.queue.stillPaused', text: 'Still paused: its cause is still there. {queue}', note: 'Resume while the cause is still there: the queue as it is now.' }),
-  teamNotPaused: agentMsg({ id: 'reply.team.notPaused', text: 'The team is not paused.', note: 'hive_team (HI-2081): not paused.' }),
-  teamParked: agentMsg({ id: 'reply.team.parked', text: 'The team is paused (by {by}) and parked.', note: 'hive_team: paused and parked.' }),
-  teamPaused: agentMsg({ id: 'reply.team.paused', text: 'The team is paused (by {by}), not parked yet: {n} still running or unchecked.', note: 'hive_team: paused, not parked yet.' }),
+  teamNotPaused: agentMsg({ id: 'reply.team.notPaused', text: 'The team is not paused.', note: 'cw_team (HI-2081): not paused.' }),
+  teamParked: agentMsg({ id: 'reply.team.parked', text: 'The team is paused (by {by}) and parked.', note: 'cw_team: paused and parked.' }),
+  teamPaused: agentMsg({ id: 'reply.team.paused', text: 'The team is paused (by {by}), not parked yet: {n} still running or unchecked.', note: 'cw_team: paused, not parked yet.' }),
   theUser: agentMsg({ id: 'reply.team.theUser', text: 'the user', note: 'Who paused the team, where none is named.' }),
-  teamSafe: agentMsg({ id: 'reply.team.safe', text: 'Safe to install: {safe, select, yes {yes} other {no}}.', note: 'hive_team: whether it is safe to install an update now.' }),
-  teamHive: agentMsg({ id: 'reply.team.hive', text: 'Hive', note: "What still runs that isn't an agent's: Hive's own." }),
-  teamUnchecked: agentMsg({ id: 'reply.team.unchecked', text: "(can't be checked)", note: 'hive_team: what still runs whose state is unknown.' }),
-  teamMore: agentMsg({ id: 'reply.team.more', text: '…and {n} more.', note: 'hive_team cut at 200 rows.' }),
-  releaseNone: agentMsg({ id: 'reply.release.none', text: 'Nothing to release in {project}: no slot is kept for an agent, and no ended run holds one.', note: 'hive_release_slot list (#1561) with nothing to release.' }),
-  releaseCarried: agentMsg({ id: 'reply.release.carried', text: '{slot}: kept for {agent} (kind carried).', note: 'hive_release_slot list: a slot kept for an agent (kind is what release takes).' }),
-  releaseProcs: agentMsg({ id: 'reply.release.processes', text: 'Its run left running: {processes} (end: true ends them first).', note: "hive_release_slot list: a held writer's processes still running." }),
-  releaseUnknown: agentMsg({ id: 'reply.release.unknown', text: "Hive doesn't know which of its processes still run.", note: "hive_release_slot list: a held writer's processes are not known." }),
-  releaseHeld: agentMsg({ id: 'reply.release.held', text: '{slot}: held by {agent}\'s ended run {run}, its Hive {hive} (kind writer, confirm \'{\'"slot":"{slot}","run":"{run}"\'}\').', note: 'hive_release_slot list: a slot held by an ended run, and the confirm release takes (JSON: keep it as it is).' }),
-  releasedCarried: agentMsg({ id: 'reply.release.releasedCarried', text: 'Released {slot} in {project}: no longer kept for {agent}; its folder and branch stay.', note: 'hive_release_slot release of a carried slot.' }),
-  releasedWriter: agentMsg({ id: 'reply.release.releasedWriter', text: "Released {slot} in {project}: {agent}'s ended run no longer holds it{ended, select, yes {, its listed processes ended first} other {}}.", note: "hive_release_slot release of a writer's slot." }),
+  teamSafe: agentMsg({ id: 'reply.team.safe', text: 'Safe to install: {safe, select, yes {yes} other {no}}.', note: 'cw_team: whether it is safe to install an update now.' }),
+  teamHive: agentMsg({ id: 'reply.team.hive', text: 'Combwork', note: "What still runs that isn't an agent's: Hive's own." }),
+  teamUnchecked: agentMsg({ id: 'reply.team.unchecked', text: "(can't be checked)", note: 'cw_team: what still runs whose state is unknown.' }),
+  teamMore: agentMsg({ id: 'reply.team.more', text: '…and {n} more.', note: 'cw_team cut at 200 rows.' }),
+  releaseNone: agentMsg({ id: 'reply.release.none', text: 'Nothing to release in {project}: no slot is kept for an agent, and no ended run holds one.', note: 'cw_release_slot list (#1561) with nothing to release.' }),
+  releaseCarried: agentMsg({ id: 'reply.release.carried', text: '{slot}: kept for {agent} (kind carried).', note: 'cw_release_slot list: a slot kept for an agent (kind is what release takes).' }),
+  releaseProcs: agentMsg({ id: 'reply.release.processes', text: 'Its run left running: {processes} (end: true ends them first).', note: "cw_release_slot list: a held writer's processes still running." }),
+  releaseUnknown: agentMsg({ id: 'reply.release.unknown', text: "Combwork doesn't know which of its processes still run.", note: "cw_release_slot list: a held writer's processes are not known." }),
+  releaseHeld: agentMsg({ id: 'reply.release.held', text: '{slot}: held by {agent}\'s ended run {run}, its Combwork {hive} (kind writer, confirm \'{\'"slot":"{slot}","run":"{run}"\'}\').', note: 'cw_release_slot list: a slot held by an ended run, and the confirm release takes (JSON: keep it as it is).' }),
+  releasedCarried: agentMsg({ id: 'reply.release.releasedCarried', text: 'Released {slot} in {project}: no longer kept for {agent}; its folder and branch stay.', note: 'cw_release_slot release of a carried slot.' }),
+  releasedWriter: agentMsg({ id: 'reply.release.releasedWriter', text: "Released {slot} in {project}: {agent}'s ended run no longer holds it{ended, select, yes {, its listed processes ended first} other {}}.", note: "cw_release_slot release of a writer's slot." }),
   context200k: agentMsg({ id: 'reply.connection.context200k', text: '200K', note: "A connection's value: the 200K context window." }),
   connectionArgs: agentMsg({ id: 'reply.connection.args', text: 'args {args}', note: "A connection's extra arguments for its CLI." }),
   cliDefaults: agentMsg({ id: 'reply.connection.cliDefaults', text: "the CLI's defaults", note: 'A connection with no values of its own.' }),
-  connectionRow: agentMsg({ id: 'reply.connection.row', text: '{name} (id {id}) on {account}, {cli}: {values}{unusable, select, yes {. Not usable here: its account is off} other {}}', note: 'hive_connection list (HI-2108): a connection, its account and CLI, its values, and whether it is usable here.' }),
+  connectionRow: agentMsg({ id: 'reply.connection.row', text: '{name} (id {id}) on {account}, {cli}: {values}{unusable, select, yes {. Not usable here: its account is off} other {}}', note: 'cw_connection list (HI-2108): a connection, its account and CLI, its values, and whether it is usable here.' }),
   unknownCli: agentMsg({ id: 'reply.connection.unknownCli', text: 'unknown CLI', note: "A connection whose CLI isn't known." }),
-  accountBare: agentMsg({ id: 'reply.connection.accountBare', text: 'Account {name} (id {id}), {cli}: no connections{off, select, yes {, off here} other {}}', note: 'hive_connection list: an account with no connections.' }),
-  connectionsNone: agentMsg({ id: 'reply.connection.none', text: 'No connections: the user adds an account in Settings → Accounts & Connections.', note: 'hive_connection list with none.' }),
+  accountBare: agentMsg({ id: 'reply.connection.accountBare', text: 'Account {name} (id {id}), {cli}: no connections{off, select, yes {, off here} other {}}', note: 'cw_connection list: an account with no connections.' }),
+  connectionsNone: agentMsg({ id: 'reply.connection.none', text: 'No connections: the user adds an account in Settings → Accounts & Connections.', note: 'cw_connection list with none.' }),
   usageLimit: agentMsg({ id: 'reply.usage.limit', text: '{label} {percent}%{hasReset, select, yes { (resets {at}Z)} other {}}', note: "An account's limit (HI-2195): its share used and when it resets (UTC)." }),
   usageMove: agentMsg({ id: 'reply.usage.move', text: 'moves its agents to {to} at {percent}% of {limit, select, weekly {the weekly limit} fiveHour {the 5-hour limit} other {either limit}}', note: "An account's usage move (HI-2195): where its agents move, at what share of which limit." }),
   usageNoFigures: agentMsg({ id: 'reply.usage.noFigures', text: 'no figures yet', note: 'An account with no usage figures yet.' }),
-  usage: agentMsg({ id: 'reply.usage.line', text: 'Usage of {account}: {usage}', note: "hive_connection list's line for an account's usage (joined by \"; \")." }),
-  connectionChanged: agentMsg({ id: 'reply.connection.changed', text: '{verb, select, Changed {Changed} other {Made}} {name} (id {id}) on {account}: {values}.{verb, select, Changed { Running agents on it take it when restarted.} other {}}', note: 'hive_connection add or update (HI-2108): what it is now.' }),
-  templatesNone: agentMsg({ id: 'reply.template.none', text: 'No templates for {project}.', note: 'hive_template list (HI-1502) with none.' }),
-  templateRow: agentMsg({ id: 'reply.template.row', text: "{name} (scope {scope}{hasFrom, select, yes {, from {from}} other {}}, file {file}): {agents} agents{hasWorkflow, select, yes {, workflow for {workflow}} other {}}{hasProblem, select, yes {. Can't be used: {problem}} other {}}", note: 'hive_template list: a template, what load needs to name it (scope, from and file), its agents and workflow, and why it can\'t be used.' }),
+  usage: agentMsg({ id: 'reply.usage.line', text: 'Usage of {account}: {usage}', note: "cw_connection list's line for an account's usage (joined by \"; \")." }),
+  connectionChanged: agentMsg({ id: 'reply.connection.changed', text: '{verb, select, Changed {Changed} other {Made}} {name} (id {id}) on {account}: {values}.{verb, select, Changed { Running agents on it take it when restarted.} other {}}', note: 'cw_connection add or update (HI-2108): what it is now.' }),
+  templatesNone: agentMsg({ id: 'reply.template.none', text: 'No templates for {project}.', note: 'cw_template list (HI-1502) with none.' }),
+  templateRow: agentMsg({ id: 'reply.template.row', text: "{name} (scope {scope}{hasFrom, select, yes {, from {from}} other {}}, file {file}): {agents} agents{hasWorkflow, select, yes {, workflow for {workflow}} other {}}{hasProblem, select, yes {. Can't be used: {problem}} other {}}", note: 'cw_template list: a template, what load needs to name it (scope, from and file), its agents and workflow, and why it can\'t be used.' }),
   wfGitOnly: agentMsg({ id: 'reply.template.wf.gitOnly', text: 'Its workflow is for Git only and this project has no version control.', note: "A template's workflow that can't apply: Git only." }),
   wfDropped: agentMsg({ id: 'reply.template.wf.dropped', text: "Its workflow ({platforms}) can't be used here.", note: "A template's workflow that can't apply here." }),
   wfChanges: agentMsg({ id: 'reply.template.wf.changes', text: '{n} options {will, select, yes {change} other {changed}} ({changes})', note: "A template's workflow: how many options it changes (or changed), each old → new." }),
@@ -257,27 +257,27 @@ const R = {
   wfNotSaved: agentMsg({ id: 'reply.template.wf.notSaved', text: 'Workflow not saved: {why}', note: "A load's workflow not saved, and why." }),
   wfNone: agentMsg({ id: 'reply.template.wf.none', text: 'it has none for this project', note: "Why a load's workflow wasn't saved, where none is given." }),
   wfLine: agentMsg({ id: 'reply.template.wf.line', text: '{head}{hasMissing, select, yes {; checks with no command here (set them in Version Control): {commands}} other {}}{identityOff, select, yes {; identity stays off (no git identity here)} other {}}.{keep, select, yes { Lanes and cards in flight keep their rules.} other {}}', note: "A template's workflow in a plan's or a load's reply: what it changes, checks with no command, the identity left off." }),
-  planAgent: agentMsg({ id: 'reply.template.planAgent', text: '{name}{renamed, select, yes { ({template})} other {}} {role}{paired, select, yes { with {pairedWith}} other {}} on {connection}', note: "hive_template plan: an agent it would create, its template's name, its role, who it pairs with and its connection." }),
+  planAgent: agentMsg({ id: 'reply.template.planAgent', text: '{name}{renamed, select, yes { ({template})} other {}} {role}{paired, select, yes { with {pairedWith}} other {}} on {connection}', note: "cw_template plan: an agent it would create, its template's name, its role, who it pairs with and its connection." }),
   noConnection: agentMsg({ id: 'reply.template.noConnection', text: 'no connection', note: 'An agent a plan would create with no connection.' }),
   noAgents: agentMsg({ id: 'reply.template.noAgents', text: 'no agents', note: 'A plan or load that removes no agents.' }),
-  planHead: agentMsg({ id: 'reply.template.planHead', text: '"{name}" into {project}: removes {remove}; creates {create}.', note: 'hive_template plan (HI-1502): what loading would do.' }),
-  planTaken: agentMsg({ id: 'reply.template.taken', text: 'Taken: {names}.', note: 'hive_template plan: names taken, each with a free one.' }),
+  planHead: agentMsg({ id: 'reply.template.planHead', text: '"{name}" into {project}: removes {remove}; creates {create}.', note: 'cw_template plan (HI-1502): what loading would do.' }),
+  planTaken: agentMsg({ id: 'reply.template.taken', text: 'Taken: {names}.', note: 'cw_template plan: names taken, each with a free one.' }),
   planTakenOne: agentMsg({ id: 'reply.template.takenOne', text: '{name} ({project}\'s): try "{suggestion}"', note: "A name taken by another project's agent, and a free one." }),
-  planOptions: agentMsg({ id: 'reply.template.options', text: 'Connections here: {connections}.', note: 'hive_template plan: the connections the agents can take.' }),
-  planBlocked: agentMsg({ id: 'reply.template.blocked', text: "Can't load yet: {why}", note: 'hive_template plan: what stops the load.' }),
-  loadRenamed: agentMsg({ id: 'reply.template.renamed', text: '{template} named {name}', note: 'hive_template load: an agent given another name than its template\'s.' }),
-  loadOn: agentMsg({ id: 'reply.template.on', text: 'On: {connections}.', note: 'hive_template load: the connections its agents got.' }),
-  loaded: agentMsg({ id: 'reply.template.loaded', text: 'Loaded "{name}" into {project}: removed {removed}; created {created}{renamed}.{on}{workflow} hive_undo can put the agents and options back.', note: 'hive_template load (HI-1502): what was loaded, names given, and its workflow saved or why not.' }),
-  appliedNone: agentMsg({ id: 'reply.template.appliedNone', text: 'no agent changed (each already on it)', note: 'hive_template apply (HI-2109) that changed no agent.' }),
-  appliedRestart: agentMsg({ id: 'reply.template.appliedRestart', text: 'Running on the old one until restarted: {agents}.', note: 'hive_template apply: agents that keep the old connection until restarted.' }),
-  appliedSkipped: agentMsg({ id: 'reply.template.appliedSkipped', text: 'Skipped: {agents}.', note: 'hive_template apply: agents skipped, each with why.' }),
-  applied: agentMsg({ id: 'reply.template.applied', text: 'Connections in {project}: {changed}.{restart}{skipped}{undo, select, yes { hive_undo can put them back.} other {}}', note: 'hive_template apply (HI-2109): who got which connection, who to restart, who was skipped.' }),
+  planOptions: agentMsg({ id: 'reply.template.options', text: 'Connections here: {connections}.', note: 'cw_template plan: the connections the agents can take.' }),
+  planBlocked: agentMsg({ id: 'reply.template.blocked', text: "Can't load yet: {why}", note: 'cw_template plan: what stops the load.' }),
+  loadRenamed: agentMsg({ id: 'reply.template.renamed', text: '{template} named {name}', note: 'cw_template load: an agent given another name than its template\'s.' }),
+  loadOn: agentMsg({ id: 'reply.template.on', text: 'On: {connections}.', note: 'cw_template load: the connections its agents got.' }),
+  loaded: agentMsg({ id: 'reply.template.loaded', text: 'Loaded "{name}" into {project}: removed {removed}; created {created}{renamed}.{on}{workflow} cw_undo can put the agents and options back.', note: 'cw_template load (HI-1502): what was loaded, names given, and its workflow saved or why not.' }),
+  appliedNone: agentMsg({ id: 'reply.template.appliedNone', text: 'no agent changed (each already on it)', note: 'cw_template apply (HI-2109) that changed no agent.' }),
+  appliedRestart: agentMsg({ id: 'reply.template.appliedRestart', text: 'Running on the old one until restarted: {agents}.', note: 'cw_template apply: agents that keep the old connection until restarted.' }),
+  appliedSkipped: agentMsg({ id: 'reply.template.appliedSkipped', text: 'Skipped: {agents}.', note: 'cw_template apply: agents skipped, each with why.' }),
+  applied: agentMsg({ id: 'reply.template.applied', text: 'Connections in {project}: {changed}.{restart}{skipped}{undo, select, yes { cw_undo can put them back.} other {}}', note: 'cw_template apply (HI-2109): who got which connection, who to restart, who was skipped.' }),
   tellsCheckpoints: agentMsg({ id: 'reply.message.tells.checkpoints', text: 'at its next tool call', note: 'How Hive tells an agent of a message (#1432): at its next tool call.' }),
   tellsStop: agentMsg({ id: 'reply.message.tells.stopContinuation', text: "at its turn's end", note: "How Hive tells an agent of a message: at its turn's end." }),
   tellsIdle: agentMsg({ id: 'reply.message.tells.idleWakes', text: 'once it is idle', note: 'How Hive tells an agent of a message: once it is idle.' }),
-  tells: agentMsg({ id: 'reply.message.tells', text: 'Hive tells it {ways}', note: 'hive_message_agent (#1497): how Hive tells the agent of the message (joined with reply.list.or).' }),
-  inboxWaits: agentMsg({ id: 'reply.message.inbox', text: 'it waits in its inbox until it reads it with hive_inbox (the user can Deliver Now)', note: 'hive_message_agent with no carrying-on switch on: the message waits in its inbox.' }),
-  queued: agentMsg({ id: 'reply.message.queued', text: 'Queued for {who} ({id}{tied}, {status}): {how}; {queued} waiting. hive_agent_activity says when it is received and acked.', note: "hive_message_agent's reply for a message queued (#1497)." })
+  tells: agentMsg({ id: 'reply.message.tells', text: 'Combwork tells it {ways}', note: 'cw_message_agent (#1497): how Hive tells the agent of the message (joined with reply.list.or).' }),
+  inboxWaits: agentMsg({ id: 'reply.message.inbox', text: 'it waits in its inbox until it reads it with cw_inbox (the user can Deliver Now)', note: 'cw_message_agent with no carrying-on switch on: the message waits in its inbox.' }),
+  queued: agentMsg({ id: 'reply.message.queued', text: 'Queued for {who} ({id}{tied}, {status}): {how}; {queued} waiting. cw_agent_activity says when it is received and acked.', note: "cw_message_agent's reply for a message queued (#1497)." })
 } as const
 
 const yn = (b: unknown): 'yes' | 'no' => (b ? 'yes' : 'no')
@@ -285,11 +285,11 @@ const yn = (b: unknown): 'yes' | 'no' => (b ? 'yes' : 'no')
 const joined = (items: readonly string[], m: AgentMsg): string => items.reduce((a, b) => say(m, { a, b }))
 
 /** A running agent's CLI's own default, where its launch gave none and it hasn't said (HI-1996). */
-// agent-protocol: a model or effort value in hive_agent_activity's JSON, the CLI's default
+// agent-protocol: a model or effort value in cw_agent_activity's JSON, the CLI's default
 export const CLI_DEFAULT = 'default'
 
 /**
- * The model and effort a running agent uses (HI-1996, hive_agent_activity): what its CLI reports, else what its launch
+ * The model and effort a running agent uses (HI-1996, cw_agent_activity): what its CLI reports, else what its launch
  * gave it (after the agent's, project's and connection's choices), else its CLI's default. Null: not running.
  */
 export function modelInUse(st: Pick<LiveSessionState, 'modelId' | 'modelName' | 'effort' | 'launchedWith'> | null | undefined): { model: string; effort: string } | null {
@@ -297,7 +297,7 @@ export function modelInUse(st: Pick<LiveSessionState, 'modelId' | 'modelName' | 
   return { model: st.modelId || st.modelName || st.launchedWith?.model || CLI_DEFAULT, effort: st.effort || st.launchedWith?.effort || CLI_DEFAULT }
 }
 
-/** A launch's retry waits as hive_agent_activity gives them (HI-1996); `latest.ongoing`: it waits now. */
+/** A launch's retry waits as cw_agent_activity gives them (HI-1996); `latest.ongoing`: it waits now. */
 export interface RetryWaitsView {
   waits: number
   seconds: number
@@ -469,7 +469,7 @@ export function commentsParam(raw: string | null): number | null | { error: stri
 }
 
 /**
- * hive_read_task's query for GET /v1/tasks/{n} (HI-2412): `comments` passes through whenever it is given, 0 included (0
+ * cw_read_task's query for GET /v1/tasks/{n} (HI-2412): `comments` passes through whenever it is given, 0 included (0
  * reads none of them), so the API answers it or says what's wrong with it, never falling back to every comment.
  */
 export function readTaskQuery(a: { history?: unknown; comments?: unknown; summary?: unknown; attachments?: unknown }): string {
@@ -569,12 +569,12 @@ export interface Refused {
 export const refusedText = (r: Refused): string => [`${r.message} (${r.rule})`, r.next, ...(r.change ? [r.change] : []), ...(r.warnings ?? []).map((warning) => say(R.warning, { warning }))].join('\n')
 
 // agent-protocol: intent names and the hive tools that take them
-export const INTENT_TOOL: Record<string, string> = { start: 'hive_start_card', submit: 'hive_submit', verdict: 'hive_verdict', 'report merge': 'hive_report_merge', 'put back': 'hive_put_back', 'start review': 'hive_start_review' }
+export const INTENT_TOOL: Record<string, string> = { start: 'cw_start_card', submit: 'cw_submit', verdict: 'cw_verdict', 'report merge': 'cw_report_merge', 'put back': 'cw_put_back', 'start review': 'cw_start_review' }
 
 /** At most this many of a list in an intent's reply (start review's files): the rest counted. */
 const INTENT_LIST_MAX = 20
 
-/** "HI-12: active → review. revision: 3f2a…; base: 9c1d… Next on it: hive_start_review or hive_verdict." and a line per warning. */
+/** "HI-12: active → review. revision: 3f2a…; base: 9c1d… Next on it: cw_start_review or cw_verdict." and a line per warning. */
 export function intentText(d: IntentDone): string {
   const where = d.from && d.to ? (d.from === d.to ? say(R.intentStill, { stage: d.to }) : `${d.from} → ${d.to}`) : say(R.intentDone)
   // A list's item: a changed file as git's letter and its path ("M greet.js", #1444: start review's files read
@@ -621,7 +621,7 @@ export interface ChangeGroupListed {
   changes: ChangeListed[]
 }
 
-/** The most changes of one message hive_undo lists before counting the rest. */
+/** The most changes of one message cw_undo lists before counting the rest. */
 const UNDO_LIST_MAX = 40
 
 /**
@@ -694,7 +694,7 @@ export interface TaskBatch {
   changed: TaskChange[]
   /**
    * `ref`: a key no card has (its number 0), as it was given. A refusal by the card's rules has its `rule`, `next` step
-   * and `change` (who can change the rule), as hive_update_task's refusal does (HI-2238); `error` is then its message.
+   * and `change` (who can change the rule), as cw_update_task's refusal does (HI-2238); `error` is then its message.
    */
   refused: { number: number; ref?: string; error: string; rule?: string; next?: string; change?: string }[]
   /** How its text names the cards refused (#1219), by number (namesOf). */
@@ -709,7 +709,7 @@ function batchLines(b: TaskBatch): string {
   for (const c of b.changed) lines.push(changedText(c))
   const plain = b.refused.filter((r) => !r.rule)
   if (plain.length) lines.push(say(R.batchRefused, { list: plain.map((r) => (r.ref ? r.error : `${cardRef(r.number)} (${r.error})`)).join('; ') }))
-  // Refused by its rules: as hive_update_task's refusal reads (the message, its rule, the next step, who can change it),
+  // Refused by its rules: as cw_update_task's refusal reads (the message, its rule, the next step, who can change it),
   // named by its card first where its message doesn't name it ("{revision} was already reviewed.").
   for (const r of b.refused) {
     if (!r.rule) continue
@@ -736,7 +736,7 @@ export interface LaneHolding {
 /**
  * HI-2267: put back or reordered on the board, a lane's card is still where its lane's own list has it, and the lane
  * takes it again in that order. The Assistant, calling the tools without a skill, reordered the column and was told
- * nothing of it. "AL-1 is on Coder's lane (lane-3f2a), which keeps its own order: to change it, hive_lane start…".
+ * nothing of it. "AL-1 is on Coder's lane (lane-3f2a), which keeps its own order: to change it, cw_lane start…".
  */
 export function laneOrderNote(l: LaneHolding): string {
   const one = l.cards.length === 1
@@ -844,7 +844,7 @@ export function projectListText(rows: ProjectRow[]): string {
 }
 
 /**
- * hive_project_status: GET /v1/projects/{id} without what its settings only repeat or keep for Hive's own bookkeeping
+ * cw_project_status: GET /v1/projects/{id} without what its settings only repeat or keep for Hive's own bookkeeping
  * (HI-1712): `lastPath` (its `path`), the file's `version` and `stepsDone` (one-time steps already taken).
  */
 export function projectStatusReply(p: unknown): unknown {
@@ -898,7 +898,7 @@ const headingLine = (h: DocHeadingRow): string => `${'  '.repeat(h.level - 1)}${
 
 /**
  * A document's outline: its headings down to `depth` (all by default), at most MAX_ROWS, each with its slug (what
- * hive_read_section takes) and its section's size in characters, subsections included.
+ * cw_read_section takes) and its section's size in characters, subsections included.
  */
 export function docOutlineText(o: { path: string; size: number; headings: DocHeadingRow[] }, depth?: number): string {
   if (!o.headings.length) return say(R.outlineNone, { path: o.path, size: charsShort(o.size) })
@@ -973,9 +973,9 @@ export interface WaitChange {
 }
 
 /**
- * hive_wait_for_tasks, as the model gets it: a watch begun (end the turn), a condition already met, the changes (each
+ * cw_wait_for_tasks, as the model gets it: a watch begun (end the turn), a condition already met, the changes (each
  * card, where it is now, who changed it, the latest comment's author and first line), or no change; with `since` for the
- * next wait. Short: the full comment is hive_read_task with latestComment.
+ * next wait. Short: the full comment is cw_read_task with latestComment.
  */
 type WaitReply = { done?: string; unsubmitted?: UnsubmittedCard[]; idle?: number; watching?: string; limitAt?: string; already?: WaitChange; usageAlready?: string[]; changes?: WaitChange[]; timedOut?: boolean; since?: string; events?: string[]; replaced?: string; cards?: LaneWatchCards; agents?: LaneWatchAgents; lanesLeft?: string[]; names?: Record<string, string> }
 
@@ -1029,7 +1029,7 @@ function waitText(r: WaitReply): string {
 const lowerWaiting = (label: string): string => label.replace(/^Waiting/, 'waiting')
 
 /**
- * hive_wait_for_agents with wake or cancel (#416), as the model gets it: an agent watch begun (end the turn, and the card
+ * cw_wait_for_agents with wake or cancel (#416), as the model gets it: an agent watch begun (end the turn, and the card
  * watch it replaced), agents not working already (each and its state), or the cancel. The bounded wait replies as JSON.
  */
 export function agentWatchText(r: { done?: string; watching?: string; limitAt?: string; replaced?: string; dropped?: string[]; already?: string[]; lanesLeft?: string[] }): string {
@@ -1056,8 +1056,8 @@ export interface SettingRow {
 }
 
 /**
- * hive_list_settings: one line a setting, read-only ones marked; what each does only when a query narrowed them (a
- * title is enough to choose from among them all); hive_read_setting has the rest. Those set to inherit (most of a
+ * cw_list_settings: one line a setting, read-only ones marked; what each does only when a query narrowed them (a
+ * title is enough to choose from among them all); cw_read_setting has the rest. Those set to inherit (most of a
  * project's own, HI-1712) come last under one line saying so, each without its value.
  */
 export function settingListText(rows: SettingRow[], opts: { query?: string; offset?: number } = {}): string {
@@ -1112,7 +1112,7 @@ export function settingText(d: SettingDetail): string {
     .join('\n')
 }
 
-/** hive_update_setting's reply: what changed, old → new, and when it applies. */
+/** cw_update_setting's reply: what changed, old → new, and when it applies. */
 export function settingChangedText(c: { title: string; id: string; path: string; project?: string; changed?: boolean; old: string; new: string; restart?: string }): string {
   if (c.changed === false || (c.changed === undefined && c.old === c.new)) return say(R.settingSame, { path: c.path, hasProject: yn(c.project), project: c.project ?? '', value: c.new })
   return say(R.settingChanged, { path: c.path, hasProject: yn(c.project), project: c.project ?? '', id: c.id, old: c.old, new: c.new, hasRestart: yn(c.restart), restart: c.restart ?? '' })
@@ -1133,7 +1133,7 @@ export interface JournalRow {
   hasDetail: boolean
 }
 
-/** hive_journal_recall: "#12 2026-10-18 decision · hive: summary [important, detail]", newest or best first. */
+/** cw_journal_recall: "#12 2026-10-18 decision · hive: summary [important, detail]", newest or best first. */
 export function journalRecallText(rows: JournalRow[], query?: string): string {
   if (!rows.length) return query ? say(R.journalNoMatch, { query }) : say(R.journalNone)
   return rows
@@ -1216,7 +1216,7 @@ export interface ConsoleSourceRow {
   events: number
 }
 
-/** The arguments hive_console takes for a source, exactly as the listing gives them (JSON strings, so any name reads back). */
+/** The arguments cw_console takes for a source, exactly as the listing gives them (JSON strings, so any name reads back). */
 const consoleArgs = (r: ConsoleSourceRow): string =>
   Object.entries(r.select ?? {})
     .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
@@ -1266,7 +1266,7 @@ const QUEUE_SHOWN = 5
 const clip = (t: string, n: number): string => (t.length > n ? `${t.slice(0, n - 1)}…` : t)
 
 /**
- * A target's merge queue (#1353, hive_queue list) in a few lines: paused or running and by whom, the entry testing
+ * A target's merge queue (#1353, cw_queue list) in a few lines: paused or running and by whom, the entry testing
  * and its step, the entries waiting in order, the latest outcomes (newest first).
  */
 export function queueText(q: QueuePublic): string {
@@ -1301,7 +1301,7 @@ export function queueText(q: QueuePublic): string {
   return lines.join('\n')
 }
 
-/** Several targets' queues (hive_queue list), or why there are none. */
+/** Several targets' queues (cw_queue list), or why there are none. */
 export function queuesText(qs: QueuePublic[], project: string): string {
   if (!qs.length) return say(R.queuesNone, { project })
   return qs.map(queueText).join('\n')
@@ -1323,7 +1323,7 @@ export interface TeamPublic {
   others: string[]
 }
 
-/** hive_team: paused or not, parked or not, safe to install or not, then what still runs, a short row each. */
+/** cw_team: paused or not, parked or not, safe to install or not, then what still runs, a short row each. */
 export function teamText(t: TeamPublic): string {
   const by = t.pausedBy ?? say(R.theUser)
   const head = !t.paused ? say(R.teamNotPaused) : t.parked ? say(R.teamParked, { by }) : say(R.teamPaused, { by, n: t.running.length })
@@ -1344,7 +1344,7 @@ export interface ReleasablePublic {
 const PROCESSES_SHOWN = 5
 
 /**
- * hive_release_slot list (#1561): a line per carried slot and per held writer, each with what release needs (a writer's
+ * cw_release_slot list (#1561): a line per carried slot and per held writer, each with what release needs (a writer's
  * confirm, and its processes, which end: true ends first), or that there is none.
  */
 export function releasableText(r: ReleasablePublic): string {
@@ -1359,7 +1359,7 @@ export function releasableText(r: ReleasablePublic): string {
   return lines.join('\n')
 }
 
-/** hive_release_slot release (#1561): what was released. */
+/** cw_release_slot release (#1561): what was released. */
 export function slotReleasedText(r: { project: string; kind: 'carried' | 'writer'; slot: string; agent: string; ended?: boolean }): string {
   return r.kind === 'carried' ? say(R.releasedCarried, { slot: r.slot, project: r.project, agent: r.agent }) : say(R.releasedWriter, { slot: r.slot, project: r.project, agent: r.agent, ended: yn(r.ended) })
 }
@@ -1393,7 +1393,7 @@ export interface ConnectionPublic {
 const connectionValuesText = (c: ConnectionPublic): string => [c.model, c.effort, c.context200k ? say(R.context200k) : '', c.mode, c.extraArgs ? say(R.connectionArgs, { args: c.extraArgs }) : ''].filter(Boolean).join(' · ') || say(R.cliDefaults)
 
 /**
- * hive_connection list (HI-2108): one row per connection, by account, those not usable here marked; then the accounts with
+ * cw_connection list (HI-2108): one row per connection, by account, those not usable here marked; then the accounts with
  * none; then each account's plan usage and usage move (HI-2195).
  */
 export function connectionListText(r: { connections: ConnectionPublic[]; accounts: { id: string; name: string; cli: string; on?: boolean }[]; usage?: AccountUsagePublic[] }): string {
@@ -1409,19 +1409,19 @@ export interface AccountUsagePublic {
   move?: { percent: number; limit: 'weekly' | 'fiveHour' | 'any'; to: string }
 }
 
-/** hive_connection list's line for an account's usage (HI-2195): each limit's share and reset (UTC), and its usage move. */
+/** cw_connection list's line for an account's usage (HI-2195): each limit's share and reset (UTC), and its usage move. */
 export function accountUsageText(u: AccountUsagePublic): string {
   const limits = u.limits.map((l) => say(R.usageLimit, { label: l.label, percent: l.usedPercent, hasReset: yn(l.resetsAt), at: l.resetsAt ? new Date(l.resetsAt).toISOString().slice(0, 16) : '' })).join(', ')
   const move = u.move ? say(R.usageMove, { to: u.move.to, percent: u.move.percent, limit: u.move.limit }) : ''
   return say(R.usage, { account: u.account, usage: [limits || say(R.usageNoFigures), move].filter(Boolean).join('; ') })
 }
 
-/** hive_connection add or update (HI-2108): what it is now. `verb` chooses the wording (an id, not text). */
+/** cw_connection add or update (HI-2108): what it is now. `verb` chooses the wording (an id, not text). */
 export function connectionChangedText(verb: 'Made' | 'Changed', c: ConnectionPublic): string {
   return say(R.connectionChanged, { verb, name: c.name, id: c.id, account: c.account, values: connectionValuesText(c) })
 }
 
-/** hive_template list (HI-1502): a line per template, with what load needs to name it (scope and file, from). */
+/** cw_template list (HI-1502): a line per template, with what load needs to name it (scope and file, from). */
 export function templateListText(r: { project: string; templates: TemplateRowPublic[] }): string {
   if (!r.templates.length) return say(R.templatesNone, { project: r.project })
   return r.templates
@@ -1485,7 +1485,7 @@ function templateWorkflowText(w: TemplateWorkflowPublic | null, will: boolean): 
   return ` ${say(R.wfLine, { head, hasMissing: yn(w.missingCommands.length), commands: w.missingCommands.join(', '), identityOff: yn(w.identityOff), keep: yn(w.saved || will) })}`
 }
 
-/** hive_template plan (HI-1502): what loading would do, what stops it, names taken (with free ones) and its workflow. */
+/** cw_template plan (HI-1502): what loading would do, what stops it, names taken (with free ones) and its workflow. */
 export function templatePlanText(r: TemplatePlanPublic): string {
   const made = r.create.map((a) => say(R.planAgent, { name: a.name, renamed: yn(a.name !== a.template), template: a.template, role: a.role, paired: yn(a.pairedWith), pairedWith: a.pairedWith ?? '', connection: a.connection ?? say(R.noConnection) })).join(', ')
   const head = say(R.planHead, { name: r.template.name, project: r.project, remove: r.remove.length ? r.remove.join(', ') : say(R.noAgents), create: made })
@@ -1495,14 +1495,14 @@ export function templatePlanText(r: TemplatePlanPublic): string {
   return `${head}${taken}${options}${templateWorkflowText(r.workflow, true)}${blocked}`
 }
 
-/** hive_template load (HI-1502): what was loaded, names given, and its workflow saved or why not. */
+/** cw_template load (HI-1502): what was loaded, names given, and its workflow saved or why not. */
 export function templateLoadedText(r: TemplateLoadPublic): string {
   const renamed = r.renamed.length ? ` (${r.renamed.map((x) => say(R.loadRenamed, { template: x.template, name: x.name })).join(', ')})` : ''
   const conn = r.connections.length ? ` ${say(R.loadOn, { connections: r.connections.map((c) => `${c.name} ${c.connection}`).join(', ') })}` : ''
   return say(R.loaded, { name: r.template.name, project: r.project, removed: r.removed.length ? r.removed.join(', ') : say(R.noAgents), created: r.created.join(', '), renamed, on: conn, workflow: templateWorkflowText(r.workflow, false) })
 }
 
-/** hive_template apply (HI-2109): who got which connection, who to restart for it, who was skipped and why. */
+/** cw_template apply (HI-2109): who got which connection, who to restart for it, who was skipped and why. */
 export function connectionsAppliedText(r: ConnectionsAppliedPublic): string {
   const changed = r.changed.length ? `${r.changed.map((c) => `${c.name} → ${c.connection}`).join(', ')}` : say(R.appliedNone)
   const restart = r.restart.length ? ` ${say(R.appliedRestart, { agents: r.restart.join(', ') })}` : ''
@@ -1514,7 +1514,7 @@ export function connectionsAppliedText(r: ConnectionsAppliedPublic): string {
 const TELLS: Record<InboxSwitch, AgentMsg> = { checkpoints: R.tellsCheckpoints, stopContinuation: R.tellsStop, idleWakes: R.tellsIdle }
 
 /**
- * hive_message_agent's reply for a message queued (#1497): how Hive tells the agent of it, only by the switches on for it
+ * cw_message_agent's reply for a message queued (#1497): how Hive tells the agent of it, only by the switches on for it
  * (`tells`, in INBOX_SWITCHES' order), or, with none, that it waits in its inbox.
  */
 export function messageQueuedText(r: { who: string; id: string; tied: string; status: string; queued: number; tells: readonly InboxSwitch[] }): string {

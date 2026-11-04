@@ -1,3 +1,4 @@
+import { isReservedServerName } from '@shared/assistantTools'
 import { basename } from './util'
 import { call, errorMessage } from './api'
 import { agentLimit } from './advanced'
@@ -1232,7 +1233,7 @@ async function chooseServerName(o: { title: string; message: string; list: strin
       placeholder: tr(msg({ id: 'actions.mcp.namePlaceholder', defaultMessage: 'server-name', description: "Placeholder of the server's name box: an example name (lower case, a dash)." })),
       initial: name,
       confirmLabel: o.confirmLabel,
-      validate: (v) => (/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(v.trim()) && v.trim().toLowerCase() !== 'hive' ? null : tr(msg({ id: 'actions.mcp.badName', defaultMessage: 'Use letters, numbers, "-" and "_". "hive" is reserved.', description: "Why an MCP server's name can't be used. Keep \"hive\" as it is: it is the built-in server's name." })))
+      validate: (v) => (/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(v.trim()) && !isReservedServerName(v) ? null : tr(msg({ id: 'actions.mcp.badName', defaultMessage: 'Use letters, numbers, "-" and "_". "combwork" and "hive" are reserved.', description: "Why an MCP server's name can't be used. Keep \"combwork\" and \"hive\" as they are: the built-in server's name and its old one (HI-2463)." })))
     })
     if (!picked) return null
     name = picked.trim()

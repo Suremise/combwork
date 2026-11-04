@@ -4,12 +4,12 @@ import { firstLine, shortPath, toolLabel } from '../conversation'
 
 /**
  * The calls a Codex code-mode script made (HI-2240). In code mode (Codex 0.166) the model runs every tool from a script
- * (its `exec` tool): `tools.mcp__hive__hive_read_task(…)`, `tools.exec_command({cmd})`, `tools.apply_patch(…)`. Hive
+ * (its `exec` tool): `tools.mcp__combwork__cw_read_task(…)`, `tools.exec_command({cmd})`, `tools.apply_patch(…)`. Hive
  * shows the script as one tool, Script; Codex's rollout records each call the script made as it ends, an
  * `item_completed` event whose item is the call: McpToolCall (server, tool, arguments, status, result.content),
  * CommandExecution (command, aggregated_output, exit_code, status), FileChange (changes), ImageView (path), WebSearch
  * (query) or another kind (Extension…). Each becomes a transcript tool named as Hive names the same call made directly
- * (`hive · hive_read_task`, Shell, Edit, view_image), the Script's `calls`. The format belongs to Codex: the scenario
+ * (`hive · cw_read_task`, Shell, Edit, view_image), the Script's `calls`. The format belongs to Codex: the scenario
  * harness reads it the same way (tests/scenarios/codexScripts.cjs).
  */
 
@@ -65,19 +65,19 @@ export function scriptCall(item: Record<string, any>, root: string | null): Tran
       const code = typeof item.exit_code === 'number' ? item.exit_code : null
       const done = item.status === 'completed' || item.status === 'failed' || code !== null
       const cwd = cwdOf(item.cwd)
-      return { ...base, name: 'Shell', summary: firstLine(cmd).slice(0, 200), input: cmd, result: done ? String(item.aggregated_output ?? '') : null, isError: item.status === 'failed' || (code !== null && code !== 0), ...(code !== null ? { exitCode: code } : {}), ...(cwd ? { cwd } : {}) } // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
+      return { ...base, name: 'Shell', summary: firstLine(cmd).slice(0, 200), input: cmd, result: done ? String(item.aggregated_output ?? '') : null, isError: item.status === 'failed' || (code !== null && code !== 0), ...(code !== null ? { exitCode: code } : {}), ...(cwd ? { cwd } : {}) } // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
     }
     case 'FileChange': {
       const files = Object.keys(item.changes ?? {}).map((f) => shortPath(f, root))
-      return { ...base, name: 'Edit', summary: files.join(', ').slice(0, 200), input: changesPatch(item.changes, root), result: [item.stdout, item.stderr].filter(Boolean).join('\n'), isError: item.status !== 'completed' } // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
+      return { ...base, name: 'Edit', summary: files.join(', ').slice(0, 200), input: changesPatch(item.changes, root), result: [item.stdout, item.stderr].filter(Boolean).join('\n'), isError: item.status !== 'completed' } // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
     }
     case 'ImageView': {
       const file = shortPath(String(item.path ?? '').replace(/^file:\/\/\/?/, ''), root)
-      return { ...base, name: 'view_image', summary: file.slice(0, 200), input: JSON.stringify({ path: file }), result: '', isError: false } // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
+      return { ...base, name: 'view_image', summary: file.slice(0, 200), input: JSON.stringify({ path: file }), result: '', isError: false } // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
     }
     case 'WebSearch': {
       const q = String(item.query ?? item.action?.query ?? '')
-      return { ...base, name: 'WebSearch', summary: firstLine(q).slice(0, 200), input: q, result: '', isError: false } // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
+      return { ...base, name: 'WebSearch', summary: firstLine(q).slice(0, 200), input: q, result: '', isError: false } // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
     }
     default: {
       if (typeof item.type !== 'string' || !item.type || NOT_CALLS.test(item.type)) return null

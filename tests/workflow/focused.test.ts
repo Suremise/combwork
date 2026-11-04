@@ -278,7 +278,7 @@ describe('run by the merge queue at the merged result', () => {
     expect(o).toMatchObject({ outcome: 'paused', reason: 'focusedSkip' })
     const req = e.wf.state(card).requests.find((r) => r.gate === 'focusedSkip')!
     expect(req).toMatchObject({ tests: ['board'] })
-    expect(e.wakes.some((w) => w.agent === 'R1' && /hive_focused_skip/.test(w.why))).toBe(true)
+    expect(e.wakes.some((w) => w.agent === 'R1' && /cw_focused_skip/.test(w.why))).toBe(true)
     // Another agent can't decide it; its reviewer can.
     expect(isRefusal(await e.wf.focusedSkip(card.key, B1, req.request, true, 'mine'))).toBe(true)
     moved(await e.wf.focusedSkip(card.key, R1, req.request, true, 'the usage limit, not the work'))

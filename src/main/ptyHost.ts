@@ -146,8 +146,9 @@ export function childEnv(extra: Record<string, string> = {}): Record<string, str
   // If Hive itself was started from inside an agent's session, don't leak that session's identity
   // (each provider lists its variables), nor Hive's own HIVE_ variables. User configuration is kept.
   const sessionVars = new Set(allProviders().flatMap((p) => p.envToStrip))
-  for (const k of Object.keys(env)) if (sessionVars.has(k) || (k.startsWith('HIVE_') && !SESSION_SETTINGS.has(k))) delete env[k]
-  env.TERM_PROGRAM = 'Hive' // i18n-ignore: an environment variable's value, which programs in the terminal read
+  // Both prefixes (HI-2463): a copy started from inside an older or newer one's session never passes its names on.
+  for (const k of Object.keys(env)) if (sessionVars.has(k) || ((k.startsWith('HIVE_') || k.startsWith('CW_')) && !SESSION_SETTINGS.has(k))) delete env[k]
+  env.TERM_PROGRAM = 'Combwork' // i18n-ignore: an environment variable's value, which programs in the terminal read
   env.COLORTERM = 'truecolor'
   // The folders of the CLIs Hive found and its PATH lacks (#1103), so what it starts runs them by name.
   return { ...envWithCliFolders(env), ...extra }
@@ -173,7 +174,7 @@ export function withTerminalType(env: Record<string, string>, on = advanced.get<
 
 /** An argument as logged: bearer tokens hidden (Codex's hooks carry one), long values shortened. */
 export function forLog(arg: string): string {
-  const safe = arg.replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]{8,}/gi, '$1***').replace(/(HIVE_[A-Z_]*TOKEN=)\S+/g, '$1***')
+  const safe = arg.replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]{8,}/gi, '$1***').replace(/((?:HIVE|CW)_[A-Z_]*TOKEN=)\S+/g, '$1***')
   return safe.length > 300 ? `${safe.slice(0, 300)}… (${safe.length} characters)` : safe
 }
 

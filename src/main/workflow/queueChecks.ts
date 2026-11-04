@@ -117,7 +117,7 @@ export function checkEnv(base: Record<string, string | undefined>): Record<strin
   const out: Record<string, string> = {}
   for (const [k, v] of Object.entries(base)) {
     const K = k.toUpperCase()
-    if (v === undefined || NEVER.has(K) || K.startsWith('HIVE_')) continue
+    if (v === undefined || NEVER.has(K) || K.startsWith('HIVE_') || K.startsWith('CW_')) continue
     out[k] = v
   }
   return out

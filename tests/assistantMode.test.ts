@@ -67,7 +67,7 @@ vi.mock('../src/main/sessions', () => ({
         guard()
         if (st.holdSend) await st.holdSend
         guard()
-        st.told.push(text.replace(/^\[Hive\] Mode: (\w+).*$/, '$1'))
+        st.told.push(text.replace(/^\[CW\] Mode: (\w+).*$/, '$1'))
       } finally {
         st.delivering = false
       }

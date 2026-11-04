@@ -323,7 +323,7 @@ describe('a card by intent (#1267)', () => {
     commit(wt, 'w.txt')
     const submitted = await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
     const armed = await armIntentWatch(w, 'a1', submitted.card, { submit: true, failed: false })
-    expect(armed).toMatch(/^Hive watches \S+.* for its review .*, up to .+: end your turn, and it wakes you\.$/)
+    expect(armed).toMatch(/^Combwork watches \S+.* for its review .*, up to .+: end your turn, and it wakes you\.$/)
     expect(watches.watchFor(repo, 'a1')).toMatchObject({ cards: [card], column: 'passed', changes: ['verdict', 'column', 'comment'] })
     // Its reply says so.
     expect(intentText({ ...submitted.done, watch: armed! })).toContain(armed!)
@@ -435,7 +435,7 @@ describe('a card by intent (#1267)', () => {
     const wf = (await service.workflowFor(w, repo))!
     const card = await create(w)
     const key = wf.store.card(card).key
-    const line = { checks: ['typecheck', 'lint'], checksHint: `before review: run one with hive-progress --check <name> --card "${key}" (--isolated: in a check copy at the card's revision; work-on-card)` }
+    const line = { checks: ['typecheck', 'lint'], checksHint: `before review: run one with cw-progress --check <name> --card "${key}" (--isolated: in a check copy at the card's revision; work-on-card)` }
     expect(wf.checksOf(`#${card}`)).toEqual(line)
     await act(w, card, builder, { kind: 'start' })
     expect(wf.checksOf(`#${card}`)).toEqual(line)
@@ -954,11 +954,11 @@ describe("the intents' routes and tools (#1267)", () => {
     // Start review's files (#1444): each as git's letter and its path, never [object Object].
     expect(intentText({ ok: true, card: '#3', from: 'review', to: 'review', data: { files: [{ path: 'greet.js', status: 'M' }, { path: 'test.js', status: 'A' }] } })).toBe('#3: still review. files: M greet.js, A test.js')
     // What's next, as the hive tools (#1530).
-    expect(intentText({ ok: true, card: 'HI-12', from: 'review', to: 'review', next: { step: 'intents', intents: ['verdict'] } })).toBe('HI-12: still review. Next on it: hive_verdict.')
+    expect(intentText({ ok: true, card: 'HI-12', from: 'review', to: 'review', next: { step: 'intents', intents: ['verdict'] } })).toBe('HI-12: still review. Next on it: cw_verdict.')
   })
 
   it("a card's checks (HI-2276): the names as data, a fixed hint with <name>; never a command built from a name", () => {
-    const hint = (iso: boolean) => `before review: run one with hive-progress --check <name> --card "AL-1"${iso ? " (--isolated: in a check copy at the card's revision; work-on-card)" : ' (work-on-card)'}`
+    const hint = (iso: boolean) => `before review: run one with cw-progress --check <name> --card "AL-1"${iso ? " (--isolated: in a check copy at the card's revision; work-on-card)" : ' (work-on-card)'}`
     expect(checksView(['quick'], 'AL-1', true)).toEqual({ checks: ['quick'], checksHint: hint(true) })
     expect(checksView(['quick', 'tests'], 'AL-1', false)).toEqual({ checks: ['quick', 'tests'], checksHint: hint(false) })
     expect(checksView([], 'AL-1', true)).toBeNull()
@@ -968,14 +968,14 @@ describe("the intents' routes and tools (#1267)", () => {
   })
 
   it('every agent has the intent tools, Codex too (#913: enabled_tools is HIVE_TOOLS); the Assistant at Control agents, never start_card', () => {
-    for (const t of [...INTENT_TOOLS, 'hive_start_card']) {
+    for (const t of [...INTENT_TOOLS, 'cw_start_card']) {
       expect(HIVE_TOOLS).toContain(t)
       expect(ASSISTANT_ONLY_TOOLS).not.toContain(t)
     }
-    expect(AGENT_ONLY_TOOLS).toContain('hive_start_card')
-    expect(assistantTools('look')).not.toContain('hive_verdict')
+    expect(AGENT_ONLY_TOOLS).toContain('cw_start_card')
+    expect(assistantTools('look')).not.toContain('cw_verdict')
     expect(assistantTools('agents')).toEqual(expect.arrayContaining(INTENT_TOOLS))
-    expect(assistantTools('projects')).not.toContain('hive_start_card')
+    expect(assistantTools('projects')).not.toContain('cw_start_card')
   })
 })
 
@@ -995,7 +995,7 @@ describe("a lane's card put back or reordered on the board says the lane keeps i
 
   it("put back's reply on a lane's card carries the note as a line of its own; a loose card's doesn't", () => {
     const note = laneOrderNote({ id: 'lane-3f2a', builder: 'Coder', cards: [1] })
-    expect(note).toBe("#1 is on Coder's lane (lane-3f2a), which keeps its own order and takes it in that order. To change it: hive_lane start with its cards in the new order (applyNow: true to apply it now).")
+    expect(note).toBe("#1 is on Coder's lane (lane-3f2a), which keeps its own order and takes it in that order. To change it: cw_lane start with its cards in the new order (applyNow: true to apply it now).")
     expect(intentText({ ok: true, card: 'AL-1', from: 'active', to: 'todo', warnings: [note] }).split('\n')).toEqual(['AL-1: active → todo.', `Warning: ${note}`])
     expect(laneOrderNote({ id: 'lane-3f2a', builder: 'Coder', cards: [1, 2] })).toMatch(/^#1, #2 are on Coder's lane \(lane-3f2a\), which keeps its own order and takes them in that order/)
   })
@@ -1003,6 +1003,6 @@ describe("a lane's card put back or reordered on the board says the lane keeps i
   it("reorder's reply names the lane for its cards, by their keys; with none on a lane, one line as before", () => {
     expect(reorderText({ column: 'todo', top: [2, 1], count: 2, names: { 1: 'AL-1', 2: 'AL-2' } })).toBe('Todo now starts AL-2, AL-1.')
     const text = reorderText({ column: 'todo', top: [2, 1], count: 2, names: { 1: 'AL-1', 2: 'AL-2' }, lanes: [{ id: 'lane-3f2a', builder: 'Coder', cards: [2, 1] }] })
-    expect(text.split('\n')).toEqual(['Todo now starts AL-2, AL-1.', "AL-2, AL-1 are on Coder's lane (lane-3f2a), which keeps its own order and takes them in that order. To change it: hive_lane start with its cards in the new order (applyNow: true to apply it now)."])
+    expect(text.split('\n')).toEqual(['Todo now starts AL-2, AL-1.', "AL-2, AL-1 are on Coder's lane (lane-3f2a), which keeps its own order and takes them in that order. To change it: cw_lane start with its cards in the new order (applyNow: true to apply it now)."])
   })
 })

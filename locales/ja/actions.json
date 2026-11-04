@@ -61,7 +61,7 @@
   "actions.mcp.add": "追加",
   "actions.mcp.addFailed": "サーバーを追加できませんでした",
   "actions.mcp.addTitle": "ファイルからMCPサーバーを追加",
-  "actions.mcp.badName": "英字、数字、「-」、「_」を使ってください。「hive」は予約済みです。",
+  "actions.mcp.badName": "英字、数字、「-」、「_」を使ってください。「combwork」と「hive」は予約済みです。",
   "actions.mcp.copied": "{names}をワークスペースにコピーしました",
   "actions.mcp.copyFailed": "MCPサーバーをコピーできませんでした",
   "actions.mcp.deleteAdded": "{where}：削除すると、そこからも外れます。",

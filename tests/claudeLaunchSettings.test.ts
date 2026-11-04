@@ -13,7 +13,7 @@ const hive = () => ({
   hooks: { Stop: [{ hooks: [{ type: 'http', url: 'hive-stop' }] }], SessionStart: [{ hooks: [{ type: 'command', command: 'hive-start' }] }] },
   statusLine: { type: 'command', command: 'hive-status', padding: 0 }
 })
-const NEEDS = { url: 'http://127.0.0.1:9/hook?run=r', envVar: 'HIVE_HOOK_TOKEN' }
+const NEEDS = { url: 'http://127.0.0.1:9/hook?run=r', envVar: 'CW_HOOK_TOKEN' }
 
 describe("a --settings in a Claude Code agent's arguments (#330)", () => {
   it('drops every --settings from the arguments, in both forms, and nothing else', () => {
@@ -79,11 +79,11 @@ describe("a --settings in a Claude Code agent's arguments (#330)", () => {
 
   it("adds what Hive's hooks need to the user's HTTP hook allowlists, which Claude Code takes whole from this file", () => {
     // Restrictive lists: Hive's URL and token variable added, the user's entries kept.
-    expect(mergeLaunchSettings(hive(), { allowedHttpHookUrls: ['https://hooks.example/*'], httpHookAllowedEnvVars: ['MY_TOKEN'] }, NEEDS)).toMatchObject({ allowedHttpHookUrls: ['https://hooks.example/*', NEEDS.url], httpHookAllowedEnvVars: ['MY_TOKEN', 'HIVE_HOOK_TOKEN'] })
+    expect(mergeLaunchSettings(hive(), { allowedHttpHookUrls: ['https://hooks.example/*'], httpHookAllowedEnvVars: ['MY_TOKEN'] }, NEEDS)).toMatchObject({ allowedHttpHookUrls: ['https://hooks.example/*', NEEDS.url], httpHookAllowedEnvVars: ['MY_TOKEN', 'CW_HOOK_TOKEN'] })
     // Empty lists (nothing allowed): only Hive's.
-    expect(mergeLaunchSettings(hive(), { allowedHttpHookUrls: [], httpHookAllowedEnvVars: [] }, NEEDS)).toMatchObject({ allowedHttpHookUrls: [NEEDS.url], httpHookAllowedEnvVars: ['HIVE_HOOK_TOKEN'] })
+    expect(mergeLaunchSettings(hive(), { allowedHttpHookUrls: [], httpHookAllowedEnvVars: [] }, NEEDS)).toMatchObject({ allowedHttpHookUrls: [NEEDS.url], httpHookAllowedEnvVars: ['CW_HOOK_TOKEN'] })
     // Already allowed: unchanged, not repeated.
-    expect(mergeLaunchSettings(hive(), { allowedHttpHookUrls: [NEEDS.url], httpHookAllowedEnvVars: ['HIVE_HOOK_TOKEN'] }, NEEDS)).toMatchObject({ allowedHttpHookUrls: [NEEDS.url], httpHookAllowedEnvVars: ['HIVE_HOOK_TOKEN'] })
+    expect(mergeLaunchSettings(hive(), { allowedHttpHookUrls: [NEEDS.url], httpHookAllowedEnvVars: ['CW_HOOK_TOKEN'] }, NEEDS)).toMatchObject({ allowedHttpHookUrls: [NEEDS.url], httpHookAllowedEnvVars: ['CW_HOOK_TOKEN'] })
     // Not set: not added (unset allows every URL and variable; setting one would block the user's other HTTP hooks).
     const merged = mergeLaunchSettings(hive(), { env: {} }, NEEDS)
     expect('allowedHttpHookUrls' in merged || 'httpHookAllowedEnvVars' in merged).toBe(false)

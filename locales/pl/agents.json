@@ -340,7 +340,7 @@
   "agents.settings.worktreeOn": "Worktree na <code>{branch}</code> (z {base})",
   "agents.start.exited": "Proces {cli} zakończył się z kodem {code}.",
   "agents.switch.confirm": "Przełącz",
-  "agents.switch.detail": "Aby przenieść pracę, przed przełączeniem poproś agenta o notatkę przekazania (Combwork MCP: hive_create_handover), a potem poproś nowego agenta, żeby ją przeczytał.",
+  "agents.switch.detail": "Aby przenieść pracę, przed przełączeniem poproś agenta o notatkę przekazania (Combwork MCP: cw_create_handover), a potem poproś nowego agenta, żeby ją przeczytał.",
   "agents.switch.message": "Jego rozmowy zostają w zakładce Sesje, ale {cli} nie potrafi wznawiać rozmów z {was}, więc agent {agent} zacznie następnym razem od nowa.",
   "agents.switch.title": "Przełączyć agenta {agent} na {cli}?",
   "agents.template.nameTaken": "Inny agent szablonu nazywa się „{name}”.",

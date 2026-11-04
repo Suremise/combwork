@@ -87,10 +87,10 @@ describe('carrying on: the inbox switches (#1432)', async () => {
         // Idle: the doorbell, or nothing typed at all.
         st.status = 'ready'
         expect(await deliveries.offerNow(alpha, 'b1')).toBe(c.idleWakes)
-        expect(st.typed).toEqual(c.idleWakes ? [`[Hive] New in your inbox: 1 message (${m.id}). Call hive_inbox to read it, act on it, then ack it.`] : [])
+        expect(st.typed).toEqual(c.idleWakes ? [`[CW] New in your inbox: 1 message (${m.id}). Call cw_inbox to read it, act on it, then ack it.`] : [])
         // Typed or not, it is unread until the agent reads it: never dropped.
         expect(await unread()).toEqual([m.id])
-        // The agent reads its inbox whenever it next calls hive_inbox: it is all there.
+        // The agent reads its inbox whenever it next calls cw_inbox: it is all there.
         expect((await deliveries.readInbox(alpha, 'b1')).items.flatMap((x) => x.ids)).toEqual([m.id])
         expect(await unread()).toEqual([])
       })
@@ -107,7 +107,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
     // Deliver Now (the pane's, session:deliverNow): one line naming both, typed once.
     const { deliverWaiting } = await import('../src/main/agentMessages')
     expect(await deliverWaiting(alpha, 'b1')).toBe(true)
-    expect(st.typed).toEqual([`[Hive] New in your inbox: 1 message and 1 card event (#1432) (${e.id}, ${m.id}). Call hive_inbox to read them, act on them, then ack them.`])
+    expect(st.typed).toEqual([`[CW] New in your inbox: 1 message and 1 card event (#1432) (${e.id}, ${m.id}). Call cw_inbox to read them, act on them, then ack them.`])
     // The agent idle again without reading them: nothing rings again by itself.
     st.status = 'ready'
     await deliveries.offerAllForTests()
@@ -123,28 +123,28 @@ describe('carrying on: the inbox switches (#1432)', async () => {
     const [tick, asked] = await Promise.all([deliveries.offerNow(alpha, 'b1'), deliverWaiting(alpha, 'b1')])
     expect(tick).toBe(false)
     expect(asked).toBe(true)
-    expect(st.typed).toEqual([`[Hive] New in your inbox: 1 message (${m.id}). Call hive_inbox to read it, act on it, then ack it.`])
+    expect(st.typed).toEqual([`[CW] New in your inbox: 1 message (${m.id}). Call cw_inbox to read it, act on it, then ack it.`])
   })
 
   it('idle wakes off: Deliver Now whose line is overtaken as it is typed (its source no longer wants it as made) makes it again at once and types it, a bounded number of times (#1504)', async () => {
     await setSwitches({ checkpoints: true, stopContinuation: true, idleWakes: false })
     // A loop wake's way: held while the board and lanes haven't changed since it was made (rolesSeq).
     let seq = 0
-    deliveries.registerSource('overtaken-as-typed', { refresh: async () => ({ body: `[Hive] #1504 is in Review (${seq}).`, meta: { seq } }), holds: (r) => r.meta?.seq === seq })
+    deliveries.registerSource('overtaken-as-typed', { refresh: async () => ({ body: `[CW] #1504 is in Review (${seq}).`, meta: { seq } }), holds: (r) => r.meta?.seq === seq })
     const { deliverWaiting } = await import('../src/main/agentMessages')
     // The card's arrival in Review updates its lane as the line is typed, once: made again from the board now, typed.
-    const e = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, card: 1504, body: '[Hive] #1504 is in Review.', source: 'overtaken-as-typed', ref: '#1504' })
+    const e = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, card: 1504, body: '[CW] #1504 is in Review.', source: 'overtaken-as-typed', ref: '#1504' })
     let changes = 0
     st.during = () => {
       if (++changes === 1) seq++
     }
     expect(await deliverWaiting(alpha, 'b1')).toBe(true)
-    expect(st.typed).toEqual([`[Hive] New in your inbox: 1 card event (#1504) (${e.id}). Call hive_inbox to read it.`])
+    expect(st.typed).toEqual([`[CW] New in your inbox: 1 card event (#1504) (${e.id}). Call cw_inbox to read it.`])
     expect(changes).toBe(2)
     // Overtaken on every try: given up after a few, nothing typed, still unread.
     await deliveries.readInbox(alpha, 'b1')
     Object.assign(st, { status: 'ready', typed: [] })
-    const f = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, card: 1505, body: '[Hive] #1505 is in Review.', source: 'overtaken-as-typed', ref: '#1505' })
+    const f = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, card: 1505, body: '[CW] #1505 is in Review.', source: 'overtaken-as-typed', ref: '#1505' })
     changes = 0
     st.during = () => {
       changes++
@@ -242,7 +242,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
       const { deliverWaiting } = await import('../src/main/agentMessages')
       expect(await deliverWaiting(alpha, 'b1')).toBe(true)
       expect(asked).toBeGreaterThan(2)
-      expect(st.typed).toEqual([`[Hive] New in your inbox: 1 message (${m.id}). Call hive_inbox to read it, act on it, then ack it.`])
+      expect(st.typed).toEqual([`[CW] New in your inbox: 1 message (${m.id}). Call cw_inbox to read it, act on it, then ack it.`])
     } finally {
       writer.onLineComing(() => false)
     }

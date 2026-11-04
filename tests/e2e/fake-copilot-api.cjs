@@ -4,7 +4,7 @@
 // separated by " then ", as the fake Claude Code and fake Codex take them:
 //   skill NAME                 Copilot's skill tool (it reads the skill's SKILL.md)
 //   hive TOOL {json}           a tool of the hive MCP server (Copilot names it hive-TOOL), run by the real server
-//   boardmove N COLUMN, boardreview N ACTION [COLUMN], boardcomment N    hive_update_task, as the fakes do
+//   boardmove N COLUMN, boardreview N ACTION [COLUMN], boardcomment N    cw_update_task, as the fakes do
 //   work N                     waits N seconds before its next step (a turn that takes a while)
 //   edit PATH OLD NEW          Copilot's edit tool (PATH relative to the session's folder)
 //   write PATH TEXT…           its create tool
@@ -16,9 +16,9 @@
 //   checkpoint                 a view of README.md: a tool call after which Hive's notice may come (#650)
 //   ratelimited                every request refused with a 429 (a request-rate limit, HI-1973): Copilot tries again
 //                              5 times, its error hook each time, then gives up (a rate_limit session error)
-// Hive's notices (#650: "[Hive] New in your inbox…" added to a tool's result, "[Hive] Before you finish…" as the prompt
-// its Stop carried the turn on with) and its doorbell (the prompt "[Hive] New in your inbox…") are followed as a model does:
-// hive_inbox, then hive_inbox with ack for its ids; new work read so (a task, a handover) is then the prompt's steps.
+// Hive's notices (#650: "[CW] New in your inbox…" added to a tool's result, "[CW] Before you finish…" as the prompt
+// its Stop carried the turn on with) and its doorbell (the prompt "[CW] New in your inbox…") are followed as a model does:
+// cw_inbox, then cw_inbox with ack for its ids; new work read so (a task, a handover) is then the prompt's steps.
 // One step a model call: each tool's result comes back in the next request, which gets the next step. Every request is
 // logged (`log`: one JSON line each, with the tools Copilot offered and the system prompt's length), so a suite can see
 // what Copilot sent. Usage is reported with each reply (tokens, as an API would), so Hive has some to count.
@@ -58,10 +58,10 @@ function actionsOf(prompt) {
     const step = raw.trim()
     let m
     for (const s of step.matchAll(/\bskill\s+([a-z0-9][\w-]*)/gi)) out.push({ tool: 'skill', args: { skill: s[1] } })
-    for (const s of step.matchAll(/\bskillref\s+([a-z0-9][\w-]*)\s+([\w.-]+\.md)/gi)) out.push({ tool: 'view', args: { path: `.agents/skills/hive-${s[1]}/${s[2]}` }, ref: { skill: s[1], file: s[2] } })
-    if ((m = /\bboardmove\s+(\d+)\s+(\w+)/i.exec(step))) out.push({ tool: 'hive_update_task', args: { number: Number(m[1]), column: m[2].toLowerCase() } })
-    if ((m = /\bboardreview\s+(\d+)\s+(\w+)(?:\s+(hold|todo|doing|review|passed|done)\b)?/i.exec(step))) out.push({ tool: 'hive_update_task', args: { number: Number(m[1]), review: m[2].toLowerCase(), ...(m[3] ? { column: m[3].toLowerCase(), comment: 'Fake review: passed.' } : {}) } })
-    if ((m = /\bboardcomment\s+(\d+)/i.exec(step))) out.push({ tool: 'hive_update_task', args: { number: Number(m[1]), comment: 'Fake: done, see the files.' } })
+    for (const s of step.matchAll(/\bskillref\s+([a-z0-9][\w-]*)\s+([\w.-]+\.md)/gi)) out.push({ tool: 'view', args: { path: `.agents/skills/cw-${s[1]}/${s[2]}` }, ref: { skill: s[1], file: s[2] } })
+    if ((m = /\bboardmove\s+(\d+)\s+(\w+)/i.exec(step))) out.push({ tool: 'cw_update_task', args: { number: Number(m[1]), column: m[2].toLowerCase() } })
+    if ((m = /\bboardreview\s+(\d+)\s+(\w+)(?:\s+(hold|todo|doing|review|passed|done)\b)?/i.exec(step))) out.push({ tool: 'cw_update_task', args: { number: Number(m[1]), review: m[2].toLowerCase(), ...(m[3] ? { column: m[3].toLowerCase(), comment: 'Fake review: passed.' } : {}) } })
+    if ((m = /\bboardcomment\s+(\d+)/i.exec(step))) out.push({ tool: 'cw_update_task', args: { number: Number(m[1]), comment: 'Fake: done, see the files.' } })
     const call = parseHiveStep(step)
     if (call) out.push({ tool: call.tool, args: call.args })
     // Anywhere in the step, as the fake CLIs read it ("… (work 10)").
@@ -78,9 +78,9 @@ function actionsOf(prompt) {
   return out
 }
 
-/** An assistant message that calls hive_inbox (a notice followed), and its arguments. */
+/** An assistant message that calls cw_inbox (a notice followed), and its arguments. */
 function inboxCall(m) {
-  const c = m.role === 'assistant' && Array.isArray(m.tool_calls) ? m.tool_calls.find((t) => (t.function?.name ?? '').endsWith('hive_inbox')) : null
+  const c = m.role === 'assistant' && Array.isArray(m.tool_calls) ? m.tool_calls.find((t) => (t.function?.name ?? '').endsWith('cw_inbox')) : null
   if (!c) return null
   try {
     return JSON.parse(c.function.arguments || '{}')
@@ -90,16 +90,16 @@ function inboxCall(m) {
 }
 
 /**
- * Hive's notice (#650: "[Hive] New in your inbox…" after a tool's result, as Copilot adds a postToolUse hook's context,
- * or "[Hive] Before you finish…", the prompt its Stop carried the turn on with), followed as a model does: hive_inbox,
- * then hive_inbox with ack for the ids it listed. The call to make, or null (no notice, or followed already).
+ * Hive's notice (#650: "[CW] New in your inbox…" after a tool's result, as Copilot adds a postToolUse hook's context,
+ * or "[CW] Before you finish…", the prompt its Stop carried the turn on with), followed as a model does: cw_inbox,
+ * then cw_inbox with ack for the ids it listed. The call to make, or null (no notice, or followed already).
  */
 function followNotice(msgs, tools) {
   // Where Copilot puts one, not a mention of one (Hive's guidance and skills quote them): after a tool's result, or the
   // whole prompt.
-  const isNotice = (m) => (m.role === 'tool' && /Additional guidance from postToolUse hooks:\s*\[Hive\] New in your inbox/.test(textOf(m))) || (m.role === 'user' && /^\[Hive\] (New in your inbox|Before you finish)/.test(promptOf(textOf(m))))
+  const isNotice = (m) => (m.role === 'tool' && /Additional guidance from postToolUse hooks:\s*\[CW\] New in your inbox/.test(textOf(m))) || (m.role === 'user' && /^\[CW\] (New in your inbox|Before you finish)/.test(promptOf(textOf(m))))
   const k = msgs.findLastIndex(isNotice)
-  const name = offered(tools, 'hive_inbox')
+  const name = offered(tools, 'cw_inbox')
   if (k < 0 || !name) return null
   const after = msgs.slice(k + 1)
   const calls = after.map(inboxCall).filter(Boolean)
@@ -148,7 +148,7 @@ function decide(body) {
       // A reference file: its link in SKILL.md as Copilot gave it (its skill tool says "loaded", and the skill comes as
       // context of its own), else a path that isn't there.
       const linked = !a.ref || msgs.some((m) => textOf(m).includes(`](${a.ref.file})`) || textOf(m).includes(`](./${a.ref.file})`))
-      const args = linked ? a.args : { path: `.agents/skills/hive-${a.ref.skill}/no-link-to-${a.ref.file}` }
+      const args = linked ? a.args : { path: `.agents/skills/cw-${a.ref.skill}/no-link-to-${a.ref.file}` }
       return name ? { ...out, wait, tool: name, args } : { ...out, wait, text: `Fake Copilot: Copilot offers no tool ${a.tool}.` }
     }
     n++

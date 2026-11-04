@@ -80,7 +80,7 @@ async function connectHive(server, held) {
 }
 
 /**
- * A Codex inline table as Hive writes it (`-c mcp_servers.hive={command="…",args=["…"],env={K="…"}}`: strings are JSON
+ * A Codex inline table as Hive writes it (`-c mcp_servers.combwork={command="…",args=["…"],env={K="…"}}`: strings are JSON
  * strings, keys bare or JSON strings) as an object.
  */
 function fromCodexTable(text) {
@@ -110,7 +110,7 @@ function fromCodexTable(text) {
  * none.
  */
 function parseHiveStep(step) {
-  const m = /\bhive\s+(hive_[a-z_]+)(?:\s+(\{.*\}))?/i.exec(step)
+  const m = /\bhive\s+(cw_[a-z_]+)(?:\s+(\{.*\}))?/i.exec(step)
   if (!m) return null
   let args = {}
   try {
@@ -122,18 +122,18 @@ function parseHiveStep(step) {
 }
 
 /** Whether a prompt is Hive's doorbell (#650): its fixed words naming what waits in the agent's inbox by id. */
-const isDoorbell = (text) => String(text).startsWith('[Hive] New in your inbox: ')
+const isDoorbell = (text) => String(text).startsWith('[CW] New in your inbox: ')
 
 /**
  * Whether a doorbell names only tasks and handovers (a new piece of work, whose text is the agent's next prompt), not
  * wakes, messages or notices.
  */
-const doorbellIsWork = (text) => /^\[Hive\] New in your inbox: (\d+ (task|tasks|handover|handovers)( \(#[\d, #]+\))?( and |, )?)+ \(m/.test(String(text))
+const doorbellIsWork = (text) => /^\[CW\] New in your inbox: (\d+ (task|tasks|handover|handovers)( \(#[\d, #]+\))?( and |, )?)+ \(m/.test(String(text))
 
 /**
- * hive_inbox's reply (shared/deliveries.ts inboxText) as its items: { ids, from, card, text }, oldest first. An item's
+ * cw_inbox's reply (shared/deliveries.ts inboxText) as its items: { ids, from, card, text }, oldest first. An item's
  * text may run over several lines (a task's); the reply's own lines (its count, what was received before, the ack note,
- * and what Hive adds to a tool's reply, such as #357's "[Hive] #12 has 1 new decision…") aren't items.
+ * and what Hive adds to a tool's reply, such as #357's "[CW] #12 has 1 new decision…") aren't items.
  */
 function inboxRows(reply) {
   const rows = []
@@ -143,7 +143,7 @@ function inboxRows(reply) {
     if (m) {
       rows.push({ ids: m[1].split(','), from: m[2], card: m[3] ? Number(m[3]) : null, text: m[4] })
       open = true
-    } else if (/^(Received before, not acked yet: |Ack each with hive_inbox |\[Hive\] )/.test(line)) open = false
+    } else if (/^(Received before, not acked yet: |Ack each with cw_inbox |\[CW\] )/.test(line)) open = false
     else if (open) rows[rows.length - 1].text += `\n${line}`
   }
   return rows

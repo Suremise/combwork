@@ -64,18 +64,18 @@ const M = {
   mcpDir: msg({ id: 'workspace.mcpView.dir', defaultMessage: 'Use {variable} to point at server code stored in `.hive/mcp`.', description: "An MCP server's view, beside its editor (Markdown). {variable} is ${HIVE_MCP_DIR}." }),
   selectMcp: msg({ id: 'workspace.mcpView.select', defaultMessage: 'Select an MCP server to edit its definition.', description: 'The MCP view with no server selected.' }),
   builtIn: msg({ id: 'workspace.mcpView.builtIn', defaultMessage: 'Built-in Combwork MCP server', description: "The heading of the built-in hive server's page." }),
-  builtInText: msg({ id: 'workspace.mcpView.builtInText', defaultMessage: 'Every session started from Combwork gets a <code>hive</code> MCP server that connects to the Agent API{hasUrl, select, yes { at {url}} other {}}. Turn it off in Settings → Agent API.', description: "The built-in server's page. <code> is the server's name: keep hive as it is." }),
+  builtInText: msg({ id: 'workspace.mcpView.builtInText', defaultMessage: 'Every session started from Combwork gets a <code>combwork</code> MCP server that connects to the Agent API{hasUrl, select, yes { at {url}} other {}}. Turn it off in Settings → Agent API.', description: "The built-in server's page. <code> is the server's name: keep combwork as it is (HI-2463)." }),
   tool: msg({ id: 'workspace.mcpView.tool', defaultMessage: 'Tool', description: "The built-in server's tools table: a column (the tool's name)." }),
   whatItDoes: msg({ id: 'workspace.mcpView.whatItDoes', defaultMessage: 'What it does', description: "The built-in server's tools table: a column." }),
-  toolListProjects: msg({ id: 'workspace.mcpView.toolListProjects', defaultMessage: 'List projects and their session status', description: "What the built-in server's hive_list_projects tool does." }),
-  toolProjectStatus: msg({ id: 'workspace.mcpView.toolProjectStatus', defaultMessage: 'Status and settings of one project', description: "What the built-in server's hive_project_status tool does." }),
-  toolSessionUsage: msg({ id: 'workspace.mcpView.toolSessionUsage', defaultMessage: 'Token use, cache and compactions for a session', description: "What the built-in server's hive_session_usage tool does." }),
-  toolListNotes: msg({ id: 'workspace.mcpView.toolListNotes', defaultMessage: 'List notes in .hive/shared', description: "What the built-in server's hive_list_shared_notes tool does." }),
-  toolReadNote: msg({ id: 'workspace.mcpView.toolReadNote', defaultMessage: 'Read a shared note', description: "What the built-in server's hive_read_shared_note tool does." }),
-  toolWriteNote: msg({ id: 'workspace.mcpView.toolWriteNote', defaultMessage: 'Create, overwrite or append to a shared note', description: "What the built-in server's hive_write_shared_note tool does." }),
-  toolHandover: msg({ id: 'workspace.mcpView.toolHandover', defaultMessage: 'Write a handover note for a future session', description: "What the built-in server's hive_create_handover tool does." }),
-  toolNotify: msg({ id: 'workspace.mcpView.toolNotify', defaultMessage: 'Show a notification to you in Combwork', description: "What the built-in server's hive_notify tool does." }),
-  toolListSkills: msg({ id: 'workspace.mcpView.toolListSkills', defaultMessage: 'List skills available to a project', description: "What the built-in server's hive_list_skills tool does." }),
+  toolListProjects: msg({ id: 'workspace.mcpView.toolListProjects', defaultMessage: 'List projects and their session status', description: "What the built-in server's cw_list_projects tool does." }),
+  toolProjectStatus: msg({ id: 'workspace.mcpView.toolProjectStatus', defaultMessage: 'Status and settings of one project', description: "What the built-in server's cw_project_status tool does." }),
+  toolSessionUsage: msg({ id: 'workspace.mcpView.toolSessionUsage', defaultMessage: 'Token use, cache and compactions for a session', description: "What the built-in server's cw_session_usage tool does." }),
+  toolListNotes: msg({ id: 'workspace.mcpView.toolListNotes', defaultMessage: 'List notes in .hive/shared', description: "What the built-in server's cw_list_shared_notes tool does." }),
+  toolReadNote: msg({ id: 'workspace.mcpView.toolReadNote', defaultMessage: 'Read a shared note', description: "What the built-in server's cw_read_shared_note tool does." }),
+  toolWriteNote: msg({ id: 'workspace.mcpView.toolWriteNote', defaultMessage: 'Create, overwrite or append to a shared note', description: "What the built-in server's cw_write_shared_note tool does." }),
+  toolHandover: msg({ id: 'workspace.mcpView.toolHandover', defaultMessage: 'Write a handover note for a future session', description: "What the built-in server's cw_create_handover tool does." }),
+  toolNotify: msg({ id: 'workspace.mcpView.toolNotify', defaultMessage: 'Show a notification to you in Combwork', description: "What the built-in server's cw_notify tool does." }),
+  toolListSkills: msg({ id: 'workspace.mcpView.toolListSkills', defaultMessage: 'List skills available to a project', description: "What the built-in server's cw_list_skills tool does." }),
   tryAsking: msg({ id: 'workspace.mcpView.tryAsking', defaultMessage: 'Try asking an agent: *"Write a handover for the next session using the hive tools."*', description: "The built-in server's page, under its tools (Markdown: keep the * around the example prompt)." }),
   invalidJson: msg({ id: 'workspace.mcpView.invalidJson', defaultMessage: 'Invalid JSON: {error}', description: "An MCP server's view: what was typed isn't JSON ({error}: the parser's message)." }),
   saveFailed: msg({ id: 'workspace.mcpView.saveFailed', defaultMessage: 'Could not save', description: "An error notice: an MCP server's definition." }),
@@ -520,15 +520,15 @@ function McpServerView({ selected }: { selected: string | null }) {
 /** The built-in hive server's tools, as a table (the tools' names are theirs; what they do is window text). */
 function hiveToolsTable(): string {
   const tools: [string, Msg][] = [
-    ['hive_list_projects', M.toolListProjects],
-    ['hive_project_status', M.toolProjectStatus],
-    ['hive_session_usage', M.toolSessionUsage],
-    ['hive_list_shared_notes', M.toolListNotes],
-    ['hive_read_shared_note', M.toolReadNote],
-    ['hive_write_shared_note', M.toolWriteNote],
-    ['hive_create_handover', M.toolHandover],
-    ['hive_notify', M.toolNotify],
-    ['hive_list_skills', M.toolListSkills]
+    ['cw_list_projects', M.toolListProjects],
+    ['cw_project_status', M.toolProjectStatus],
+    ['cw_session_usage', M.toolSessionUsage],
+    ['cw_list_shared_notes', M.toolListNotes],
+    ['cw_read_shared_note', M.toolReadNote],
+    ['cw_write_shared_note', M.toolWriteNote],
+    ['cw_create_handover', M.toolHandover],
+    ['cw_notify', M.toolNotify],
+    ['cw_list_skills', M.toolListSkills]
   ]
   return [`| ${tr(M.tool)} | ${tr(M.whatItDoes)} |`, '|---|---|', ...tools.map(([name, what]) => `| \`${name}\` | ${tr(what)} |`), '', tr(M.tryAsking)].join('\n')
 }
@@ -555,7 +555,7 @@ export function DocsView() {
   useEffect(() => {
     if (!anchor) return
     const t = setTimeout(() => {
-      // Resolved as card references and hive_read_section resolve a heading: an id none or several carry goes nowhere.
+      // Resolved as card references and cw_read_section resolve a heading: an id none or several carry goes nowhere.
       const slug = guideTarget(source, anchor)
       if (!slug) console.warn(`Docs: no single heading has the id "${anchor}"`) // i18n-ignore: a developer's console line
       const h = slug ? [...(pageRef.current?.querySelectorAll('h1, h2, h3, h4, h5, h6') ?? [])].find((x) => x.id === slug) : undefined

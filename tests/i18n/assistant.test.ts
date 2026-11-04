@@ -209,7 +209,7 @@ describe("the Assistant panel's status line is window text (#885)", () => {
       assistantStatusLine({ status: 'watching', watch }, at),
       assistantStatusLine({ status: 'watching', watch: { ...watch, cards: [], agents: ['B6'], label: 'Waiting for B6 to finish' } }, at),
       assistantStatusLine({ status: 'working', question: { text: 'Which one?', since: '' } }, at),
-      assistantStatusLine({ status: 'ready', untakenLine: { since: '', text: '[Hive] #1' } }, at),
+      assistantStatusLine({ status: 'ready', untakenLine: { since: '', text: '[CW] #1' } }, at),
       assistantStatusLine({ status: 'working' }, at, ['A?', 'B?'])
     ]
     for (const l of lines) expect(says(l)).toContain('[')

@@ -3,7 +3,7 @@
 // Card attachments (HI-1700): an image pasted into a card dialog's comment box is a draft (a chip, a link at the caret,
 // nothing stored), and Post keeps it with the card: shown inline in the comment and in the card's Attachments list, kept
 // in the project's .hive/attachments/cards/<number>, and listed by path in the card's JSON (the Agent API, as
-// hive_read_task reads it). It stays through a move to Doing, archiving and back, and moves with the card to another
+// cw_read_task reads it). It stays through a move to Doing, archiving and back, and moves with the card to another
 // project. A session's file is copied to a card from the Attachments tab (Attach to a card, the menu a pane's chip uses
 // too). The tab's two tabs (HI-1841): Pane attachments and Card attachments, each its count and its own kind filters,
 // remembered; the card dialog's Show in Attachments opening Card attachments at its card, whatever its filter, without
@@ -137,7 +137,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     await page.keyboard.press('Escape')
     await until(async () => (await fresh.count()) === 0)
 
-    // --- The card's JSON lists it by path, as hive_read_task reads it, and its comment's link reads as that path.
+    // --- The card's JSON lists it by path, as cw_read_task reads it, and its comment's link reads as that path.
     const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const get = async () => (await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${n}`, { headers: { Authorization: `Bearer ${token}` } })).json()
     const view = await get()
@@ -394,7 +394,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
       check('…its files go to the Recycle Bin (the suite’s trash), their rows with them', !!(await until(async () => archivedFiles.length === 1 && lib.trashed(path.basename(archivedFiles[0].path)).length === 1 && !fs.existsSync(archivedFiles[0].path) && (await keptOf(archivedCard)).length === 0)), JSON.stringify(archivedFiles))
       check('…but a file changed since the list was made stays, row and all, and the notice says so', !!(await until(async () => JSON.stringify((await keptOf(changedCard)).map((f) => f.name)) === '["changes.png"]' && fs.existsSync(changing.path) && /Moved 2 files .* of 2 archived cards/.test(await page.locator('.toast, .notification').allInnerTexts().then((t) => t.join(' ')).catch(() => '')) && /1 file was left as it is/.test(await page.locator('.toast, .notification').allInnerTexts().then((t) => t.join(' ')).catch(() => '')))), JSON.stringify(await keptOf(changedCard)))
       const cleaned = await readCardJson(archivedCard.number)
-      check("…and Hive's comment on it says how many and which", (cleaned?.comments?.at(-1)?.text ?? '').startsWith("Removed 1 attachment (archived-shot.png): this project removes archived cards' attachments 3 days after archiving") && cleaned.comments.at(-1).by === 'Hive' && cleaned.archived === true, cleaned?.comments?.at(-1)?.text)
+      check("…and Hive's comment on it says how many and which", (cleaned?.comments?.at(-1)?.text ?? '').startsWith("Removed 1 attachment (archived-shot.png): this project removes archived cards' attachments 3 days after archiving") && cleaned.comments.at(-1).by === 'Combwork' && cleaned.archived === true, cleaned?.comments?.at(-1)?.text)
       check('an open card and a Done card keep theirs', (await keptOf(openCard)).length === 1 && (await keptOf(doneCard)).length === 1 && fs.existsSync((await keptOf(openCard))[0].path))
       await page.screenshot({ path: path.join(shots, 'cardattach-cleanup-storage.png') })
     }

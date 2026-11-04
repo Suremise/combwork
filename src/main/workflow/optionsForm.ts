@@ -138,7 +138,7 @@ export async function workflowForm(ws: WorkspaceService, projectPath: string): P
 }
 
 /**
- * The project's options for agents (`hive_project_status`, lean): the options in force, and which of them the project,
+ * The project's options for agents (`cw_project_status`, lean): the options in force, and which of them the project,
  * the workspace or Hive's settings set (the rest are the platform's all-off). `invalid`: why they work as all-off.
  */
 export async function workflowSummary(ws: WorkspaceService, projectPath: string): Promise<Record<string, unknown> | null> {

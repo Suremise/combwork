@@ -39,12 +39,12 @@ const log = createLogger('laneStarts')
 const A = {
   first: agentMsg({
     id: 'brief.start.firstCard',
-    text: "Hive started this card for you: it is your lane's first card. Use card-loop as its builder (hive_lane next names your cards).",
+    text: "Combwork started this card for you: it is your lane's first card. Use card-loop as its builder (cw_lane next names your cards).",
     note: "HI-2029: with the rules on, Hive starts a lane's first card on its builder itself. The note of the card's start prompt."
   }),
   next: agentMsg({
     id: 'brief.start.nextCard',
-    text: "Hive started this card for you: it is your lane's next card, after {card} went Done.",
+    text: "Combwork started this card for you: it is your lane's next card, after {card} went Done.",
     note: "Hive starts a lane's next card on its builder once the one before it is Done. The note of the card's start prompt."
   })
 }

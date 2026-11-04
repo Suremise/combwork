@@ -1,3 +1,4 @@
+import { isReservedServerName, TOOLS_SERVER } from '@shared/assistantTools'
 import { Children, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { McpServerInfo, NoteFile, ProjectInfo, SkillInfo } from '@shared/types'
 import { AgentsTable, agentsText } from './AgentsTable'
@@ -122,7 +123,7 @@ const M = {
   mcpServers: msg({ id: 'assistant.sidebar.mcpServers', defaultMessage: 'MCP Servers', description: "The heading of the MCP sidebar: the workspace's MCP servers." }),
   newServerTitle: msg({ id: 'assistant.sidebar.newServerTitle', defaultMessage: 'New MCP Server', description: "The title of the dialog that creates an MCP server." }),
   newServerMessage: msg({ id: 'assistant.sidebar.newServerMessage', defaultMessage: 'Creates {file} in the workspace from a template you can edit.', description: 'New MCP Server. {file} is .hive/mcp/<name>.json, <name> standing for the name you type.' }),
-  serverNameRule: msg({ id: 'assistant.sidebar.serverNameRule', defaultMessage: 'Use letters, numbers, "-" and "_". "hive" is reserved.', description: "New MCP Server: a name that can't be used. Keep hive as it is (the built-in server's name)." }),
+  serverNameRule: msg({ id: 'assistant.sidebar.serverNameRule', defaultMessage: 'Use letters, numbers, "-" and "_". "combwork" and "hive" are reserved.', description: "New MCP Server: a name that can't be used. Keep combwork and hive as they are (the built-in server's name and its old one, HI-2463)." }),
   createServerFailed: msg({ id: 'assistant.sidebar.createServerFailed', defaultMessage: 'Could not create server', description: "An error notice: New MCP Server couldn't create the server's file; the reason follows." }),
   mcpTip: msg({ id: 'assistant.sidebar.mcpTipAdded', defaultMessage: "MCP servers deployed to the workspace (.hive/mcp) are available to every project and the Assistant, and run only where they are added: a project's MCP tab, the Assistant's view, or Add to… here. Changes apply to new sessions.", description: 'Tooltip on MCP Servers (HI-2059). Keep .hive/mcp as it is; "MCP tab" and "Add to…" as Hive shows them.' }),
   newServer: msg({ id: 'assistant.sidebar.newServer', defaultMessage: 'New MCP Server…', description: "A button over the MCP servers: creates a server from a template." }),
@@ -820,7 +821,7 @@ function McpPanel() {
       message: tr(M.newServerMessage, { file: '.hive/mcp/<name>.json' }),
       placeholder: tr(msg({ id: 'actions.mcp.namePlaceholder', defaultMessage: 'server-name', description: "Placeholder of the server's name box: an example name (lower case, a dash)." })),
       confirmLabel: tr(M.create),
-      validate: (v) => (/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(v.trim()) && v.trim() !== 'hive' ? null : tr(M.serverNameRule))
+      validate: (v) => (/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(v.trim()) && !isReservedServerName(v) ? null : tr(M.serverNameRule))
     })
     if (!name) return
     const m = await actions.attempt(tr(M.createServerFailed), () => call('mcp:create', name.trim()))
@@ -894,7 +895,7 @@ function McpPanel() {
           <div className={cx(/* i18n-ignore: class names */ 'row tall', selected === '__hive' && 'selected')} onClick={() => set({ selectedMcp: '__hive' })}>
             <Icon name="hubot" />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="label">{'hive' /* i18n-ignore: the server's name */}</div>
+              <div className="label">{TOOLS_SERVER /* i18n-ignore: the server's name */}</div>
               <div className="desc">{tr(M.hiveServerDesc)}</div>
             </div>
             <Tooltip content={tr(M.hiveServerTip)}>

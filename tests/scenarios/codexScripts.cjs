@@ -1,5 +1,5 @@
 // What a Codex code-mode script actually called (HI-2235, HI-2246). In code mode the model writes a script (its `exec`
-// tool) that calls tools from code: tools.mcp__hive__hive_read_task(…), tools.exec_command({cmd}), tools.apply_patch(…).
+// tool) that calls tools from code: tools.mcp__combwork__cw_read_task(…), tools.exec_command({cmd}), tools.apply_patch(…).
 // A call written in it may never run, and a reply it never printed isn't in its output. Codex's rollout records each
 // call the script made as it ends, and Hive's parser gives each script those calls (`tool.calls`, HI-2240:
 // src/main/providers/codex/scriptCalls.ts), named as the same call made directly is, in the script it started in. The

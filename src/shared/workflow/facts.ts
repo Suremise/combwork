@@ -156,7 +156,7 @@ export const QUEUE_STUCK_GATE = 'queueStuck'
 
 /**
  * G20 (HI-1367): the merge queue's question when a card's focused tests were skipped for their environment, bound to
- * the entry and those tests (`tests`): answered by the card's reviewer agent (hive_focused_skip) or the user.
+ * the entry and those tests (`tests`): answered by the card's reviewer agent (cw_focused_skip) or the user.
  */
 export const FOCUSED_SKIP_GATE = 'focusedSkip'
 

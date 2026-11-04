@@ -129,7 +129,7 @@
   "panes.messages.notDeliveredDetail": "它不处于空闲状态，或者你正在它的终端中输入。它的消息仍留在收件箱中：等它空闲后再试一次。",
   "panes.messages.overdue": "{n, plural, other {# 条逾期}}",
   "panes.messages.overdueTip": "{n, plural, =1 {有一次投递未及时确认：智能体尚未表示已处理。} other {有 # 次投递未及时确认：智能体尚未表示已处理。}}",
-  "panes.messages.tip": "{agent} 尚有{n, plural, =1 {一条消息} other { # 条消息}}未获取或确认：它空闲后会作为下一行输入给它，也可以用 hive_inbox 读取。",
+  "panes.messages.tip": "{agent} 尚有{n, plural, =1 {一条消息} other { # 条消息}}未获取或确认：它空闲后会作为下一行输入给它，也可以用 cw_inbox 读取。",
   "panes.messages.tipNoWakes": "{agent} 尚有{n, plural, other { # 条消息}}未获取或确认",
   "panes.messages.unread": "{n, plural, other {# 条未读}}",
   "panes.pages.agentsTip": "{button, select, none {第 {page} 页} other {{button}（第 {page} 页）}}：{agents}{added, select, yes {，含一个由助手添加的智能体} other {}}{key, select, none {} other {（按 {key} 转到下一页）}}",

@@ -127,7 +127,7 @@ describe('its readers (#1430)', () => {
   })
 })
 
-// #1531 (#1346 item 2): hive_project_status's pairs, so the Assistant doesn't guess which agent reviews whose work.
+// #1531 (#1346 item 2): cw_project_status's pairs, so the Assistant doesn't guess which agent reviews whose work.
 describe('builder and reviewer pairs', async () => {
   const { workflowPairs } = await import('../src/shared/workflow/roles')
   const lane = (id: string, builder: string, reviewer: string | null, state = 'active', pool = false) => ({ id, state, builder: { name: builder }, reviewer: reviewer ? { name: reviewer } : null, ...(pool ? { pool } : {}) })
@@ -146,7 +146,7 @@ describe('builder and reviewer pairs', async () => {
     expect(workflowPairs([{ name: 'Solo' }], [])).toEqual([])
   })
 
-  it("a running lane's pair carries its state as hive_lane list says it, the card it is on (HI-2271); pairs by name carry none", async () => {
+  it("a running lane's pair carries its state as cw_lane list says it, the card it is on (HI-2271); pairs by name carry none", async () => {
     const { laneStateText, laneLine } = await import('../src/shared/lanes')
     const card = (number: number, column: string, more: object = {}) => ({ number, title: `Card ${number}`, column, blocked: null, round: 1, reviewing: false, ...more })
     const info = (id: string, builder: string, reviewer: string, state: string, current: number | null, cards: object[], more: object = {}) => ({ id, project: 'alpha', name: null, builder: { id: builder, name: builder }, reviewer: { id: reviewer, name: reviewer }, cards, current, state, pausedOn: null, rounds: 10, waitMinutes: 360, status: null, ...more }) as never

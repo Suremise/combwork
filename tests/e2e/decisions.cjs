@@ -286,7 +286,7 @@ const check = (name, ok, extra = '') => {
   const launch = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).at(-1)
   const coderToken = launch.token
   // HI-2262: its session has the token's file, never the token in its environment (an `env` listing printed it).
-  check("Coder's session has HIVE_API_TOKEN_FILE and its token, never HIVE_API_TOKEN", !!launch.env?.HIVE_API_TOKEN_FILE && /^[0-9a-f]{64}$/.test(coderToken ?? '') && !('HIVE_API_TOKEN' in (launch.env ?? {})), JSON.stringify(Object.keys(launch.env ?? {})))
+  check("Coder's session has CW_API_TOKEN_FILE and its token, never HIVE_API_TOKEN", !!launch.env?.CW_API_TOKEN_FILE && /^[0-9a-f]{64}$/.test(coderToken ?? '') && !('HIVE_API_TOKEN' in (launch.env ?? {})), JSON.stringify(Object.keys(launch.env ?? {})))
   const asCoder = async (p, method = 'GET', body) => {
     const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${coderToken}`, 'X-Hive-Workspace': encodeURIComponent(ws), 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
     const notice = res.headers.get('x-hive-notice')
@@ -300,18 +300,18 @@ const check = (name, ok, extra = '') => {
   const named = `${(await card(n)).key}`
   check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(named), named)
   const status = await asCoder('/v1/projects/alpha')
-  check('a decision recorded since: its next reply, from a tool that is not the board, flags it', status.status === 200 && status.notice === `[Hive] ${named} has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.`, JSON.stringify(status))
+  check('a decision recorded since: its next reply, from a tool that is not the board, flags it', status.status === 200 && status.notice === `[CW] ${named} has 1 new decision since you last read it: read the card (cw_read_task) at your next checkpoint.`, JSON.stringify(status))
   // Through the real hive MCP server, as the agent's tools see it: the reply ends with the line.
   const viaMcp = JSON.parse(
-    execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
-      input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'hive_project_status', arguments: {} } }) + '\n',
-      env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${PORT}`, HIVE_WORKSPACE: ws, HIVE_API_TOKEN_FILE: lib.tokenFile(coderToken), HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }),
+    execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
+      input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_project_status', arguments: {} } }) + '\n',
+      env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${PORT}`, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: lib.tokenFile(coderToken), CW_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }),
       timeout: 60000
     })
       .toString()
       .split('\n')[0]
   ).result
-  check('…and hive_project_status ends with it', !viaMcp.isError && viaMcp.content[0].text.endsWith(`\n[Hive] ${named} has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.`), viaMcp.content?.[0]?.text?.slice(-200))
+  check('…and cw_project_status ends with it', !viaMcp.isError && viaMcp.content[0].text.endsWith(`\n[CW] ${named} has 1 new decision since you last read it: read the card (cw_read_task) at your next checkpoint.`), viaMcp.content?.[0]?.text?.slice(-200))
   await asCoder(`/v1/tasks/${n}`)
   // Its read in full is recorded as a fact (#1216): the decision generation that reply gave it, the card's newest.
   const received = await until(async () => {
@@ -327,7 +327,7 @@ const check = (name, ok, extra = '') => {
   await lib.sleep(20)
   await inv('tasks:update', n, { decision: 'One message per field.' })
   const moved = await asCoder(`/v1/tasks/${n}`, 'PATCH', { column: 'review', reply: 'short' })
-  check('moving the card to Review with a decision unread: that reply flags it', moved.status === 200 && moved.notice === `[Hive] ${named} has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.`, JSON.stringify(moved))
+  check('moving the card to Review with a decision unread: that reply flags it', moved.status === 200 && moved.notice === `[CW] ${named} has 1 new decision since you last read it: read the card (cw_read_task) at your next checkpoint.`, JSON.stringify(moved))
   check('…and once out of its hands, its next replies say nothing more', (await asCoder('/v1/projects/alpha')).notice === null)
 
   await app.close()

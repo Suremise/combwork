@@ -85,15 +85,15 @@ type Answer = Parameters<typeof reviewCopyText>[0]
 const ANSWERS: { a: Answer; card?: string; was: string; values: string[] }[] = [
   { a: { is: 'ready', copy: 'copy-1', folder: 'C:/w/copies/copy-1', revision: '0123456789abcdef' }, was: 'Review in C:/w/copies/copy-1 at 0123456789ab: read and run commands there, with it as their working directory; your session stays where it is.', values: ['C:/w/copies/copy-1', '0123456789ab'] },
   { a: { is: 'ready', copy: 'copy-1', folder: 'C:/w/copies/copy-1', revision: '0123456789abcdef' }, card: 'HI-12', was: "HI-12's review copy is ready. Review in C:/w/copies/copy-1 at 0123456789ab: read and run commands there, with it as their working directory; your session stays where it is.", values: ['HI-12', 'C:/w/copies/copy-1', '0123456789ab'] },
-  { a: { is: 'waiting', why: 'w' }, was: 'Waiting for a review copy (w): Hive tells you when one is ready, with its folder. Meanwhile git can show the submission from where you are.', values: ['w'] },
+  { a: { is: 'waiting', why: 'w' }, was: 'Waiting for a review copy (w): Combwork tells you when one is ready, with its folder. Meanwhile git can show the submission from where you are.', values: ['w'] },
   { a: { is: 'none', why: 'n' }, was: "No review copy (n): review the builder's work read-only from where you are.", values: ['n'] }
 ] as never
 const merged = 'aaa9a0c3c180fc41a6298d7a19f17a1f9239b3f5'
 const NOTES: { args: Parameters<typeof laneEndNote>; was: string; values: string[] }[] = [
-  { args: ['Off main', false, [{ key: 'HI-1', merged }, { key: 'HI-2', merged: null }]], was: "Lane Off main is finished: HI-1 merged at aaa9a0c3c180; HI-2 not merged. Your session ends once this turn does; Hive resumes it for your next lane. Close the lane's work in your reply, then end your turn.", values: ['Off main', 'HI-1', 'aaa9a0c3c180', 'HI-2'] },
-  { args: ['x', true, [{ key: 'HI-3', merged: null }]], was: "Lane x was abandoned: HI-3 not merged. Your session ends once this turn does; Hive resumes it for your next lane. Close the lane's work in your reply, then end your turn.", values: ['x', 'HI-3'] },
-  { args: ['y', false, []], was: "Lane y is finished. Your session ends once this turn does; Hive resumes it for your next lane. Close the lane's work in your reply, then end your turn.", values: ['y'] },
-  { args: ['z', true, Array.from({ length: 21 }, (_, i) => ({ key: `K${i}`, merged: null }))], was: `Lane z was abandoned: ${Array.from({ length: 20 }, (_, i) => `K${i} not merged`).join('; ')}; and 1 more. Your session ends once this turn does; Hive resumes it for your next lane. Close the lane's work in your reply, then end your turn.`, values: ['z', ...Array.from({ length: 20 }, (_, i) => `K${i}`).reverse(), '1'] }
+  { args: ['Off main', false, [{ key: 'HI-1', merged }, { key: 'HI-2', merged: null }]], was: "Lane Off main is finished: HI-1 merged at aaa9a0c3c180; HI-2 not merged. Your session ends once this turn does; Combwork resumes it for your next lane. Close the lane's work in your reply, then end your turn.", values: ['Off main', 'HI-1', 'aaa9a0c3c180', 'HI-2'] },
+  { args: ['x', true, [{ key: 'HI-3', merged: null }]], was: "Lane x was abandoned: HI-3 not merged. Your session ends once this turn does; Combwork resumes it for your next lane. Close the lane's work in your reply, then end your turn.", values: ['x', 'HI-3'] },
+  { args: ['y', false, []], was: "Lane y is finished. Your session ends once this turn does; Combwork resumes it for your next lane. Close the lane's work in your reply, then end your turn.", values: ['y'] },
+  { args: ['z', true, Array.from({ length: 21 }, (_, i) => ({ key: `K${i}`, merged: null }))], was: `Lane z was abandoned: ${Array.from({ length: 20 }, (_, i) => `K${i} not merged`).join('; ')}; and 1 more. Your session ends once this turn does; Combwork resumes it for your next lane. Close the lane's work in your reply, then end your turn.`, values: ['z', ...Array.from({ length: 20 }, (_, i) => `K${i}`).reverse(), '1'] }
 ]
 const RAW = ['Builder', 'Reviewer', 'Reviewer']
 const EXPANDED = ['AL-B1', 'AL-R1', 'AL-R2']

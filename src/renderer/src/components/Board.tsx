@@ -1544,7 +1544,7 @@ interface DecisionEdit {
 /**
  * A card's decisions (#357), pinned above its comments: what the user decided, newest last, each saying who recorded it
  * (the user decides; an agent or the Assistant may write it down) and "new since start" when it came after work on the
- * card began. The user adds, changes and removes them; agents and the Assistant can only add one (hive_update_task).
+ * card began. The user adds, changes and removes them; agents and the Assistant can only add one (cw_update_task).
  */
 function Decisions({
   card,

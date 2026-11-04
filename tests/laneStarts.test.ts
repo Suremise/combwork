@@ -61,7 +61,7 @@ function builder(status: string, id = 'b1'): { status: string } {
 
 const card = async (title: string, agent = 'b1'): Promise<number> => (await run(() => tasks.createTask({ title, project: 'alpha', agent }, user))).number
 const columnOf = async (n: number): Promise<string> => (await run(() => tasks.getTask(n, w))).column
-// The builder's doorbell for its task (#650: the task's id, which it reads with hive_inbox).
+// The builder's doorbell for its task (#650: the task's id, which it reads with cw_inbox).
 const rung = (): boolean => pty.typed.join('').includes('New in your inbox: 1 task')
 
 describe("Hive starts a lane's next card (HI-1990)", () => {
@@ -100,7 +100,7 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
     await checkLaneStarts(w)
     const started = await run(() => tasks.getTask(first, w))
     expect([started.column, started.agent]).toEqual(['doing', 'b1'])
-    expect(started.history.some((h) => h.by === 'Hive' && /^Moved to (the (top|bottom) of )?Doing\b/.test(h.what))).toBe(true)
+    expect(started.history.some((h) => h.by === 'Combwork' && /^Moved to (the (top|bottom) of )?Doing\b/.test(h.what))).toBe(true)
     expect(rung()).toBe(true)
     expect((await lanes.getLane(w, lane.id)).status?.reason).not.toBe('startWait')
     await lanes.endLane(w, lane.id, { abandoned: true })

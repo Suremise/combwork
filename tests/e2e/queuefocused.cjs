@@ -2,7 +2,7 @@
 // (queueFixture.cjs) with no G9 checks and G20 on, its picker and runner node scripts outside the repository, steered by
 // a control file; fake Claude Code agents acting by their own tokens. The picker's tests are kept with the submission;
 // the queue runs them once with the jobs Settings → Advanced gives, and merges on green; a failed test returns the card
-// with its output; a skipped one pauses the queue and asks the card's reviewer, whose hive_focused_skip lets it merge; a
+// with its output; a skipped one pauses the queue and asks the card's reviewer, whose cw_focused_skip lets it merge; a
 // picker that fails refuses the submit until the builder names the tests itself.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')

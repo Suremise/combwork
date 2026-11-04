@@ -88,25 +88,25 @@ describe("the stand-in model's steps", () => {
   it('reads the steps of a prompt, as the fake CLIs do', () => {
     expect(actionsOf('skill work-on-card boardmove 3 doing then boardcomment 3 then work 2 then say Done here.')).toEqual([
       { tool: 'skill', args: { skill: 'work-on-card' } },
-      { tool: 'hive_update_task', args: { number: 3, column: 'doing' } },
-      { tool: 'hive_update_task', args: { number: 3, comment: 'Fake: done, see the files.' } },
+      { tool: 'cw_update_task', args: { number: 3, column: 'doing' } },
+      { tool: 'cw_update_task', args: { number: 3, comment: 'Fake: done, see the files.' } },
       { wait: 2000 },
       { say: 'Done here.' }
     ])
     expect(actionsOf('shell: git status && node check.js')).toEqual([{ tool: 'powershell', args: { command: 'git status && node check.js', description: 'Run a command', mode: 'sync', initial_wait: 30 } }])
-    expect(actionsOf('hive hive_list_tasks {"column":"todo"}')).toEqual([{ tool: 'hive_list_tasks', args: { column: 'todo' } }])
+    expect(actionsOf('hive cw_list_tasks {"column":"todo"}')).toEqual([{ tool: 'cw_list_tasks', args: { column: 'todo' } }])
     // "work N" anywhere in a step, as in a task's own words.
     expect(actionsOf('Run this, then reply "built" (work 10)')).toEqual([{ wait: 10000 }])
   })
 
   it("takes one step a request, counting the turn's tool calls after the person's dated prompt (a loaded skill isn't one)", () => {
-    const tools = [{ function: { name: 'skill' } }, { function: { name: 'hive-hive_update_task' } }]
+    const tools = [{ function: { name: 'skill' } }, { function: { name: 'combwork-cw_update_task' } }]
     const prompt = { role: 'user', content: '<current_datetime>2026-10-09T00:00:00Z</current_datetime>\n\nskill work-on-card then boardmove 1 doing' }
     expect(decide({ tools, messages: [prompt] })).toMatchObject({ tool: 'skill', args: { skill: 'work-on-card' }, step: 0 })
     const call = { role: 'assistant', tool_calls: [{ id: 'c1' }] }
     // Copilot sends the skill it loaded back as a user message: still the same turn.
     const skillText = { role: 'user', content: '<skill-context>… skill and more …</skill-context>' }
-    expect(decide({ tools, messages: [prompt, call, { role: 'tool', content: 'ok' }, skillText] })).toMatchObject({ tool: 'hive-hive_update_task', args: { number: 1, column: 'doing' }, step: 1 })
+    expect(decide({ tools, messages: [prompt, call, { role: 'tool', content: 'ok' }, skillText] })).toMatchObject({ tool: 'combwork-cw_update_task', args: { number: 1, column: 'doing' }, step: 1 })
     const done = decide({ tools, messages: [prompt, call, { role: 'tool' }, skillText, call, { role: 'tool' }] })
     expect(done).toMatchObject({ text: 'Done.', step: 2 })
     // The last reply takes a moment, so the turn is seen working.

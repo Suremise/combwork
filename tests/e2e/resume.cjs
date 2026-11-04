@@ -41,7 +41,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `resume-${n
   // Old sessions: two of Agent 1's, none of Agent 2's.
   const A1 = await lib.addAgent(inv, proj)
   const A2 = await lib.addAgent(inv, proj)
-  const old = (id, name, at, extra = {}) => ({ id, agent: 'claude-code', name, createdAt: at, lastActiveAt: at, archived: false, ...extra })
+  const old = (id, name, at, extra = {}) => ({ id, agent: 'claude-code', name, createdAt: at, lastActiveAt: at, archived: false, names: 2, ...extra })
   // In the workspace's database (#1061): Hive has read the project's records.
   putSessions(proj, { version: 1, sessions: [old('11111111-0000-4000-8000-000000000001', 'Older work', '2026-09-20T10:00:00Z', { agentId: A1.id }), old('11111111-0000-4000-8000-000000000002', 'Tray fixes', '2026-09-25T10:00:00Z', { agentId: A1.id })] })
   // Hive's backups of their transcripts: a session with no transcript anywhere can't be resumed.

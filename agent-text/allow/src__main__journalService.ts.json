@@ -5,6 +5,5 @@
   "prose|call|The user deleted your journal: it starts again empty. Entries you recalled before are gone.": 1,
   "prose|error|Keep everyday entries for: a whole number of days from {} to {}. Nothing was changed.": 1,
   "prose|error|Size cap: no limit, or a whole number of MB from {} to {}. Nothing was changed.": 1,
-  "prose|prop:text|Hive": 1,
   "prose|var|Your journal is off. Suggest to the user once, in a line, that Settings → Assistant → Journal lets you remember decisions and plans across sessions without handovers; Hive won't ask again.": 1
 }

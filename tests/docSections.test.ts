@@ -128,7 +128,7 @@ describe('findHeading and sectionText', () => {
     expect(o.map((h) => [h.text, h.slug, !!h.fixed, h.sharedId])).toEqual([['Doc', 'doc', false, undefined], ['First', 'setup', false, 'setup'], ['Second', 'setup-1', false, 'setup'], ['Setup', 'setup-2', false, undefined]])
     const m = findHeading(o, '#setup')
     expect('ambiguous' in m && m.ambiguous.map((h) => h.text)).toEqual(['First', 'Second'])
-    // As a bare slug too, any case (hive_read_section's heading: setup), after the heading text ("Setup" is a heading's).
+    // As a bare slug too, any case (cw_read_section's heading: setup), after the heading text ("Setup" is a heading's).
     expect(findHeading(o, '#SETUP')).toEqual(m)
     const noText = docOutline(md.replace('## Setup\n\nThree.\n', ''))
     for (const asked of ['setup', 'SETUP', '#setup', '#Setup']) {
@@ -211,7 +211,7 @@ describe("the hive tools' replies", () => {
     expect(text.split('\n')[0]).toBe('docs/PLAN.md: 6 headings, 12k characters. [slug] and size per section (subsections included):')
     expect(text).toContain('\n  ## Core contracts [core-contracts] ')
     expect(text).toContain('\n    ### Errors [errors] ')
-    expect(text.endsWith('hive_read_section reads one as #<slug>.')).toBe(true)
+    expect(text.endsWith('cw_read_section reads one as #<slug>.')).toBe(true)
     // depth: only the levels down to it.
     expect(docOutlineText(outline, 1)).not.toContain('Core contracts')
     expect(docOutlineText({ path: 'x.md', size: 40, headings: [] })).toBe('x.md (40 characters) has no headings: read it whole.')

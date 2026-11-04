@@ -70,12 +70,12 @@ const check = (name, ok, extra = '') => {
   const tokenFile = path.join(userData, 'assistant-api', `${createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`)
   const token = JSON.parse(fs.readFileSync(tokenFile, 'utf8')).token
   // In its launch's private folder in Hive's user data, not the project (#345).
-  const mcp = JSON.parse(fs.readFileSync(path.join(lib.launchDir(userData, (await live(home, 'assistant')).runId), 'mcp.json'), 'utf8')).mcpServers.hive
-  check("the Assistant's hive tools use its token and role", mcp?.env.HIVE_API_TOKEN_FILE === tokenFile && mcp.env.HIVE_ROLE === 'assistant' && mcp.env.HIVE_ASSISTANT_CONTROL === 'projects', JSON.stringify(mcp?.env))
+  const mcp = JSON.parse(fs.readFileSync(path.join(lib.launchDir(userData, (await live(home, 'assistant')).runId), 'mcp.json'), 'utf8')).mcpServers.combwork
+  check("the Assistant's hive tools use its token and role", mcp?.env.CW_API_TOKEN_FILE === tokenFile && mcp.env.HIVE_ROLE === 'assistant' && mcp.env.HIVE_ASSISTANT_CONTROL === 'projects', JSON.stringify(mcp?.env))
   // Its skills: the workspace's skills for the Assistant (coordinate-agents and the shared ones), none for agents only.
   const assistantSkills = fs.readdirSync(path.join(home, '.hive', 'launch-assistant', 'plugin', 'skills')).sort()
-  // use-hive-api is for both (HI-2012): its tools.md, the hive tools' detail, is copied with it.
-  check('the Assistant gets the skills for it', ['coordinate-agents', 'handover', 'pick-up', 'split-work', 'workspace-note', 'use-hive-api'].every((n) => assistantSkills.includes(n)) && fs.existsSync(path.join(home, '.hive', 'launch-assistant', 'plugin', 'skills', 'use-hive-api', 'tools.md')) && !['work-on-card', 'review-agent-work', 'merge-ready'].some((n) => assistantSkills.includes(n)), assistantSkills.join(','))
+  // use-cw-api is for both (HI-2012): its tools.md, the hive tools' detail, is copied with it.
+  check('the Assistant gets the skills for it', ['coordinate-agents', 'handover', 'pick-up', 'split-work', 'workspace-note', 'use-cw-api'].every((n) => assistantSkills.includes(n)) && fs.existsSync(path.join(home, '.hive', 'launch-assistant', 'plugin', 'skills', 'use-cw-api', 'tools.md')) && !['work-on-card', 'review-agent-work', 'merge-ready'].some((n) => assistantSkills.includes(n)), assistantSkills.join(','))
   // Its instructions: its control level and boundaries, the skill that says how, then the mode.
   const told = fs.readFileSync(path.join(home, '.hive', 'launch-assistant', 'instructions.md'), 'utf8')
   check('its instructions give its control level and point to coordinate-agents, before the mode', /Control agents and create projects/.test(told) && told.indexOf('coordinate-agents skill') > 0 && told.indexOf('coordinate-agents skill') < told.indexOf('# Your mode'), told.slice(0, 300))
@@ -199,7 +199,7 @@ const check = (name, ok, extra = '') => {
   const watched = (await api('POST', '/v1/tasks', { title: 'Watched card', project: 'alpha' })).body?.number
   await api('POST', '/v1/projects/alpha/agents/Fixer/start', {})
   await until(async () => (await live(alpha, fixer))?.status === 'ready', HUNG_MS)
-  await api('POST', '/v1/projects/alpha/agents/Fixer/prompt', { text: `hive hive_wait_for_tasks ${JSON.stringify({ cards: [`#${watched}`], column: 'done', wake: true })}` })
+  await api('POST', '/v1/projects/alpha/agents/Fixer/prompt', { text: `hive cw_wait_for_tasks ${JSON.stringify({ cards: [`#${watched}`], column: 'done', wake: true })}` })
   check('Fixer watches a card', !!(await until(async () => (await live(alpha, fixer))?.status === 'watching', HUNG_MS)), (await live(alpha, fixer))?.status)
   const quiet = await api('POST', '/v1/projects/alpha/agents/Fixer/stop', { reason: 'testing' })
   check('stopping an agent that only watches asks nothing: it stops at once', quiet.status === 200 && quiet.body?.wasRunning === true && (await inv('assistant:questions')).length === 0 && !!(await until(async () => !(await live(alpha, fixer)), HUNG_MS)), JSON.stringify(quiet.body))
@@ -256,9 +256,9 @@ const check = (name, ok, extra = '') => {
 
   // Through its real hive tools, with the Agent API on: the CLI hands its own environment to MCP servers, and
   // that may carry the Agent API's token (HIVE_API_TOKEN); the Assistant's tools must still use its own.
-  const viaTool = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
-    input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'hive_activate_project', arguments: { project: 'alpha', active: true } } }) + '\n',
-    env: lib.childEnv({ HIVE_API_TOKEN: apiToken, ...mcp.env, HIVE_API_URL: API }),
+  const viaTool = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
+    input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_activate_project', arguments: { project: 'alpha', active: true } } }) + '\n',
+    env: lib.childEnv({ HIVE_API_TOKEN: apiToken, ...mcp.env, CW_API_URL: API }),
     timeout: 15000
   }).toString()
   const toolReply = JSON.parse(viaTool.split('\n')[0]).result
@@ -339,9 +339,9 @@ const check = (name, ok, extra = '') => {
   const kept = (await api('GET', '/v1/assistant/changes')).body
   const relabel = kept?.flatMap((g) => g.changes).find((c) => c.card === cardNo && c.fields.includes('labels'))
   check('its change is kept for undo, by its message, with the field it set', !!relabel && kept[0]?.group !== before && kept[0].changes.includes(relabel), JSON.stringify(kept).slice(0, 400))
-  const undoTool = (args) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'hive_undo', arguments: args } }) + '\n', env: lib.childEnv({ ...mcp.env, HIVE_API_URL: API }), timeout: 15000 }).toString().split('\n')[0]).result
+  const undoTool = (args) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_undo', arguments: args } }) + '\n', env: lib.childEnv({ ...mcp.env, CW_API_URL: API }), timeout: 15000 }).toString().split('\n')[0]).result
   const undoneReply = undoTool({ change: relabel?.id })
-  check('hive_undo undoes it: the label it set is gone', !undoneReply?.isError && (undoneReply?.content?.[0]?.text ?? '').startsWith('Undid 1 of 1 change in full.') && (await api('GET', `/v1/tasks/${cardNo}`)).body?.labels?.length === 0, JSON.stringify(undoneReply).slice(0, 300))
+  check('cw_undo undoes it: the label it set is gone', !undoneReply?.isError && (undoneReply?.content?.[0]?.text ?? '').startsWith('Undid 1 of 1 change in full.') && (await api('GET', `/v1/tasks/${cardNo}`)).body?.labels?.length === 0, JSON.stringify(undoneReply).slice(0, 300))
   check('…listed in Done by the Assistant', (await inv('assistant:actions')).some((x) => x.ok && x.kind === 'undo' && x.card === cardNo), JSON.stringify((await inv('assistant:actions')).slice(-2)))
   check('…and in the window\'s list as undone', (await inv('assistant:changes')).flatMap((g) => g.changes).some((c) => c.id === relabel?.id && !!c.undoneAt))
   check('an id that is not one of its changes is refused', (await api('POST', '/v1/assistant/undo', { change: 'not-a-change' })).status === 404)
@@ -352,19 +352,19 @@ const check = (name, ok, extra = '') => {
 
   // The tools its hive MCP server offers follow the control level; project agents never get them.
   const tools = (envExtra) => {
-    const outText = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) + '\n', env: lib.childEnv({ HIVE_API_URL: API, ...envExtra }), timeout: 10000 }).toString()
+    const outText = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) + '\n', env: lib.childEnv({ CW_API_URL: API, ...envExtra }), timeout: 10000 }).toString()
     return JSON.parse(outText.split('\n')[0]).result.tools.map((t) => t.name)
   }
-  const asAgent = tools({ HIVE_PROJECT: 'alpha' })
+  const asAgent = tools({ CW_PROJECT: 'alpha' })
   const asAgents = tools({ HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'agents' })
   const asLook = tools({ HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'look' })
-  check('project agents get no control tools', !asAgent.includes('hive_add_agent') && !asAgent.includes('hive_agent_activity') && !asAgent.includes('hive_start_task'), asAgent.join(','))
-  check('project agents get the board tools', ['hive_list_tasks', 'hive_read_task', 'hive_create_task', 'hive_update_task', 'hive_reorder_tasks'].every((t) => asAgent.includes(t)), asAgent.join(','))
-  check('Control agents: agent tools, no project creation', asAgents.includes('hive_prompt_agent') && asAgents.includes('hive_stop_agent') && asAgents.includes('hive_hand_over') && asAgents.includes('hive_start_task') && !asAgents.includes('hive_create_project'))
-  check('Look and advise: reading tools only', asLook.includes('hive_agent_activity') && asLook.includes('hive_wait_for_agents') && asLook.includes('hive_list_tasks') && !asLook.includes('hive_add_agent') && !asLook.includes('hive_start_task'))
+  check('project agents get no control tools', !asAgent.includes('cw_add_agent') && !asAgent.includes('cw_agent_activity') && !asAgent.includes('cw_start_task'), asAgent.join(','))
+  check('project agents get the board tools', ['cw_list_tasks', 'cw_read_task', 'cw_create_task', 'cw_update_task', 'cw_reorder_tasks'].every((t) => asAgent.includes(t)), asAgent.join(','))
+  check('Control agents: agent tools, no project creation', asAgents.includes('cw_prompt_agent') && asAgents.includes('cw_stop_agent') && asAgents.includes('cw_hand_over') && asAgents.includes('cw_start_task') && !asAgents.includes('cw_create_project'))
+  check('Look and advise: reading tools only', asLook.includes('cw_agent_activity') && asLook.includes('cw_wait_for_agents') && asLook.includes('cw_list_tasks') && !asLook.includes('cw_add_agent') && !asLook.includes('cw_start_task'))
   // Its lane tool says only list works there (#500); trusted at every level (sessions' trustedHiveTools, unit-tested).
-  const laneTool = (envExtra) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) + '\n', env: lib.childEnv({ HIVE_API_URL: API, ...envExtra }), timeout: 10000 }).toString().split('\n')[0]).result.tools.find((t) => t.name === 'hive_lane')
-  check('Look and advise: hive_lane says only list works', /only list works/.test(laneTool({ HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'look' })?.description ?? '') && !/only list works/.test(laneTool({ HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'agents' })?.description ?? ''))
+  const laneTool = (envExtra) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) + '\n', env: lib.childEnv({ CW_API_URL: API, ...envExtra }), timeout: 10000 }).toString().split('\n')[0]).result.tools.find((t) => t.name === 'cw_lane')
+  check('Look and advise: cw_lane says only list works', /only list works/.test(laneTool({ HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'look' })?.description ?? '') && !/only list works/.test(laneTool({ HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'agents' })?.description ?? ''))
 
   // --- HI-2328: an agent change waiting behind project.json's lock is checked again with its write. The user's own write is
   // held just before its file is replaced (as in assistantsettings), the Assistant's change queues behind it, Control is

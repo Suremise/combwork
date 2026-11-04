@@ -460,7 +460,7 @@ const SOURCES: readonly AdvancedSource[] = [
     id: 'hive.console.showText',
     group: 'hive',
     title: msg({ id: 'settings.advanced.hive.console.showText.title', defaultMessage: 'Developer console: show prompt, reply and command text', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
-    desc: msg({ id: 'settings.advanced.hive.console.showText.desc', defaultMessage: "Show the text in the developer console: prompts, replies, commands and tools' arguments, under a banner saying it is unredacted, and start each recording with its text box ticked. Tokens, API keys and sign-in details stay masked whatever this says; agents' hive_console stays redacted, and a recording with text is never attached to Copy Diagnostics.", description: 'What the advanced setting "Developer console: show prompt, reply and command text" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    desc: msg({ id: 'settings.advanced.hive.console.showText.desc', defaultMessage: "Show the text in the developer console: prompts, replies, commands and tools' arguments, under a banner saying it is unredacted, and start each recording with its text box ticked. Tokens, API keys and sign-in details stay masked whatever this says; agents' cw_console stays redacted, and a recording with text is never attached to Copy Diagnostics.", description: 'What the advanced setting "Developer console: show prompt, reply and command text" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'boolean',
     default: false,
     applies: 'now'
@@ -580,8 +580,8 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'hive.progress.replySeconds',
     group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.progress.replySeconds.title', defaultMessage: "hive-progress: Combwork's reply time", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. hive-progress is the command agents run long commands and checks through: keep it as it is." }),
-    desc: msg({ id: 'settings.advanced.hive.progress.replySeconds.desc', defaultMessage: "How long hive-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 2 minutes at most.", description: "What the advanced setting \"hive-progress: Hive's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced)." }),
+    title: msg({ id: 'settings.advanced.hive.progress.replySeconds.title', defaultMessage: "cw-progress: Combwork's reply time", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. cw-progress is the command agents run long commands and checks through: keep it as it is." }),
+    desc: msg({ id: 'settings.advanced.hive.progress.replySeconds.desc', defaultMessage: "How long cw-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 2 minutes at most.", description: "What the advanced setting \"cw-progress: Hive's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced)." }),
     kind: 'number',
     default: 15,
     min: 1,
@@ -677,7 +677,7 @@ const SOURCES: readonly AdvancedSource[] = [
     id: 'hive.wait.cardMaxSeconds',
     group: 'hive',
     title: msg({ id: 'settings.advanced.hive.wait.cardMaxSeconds.title', defaultMessage: 'Card waits: longest', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
-    desc: msg({ id: 'settings.advanced.hive.wait.cardMaxSeconds.desc', defaultMessage: "The longest an agent's hive_wait_for_tasks call (without wake) waits before it answers. It has to stay under the CLIs' own tool timeouts, so Combwork keeps it a minute below Codex's hive tool timeout whatever is set here.", description: 'What the advanced setting "Card waits: longest" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    desc: msg({ id: 'settings.advanced.hive.wait.cardMaxSeconds.desc', defaultMessage: "The longest an agent's cw_wait_for_tasks call (without wake) waits before it answers. It has to stay under the CLIs' own tool timeouts, so Combwork keeps it a minute below Codex's hive tool timeout whatever is set here.", description: 'What the advanced setting "Card waits: longest" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 840,
     min: 60,
@@ -689,7 +689,7 @@ const SOURCES: readonly AdvancedSource[] = [
     id: 'hive.wait.agentsMaxSeconds',
     group: 'hive',
     title: msg({ id: 'settings.advanced.hive.wait.agentsMaxSeconds.title', defaultMessage: 'Agent waits: longest', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
-    desc: msg({ id: 'settings.advanced.hive.wait.agentsMaxSeconds.desc', defaultMessage: "The longest hive_wait_for_agents waits for agents to finish before it answers. Kept a minute below Codex's hive tool timeout, as card waits are.", description: 'What the advanced setting "Agent waits: longest" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    desc: msg({ id: 'settings.advanced.hive.wait.agentsMaxSeconds.desc', defaultMessage: "The longest cw_wait_for_agents waits for agents to finish before it answers. Kept a minute below Codex's hive tool timeout, as card waits are.", description: 'What the advanced setting "Agent waits: longest" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 600,
     min: 30,
@@ -1145,8 +1145,8 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.hive.copies.review.title', defaultMessage: 'Reviewers review in review copies', description: "An advanced setting's title (Settings → Advanced), listed under Hive. A review copy is a folder Hive keeps at the exact revision a reviewer reviews, which nothing else writes." }),
     desc: msg({
       id: 'settings.advanced.hive.copies.review.desc',
-      defaultMessage: "A reviewer reads a card's work, and runs its commands, in a review copy: a folder at exactly the revision under review, which nothing else writes, so what it checks is what was submitted. Turned off, reviewers read the builder's folder as before. Isolated checks (hive-progress --check with --isolated) use the same copies either way.",
-      description: 'What the advanced setting "Reviewers review in review copies" does (Settings → Advanced, under Hive). hive-progress --check and --isolated are a command and its options: keep them as they are.'
+      defaultMessage: "A reviewer reads a card's work, and runs its commands, in a review copy: a folder at exactly the revision under review, which nothing else writes, so what it checks is what was submitted. Turned off, reviewers read the builder's folder as before. Isolated checks (cw-progress --check with --isolated) use the same copies either way.",
+      description: 'What the advanced setting "Reviewers review in review copies" does (Settings → Advanced, under Hive). cw-progress --check and --isolated are a command and its options: keep them as they are.'
     }),
     kind: 'boolean',
     default: true,
@@ -2385,7 +2385,7 @@ const SOURCES: readonly AdvancedSource[] = [
     max: 60,
     unit: 's',
     applies: 'now',
-    samples: [{ from: `${FIX}/advanced/drawn-codex-0.163.0.txt`, version: '0.163.0', text: '› [Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it.', shows: "Codex showing a line Hive typed in its prompt, before Enter: what Hive waits to see" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/drawn-codex-0.163.0.txt`, version: '0.163.0', text: '› [CW] New in your inbox: 1 message (m1). Call cw_inbox to read it.', shows: "Codex showing a line Combwork typed in its prompt, before Enter: what Combwork waits to see (the doorbell's text since HI-2463; the screen recorded with 0.163.0 had Hive's)" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   // A line break in a prompt Hive types into Codex (HI-1327): a key its input box takes as a new line, or a space.
   {

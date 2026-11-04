@@ -1,6 +1,6 @@
 // Sessions on leases (#1434, S35; SPEC §16.10.2–16.10.3): a Git project's slots lent through the test copies'
 // `slots:test` channel (as #1438's card start will), on the fake Claude Code:
-// 1. B1's card #12 gets slot-a: B1's new conversation starts there, with HIVE_SLOT and HIVE_SLOT_PORT_BASE, bound to
+// 1. B1's card #12 gets slot-a: B1's new conversation starts there, with CW_SLOT and CW_SLOT_PORT_BASE, bound to
 //    the lease. The lease ends while B1 is in a turn: its session is stopped once the turn is over. #13's lease ends
 //    while B1's next run there is still starting (its CLI asking to trust the folder): slot-a isn't lent meanwhile, and
 //    is free once that run is idle and stopped.
@@ -103,9 +103,9 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     const s1 = await until(async () => ((await idle(b1.id)) ? live(b1.id) : null), HUNG_MS)
     check("B1's new conversation starts in its card's slot", same(s1?.cwd, folderA) && s1?.slot === 'slot-a', JSON.stringify(s1))
     check('…the fake Claude Code was started there', same(lines(path.join(home, 'fake-launches.jsonl')).at(-1)?.cwd, folderA))
-    await say(b1.id, 'shell: echo %HIVE_SLOT% %HIVE_SLOT_PORT_BASE%')
+    await say(b1.id, 'shell: echo %CW_SLOT% %CW_SLOT_PORT_BASE%')
     const echoed = await until(() => lines(path.join(home, 'fake-shell.jsonl')).find((l) => l.agent === 'B1'), HUNG_MS)
-    check('…with HIVE_SLOT and HIVE_SLOT_PORT_BASE', echoed?.stdout?.trim() === `slot-a ${l12.slot.portBase}`, JSON.stringify(echoed))
+    check('…with CW_SLOT and CW_SLOT_PORT_BASE', echoed?.stdout?.trim() === `slot-a ${l12.slot.portBase}`, JSON.stringify(echoed))
     const conv1 = s1.sessionId
     check('…its session recorded in slot-a, bound to #12\'s lease', !!(await until(async () => (await sessionOf(conv1))?.lease === l12.lease.id, HUNG_MS)) && (await sessionOf(conv1)).slot === 'slot-a' && !(await sessionOf(conv1)).hold, JSON.stringify(await sessionOf(conv1)))
     await until(() => idle(b1.id), HUNG_MS)

@@ -1364,8 +1364,8 @@
     "description": "Button: changes the agent's provider. Keep it short."
   },
   "agents.switch.detail": {
-    "defaultMessage": "To carry the work over, ask the agent for a handover before switching (Combwork MCP: hive_create_handover), then ask the new agent to read it.",
-    "description": "Under the confirmation before an agent changes provider. hive_create_handover is a tool name: keep it."
+    "defaultMessage": "To carry the work over, ask the agent for a handover before switching (Combwork MCP: cw_create_handover), then ask the new agent to read it.",
+    "description": "Under the confirmation before an agent changes provider. cw_create_handover is a tool name: keep it."
   },
   "agents.switch.message": {
     "defaultMessage": "Its conversations stay in the Sessions tab, but {cli} can't resume {was} conversations, so {agent} starts fresh next time.",

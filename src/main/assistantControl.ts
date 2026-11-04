@@ -150,7 +150,7 @@ const CONTROL = {
   sessionEnded: agentMsg({ id: 'control.sessionEnded', text: "The Assistant's session that asked for this ended before the change was made: nothing changed here.", note: "The Assistant's change refused at the moment it was to be made: the session that asked was restarted or ended while it waited." }),
   notAllowed: agentMsg({ id: 'control.notAllowed', text: 'not allowed by Settings → Assistant → Control', note: "Why a change was refused, in the Assistant's activity list beside the change (#763)." }),
   notAllowedReason: agentMsg({ id: 'control.notAllowedReason', text: 'Not allowed by Settings → Assistant → Control', note: "Why a change was refused, as the Agent API's event stream says it (a refusal's reason, #763)." }),
-  tokenNote: agentMsg({ id: 'control.tokenNote', text: "The Hive Assistant's Agent API token for one workspace. Hive replaces it each time the Assistant starts.", note: "The note beside the Assistant's token in its file, for whoever opens it." }),
+  tokenNote: agentMsg({ id: 'control.tokenNote', text: "The Assistant's Agent API token for one workspace. Combwork replaces it each time the Assistant starts.", note: "The note beside the Assistant's token in its file, for whoever opens it." }),
   level: {
     look: agentMsg({ id: 'control.level.look', text: 'Look and advise', note: 'The control level Look and advise (Settings → Assistant → Control), as the Assistant\'s refusals name it.' }),
     agents: agentMsg({ id: 'control.level.agents', text: 'Control agents', note: 'The control level Control agents (Settings → Assistant → Control), as the Assistant\'s refusals name it.' }),

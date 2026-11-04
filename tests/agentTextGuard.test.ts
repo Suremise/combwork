@@ -59,7 +59,7 @@ describe('the agent-text guard', () => {
 
   it("leaves out what isn't wording: a reasoned agent-protocol mark, logs, ids, comparisons; a bare mark fails", () => {
     const t = tree({ [AGENT]: 'export const x = 1\n' })
-    t.write(AGENT, [`// agent-protocol: the doorbell's fixed prefix, which isDoorbell() matches`, `export const PREFIX = '[Hive] New in your inbox: '`, `export const k = 'contract.inbox.rule'`, `log.info('Started the lane now')`, `export const same = (s: string) => s === 'Moved to Review'`, `export const t = 'Some text' // agent-protocol: a test seam's name`].join('\n'))
+    t.write(AGENT, [`// agent-protocol: the doorbell's fixed prefix, which isDoorbell() matches`, `export const PREFIX = '[CW] New in your inbox: '`, `export const k = 'contract.inbox.rule'`, `log.info('Started the lane now')`, `export const same = (s: string) => s === 'Moved to Review'`, `export const t = 'Some text' // agent-protocol: a test seam's name`].join('\n'))
     expect(t.run().exit).toBe(0)
     t.write(AGENT, `export const t = 'Some text' // agent-protocol\n`)
     expect(reported(t.run())).toEqual([expect.stringMatching(/^BARE PROTOCOL src\/shared\/toolReplies\.ts:1 /), expect.stringMatching(/^NEW AGENT TEXT .*prose\|var\|Some text$/)])

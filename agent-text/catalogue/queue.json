@@ -84,7 +84,7 @@
     "note": "{who}: queue.line.who. {why}: decision (a decision since its approval) or stale (its pass)."
   },
   "queue.line.merged": {
-    "text": "Hive merged this card.",
+    "text": "Combwork merged this card.",
     "note": "A card the merge queue merged."
   },
   "queue.line.notYet": {
@@ -104,7 +104,7 @@
     "note": "{who}: queue.line.who. {returned}: what came back and what to do next (queue.returned.*)."
   },
   "queue.line.stale": {
-    "text": "{who} Its pass is for {approved}, but its line is at {current} (changed since): submit it again for review (hive_submit); it is queued once that is approved.",
+    "text": "{who} Its pass is for {approved}, but its line is at {current} (changed since): submit it again for review (cw_submit); it is queued once that is approved.",
     "note": "HI-1763: approved with a stale pass, never queued (HI-1737 sat so, its lane paused, nobody told). {who}: queue.line.who. {approved}, {current}: short revisions (\"—\" for none)."
   },
   "queue.line.testing": {
@@ -112,27 +112,27 @@
     "note": "{who}: queue.line.who. {target}: the branch it merges into. {step}: the queue's step with it (advance, checks; other: another or not known here)."
   },
   "queue.line.unenforced": {
-    "text": "Hive merges this card (its rules), but workflow rules aren't enforced: merge it yourself and report the merge (hive_report_merge).",
+    "text": "Combwork merges this card (its rules), but workflow rules aren't enforced: merge it yourself and report the merge (cw_report_merge).",
     "note": "A card read under Hive merges while Settings → Advanced: workflow rules are enforced is off: nothing refuses, so the agent merges and reports as before 1.0."
   },
   "queue.line.who": {
-    "text": "Hive merges this card (its rules): don't merge it yourself.",
+    "text": "Combwork merges this card (its rules): don't merge it yourself.",
     "note": "The first sentence of every queue line for a card Hive's merge queue merges (#1354): the agent never merges it itself."
   },
   "queue.next.conflict": {
-    "text": "Merge {target} into your worktree, resolve the conflict, commit and submit again (hive_submit).",
+    "text": "Merge {target} into your worktree, resolve the conflict, commit and submit again (cw_submit).",
     "note": "The next step after a conflict with {target}, the branch."
   },
   "queue.next.fix": {
-    "text": "Fix it in your worktree, commit and submit again (hive_submit).",
+    "text": "Fix it in your worktree, commit and submit again (cw_submit).",
     "note": "The next step after anything else that came back."
   },
   "queue.next.proof": {
-    "text": "Have its reviewer run those tests at the revision submitted (hive-progress --check \"focused:<test>\"), then submit the same revision again (hive_submit).",
+    "text": "Have its reviewer run those tests at the revision submitted (cw-progress --check \"focused:<test>\"), then submit the same revision again (cw_submit).",
     "note": "The next step when its focused tests that the queue doesn't run need a counted run (G20, HI-1367)."
   },
   "queue.next.repick": {
-    "text": "Bring your worktree up to date, then submit again naming the tests the change needs (tests on hive_submit), for review.",
+    "text": "Bring your worktree up to date, then submit again naming the tests the change needs (tests on cw_submit), for review.",
     "note": "The next step when its focused tests couldn't be chosen (G20, HI-1367)."
   },
   "queue.next.runner": {
@@ -140,7 +140,7 @@
     "note": "The next step when the project has no focused-test command: the setting is the user's (a tab and option name, as the window shows them)."
   },
   "queue.next.transient": {
-    "text": "Submit the same revision again (hive_submit): it goes straight back into the queue, at most twice in a row.",
+    "text": "Submit the same revision again (cw_submit): it goes straight back into the queue, at most twice in a row.",
     "note": "The next step after a failure of the environment, not the work."
   },
   "queue.paused.approval": {
@@ -156,7 +156,7 @@
     "note": "What a queue paused on the folder its target is checked out in waits for (#1406). {target}: the branch."
   },
   "queue.paused.mergeChoice": {
-    "text": "it moves on once the user chooses, in For you, how Hive merges this project (merge style and commit message)",
+    "text": "it moves on once the user chooses, in For you, how Combwork merges this project (merge style and commit message)",
     "note": "What a queue paused for the project's merge style waits for (#1406)."
   },
   "queue.paused.resume": {
@@ -184,7 +184,7 @@
     "note": "A returned card's log, by its path, where it fits."
   },
   "queue.returned.logPointer": {
-    "text": "Its log path: hive_read_task.",
+    "text": "Its log path: cw_read_task.",
     "note": "Where a returned card's log path is, when the path itself doesn't fit."
   },
   "queue.returned.subjectIt": {
@@ -192,11 +192,11 @@
     "note": "The subject of a returned card's sentence in its own card read (a wake names it by its key)."
   },
   "queue.wake.left.decision": {
-    "text": "{card} left the merge queue: a decision since its approval needs it reviewed again. Read its decisions (hive_read_task){to, select, review {; it is back in Review, and queued again once approved.} other {, then submit again (hive_submit).}}",
+    "text": "{card} left the merge queue: a decision since its approval needs it reviewed again. Read its decisions (cw_read_task){to, select, review {; it is back in Review, and queued again once approved.} other {, then submit again (cw_submit).}}",
     "note": "#1354: its builder's wake for a card that left the queue for a decision since its approval. {to}: review (it went back to Review) or active."
   },
   "queue.wake.left.stale": {
-    "text": "{card} left the merge queue: its pass is stale (its revision changed since it was approved). Submit the current revision (hive_submit) for review.",
+    "text": "{card} left the merge queue: its pass is stale (its revision changed since it was approved). Submit the current revision (cw_submit) for review.",
     "note": "#1354: its builder's wake for a card that left the queue, its pass stale."
   },
   "queue.wake.resubmitted": {
@@ -204,7 +204,7 @@
     "note": "HI-2143: a card submitted again after the queue returned it, its reviewer's wake. {failure}: what came back (queue.failure.*). {conflict}: yes when it came back with a conflict."
   },
   "queue.wake.stale": {
-    "text": "{card}: its pass is stale: it is for {approved}, but its line is at {current} (changed since). Submit {current} for review (hive_submit).",
+    "text": "{card}: its pass is stale: it is for {approved}, but its line is at {current} (changed since). Submit {current} for review (cw_submit).",
     "note": "HI-1763: a pass gone stale, its builder's wake at once (HI-1737 sat in Approved, nobody told). {approved}, {current}: short revisions (\"—\" for none)."
   }
 }

@@ -56,10 +56,11 @@ import { idleKey } from '../shared/laneBar'
 import { cardRef } from '../shared/projectKeys'
 import type { AppSettings, ProjectConfig, WorkspaceConfig } from '../shared/types'
 import { slotCopyOf, type SlotLevels } from '../shared/slotDefaults'
+import { COPY_PREFIX, LEGACY_COPY_PREFIX } from './providers/common'
 
 const log = createLogger('slots')
 
-/** Ports each slot gets (HIVE_SLOT_PORT_BASE and the 9 after it), and where a project's blocks start. */
+/** Ports each slot gets (CW_SLOT_PORT_BASE and the 9 after it), and where a project's blocks start. */
 export const SLOT_PORTS = 10
 export const PORT_FLOOR = 41000
 /** How long a ready slot beyond the pool's size stays unused before `tidy` removes it. */
@@ -95,7 +96,7 @@ const T = {
   takeoverNotReady: agentMsg({ id: 'slot.takeover.notReady', text: "isn't ready ({state})", note: "As slot.takeover.gone: the slot isn't lent. {state} is its state's id (ready, dirty…)." }),
   takeoverLent: agentMsg({ id: 'slot.takeover.lent', text: 'is lent again', note: 'As slot.takeover.gone: another lease has it.' }),
   takeoverOtherRun: agentMsg({ id: 'slot.takeover.otherRun', text: 'has another run in it now', note: 'As slot.takeover.gone: another run writes there now.' }),
-  takeoverOtherHive: agentMsg({ id: 'slot.takeover.otherHive', text: "is held by another Hive's run", note: 'As slot.takeover.gone: a run of another Hive (another profile) holds it.' }),
+  takeoverOtherHive: agentMsg({ id: 'slot.takeover.otherHive', text: "is held by another Combwork's run", note: 'As slot.takeover.gone: a run of another Hive (another profile) holds it.' }),
   takeoverHolds: agentMsg({ id: 'slot.takeover.holdsLease', text: "can't be taken over while its agent holds another lease", note: 'As slot.takeover.gone: one agent, one slot (HI-1762).' }),
   closed: agentMsg({ id: 'slot.error.closed', text: 'the workspace closed', note: "A slot's setup or preparation stopped: its workspace closed. Kept on the slot as its error." }),
   notListed: agentMsg({ id: 'slot.error.notListed', text: 'its folder is there but git does not list it as a worktree', note: "A slot's setup error: its folder exists but isn't a worktree git knows, so Hive leaves it alone." }),
@@ -269,7 +270,7 @@ export function refusalText(r: SlotRefusal, name: (agent: string) => string = (a
 
 /** A slot's environment for its sessions and runs: its name and its block of SLOT_PORTS ports. */
 export function slotEnv(slot: Pick<Slot, 'name' | 'portBase'>): Record<string, string> {
-  return { HIVE_SLOT: slot.name, HIVE_SLOT_PORT_BASE: String(slot.portBase) }
+  return { CW_SLOT: slot.name, CW_SLOT_PORT_BASE: String(slot.portBase) }
 }
 
 /** The nth generic slot name (0: slot-a … 25: slot-z, 26: slot-aa…). */
@@ -1208,16 +1209,17 @@ export interface SlotRenamer {
   where(from: string, to: string, tree: string): Promise<'from' | 'to' | 'elsewhere' | null>
 }
 /**
- * The `hive-*` entries in a folder's `.agents/skills` (where Hive puts its skill copies), by name: folders, and links
- * or anything else with that name too (never followed). None only when the skills folder is proved absent; any other
- * error reading it throws, so the slot is kept (cantCheck) rather than removed unseen.
+ * The `cw-*` entries in a folder's `.agents/skills` (where Combwork puts its skill copies), and `hive-*` ones (its
+ * copies' names before HI-2463), by name: folders, and links or anything else with that name too (never followed). None
+ * only when the skills folder is proved absent; any other error reading it throws, so the slot is kept (cantCheck)
+ * rather than removed unseen.
  */
 async function hiveSkillFolders(folder: string): Promise<string[]> {
   const entries = await readdir(join(folder, '.agents', 'skills'), { withFileTypes: true }).catch((e: NodeJS.ErrnoException) => {
     if (e.code === 'ENOENT') return []
     throw e
   })
-  return entries.filter((e) => e.name.toLowerCase().startsWith('hive-')).map((e) => e.name)
+  return entries.filter((e) => [COPY_PREFIX, LEGACY_COPY_PREFIX].some((p) => e.name.toLowerCase().startsWith(p))).map((e) => e.name)
 }
 const newJob = (): string => `slot-${randomBytes(6).toString('hex')}`
 
@@ -1926,7 +1928,7 @@ export class SlotPool {
         // so a recovery (this Hive's next look, its token no longer running) finishes it from what git says.
         added = true
         const made = await this.madeOn(intent)
-        if (made !== true) return `git ${made === null ? "couldn't say whether" : "doesn't list"} ${intent.to} on ${intent.line}: Hive looks again` // agent-protocol: the log's reason (Repair logs it), never an agent's
+        if (made !== true) return `git ${made === null ? "couldn't say whether" : "doesn't list"} ${intent.to} on ${intent.line}: Combwork looks again` // agent-protocol: the log's reason (Repair logs it), never an agent's
         await this.store.endRecreate(name, token, intent, true)
         log.info(`Slot ${userText(name)} made again at ${userText(intent.to)} on ${userText(intent.line)}`)
         return null

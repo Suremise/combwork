@@ -1,5 +1,5 @@
 // HI-2285: a lane's builder starting a card watch on its own card while nothing on it waits on anyone (shared/idleWatch.ts):
-// hive_wait_for_tasks's reply says so. Agent-facing.
+// cw_wait_for_tasks's reply says so. Agent-facing.
 
 import { nothingWaitsOn } from '../shared/idleWatch'
 import { listLanes } from './lanes'

@@ -126,9 +126,9 @@ describe('who gets which skill', () => {
 
       // A tool listing says it too.
       const text = skillListText(all.filter((s) => ['misspelt', 'inline-assistant', 'plain'].includes(s.name)).map((s) => ({ name: s.name, description: s.description, level: s.level, ...(s.audience ? { audience: s.audience } : {}), ...(s.problem ? { problem: s.problem } : {}) })))
-      expect(text).toContain('misspelt (Hive, given to nobody: its audience is "assitant", not agents, assistant or all)')
-      expect(text).toContain('inline-assistant (Hive, for the Assistant)')
-      expect(text).toContain('plain (Hive, for agents)')
+      expect(text).toContain('misspelt (Combwork, given to nobody: its audience is "assitant", not agents, assistant or all)')
+      expect(text).toContain('inline-assistant (Combwork, for the Assistant)')
+      expect(text).toContain('plain (Combwork, for agents)')
     } finally {
       await disposeWorkspaceService(w)
     }

@@ -96,7 +96,7 @@ const project = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'proj
     await inv('agents:add', alpha, { name: 'Three' })
     const three = project().agents.find((a) => a.name === 'Three')
     await inv('session:start', alpha, { agentId: three.id })
-    const launched = (name) => lines(path.join(accountsRoot, max1.id, 'fake-launches.jsonl')).find((l) => l.env.HIVE_AGENT === name) ?? null
+    const launched = (name) => lines(path.join(accountsRoot, max1.id, 'fake-launches.jsonl')).find((l) => l.env.CW_AGENT === name) ?? null
     const t = await lib.until(() => launched('Three'), HUNG_MS)
     check("Three (none of its own) launches with its connection's defaults: --model sonnet --effort low", t?.opts['--model'] === 'sonnet' && t?.opts['--effort'] === 'low', JSON.stringify(t?.opts))
     await inv('session:start', alpha, { agentId: 'a-two' })

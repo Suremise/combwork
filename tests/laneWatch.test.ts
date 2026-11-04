@@ -83,7 +83,7 @@ describe('what a lane watch counts (#531)', () => {
     expect(readSavedLaneMark({ ...was, cards: { 1: { ...card(), r: 'soon' } } })).toBeNull()
   })
 
-  // HI-1991: a builder's hive_ask_user sat under For you for 20 minutes: its builder wasn't waiting at a prompt, and the
+  // HI-1991: a builder's cw_ask_user sat under For you for 20 minutes: its builder wasn't waiting at a prompt, and the
   // Assistant had dropped `paused`, which also fired on every merge.
   it('a question for the user on a lane card is always told (paused-user), whatever the events; a merge pause is paused-merge, and paused still reads as it', () => {
     const t0 = '2026-10-29T00:00:00.000Z'
@@ -99,7 +99,7 @@ describe('what a lane watch counts (#531)', () => {
     const ask = { since: t1, by: 'HB6', text: 'Push the tag now?\nIt is v1.0.0.' }
     expect(laneHits(was, now(t1, ask), ['failed', 'paused-user'])!.parts).toEqual([{ n: 1, event: 'paused-user', text: '#1 waits for the user (HB6 asks)', detail: 'Push the tag now?' }])
     // Hive's own request (no asker), a second question after the first, none new, one answered: told, told, quiet, quiet.
-    expect(laneHits(was, now(t1, { since: t1, by: null, text: 'Approve the merge?' }), ['paused-user'])!.parts[0].text).toBe('#1 waits for the user (Hive asks)')
+    expect(laneHits(was, now(t1, { since: t1, by: null, text: 'Approve the merge?' }), ['paused-user'])!.parts[0].text).toBe('#1 waits for the user (Combwork asks)')
     expect(laneHits(now(t1).mark, now(t2, { ...ask, since: t2 }), ['paused-user'])).not.toBeNull()
     expect(laneHits(now(t1).mark, now(t1, ask), ['paused-user'])).toBeNull()
     expect(laneHits(now(t1).mark, now(''), ['paused-user'])).toBeNull()
@@ -110,7 +110,7 @@ describe('what a lane watch counts (#531)', () => {
     expect(laneHits({ ...was, cards: {} }, now(t1, ask), ['paused-user'], t0)).not.toBeNull()
     expect(laneHits({ ...was, cards: {} }, now(t0, { ...ask, since: t0 }), ['paused-user'], t1)).toBeNull()
     // Its line says to tell the user, never answer for them; the mark keeps q.
-    expect(laneWakeLine([laneHits(was, now(t1, ask), ['paused-user'])!])).toBe('[Hive] Lane B1 / R1: #1 waits for the user (HB6 asks): "Push the tag now?". Your lane watch has ended: read the cards named (hive_read_task), act on them, tell the user what an agent waits for (hive_notify) and never answer it for them, then watch the lanes again (hive_wait_for_tasks with lanes).')
+    expect(laneWakeLine([laneHits(was, now(t1, ask), ['paused-user'])!])).toBe('[CW] Lane B1 / R1: #1 waits for the user (HB6 asks): "Push the tag now?". Your lane watch has ended: read the cards named (cw_read_task), act on them, tell the user what an agent waits for (cw_notify) and never answer it for them, then watch the lanes again (cw_wait_for_tasks with lanes).')
     expect(readSavedLaneMark(JSON.parse(JSON.stringify(now(t1).mark)))!.cards[1].q).toBe(t1)
     expect(readSavedLaneMark({ ...was, cards: { 1: { ...card(), q: 'soon' } } })).toBeNull()
     // The merge pause, its own event and line; a pause for the user isn't one.
@@ -194,7 +194,7 @@ describe('what a lane watch counts (#531)', () => {
       expect(laneHits(due, now(due), LANE_DEFAULT_EVENTS)).toBeNull()
       const hit = laneHits(due, now({ ...due, ms: true }, why), LANE_DEFAULT_EVENTS)!
       expect(hit.parts).toEqual([{ n: null, event: 'stalled', text: 'its merge is stalled', detail: why }])
-      expect(laneWakeLine([hit])).toMatch(/^\[Hive\] Lane HB1 \/ HR1 \(lane G\): its merge is stalled: "Every card passed, but HB1 has been idle for 12 min with no merge slot claimed\."\. Your lane watch has ended/)
+      expect(laneWakeLine([hit])).toMatch(/^\[CW\] Lane HB1 \/ HR1 \(lane G\): its merge is stalled: "Every card passed, but HB1 has been idle for 12 min with no merge slot claimed\."\. Your lane watch has ended/)
       expect(laneHits({ ...due, ms: true }, now({ ...due, ms: true }, why), LANE_DEFAULT_EVENTS)).toBeNull()
       expect(laneHits(due, now({ ...due, ms: true }, why), ['failed', 'merge-due'])).toBeNull()
       expect(readSavedLaneMark(JSON.parse(JSON.stringify({ ...due, ms: true })))).toEqual({ ...due, ms: true })
@@ -203,17 +203,17 @@ describe('what a lane watch counts (#531)', () => {
   })
 
   it("the reply to a lane watch: lean, with the events only when they aren't the default", () => {
-    expect(taskWaitText({ watching: 'Waiting on all running lanes', limitAt: 'T', events: [...LANE_DEFAULT_EVENTS] })).toBe('Waiting on all running lanes. End your turn now: Hive types a line into this session on a lane event, or at T if none comes.')
-    expect(taskWaitText({ watching: 'Waiting on 2 lanes', limitAt: 'T', events: ['failed', 'passed'], replaced: 'Waiting for #12 → Review' })).toBe('Waiting on 2 lanes (failed, passed). End your turn now: Hive types a line into this session on a lane event, or at T if none comes. It replaces your watch (waiting for #12 → Review).')
+    expect(taskWaitText({ watching: 'Waiting on all running lanes', limitAt: 'T', events: [...LANE_DEFAULT_EVENTS] })).toBe('Waiting on all running lanes. End your turn now: Combwork types a line into this session on a lane event, or at T if none comes.')
+    expect(taskWaitText({ watching: 'Waiting on 2 lanes', limitAt: 'T', events: ['failed', 'passed'], replaced: 'Waiting for #12 → Review' })).toBe('Waiting on 2 lanes (failed, passed). End your turn now: Combwork types a line into this session on a lane event, or at T if none comes. It replaces your watch (waiting for #12 → Review).')
   })
 
   it('the wake line names each lane and card, within the size: details give way, then labels, then each lane is counted', () => {
     const hit = (i: number, detail = 'Which icon should the app use? A bee, a honeycomb or a hive cell.') => ({ id: `lane-${i}`, label: `Builder${i} / Reviewer${i} (lane ${i})`, parts: [{ n: 100 + i, event: 'blocked' as const, text: `#${100 + i} is blocked`, detail }, { n: 200 + i, event: 'failed' as const, text: `#${200 + i} failed review (Reviewer${i} (alpha))` }] })
-    expect(laneWakeLine([hit(1)])).toBe(`[Hive] Lane Builder1 / Reviewer1 (lane 1): #101 is blocked: "Which icon should the app use? A bee, a honeycomb or a hive cell."; #201 failed review (Reviewer1 (alpha)). Your lane watch has ended: read the cards named (hive_read_task), act on them, then watch the lanes again (hive_wait_for_tasks with lanes).`)
+    expect(laneWakeLine([hit(1)])).toBe(`[CW] Lane Builder1 / Reviewer1 (lane 1): #101 is blocked: "Which icon should the app use? A bee, a honeycomb or a hive cell."; #201 failed review (Reviewer1 (alpha)). Your lane watch has ended: read the cards named (cw_read_task), act on them, then watch the lanes again (cw_wait_for_tasks with lanes).`)
     for (const n of [3, 7, 20, 60]) {
       const line = laneWakeLine(Array.from({ length: n }, (_, i) => hit(i, '評'.repeat(300))))
       expect(Buffer.byteLength(JSON.stringify(line))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
-      expect(line).toMatch(/^\[Hive\] .*Your lane watch has ended/)
+      expect(line).toMatch(/^\[CW\] .*Your lane watch has ended/)
       if (n <= 7) for (let i = 0; i < n; i++) expect(line).toContain(`#${100 + i}`)
     }
   })
@@ -228,7 +228,7 @@ describe('what a lane watch counts (#531)', () => {
     expect(readLaneCards({ cards: Array.from({ length: 21 }, (_, i) => i + 1) })).toMatch(/at most 20/)
     expect(readLaneCards({ cards: [7], changes: ['blocked'] })).toMatch(/changes must be/)
     // The reply says whether its cards were kept, replaced or dropped.
-    expect(taskWaitText({ watching: 'Waiting on all running lanes and #720', limitAt: 'T', events: [...LANE_DEFAULT_EVENTS], cards: { now: [720], kept: true } })).toBe('Waiting on all running lanes and #720. End your turn now: Hive types a line into this session on a lane event or a change to #720, or at T if none comes. It kept #720 from your last lane watch (cards: [] for none).')
+    expect(taskWaitText({ watching: 'Waiting on all running lanes and #720', limitAt: 'T', events: [...LANE_DEFAULT_EVENTS], cards: { now: [720], kept: true } })).toBe('Waiting on all running lanes and #720. End your turn now: Combwork types a line into this session on a lane event or a change to #720, or at T if none comes. It kept #720 from your last lane watch (cards: [] for none).')
     expect(taskWaitText({ watching: 'Waiting on all running lanes and #721', limitAt: 'T', events: [...LANE_DEFAULT_EVENTS], cards: { now: [721], replaced: [720] } })).toContain('Its cards replace #720.')
     expect(taskWaitText({ watching: 'Waiting on all running lanes', limitAt: 'T', events: [...LANE_DEFAULT_EVENTS], cards: { now: [], replaced: [720] } })).toContain('It no longer watches #720.')
     expect(taskWaitText({ watching: 'Waiting on all running lanes and #720', limitAt: 'T', events: [...LANE_DEFAULT_EVENTS], cards: { now: [720], kept: true, dropped: [719] } })).toContain('#719 left it (done or gone).')
@@ -239,18 +239,18 @@ describe('what a lane watch counts (#531)', () => {
     const rel: CardChange = { number: 720, column: 'review', changes: ['comment'], by: 'HB6 (hive)', comment: { by: 'HB6 (hive)', firstLine: 'Draft release is up: push when ready' }, about: { owner: 'HB6', verdict: null } }
     const wait = { name: 'HB6', project: 'hive', card: 720, what: 'Claude needs your permission to use Bash' }
     expect(laneWakeLine([lane], { cards: [rel], waits: [wait], watching: true })).toBe(
-      `[Hive] Lane B1 / R1: #12 failed review (R1 (alpha)) | #720 (HB6's card) is in Review (latest comment by HB6 (hive): "Draft release is up: push when ready") | HB6 (hive) is waiting for the user on #720: "Claude needs your permission to use Bash". Your lane watch has ended: read the cards named (hive_read_task), act on them, tell the user what an agent waits for (hive_notify) and never answer it for them, then watch the lanes again (hive_wait_for_tasks with lanes; your cards stay unless you pass cards).`
+      `[CW] Lane B1 / R1: #12 failed review (R1 (alpha)) | #720 (HB6's card) is in Review (latest comment by HB6 (hive): "Draft release is up: push when ready") | HB6 (hive) is waiting for the user on #720: "Claude needs your permission to use Bash". Your lane watch has ended: read the cards named (cw_read_task), act on them, tell the user what an agent waits for (cw_notify) and never answer it for them, then watch the lanes again (cw_wait_for_tasks with lanes; your cards stay unless you pass cards).`
     )
     // Only what happened: a wait alone, or a card alone.
-    expect(laneWakeLine([], { waits: [{ ...wait, card: null, what: null }] })).toMatch(/^\[Hive\] HB6 \(hive\) is waiting for the user\. Your lane watch has ended/)
-    expect(laneWakeLine([], { cards: [{ ...rel, changes: ['blocked'], blocked: 'Darren pushes the tag' }], watching: true })).toMatch(/^\[Hive\] #720 \(HB6's card\) is in Review and blocked: "Darren pushes the tag" \(latest comment/)
+    expect(laneWakeLine([], { waits: [{ ...wait, card: null, what: null }] })).toMatch(/^\[CW\] HB6 \(hive\) is waiting for the user\. Your lane watch has ended/)
+    expect(laneWakeLine([], { cards: [{ ...rel, changes: ['blocked'], blocked: 'Darren pushes the tag' }], watching: true })).toMatch(/^\[CW\] #720 \(HB6's card\) is in Review and blocked: "Darren pushes the tag" \(latest comment/)
     for (const n of [3, 10, 40]) {
       const many = laneWakeLine(
         Array.from({ length: n }, (_, i) => ({ ...lane, id: `lane-${i}`, label: `Builder${i} / Reviewer${i} (lane ${i})` })),
         { cards: Array.from({ length: Math.min(n, 20) }, (_, i) => ({ ...rel, number: 700 + i, comment: { by: 'HB6', firstLine: '評'.repeat(200) } })), waits: Array.from({ length: n }, (_, i) => ({ ...wait, name: `Agent${i}`, what: '評'.repeat(200) })), watching: true }
       )
       expect(Buffer.byteLength(JSON.stringify(many))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
-      expect(many).toMatch(/^\[Hive\] .*Your lane watch has ended.*never answer it for them/)
+      expect(many).toMatch(/^\[CW\] .*Your lane watch has ended.*never answer it for them/)
     }
   })
 })
@@ -419,7 +419,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     return { w, alpha, home: w.assistantHome }
   }
   /**
-   * The Assistant (watching, then working once typed into; #650: it follows Hive's doorbell with hive_inbox, and what it
+   * The Assistant (watching, then working once typed into; #650: it follows Hive's doorbell with cw_inbox, and what it
    * read is `told`), and every agent of alpha running and working.
    */
   const fake = (alpha: string, home: string) => {
@@ -487,26 +487,26 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await fail(w, a, 'r1')
     await watches.evaluateWatches(w)
     await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
-    expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] Lane B1 / R1 \\(greetings\\): #${a} failed review \\(R1 \\(alpha\\)\\)\\. Your lane watch has ended`))
+    expect(st.told[0]).toMatch(new RegExp(`^\\[CW\\] Lane B1 / R1 \\(greetings\\): #${a} failed review \\(R1 \\(alpha\\)\\)\\. Your lane watch has ended`))
     // Watched again: a block in the other lane.
     await watchAll(w, home, st)
     await inWorkspace(w, () => tasks.updateTask(c, { blocked: 'Which icon?' }, agent('b2')))
     await watches.evaluateWatches(w)
     await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
-    expect(st.told[1]).toMatch(new RegExp(`^\\[Hive\\] Lane B2 / R2: #${c} is blocked: "Which icon\\?"`))
+    expect(st.told[1]).toMatch(new RegExp(`^\\[CW\\] Lane B2 / R2: #${c} is blocked: "Which icon\\?"`))
     // Both of B1's cards pass: its merge is due. Then Done: the lane ends.
     await watchAll(w, home, st)
     for (const n of [a, b]) await inWorkspace(w, () => tasks.updateTask(n, { column: 'passed' }, user))
     await watches.evaluateWatches(w)
     await vi.waitFor(() => expect(st.told).toHaveLength(3), { timeout: HUNG_MS })
-    expect(st.told[2]).toMatch(/^\[Hive\] Lane B1 \/ R1 \(greetings\): all its cards passed: its merge is due\./)
+    expect(st.told[2]).toMatch(/^\[CW\] Lane B1 \/ R1 \(greetings\): all its cards passed: its merge is due\./)
     await watchAll(w, home, st)
     for (const n of [a, b]) await inWorkspace(w, () => tasks.updateTask(n, { column: 'done' }, user))
     // Hive ends a lane whose cards are all Done as it follows the board (lanes.refresh).
     await lanes.refresh(w)
     await watches.evaluateWatches(w)
     await vi.waitFor(() => expect(st.told).toHaveLength(4), { timeout: HUNG_MS })
-    expect(st.told[3]).toMatch(/^\[Hive\] Lane B1 \/ R1 \(greetings\): ended \(merged\)\./)
+    expect(st.told[3]).toMatch(/^\[CW\] Lane B1 \/ R1 \(greetings\): ended \(merged\)\./)
     await disposeWorkspaceService(w)
   })
 
@@ -529,7 +529,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await disposeWorkspaceService(w)
   })
 
-  it("HI-1991: a builder's question for the user (hive_ask_user) wakes a lane watch that dropped paused, naming the card and its first line; once only", async () => {
+  it("HI-1991: a builder's question for the user (cw_ask_user) wakes a lane watch that dropped paused, naming the card and its first line; once only", async () => {
     const { w, alpha, home } = await open()
     const st = fake(alpha, home)
     const { workflowFor } = await import('../src/main/workflow/service')
@@ -541,7 +541,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await inWorkspace(w, () => wf.askTheUser(`#${a}`, 'agent:b1', { kind: 'decide', text: 'Keep the old setting name?\nIt is in three docs.' }))
     await watches.evaluateWatches(w)
     await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
-    expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] Lane B1 / R1: #${a} waits for the user \\(b1 asks\\): "Keep the old setting name\\?"\\. Your lane watch has ended: .*tell the user what an agent waits for`))
+    expect(st.told[0]).toMatch(new RegExp(`^\\[CW\\] Lane B1 / R1: #${a} waits for the user \\(b1 asks\\): "Keep the old setting name\\?"\\. Your lane watch has ended: .*tell the user what an agent waits for`))
     expect((await lanes.listLanes(w, { project: 'alpha' }))[0]).toMatchObject({ state: 'paused', status: { reason: 'you', card: a } })
     // Watched again with the question still open: nothing new to tell.
     await watchAll(w, home, st, ['failed'])
@@ -604,7 +604,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     status(alpha, st, 'b2', 'ready')
     await watches.evaluateAgentWatches(w)
     await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
-    expect(st.told[0]).toBe('[Hive] B2 (alpha) finished: "b2 done.". Your lane watch has ended: read the cards named (hive_read_task), act on them, then watch the lanes again (hive_wait_for_tasks with lanes; your agents stay unless you pass agents, less the agents told here).')
+    expect(st.told[0]).toBe('[CW] B2 (alpha) finished: "b2 done.". Your lane watch has ended: read the cards named (cw_read_task), act on them, then watch the lanes again (cw_wait_for_tasks with lanes; your agents stay unless you pass agents, less the agents told here).')
     await watches.settled()
     const again = await watchAll(w, home, st)
     expect(again.agents).toBeUndefined()
@@ -617,7 +617,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     status(alpha, st, 'b3', 'ready')
     await watches.evaluateAgentWatches(w)
     await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
-    expect(st.told[1]).toMatch(/^\[Hive\] B3 \(alpha\) finished/)
+    expect(st.told[1]).toMatch(/^\[CW\] B3 \(alpha\) finished/)
     await watches.settled()
     const kept = await watchAll(w, home, st)
     expect(kept.agents).toEqual({ now: ['B2 (alpha)'], kept: true })
@@ -634,7 +634,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     st.status = 'watching'
     await watches.tick()
     await vi.waitFor(() => expect(st.told).toHaveLength(3), { timeout: HUNG_MS })
-    expect(st.told[2]).toMatch(new RegExp(`^\\[Hive\\] Lane B1 / R1: #${a} failed review \\(R1 \\(alpha\\)\\) \\| B2 \\(alpha\\) finished: "b2 done\\."\\. Your lane watch has ended`))
+    expect(st.told[2]).toMatch(new RegExp(`^\\[CW\\] Lane B1 / R1: #${a} failed review \\(R1 \\(alpha\\)\\) \\| B2 \\(alpha\\) finished: "b2 done\\."\\. Your lane watch has ended`))
     await watches.settled()
     // An agent watch after that lane wake, with the lane still running: the reply says the lane is no longer followed.
     st.agents.b2 = 'working'
@@ -657,20 +657,20 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     // The user's reply in B1's pane: told on its own, at once, with its first line; the lane watch carries on.
     watches.noteUserReply(alpha, 'b1', 'B1', 'OK, push it\nand then merge')
     await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
-    expect(st.told[0]).toBe('[Hive] User replied to B1 (alpha): "OK, push it".')
+    expect(st.told[0]).toBe('[CW] User replied to B1 (alpha): "OK, push it".')
     expect(watches.watchFor(home, 'assistant')?.lanes).toEqual(['all'])
     // B1 clears the block: the lane watch wakes.
     st.status = 'watching'
     await inWorkspace(w, () => tasks.updateTask(a, { blocked: '' }, agent('b1')))
     await watches.evaluateWatches(w)
     await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
-    expect(st.told[1]).toMatch(new RegExp(`^\\[Hive\\] Lane B1 / R1: #${a} is no longer blocked\\. Your lane watch has ended`))
+    expect(st.told[1]).toMatch(new RegExp(`^\\[CW\\] Lane B1 / R1: #${a} is no longer blocked\\. Your lane watch has ended`))
     // The user ends it with its merge commit (its card merged by hand, with no facts): the end says it.
     await watchAll(w, home, st)
     await lanes.endLane(w, lane.lane.id, { mergeCommit: 'dd4ed990c0ffee1234567890abcdef1234567890' })
     await watches.evaluateWatches(w)
     await vi.waitFor(() => expect(st.told).toHaveLength(3), { timeout: HUNG_MS })
-    expect(st.told[2]).toMatch(/^\[Hive\] Lane B1 \/ R1: ended: merged at dd4ed990c0ff\./)
+    expect(st.told[2]).toMatch(/^\[CW\] Lane B1 \/ R1: ended: merged at dd4ed990c0ff\./)
     await disposeWorkspaceService(w)
   })
 
@@ -689,14 +689,14 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await watches.evaluateWatches(w)
     await watches.settled()
     expect(st.typed).toEqual([])
-    // Asked with hive_ask_assistant: the Assistant is woken at once and reads the request whole, as B1's.
+    // Asked with cw_ask_assistant: the Assistant is woken at once and reads the request whole, as B1's.
     const asked = `Please put #${b} On Hold and move #${a} to Done: the user chose option A on it.`
     const r = await inWorkspace(w, () => askAssistant(w, a, agent('b1'), asked))
     expect(r.id).toMatch(/^m\d+$/)
     await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
-    expect(st.typed[0]).toMatch(/^\[Hive\] New in your inbox: /)
+    expect(st.typed[0]).toMatch(/^\[CW\] New in your inbox: /)
     expect(st.told[0]).toContain(`B1 (alpha) asks you on #${a} (an agent's request, not the user's decision): <<<${asked}>>>`)
-    expect(st.told[0]).toContain('hive_message_agent')
+    expect(st.told[0]).toContain('cw_message_agent')
     expect((await deliveries.readInbox(home, 'assistant')).items).toEqual([])
     // Its lane watch carries on (a delivery to a watching agent never ends it).
     expect(watches.watchFor(home, 'assistant')?.lanes).toEqual(['all'])
@@ -788,7 +788,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
       await fail(w, a, 'r1')
       await watches.evaluateWatches(w)
       await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
-      expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] Lane B1 / R1 \\(reads\\): #${a} failed review`))
+      expect(st.told[0]).toMatch(new RegExp(`^\\[CW\\] Lane B1 / R1 \\(reads\\): #${a} failed review`))
       // An agent waiting for the user: its card found among the live cards.
       await watchAll(w, home, st)
       status(alpha, st, 'b2', 'waiting', 'Claude needs your permission to use Bash')
@@ -817,7 +817,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await fail(w, n, 'r1')
     await watches.evaluateWatches(w)
     await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
-    expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] Lane B7 / R1: #${n} failed review \\(R1 \\(alpha\\)\\)\\. Your lane watch has ended`))
+    expect(st.told[0]).toMatch(new RegExp(`^\\[CW\\] Lane B7 / R1: #${n} failed review \\(R1 \\(alpha\\)\\)\\. Your lane watch has ended`))
     await disposeWorkspaceService(w)
   })
 
@@ -862,7 +862,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
       } else await lanes.endLane(w, other.id, { abandoned: true })
       await watchAll(w, home, st)
       await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
-      expect(st.told[1]).toMatch(new RegExp(`^\\[Hive\\] Lane B2 / R2: ${how === 'ended' ? 'ended \\(merged\\)' : 'was abandoned'}\\.`))
+      expect(st.told[1]).toMatch(new RegExp(`^\\[CW\\] Lane B2 / R2: ${how === 'ended' ? 'ended \\(merged\\)' : 'was abandoned'}\\.`))
       // Its end told, the lane leaves the watch: nothing more about it.
       await watchAll(w, home, st)
       await watches.evaluateWatches(w)
@@ -916,7 +916,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
       await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r2', cards: [c], by: 'B2 (alpha)' })
       await watchAll(w, home, st)
       await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
-      expect(st.told[1]).toMatch(new RegExp(`^\\[Hive\\] Lane B2 / R2: #${c} is blocked: "Asked as the lane started"`))
+      expect(st.told[1]).toMatch(new RegExp(`^\\[CW\\] Lane B2 / R2: #${c} is blocked: "Asked as the lane started"`))
       await watchAll(w, home, st)
       await watches.evaluateWatches(w)
       await watches.settled()
@@ -935,7 +935,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
         } else await lanes.endLane(w, l.id, { abandoned: true })
         await watchAll(w, home, st)
         await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
-        expect(st.told[1]).toMatch(new RegExp(`^\\[Hive\\] Lane B2 / R2: ${how === 'ended' ? 'ended \\(merged\\)' : 'was abandoned'}\\.`))
+        expect(st.told[1]).toMatch(new RegExp(`^\\[CW\\] Lane B2 / R2: ${how === 'ended' ? 'ended \\(merged\\)' : 'was abandoned'}\\.`))
         await watchAll(w, home, st)
         await watches.evaluateWatches(w)
         await watches.settled()
@@ -1329,7 +1329,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     } finally {
       vi.useRealTimers()
     }
-    expect(st.told[1]).toMatch(/^\[Hive\] Lane B1 \/ R1 \(lane G\): its merge is stalled: "Every card passed, but B1 has been idle for 11 min with no merge slot claimed\."/)
+    expect(st.told[1]).toMatch(/^\[CW\] Lane B1 \/ R1 \(lane G\): its merge is stalled: "Every card passed, but B1 has been idle for 11 min with no merge slot claimed\."/)
     await disposeWorkspaceService(w)
   })
 
@@ -1377,7 +1377,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await inWorkspace(w, () => tasks.commentTask(rel, 'Draft release is up: push when ready', agent('b2')))
     await watches.evaluateWatches(w)
     await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
-    expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] #${rel} .*is in Doing \\(latest comment by B2 \\(alpha\\): "Draft release is up: push when ready"\\)\\. Your lane watch has ended: .*your cards stay unless you pass cards`))
+    expect(st.told[0]).toMatch(new RegExp(`^\\[CW\\] #${rel} .*is in Doing \\(latest comment by B2 \\(alpha\\): "Draft release is up: push when ready"\\)\\. Your lane watch has ended: .*your cards stay unless you pass cards`))
     // Watched again without cards: the card is kept.
     const again = await watchWith(w, home, st)
     expect(again.cards).toEqual({ now: [rel], kept: true })
@@ -1564,7 +1564,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     status(alpha, st, 'b2', 'waiting', 'Claude needs your permission to use Bash')
     await watches.evaluateWatches(w)
     await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
-    expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] B2 \\(alpha\\) is waiting for the user on #${rel}: "Claude needs your permission to use Bash"\\. Your lane watch has ended: .*tell the user what an agent waits for \\(hive_notify\\) and never answer it for them`))
+    expect(st.told[0]).toMatch(new RegExp(`^\\[CW\\] B2 \\(alpha\\) is waiting for the user on #${rel}: "Claude needs your permission to use Bash"\\. Your lane watch has ended: .*tell the user what an agent waits for \\(cw_notify\\) and never answer it for them`))
     // The same wait again (a refresh of its status): not told again.
     await watchAll(w, home, st)
     status(alpha, st, 'b2', 'waiting', 'Claude needs your permission to use Bash')

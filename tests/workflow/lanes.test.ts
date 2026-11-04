@@ -60,7 +60,7 @@ describe('lanes', () => {
     const again = await e.wf.start(c2.key, B1)
     moved(again)
     expect(again.data).toEqual(byHive.data)
-    expect(again.warnings).toEqual([`Hive started ${c2.key} for you, as your lane's next card: carry on with it.`])
+    expect(again.warnings).toEqual([`Combwork started ${c2.key} for you, as your lane's next card: carry on with it.`])
     expect(e.store.facts(c2.id).filter((f) => f.kind === 'Started')).toHaveLength(1)
     // Another agent's start of it is refused, as before; so is its builder's second start of a card it started itself.
     refusedBy(await e.wf.start(c2.key, B2), 'move.notFromHere')
@@ -85,7 +85,7 @@ describe('lanes', () => {
     moved(hive.start!)
     moved(own)
     expect(own.data).toEqual(hive.start!.data)
-    expect(own.warnings).toEqual([`Hive started ${c1.key} for you, as your lane's next card: carry on with it.`])
+    expect(own.warnings).toEqual([`Combwork started ${c1.key} for you, as your lane's next card: carry on with it.`])
     expect(e.store.facts(c1.id).filter((f) => f.kind === 'Started')).toHaveLength(1)
   })
 

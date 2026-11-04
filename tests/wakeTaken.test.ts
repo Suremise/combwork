@@ -57,7 +57,7 @@ describe('a line still waiting to be taken (#430)', () => {
     // Typed a moment ago (a wake being confirmed): another wake or a task is refused before anything is written.
     const e = running({ typed: { at: Date.now(), prompts: 0 } })
     expect(sessions.lineWaiting(project, id)).toBe(true)
-    await expect(sessions.sendPrompt(project, id, 'SECOND LINE')).rejects.toThrow(/hasn't taken the line Hive typed before/)
+    await expect(sessions.sendPrompt(project, id, 'SECOND LINE')).rejects.toThrow(/hasn't taken the line Combwork typed before/)
     expect(writes).toEqual([])
     // Taken (the CLI reported the prompt): typing goes on.
     e.prompts = 1
@@ -67,14 +67,14 @@ describe('a line still waiting to be taken (#430)', () => {
     // Marked not taken: refused, however long ago it was typed.
     writes.length = 0
     e.typed = { at: Date.now() - 60 * 60_000, prompts: 1 }
-    e.state.untakenLine = { since: new Date().toISOString(), text: '[Hive] #1 is in Review' }
+    e.state.untakenLine = { since: new Date().toISOString(), text: '[CW] #1 is in Review' }
     await expect(sessions.sendPrompt(project, id, 'THIRD')).rejects.toThrow(/hasn't taken/)
     expect(writes).toEqual([])
   })
 
   it("the user's Enter there isn't proof it was taken: the mark stays until its CLI takes a prompt", () => {
     const e = running()
-    e.state.untakenLine = { since: new Date().toISOString(), text: '[Hive] #1 is in Review' }
+    e.state.untakenLine = { since: new Date().toISOString(), text: '[CW] #1 is in Review' }
     sessions.noteUserInput(`session:${key}`, '\r')
     expect(sessions.lineUntaken(project, id)).toBe(true)
   })
@@ -187,7 +187,7 @@ describe("a line whose CLI took it with no prompt seen: what it rang for was rea
     // The window is told of its state (a hand-made state has no provider to show it by).
     const told = vi.spyOn(sessions as unknown as { emitState: (s: unknown) => void }, 'emitState').mockImplementation(() => undefined)
     // Line B rang for mB and is marked; mA, an older line's (taken by a prompt, its delivery read only now), says nothing of B.
-    sessions.lineNotTaken(project, id, 'run1', '[Hive] New in your inbox: 1 card event (#166) (mB).', true, ['mB'])
+    sessions.lineNotTaken(project, id, 'run1', '[CW] New in your inbox: 1 card event (#166) (mB).', true, ['mB'])
     expect(sessions.lineUntaken(project, id)).toBe(true)
     told.mockClear()
     sessions.lineTaken(project, id, 'run1', 'mA', 'mA, which it rang for, was read')
@@ -231,7 +231,7 @@ describe("a line of Hive's the user typed into is theirs (#652 round 1 finding 2
     live.set(key, e)
     return e
   }
-  const BELL = '[Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it, act on it, then ack it.'
+  const BELL = '[CW] New in your inbox: 1 message (m1). Call cw_inbox to read it, act on it, then ack it.'
 
   for (const pause of [15, 0]) {
     it(`edited and left past the typing pause (${pause} s): no Enter again, and nothing more typed until a prompt is sent`, async () => {
@@ -256,7 +256,7 @@ describe("a line of Hive's the user typed into is theirs (#652 round 1 finding 2
       expect(sessions.submitAgain(project, id, 'run1')).toBe(false)
       vi.setSystemTime(t + 10 * 60_000)
       expect(sessions.lineWaiting(project, id)).toBe(true)
-      await expect(sessions.sendPrompt(project, id, 'NEXT BELL')).rejects.toThrow(/hasn't taken the line Hive typed before/)
+      await expect(sessions.sendPrompt(project, id, 'NEXT BELL')).rejects.toThrow(/hasn't taken the line Combwork typed before/)
       expect(writes).toEqual([])
       // The user sends it (the CLI's count goes up): typing goes on.
       e.prompts = 1

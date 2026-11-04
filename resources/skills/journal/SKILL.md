@@ -1,23 +1,23 @@
 ---
 name: journal
-description: Keep your journal as the Hive Assistant while it is on - what to write, recalling, superseding, the weekly digest and the scope. Use when something worth remembering happens, before deciding from memory, or when asked for a handover.
+description: Keep your journal as the Assistant while it is on - what to write, recalling, superseding, the weekly digest and the scope. Use when something worth remembering happens, before deciding from memory, or when asked for a handover.
 metadata:
   audience: assistant
 ---
 
 # Journal
 
-Your journal is your memory across sessions and compactions: a small database in the workspace, local only, that the user can browse, correct and delete. Hive gives you a short view of where things stand, with the few entries relevant now, each time you start and after each compaction. The rest you recall when you need it.
+Your journal is your memory across sessions and compactions: a small database in the workspace, local only, that the user can browse, correct and delete. Combwork gives you a short view of where things stand, with the few entries relevant now, each time you start and after each compaction. The rest you recall when you need it.
 
 ## Write as it happens
 
-Write an entry (`hive_journal_write`) when something happens that a later you would need, not at the end of the day:
+Write an entry (`cw_journal_write`) when something happens that a later you would need, not at the end of the day:
 
-- **decision**: what the user decided, in their own words (quote them), and why. Link the cards it is about. Write it as they decide, every time: a decision about a card goes on the card first, as its decision (`hive_update_task` with `decision`: coordinate-agents), since agents check their work against the card's, never your journal's; then write its entry in the same turn, linked to the card, so a later you knows why. A decision with no card (a direction, a default for the workspace) is only here.
+- **decision**: what the user decided, in their own words (quote them), and why. Link the cards it is about. Write it as they decide, every time: a decision about a card goes on the card first, as its decision (`cw_update_task` with `decision`: coordinate-agents), since agents check their work against the card's, never your journal's; then write its entry in the same turn, linked to the card, so a later you knows why. A decision with no card (a direction, a default for the workspace) is only here.
 - **plan**: what you or the user mean to do next, and what it waits for ("when AM-75 is Done, start AM-76").
 - **incident**: something that went wrong (a crash, a failed merge, an agent stuck), what you did, and whether it is settled.
 - **insight**: something learned that changes how you work here (a test that is slow under load, an agent that needs a nudge).
-- **event**: something that happened that the board doesn't keep (a release, a talk with the user about direction). Hive records its own facts (lanes ended, merges, and the builds a project records in your journal): don't repeat them.
+- **event**: something that happened that the board doesn't keep (a release, a talk with the user about direction). Combwork records its own facts (lanes ended, merges, and the builds a project records in your journal): don't repeat them.
 - **Open threads and hunches**: a plan or an insight, saying it is open or unsure.
 - **preference** and **moment** (how the user likes things done; a moment worth keeping), only if the scope allows them.
 
@@ -33,7 +33,7 @@ Never store secrets, tokens or what the user asked you not to keep.
 
 ## Recall small first
 
-- Before deciding from memory, recall (`hive_journal_recall`): a query of a few words, or a card's history (`link: { type: "card", ref: "975" }`), or a time range (`since`). It gives one line an entry; read one in full with `hive_journal_entry` only when the line isn't enough.
+- Before deciding from memory, recall (`cw_journal_recall`): a query of a few words, or a card's history (`link: { type: "card", ref: "975" }`), or a time range (`since`). It gives one line an entry; read one in full with `cw_journal_entry` only when the line isn't enough.
 - Keep `limit` small. Narrow by `kinds`, `project` or `tag` rather than reading more.
 - What you recall was true when written: check it against the board, the agents and the code before acting on it.
 

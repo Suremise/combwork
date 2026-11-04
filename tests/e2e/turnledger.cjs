@@ -174,7 +174,7 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(path.join(codexHome, 'fake-retried-Codex'), '')
   const over = await is(codex, 'finished', 'over')
   check('its retry going through clears it: the turn ends as usual', !!over && !over.retryWait, JSON.stringify(over?.retryWait))
-  // HI-1996: afterwards, the wait is in the launch's tally: hive_agent_activity says how long it waited, with the model and
+  // HI-1996: afterwards, the wait is in the launch's tally: cw_agent_activity says how long it waited, with the model and
   // effort it runs with, and the footer model's hover says it too.
   const activityOf = async (name) => {
     const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
@@ -182,7 +182,7 @@ const check = (name, ok, extra = '') => {
     return res.json()
   }
   const act = await activityOf('Codex')
-  check('hive_agent_activity: the wait it had, its model and effort', act.retryWaits?.waits === 1 && act.retryWaits.latest?.status === 429 && act.retryWaits.latest.tries === 1 && !act.retryWaits.latest.ongoing && act.retryWaits.latest.since === waiting.retryWait.since && typeof act.retryWaits.seconds === 'number' && typeof act.model === 'string' && act.model.length > 0 && typeof act.effort === 'string', JSON.stringify({ retryWaits: act.retryWaits, model: act.model, effort: act.effort }))
+  check('cw_agent_activity: the wait it had, its model and effort', act.retryWaits?.waits === 1 && act.retryWaits.latest?.status === 429 && act.retryWaits.latest.tries === 1 && !act.retryWaits.latest.ongoing && act.retryWaits.latest.since === waiting.retryWait.since && typeof act.retryWaits.seconds === 'number' && typeof act.model === 'string' && act.model.length > 0 && typeof act.effort === 'string', JSON.stringify({ retryWaits: act.retryWaits, model: act.model, effort: act.effort }))
   const footTip = await lib.hoverTip(page, page.locator('.agent-pane').filter({ has: header }).locator('.pane-footer-bar .foot-model'), (t) => /This session has waited/.test(t))
   check("the footer model's hover says how long this session waited for retries", /This session has waited (under a minute|\d+ minutes?) in all for Codex to retry rate-limited or failed requests \(1 wait, the latest from .+\): time not spent on its work\./.test(footTip), footTip)
   await page.screenshot({ path: path.join(lib.WORK, 'turnledger-retry-hover.png') })

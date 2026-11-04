@@ -210,7 +210,7 @@ describe('the start prompt', () => {
   const card = { number: 7, title: 'Fix it', description: 'The details.', blockedBy: [], comments: [], context: ['docs/PLAN.md#setup', 'shared:plans/notes.md'] } as unknown as TaskCard
   it('lists the references with their sizes, and how to read them, not their text', () => {
     expect(taskPrompt(card, true, { context: [{ ref: 'docs/PLAN.md#setup', size: 840 }, { ref: 'shared:plans/notes.md', size: 12_400 }] })).toBe(
-      'Work on task #7 from the Hive task board: Fix it\n\nThe details.\n\nRead these first: docs/PLAN.md#setup (840 characters), shared:plans/notes.md (12k characters). hive_read_section reads each as the card has it (path: the file; heading: # and the slug after it, none for a whole file; from: "project").\n\nUse the work-on-card skill.'
+      'Work on task #7 from the Combwork task board: Fix it\n\nThe details.\n\nRead these first: docs/PLAN.md#setup (840 characters), shared:plans/notes.md (12k characters). cw_read_section reads each as the card has it (path: the file; heading: # and the slug after it, none for a whole file; from: "project").\n\nUse the work-on-card skill.'
     )
   })
   it('names what no longer resolves, why and the closest, never silently nothing (#819)', () => {
@@ -221,11 +221,11 @@ describe('the start prompt', () => {
     expect(all).not.toContain('Read these first')
     expect(all).toContain('These references no longer resolve: a.md#x (several headings have its text; they are: #x, #x-1); b.md (no such file).')
     // With none resolving, how to read the closest still says the project's copy (#819 round 2).
-    expect(all).toContain('hive_read_section reads the closest as the card has it (path: the file; heading: # and the slug; from: "project").')
-    expect(text).toContain('hive_read_section reads each as the card has it')
+    expect(all).toContain('cw_read_section reads the closest as the card has it (path: the file; heading: # and the slug; from: "project").')
+    expect(text).toContain('cw_read_section reads each as the card has it')
   })
   it("without Hive's tools, or with no sizes worked out, the references alone; none, no line", () => {
-    expect(taskPrompt(card, false)).toBe("Work on task #7 from the Hive task board: Fix it\n\nThe details.\n\nRead these sections of the project's docs first: docs/PLAN.md#setup, shared:plans/notes.md.")
+    expect(taskPrompt(card, false)).toBe("Work on task #7 from the Combwork task board: Fix it\n\nThe details.\n\nRead these sections of the project's docs first: docs/PLAN.md#setup, shared:plans/notes.md.")
     expect(taskPrompt({ ...card, context: undefined }, true)).not.toContain('Read these first')
   })
 })

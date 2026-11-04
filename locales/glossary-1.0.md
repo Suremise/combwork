@@ -207,7 +207,7 @@ tool names), never *capability* or *sameness*.
 | Internal (spec, code) | The user reads | Notes |
 |---|---|---|
 | gate, guard | rule | "Review needs a new commit (rule: checks before review)". |
-| intent (`hive_submit`…) | — | Agents only. The user sees the move it caused, or its refusal. |
+| intent (`cw_submit`…) | — | Agents only. The user sees the move it caused, or its refusal. |
 | fact, fact log | Work (the card's section), history | Facts show as the card's Work section and lines in its history. |
 | capability | — | Never shown. A missing one shows as an option that isn't available, with why. |
 | sameness, patch-id | same change | |

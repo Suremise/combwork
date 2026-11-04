@@ -22,14 +22,14 @@ export interface AgentProcess {
  */
 export function progressRunTitle(commandLine: string): string | undefined {
   const args = splitCommandLine(commandLine)
-  const at = args.findIndex((a) => /(^|[\\/])hive-progress\.js$/i.test(a))
+  const at = args.findIndex((a) => /(^|[\\/])(?:cw|hive)-progress\.js$/i.test(a))
   if (at < 0) return undefined
   const rest = args.slice(at + 1)
   const dash = rest.indexOf('--')
   const flag = rest.indexOf('--title')
   const title = flag >= 0 && (dash < 0 || flag < dash) ? rest[flag + 1]?.trim() : ''
   const command = (dash >= 0 ? rest.slice(dash + 1) : rest).map((a) => lastPart(a)).join(' ').trim()
-  const named = (title || command || 'hive-progress').replace(/\s+/g, ' ')
+  const named = (title || command || 'cw-progress').replace(/\s+/g, ' ')
   return named.length > MAX_LABEL ? `${named.slice(0, MAX_LABEL - 1)}…` : named
 }
 
@@ -68,7 +68,7 @@ export function groupProgressRuns(processes: readonly AgentProcess[]): { runs: P
   const tops = new Map<number, AgentProcess>()
   for (const r of processes.filter((p) => p.run)) {
     let top = r
-    for (let s = parentOf(r); s && !s.run && /\bhive-progress\b/i.test(s.label) && !shellOf.has(s.pid); s = parentOf(s)) {
+    for (let s = parentOf(r); s && !s.run && /\b(?:cw|hive)-progress\b/i.test(s.label) && !shellOf.has(s.pid); s = parentOf(s)) {
       shellOf.set(s.pid, r)
       top = s
     }
@@ -185,6 +185,6 @@ export function leftoversSummary(l: Pick<AgentLeftovers, 'processes' | 'more'>, 
   const labels = shown.map(([label, n]) => (n < 2 ? label : tr ? tr(msg({ id: 'session.leftovers.times', defaultMessage: '{n, number} × {label}', description: 'A process an agent left running, in a list of them, when several run the same command: how many, and the command ({label}: "tail -f capture.log").' }), { n, label }) : `${n} × ${label}`)) // i18n-ignore: English for agents and the Agent API (the window passes tr)
   const list = words?.list ?? englishList
   if (extra <= 0) return list(labels, 'unit')
-  const more = tr ? tr(msg({ id: 'session.leftovers.more', defaultMessage: '{n, plural, one {# more process} other {# more processes}}', description: 'The last item of a list of the processes an agent left running, after the first few: how many more there are. Hive joins it to the list ("node serve.js, 2 × tail -f capture.log and 3 more processes").' }), { n: extra }) : `${extra} more ${extra === 1 ? 'process' : 'processes'}` // i18n-ignore: English for agents and the Agent API (the window passes tr)
+  const more = tr ? tr(msg({ id: 'session.leftovers.more', defaultMessage: '{n, plural, one {# more process} other {# more processes}}', description: 'The last item of a list of the processes an agent left running, after the first few: how many more there are. Combwork joins it to the list ("node serve.js, 2 × tail -f capture.log and 3 more processes").' }), { n: extra }) : `${extra} more ${extra === 1 ? 'process' : 'processes'}` // i18n-ignore: English for agents and the Agent API (the window passes tr)
   return list([...labels, more])
 }

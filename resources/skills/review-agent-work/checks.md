@@ -4,4 +4,4 @@
 
 **Run a whole suite again** only when there's no run record, it is for other code, something in it looks wrong (a flaky check, a pass that doesn't fit the change), or the change is to shared test infrastructure, and say which in your verdict.
 
-**Proof you can't open** (a cited log or run folder that isn't there) isn't a failed round on that alone: ask the builder for it (`hive_request_builder`), and judge it once it's there.
+**Proof you can't open** (a cited log or run folder that isn't there) isn't a failed round on that alone: ask the builder for it (`cw_request_builder`), and judge it once it's there.

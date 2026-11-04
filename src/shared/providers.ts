@@ -650,7 +650,7 @@ export function splitArgs(input: string): string[] {
 export function extraArgsProblem(input: string | string[], tr?: Tr): string | null {
   if (!(typeof input === 'string' ? splitArgs(input) : input).includes('--')) return null
   if (tr) return tr(msg({ id: 'agents.provider.extraArgsDashes', defaultMessage: 'Combwork passes the task after "--"; remove it from extra arguments. For an option whose value is "--", write --option=--.', description: 'Why extra arguments for a CLI are refused: they contain a bare "--". Keep "--" and --option=-- exactly as they are.' }))
-  return 'Hive passes the task after "--"; remove it from extra arguments. For an option whose value is "--", write --option=--.' // i18n-ignore: English without tr (main's errors: their area converts them)
+  return 'Combwork passes the task after "--"; remove it from extra arguments. For an option whose value is "--", write --option=--.' // i18n-ignore: English without tr (main's errors: their area converts them)
 }
 
 /**

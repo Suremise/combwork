@@ -24,14 +24,14 @@ const srv = http.createServer((req, res) => {
 srv.listen(0, async () => {
   const port = srv.address().port
   const run = (project, msgs) => new Promise((resolve) => {
-    const p = spawn(process.execPath, [path.join(lib.ROOT, 'out/main/hive-mcp.js')], { env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${port}`, HIVE_API_TOKEN_FILE: lib.tokenFile('t'), HIVE_PROJECT: project }) })
+    const p = spawn(process.execPath, [path.join(lib.ROOT, 'out/main/cw-mcp.js')], { env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${port}`, CW_API_TOKEN_FILE: lib.tokenFile('t'), CW_PROJECT: project }) })
     let out = ''
     p.stdout.on('data', (d) => { out += d; if (out.trim().split('\n').length >= msgs.length) { p.kill(); resolve(out.trim().split('\n').map((l) => JSON.parse(l))) } })
     for (const m of msgs) p.stdin.write(JSON.stringify(m) + '\n')
   })
   const msgs = [
     { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } },
-    { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'hive_read_latest_handover', arguments: {} } }
+    { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'cw_read_latest_handover', arguments: {} } }
   ]
   for (const project of ['hive', 'mcp', 'other']) {
     const r = await run(project, msgs)

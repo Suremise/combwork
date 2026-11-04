@@ -21,7 +21,7 @@ const samePath = (a: string | null | undefined, b: string | null | undefined): b
 const hereHas = (t: ToastTarget): boolean => (t.kind === 'card' ? samePath(t.workspacePath, get().workspace?.path) : !!findProject(get(), t.projectPath))
 
 /**
- * A click on a notice with a target (HI-1961: `hive_notify`'s): here when this window has its place, else in the window
+ * A click on a notice with a target (HI-1961: `cw_notify`'s): here when this window has its place, else in the window
  * that has it (`notice:target`), else back here, where it says the target is gone or its workspace isn't open.
  */
 export function openNoticeTarget(t: ToastTarget): void {

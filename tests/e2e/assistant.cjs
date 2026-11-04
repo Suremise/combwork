@@ -48,7 +48,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check("it defaults to the agents' model and effort, and Auto mode", JSON.stringify(info.assistant.config.providers['claude-code']) === JSON.stringify({ model: 'inherit', effort: 'inherit', permissionMode: 'auto', extraArgs: '', use200kContext: 'inherit' }), JSON.stringify(info.assistant.config.providers['claude-code']))
 
   // The panel: hidden at first, Ctrl+Alt+I shows it, and each workspace remembers it.
-  check('the panel starts hidden, as a strip', (await page.locator('.assistant-panel').count()) === 0 && (await page.locator('.assistant-rail', { hasText: 'Hive Assistant' }).count()) === 1)
+  check('the panel starts hidden, as a strip', (await page.locator('.assistant-panel').count()) === 0 && (await page.locator('.assistant-rail', { hasText: 'Assistant' }).count()) === 1)
   await page.locator('.assistant-rail').click()
   const panelWidth = async () => Math.round((await page.locator('.assistant-panel').boundingBox().catch(() => null))?.width ?? -1)
   check('clicking the strip shows the panel', await becomes(async () => (await page.locator('.assistant-panel').count()) === 1 && (await page.locator('.assistant-rail').count()) === 0))
@@ -135,7 +135,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   await inv('modes:restore', 'qa-triager')
   check('and restores', (await inv('modes:list')).find((p) => p.id === 'qa-triager')?.bundled === 'same')
   // The Hive Assistant view: a summary, its conversations and its modes.
-  await page.locator('.activity-btn[aria-label="Hive Assistant"]').click()
+  await page.locator('.activity-btn[aria-label="Assistant"]').click()
   check('the Assistant view has a summary', await becomes(async () => (await page.locator('.assistant-summary .assistant-stat').count()) === 4))
   // The summary's stats are drawn at once (showing "…" until its conversations are read), the list once they are: so
   // the list is waited for, not read once after the stats (#710: it failed under load).
@@ -162,7 +162,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('it launches in Auto', launch.includes('"--permission-mode","auto"'))
   check('…with the model its connection sets', launch.includes('"--model","sonnet"'))
   check("its mode is appended to Claude Code's system prompt", launch.includes('--append-system-prompt-file'))
-  check("Hive's reading tools are allowed", launch.includes('mcp__hive__hive_list_projects') && !launch.includes('mcp__hive__hive_write_shared_note'))
+  check("Hive's reading tools are allowed", launch.includes('mcp__combwork__cw_list_projects') && !launch.includes('mcp__combwork__cw_write_shared_note'))
   check('Planner\'s instructions are in the launch', fs.readFileSync(path.join(home, '.hive', 'launch-assistant', 'instructions.md'), 'utf8').includes('# Your mode: Planner'))
   check('it is not a project agent', (await inv('workspace:get')).projects.every((p) => p.agents.every((a) => a.id !== 'assistant')))
   // The header's fold button (#1330), as the Progress panel's: its tooltip names the shortcut (a rebinding too), and

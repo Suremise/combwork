@@ -152,8 +152,8 @@
     "description": "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
   },
   "providers.codex.nativeHive": {
-    "defaultMessage": "Your Codex config has an MCP server named hive, reached over HTTP ({file}). Codex merges it into Combwork’s own hive server, and can’t start with both. Rename yours there to start Codex agents.",
-    "description": "Why a Codex agent didn't start: the user's own Codex config has an MCP server named hive. {file} is that config file's path. hive is the name of Hive's MCP server: keep it."
+    "defaultMessage": "Your Codex config has an MCP server named combwork, reached over HTTP ({file}). Codex merges it into Combwork’s own combwork server, and can’t start with both. Rename yours there to start Codex agents.",
+    "description": "Why a Codex agent didn't start: the user's own Codex config has an MCP server named combwork. {file} is that config file's path. combwork is the name of Combwork's MCP server (HI-2463): keep it."
   },
   "providers.codex.sandbox.default": {
     "defaultMessage": "**Set up default sandbox** (recommended): commands run under two local Windows accounts Codex creates for them (`CodexSandboxOffline` and `CodexSandboxOnline`), with a firewall rule that keeps them offline unless you allow it. It isolates commands best. Windows asks for Administrator permission once.",

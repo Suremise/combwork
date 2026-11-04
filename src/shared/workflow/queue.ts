@@ -1,6 +1,6 @@
 // The merge queue's model (#1353, SPEC §16.9.3): what a target's queue is doing, as every control reads it. The window
 // (IPC `queue:list`, the panel #1356 and the card #1357), the Agent API (`GET /v1/queue`) and the Assistant's
-// `hive_queue` all read this one model; main builds it from the cards' facts, the target's pause and lease, and the
+// `cw_queue` all read this one model; main builds it from the cards' facts, the target's pause and lease, and the
 // queue host's step (workflow/queueControls.ts). Codes, never words: the window says them in its language.
 
 import type { FactData } from './facts'
@@ -193,7 +193,7 @@ export interface QueueView {
 }
 
 /**
- * A queue as the Agent API gives it (GET /v1/queue, hive_queue): no folder (a stuck advance's folder neither), and whether
+ * A queue as the Agent API gives it (GET /v1/queue, cw_queue): no folder (a stuck advance's folder neither), and whether
  * an outcome has a log, not the log.
  */
 export type QueuePublic = Omit<QueueView, 'projectPath' | 'recent' | 'returns' | 'returnsMore' | 'paused' | 'hiveMerges' | 'inFlight' | 'pauses'> & {

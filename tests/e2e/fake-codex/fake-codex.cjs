@@ -28,10 +28,10 @@
 //   "ratelimited" (HI-1972): a 429 recorded only in its log database (logs_2.sqlite), then no hook until
 //   fake-retried-<agent> is in CODEX_HOME.
 //   Notices (#650), as Codex 0.162.1 takes them: context in a PostToolUse reply reaches "the model", and a Stop blocked
-//   carries the same turn on to another Stop with stop_hook_active. Each ("[Hive] …") is logged in fake-notices.jsonl in
-//   CODEX_HOME; with fake-follow-notices.txt (or fake-follow-notices-<agent>.txt) there, it reads its inbox (hive_inbox)
+//   carries the same turn on to another Stop with stop_hook_active. Each ("[CW] …") is logged in fake-notices.jsonl in
+//   CODEX_HOME; with fake-follow-notices.txt (or fake-follow-notices-<agent>.txt) there, it reads its inbox (cw_inbox)
 //   and acks what it listed. "checkpoint": a command (PreToolUse, PostToolUse) whose reply it reads. Hive's doorbell
-//   ("[Hive] New in your inbox: …") it follows as a model does: it reads its inbox; new work it read (a task, a
+//   ("[CW] New in your inbox: …") it follows as a model does: it reads its inbox; new work it read (a task, a
 //   handover) is its prompt, anything else (a wake, a message) is logged in fake-wakes.jsonl in CODEX_HOME, with the
 //   doorbell's line as it was sent (`doorbell`, HI-1974).
 // - Each prompt is a turn with its own id, which its hooks carry (turn_id) and its rollout records (task_started,
@@ -99,7 +99,7 @@ if (args[0] === 'login') {
 // Started plainly in a connection's folder (HI-1870: its Set Up, no agent's, with only `-c` overrides: HI-1893) with no
 // sandbox there or given: its one-time Windows sandbox setup, answered at once (the non-admin one), written to the
 // folder's config.toml as Codex keeps it.
-const setUpRun = inConnection && !process.env.HIVE_AGENT && args.length % 2 === 0 && args.every((a, i) => i % 2 === 1 || a === '-c')
+const setUpRun = inConnection && !process.env.CW_AGENT && args.length % 2 === 0 && args.every((a, i) => i % 2 === 1 || a === '-c')
 if (setUpRun) {
   const toml = path.join(connectionHome, 'config.toml')
   const now = fs.existsSync(toml) ? fs.readFileSync(toml, 'utf8') : ''
@@ -193,7 +193,7 @@ if (debugAt >= 0 && args[debugAt + 1] === 'prompt-input') {
 // Each launch is recorded in fake-launches.jsonl in CODEX_HOME: its folder and arguments (for what Hive tells it).
 // With its home, agent, and the names (never the values) of the login variables it was given (HI-1757).
 const loginVars = Object.keys(process.env).filter((k) => /^(CODEX_ACCESS_TOKEN|CODEX_API_KEY|OPENAI_API_KEY)$/i.test(k))
-if (process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-launches.jsonl'), JSON.stringify({ cwd: process.cwd(), args, home: process.env.CODEX_HOME, agent: process.env.HIVE_AGENT || null, loginVars }) + '\n')
+if (process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-launches.jsonl'), JSON.stringify({ cwd: process.cwd(), args, home: process.env.CODEX_HOME, agent: process.env.CW_AGENT || null, loginVars }) + '\n')
 
 const hookUrl = /(http:\/\/127\.0\.0\.1:\d+\/hook\?run=[\w-]+)/.exec(args.find((a) => a.startsWith('hooks.Stop=')) ?? '')?.[1]
 // Codex runs Hive's hook command, whose curl reads the Authorization header from the launch's auth file (#345).
@@ -280,7 +280,7 @@ let turnId = null
  * Its hooks are off (#1336): while fake-nohooks-<agent> is in CODEX_HOME (read at each hook), no hook is sent; it works
  * on as before.
  */
-const hooksOff = () => !!process.env.CODEX_HOME && fs.existsSync(path.join(process.env.CODEX_HOME, `fake-nohooks-${String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_')}`))
+const hooksOff = () => !!process.env.CODEX_HOME && fs.existsSync(path.join(process.env.CODEX_HOME, `fake-nohooks-${String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_')}`))
 
 /** Sends a hook as Codex's curl command does; Hive's reply (JSON), or null. */
 async function hook(event, extra = {}) {
@@ -296,8 +296,8 @@ async function hook(event, extra = {}) {
 /** Hive's notice in a hook's reply (#650: context after a tool call, a block's reason at Stop), logged in fake-notices.jsonl; null when none. */
 function noticeIn(reply, at) {
   const text = reply?.hookSpecificOutput?.additionalContext ?? (reply?.decision === 'block' ? reply.reason : null)
-  if (typeof text !== 'string' || !text.startsWith('[Hive]') || !process.env.CODEX_HOME) return null
-  const agent = String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_')
+  if (typeof text !== 'string' || !text.startsWith('[CW]') || !process.env.CODEX_HOME) return null
+  const agent = String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_')
   fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-notices.jsonl'), JSON.stringify({ agent, at, text, when: new Date().toISOString() }) + '\n')
   return text
 }
@@ -305,15 +305,15 @@ function noticeIn(reply, at) {
 /** Whether this agent follows Hive's notices (fake-follow-notices.txt in CODEX_HOME, or its own fake-follow-notices-<agent>.txt). */
 function followsNotices() {
   const home = process.env.CODEX_HOME
-  const agent = String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_')
+  const agent = String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_')
   return !!home && (fs.existsSync(path.join(home, 'fake-follow-notices.txt')) || fs.existsSync(path.join(home, `fake-follow-notices-${agent}.txt`)))
 }
 
-/** Acts on a notice as a model that follows them: reads its inbox (hive_inbox), then acks the ids it listed. */
+/** Acts on a notice as a model that follows them: reads its inbox (cw_inbox), then acks the ids it listed. */
 async function readInbox() {
-  const listed = await hiveCall('hive_inbox', {})
+  const listed = await hiveCall('cw_inbox', {})
   const ids = [...new Set([...String(listed?.text ?? '').matchAll(/\bm\d+\b/g)].map((m) => m[0]))]
-  if (ids.length) await hiveCall('hive_inbox', { ack: ids })
+  if (ids.length) await hiveCall('cw_inbox', { ack: ids })
 }
 
 /** Codex's own record of a turn starting or ending (task_started, task_complete), by its turn id. */
@@ -389,11 +389,11 @@ async function question(late) {
 /** One rollout entry, as Codex writes it. */
 const record = (payload) => fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'response_item', payload }) + '\n')
 
-/** The launch's hive MCP server (its -c mcp_servers.hive table), or null. */
+/** The launch's hive MCP server (its -c mcp_servers.combwork table), or null. */
 function hiveServer() {
-  const arg = args.find((a) => a.startsWith('mcp_servers.hive='))
+  const arg = args.find((a) => a.startsWith('mcp_servers.combwork='))
   try {
-    return arg ? fromCodexTable(arg.slice('mcp_servers.hive='.length)) : null
+    return arg ? fromCodexTable(arg.slice('mcp_servers.combwork='.length)) : null
   } catch {
     return null
   }
@@ -434,7 +434,7 @@ async function hiveCall(tool, input) {
   const server = hiveServer()
   if (codeMode()) {
     let r = null
-    await inScript(`text(await tools.mcp__hive__${tool}(${JSON.stringify(input)}));`, async (done) => {
+    await inScript(`text(await tools.mcp__combwork__${tool}(${JSON.stringify(input)}));`, async (done) => {
       r = server ? await callHiveTool(server, tool, input) : { text: 'error: no hive server', isError: true }
       const result = { content: [{ type: 'text', text: r.text }], ...(r.isError ? { isError: true } : {}) }
       done({ type: 'McpToolCall', server: 'hive', tool, arguments: input, status: r.isError ? 'failed' : 'completed', result })
@@ -443,7 +443,7 @@ async function hiveCall(tool, input) {
     return r
   }
   const id = `call_${randomUUID().slice(0, 8)}`
-  record({ type: 'function_call', name: `mcp__hive__${tool}`, arguments: JSON.stringify(input), call_id: id })
+  record({ type: 'function_call', name: `mcp__combwork__${tool}`, arguments: JSON.stringify(input), call_id: id })
   const r = server ? await callHiveTool(server, tool, input) : { text: 'error: no hive server', isError: true }
   record({ type: 'function_call_output', call_id: id, output: r.isError && !/^error/i.test(r.text) ? `error: ${r.text}` : r.text })
   return r
@@ -452,7 +452,7 @@ async function hiveCall(tool, input) {
 /** Reads a skill as Codex does: its SKILL.md from the folder Hive delivered it to, with a shell command. */
 function readSkill(name) {
   const dir = path.join(process.cwd(), '.agents', 'skills')
-  const folder = [name, `hive-${name}`].map((d) => path.join(dir, d, 'SKILL.md')).find((f) => fs.existsSync(f)) ?? path.join(dir, name, 'SKILL.md')
+  const folder = [name, `cw-${name}`].map((d) => path.join(dir, d, 'SKILL.md')).find((f) => fs.existsSync(f)) ?? path.join(dir, name, 'SKILL.md')
   return readFile(folder)
 }
 
@@ -461,7 +461,7 @@ function readSkill(name) {
  * SKILL.md (its copy in .agents/skills), resolved against that folder, and the file read with a shell command.
  */
 function readSkillRef(name, file) {
-  const dir = [name, `hive-${name}`].map((d) => path.join(process.cwd(), '.agents', 'skills', d)).find((d) => fs.existsSync(path.join(d, 'SKILL.md'))) ?? path.join(process.cwd(), '.agents', 'skills', name)
+  const dir = [name, `cw-${name}`].map((d) => path.join(process.cwd(), '.agents', 'skills', d)).find((d) => fs.existsSync(path.join(d, 'SKILL.md'))) ?? path.join(process.cwd(), '.agents', 'skills', name)
   const skill = fs.existsSync(path.join(dir, 'SKILL.md')) ? fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf8') : ''
   const target = skill.includes(`](${file})`) || skill.includes(`](./${file})`) ? path.resolve(dir, file) : path.join(dir, `no-link-to-${file}`)
   return readFile(target)
@@ -470,7 +470,7 @@ function readSkillRef(name, file) {
 /**
  * The scenario steps the fake Claude Code takes too (tests/scenarios): "skill NAME", "boardmove N COLUMN", "boardreview N
  * ACTION [COLUMN]", "boardcomment N", "hive TOOL {json}" and "work N". Board changes go through the real hive MCP
- * server (hive_update_task), as a model's would. Whether the step was one of these.
+ * server (cw_update_task), as a model's would. Whether the step was one of these.
  */
 async function scripted(step) {
   let any = false
@@ -483,11 +483,11 @@ async function scripted(step) {
     any = true
   }
   const move = /\bboardmove\s+(\d+)\s+(\w+)/i.exec(step)
-  if (move) await hiveCall('hive_update_task', { number: Number(move[1]), column: move[2].toLowerCase() })
+  if (move) await hiveCall('cw_update_task', { number: Number(move[1]), column: move[2].toLowerCase() })
   const rev = /\bboardreview\s+(\d+)\s+(\w+)(?:\s+(hold|todo|doing|review|passed|done)\b)?/i.exec(step)
-  if (rev) await hiveCall('hive_update_task', { number: Number(rev[1]), review: rev[2].toLowerCase(), ...(rev[3] ? { column: rev[3].toLowerCase(), comment: 'Fake review: passed.' } : {}) })
+  if (rev) await hiveCall('cw_update_task', { number: Number(rev[1]), review: rev[2].toLowerCase(), ...(rev[3] ? { column: rev[3].toLowerCase(), comment: 'Fake review: passed.' } : {}) })
   const comment = /\bboardcomment\s+(\d+)/i.exec(step)
-  if (comment) await hiveCall('hive_update_task', { number: Number(comment[1]), comment: 'Fake: done, see the files.' })
+  if (comment) await hiveCall('cw_update_task', { number: Number(comment[1]), comment: 'Fake: done, see the files.' })
   const call = parseHiveStep(step)
   if (call) await hiveCall(call.tool, call.args)
   const pause = /\bwork\s+(\d+)/i.exec(step)
@@ -523,10 +523,10 @@ async function scripted(step) {
     const reply = await hook('PreToolUse', c)
     const refused = reply?.hookSpecificOutput?.permissionDecision === 'deny' ? String(reply.hookSpecificOutput.permissionDecisionReason ?? '') : null
     if (refused === null) {
-      fs.appendFileSync(path.join(process.cwd(), edit[1]), `edited by ${process.env.HIVE_AGENT || 'agent'}\n`)
+      fs.appendFileSync(path.join(process.cwd(), edit[1]), `edited by ${process.env.CW_AGENT || 'agent'}\n`)
       await hook('PostToolUse', c)
     }
-    const agent = String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_')
+    const agent = String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_')
     if (process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-edits.jsonl'), JSON.stringify({ agent, file: edit[1], allowed: refused === null, reason: refused, at: new Date().toISOString() }) + '\n')
   }
   return any || !!(move || rev || comment || call || pause || check || sh || plan || edit)
@@ -541,7 +541,7 @@ function shellRun(cmd) {
     p.stdout.on('data', (d) => (stdout += d))
     p.stderr.on('data', (d) => (stderr += d))
     p.on('close', (code) => {
-      if (process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-shell.jsonl'), JSON.stringify({ agent: process.env.HIVE_AGENT || 'agent', cmd, code, stdout, stderr }) + '\n')
+      if (process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-shell.jsonl'), JSON.stringify({ agent: process.env.CW_AGENT || 'agent', cmd, code, stdout, stderr }) + '\n')
       resolve()
     })
   })
@@ -553,7 +553,7 @@ function shellRun(cmd) {
  */
 function nextScripted() {
   if (!process.env.CODEX_HOME) return null
-  const file = path.join(process.env.CODEX_HOME, `fake-wakes-${String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_')}.txt`)
+  const file = path.join(process.env.CODEX_HOME, `fake-wakes-${String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_')}.txt`)
   if (!fs.existsSync(file)) return null
   const [first, ...rest] = fs.readFileSync(file, 'utf8').split('\n')
   fs.writeFileSync(file, rest.join('\n'))
@@ -578,7 +578,7 @@ async function rateLimited() {
   } finally {
     db.close()
   }
-  const go = path.join(home, `fake-retried-${String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_')}`)
+  const go = path.join(home, `fake-retried-${String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_')}`)
   while (!fs.existsSync(go)) await sleep(100)
   fs.rmSync(go, { force: true })
 }
@@ -586,7 +586,7 @@ async function rateLimited() {
 /** Whether a line typed while a turn runs is queued and taken in it (fake-queue-<agent> in CODEX_HOME, #1514). */
 function queues() {
   const home = process.env.CODEX_HOME
-  return !!home && fs.existsSync(path.join(home, `fake-queue-${String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_')}`))
+  return !!home && fs.existsSync(path.join(home, `fake-queue-${String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_')}`))
 }
 /** Lines typed while a turn ran, queued for it (#1514). */
 const queued = []
@@ -604,10 +604,10 @@ async function takeQueued() {
     const text = queued.shift()
     userLine(text)
     if (!isDoorbell(text)) continue
-    const r = await hiveCall('hive_inbox', {})
+    const r = await hiveCall('cw_inbox', {})
     const rows = r.isError ? [] : inboxRows(r.text)
-    if (rows.length && followsNotices()) await hiveCall('hive_inbox', { ack: rows.flatMap((x) => x.ids) })
-    if (process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-wakes.jsonl'), JSON.stringify({ agent: String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_'), text: rows.map((x) => x.text).join(' '), at: new Date().toISOString(), queued: true }) + '\n')
+    if (rows.length && followsNotices()) await hiveCall('cw_inbox', { ack: rows.flatMap((x) => x.ids) })
+    if (process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-wakes.jsonl'), JSON.stringify({ agent: String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_'), text: rows.map((x) => x.text).join(' '), at: new Date().toISOString(), queued: true }) + '\n')
   }
 }
 
@@ -641,15 +641,15 @@ async function runPrompt(text) {
     userLine(text)
     await hook('UserPromptSubmit', { prompt: text })
   }
-  // Hive's doorbell (#650): it reads its inbox (hive_inbox), as a model does, and acts on what it read (one that follows
+  // Hive's doorbell (#650): it reads its inbox (cw_inbox), as a model does, and acts on what it read (one that follows
   // notices acks it too); what else it read (a wake, a message) is logged in fake-wakes.jsonl in CODEX_HOME.
   if (isDoorbell(text)) {
     const work = doorbellIsWork(text)
-    const r = await hiveCall('hive_inbox', {})
+    const r = await hiveCall('cw_inbox', {})
     const rows = r.isError ? [] : inboxRows(r.text)
-    if (rows.length && followsNotices()) await hiveCall('hive_inbox', { ack: rows.flatMap((x) => x.ids) })
+    if (rows.length && followsNotices()) await hiveCall('cw_inbox', { ack: rows.flatMap((x) => x.ids) })
     const read = rows.map((x) => x.text).join(' ')
-    if (!work && process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-wakes.jsonl'), JSON.stringify({ agent: String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_'), text: read, doorbell: text, at: new Date().toISOString() }) + '\n')
+    if (!work && process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-wakes.jsonl'), JSON.stringify({ agent: String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_'), text: read, doorbell: text, at: new Date().toISOString() }) + '\n')
     if (rows.length) text = work ? read : nextScripted() || ''
   }
   // As 0.162.1 does (FAKE_CODEX_VERSION), its Working line while a turn runs (#1336: what Hive's screen reading looks for).

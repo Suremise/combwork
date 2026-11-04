@@ -274,7 +274,7 @@ async function client(port) {
       await ui.typeShown('DRAFT kept')
       const h1 = seenHooks.length
       const m = c.events.length
-      const started = await c.call('turn/start', { threadId, clientUserMessageId: 'hive-m1', input: text('[Hive] New in your inbox: 1 message (m1). Reply with just: two') })
+      const started = await c.call('turn/start', { threadId, clientUserMessageId: 'hive-m1', input: text('[CW] New in your inbox: 1 message (m1). Reply with just: two') })
       const hiveDone = await lib.until(() => c.seen('turn/completed', (e) => e.params.turn.id === started.result?.turn?.id, m), HUNG_MS)
       const own = c.events.slice(m).find((e) => e.method === 'item/completed' && e.params?.item?.type === 'userMessage')
       check('a turn Hive starts comes as identified turn events too, with the id turn/start answered', !!hiveDone && hiveDone.params.turn.status === 'completed', JSON.stringify(started.error ?? hiveDone?.params?.turn?.status))

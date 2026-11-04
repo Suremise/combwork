@@ -1,6 +1,6 @@
 // The board's stage model and names (#1417, SPEC §16.5.2, OP-1, OP-30): the board's column headers read Active and
 // Approved while the Agent API keeps the ids doing and passed; workflow:stages gives the stages a Pair (Hive merges), a
-// No review and a None project produce; a rename through the Assistant's settings tool (hive_update_setting's route)
+// No review and a None project produce; a rename through the Assistant's settings tool (cw_update_setting's route)
 // shows in the project's status, keeps the ruleset a card starts under, and workflow:check says it applies at once; a
 // refused rename gives its reason; and a field of `workflow` written by hand into project.json survives a save.
 // Screenshots of the board's renamed columns in both themes, in English, German, Polish and Chinese. Dev build,
@@ -111,12 +111,12 @@ function projectJson(dir, platform, workflow) {
     const token = (await lib.until(() => fs.existsSync(tokenFile), HUNG_MS)) ? JSON.parse(fs.readFileSync(tokenFile, 'utf8')).token : null
     check('the Assistant has its token', !!token)
 
-    // Agents read the ids, as before (hive_list_tasks' route).
+    // Agents read the ids, as before (cw_list_tasks' route).
     const listed = await api(token, 'GET', '/v1/tasks?project=pair')
     const listedCards = Array.isArray(listed.body) ? listed.body : (listed.body?.tasks ?? [])
     check("the Agent API's cards keep the ids doing and passed", listed.status === 200 && listedCards.find((c) => c.number === cards.doing)?.column === 'doing' && listedCards.find((c) => c.number === cards.passed)?.column === 'passed', JSON.stringify(listedCards.map((c) => [c.number, c.column])))
 
-    // --- A rename through the settings tool's route (hive_update_setting): applies at once, keeps the ruleset.
+    // --- A rename through the settings tool's route (cw_update_setting): applies at once, keeps the ruleset.
     const startedRuleset = async (n) => (await inv('tasks:facts', n)).find((f) => f.kind === 'Started')?.ruleset ?? null
     const before = await lib.until(() => startedRuleset(cards.doing), HUNG_MS)
     check('a card started before the rename has its ruleset', !!before, JSON.stringify(await inv('tasks:facts', cards.doing)))

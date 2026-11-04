@@ -14,7 +14,7 @@ import { relativeInside } from '../places'
 /** An item before it gets its id (distributes over the union, so each kind keeps its own fields). */
 export type NewItem = TranscriptItem extends infer T ? (T extends TranscriptItem ? Omit<T, 'id'> : never) : never
 
-/** "mcp__hive__hive_notify" → "hive · hive_notify"; built-in tools keep their name. */
+/** "mcp__combwork__cw_notify" → "combwork · cw_notify"; built-in tools keep their name. */
 export function toolLabel(name: string): string {
   const m = /^mcp__(.+?)__(.+)$/.exec(name)
   return m ? `${m[1]} · ${m[2]}` : name

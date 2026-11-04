@@ -94,7 +94,7 @@ function agents() {
   const typed = () => pty.typed.filter((t) => t.key === s.key(p, editor.agentId)).map((t) => t.data)
   /**
    * The go-ahead for the file given: its doorbell typed (in pieces, as Hive types) and sent (#650: it names the notice by
-   * id; the agent reads what it says with hive_inbox).
+   * id; the agent reads what it says with cw_inbox).
    */
   const goAhead = async () => typed().join('').includes('New in your inbox: 1 notice') && typed().at(-1) === '\r' && (await deliveries.deliveriesOf(p, editor.agentId)).some((r) => r.state === 'offered' && r.body.includes(`allowed you to edit ${file}`))
   /** Its go-ahead once the claim it waited on ended unanswered (HI-2386): try again, nothing allowed. */
@@ -232,7 +232,7 @@ describe('Allow on an "Ask me" lock', () => {
     a.editor.status = 'working'
     // The retry is refused for the new holder's claim, and asks the user about that one: a new question, its own notice.
     const refused = JSON.stringify(await a.edit())
-    expect(refused).toContain('Hive has asked the user')
+    expect(refused).toContain('Combwork has asked the user')
     expect(a.offer()).not.toBeNull()
     expect(a.offer()).not.toBe(old)
   })
@@ -260,7 +260,7 @@ describe('Allow on an "Ask me" lock', () => {
     // Its old notice's Allow answers nothing, and C's retry asks about B's claim: a new question.
     await run(() => sessions.allowLockedEdit(p, a.other.agentId, join(p, a.file), `lock:${old![0]}#${old![1]}`))
     a.other.status = 'working'
-    expect(JSON.stringify(await a.editBy(a.other, a.file))).toContain('Hive has asked the user')
+    expect(JSON.stringify(await a.editBy(a.other, a.file))).toContain('Combwork has asked the user')
     expect(askOf()?.[1]).not.toBe(old![1])
   })
 
@@ -279,7 +279,7 @@ describe('Allow on an "Ask me" lock', () => {
     await run(() => sessions.allowLockedEdit(p, a.other.agentId, join(p, a.file), `lock:${c[0]}#${c[1]}`))
     expect(await a.editBy(a.other, a.file)).toBeNull()
     // B, still in its turn, edits again: refused for C's claim, and asked about anew.
-    expect(JSON.stringify(await a.edit())).toContain('Hive has asked the user')
+    expect(JSON.stringify(await a.edit())).toContain('Combwork has asked the user')
     const fresh = a.offer()
     expect(fresh).not.toBeNull()
     // Its Allow is answered (not refused as "already allowed" by the Allow it had against A): its retry goes ahead.
@@ -302,7 +302,7 @@ describe('Allow on an "Ask me" lock', () => {
     await vi.waitFor(async () => expect(await a.freed()).toBe(true), { timeout: HUNG_MS })
     await a.allow(old)
     a.editor.status = 'working'
-    expect(JSON.stringify(await a.edit())).toContain('Hive has asked the user')
+    expect(JSON.stringify(await a.edit())).toContain('Combwork has asked the user')
     expect(a.offer()).not.toBe(old)
   })
 
@@ -316,7 +316,7 @@ describe('Allow on an "Ask me" lock', () => {
     await a.hook('Stop')
     await vi.waitFor(async () => expect(await a.freed()).toBe(true), { timeout: HUNG_MS })
     a.editor.status = 'working'
-    expect(JSON.stringify(await a.edit())).toContain('Hive has asked the user')
+    expect(JSON.stringify(await a.edit())).toContain('Combwork has asked the user')
   })
 
   it('clicked while the blocked agent is still in its turn: nothing is typed then; at its end, the go-ahead, and the edit is allowed', async () => {

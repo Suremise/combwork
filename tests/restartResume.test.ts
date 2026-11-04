@@ -84,11 +84,11 @@ describe('the restart record', () => {
 describe('the line a resumed agent is given (resumeNote)', () => {
   it('says why, from which version to which and when, its card, round and lane, and to re-arm its watch', () => {
     const note = resumeNote(entry({ status: 'watching', card: { label: 'HI-1673', round: 2 }, lane: { id: 'lane-1', name: 'Lanes from the bottom', role: 'builder' }, at: '2026-10-26T10:00:00.000Z' }), '1.0.0-rc.5', 'install')
-    expect(note).toBe("[Hive] Hive restarted for an update (1.0.0-rc.4 → 1.0.0-rc.5) at 10:00 UTC; your session was stopped and is resumed now. You were on HI-1673, round 2, in lane 'Lanes from the bottom' (its builder). Carry on: re-arm your card watch if you were waiting.")
+    expect(note).toBe("[CW] Combwork restarted for an update (1.0.0-rc.4 → 1.0.0-rc.5) at 10:00 UTC; your session was stopped and is resumed now. You were on HI-1673, round 2, in lane 'Lanes from the bottom' (its builder). Carry on: re-arm your card watch if you were waiting.")
   })
 
   it('after a quit, with no card or lane: why, and to carry on', () => {
-    expect(resumeNote(entry({ from: '1.0.0', at: '2026-10-26T09:30:00.000Z' }), '1.0.0', 'quit')).toBe('[Hive] Hive was quit and started again at 09:30 UTC; your session was stopped and is resumed now. Carry on where you were.')
+    expect(resumeNote(entry({ from: '1.0.0', at: '2026-10-26T09:30:00.000Z' }), '1.0.0', 'quit')).toBe('[CW] Combwork was quit and started again at 09:30 UTC; your session was stopped and is resumed now. Carry on where you were.')
   })
 })
 

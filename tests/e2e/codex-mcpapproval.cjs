@@ -22,9 +22,9 @@ const SHOWN_MS = 30000
 // Codex redraws a line by moving the cursor over letters that didn't change, and plainText makes each move a space: any
 // letter of a reply can read as a space ("DE-1 crea ed in Todo", HI-2210).
 const gappy = (text) => [...text].map((c) => (c === ' ' ? ' ' : `[${c.replace(/[\\\]^-]/g, '\\$&')} ]`)).join('')
-const LISTED = new RegExp(`ed hive\\.hive_list_projects\\s*└\\s*${gappy('demo')} \\(on`)
+const LISTED = new RegExp(`ed hive\\.cw_list_projects\\s*└\\s*${gappy('demo')} \\(on`)
 // Its reply names the card by its key alone (#1219, HI-1661): "DE-1 created in Todo".
-const CREATED = new RegExp(`ed hive\\.hive_create_task\\s*└\\s*([A-Z]{2,4}-\\d+) ${gappy('created in Todo')}`)
+const CREATED = new RegExp(`ed hive\\.cw_create_task\\s*└\\s*([A-Z]{2,4}-\\d+) ${gappy('created in Todo')}`)
 const record = {}
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -101,7 +101,7 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
         check(`${mode}: ready`, ready?.status === 'ready', JSON.stringify(ready && { status: ready.status, msg: ready.statusMessage }))
         if (ready?.status !== 'ready') return
         check(`${mode}: runs in that mode`, ready.permissionMode === mode, ready.permissionMode)
-        const prompt = `Call the hive_list_projects tool. Then call the stamp tool of the stamp MCP server with text "${mode}". Make no other tool calls, then reply DONE.`
+        const prompt = `Call the cw_list_projects tool. Then call the stamp tool of the stamp MCP server with text "${mode}". Make no other tool calls, then reply DONE.`
         // What happens to stamp's call: Codex asks (the session waits for the user), it runs, or the turn ends without.
         // A prompt Codex takes while its MCP servers start can be answered without them ("that tool isn't available"):
         // then it is asked once more.
@@ -160,19 +160,19 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
     const { provider, ...launch } = small
     await inv('agents:update', home, 'assistant', { provider })
     await lib.setLaunch(inv, home, 'assistant', { ...launch, permissionMode: 'ask' })
-    // A native server named hive in the Codex config of the folder the Assistant works in (the workspace's, trusted here),
+    // A native server named combwork (Combwork's own server's name, HI-2463) in the Codex config of the folder the Assistant works in (the workspace's, trusted here),
     // approving every tool and the note's tool by name: Codex merges it into Hive's key by key, and Hive's approvals must
     // still win (#1281).
     lib.trustForCodex(ws)
     fs.mkdirSync(path.join(ws, '.codex'), { recursive: true })
-    fs.writeFileSync(path.join(ws, '.codex', 'config.toml'), '[mcp_servers.hive]\ncommand = "node"\nargs = ["native.js"]\ndefault_tools_approval_mode = "approve"\ntools = { hive_write_shared_note = { approval_mode = "approve" } }\n')
+    fs.writeFileSync(path.join(ws, '.codex', 'config.toml'), '[mcp_servers.combwork]\ncommand = "node"\nargs = ["native.js"]\ndefault_tools_approval_mode = "approve"\ntools = { cw_write_shared_note = { approval_mode = "approve" } }\n')
     const akey = lib.ptyKey(home, 'assistant')
     await lib.cliStep('the Assistant on Codex', { session: akey }, async () => {
       await inv('session:start', home, { agentId: 'assistant' })
       const ready = await lib.until(async () => ['ready', 'waiting'].includes((await live(home, 'assistant'))?.status) && (await live(home, 'assistant')), 90000, 500)
       check('Assistant: ready', ready?.status === 'ready', JSON.stringify(ready && { status: ready.status, msg: ready.statusMessage }))
       if (ready?.status !== 'ready') return
-      const prompt = 'Call hive_list_projects, then add a card titled "MCP approval check" to project demo with hive_create_task. Make no other tool calls, then reply DONE.'
+      const prompt = 'Call cw_list_projects, then add a card titled "MCP approval check" to project demo with cw_create_task. Make no other tool calls, then reply DONE.'
       check('Assistant: prompt taken', (await lib.sendPrompt(inv, akey, prompt, { submitted: async () => ['working', 'waiting', 'finished'].includes((await live(home, 'assistant'))?.status) })) > 0)
       let asked = false
       const done = await lib.until(async () => {
@@ -190,8 +190,8 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
       await page.screenshot({ path: path.join(scratch, 'mcpapproval-assistant.png') })
       check('Assistant: its turn ended', !!done, record.assistant.screenEnd.slice(-400))
       check('Assistant: never asked about a Hive tool', !asked, l?.statusMessage ?? '')
-      check('Assistant: hive_list_projects ran', LISTED.test(shown), record.assistant.screenEnd.slice(-400))
-      check('Assistant: hive_create_task ran', CREATED.test(shown), record.assistant.screenEnd.slice(-400))
+      check('Assistant: cw_list_projects ran', LISTED.test(shown), record.assistant.screenEnd.slice(-400))
+      check('Assistant: cw_create_task ran', CREATED.test(shown), record.assistant.screenEnd.slice(-400))
       const card = (await inv('tasks:list')).find((t) => t.title === 'MCP approval check')
       record.assistant.cardMade = card ? { number: card.number, project: card.project } : null
       check('Assistant: the card is on the board, in demo', card?.project === 'demo', JSON.stringify(record.assistant.cardMade))
@@ -202,7 +202,7 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
       // shared note asks, as on Claude Code and Copilot. Cancelled here, so nothing is written.
       if (!done) return
       const note = path.join(ws, '.hive', 'shared', 'notes', 'mcp-approval-check.md')
-      const notePrompt = 'Write a shared note at notes/mcp-approval-check.md containing the word check, with hive_write_shared_note. Make no other tool calls, then reply DONE.'
+      const notePrompt = 'Write a shared note at notes/mcp-approval-check.md containing the word check, with cw_write_shared_note. Make no other tool calls, then reply DONE.'
       check('Assistant: the note prompt is taken', (await lib.sendPrompt(inv, akey, notePrompt, { submitted: async () => ['working', 'waiting'].includes((await live(home, 'assistant'))?.status) })) > 0)
       const asking = await lib.until(async () => {
         const a = await live(home, 'assistant')
@@ -211,11 +211,11 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
       }, TURN_MS, 500)
       record.assistant.noteAsk = typeof asking === 'object' && asking ? { status: asking.status, message: asking.statusMessage ?? null } : asking
       await page.screenshot({ path: path.join(scratch, 'mcpapproval-assistant-note.png') })
-      check('Assistant: Codex asks before hive_write_shared_note (outside its Control subset)', typeof asking === 'object' && !!asking && /hive_write_shared_note/.test(asking.statusMessage ?? ''), JSON.stringify(record.assistant.noteAsk))
+      check('Assistant: Codex asks before cw_write_shared_note (outside its Control subset)', typeof asking === 'object' && !!asking && /cw_write_shared_note/.test(asking.statusMessage ?? ''), JSON.stringify(record.assistant.noteAsk))
       check('…and the note is not written while it asks', !fs.existsSync(note))
-      // The native server named hive was read (its folder's Codex config), and Hive's approvals won over its own.
+      // The native server named combwork was read (its folder's Codex config), and Hive's approvals won over its own.
       const hiveLog = fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
-      check("…with the folder's own Codex config approving every hive tool (read: Hive's log names it)", /Codex has an MCP server named hive in .*\.codex[\\/]config\.toml⁩?: Hive's own hive server is used instead/.test(hiveLog), hiveLog.split('\n').filter((line) => /named hive/.test(line)).slice(-2).join(' / '))
+      check("…with the folder's own Codex config approving every hive tool (read: Hive's log names it)", /Codex has an MCP server named combwork in .*\.codex[\\/]config\.toml⁩?: Hive's own server is used instead/.test(hiveLog), hiveLog.split('\n').filter((line) => /named combwork/.test(line)).slice(-2).join(' / '))
       if (typeof asking === 'object' && asking) {
         // Cancel the tool call (Esc, as its question says): the turn ends and nothing is written.
         await inv('pty:write', akey, '\x1b')

@@ -30,7 +30,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
   const go = path.join(fx.tools, 'slot-go.txt')
   const setup = path.join(fx.tools, 'setup.js')
   // The setup: writes the slot's name and port block, then waits for the test's go-ahead (bounded against a hang).
-  fs.writeFileSync(setup, ["const fs = require('fs')", "fs.mkdirSync('warm', { recursive: true })", "fs.writeFileSync('warm/env.txt', process.env.HIVE_SLOT + ' ' + process.env.HIVE_SLOT_PORT_BASE)", `const go = ${JSON.stringify(go)}, t = Date.now()`, 'const tick = () => (fs.existsSync(go) ? process.exit(0) : Date.now() - t > 120000 ? process.exit(3) : setTimeout(tick, 100))', 'tick()', ''].join('\n'))
+  fs.writeFileSync(setup, ["const fs = require('fs')", "fs.mkdirSync('warm', { recursive: true })", "fs.writeFileSync('warm/env.txt', process.env.CW_SLOT + ' ' + process.env.CW_SLOT_PORT_BASE)", `const go = ${JSON.stringify(go)}, t = Date.now()`, 'const tick = () => (fs.existsSync(go) ? process.exit(0) : Date.now() - t > 120000 ? process.exit(3) : setTimeout(tick, 100))', 'tick()', ''].join('\n'))
   const h = await q.startHive(fx, { port: PORT, keepOptions: true })
   try {
     const { page, inv } = h

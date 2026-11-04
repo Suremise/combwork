@@ -24,10 +24,10 @@ describe("the events stream's notification titles", () => {
   const event = noticeEvent({ apiTitle: closed.apiTitle, apiTitleText: closed.apiTitleText })
 
   it('read in English as made with no chain, for every client, and leave the text as data out', () => {
-    expect(closed.apiTitle).toBe('Hive has closed')
-    for (const client of [AGENT, null]) expect(forClient(event, client)).toEqual({ type: 'notice', notice: { id: 'n-1', kind: 'notice', title: 'Hive has closed', projectPath: AGENT.projectPath } })
+    expect(closed.apiTitle).toBe('Combwork has closed')
+    for (const client of [AGENT, null]) expect(forClient(event, client)).toEqual({ type: 'notice', notice: { id: 'n-1', kind: 'notice', title: 'Combwork has closed', projectPath: AGENT.projectPath } })
     // A notice from before (no text kept), or one whose title is its English: as it was.
-    expect(titleOf(forClient(noticeEvent({ apiTitle: 'Hive has closed' }), AGENT))).toBe('Hive has closed')
+    expect(titleOf(forClient(noticeEvent({ apiTitle: 'Combwork has closed' }), AGENT))).toBe('Combwork has closed')
     expect(titleOf(forClient(noticeEvent({ title: 'Agent finished' }), AGENT))).toBe('Agent finished')
   })
 
@@ -37,7 +37,7 @@ describe("the events stream's notification titles", () => {
     expect(titleOf(forClient(event, null))).toBe('Hive closed (API)')
     // An override of another text leaves it as made.
     setChainResolver(() => chain({ 'main.plan.used': 'x' }))
-    expect(titleOf(forClient(event, AGENT))).toBe('Hive has closed')
+    expect(titleOf(forClient(event, AGENT))).toBe('Combwork has closed')
   })
 
   it("a burst of finishes keeps its group title's text as data, which the stream says in the client's chain", () => {

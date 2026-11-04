@@ -15,7 +15,7 @@ import { pausedFor } from './teamPause'
  * Notices in hooks (#650, plans/2026-10-12-messaging-redesign.md §3.2): a busy agent is told what it has unread at its
  * next checkpoint (a tool call of its own ended), and before its turn ends (the Stop drain), in the reply to that hook,
  * so nothing is typed into a working agent. The notice is Hive's fixed text with counts, cards and ids
- * (shared/doorbell.ts); the agent reads the bodies with hive_inbox, which alone makes them received. Each CLI says which
+ * (shared/doorbell.ts); the agent reads the bodies with cw_inbox, which alone makes them received. Each CLI says which
  * of its hooks can carry one (the adapter's noticeReply; sessions.hookReply asks only those).
  *
  * - **Checkpoint**: only deliveries it wasn't told of yet in this launch, so a long turn isn't told the same thing at
@@ -32,7 +32,7 @@ import { pausedFor } from './teamPause'
 const told = new WeakMap<LiveSessionState, Set<string>>()
 
 /**
- * The deliveries an agent has unread that hive_inbox would give it now (HI-1687: what a notice names, a read gives and an
+ * The deliveries an agent has unread that cw_inbox would give it now (HI-1687: what a notice names, a read gives and an
  * ack takes): `countable`, the gate's own check without making anything again; not expired, and not for another
  * conversation.
  */
@@ -56,7 +56,7 @@ async function inboxNoticeFor(st: LiveSessionState, at: 'checkpoint' | 'drain'):
   // One that can't read an inbox (its hive tools off) is given no delivery (#650's decision): nothing to tell it here.
   if (!agentReadsInbox(st.projectPath, st.agentId)) return null
   // Its switch off (#1432): no notice there, so the turn goes on (or ends) as the CLI would; what is unread stays in the
-  // inbox for the drain, the doorbell or hive_inbox. The checkpoint's not told isn't counted as told.
+  // inbox for the drain, the doorbell or cw_inbox. The checkpoint's not told isn't counted as told.
   if (!(await inboxSwitch(st.projectPath, at === 'checkpoint' ? 'checkpoints' : 'stopContinuation'))) return null
   const lanes = at === 'drain' ? await unwatchedLanes(st) : ''
   const unread = await unreadFor(st)

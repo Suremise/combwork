@@ -4,7 +4,7 @@
  *
  * - format.ts: a file's shape and its one check (the schema's);
  * - store.ts: `.hive/dialects/` on disk, `.state.json`'s switches, saves, imports, duplicates, Promote, and the file a
- *   launch's resolved texts go in (`HIVE_DIALECT_FILE`);
+ *   launch's resolved texts go in (`CW_DIALECT_FILE`);
  * - match.ts: which file fills a session's model slot (Auto by the real model ID, or the agent's pick);
  * - chain.ts: Model file → CLI → Workspace → Default, or API → Workspace → Default for a caller with no session.
  *

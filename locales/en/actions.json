@@ -248,8 +248,8 @@
     "description": "Title of the Add MCP Server from File dialog (the command of the same name). MCP is a name: keep it."
   },
   "actions.mcp.badName": {
-    "defaultMessage": "Use letters, numbers, \"-\" and \"_\". \"hive\" is reserved.",
-    "description": "Why an MCP server's name can't be used. Keep \"hive\" as it is: it is the built-in server's name."
+    "defaultMessage": "Use letters, numbers, \"-\" and \"_\". \"combwork\" and \"hive\" are reserved.",
+    "description": "Why an MCP server's name can't be used. Keep \"combwork\" and \"hive\" as they are: the built-in server's name and its old one (HI-2463)."
   },
   "actions.mcp.copied": {
     "defaultMessage": "Copied {names} to the workspace",

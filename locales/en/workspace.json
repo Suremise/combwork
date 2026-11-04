@@ -632,8 +632,8 @@
     "description": "The heading of the built-in hive server's page."
   },
   "workspace.mcpView.builtInText": {
-    "defaultMessage": "Every session started from Combwork gets a <code>hive</code> MCP server that connects to the Agent API{hasUrl, select, yes { at {url}} other {}}. Turn it off in Settings → Agent API.",
-    "description": "The built-in server's page. <code> is the server's name: keep hive as it is."
+    "defaultMessage": "Every session started from Combwork gets a <code>combwork</code> MCP server that connects to the Agent API{hasUrl, select, yes { at {url}} other {}}. Turn it off in Settings → Agent API.",
+    "description": "The built-in server's page. <code> is the server's name: keep combwork as it is (HI-2463)."
   },
   "workspace.mcpView.deleteServer": {
     "defaultMessage": "Delete server",
@@ -689,39 +689,39 @@
   },
   "workspace.mcpView.toolHandover": {
     "defaultMessage": "Write a handover note for a future session",
-    "description": "What the built-in server's hive_create_handover tool does."
+    "description": "What the built-in server's cw_create_handover tool does."
   },
   "workspace.mcpView.toolListNotes": {
     "defaultMessage": "List notes in .hive/shared",
-    "description": "What the built-in server's hive_list_shared_notes tool does."
+    "description": "What the built-in server's cw_list_shared_notes tool does."
   },
   "workspace.mcpView.toolListProjects": {
     "defaultMessage": "List projects and their session status",
-    "description": "What the built-in server's hive_list_projects tool does."
+    "description": "What the built-in server's cw_list_projects tool does."
   },
   "workspace.mcpView.toolListSkills": {
     "defaultMessage": "List skills available to a project",
-    "description": "What the built-in server's hive_list_skills tool does."
+    "description": "What the built-in server's cw_list_skills tool does."
   },
   "workspace.mcpView.toolNotify": {
     "defaultMessage": "Show a notification to you in Combwork",
-    "description": "What the built-in server's hive_notify tool does."
+    "description": "What the built-in server's cw_notify tool does."
   },
   "workspace.mcpView.toolProjectStatus": {
     "defaultMessage": "Status and settings of one project",
-    "description": "What the built-in server's hive_project_status tool does."
+    "description": "What the built-in server's cw_project_status tool does."
   },
   "workspace.mcpView.toolReadNote": {
     "defaultMessage": "Read a shared note",
-    "description": "What the built-in server's hive_read_shared_note tool does."
+    "description": "What the built-in server's cw_read_shared_note tool does."
   },
   "workspace.mcpView.toolSessionUsage": {
     "defaultMessage": "Token use, cache and compactions for a session",
-    "description": "What the built-in server's hive_session_usage tool does."
+    "description": "What the built-in server's cw_session_usage tool does."
   },
   "workspace.mcpView.toolWriteNote": {
     "defaultMessage": "Create, overwrite or append to a shared note",
-    "description": "What the built-in server's hive_write_shared_note tool does."
+    "description": "What the built-in server's cw_write_shared_note tool does."
   },
   "workspace.mcpView.tryAsking": {
     "defaultMessage": "Try asking an agent: *\"Write a handover for the next session using the hive tools.\"*",

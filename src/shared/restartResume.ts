@@ -179,7 +179,7 @@ export function checkRequest(text: string, t: RequestTarget, samePath: (a: strin
   if (v.pid !== t.pid) return { ok: false, why: `for another process (${v.pid})`, nonce } // agent-protocol: the installer request's check, written only to the log
   const created = Date.parse(v.pidCreated)
   if (Number.isNaN(created) || Math.abs(created - t.startedAt) > START_TOLERANCE_MS) return { ok: false, why: 'for an earlier process with the same id', nonce } // agent-protocol: the installer request's check, written only to the log
-  if (!samePath(v.exe, t.exe)) return { ok: false, why: 'for another copy of Hive', nonce } // agent-protocol: the installer request's check, written only to the log
+  if (!samePath(v.exe, t.exe)) return { ok: false, why: 'for another copy of Combwork', nonce } // agent-protocol: the installer request's check, written only to the log
   const at = Date.parse(v.at)
   if (Number.isNaN(at) || t.now - at > REQUEST_MAX_AGE_MS || at - t.now > START_TOLERANCE_MS) return { ok: false, why: 'stale', nonce }
   return { ok: true, request: v as RestartRequest }
@@ -190,10 +190,10 @@ export function checkRequest(text: string, t: RequestTarget, samePath: (a: strin
 // ---------------------------------------------------------------------------
 
 const T = {
-  restarting: agentMsg({ id: 'notice.restart.restarting', text: "Hive is restarting for an update. Your work is saved; you'll be resumed.", note: 'HI-1707: the notice an agent finds in its inbox as Hive closes for an update, an install or a restart.' }),
+  restarting: agentMsg({ id: 'notice.restart.restarting', text: "Combwork is restarting for an update. Your work is saved; you'll be resumed.", note: 'HI-1707: the notice an agent finds in its inbox as Hive closes for an update, an install or a restart.' }),
   resumed: agentMsg({
     id: 'notice.restart.resumed',
-    text: '{reason, select, quit {Hive was quit and started again} restart {Hive restarted} other {Hive restarted for an update}}{versions} at {time} UTC; your session was stopped and is resumed now.{where}{watch, select, yes { Carry on: re-arm your card watch if you were waiting.} other { Carry on where you were.}}',
+    text: '{reason, select, quit {Combwork was quit and started again} restart {Combwork restarted} other {Combwork restarted for an update}}{versions} at {time} UTC; your session was stopped and is resumed now.{where}{watch, select, yes { Carry on: re-arm your card watch if you were waiting.} other { Carry on where you were.}}',
     note: 'HI-1707: the first prompt a resumed agent is given. reason: quit, restart or update (an install too); versions: " (1.0.0 → 1.0.1)" when the version changed, or nothing; time: when Hive closed ("10:00"); where: what it was on (notice.restart.where), after a space, or nothing; watch: yes when it was watching or in a lane.'
   }),
   where: agentMsg({

@@ -1,5 +1,5 @@
 // Dialects (HI-2065), HI-2464: Hive's own requests for the user (For you: the round limit, Hive's approvals) keep their
-// Default English as stored, and are said again in each reader's chain where agents read them: hive_read_task's forYou
+// Default English as stored, and are said again in each reader's chain where agents read them: cw_read_task's forYou
 // rows (cardRequests) and a lane watch's wake that quotes a request (laneHits). With no chain, or one that overrides none
 // of the request's messages, they read exactly as stored, older wording included.
 import { join } from 'path'
@@ -42,7 +42,7 @@ describe("Hive's For you requests, as agents read them", () => {
     expect(asAgent(() => cardRequests([{ ...row('Push the tag?'), shown: undefined }]))![0].text).toBe('Push the tag?')
   })
 
-  it("hive_read_task's forYou rows say the round limit's request in the reader's chain", () => {
+  it("cw_read_task's forYou rows say the round limit's request in the reader's chain", () => {
     using(OVERRIDE)
     expect(asAgent(() => cardRequests([row(english)]))![0].text).toBe('HI-12 is at its round limit after 3 reviews: more rounds, split, accept, or take over?')
     // Older wording stored with the same message is said in the reader's chain too (5b's rule for stored records).

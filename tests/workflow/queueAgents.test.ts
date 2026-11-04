@@ -119,7 +119,7 @@ describe('refusals under Hive merges (the card says what to do)', () => {
     for (const [reason, waits, line, next, st] of cases) {
       e.store.setQueuePause('main', { reason, card: first.key, ...(st ? { stuck: st } : {}) })
       expect(pauseWait(reason, !!st)).toBe(waits)
-      expect(e.wf.queueLineOf(card.key)).toBe(`Hive merges this card (its rules): don't merge it yourself. It is in the merge queue for main, which is paused (${reason}, on ${first.key}); ${line}`)
+      expect(e.wf.queueLineOf(card.key)).toBe(`Combwork merges this card (its rules): don't merge it yourself. It is in the merge queue for main, which is paused (${reason}, on ${first.key}); ${line}`)
       const r = refusedBy(await e.wf.reportMerge(card.key, B1), 'merge.hiveMerges')
       expect(r.next).toBe(`It is in the merge queue for main, ${next}${tail}`)
     }
@@ -203,7 +203,7 @@ describe('wakes at each queue outcome (what came back and what to do)', () => {
     const output = ['ok 1', 'ok 2', 'not ok 3 - adds', '# 1 failing'].join('\n')
     await e.queue({ runCheck: async () => ({ ok: false, output, logPath: 'C:\\logs\\check.log' }) }).drain('main')
     const wake = e.wakes.find((w) => w.card === card.key && w.why.includes('merge queue'))!.why
-    expect(wake).toBe(`${card.key} came back from the merge queue: the merge check quick failed on the merged result. Its log: C:\\logs\\check.log. Its last lines: "ok 1 | ok 2 | not ok 3 - adds | # 1 failing". Fix it in your worktree, commit and submit again (hive_submit).`)
+    expect(wake).toBe(`${card.key} came back from the merge queue: the merge check quick failed on the merged result. Its log: C:\\logs\\check.log. Its last lines: "ok 1 | ok 2 | not ok 3 - adds | # 1 failing". Fix it in your worktree, commit and submit again (cw_submit).`)
     expect(e.wf.state(card).entries.at(-1)?.failure).toMatchObject({ check: 'quick', logPath: 'C:\\logs\\check.log' })
     // The card read says it too.
     expect(e.wf.queueLineOf(card.key)).toContain('Its log: C:\\logs\\check.log.')
@@ -215,12 +215,12 @@ describe('wakes at each queue outcome (what came back and what to do)', () => {
     await e.queue({ runCheck: async () => ({ ok: false, transient: true, cause: { cause: 'network', code: 'ENOTFOUND' }, output: 'npm error code ENOTFOUND' }) }).drain('main')
     const wake = e.wakes.find((w) => w.card === card.key && w.why.includes('merge queue'))!.why
     expect(wake).toContain('the merge check quick failed for the environment, not the work (network: ENOTFOUND)')
-    expect(wake).toContain('Submit the same revision again (hive_submit): it goes straight back into the queue, at most twice in a row.')
+    expect(wake).toContain('Submit the same revision again (cw_submit): it goes straight back into the queue, at most twice in a row.')
   })
 
   it('a conflict: the files, and merging the target in', () => {
     const f: FactData['IntegrationFailed'] = { entry: 'AM-1/e1', revision: 'a', target: 'main', reason: 'conflict', transient: false, files: Array.from({ length: 10 }, (_, i) => `f${i}.ts`) }
-    expect(returnedText('AM-1', f)).toBe('AM-1 came back from the merge queue: a conflict with main in f0.ts, f1.ts, f2.ts, f3.ts, f4.ts, f5.ts, f6.ts, f7.ts and 2 more. Merge main into your worktree, resolve the conflict, commit and submit again (hive_submit).')
+    expect(returnedText('AM-1', f)).toBe('AM-1 came back from the merge queue: a conflict with main in f0.ts, f1.ts, f2.ts, f3.ts, f4.ts, f5.ts, f6.ts, f7.ts and 2 more. Merge main into your worktree, resolve the conflict, commit and submit again (cw_submit).')
   })
 
   it("a conflict's hunks (HI-1181): where each file's are, or why it wasn't read; the files alone when that doesn't fit", () => {
@@ -241,7 +241,7 @@ describe('wakes at each queue outcome (what came back and what to do)', () => {
     const t = returnedText('AM-1', f)
     expect(t.length).toBeLessThanOrEqual(WAKE_NOTE_MAX)
     expect(t).toContain('line 49')
-    expect(t.endsWith('Fix it in your worktree, commit and submit again (hive_submit).')).toBe(true)
+    expect(t.endsWith('Fix it in your worktree, commit and submit again (cw_submit).')).toBe(true)
     // The wake line quotes Hive's note whole (up to 600), a reviewer's request still at 200.
     const change = cardChange(5, { number: 5, title: 'T', column: 'doing', comments: [], history: [] } as unknown as TaskCard, ['column'])
     expect(loopWakeLine(change, 'note', t)).toContain(t.slice(-60))
@@ -251,7 +251,7 @@ describe('wakes at each queue outcome (what came back and what to do)', () => {
   it('long names: what came back and the next step always whole, in the note and the wake line; what is left out is said', () => {
     const nested = (i: number) => `packages/feature-${i}/src/components/deeply/nested/folder/structure/Component${i}.test.tsx`.padEnd(92, 'x')
     const files = Array.from({ length: 8 }, (_, i) => nested(i))
-    const longPath = `C:\\Users\\someone\\AppData\\Local\\hive\\queue-logs\\${'very-long-folder-name\\'.repeat(14)}check.log`
+    const longPath = `C:\\Users\\someone\\AppData\\Local\\hive\\queue-logs\\${'very-long-folder-name\\'.repeat(16)}check.log`
     const longName = 'release/' + 'a-very-long-branch-name-'.repeat(8)
     const longCheck = 'npm run ' + 'check:'.repeat(30)
     const base = { entry: 'AM-1/e1', revision: 'a', transient: false } as const
@@ -267,7 +267,7 @@ describe('wakes at each queue outcome (what came back and what to do)', () => {
     const change = cardChange(5, { number: 5, title: 'T', column: 'doing', comments: [], history: [] } as unknown as TaskCard, ['column'])
     for (const [what, f] of cases) {
       const t = returnedText('AM-1', f)
-      const next = f.transient ? 'Submit the same revision again (hive_submit): it goes straight back into the queue, at most twice in a row.' : f.reason === 'conflict' ? 'resolve the conflict, commit and submit again (hive_submit).' : 'Fix it in your worktree, commit and submit again (hive_submit).'
+      const next = f.transient ? 'Submit the same revision again (cw_submit): it goes straight back into the queue, at most twice in a row.' : f.reason === 'conflict' ? 'resolve the conflict, commit and submit again (cw_submit).' : 'Fix it in your worktree, commit and submit again (cw_submit).'
       expect(t.length, what).toBeLessThanOrEqual(WAKE_NOTE_MAX)
       expect(t.endsWith(next), `${what}: ${t}`).toBe(true)
       expect(t.startsWith('AM-1 came back from the merge queue: '), what).toBe(true)
@@ -282,7 +282,7 @@ describe('wakes at each queue outcome (what came back and what to do)', () => {
     // A log path that doesn't fit whole points to the card instead of a cut path.
     const pathless = returnedText('AM-1', cases[3][1])
     expect(pathless).not.toContain('check.log')
-    expect(pathless).toContain('Its log path: hive_read_task.')
+    expect(pathless).toContain('Its log path: cw_read_task.')
     // A card read has the room for it.
     expect(returnedText('It', cases[2][1], 1500, 15)).toContain(`Its log: ${longPath}.`)
   })
@@ -325,9 +325,9 @@ describe('wakes at each queue outcome (what came back and what to do)', () => {
     expect(queueStateOf(e.wf, card)).toMatchObject({ state: 'left', why: 'decision' })
     expect(e.wf.queueLineOf(card.key)).toContain('a decision since its approval needs it reviewed again')
     // The queue's own skip says the same, by why and where the card went.
-    expect(leftWake('AM-4', 'stale', 'review')).toBe('AM-4 left the merge queue: its pass is stale (its revision changed since it was approved). Submit the current revision (hive_submit) for review.')
-    expect(leftWake('AM-4', 'decision', 'review')).toBe('AM-4 left the merge queue: a decision since its approval needs it reviewed again. Read its decisions (hive_read_task); it is back in Review, and queued again once approved.')
-    expect(leftWake('AM-4', 'decision', 'active')).toContain('then submit again (hive_submit).')
+    expect(leftWake('AM-4', 'stale', 'review')).toBe('AM-4 left the merge queue: its pass is stale (its revision changed since it was approved). Submit the current revision (cw_submit) for review.')
+    expect(leftWake('AM-4', 'decision', 'review')).toBe('AM-4 left the merge queue: a decision since its approval needs it reviewed again. Read its decisions (cw_read_task); it is back in Review, and queued again once approved.')
+    expect(leftWake('AM-4', 'decision', 'active')).toContain('then submit again (cw_submit).')
   })
 })
 
@@ -335,7 +335,7 @@ describe('where a card is, for its readers (queueState.ts)', () => {
   it('queued, testing, merged; nothing for a card the agent merges', async () => {
     const e = team()
     const { card } = await queued(e)
-    expect(e.wf.queueLineOf(card.key)).toBe("Hive merges this card (its rules): don't merge it yourself. It is in the merge queue for main, position 1; it moves to Done once merged.")
+    expect(e.wf.queueLineOf(card.key)).toBe("Combwork merges this card (its rules): don't merge it yourself. It is in the merge queue for main, position 1; it moves to Done once merged.")
     await e.queue().drain('main')
     expect(queueStateOf(e.wf, card)).toEqual({ state: 'merged' })
     // Done: nothing more to say on a card read.
@@ -364,7 +364,7 @@ describe('where a card is, for its readers (queueState.ts)', () => {
     expect(refusedBy(await e.wf.reportMerge(first.key, B1), 'merge.hiveMerges').next).toContain('is merging it into main now')
   })
 
-  it("hive_lane next: a passed card Hive merges is named with where it is, and the next card waits for it", () => {
+  it("cw_lane next: a passed card Hive merges is named with where it is, and the next card waits for it", () => {
     const lane = { state: 'running' } as unknown as Parameters<typeof laneNextText>[0]['lane']
     expect(laneNextText({ lane, next: { card: 9, title: 'Next one', carryOn: false }, waits: null, queue: [{ card: 8, line: 'Hive merges this card (its rules): queued.' }] })).toBe('#8: Hive merges this card (its rules): queued. Next: #9 Next one, once it is Done.')
     expect(laneNextText({ lane, next: null, waits: null, queue: [{ card: 8, line: 'Queued.' }] })).toBe('#8: Queued. Nothing else to start: the lane ends by itself once all are Done.')

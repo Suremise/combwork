@@ -56,7 +56,7 @@ export const optionOf = (c: Connection, account: { name: string; provider: Provi
 })
 
 /**
- * What a picker answers (the dialogs', and `hive_template` `connections` once read: templateApi.ts): one connection for
+ * What a picker answers (the dialogs', and `cw_template` `connections` once read: templateApi.ts): one connection for
  * every agent (`all`), one per role, and one per agent by its **key** (over its role's, over all's): an existing agent's
  * id, a template's agent's name in the template as made for the project (`templateNames`). Kept apart, so an agent called
  * Builder never stands for the builders (HR3's round 1), and bound to the agent it was chosen for, never to a place a

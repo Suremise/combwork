@@ -1,5 +1,5 @@
 // The merge queue's controls (#1353, SPEC §16.9.3 User controls): the queue's model (what each target's queue is doing,
-// one model for the window, the Agent API and the Assistant's hive_queue), and Pause queue / Resume per project and
+// one model for the window, the Agent API and the Assistant's cw_queue), and Pause queue / Resume per project and
 // target. A card's Remove from queue and Retry merge are intents on the board's intent path (cardIntents.ts). Who may:
 // the user (the window), the Assistant within Settings → Assistant → Control (the Agent API, through assistantChange),
 // never a project agent. The callers check it; this module does what they allowed.
@@ -56,7 +56,7 @@ interface QueueScope {
 }
 
 /**
- * A project's queues (one target's, or every one's), as the window, the Agent API and hive_queue read them. `window`: the
+ * A project's queues (one target's, or every one's), as the window, the Agent API and cw_queue read them. `window`: the
  * window's listing (#1356), which also lists the targets that only have cards in flight under Hive merges, or are the
  * current options' target, so the panel can decide which show.
  */

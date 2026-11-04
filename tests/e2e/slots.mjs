@@ -212,14 +212,14 @@ export function needsSlot({ count, repeat = 1 }, env = process.env) {
  * in, as their progress reporting does: the reply's JSON, or null when no Hive agent runs this, or the API doesn't answer
  * in time or refuses. workspace: the X-Hive-Workspace to name (the session's own by default).
  */
-async function apiGet(path, env, { fetch = globalThis.fetch, timeoutMs = 3000, workspace = env.HIVE_WORKSPACE } = {}) {
-  const url = env.HIVE_API_URL?.replace(/\/+$/, '')
+async function apiGet(path, env, { fetch = globalThis.fetch, timeoutMs = 3000, workspace = env.CW_WORKSPACE } = {}) {
+  const url = env.CW_API_URL?.replace(/\/+$/, '')
   if (!url) return null
   // The session's token file, never HIVE_API_TOKEN (HI-2262: sessions no longer get it).
   let token = ''
-  if (env.HIVE_API_TOKEN_FILE) {
+  if (env.CW_API_TOKEN_FILE) {
     try {
-      token = String(JSON.parse(readFileSync(env.HIVE_API_TOKEN_FILE, 'utf8')).token ?? '')
+      token = String(JSON.parse(readFileSync(env.CW_API_TOKEN_FILE, 'utf8')).token ?? '')
     } catch {
       token = ''
     }
@@ -242,9 +242,9 @@ async function apiGet(path, env, { fetch = globalThis.fetch, timeoutMs = 3000, w
  * answer in time: an ordinary run then.
  */
 export async function holdsMergeSlot(env = process.env, { fetch = globalThis.fetch, timeoutMs = 3000 } = {}) {
-  if (!env.HIVE_PROJECT || !env.HIVE_AGENT) return false
-  const holder = (await apiGet(`/v1/projects/${encodeURIComponent(env.HIVE_PROJECT)}/merge-slot`, env, { fetch, timeoutMs }))?.holder
-  return holder?.kind === 'agent' && holder.name === env.HIVE_AGENT
+  if (!env.CW_PROJECT || !env.CW_AGENT) return false
+  const holder = (await apiGet(`/v1/projects/${encodeURIComponent(env.CW_PROJECT)}/merge-slot`, env, { fetch, timeoutMs }))?.holder
+  return holder?.kind === 'agent' && holder.name === env.CW_AGENT
 }
 
 /**
@@ -252,8 +252,8 @@ export async function holdsMergeSlot(env = process.env, { fetch = globalThis.fet
  * workspace }, or undefined outside an agent's session.
  */
 export function runOwner(env = process.env) {
-  if (!env.HIVE_PROJECT || !env.HIVE_AGENT || !env.HIVE_RUN_ID) return undefined
-  return { project: env.HIVE_PROJECT, agent: env.HIVE_AGENT, run: env.HIVE_RUN_ID, ...(env.HIVE_WORKSPACE ? { workspace: env.HIVE_WORKSPACE } : {}) }
+  if (!env.CW_PROJECT || !env.CW_AGENT || !env.CW_RUN_ID) return undefined
+  return { project: env.CW_PROJECT, agent: env.CW_AGENT, run: env.CW_RUN_ID, ...(env.CW_WORKSPACE ? { workspace: env.CW_WORKSPACE } : {}) }
 }
 
 /**

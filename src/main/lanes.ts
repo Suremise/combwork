@@ -58,7 +58,7 @@ const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCas
 const KINDS: Record<number, HiveErrorKind> = { 400: 'invalid', 403: 'forbidden', 404: 'notFound', 409: 'conflict' }
 
 /**
- * A lane change Hive refuses (status: the HTTP status the Agent API answers with). Most come only from agents (hive_lane),
+ * A lane change Hive refuses (status: the HTTP status the Agent API answers with). Most come only from agents (cw_lane),
  * in English; one the window can meet too (Progress → Lanes: ending a lane) is text, in its language there (#850).
  */
 export class LaneError extends HiveError {
@@ -79,7 +79,7 @@ const M = {
 }
 
 /**
- * What lanes say to agents (dialects, HI-2435): hive_lane's refusals and replies, the lines Hive delivers to a lane's
+ * What lanes say to agents (dialects, HI-2435): cw_lane's refusals and replies, the lines Hive delivers to a lane's
  * builder, and the journal's lane facts. Said where they are sent: a refusal in the request's scope, a delivery in its
  * builder's (inDialectOf), and what is stored for any reader (a journal fact, a fact's reason) in the Default.
  * `{card}` is a card's key or number, `{builder}`/`{reviewer}`/`{agent}` an agent's name.
@@ -87,47 +87,47 @@ const M = {
 const A = {
   readFailed: agentMsg({ id: 'lane.store.readFailed', text: 'Could not read the lanes ({error})', note: "The workspace's lanes.json from before #1018 couldn't be read to move it in (Windows holding it, no permission); {error} is the system's error. The next open tries again." }),
   damaged: agentMsg({ id: 'lane.store.damaged', text: "The lanes file is damaged and couldn't be set aside ({error}): it was left as it is", note: "lanes.json from before #1018 isn't JSON lanes and couldn't be renamed aside; {error} is the system's error." }),
-  listChanged: agentMsg({ id: 'lane.tell.listChanged', text: "Your lane's card list changed, as queued: its cards are now {cards}. hive_lane next names your next card.", note: "Delivered to a lane's builder once a queued change of its card list applies (#1270); {cards} is the list, in order." }),
-  reordered: agentMsg({ id: 'lane.tell.reordered', text: 'Your lane was reordered now by {by}: {card} is back in Todo (its work stays on {line}): stop working on it. Its cards are now {cards}. hive_lane next names your next card.', note: "Delivered to a lane's builder after a reorder applied now (HI-1995) put its card in flight back; {by} is who reordered it, {line} its branch (or lane.reorder.itsBranch)." }),
+  listChanged: agentMsg({ id: 'lane.tell.listChanged', text: "Your lane's card list changed, as queued: its cards are now {cards}. cw_lane next names your next card.", note: "Delivered to a lane's builder once a queued change of its card list applies (#1270); {cards} is the list, in order." }),
+  reordered: agentMsg({ id: 'lane.tell.reordered', text: 'Your lane was reordered now by {by}: {card} is back in Todo (its work stays on {line}): stop working on it. Its cards are now {cards}. cw_lane next names your next card.', note: "Delivered to a lane's builder after a reorder applied now (HI-1995) put its card in flight back; {by} is who reordered it, {line} its branch (or lane.reorder.itsBranch)." }),
   itsBranch: agentMsg({ id: 'lane.reorder.itsBranch', text: 'its branch', note: "In place of {line}: where a put-back card's work stays, when its branch's name isn't known." }),
   putBackWhy: agentMsg({ id: 'lane.reorder.putBackWhy', text: 'Put back by a lane reorder applied now ({by})', note: "The reason recorded on a card put back by a reorder applied now (HI-1995), stored on the card's facts; {by} is who reordered." }),
-  generalist: agentMsg({ id: 'lane.refused.generalist', text: "{agent} is a generalist: it takes no side in the workflow, so it is never a lane's builder or reviewer. Choose a builder, a reviewer or an either-role agent.", note: "hive_lane's refusal (HI-686): a generalist agent is never a lane's builder or reviewer." }),
+  generalist: agentMsg({ id: 'lane.refused.generalist', text: "{agent} is a generalist: it takes no side in the workflow, so it is never a lane's builder or reviewer. Choose a builder, a reviewer or an either-role agent.", note: "cw_lane's refusal (HI-686): a generalist agent is never a lane's builder or reviewer." }),
   sharedItem: agentMsg({ id: 'lane.warn.sharedItem', text: "{card} is also in {builder}'s lane ({lane})", note: "One card of a start's list another builder's running lane lists too (HI-1821); {lane} is that lane's id. Joined with \"; \" into lane.warn.shared's {items}." }),
-  shared: agentMsg({ id: 'lane.warn.shared', text: "Warning: {items}. A card belongs to one lane: ask the Assistant or the user to take it out of one of them (a builder's own hive_lane start never takes a card off its lane).", note: "hive_lane start's warning (HI-1821, HI-2169): cards on two lanes; {items} are lane.warn.sharedItem's." }),
+  shared: agentMsg({ id: 'lane.warn.shared', text: "Warning: {items}. A card belongs to one lane: ask the Assistant or the user to take it out of one of them (a builder's own cw_lane start never takes a card off its lane).", note: "cw_lane start's warning (HI-1821, HI-2169): cards on two lanes; {items} are lane.warn.sharedItem's." }),
   freshItem: agentMsg({ id: 'lane.warn.freshItem', text: '{card} was created {ago} s ago by {who}', note: 'One card of a start\'s list made by someone else since the caller\'s turn began (HI-2167); {ago} in seconds. Joined with "; " into lane.warn.fresh\'s {items}.' }),
-  fresh: agentMsg({ id: 'lane.warn.fresh', text: "Warning: {items}: is it the card you meant? To put a new card on a lane, create it with hive_create_task's lane, never by its guessed key.", note: "hive_lane start's safety net (HI-2167): a card in its list may be a guessed key; {items} are lane.warn.freshItem's." }),
+  fresh: agentMsg({ id: 'lane.warn.fresh', text: "Warning: {items}: is it the card you meant? To put a new card on a lane, create it with cw_create_task's lane, never by its guessed key.", note: "cw_lane start's safety net (HI-2167): a card in its list may be a guessed key; {items} are lane.warn.freshItem's." }),
   inReview: agentMsg({ id: 'lane.refused.applyNow.inReview', text: '{card} is in {where, select, review {Review} other {Approved or merging}}: putting it back would lose its review or merge. Change the order without applyNow (it applies once {card} is Done), or wait.', note: "A reorder applied now (HI-1995) refused: the builder's card in flight is in Review (where review) or Approved or merging." }),
   inATurn: agentMsg({ id: 'lane.refused.applyNow.inATurn', text: '{agent} {status, select, working {is working} starting {is starting} waiting {is waiting for the user} other {has background tasks running}}: a reorder applied now never puts its card back under it. Ask it to finish and end its turn, then reorder again.', note: 'A reorder applied now (HI-1995) refused: the builder is in a turn of its own ({status}: working, starting, waiting for the user, or background tasks running).' }),
   uncommitted: agentMsg({ id: 'lane.refused.applyNow.uncommitted', text: "{card}'s folder has changes that aren't committed: commit them first (or ask {agent} to), then reorder again, so its work stays on its branch.", note: "A reorder applied now (HI-1995) refused: the card in flight's folder has uncommitted changes." }),
   notPutBack: agentMsg({ id: 'lane.refused.applyNow.notPutBack', text: "{card} couldn't be put back", note: "A reorder applied now (HI-1995) refused: putting the card in flight back was refused, with no reason given." }),
-  carriedBrief: agentMsg({ id: 'lane.start.carried', text: "{builder}'s lane {lane} had just ended (all merged): started a new lane with its {what, select, brief {brief} name {name} other {brief and name}}; pass brief to change it.", note: "hive_lane start's note (HI-2097, HI-2104): a list change raced its lane's end, so a new lane started with the ended one's brief, name, or both ({what})." }),
-  reviewerIs: agentMsg({ id: 'lane.refused.unknownReviewer.has', text: "No agent \"{name}\" in {project}; this lane's reviewer is {reviewer}: leave reviewer out to keep it.", note: "hive_lane start refused (HI-2273): it names a reviewer that is no agent of the project, and the builder's running lane has its reviewer." }),
-  reviewerPool: agentMsg({ id: 'lane.refused.unknownReviewer.pool', text: "No agent \"{name}\" in {project}; this lane is reviewed by the project's reviewer pool: leave reviewer out.", note: "hive_lane start refused (HI-2273): it names a reviewer that is no agent of the project, and the lane is reviewed by the pool." }),
-  reviewerNone: agentMsg({ id: 'lane.refused.unknownReviewer.none', text: 'No agent "{name}" in {project}; this lane has no reviewer yet: leave reviewer out, or name an agent of {project}.', note: 'hive_lane start refused (HI-2273): it names a reviewer that is no agent of the project, and the lane has none yet.' }),
-  unknownBuilder: agentMsg({ id: 'lane.refused.unknownBuilder', text: 'Unknown agent: the builder must be an agent of the project', note: "hive_lane start refused: its builder isn't an agent of the project." }),
-  unknownReviewer: agentMsg({ id: 'lane.refused.unknownReviewer', text: 'Unknown agent: the reviewer must be an agent of the project', note: "hive_lane start refused: its reviewer isn't an agent of the project." }),
-  unknownPair: agentMsg({ id: 'lane.refused.unknownPair', text: 'Unknown agent: the builder and reviewer must be agents of the project', note: "hive_lane join refused: its builder or reviewer isn't an agent of the project." }),
-  selfReview: agentMsg({ id: 'lane.refused.selfReview', text: "A lane's builder can't be its reviewer", note: 'hive_lane start or join refused: the same agent named as builder and reviewer.' }),
-  poolReviewer: agentMsg({ id: 'lane.refused.poolReviewer', text: 'A lane reviewed by the pool has no reviewer of its own', note: 'hive_lane start refused: a reviewer named for a lane reviewed by the pool (#1443).' }),
-  endedMeanwhile: agentMsg({ id: 'lane.refused.applyNow.endedMeanwhile', text: "{card} was put back in Todo (its work stays on its branch), but the lane was ended meanwhile: its list wasn't changed and nothing was started. hive_lane list shows the lanes.", note: 'A reorder applied now (HI-1995): its card was put back, then the lane ended before its list was saved.' }),
-  changedMeanwhile: agentMsg({ id: 'lane.refused.applyNow.changedMeanwhile', text: "{card} was put back in Todo (its work stays on its branch), but the lane's list changed meanwhile: this list wasn't applied. hive_lane list shows it now.", note: "A reorder applied now (HI-1995): its card was put back, then the lane's list changed before this one was saved." }),
-  noLaneToPlace: agentMsg({ id: 'lane.refused.noLaneToPlace', text: "{builder} has no running lane in {project}: the card was made but not placed. Start one with hive_lane start (its key is in this reply), or pass lane as '{ builder, reviewer }' to start one as you create a card.", note: "hive_create_task's lane refused (HI-2167): the builder named has no running lane to place the card on. '{ builder, reviewer }' is quoted ICU: it shows as { builder, reviewer }." }),
-  allDoneNoLane: agentMsg({ id: 'lane.refused.allDone', text: '{cards} {n, plural, one {is} other {are}} already Done: no lane started.', note: 'hive_lane start refused: every card of its list is already Done; {n} is how many.' }),
-  keptChanging: agentMsg({ id: 'lane.refused.keptChanging', text: 'The lane kept changing: try again', note: "hive_lane start refused: the lane's cards kept moving between its read and its save." }),
-  queued: agentMsg({ id: 'lane.start.queued', text: 'The list change is queued: it applies once {card} is Done, and you are told then.', note: "hive_lane start's note (#1270): a list change while a card is in flight waits for that card ({card}) to be Done." }),
-  applied: agentMsg({ id: 'lane.start.applied', text: "Applied now: {card} is back in Todo (its work stays on {line}); the lane's cards are now in this order, and {builder} is told.", note: "hive_lane start's note for a reorder applied now (HI-1995); {line} is the card's branch (or lane.reorder.itsBranch)." }),
-  leftOut: agentMsg({ id: 'lane.start.leftOut', text: '{cards} {n, plural, one {is} other {are}} already Done: left out.', note: "hive_lane start's note (HI-2097): cards already Done, left out of a new lane; {n} is how many." }),
-  stays: agentMsg({ id: 'lane.start.stays', text: "{cards} {n, plural, one {stays} other {stay}} on the lane, after the cards you listed: a builder's own hive_lane start adds or reorders cards, never takes one off (the Assistant or the user does).", note: "hive_lane start's note (HI-2169): a builder's own start left cards of its lane out, and they are kept after its list; {n} is how many." }),
-  joinPool: agentMsg({ id: 'lane.refused.joinPool', text: "{builder}'s lane is reviewed by the reviewer pool: there is nothing to join. Hive gives you its cards when it assigns them to you.", note: 'hive_lane join refused (#1443): a lane reviewed by the pool has nobody to join it.' }),
-  joinNoLane: agentMsg({ id: 'lane.refused.joinNoLane', text: '{builder} has no lane running yet: give the cards too, and the lane starts with you as its reviewer', note: "hive_lane join refused: the builder has no running lane, and no cards were given to start one." }),
-  joinedFirst: agentMsg({ id: 'lane.join.first', text: "{builder} hadn't registered it yet: its own start updates it.", note: "hive_lane join's note: the reviewer joined first, starting the lane from its cards; the builder's own start updates it." }),
-  endNotOurs: agentMsg({ id: 'lane.refused.end.notOurs', text: "Only a lane's builder or reviewer ends it (or the user, or the Assistant)", note: "hive_lane end refused: a project agent that isn't the lane's builder or reviewer." }),
-  abandonNotOurs: agentMsg({ id: 'lane.refused.end.abandon', text: 'Only the user or the Assistant abandons a lane: tell the user if it should stop', note: 'hive_lane end with abandoned refused (#1270, §16.8.2): an agent never abandons its lane.' }),
-  endNotDone: agentMsg({ id: 'lane.refused.end.notDone', text: 'The lane ends by itself once all its cards are Done: {cards} not yet', note: "hive_lane end refused (#1270): an agent's lane ends by itself once all its cards are Done; {cards} are those not Done yet." }),
-  movedOn: agentMsg({ id: 'lane.refused.end.movedOn', text: 'Its cards moved on meanwhile: read the lane again', note: "hive_lane end refused: the lane's cards moved between its read and its save (a card reopened)." }),
-  nextEnded: agentMsg({ id: 'lane.refused.next.ended', text: "Your lane {lane} has ended: all its cards are Done. Nothing more on it: don't start it again; end your turn unless you have other work.", note: "hive_lane next, for an agent whose lane just ended (HI-2273): never \"start one\", which invited a builder to start it again." }),
-  nextAbandoned: agentMsg({ id: 'lane.refused.next.abandoned', text: "Your lane {lane} was abandoned: don't start it again; ask the user if there is more to do.", note: 'hive_lane next, for an agent whose lane was just abandoned (HI-2273).' }),
-  nextNone: agentMsg({ id: 'lane.refused.next.none', text: 'No running lane of yours: start one with hive_lane start, or ask the user', note: 'hive_lane next, for an agent with no running lane.' }),
+  carriedBrief: agentMsg({ id: 'lane.start.carried', text: "{builder}'s lane {lane} had just ended (all merged): started a new lane with its {what, select, brief {brief} name {name} other {brief and name}}; pass brief to change it.", note: "cw_lane start's note (HI-2097, HI-2104): a list change raced its lane's end, so a new lane started with the ended one's brief, name, or both ({what})." }),
+  reviewerIs: agentMsg({ id: 'lane.refused.unknownReviewer.has', text: "No agent \"{name}\" in {project}; this lane's reviewer is {reviewer}: leave reviewer out to keep it.", note: "cw_lane start refused (HI-2273): it names a reviewer that is no agent of the project, and the builder's running lane has its reviewer." }),
+  reviewerPool: agentMsg({ id: 'lane.refused.unknownReviewer.pool', text: "No agent \"{name}\" in {project}; this lane is reviewed by the project's reviewer pool: leave reviewer out.", note: "cw_lane start refused (HI-2273): it names a reviewer that is no agent of the project, and the lane is reviewed by the pool." }),
+  reviewerNone: agentMsg({ id: 'lane.refused.unknownReviewer.none', text: 'No agent "{name}" in {project}; this lane has no reviewer yet: leave reviewer out, or name an agent of {project}.', note: 'cw_lane start refused (HI-2273): it names a reviewer that is no agent of the project, and the lane has none yet.' }),
+  unknownBuilder: agentMsg({ id: 'lane.refused.unknownBuilder', text: 'Unknown agent: the builder must be an agent of the project', note: "cw_lane start refused: its builder isn't an agent of the project." }),
+  unknownReviewer: agentMsg({ id: 'lane.refused.unknownReviewer', text: 'Unknown agent: the reviewer must be an agent of the project', note: "cw_lane start refused: its reviewer isn't an agent of the project." }),
+  unknownPair: agentMsg({ id: 'lane.refused.unknownPair', text: 'Unknown agent: the builder and reviewer must be agents of the project', note: "cw_lane join refused: its builder or reviewer isn't an agent of the project." }),
+  selfReview: agentMsg({ id: 'lane.refused.selfReview', text: "A lane's builder can't be its reviewer", note: 'cw_lane start or join refused: the same agent named as builder and reviewer.' }),
+  poolReviewer: agentMsg({ id: 'lane.refused.poolReviewer', text: 'A lane reviewed by the pool has no reviewer of its own', note: 'cw_lane start refused: a reviewer named for a lane reviewed by the pool (#1443).' }),
+  endedMeanwhile: agentMsg({ id: 'lane.refused.applyNow.endedMeanwhile', text: "{card} was put back in Todo (its work stays on its branch), but the lane was ended meanwhile: its list wasn't changed and nothing was started. cw_lane list shows the lanes.", note: 'A reorder applied now (HI-1995): its card was put back, then the lane ended before its list was saved.' }),
+  changedMeanwhile: agentMsg({ id: 'lane.refused.applyNow.changedMeanwhile', text: "{card} was put back in Todo (its work stays on its branch), but the lane's list changed meanwhile: this list wasn't applied. cw_lane list shows it now.", note: "A reorder applied now (HI-1995): its card was put back, then the lane's list changed before this one was saved." }),
+  noLaneToPlace: agentMsg({ id: 'lane.refused.noLaneToPlace', text: "{builder} has no running lane in {project}: the card was made but not placed. Start one with cw_lane start (its key is in this reply), or pass lane as '{ builder, reviewer }' to start one as you create a card.", note: "cw_create_task's lane refused (HI-2167): the builder named has no running lane to place the card on. '{ builder, reviewer }' is quoted ICU: it shows as { builder, reviewer }." }),
+  allDoneNoLane: agentMsg({ id: 'lane.refused.allDone', text: '{cards} {n, plural, one {is} other {are}} already Done: no lane started.', note: 'cw_lane start refused: every card of its list is already Done; {n} is how many.' }),
+  keptChanging: agentMsg({ id: 'lane.refused.keptChanging', text: 'The lane kept changing: try again', note: "cw_lane start refused: the lane's cards kept moving between its read and its save." }),
+  queued: agentMsg({ id: 'lane.start.queued', text: 'The list change is queued: it applies once {card} is Done, and you are told then.', note: "cw_lane start's note (#1270): a list change while a card is in flight waits for that card ({card}) to be Done." }),
+  applied: agentMsg({ id: 'lane.start.applied', text: "Applied now: {card} is back in Todo (its work stays on {line}); the lane's cards are now in this order, and {builder} is told.", note: "cw_lane start's note for a reorder applied now (HI-1995); {line} is the card's branch (or lane.reorder.itsBranch)." }),
+  leftOut: agentMsg({ id: 'lane.start.leftOut', text: '{cards} {n, plural, one {is} other {are}} already Done: left out.', note: "cw_lane start's note (HI-2097): cards already Done, left out of a new lane; {n} is how many." }),
+  stays: agentMsg({ id: 'lane.start.stays', text: "{cards} {n, plural, one {stays} other {stay}} on the lane, after the cards you listed: a builder's own cw_lane start adds or reorders cards, never takes one off (the Assistant or the user does).", note: "cw_lane start's note (HI-2169): a builder's own start left cards of its lane out, and they are kept after its list; {n} is how many." }),
+  joinPool: agentMsg({ id: 'lane.refused.joinPool', text: "{builder}'s lane is reviewed by the reviewer pool: there is nothing to join. Combwork gives you its cards when it assigns them to you.", note: 'cw_lane join refused (#1443): a lane reviewed by the pool has nobody to join it.' }),
+  joinNoLane: agentMsg({ id: 'lane.refused.joinNoLane', text: '{builder} has no lane running yet: give the cards too, and the lane starts with you as its reviewer', note: "cw_lane join refused: the builder has no running lane, and no cards were given to start one." }),
+  joinedFirst: agentMsg({ id: 'lane.join.first', text: "{builder} hadn't registered it yet: its own start updates it.", note: "cw_lane join's note: the reviewer joined first, starting the lane from its cards; the builder's own start updates it." }),
+  endNotOurs: agentMsg({ id: 'lane.refused.end.notOurs', text: "Only a lane's builder or reviewer ends it (or the user, or the Assistant)", note: "cw_lane end refused: a project agent that isn't the lane's builder or reviewer." }),
+  abandonNotOurs: agentMsg({ id: 'lane.refused.end.abandon', text: 'Only the user or the Assistant abandons a lane: tell the user if it should stop', note: 'cw_lane end with abandoned refused (#1270, §16.8.2): an agent never abandons its lane.' }),
+  endNotDone: agentMsg({ id: 'lane.refused.end.notDone', text: 'The lane ends by itself once all its cards are Done: {cards} not yet', note: "cw_lane end refused (#1270): an agent's lane ends by itself once all its cards are Done; {cards} are those not Done yet." }),
+  movedOn: agentMsg({ id: 'lane.refused.end.movedOn', text: 'Its cards moved on meanwhile: read the lane again', note: "cw_lane end refused: the lane's cards moved between its read and its save (a card reopened)." }),
+  nextEnded: agentMsg({ id: 'lane.refused.next.ended', text: "Your lane {lane} has ended: all its cards are Done. Nothing more on it: don't start it again; end your turn unless you have other work.", note: "cw_lane next, for an agent whose lane just ended (HI-2273): never \"start one\", which invited a builder to start it again." }),
+  nextAbandoned: agentMsg({ id: 'lane.refused.next.abandoned', text: "Your lane {lane} was abandoned: don't start it again; ask the user if there is more to do.", note: 'cw_lane next, for an agent whose lane was just abandoned (HI-2273).' }),
+  nextNone: agentMsg({ id: 'lane.refused.next.none', text: 'No running lane of yours: start one with cw_lane start, or ask the user', note: 'cw_lane next, for an agent with no running lane.' }),
   journal: agentMsg({ id: 'lane.journal.fact', text: 'Lane {named, select, yes {"{name}" } other {}}{state, select, started {started} ended {ended} merged {ended, merged at {commit}} other {abandoned}}: {who}, {cards}', note: "A lane's start or end as a fact in the Assistant's journal (#1031), stored: {who} is \"builder / reviewer\", {cards} its cards; {named} yes when the lane has a name ({name})." })
 }
 
@@ -806,8 +806,8 @@ async function tellListChanged(ws: WorkspaceService, l: LaneRecord): Promise<voi
   // Said in the builder's dialect: the delivery is for it alone.
   const body = inDialectOf({ projectPath, agentId: l.builder.id }, () => withCardNames(ws, () => say(A.listChanged, { cards: l.cards.map(cardRef).join(', ') })))
   try {
-    // agent-protocol: the sender's name, Hive's own
-    await createDelivery(projectPath, { agentId: l.builder.id, agentName: l.builder.name, kind: 'rebrief', from: { kind: 'hive', name: 'Hive' }, body, source: 'lane', ref: l.id }) // i18n-ignore: the sender's name, Hive's own
+    // agent-protocol: the sender's name, Combwork's own
+    await createDelivery(projectPath, { agentId: l.builder.id, agentName: l.builder.name, kind: 'rebrief', from: { kind: 'hive', name: 'Combwork' }, body, source: 'lane', ref: l.id }) // i18n-ignore: the sender's name, Hive's own
     await offerNow(projectPath, l.builder.id)
   } catch (e) {
     log.warn(`telling lane ${l.id}'s builder its list changed`, e)
@@ -884,14 +884,14 @@ export interface StartLane {
    */
   applyNow?: boolean
   /**
-   * A new card placed on the builder's lane as it is made (HI-2167, hive_create_task's lane): the list is the running
+   * A new card placed on the builder's lane as it is made (HI-2167, cw_create_task's lane): the list is the running
    * lane's, as read under the lock (its queued list when it has one), with the card added last or `next` (before its first
    * card still in Todo); with no running lane, a new lane of the card alone, or refused when `needsLane`. `cards` is
    * ignored.
    */
   place?: LanePlace
   /**
-   * The lane's own builder changes its running lane (HI-2169: a project agent's own hive_lane start, from the
+   * The lane's own builder changes its running lane (HI-2169: a project agent's own cw_lane start, from the
    * authenticated caller, never the request): with the rules enforced, the cards of the lane's list (its queued one when
    * it has one) that the new list leaves out are kept, after the given ones. A builder adds and reorders cards; taking one
    * off is the Assistant's, the user's or a script's.
@@ -908,15 +908,15 @@ export interface StartLane {
 export interface LanePlace {
   card: number
   position?: 'last' | 'next'
-  /** Placed only on a running lane (hive_create_task's lane: "<builder>"): never starts one. */
+  /** Placed only on a running lane (cw_create_task's lane: "<builder>"): never starts one. */
   needsLane?: boolean
 }
 
-/** How recently a card was made for hive_lane start to ask whether it is the one meant (HI-2167). */
+/** How recently a card was made for cw_lane start to ask whether it is the one meant (HI-2167). */
 export const FRESH_CARD_MS = 2 * 60_000
 
 /**
- * hive_lane start's safety net (HI-2167): a card in its list made by someone else than the caller since the caller's turn
+ * cw_lane start's safety net (HI-2167): a card in its list made by someone else than the caller since the caller's turn
  * began (`since`), in the last FRESH_CARD_MS, may be a guessed key (a create batched with the start, another agent's card
  * taking the number); one made before the turn began is one the caller was told of. Null for none, and with no turn.
  * Only cards in the caller's `scope` (a project agent's project; null: the workspace) are read: one outside it is told as
@@ -966,7 +966,7 @@ const IN_A_TURN: ReadonlySet<string> = new Set(['working', 'starting', 'waiting'
  */
 /**
  * A changed list applied now (HI-1995, `applyNow`; Darren's decision of 29 Oct: two steps Hive already has): when the
- * builder's own card in flight is no longer the new list's first own open card, it is put back first, as `hive_put_back`
+ * builder's own card in flight is no longer the new list's first own open card, it is put back first, as `cw_put_back`
  * does (the runtime's put back, through the card's intent path: to Todo, its line and work kept); the start's own edit
  * then applies the list, at once now that no card of the lane is in flight (bound to this lane: one ended or changed in
  * between is refused there, nothing resumed or recreated). Refused here (409, nothing changed) while that card is in
@@ -1018,8 +1018,8 @@ async function tellReordered(ws: WorkspaceService, l: LaneRecord, put: { putBack
   // Said in the builder's dialect: the delivery is for it alone.
   const body = inDialectOf({ projectPath, agentId: l.builder.id }, () => withCardNames(ws, () => say(A.reordered, { by, card: put.putBack, line: put.line ?? say(A.itsBranch), cards: l.cards.map(cardRef).join(', ') })))
   try {
-    // agent-protocol: the sender's name, Hive's own
-    await createDelivery(projectPath, { agentId: l.builder.id, agentName: l.builder.name, kind: 'rebrief', from: { kind: 'hive', name: 'Hive' }, body, source: 'lane', ref: l.id }) // i18n-ignore: the sender's name, Hive's own
+    // agent-protocol: the sender's name, Combwork's own
+    await createDelivery(projectPath, { agentId: l.builder.id, agentName: l.builder.name, kind: 'rebrief', from: { kind: 'hive', name: 'Combwork' }, body, source: 'lane', ref: l.id }) // i18n-ignore: the sender's name, Hive's own
     await offerNow(projectPath, l.builder.id)
   } catch (e) {
     log.warn(`telling lane ${l.id}'s builder of its reorder`, e)
@@ -1377,7 +1377,7 @@ export async function endLane(ws: WorkspaceService, id: string, o: { abandoned?:
 }
 
 /**
- * The next card of an agent's running lane (#1270, `hive_lane next`): the card to start, the one in flight to carry on,
+ * The next card of an agent's running lane (#1270, `cw_lane next`): the card to start, the one in flight to carry on,
  * or why the lane waits (a card passed but not merged: one card at a time, §16.11.2); none once every card is Done.
  */
 export async function laneNext(ws: WorkspaceService, project: string, agentId: string): Promise<{ lane: LaneInfo; next: { card: number; title: string; carryOn: boolean } | null; waits: LaneInfo['status'] }> {
@@ -1403,7 +1403,7 @@ export async function laneNext(ws: WorkspaceService, project: string, agentId: s
 }
 
 /**
- * A running lane as it reads now, without waiting (HI-1990): `laneView` itself, the window's and `hive_lane`'s reading,
+ * A running lane as it reads now, without waiting (HI-1990): `laneView` itself, the window's and `cw_lane`'s reading,
  * from the same inputs read synchronously (its record, its cards' rows, their facts while the rules are enforced, the
  * round limit, its agents' hooks, its slot, its line, the cards' owners), so it pauses for what the lane view pauses for
  * (a request for the user, a block, a merge, a slot…). Only the names it shows aren't read (agents' new names, the old

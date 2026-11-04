@@ -4,20 +4,20 @@ import { sessions } from './sessions'
 import { agentMsg, say } from '../shared/agentText'
 
 const T = {
-  notRunning: agentMsg({ id: 'inbox.message.notRunning', text: '{agent} isn\'t running.', note: '#530: a message left for an agent (hive_message_agent) refused: the agent isn\'t running. agent: its name.' }),
+  notRunning: agentMsg({ id: 'inbox.message.notRunning', text: '{agent} isn\'t running.', note: '#530: a message left for an agent (cw_message_agent) refused: the agent isn\'t running. agent: its name.' }),
   noText: agentMsg({ id: 'inbox.message.noText', text: 'text is required', note: 'A message left for an agent refused: its text (the tool\'s argument, text) is empty.' }),
   tooLong: agentMsg({ id: 'inbox.message.tooLong', text: 'A message is at most {max} characters (this one has {n}).', note: 'A message left for an agent refused: too long. max: the most; n: its length.' }),
-  tooMany: agentMsg({ id: 'inbox.message.tooMany', text: '{agent} already has {max} messages waiting, the most Hive keeps for an agent: wait until they are delivered (hive_agent_activity), or cancel them.', note: 'A message left for an agent refused: as many as Hive keeps for it already wait. agent: its name; max: how many.' })
+  tooMany: agentMsg({ id: 'inbox.message.tooMany', text: '{agent} already has {max} messages waiting, the most Combwork keeps for an agent: wait until they are delivered (cw_agent_activity), or cancel them.', note: 'A message left for an agent refused: as many as Hive keeps for it already wait. agent: its name; max: how many.' })
 }
 
 /**
- * Messages left for an agent (#530: hive_message_agent), now deliveries (#647, deliveries.ts): a re-brief for the work it
+ * Messages left for an agent (#530: cw_message_agent), now deliveries (#647, deliveries.ts): a re-brief for the work it
  * is on, saved in its workspace's database (#1018: its project's deliveries) and given by the delivery service like everything else (#650): a
  * busy agent is told of it at its next tool call or before its turn ends, an idle or watching one by the doorbell (a
  * watching agent is woken by it, and its watch carries on), each as the carrying-on switches leave on (#1432; all off,
- * it waits in its inbox until read or the user's Deliver Now), and it reads it with hive_inbox, labelled with its sender,
+ * it waits in its inbox until read or the user's Deliver Now), and it reads it with cw_inbox, labelled with its sender,
  * then acks it. On 10 Oct the user pasted about ten of the Assistant's messages into agents' panes because
- * hive_prompt_agent refused every agent of a running card loop; a message goes in whatever the agent is doing.
+ * cw_prompt_agent refused every agent of a running card loop; a message goes in whatever the agent is doing.
  *
  * Its sender's permission is worked out again at every step, until the agent reads it: one no longer allowed is refused.
  * At most MAX_QUEUED waiting per agent, each at most MESSAGE_MAX_CHARS. They survive the agent's stops and Hive's

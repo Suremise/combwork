@@ -9,7 +9,7 @@
  *   and wakes and deliveries for the session they target (`inDialectOf`). A **chain resolver** turns a scope into its
  *   chain; until one is registered (`setChainResolver`, the dialects service), every scope resolves to the Default.
  * - **The process**, in hive-mcp.js and hive-progress.js: one process serves one session, whose resolved texts Hive
- *   writes to the file `HIVE_DIALECT_FILE` names (processDialect.ts loads it).
+ *   writes to the file `CW_DIALECT_FILE` names (processDialect.ts loads it).
  * - Neither: the Default, the code's English.
  *
  * An override that doesn't format (a placeholder it lost, broken ICU) falls back to the code's English: a dialect can't

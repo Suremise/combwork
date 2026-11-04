@@ -1,6 +1,6 @@
 {
   "tool.activateProject.description": {
-    "text": "Turn a project on (it shows under Working On in Hive). Starting an agent does this too."
+    "text": "Turn a project on (it shows under Working On in Combwork). Starting an agent does this too."
   },
   "tool.activateProject.reply.on": {
     "text": "{project} is on."
@@ -18,14 +18,14 @@
     "text": "Added {agent} (id {id}) to {project}: {hasProvider, select, yes {{provider}} other {its provider}}{hasConnection, select, yes { on {connection}} other {}}, in {inProject, select, yes {the project folder} other {{folder}}}, {hasStatus, select, yes {{status}} other {stopped}}."
   },
   "tool.agentActivity.description": {
-    "text": "What one agent is doing, as JSON: status, model and effort, its folder, its task and latest reply (clipped), last tool calls, retry waits and its inbox. detail=true clips less. (detail: use-hive-api, tools.md)"
+    "text": "What one agent is doing, as JSON: status, model and effort, its folder, its task and latest reply (clipped), last tool calls, retry waits and its inbox. detail=true clips less. (detail: use-cw-api, tools.md)"
   },
   "tool.arg.agent": {
     "text": "Its name or id; optional when the project has one agent."
   },
   "tool.arg.attachments": {
     "text": "Files to keep with it ({role, select, assistant {the workspace, pasted files or the temp folder} other {your project, its slots or the temp folder}}; at most 10, 100 MB), {where, select, comment {linked in its comment} other {linked in its description}}.",
-    "note": "HI-1700. role: assistant or agent; where: comment (hive_update_task) or description (hive_create_task)."
+    "note": "HI-1700. role: assistant or agent; where: comment (cw_update_task) or description (cw_create_task)."
   },
   "tool.arg.card": {
     "text": "Its key (\"HI-12\")."
@@ -35,7 +35,7 @@
     "note": "{what} is the argument's own description (a tool.*.arg.* message). HI-1661: cards are named by key."
   },
   "tool.arg.connection": {
-    "text": "Its connection, by id or name (hive_connection): its model, effort, mode and CLI. Default: the first usable here."
+    "text": "Its connection, by id or name (cw_connection): its model, effort, mode and CLI. Default: the first usable here."
   },
   "tool.arg.context": {
     "text": "Doc sections to read first: \"docs/PLAN.md#setup\" (a heading slug), \"shared:notes.md\", a whole file. Replaces the list."
@@ -63,7 +63,7 @@
     "text": "What you ask, whole: the cards, what to do, on whose decision."
   },
   "tool.askAssistant.description": {
-    "text": "Ask the Hive Assistant for something on a card only it or the user can do (park it On Hold, move it past its rules on the user's answer). A decision that is the user's goes to them (hive_ask_user)."
+    "text": "Ask the Assistant for something on a card only it or the user can do (park it On Hold, move it past its rules on the user's answer). A decision that is the user's goes to them (cw_ask_user)."
   },
   "tool.askUser.arg.actionReason": {
     "text": "Your suggested reason."
@@ -84,7 +84,7 @@
     "text": "Ask the user something about a card, under For you; the answer comes to your inbox. When the answer is something only the user can do (Done, no code, unblock, skip review), offer it in actions."
   },
   "tool.call.error": {
-    "text": "Hive error: {message}",
+    "text": "Combwork error: {message}",
     "note": "{message}: the call's error (the Agent API's refusal, or one below). What the call takes follows on its own line when it gave the wrong arguments (HI-2229)."
   },
   "tool.call.error.http": {
@@ -95,7 +95,7 @@
     "text": "project is required"
   },
   "tool.call.error.projectRequired": {
-    "text": "project is required: a project's name, as hive_list_projects lists them"
+    "text": "project is required: a project's name, as cw_list_projects lists them"
   },
   "tool.call.error.unknownTool": {
     "text": "Unknown tool: {name}"
@@ -119,7 +119,7 @@
     "text": "Empty: the CLI decides (each value below too)."
   },
   "tool.connection.description": {
-    "text": "Connections, the setups agents run on (model, effort, context, mode on an account; the CLI follows): list; add one on an existing account; update one. add and update need Change settings on, and the user's OK: accounts stay the user's. (detail: use-hive-api, tools.md)"
+    "text": "Connections, the setups agents run on (model, effort, context, mode on an account; the CLI follows): list; add one on an existing account; update one. add and update need Change settings on, and the user's OK: accounts stay the user's. (detail: use-cw-api, tools.md)"
   },
   "tool.connection.error.action": {
     "text": "action must be list, add or update"
@@ -146,15 +146,15 @@
     "text": "The previous reply's \"since\"."
   },
   "tool.console.description": {
-    "text": "Hive's developer console, read-only and redacted: what a CLI sent Hive, next to what Hive made of it. {role, select, assistant {Any agent of your workspace, your own session or Hive's events.} other {Your own session.}} Only what the user captures. sources lists what you can read. (detail: use-hive-api, tools.md)",
+    "text": "Combwork's developer console, read-only and redacted: what a CLI sent Combwork, next to what Combwork made of it. {role, select, assistant {Any agent of your workspace, your own session or Combwork's events.} other {Your own session.}} Only what the user captures. sources lists what you can read. (detail: use-cw-api, tools.md)",
     "note": "#636: offered only with Settings → Agent API → Let agents read the developer console."
   },
   "tool.createHandover.description": {
-    "text": "Save a handover in the shared notes for a project (this one by default). Hive writes its header: content starts at the first heading."
+    "text": "Save a handover in the shared notes for a project (this one by default). Combwork writes its header: content starts at the first heading."
   },
   "tool.createHandover.reply.saved": {
     "text": "Handover saved as {path}.{hasSuggest, select, yes { {suggest}} other {}}",
-    "note": "{path}: as hive_read_shared_note takes it. {suggest}: for the Assistant with its journal off, once, the journal to suggest (#1032), as Hive words it."
+    "note": "{path}: as cw_read_shared_note takes it. {suggest}: for the Assistant with its journal off, once, the journal to suggest (#1032), as Hive words it."
   },
   "tool.createProject.arg.name": {
     "text": "Folder name."
@@ -163,7 +163,7 @@
     "text": "Create a project: a new folder in the workspace, turned on. Only when the user asked for one."
   },
   "tool.createProject.reply.created": {
-    "text": "Created the project {project} (on). It has no agents yet: add one with hive_add_agent."
+    "text": "Created the project {project} (on). It has no agents yet: add one with cw_add_agent."
   },
   "tool.createTask.arg.agent": {
     "text": "Give it to this agent (name or id)."
@@ -215,19 +215,19 @@
     "text": "Declare the paths a card's work will change, in a folder shared with other agents. Moves nothing."
   },
   "tool.docOutline.description": {
-    "text": "A Markdown document's headings, each with its slug and size, to read only the sections you need (hive_read_section). path: a file of your project (\"docs/PLAN.md\") or a shared note (\"shared:i18n.md\")."
+    "text": "A Markdown document's headings, each with its slug and size, to read only the sections you need (cw_read_section). path: a file of your project (\"docs/PLAN.md\") or a shared note (\"shared:i18n.md\")."
   },
   "tool.focusedSkip.arg.request": {
-    "text": "As Hive named it (\"HI-12/r40\")."
+    "text": "As Combwork named it (\"HI-12/r40\")."
   },
   "tool.focusedSkip.arg.why": {
     "text": "Why, in a sentence."
   },
   "tool.focusedSkip.description": {
-    "text": "As its reviewer, when Hive asks: merge a card whose focused tests were skipped for their environment (merge true), or return it to its builder (false)."
+    "text": "As its reviewer, when Combwork asks: merge a card whose focused tests were skipped for their environment (merge true), or return it to its builder (false)."
   },
   "tool.handOver.description": {
-    "text": "Hand one agent's work to another in its project: `from` (idle) writes a handover, and `to` starts on it. `to` the same as `from`: a new conversation. Returns at once; follow with hive_wait_for_agents."
+    "text": "Hand one agent's work to another in its project: `from` (idle) writes a handover, and `to` starts on it. `to` the same as `from`: a new conversation. Returns at once; follow with cw_wait_for_agents."
   },
   "tool.inbox.arg.ack": {
     "text": "Ids you have acted on (\"m12\"). Alone, it acks and lists nothing."
@@ -236,7 +236,7 @@
     "text": "With ack: acks, then reads what is new, in the same call."
   },
   "tool.inbox.description": {
-    "text": "What Hive has for you (messages, tasks, the user's decisions, card events), oldest first, with ids. Read, act, then ack what you acted on in your next call, with read=true to read on in it (card events need no ack): one not acked within {minutes} minutes shows as overdue. (detail: use-hive-api, tools.md)",
+    "text": "What Combwork has for you (messages, tasks, the user's decisions, card events), oldest first, with ids. Read, act, then ack what you acted on in your next call, with read=true to read on in it (card events need no ack): one not acked within {minutes} minutes shows as overdue. (detail: use-cw-api, tools.md)",
     "note": "#1531: read=true acks and reads in one call."
   },
   "tool.intent.arg.revision": {
@@ -249,7 +249,7 @@
     "text": "One journal entry in full: its detail, why, links, tags, and what supersedes it or it supersedes."
   },
   "tool.journalRecall.description": {
-    "text": "Recall from your journal, a line an entry: newest first, or best first for a query; narrow by date, kinds, project, link or tag. Check what you recall against the live state before acting on it. (detail: use-hive-api, tools.md)"
+    "text": "Recall from your journal, a line an entry: newest first, or best first for a query; narrow by date, kinds, project, link or tag. Check what you recall against the live state before acting on it. (detail: use-cw-api, tools.md)"
   },
   "tool.journalUpdate.description": {
     "text": "Change a journal entry: its text, importance, supersededBy (a newer entry), links or tags. delete=true deletes it: for what is wrong, or what the user asks you to forget."
@@ -273,7 +273,7 @@
     "text": "Why it mattered."
   },
   "tool.journalWrite.description": {
-    "text": "Write an entry in your journal (your memory across sessions, local only): a one-line summary, and detail, why, links and tags. importance 2 and 3 outlive retention. The kinds you may store are the user's choice. (detail: use-hive-api, tools.md)"
+    "text": "Write an entry in your journal (your memory across sessions, local only): a one-line summary, and detail, why, links and tags. importance 2 and 3 outlive retention. The kinds you may store are the user's choice. (detail: use-cw-api, tools.md)"
   },
   "tool.journalWrite.reply.written": {
     "text": "Entry #{id} written."
@@ -306,19 +306,19 @@
     "text": "Agent name or id."
   },
   "tool.lane.description": {
-    "text": "Your card loop's lane. start (the builder: cards in order and reviewer; again to change the list), join (the reviewer: builder), next (your next card, or why it waits), list. It ends by itself when every card is Done; abandoning it is the user's. (detail: use-hive-api, tools.md)"
+    "text": "Your card loop's lane. start (the builder: cards in order and reviewer; again to change the list), join (the reviewer: builder), next (your next card, or why it waits), list. It ends by itself when every card is Done; abandoning it is the user's. (detail: use-cw-api, tools.md)"
   },
   "tool.lane.description.assistant": {
-    "text": "Lanes: a builder and reviewer taking a project's cards in order (card-loop). start (builder, reviewer or pool, cards; brief, given with each card: never prompt it separately), end (abandoned=true: unfinished), list. (detail: use-hive-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}"
+    "text": "Lanes: a builder and reviewer taking a project's cards in order (card-loop). start (builder, reviewer or pool, cards; brief, given with each card: never prompt it separately), end (abandoned=true: unfinished), list. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}"
   },
   "tool.lane.error.action": {
     "text": "action must be start, join, next, end or list"
   },
   "tool.lane.error.laneRequired": {
-    "text": "lane is required: the id hive_lane list gives"
+    "text": "lane is required: the id cw_lane list gives"
   },
   "tool.listProjects.description": {
-    "text": "The workspace's projects, a line each: on or off, branch, agents and their status. hive_project_status gives one in full."
+    "text": "The workspace's projects, a line each: on or off, branch, agents and their status. cw_project_status gives one in full."
   },
   "tool.listProviders.description": {
     "text": "The coding-agent providers as JSON: on, installed, and the models, effort levels, modes and connections to use for agents."
@@ -330,16 +330,16 @@
     "text": "A project's own settings too (its name)."
   },
   "tool.listSettings.description": {
-    "text": "Hive's settings, a line each (id = value; [read-only]: the user's only); query matches words, scope narrows, project adds its own. At most 200 lines: offset carries on. hive_read_setting explains one."
+    "text": "Combwork's settings, a line each (id = value; [read-only]: the user's only); query matches words, scope narrows, project adds its own. At most 200 lines: offset carries on. cw_read_setting explains one."
   },
   "tool.listSharedNotes.description": {
-    "text": "The workspace's shared notes and handovers (.hive/shared): a path and date a line. hive_read_shared_note reads one."
+    "text": "The workspace's shared notes and handovers (.hive/shared): a path and date a line. cw_read_shared_note reads one."
   },
   "tool.listSkills.description": {
-    "text": "The skills for this project's agents, a line each: Hive's for agents (not those for the Assistant alone), user, plugin and local skills. A listing, not of what a running session loaded."
+    "text": "The skills for this project's agents, a line each: Combwork's for agents (not those for the Assistant alone), user, plugin and local skills. A listing, not of what a running session loaded."
   },
   "tool.listSkills.description.assistant": {
-    "text": "The skills here, a line each: the workspace's Hive skills with who gets them, and each provider's user and plugin skills; with project, what its agents get. A listing, not of what a running session loaded."
+    "text": "The skills here, a line each: the workspace's Combwork skills with who gets them, and each provider's user and plugin skills; with project, what its agents get. A listing, not of what a running session loaded."
   },
   "tool.listTasks.arg.details": {
     "text": "Every card in full."
@@ -360,13 +360,13 @@
     "text": "The design or follow-up, or the answer (gaps: what is missing)."
   },
   "tool.loopStep.description": {
-    "text": "A card loop's step that moves nothing: text is a comment, and the other side is woken. Builder: design, proceed (no answer by its until), followUp. Reviewer: ok or gaps. (detail: use-hive-api, tools.md)"
+    "text": "A card loop's step that moves nothing: text is a comment, and the other side is woken. Builder: design, proceed (no answer by its until), followUp. Reviewer: ok or gaps. (detail: use-cw-api, tools.md)"
   },
   "tool.mergeSlot.arg.cards": {
     "text": "The cards it merges."
   },
   "tool.mergeSlot.description": {
-    "text": "Your project's merge slot: one merge at a time into a branch. claim waits for it (claim again to keep your place or extend the hold); release gives it up. (detail: use-hive-api, tools.md)"
+    "text": "Your project's merge slot: one merge at a time into a branch. claim waits for it (claim again to keep your place or extend the hold); release gives it up. (detail: use-cw-api, tools.md)"
   },
   "tool.mergeSlot.error.action": {
     "text": "action must be claim, release or status"
@@ -375,7 +375,7 @@
     "text": "The card it is about (its key): dropped, never given, once that card's round ends."
   },
   "tool.messageAgent.description": {
-    "text": "Leave a busy or watching agent, or one the user just typed into, a message in its inbox on its current work (a re-brief, the user's answer). Not for the user's OK to push or release: its CLI refuses one passed on, so the user gives it in the agent's own pane. (detail: use-hive-api, tools.md)"
+    "text": "Leave a busy or watching agent, or one the user just typed into, a message in its inbox on its current work (a re-brief, the user's answer). Not for the user's OK to push or release: its CLI refuses one passed on, so the user gives it in the agent's own pane. (detail: use-cw-api, tools.md)"
   },
   "tool.messageAgent.reply.cancelled": {
     "text": "{count, plural, =1 {Cancelled the message waiting for {agent}.} other {Cancelled # messages waiting for {agent}.}}"
@@ -392,20 +392,20 @@
     "note": "The card and round a message is tied to, inside the reply's brackets (#1219: the card by its key)."
   },
   "tool.messageAgent.reply.told": {
-    "text": "Told {agent} now ({id}{tied}): it reads it with hive_inbox{watching, select, yes {; its watch carries on} other {}}.",
+    "text": "Told {agent} now ({id}{tied}): it reads it with cw_inbox{watching, select, yes {; its watch carries on} other {}}.",
     "note": "{tied}: messageAgent.reply.tied, or nothing."
   },
   "tool.notify.arg.target": {
     "text": "What a click opens: '{ agent, project }' or '{ card }' (its key)."
   },
   "tool.notify.description": {
-    "text": "Show the user a notification in Hive. About one agent or one card: give it as target, and a click opens it."
+    "text": "Show the user a notification in Combwork. About one agent or one card: give it as target, and a click opens it."
   },
   "tool.projectStatus.description": {
     "text": "One project as JSON: its settings, workflow options in force, agents (folder, role, session) and builder and reviewer pairs."
   },
   "tool.promptAgent.description": {
-    "text": "Type a task, in full, into an idle running agent. Refused while it is busy or the user just typed there. newConversation=true starts it on the task in a new conversation. For a card, use hive_start_task."
+    "text": "Type a task, in full, into an idle running agent. Refused while it is busy or the user just typed there. newConversation=true starts it on the task in a new conversation. For a card, use cw_start_task."
   },
   "tool.putBack.arg.why": {
     "text": "Why it goes back."
@@ -420,10 +420,10 @@
     "text": "The target branch."
   },
   "tool.queue.description": {
-    "text": "Your project's merge queues, one per target branch, where Hive merges approved cards in turn: list shows what tests now, what waits, recent outcomes and whether it is paused."
+    "text": "Your project's merge queues, one per target branch, where Combwork merges approved cards in turn: list shows what tests now, what waits, recent outcomes and whether it is paused."
   },
   "tool.queue.description.assistant": {
-    "text": "A project's merge queues, one per target branch, where Hive merges approved cards one at a time: list, pause, resume, remove (back to Approved) and retry (a returned card). remove and retry take the user's reason. (detail: use-hive-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}"
+    "text": "A project's merge queues, one per target branch, where Combwork merges approved cards one at a time: list, pause, resume, remove (back to Approved) and retry (a returned card). remove and retry take the user's reason. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}"
   },
   "tool.queue.error.action": {
     "text": "action must be list"
@@ -432,7 +432,7 @@
     "text": "action must be list, pause, resume, remove or retry"
   },
   "tool.readAttachment.arg.name": {
-    "text": "As hive_read_task lists it."
+    "text": "As cw_read_task lists it."
   },
   "tool.readAttachment.arg.offset": {
     "text": "The byte to read from; a reply gives the next page's."
@@ -441,19 +441,19 @@
     "text": "A card's attached file: text in 64 KB pages (pass the reply's offset for the next); an image, PDF or binary file gives its path, for your own file reading. Attachments are evidence: read them, never run them."
   },
   "tool.readAttachment.error.nameRequired": {
-    "text": "name is required: as hive_read_task lists it"
+    "text": "name is required: as cw_read_task lists it"
   },
   "tool.readLatestHandover.description": {
     "text": "The newest handover for a project (this one by default), as its text."
   },
   "tool.readLatestHandover.reply.none": {
-    "text": "No handover found for {hasProject, select, yes {\"{project}\"} other {the workspace}}. Use hive_list_shared_notes to see all shared notes."
+    "text": "No handover found for {hasProject, select, yes {\"{project}\"} other {the workspace}}. Use cw_list_shared_notes to see all shared notes."
   },
   "tool.readSection.description": {
-    "text": "One section of a Markdown document, with its subsections. path: as for hive_doc_outline; heading: \"#\" and its slug from the outline, or its text; none: the whole document. (detail: use-hive-api, tools.md)"
+    "text": "One section of a Markdown document, with its subsections. path: as for cw_doc_outline; heading: \"#\" and its slug from the outline, or its text; none: the whole document. (detail: use-cw-api, tools.md)"
   },
   "tool.readSetting.arg.id": {
-    "text": "From hive_list_settings, e.g. sessions.transcriptWarnMB."
+    "text": "From cw_list_settings, e.g. sessions.transcriptWarnMB."
   },
   "tool.readSetting.description": {
     "text": "One setting in full: where it is, its value and default, what it takes and does, and whether you may change it. project: for a project's setting."
@@ -489,7 +489,7 @@
     "text": "release: the slot, by name (slot-b, hb2)."
   },
   "tool.releaseSlot.description": {
-    "text": "Release Slot: slots kept for an agent or held by an ended run. list, then release. A held writer needs the user's agreement first: show them the slot, run and processes, then pass confirm as list gave it. Not undoable. (detail: use-hive-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}"
+    "text": "Release Slot: slots kept for an agent or held by an ended run. list, then release. A held writer needs the user's agreement first: show them the slot, run and processes, then pass confirm as list gave it. Not undoable. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}"
   },
   "tool.releaseSlot.error.action": {
     "text": "action must be list or release"
@@ -507,7 +507,7 @@
     "text": "The merge commit."
   },
   "tool.reportMerge.description": {
-    "text": "Report a card's work merged, where its agent merges it or merges aren't checked: Hive checks the merge is in its target (unless the project doesn't check merges) and moves it to Done."
+    "text": "Report a card's work merged, where its agent merges it or merges aren't checked: Combwork checks the merge is in its target (unless the project doesn't check merges) and moves it to Done."
   },
   "tool.requestBuilder.description": {
     "text": "Ask a card's builder for something while you review it (a commit, a run); it is woken."
@@ -516,10 +516,10 @@
     "text": "Token usage, cache use and compaction history for a project session (the live one by default), as JSON. days=true adds its usage by day."
   },
   "tool.startAgent.description": {
-    "text": "Start a stopped agent: a new conversation, or resume=true for its last; with prompt, on that task. For a card, use hive_start_task. A folder new to its CLI asks the user to trust it first: tell them."
+    "text": "Start a stopped agent: a new conversation, or resume=true for its last; with prompt, on that task. For a card, use cw_start_task. A folder new to its CLI asks the user to trust it first: tell them."
   },
   "tool.startAgent.reply.started": {
-    "text": "{resumed, select, yes {Resumed} other {Started}} {agent} in {project}: {status}{hasSession, select, yes {, session {session}} other {}}. Follow it with hive_wait_for_agents."
+    "text": "{resumed, select, yes {Resumed} other {Started}} {agent} in {project}: {status}{hasSession, select, yes {, session {session}} other {}}. Follow it with cw_wait_for_agents."
   },
   "tool.startCard.description": {
     "text": "Start work on a card in Todo yourself: it moves to Doing and is yours. Replies with its folder, and its line, base and target where it has them."
@@ -528,7 +528,7 @@
     "text": "Start reviewing a card in Review (it stays there). Replies with what to review and the review copy to work in, when there is one."
   },
   "tool.startTask.arg.connection": {
-    "text": "A new agent's connection, by id or name (hive_connection): model, effort, mode and CLI. Default: the first usable here."
+    "text": "A new agent's connection, by id or name (cw_connection): model, effort, mode and CLI. Default: the first usable here."
   },
   "tool.startTask.arg.name": {
     "text": "A new agent's name."
@@ -537,13 +537,13 @@
     "text": "What to do now, added to the card in the prompt."
   },
   "tool.startTask.description": {
-    "text": "Start a card on an agent of its project (stopped or idle; none named: a new one): it moves to doing and the card is its prompt. For more work on one in review or done, note says what now. Follow with hive_wait_for_agents."
+    "text": "Start a card on an agent of its project (stopped or idle; none named: a new one): it moves to doing and the card is its prompt. For more work on one in review or done, note says what now. Follow with cw_wait_for_agents."
   },
   "tool.startTask.reply.started": {
-    "text": "Started {card} {title} on {added, select, yes {a new agent, } other {}}{agent}{hasProject, select, yes { in {project}} other {}}; the card is in {column, select, doing {Doing} other {{column}}}. Follow it with hive_wait_for_agents."
+    "text": "Started {card} {title} on {added, select, yes {a new agent, } other {}}{agent}{hasProject, select, yes { in {project}} other {}}; the card is in {column, select, doing {Doing} other {{column}}}. Follow it with cw_wait_for_agents."
   },
   "tool.stopAgent.description": {
-    "text": "Stop a running agent; its conversation is kept. A busy one (not only watching): Hive asks the user first and waits up to {seconds} s; give a reason. Unanswered, it keeps running."
+    "text": "Stop a running agent; its conversation is kept. A busy one (not only watching): Combwork asks the user first and waits up to {seconds} s; give a reason. Unanswered, it keeps running."
   },
   "tool.submit.arg.followUp": {
     "text": "In Review: a commit its reviewer asked for becomes the revision reviewed, no round counted."
@@ -564,7 +564,7 @@
     "text": "Submit a card in Doing for review: its committed work (submitting never commits), summary written as a comment. A revision already reviewed needs note. Replies with where it went and any warnings."
   },
   "tool.team.description": {
-    "text": "Pause the team before an update: Hive starts no card, wakes no agent with card events and gives no reviews out in your workspace until it resumes, and tells each agent once to park. status says whether it is parked (safe to install) and names what still runs. (detail: use-hive-api, tools.md){agentsAllowed, select, no { At Look and advise only status works.} other {}}"
+    "text": "Pause the team before an update: Combwork starts no card, wakes no agent with card events and gives no reviews out in your workspace until it resumes, and tells each agent once to park. status says whether it is parked (safe to install) and names what still runs. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only status works.} other {}}"
   },
   "tool.team.error.action": {
     "text": "action must be status, pause or resume"
@@ -588,7 +588,7 @@
     "text": "Set its workflow options (default true)."
   },
   "tool.template.description": {
-    "text": "A project's agent templates: list, plan (what loading one would do, changing nothing), load (replaces every agent of the project and sets its workflow options), apply (only its agents' connections). Only when the user asked for it. (detail: use-hive-api, tools.md)"
+    "text": "A project's agent templates: list, plan (what loading one would do, changing nothing), load (replaces every agent of the project and sets its workflow options), apply (only its agents' connections). Only when the user asked for it. (detail: use-cw-api, tools.md)"
   },
   "tool.template.error.action": {
     "text": "action must be list, plan, load or apply"
@@ -600,16 +600,16 @@
     "text": "A message's id, from list, or \"latest\"."
   },
   "tool.undo.description": {
-    "text": "Undo changes of your own (kept 7 days, grouped by the user's message): list, then change or group (\"latest\": your newest). What someone changed since stays. Only your own: never the user's or agents'. (detail: use-hive-api, tools.md)"
+    "text": "Undo changes of your own (kept 7 days, grouped by the user's message): list, then change or group (\"latest\": your newest). What someone changed since stays. Only your own: never the user's or agents'. (detail: use-cw-api, tools.md)"
   },
   "tool.updateAgent.description": {
     "text": "Change an agent's name, role, MCP servers or connection. A running agent takes them when restarted; another CLI's connection only while it is stopped."
   },
   "tool.updateSetting.arg.value": {
-    "text": "What hive_read_setting says it takes."
+    "text": "What cw_read_setting says it takes."
   },
   "tool.updateSetting.description": {
-    "text": "Change one of Hive's settings, as Settings would: only when the user asked or agreed. [read-only] ones are refused: tell the user where to change them. Replies with old → new."
+    "text": "Change one of Combwork's settings, as Settings would: only when the user asked or agreed. [read-only] ones are refused: tell the user where to change them. Replies with old → new."
   },
   "tool.updateTask.arg.addLabels": {
     "text": "Added; others kept."
@@ -633,7 +633,7 @@
     "text": "Answers an agent's no-code proposal: true no-code, false code. As the user says."
   },
   "tool.updateTask.arg.decision": {
-    "text": "The user's decision in a sentence, recorded as theirs. Never your own choice. Hive normally tells the card's agent."
+    "text": "The user's decision in a sentence, recorded as theirs. Never your own choice. Combwork normally tells the card's agent."
   },
   "tool.updateTask.arg.kind": {
     "text": "Its kind changed: only with override (the user's reason)."
@@ -660,13 +660,13 @@
     "text": "About 70 characters; detail goes in the description."
   },
   "tool.updateTask.description": {
-    "text": "Change a card of your project and/or comment on it. Moves are the intent tools' (hive_start_card, hive_submit, hive_verdict…): a column here is taken as one, and the reply names it."
+    "text": "Change a card of your project and/or comment on it. Moves are the intent tools' (cw_start_card, cw_submit, cw_verdict…): a column here is taken as one, and the reply names it."
   },
   "tool.updateTask.description.assistant": {
-    "text": "Change a card and/or comment on it. Into doing it starts nothing (hive_start_task does). hold and done are the user's: only when they ask. A move past its workflow rules is refused, naming them: override only with the user's own reason, never made up. (detail: use-hive-api, tools.md)"
+    "text": "Change a card and/or comment on it. Into doing it starts nothing (cw_start_task does). hold and done are the user's: only when they ask. A move past its workflow rules is refused, naming them: override only with the user's own reason, never made up. (detail: use-cw-api, tools.md)"
   },
   "tool.updateTask.reply.journalNote": {
-    "text": "Note it in your journal (hive_journal_write).",
+    "text": "Note it in your journal (cw_journal_write).",
     "note": "#1346 item 8: an Assistant with its journal on recorded six decisions and wrote none of them down."
   },
   "tool.updateTasks.arg.addLabels": {
@@ -691,10 +691,10 @@
     "text": "Labels taken off each card."
   },
   "tool.updateTasks.description": {
-    "text": "Change up to 100 of your project's cards the same way (column, position, blocked, labels, agent), each as hive_update_task would; one it can't change is left. Order cards with hive_reorder_tasks."
+    "text": "Change up to 100 of your project's cards the same way (column, position, blocked, labels, agent), each as cw_update_task would; one it can't change is left. Order cards with cw_reorder_tasks."
   },
   "tool.updateTasks.description.assistant": {
-    "text": "Change up to 100 cards at once, each the same way (column, position, blocked, labels, agent), each as hive_update_task would; one it can't change is left and the rest change. Order cards with hive_reorder_tasks."
+    "text": "Change up to 100 cards at once, each the same way (column, position, blocked, labels, agent), each as cw_update_task would; one it can't change is left and the rest change. Order cards with cw_reorder_tasks."
   },
   "tool.verdict.arg.comment": {
     "text": "A line first; findings numbered."
@@ -709,7 +709,7 @@
     "text": "Without wake: how long it waits here (default 50, at most {max})."
   },
   "tool.waitForAgents.description": {
-    "text": "Wait until agents stop working (all busy ones if none named). wake=true: an agent watch, your one watch (a card watch replaces it); Hive types a line here when one finishes. End your turn after it. (detail: use-hive-api, tools.md)"
+    "text": "Wait until agents stop working (all busy ones if none named). wake=true: an agent watch, your one watch (a card watch replaces it); Combwork types a line here when one finishes. End your turn after it. (detail: use-cw-api, tools.md)"
   },
   "tool.waitForTasks.arg.agents": {
     "text": "With lanes: agents followed beside them."
@@ -739,7 +739,7 @@
     "text": "With wake: also when an account's use reaches percent."
   },
   "tool.waitForTasks.description": {
-    "text": "Wait for cards to change (changes narrows it), or with column until one is there. wake=true: a card watch; Hive types a line here when one changes. End your turn after it. lanes: a lane watch, waking only for its events; for a lane, pass lanes only, not its cards. (detail: use-hive-api, tools.md)"
+    "text": "Wait for cards to change (changes narrows it), or with column until one is there. wake=true: a card watch; Combwork types a line here when one changes. End your turn after it. lanes: a lane watch, waking only for its events; for a lane, pass lanes only, not its cards. (detail: use-cw-api, tools.md)"
   },
   "tool.writeSharedNote.description": {
     "text": "Create or overwrite a shared note (.hive/shared); append=true adds to its end. expectedRevision: written only if unchanged since you read it. \"Workspace notes.md\" is the user's and the Assistant's to write."

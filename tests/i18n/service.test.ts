@@ -1,7 +1,7 @@
 // #850 (E10f): the `service` area, the services behind the workspace, files, git, lanes, transcripts, metrics,
 // benchmarks, providers and advanced settings. Refusals are HiveErrors: the Agent API and every reader of `.message` get
 // the English exactly as before, with the status its English gave, and the window (IPC) its language. Text only agents
-// read stays English (a lane's refusals to hive_lane, a delivery's reasons, progress runs). Metrics keep their English
+// read stays English (a lane's refusals to cw_lane, a delivery's reasons, progress runs). Metrics keep their English
 // lists for agents with the window's text beside them, item for item; advanced.json's problem is text too.
 import { execFileSync } from 'child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'

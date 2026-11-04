@@ -1,9 +1,4 @@
 {
-  "prose|call|SELECT 1 FROM lane_cards c JOIN lanes l ON l.id = c.lane WHERE c.card = ? AND l.state = 'active' LIMIT 1": 1,
-  "prose|call|SELECT col, stage, agent, review_agent, archived, updated_at FROM cards WHERE number = ?": 1,
-  "prose|call|SELECT l.id, l.builder_id, l.reviewer_id, l.state FROM lane_cards c JOIN lanes l ON l.id = c.lane WHERE c.card = ? ORDER BY l.id": 1,
-  "prose|call|SELECT max(ord) AS last, count(*) AS n FROM card_history WHERE card = ?": 1,
-  "prose|call|SELECT max(seq) AS last, count(*) AS n FROM card_facts WHERE card = ?": 1,
   "prose|call|a loop handoff": 1,
   "prose|call|a loop wake": 1,
   "prose|call|noting a loop wake on #{}": 1,

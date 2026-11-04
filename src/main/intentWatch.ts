@@ -13,9 +13,9 @@ const log = createLogger('loops')
 
 const T = {
   ownCovers: agentMsg({ id: 'notice.intent.ownCovers', text: 'You already watch {card} ({label}): end your turn.', note: '#1639: an intent\'s reply (a submit, a failed review) in a running lane, when the agent\'s own watch already covers its card. card: the card ("HI-12 (title)"); label: the watch\'s label.' }),
-  ownStays: agentMsg({ id: 'notice.intent.ownStays', text: 'Your watch ({label}) stays: Hive\'s loop wake tells you when {card} comes back.', note: '#1639: an intent\'s reply in a running lane, when the agent has another watch of its own (kept, not replaced). label: that watch\'s label; card: the card.' }),
+  ownStays: agentMsg({ id: 'notice.intent.ownStays', text: 'Your watch ({label}) stays: Combwork\'s loop wake tells you when {card} comes back.', note: '#1639: an intent\'s reply in a running lane, when the agent has another watch of its own (kept, not replaced). label: that watch\'s label; card: the card.' }),
   already: agentMsg({ id: 'notice.intent.already', text: '{card} is already {column}: carry on.', note: '#1639: an intent\'s reply in a running lane, when the card already reached the column its watch would wait for (a quick reviewer). column: the column\'s id ("passed").' }),
-  armed: agentMsg({ id: 'notice.intent.armed', text: 'Hive watches {card} for you, for {what, select, review {its review (a verdict, a move or a comment)} other {its next round in Review}}, up to {limit}: end your turn, and it wakes you.', note: '#1639: an intent\'s reply in a running lane: the card watch Hive armed for the agent. what: review after a builder\'s submit, round after a reviewer\'s failed verdict; limit: the lane\'s wait ("2h").' })
+  armed: agentMsg({ id: 'notice.intent.armed', text: 'Combwork watches {card} for you, for {what, select, review {its review (a verdict, a move or a comment)} other {its next round in Review}}, up to {limit}: end your turn, and it wakes you.', note: '#1639: an intent\'s reply in a running lane: the card watch Hive armed for the agent. what: review after a builder\'s submit, round after a reviewer\'s failed verdict; limit: the lane\'s wait ("2h").' })
 }
 
 /**

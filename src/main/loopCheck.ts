@@ -141,7 +141,7 @@ function inPoolLoop(card: Pick<TaskCard, 'agent'>, agentId: string, reach: Pick<
  * - its own card (the builder's) in Review, with no request of its reviewer's left to answer: the reviewer's verdict;
  * - its own card in Doing with a design or follow-up posted (`pendingStep`): the reviewer's answer;
  * - a card it reviews in the loop, in Doing with no step waiting for it: the builder's submission;
- * - a card with an open For you request it asked (`hive_ask_user`, `hive_cannot_within_rules`; HI-2080): the user's
+ * - a card with an open For you request it asked (`cw_ask_user`, `cw_cannot_within_rules`; HI-2080): the user's
  *   answer, whatever the card's column or reviewer. Once answered or closed, the card is owed as before.
  * The rest is its own move (a builder's card in Doing, a step its reviewer must answer, a card in Review its reviewer
  * hasn't given a verdict on), or one no loop wake tells (no reviewer, loop wakes off, no inbox). A pool card is owed
@@ -169,7 +169,7 @@ function failedSinceArrival(card: Pick<TaskCard, 'history'>): boolean {
 }
 
 /**
- * A request of its reviewer's to its builder (`hive_request_builder`: "Asked the builder…") on a card in Review, since it
+ * A request of its reviewer's to its builder (`cw_request_builder`: "Asked the builder…") on a card in Review, since it
  * came in, that the builder hasn't answered (nothing of the builder's on the card after it): the builder's move.
  */
 function requestOpen(card: Pick<TaskCard, 'history' | 'comments' | 'agentName' | 'project'>): boolean {

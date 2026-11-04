@@ -78,8 +78,8 @@ const check = (name, ok, extra = '') => {
     const tokenOf = async (agent) => {
       const sessionId = (await live(agent))?.sessionId
       const launch = await lib.until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     const tokens = Object.fromEntries(await Promise.all(Object.entries(agents).map(async ([k, a]) => [k, await tokenOf(a)])))
     check('each agent has its token', Object.values(tokens).every(Boolean))

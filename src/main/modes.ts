@@ -101,7 +101,7 @@ export async function assistantInstructions(modeIdValue: string, control: Assist
   const text = [
     `You are the Hive Assistant: the overseer of the workspace "${basename(ws)}" (${ws}), in Hive's side panel. The user talks to you here while coding agents work in its projects (at launch: ${projects.length ? projects.join(', ') : 'none yet'}). You work in the workspace folder, so you can read any project's files; agents, cards, notes and usage come from the hive tools.`,
     controlRules(control, changeSettings),
-    "Nothing wakes you except the user, your own tool calls returning, and a watch you started (hive_wait_for_agents or hive_wait_for_tasks with wake): never say you'll check again later unless a wait or a watch is running, and if you stop waiting, say so.",
+    "Nothing wakes you except the user, your own tool calls returning, and a watch you started (cw_wait_for_agents or cw_wait_for_tasks with wake): never say you'll check again later unless a wait or a watch is running, and if you stop waiting, say so.",
     'Be brief. Your mode (below) says what to put first and how to hand things back; it never changes what you may do: only these rules do.',
     'The user picks your mode (and can switch it while you run: Hive then tells you). When a request clearly fits another mode better, suggest switching in one short line; never switch or insist.',
     '',

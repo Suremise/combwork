@@ -1,34 +1,34 @@
 {
   "inbox.ack.acked": {
     "text": "Acked {ids}.",
-    "note": "hive_inbox ack's reply: what it acked. ids: their ids (\"m12, m14\")."
+    "note": "cw_inbox ack's reply: what it acked. ids: their ids (\"m12, m14\")."
   },
   "inbox.ack.none": {
     "text": "Nothing acked.",
-    "note": "hive_inbox ack's reply when none of the ids was acked."
+    "note": "cw_inbox ack's reply when none of the ids was acked."
   },
   "inbox.ack.notReadBefore": {
     "text": "Not read before: {ids}, not acked: ack {n, plural, one {it} other {them}} once you have acted on {n, plural, one {it} other {them}}.",
-    "note": "In hive_inbox ack's reply with read: true (#1531): ids it was asked to ack that the agent hadn't read, now in the read that follows. ids: their ids; n: how many."
+    "note": "In cw_inbox ack's reply with read: true (#1531): ids it was asked to ack that the agent hadn't read, now in the read that follows. ids: their ids; n: how many."
   },
   "inbox.ack.notReadYet": {
-    "text": "Not read yet: {ids}: read {n, plural, one {it} other {them}} with hive_inbox first.",
-    "note": "In hive_inbox ack's reply: ids it was asked to ack that the agent hasn't read. ids: their ids; n: how many."
+    "text": "Not read yet: {ids}: read {n, plural, one {it} other {them}} with cw_inbox first.",
+    "note": "In cw_inbox ack's reply: ids it was asked to ack that the agent hasn't read. ids: their ids; n: how many."
   },
   "inbox.ack.unknown": {
     "text": "Not in your inbox: {ids}.",
-    "note": "In hive_inbox ack's reply: ids it was asked to ack that aren't the agent's deliveries. ids: those ids."
+    "note": "In cw_inbox ack's reply: ids it was asked to ack that aren't the agent's deliveries. ids: those ids."
   },
   "inbox.again.launch": {
     "text": "its session ended or restarted before it was read",
     "note": "Why a delivery may repeat (#649), after the doorbell (inbox.offer.again), and in why it is uncertain (inbox.ended.uncertain)."
   },
   "inbox.again.restart": {
-    "text": "Hive restarted while offering it",
+    "text": "Combwork restarted while offering it",
     "note": "Why a delivery may repeat (#649), after the doorbell (inbox.offer.again): Hive stopped while it was being offered."
   },
   "inbox.again.typing": {
-    "text": "Hive restarted while typing it",
+    "text": "Combwork restarted while typing it",
     "note": "Why a watch's wake may repeat (#649), after the doorbell (inbox.offer.again): Hive stopped while typing it."
   },
   "inbox.cardEvents.counted": {
@@ -39,8 +39,12 @@
     "text": "{body} (with {more} more {n, plural, one {change} other {changes}}: read the card)",
     "note": "A card's events in one inbox item, led by the merge queue's return of the card while only comments came after it (HI-2087). body: the return's own line; n and more: how many events came after it."
   },
+  "inbox.carried.notice": {
+    "text": "Your earlier conversation read {n, plural, one {a message} other {# messages}} it never acked ({ids}). cw_inbox shows {n, plural, one {it} other {them}} again now: act on {n, plural, one {it} other {them}}, then ack {n, plural, one {it} other {them}}.",
+    "note": "HI-2463: a conversation from before the rename started fresh; what the earlier one had received and not acked is shown again in the new one. After \"[CW] \". n: how many; ids: their delivery ids (\"m3, m7\")."
+  },
   "inbox.create.badKey": {
-    "text": "Not a delivery Hive can keep: its source or key is too long.",
+    "text": "Not a delivery Combwork can keep: its source or key is too long.",
     "note": "Why a delivery isn't made: what names its producer is too long to keep."
   },
   "inbox.create.full": {
@@ -52,7 +56,7 @@
     "note": "Why a delivery the Assistant left is refused when it is made. why: inbox.refused.controlDown or .assistantEnded."
   },
   "inbox.create.projectFull": {
-    "text": "This project already has {max} deliveries waiting or not acked, the most Hive keeps.",
+    "text": "This project already has {max} deliveries waiting or not acked, the most Combwork keeps.",
     "note": "Why a delivery isn't made: its project has as many live deliveries as Hive keeps. max: that many."
   },
   "inbox.create.tooLong": {
@@ -100,7 +104,7 @@
     "note": "Why a delivery is uncertain (#649), as its sender reads it; it is offered once more. why: inbox.again.launch."
   },
   "inbox.ended.uncertainRestart": {
-    "text": "may not have reached it: Hive stopped while offering it",
+    "text": "may not have reached it: Combwork stopped while offering it",
     "note": "Why a delivery is uncertain (#649), as its sender reads it: Hive stopped while it was being offered; it is offered once more."
   },
   "inbox.expired.late": {
@@ -120,7 +124,7 @@
     "note": "Why a delivery wanted now (a task, a handover's step) wasn't given: its caller no longer wants it."
   },
   "inbox.given.notTyped": {
-    "text": "Hive could not type it",
+    "text": "Combwork could not type it",
     "note": "Why a delivery wanted now (a task, a handover's step) wasn't given, when nothing more is known."
   },
   "inbox.load.failed": {
@@ -140,7 +144,7 @@
     "note": "Why a loop wake was cancelled just before it was given: its workspace closed, or its window opened another."
   },
   "inbox.loopEnded.unreadable": {
-    "text": "not a loop wake Hive can read",
+    "text": "not a loop wake Combwork can read",
     "note": "Why a loop wake (#405, a delivery) was cancelled just before it was given: what it was made from can't be read back."
   },
   "inbox.message.noText": {
@@ -149,14 +153,14 @@
   },
   "inbox.message.notRunning": {
     "text": "{agent} isn't running.",
-    "note": "#530: a message left for an agent (hive_message_agent) refused: the agent isn't running. agent: its name."
+    "note": "#530: a message left for an agent (cw_message_agent) refused: the agent isn't running. agent: its name."
   },
   "inbox.message.tooLong": {
     "text": "A message is at most {max} characters (this one has {n}).",
     "note": "A message left for an agent refused: too long. max: the most; n: its length."
   },
   "inbox.message.tooMany": {
-    "text": "{agent} already has {max} messages waiting, the most Hive keeps for an agent: wait until they are delivered (hive_agent_activity), or cancel them.",
+    "text": "{agent} already has {max} messages waiting, the most Combwork keeps for an agent: wait until they are delivered (cw_agent_activity), or cancel them.",
     "note": "A message left for an agent refused: as many as Hive keeps for it already wait. agent: its name; max: how many."
   },
   "inbox.noLine.cliAsks": {
@@ -168,7 +172,7 @@
     "note": "Why Hive could not type a line into an agent now (#646), in the reply of the call that wanted it. what: what is changing the agent's folder (a Git switch or pull)."
   },
   "inbox.noLine.hooksMissing": {
-    "text": "its CLI's hooks aren't reaching Hive, so Hive can't tell when it is free",
+    "text": "its CLI's hooks aren't reaching Combwork, so Combwork can't tell when it is free",
     "note": "Why Hive could not type a line into an agent now, in the reply of the call that wanted it."
   },
   "inbox.noLine.inputBlocked": {
@@ -180,7 +184,7 @@
     "note": "Why Hive could not type a line into an agent now, in the reply of the call that wanted it."
   },
   "inbox.noLine.lineWaiting": {
-    "text": "its CLI hasn't taken the line Hive typed before",
+    "text": "its CLI hasn't taken the line Combwork typed before",
     "note": "Why Hive could not type a line into an agent now, in the reply of the call that wanted it."
   },
   "inbox.noLine.notRunning": {
@@ -192,11 +196,11 @@
     "note": "Why Hive could not type a line into an agent now, in the reply of the call that wanted it. status: the agent's status, as Hive names it (working, starting…)."
   },
   "inbox.noLine.toolsWaiting": {
-    "text": "its hive tools haven't connected yet",
+    "text": "its Combwork tools haven't connected yet",
     "note": "Why Hive could not type a line into an agent now (#865), in the reply of the call that wanted it."
   },
   "inbox.noLine.typing": {
-    "text": "Hive is already typing a line into it",
+    "text": "Combwork is already typing a line into it",
     "note": "Why Hive could not type a line into an agent now, in the reply of the call that wanted it."
   },
   "inbox.noLine.userTyping": {
@@ -216,24 +220,24 @@
     "note": "After the doorbell: deliveries offered again, which the agent may have seen before. ids: their ids (\"m12, m14\"); why: why each is offered again, joined by \"; \" (inbox.again.*); n: how many."
   },
   "inbox.offer.watchOn": {
-    "text": "(Your watch is still on, {watch}: do what this asks, then end your turn, and Hive wakes you when it changes.)",
+    "text": "(Your watch is still on, {watch}: do what this asks, then end your turn, and Combwork wakes you when it changes.)",
     "note": "After the doorbell, typed into an agent waiting on a watch: its watch carries on. watch: the watch's label, its first letter in lower case (\"waiting on HI-12\")."
   },
   "inbox.read.ackEach": {
-    "text": "Ack each with hive_inbox (ack: its ids) once you have acted on it.",
-    "note": "hive_inbox's last line, after what is new."
+    "text": "Ack each with cw_inbox (ack: its ids) once you have acted on it.",
+    "note": "cw_inbox's last line, after what is new."
   },
   "inbox.read.newCount": {
     "text": "{count} new:",
-    "note": "hive_inbox's first line, before one line per item (ids · sender · card: text). count: how many items."
+    "note": "cw_inbox's first line, before one line per item (ids · sender · card: text). count: how many items."
   },
   "inbox.read.nothingNew": {
     "text": "Nothing new.",
-    "note": "hive_inbox's reply when nothing is unread (before inbox.read.older, if any)."
+    "note": "cw_inbox's reply when nothing is unread (before inbox.read.older, if any)."
   },
   "inbox.read.older": {
     "text": "Received before, not acked yet: {ids}.",
-    "note": "In hive_inbox's reply: deliveries the agent read before and has not acked. ids: their ids (\"m12, m14\")."
+    "note": "In cw_inbox's reply: deliveries the agent read before and has not acked. ids: their ids (\"m12, m14\")."
   },
   "inbox.refused.assistantEnded": {
     "text": "the Assistant's session that left it ended",
@@ -260,7 +264,7 @@
     "note": "The Assistant's line when the user declined an agent's question (HI-1734): never worded as a grant. said: what the user did (inbox.relay.said)."
   },
   "inbox.relay.needed": {
-    "text": "This needs you: {said} {asker} can't {need, select, done {move it to Done} noCode {make it no code} unblock {unblock it} other {skip its review}} by itself. {outcome, select, approved {Their approval is a yes, within any conditions its reply sets} other {Do it only if the answer agrees, within any conditions it sets}}, with the answer as the reason (hive_update_task).",
+    "text": "This needs you: {said} {asker} can't {need, select, done {move it to Done} noCode {make it no code} unblock {unblock it} other {skip its review}} by itself. {outcome, select, approved {Their approval is a yes, within any conditions its reply sets} other {Do it only if the answer agrees, within any conditions it sets}}, with the answer as the reason (cw_update_task).",
     "note": "The Assistant's line when the user answered or approved an agent's question on a card that needs what only the Assistant or the user can do (HI-1734). said: what the user did (inbox.relay.said); asker: the asking agent's name; need: done, noCode, unblock or skipReview; outcome: approved or answered."
   },
   "inbox.relay.reply": {
@@ -272,8 +276,12 @@
     "note": "In the Assistant's line for the user's answer to an agent's question: an approval's note, which is its reply and the card's decision too, said once (HI-2286)."
   },
   "inbox.relay.said": {
-    "text": "the user {outcome, select, approved {approved} declined {declined} other {answered}} {asker}'s question on {card}. The question, whole: <<<{question}>>>.{wrote, select, yes { {words}.} answered {} other { Nothing was written with it.}} (Both stay on the card: hive_read_task {card}.)",
+    "text": "the user {outcome, select, approved {approved} declined {declined} other {answered}} {asker}'s question on {card}. The question, whole: <<<{question}>>>.{wrote, select, yes { {words}.} answered {} other { Nothing was written with it.}} (Both stay on the card: cw_read_task {card}.)",
     "note": "What the user did with an agent's question, in the Assistant's line (HI-1734), after its opening (inbox.relay.declined, .needed, .check). asker: the asking agent's name; card: its card (HI-12); question: the question, whole; wrote: yes with words (the reply and decision: inbox.relay.reply, .decision), answered for an answer with none, no for a bare approval or decline."
+  },
+  "inbox.renamedNote": {
+    "text": "(Combwork has renamed what agents use: a hive_<tool> named here is now cw_<tool>, mcp__hive__ is mcp__{server}__, and hive-progress is cw-progress.)",
+    "note": "HI-2463: after a line or message from Combwork that names an old tool or command outside what it quotes (one written before the rename, or a lane's brief written that way). Its words are kept as written (they may be a person's or an agent's): this says how the old names map. server: Combwork's MCP server's name."
   },
   "inbox.round.noCard": {
     "text": "There is no card {card}.",
@@ -284,7 +292,7 @@
     "note": "Why a message tied to a card's round (#652) isn't made. why: why the card has no round under way (inbox.stale.*)."
   },
   "inbox.round.unreadable": {
-    "text": "Hive couldn't read {card} now.",
+    "text": "Combwork couldn't read {card} now.",
     "note": "Why a message tied to a card's round (#652) isn't made: the card can't be read now (its workspace closed). card: the card (HI-12)."
   },
   "inbox.save.dbReplaced": {
@@ -292,7 +300,7 @@
     "note": "Why the deliveries couldn't be saved, in inbox.save.failed: an upgrade or a restore replaced the database."
   },
   "inbox.save.failed": {
-    "text": "Hive couldn't save the deliveries ({error}): nothing changed.",
+    "text": "Combwork couldn't save the deliveries ({error}): nothing changed.",
     "note": "Why a change to deliveries (a message, a read, an ack, a cancel) failed. error: why the save failed (inbox.save.tooMany, .dbReplaced, or a system error)."
   },
   "inbox.save.tooMany": {

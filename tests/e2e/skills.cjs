@@ -20,7 +20,7 @@ const HUNG_MS = 10000
 const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 /** The bundled skills from before Combwork kept track of them (an existing workspace without them deleted them), and the newer ones. */
 const EARLIER = ['handover', 'merge-ready', 'pick-up', 'review-agent-work', 'split-work', 'workspace-note']
-const NEWER = ['board-hygiene', 'card-loop', 'coordinate-agents', 'generalist', 'journal', 'licence-audit', 'run-lanes', 'triage-report', 'tune-settings', 'use-hive-api', 'work-on-card']
+const NEWER = ['board-hygiene', 'card-loop', 'coordinate-agents', 'generalist', 'journal', 'licence-audit', 'run-lanes', 'triage-report', 'tune-settings', 'use-cw-api', 'work-on-card']
 const BUNDLED = [...EARLIER, ...NEWER]
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -43,7 +43,7 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(path.join(dump, 'photo.png'), lib.samplePng())
   fs.writeFileSync(path.join(dump, 'deploy.zip'), zipSync({ 'deploy/SKILL.md': strToU8('---\nname: deploy\ndescription: Deploy the app.\n---\n\nRun scripts/deploy.ps1.\n'), 'deploy/scripts/deploy.ps1': strToU8('Write-Host deploy') }))
   // A Hive copy for Codex in the project's .agents/skills: never a local skill.
-  const copy = path.join(proj, '.agents', 'skills', 'hive-handover')
+  const copy = path.join(proj, '.agents', 'skills', 'cw-handover')
   fs.mkdirSync(copy, { recursive: true })
   fs.writeFileSync(path.join(copy, 'SKILL.md'), '---\nname: handover\ndescription: copy\n---\n')
   fs.writeFileSync(path.join(copy, '.hive-copy'), '{"hash":"x"}')

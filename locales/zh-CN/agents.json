@@ -340,7 +340,7 @@
   "agents.settings.worktreeOn": "位于 <code>{branch}</code> 的工作树（基于 {base}）",
   "agents.start.exited": "{cli} 已退出，退出代码为 {code}。",
   "agents.switch.confirm": "切换",
-  "agents.switch.detail": "如需延续工作，请在切换前让智能体写一份交接说明（Combwork MCP：hive_create_handover），然后让新智能体阅读。",
+  "agents.switch.detail": "如需延续工作，请在切换前让智能体写一份交接说明（Combwork MCP：cw_create_handover），然后让新智能体阅读。",
   "agents.switch.message": "它的对话保留在“会话历史”标签页中，但 {cli} 无法恢复 {was} 的对话，因此 {agent} 下次会全新开始。",
   "agents.switch.title": "将 {agent} 切换到 {cli}？",
   "agents.template.nameTaken": "模板中已有另一个名为“{name}”的智能体。",

@@ -13,8 +13,14 @@ import { git } from '../git'
 import { endTree, shellSpec } from '../progressReporters/wrapper'
 import { bracketEnd, bracketStart, checkEnv, programFound, type Spawn } from './queueChecks'
 import { FOCUSED_MAX_DIAGNOSTICS, FOCUSED_MAX_OUTPUT, changePaths, parsePick, type FocusedPickState, type FocusedPickWhy, type FocusedTest, type PathChange } from '../../shared/workflow/focused'
+import { agentMsg, say } from '../../shared/agentText'
 
 /** A pick's outcome: the selection, or why there is none, and the picker's diagnostics. */
+/** What the picker's run says (HI-2463: Combwork's name). */
+const FOCUSED_TEXT = {
+  programMissing: agentMsg({ id: 'workflow.focused.programMissing', text: "Combwork couldn't find the program this command starts: {command}", note: "The focused-test picker's diagnostics: its command's program isn't found. command: the command as written." })
+}
+
 export interface PickOutcome {
   state: FocusedPickState
   tests: FocusedTest[]
@@ -118,7 +124,7 @@ export function runPick(deps: PickDeps, command: string, folder: string, base: s
     deps.signal?.addEventListener('abort', cancel, { once: true })
     try {
       const env = { ...checkEnv(deps.env()), HIVE_FOCUSED_BASE: base }
-      if (!programFound(command, env, folder, platform)) return done({ state: 'unknown', tests: [], why: 'failed', diagnostics: `Hive couldn't find the program this command starts: ${command}` }) // i18n-ignore: the picker's diagnostics, agent-facing
+      if (!programFound(command, env, folder, platform)) return done({ state: 'unknown', tests: [], why: 'failed', diagnostics: say(FOCUSED_TEXT.programMissing, { command }) }) // i18n-ignore: the picker's state (a code) and its diagnostics, agent text
       const sh = shellSpec(command, env, platform)
       child = spawn(sh.file, sh.args, { cwd: folder, env, windowsHide: true, windowsVerbatimArguments: sh.verbatim, stdio: ['pipe', 'pipe', 'pipe'] })
     } catch (e) {

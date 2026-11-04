@@ -126,11 +126,11 @@ describe('the harness scores from the record', () => {
     expect(existsSync(dir)).toBe(false)
     const known = knownTokens(file, apiToken)
     expect(known).toEqual([{ kind: 'workspace', token: apiToken }, { kind: 'hook', token }])
-    const printed = `HIVE_HOOK_TOKEN=${token}\nHIVE_PROJECT=alpha`
-    expect(tokenSightings(known, { tools: [{ name: 'Bash', result: printed }] })).toEqual([{ kind: 'hook', in: 'tool', at: 0, name: 'Bash', excerpt: 'HIVE_HOOK_TOKEN=<hook token> HIVE_PROJECT=alpha' }])
+    const printed = `CW_HOOK_TOKEN=${token}\nCW_PROJECT=alpha`
+    expect(tokenSightings(known, { tools: [{ name: 'Bash', result: printed }] })).toEqual([{ kind: 'hook', in: 'tool', at: 0, name: 'Bash', excerpt: 'CW_HOOK_TOKEN=<hook token> CW_PROJECT=alpha' }])
     const kept = JSON.stringify(retainedObserved({ tools: [{ name: 'Bash', input: 'env', result: printed }], finalReply: `It was ${token}.` }, known.map((t) => t.token)))
     expect(kept).not.toContain(token)
-    expect(kept).toContain('HIVE_HOOK_TOKEN=<token>')
+    expect(kept).toContain('CW_HOOK_TOKEN=<token>')
   })
 
   it('a missing, unreadable or malformed record fails the scoring rather than leaving tokens out', () => {

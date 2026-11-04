@@ -24,7 +24,7 @@ export function findSecretWarnings(def: McpServerDef): string[] {
     if (typeof raw !== 'string') return
     const value = raw.replace(/^Bearer\s+/i, '').trim()
     if (!value || isEnvRef(value) || value.includes('${')) return
-    // A file or folder that holds a secret (e.g. HIVE_API_TOKEN_FILE) isn't one itself.
+    // A file or folder that holds a secret (e.g. CW_API_TOKEN_FILE) isn't one itself.
     if (/_(FILE|PATH|DIR)$/i.test(key)) return
     if (SECRET_VALUE.test(value) || (SECRET_KEY.test(key) && value.length >= 8)) {
       const envName = key.toUpperCase().replace(/[^A-Z0-9]/g, '_')

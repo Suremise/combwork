@@ -49,7 +49,7 @@ const EARLY = { sentAt: '2026-10-31T00:59:59.500Z', doneAt: '2026-10-31T00:59:59
 let seq = 0
 type Who = { agent?: string; assistant?: boolean }
 /** A call line of the hive servers' test log, with its id; `sized`: with its reply's size (mode, chars, bytes). */
-const call = (who: Who, at = LATER, sized = true, extra: object = {}) => ({ at, id: `9.${++seq}`, tool: 'hive_inbox', role: who.assistant ? 'assistant' : 'agent', project: who.assistant ? '' : 'alpha', agent: who.agent ?? null, ok: true, args: '{}', ...(sized ? { mode: 'compact', chars: 10, bytes: 12 } : {}), ...extra })
+const call = (who: Who, at = LATER, sized = true, extra: object = {}) => ({ at, id: `9.${++seq}`, tool: 'cw_inbox', role: who.assistant ? 'assistant' : 'agent', project: who.assistant ? '' : 'alpha', agent: who.agent ?? null, ok: true, args: '{}', ...(sized ? { mode: 'compact', chars: 10, bytes: 12 } : {}), ...extra })
 const list = (who: Who, at = LATER) => ({ at, id: `9.${++seq}`, kind: 'list', role: who.assistant ? 'assistant' : 'agent', project: 'alpha', agent: who.agent ?? null, tools: 40, bytes: 27000, chars: 26900 })
 /** The `reported` line for these lines' report. */
 const reported = (lines: { id?: string }[], when = IN) => ({ kind: 'reported', ids: lines.map((l) => l.id), ...when })

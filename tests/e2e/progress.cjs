@@ -133,7 +133,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   check('and its activity', r.body?.progress?.title === 'e2e: 3 suites', JSON.stringify(r.body?.progress))
   r = await call(workspaceToken, 'GET', '/v1/projects?view=short')
   const row0 = r.body?.find((p) => p.name === 'alpha')?.agents?.find((a) => a.name === 'Alfie')
-  check("and the short listing hive_list_projects uses", /^e2e: 3 suites 0\/3, about 3 min left$/.test(row0?.progress ?? ''), JSON.stringify(row0))
+  check("and the short listing cw_list_projects uses", /^e2e: 3 suites 0\/3, about 3 min left$/.test(row0?.progress ?? ''), JSON.stringify(row0))
 
   // --- Another agent can't touch it: as if it didn't exist.
   r = await call(bettyToken, 'PATCH', `/v1/progress/${run1}`, { step: 3 })
@@ -723,7 +723,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   // panel is off; a session started afterwards gets the matching rule (its hive MCP server's instructions).
   const instructionsOf = async (dir) => {
     const launch = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).filter((l) => l.cwd.toLowerCase() === dir.toLowerCase()).at(-1)
-    const server = JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive
+    const server = JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork
     const p = spawn(server.command, server.args, { env: lib.childEnv(server.env) })
     let out = ''
     const got = new Promise((resolve) => p.stdout.on('data', (d) => {

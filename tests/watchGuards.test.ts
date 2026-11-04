@@ -89,7 +89,7 @@ describe("a watch while Hive is giving the agent a card in a slot (HI-2197)", ()
     await run(() => tasks.updateTask(number, { column: 'doing' }, user))
     expect(await run(() => watchWhilePlaced(w, p, 'a1'))).toBeNull()
     slot.due = { slot: 'slot-b', lease: 'l-1' }
-    expect(await run(() => watchWhilePlaced(w, p, 'a1'))).toBe(`Hive is giving you ${key} in slot-b: end your turn with no watch. The card comes to you as a task; a watch now would hold it off.`)
+    expect(await run(() => watchWhilePlaced(w, p, 'a1'))).toBe(`Combwork is giving you ${key} in slot-b: end your turn with no watch. The card comes to you as a task; a watch now would hold it off.`)
     // Another agent has no card coming.
     expect(await run(() => watchWhilePlaced(w, p, 'a2'))).toBeNull()
     await run(() => tasks.updateTask(number, { column: 'todo' }, user))

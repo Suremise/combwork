@@ -1,4 +1,4 @@
-// Agent watches (#416): hive_wait_for_agents with wake, on fake Claude Code agents (fake-claude/). A watcher asks to be
+// Agent watches (#416): cw_wait_for_agents with wake, on fake Claude Code agents (fake-claude/). A watcher asks to be
 // told when another agent is done and ends its turn at once (watching, "Waiting for Worker to finish"); Hive types one
 // line into it when the agent finishes its turn (with its reply), starts waiting for the user, or stops; exactly once
 // each. Also: an agent not working is the answer at once; nothing is typed while the watcher works or the user types
@@ -74,7 +74,7 @@ const check = (name, ok, extra = '') => {
     // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
   }
-  const watchOn = (name, extra = {}) => `hive hive_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: name }], wake: true, ...extra })}`
+  const watchOn = (name, extra = {}) => `hive cw_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: name }], wake: true, ...extra })}`
   /** Lets a fake's turn go on (holduntil NAME) or ask (askwhen NAME): the file it waits for, in its home. */
   const go = (name) => fs.writeFileSync(path.join(claudeHome, name), '')
   /**
@@ -87,11 +87,11 @@ const check = (name, ok, extra = '') => {
   }
   /** Between steps: both agents' turns over, so nothing of a step's is still to come in the next (#667). */
   const settle = async (what) => check(`${what}: both agents' turns are over`, !!(await until(async () => (await idle(watcher.id)) && (await idle(worker.id)) && !(await live(watcher.id))?.watch, HUNG_MS)), JSON.stringify({ watcher: await live(watcher.id).then((s) => [s?.status, s?.watch?.label]), worker: (await live(worker.id))?.status }))
-  /** The result of the agent's latest hive_wait_for_agents call, from its transcript. */
+  /** The result of the agent's latest cw_wait_for_agents call, from its transcript. */
   const waitReplies = async (id) => {
     const s = await live(id)
     const items = s?.sessionId ? ((await inv('transcript:read', alpha, s.sessionId).catch(() => null))?.items ?? []) : []
-    return items.filter((x) => x.kind === 'tool' && x.tool.name === 'hive · hive_wait_for_agents').map((x) => x.tool.result ?? null)
+    return items.filter((x) => x.kind === 'tool' && x.tool.name === 'combwork · cw_wait_for_agents').map((x) => x.tool.result ?? null)
   }
   const lastWaitReply = async (id) => (await waitReplies(id)).at(-1) ?? null
   /** Whether an agent's turn has ended and it isn't watching. */
@@ -120,7 +120,7 @@ const check = (name, ok, extra = '') => {
   // …and that answer ends a watch it had, saying so, the busy agent asked about again included (#1530, HR2's rounds 1-2).
   await say(watcher.id, watchOn('Slow'))
   await until(async () => (await live(watcher.id))?.status === 'watching', HUNG_MS)
-  await say(watcher.id, `hive hive_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: 'Slow' }, { project: 'alpha', agent: 'Worker' }], wake: true })}`)
+  await say(watcher.id, `hive cw_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: 'Slow' }, { project: 'alpha', agent: 'Worker' }], wake: true })}`)
   await until(async () => ((await lastWaitReply(watcher.id)) ?? '').startsWith('Already: ') && (await idle(watcher.id)), HUNG_MS)
   const ended = await lastWaitReply(watcher.id)
   check("…and ends a watch it had, saying so: every agent it followed", (ended ?? '').startsWith('Already: Worker (alpha) is idle') && (ended ?? '').endsWith(" Your watch on Slow (alpha) has ended: watch again, passing every agent you're following.") && !(await live(watcher.id))?.watch, ended)
@@ -144,7 +144,7 @@ const check = (name, ok, extra = '') => {
   await until(async () => wakes('Watcher').length >= 1, HUNG_MS)
   await lib.sleep(2000) // A fixed wait on purpose: this checks that a second line does NOT come.
   const w1 = wakes('Watcher')
-  check('woken exactly once when the worker finished, with its reply', w1.length === 1 && w1[0].startsWith('[Hive] Worker (alpha) finished: "Done: work 1 holduntil agentwatch-first"') && w1[0].includes('Your agent watch has ended'), JSON.stringify(w1))
+  check('woken exactly once when the worker finished, with its reply', w1.length === 1 && w1[0].startsWith('[CW] Worker (alpha) finished: "Done: work 1 holduntil agentwatch-first"') && w1[0].includes('Your agent watch has ended'), JSON.stringify(w1))
   await until(() => idle(watcher.id), HUNG_MS)
   check('…and the watch has ended', !(await live(watcher.id))?.watch)
   await settle('finishing')
@@ -157,7 +157,7 @@ const check = (name, ok, extra = '') => {
   go('agentwatch-permission')
   await until(async () => wakes('Watcher').length >= 2, HUNG_MS)
   const w2 = wakes('Watcher')
-  check('woken once when the worker waits for the user', w2.length === 2 && w2[1].startsWith('[Hive] Worker (alpha) is waiting for the user'), JSON.stringify(w2.slice(1)))
+  check('woken once when the worker waits for the user', w2.length === 2 && w2[1].startsWith('[CW] Worker (alpha) is waiting for the user'), JSON.stringify(w2.slice(1)))
   // Its turn then ends with no watch on it: the step is over only once it has (#667: a late "finished" line, typed in
   // the next step).
   go('agentwatch-answered')
@@ -184,7 +184,7 @@ const check = (name, ok, extra = '') => {
   await lib.sleep(2500) // A fixed wait on purpose: this checks that no line comes while the watcher works.
   check('no line while the watcher works', wakes('Watcher').length === 2 && (await live(watcher.id))?.status === 'working', JSON.stringify({ lines: wakes('Watcher').slice(2), watcher: (await live(watcher.id))?.status }))
   go('agentwatch-busy-watcher')
-  check('…then one, once its turn has ended', !!(await until(async () => wakes('Watcher').length === 3, HUNG_MS)) && wakes('Watcher')[2].startsWith('[Hive] Worker (alpha) finished'), JSON.stringify(wakes('Watcher').slice(2)))
+  check('…then one, once its turn has ended', !!(await until(async () => wakes('Watcher').length === 3, HUNG_MS)) && wakes('Watcher')[2].startsWith('[CW] Worker (alpha) finished'), JSON.stringify(wakes('Watcher').slice(2)))
   await settle('busy')
 
   // --- Not while the user types there (no Enter): the line waits out the typing pause. The user keeps typing until
@@ -218,7 +218,7 @@ const check = (name, ok, extra = '') => {
   await inv('session:stop', alpha, worker.id)
   await until(async () => wakes('Watcher').length >= 5, HUNG_MS)
   const w5 = wakes('Watcher')
-  check('woken once when the worker stops', w5.length === 5 && w5[4].startsWith('[Hive] Worker (alpha) stopped'), JSON.stringify(w5.slice(4)))
+  check('woken once when the worker stops', w5.length === 5 && w5[4].startsWith('[CW] Worker (alpha) stopped'), JSON.stringify(w5.slice(4)))
   await until(() => idle(watcher.id), HUNG_MS)
 
   // --- Cancel: the watcher ends its own watch, and nothing is typed when the agent finishes. The worker's turn is held
@@ -227,7 +227,7 @@ const check = (name, ok, extra = '') => {
   await say(worker.id, 'holduntil agentwatch-cancelled')
   await until(async () => (await live(worker.id))?.status === 'working', HUNG_MS)
   await watchWorker('cancel')
-  await say(watcher.id, 'hive hive_wait_for_agents {"cancel":true}')
+  await say(watcher.id, 'hive cw_wait_for_agents {"cancel":true}')
   await until(async () => (await lastWaitReply(watcher.id)) === 'Cancelled your agent watch.' && (await idle(watcher.id)), HUNG_MS)
   check('cancel ends the agent watch', (await lastWaitReply(watcher.id)) === 'Cancelled your agent watch.' && !(await live(watcher.id))?.watch, await lastWaitReply(watcher.id))
   go('agentwatch-cancelled')
@@ -240,7 +240,7 @@ const check = (name, ok, extra = '') => {
   if (left > 0) await lib.sleep(left)
   await until(async () => wakes('Limiter').length >= 1, HUNG_MS)
   const lw = wakes('Limiter')
-  check('limitMinutes passing with the agent still working: one "still working" line', lw.length === 1 && lw[0].startsWith('[Hive] Slow is still working after 1 min: your agent watch has ended'), JSON.stringify(lw))
+  check('limitMinutes passing with the agent still working: one "still working" line', lw.length === 1 && lw[0].startsWith('[CW] Slow is still working after 1 min: your agent watch has ended'), JSON.stringify(lw))
   check('…while Slow still works', ['working'].includes((await live(slow.id))?.status), (await live(slow.id))?.status)
 
   await inv('session:stop', alpha, slow.id).catch(() => undefined)

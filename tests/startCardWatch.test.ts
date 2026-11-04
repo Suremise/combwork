@@ -83,7 +83,7 @@ describe("a builder's own start in a slot ends its watch (HI-2197)", () => {
     slot.due = { slot: 'slot-b', lease: 'l-1' }
     const r = await start(w, card)
     expect(r.done.warnings?.join(' ')).toMatch(/You'll continue in slot-b/)
-    expect(r.done.warnings?.join(' ')).toMatch(new RegExp(`Your watch \\(.*\\) has ended: Hive gives you ${r.done.card} as a task, and a watch would hold it off\\.`))
+    expect(r.done.warnings?.join(' ')).toMatch(new RegExp(`Your watch \\(.*\\) has ended: Combwork gives you ${r.done.card} as a task, and a watch would hold it off\\.`))
     expect(watches.watchFor(repo, 'a1')).toBeNull()
   })
 
@@ -116,7 +116,7 @@ describe("a watch and a builder's own start at once (HI-2197, HR3's race)", () =
     // The route had no preflight to pass: the watch is checked as it is written.
     slot.due = { slot: 'slot-b', lease: 'l-1' }
     await start(w, next)
-    const refused = /^Hive is giving you .+ in slot-b: end your turn with no watch\./
+    const refused = /^Combwork is giving you .+ in slot-b: end your turn with no watch\./
     await expect(inWorkspace(w, () => watches.registerWatch(w, repo, 'a1', { cards: [old], changes: ['comment'] }))).rejects.toThrow(refused)
     await expect(inWorkspace(w, () => watches.registerLaneWatch(w, repo, 'a1', { ids: 'all', events: ['failed'] }))).rejects.toThrow(refused)
     await expect(inWorkspace(w, () => watches.registerAgentWatch(w, repo, 'a1', { agents: [{ projectPath: repo, agentId: 'a2', name: 'Reviewer', project: 'p' }], ignoreBackground: false }))).rejects.toThrow(refused)

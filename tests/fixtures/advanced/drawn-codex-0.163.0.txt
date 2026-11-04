@@ -23,7 +23,7 @@
 
 
 
-› [Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it. probe1xmvfnaoyp Reply with
+› [CW] New in your inbox: 1 message (m1). Call cw_inbox to read it. probe1xmvfnaoyp Reply with
   just: ok
 
   GPT-6.1-Sol low · C:\work\alpha

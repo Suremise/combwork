@@ -78,7 +78,7 @@ const check = (name, ok, extra = '') => {
   const say = async (dir, agent, text) => {
     await lib.typeLine(inv, lib.ptyKey(dir, agent.id), claudeHome, agent.name, text, { ready: async () => ['ready', 'finished'].includes((await live(dir, agent.id))?.status), live: () => live(dir, agent.id), hungMs: 60000 })
   }
-  const slot = (args) => `hive hive_merge_slot ${JSON.stringify(args)}`
+  const slot = (args) => `hive cw_merge_slot ${JSON.stringify(args)}`
   const shellRuns = () => {
     const f = path.join(claudeHome, 'fake-shell.jsonl')
     return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []

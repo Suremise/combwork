@@ -1,9 +1,9 @@
 // Builds recorded as facts (#1534, #1062): after a successful `npm run dist` or `npm run release`, tells Hive of the
 // build so it goes into the workspace's journal as Hive's own entry (src/main/buildFacts.ts). A failed build never gets
 // here: both scripts exit first. Through the Agent API (POST /v1/builds) when Hive can be reached: the session's
-// HIVE_API_URL and token (an agent running the build has them; a script can set them). Otherwise, or when Hive doesn't
+// CW_API_URL and token (an agent running the build has them; a script can set them). Otherwise, or when Hive doesn't
 // answer, a marker file in the workspace's .hive/builds, which Hive picks up when the workspace next opens. The
-// workspace is HIVE_WORKSPACE, else the nearest folder above the main checkout with a .hive/workspace.json.
+// workspace is CW_WORKSPACE, else the nearest folder above the main checkout with a .hive/workspace.json.
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { request } from 'http'
 import { dirname, join } from 'path'
@@ -41,7 +41,7 @@ export function installerOf(lines) {
 
 /** The workspace a checkout's builds are recorded in, or null. */
 export function workspaceOf(root, env = process.env) {
-  const named = env.HIVE_WORKSPACE
+  const named = env.CW_WORKSPACE
   if (named && existsSync(join(named, '.hive', 'workspace.json'))) return named
   let dir = checkoutOf(root)?.main ?? root
   for (;;) {
@@ -55,7 +55,7 @@ export function workspaceOf(root, env = process.env) {
 /** The token a session's hive tools use: its token file's (it changes each launch), never HIVE_API_TOKEN (HI-2262). */
 function tokenOf(env) {
   try {
-    if (env.HIVE_API_TOKEN_FILE) return JSON.parse(readFileSync(env.HIVE_API_TOKEN_FILE, 'utf8')).token || null
+    if (env.CW_API_TOKEN_FILE) return JSON.parse(readFileSync(env.CW_API_TOKEN_FILE, 'utf8')).token || null
   } catch {
     // fall through
   }
@@ -136,13 +136,13 @@ export async function recordBuild({ root, version, commit, branch = null, instal
   }
   const workspace = workspaceOf(root, env)
   const token = tokenOf(env)
-  if (env.HIVE_API_URL && token) {
+  if (env.CW_API_URL && token) {
     const reply = await Promise.resolve()
-      .then(() => post(fact, { url: env.HIVE_API_URL, token, workspace }))
+      .then(() => post(fact, { url: env.CW_API_URL, token, workspace }))
       .catch(() => null)
     if (reply) return reply.recorded ? `Build recorded in Hive's journal (${fact.kind}).` : `Build not recorded in Hive's journal: ${reply.reason}`
   }
-  if (!workspace) return "Build not recorded in Hive's journal: no Hive workspace holds this checkout (HIVE_WORKSPACE names one)."
+  if (!workspace) return "Build not recorded in Hive's journal: no Hive workspace holds this checkout (CW_WORKSPACE names one)."
   try {
     leaveBuild(fact, workspace)
     return `Build left for Hive's journal (${fact.kind}): it's recorded when the workspace next opens in Hive.`

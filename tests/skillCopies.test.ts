@@ -3,7 +3,7 @@
 // say Hive made it, the copy is unchanged since and no session of Hive's works there; Settings → Advanced says where
 // (Slots only, Everywhere, Never). The skills delivered are a choice (Skills → Delivered to agents), which the launch,
 // the copies and the guidance follow.
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
@@ -46,7 +46,7 @@ function world(...names: string[]) {
     writeFileSync(join(sourcePath, 'SKILL.md'), `# ${name}`)
     return { name, sourcePath }
   })
-  const copy = (folder: string, name: string): string => join(folder, '.agents', 'skills', `hive-${name}`)
+  const copy = (folder: string, name: string): string => join(folder, '.agents', 'skills', `cw-${name}`)
   return { root, project, slot, sources, copy }
 }
 
@@ -119,6 +119,26 @@ describe('safe clean-up (#1431)', () => {
     expect(await removeHiveCopies(w.slot, w.project, book, () => false)).toEqual(['deploy'])
     expect(existsSync(w.copy(w.slot, 'legacy'))).toBe(true)
     expect(book.rows.size).toBe(0)
+  })
+
+  it('a copy from before HI-2463 (hive-<skill>) is retired as the cw- one is written when unchanged; an edited one stays', async () => {
+    const w = world('deploy', 'notes')
+    const book = memBook()
+    await sync(w.slot, w.project, w.sources, book)
+    // As a build before the rename left them: the same copies, marked and recorded, under the old prefix.
+    const old = (s: string) => join(w.slot, '.agents', 'skills', `hive-${s}`)
+    for (const s of ['deploy', 'notes']) renameSync(w.copy(w.slot, s), old(s))
+    writeFileSync(join(old('notes'), 'SKILL.md'), '# notes, my edit')
+    const out = await sync(w.slot, w.project, w.sources, book)
+    // The unchanged one is gone, the edited one stays; each skill is delivered under the new name, and recorded there.
+    expect(existsSync(old('deploy'))).toBe(false)
+    expect(readFileSync(join(old('notes'), 'SKILL.md'), 'utf8')).toBe('# notes, my edit')
+    for (const s of ['deploy', 'notes']) expect(readFileSync(join(w.copy(w.slot, s), 'SKILL.md'), 'utf8'), s).toBe(`# ${s}`)
+    expect(out.deploy.revision).toBe(await contentHash(w.copy(w.slot, 'deploy')))
+    expect([...book.rows.values()].map((r) => r.skill).sort()).toEqual(['deploy', 'notes'])
+    // A clean-up finds the old prefix too: only Combwork's own, unchanged copies go, and the edited one stays.
+    expect((await removeHiveCopies(w.slot, w.project, book, () => false)).sort()).toEqual(['deploy', 'notes'])
+    expect(readFileSync(join(old('notes'), 'SKILL.md'), 'utf8')).toBe('# notes, my edit')
   })
 
   it("records it can't read keep every copy; a record whose copy has gone is dropped", async () => {
@@ -343,7 +363,7 @@ describe('choosing the skills delivered (#1431)', () => {
     }
     expect(hiveInstructions('p', 'agent', true, new Set(['handover']))).not.toMatch(/\bhandovers,/)
     expect(boardSkillsLine(new Set(['work-on-card']))).toMatch(/Asked to review or check a card, use review-agent-work/)
-    expect(boardSkillsLine(new Set(['work-on-card', 'review-agent-work', 'card-loop', 'handover', 'pick-up', 'workspace-note', 'merge-ready', 'split-work', 'use-hive-api', 'generalist']))).toBe("The board shows your project's cards, each named by its key (AM-12).")
+    expect(boardSkillsLine(new Set(['work-on-card', 'review-agent-work', 'card-loop', 'handover', 'pick-up', 'workspace-note', 'merge-ready', 'split-work', 'use-cw-api', 'generalist']))).toBe("The board shows your project's cards, each named by its key (AM-12).")
     // The Assistant's own skills aren't chosen here.
     expect(hiveInstructions('', 'assistant', true, new Set(['handover']))).toBe(hiveInstructions('', 'assistant'))
   })

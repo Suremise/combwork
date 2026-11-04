@@ -1,7 +1,7 @@
 {
   "activity.batch.update": {
     "text": "change {n} {count, plural, one {card} other {cards}} on the board",
-    "note": "What the Assistant's batch of card changes is called (hive_update_tasks), lower case: in a refusal (\"…don't let you {what}\") and its activity line. {n} is the number of cards as digits; {count} the same number, choosing the word."
+    "note": "What the Assistant's batch of card changes is called (cw_update_tasks), lower case: in a refusal (\"…don't let you {what}\") and its activity line. {n} is the number of cards as digits; {count} the same number, choosing the word."
   },
   "activity.reason.conflict": {
     "text": "Not possible now",
@@ -100,7 +100,7 @@
     "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
   },
   "activity.undo.projectMade": {
-    "text": "A project it made stays: remove it from Hive if it isn't wanted.",
+    "text": "A project it made stays: remove it from Combwork if it isn't wanted.",
     "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
   },
   "activity.undo.projectOpened": {

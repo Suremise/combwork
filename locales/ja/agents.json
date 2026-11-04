@@ -340,7 +340,7 @@
   "agents.settings.worktreeOn": "<code>{branch}</code>のワークツリー（{base}から）",
   "agents.start.exited": "{cli}がコード{code}で終了しました。",
   "agents.switch.confirm": "切り替える",
-  "agents.switch.detail": "作業を引き継ぐには、切り替える前にエージェントに引き継ぎメモを書いてもらい（Combwork MCP：hive_create_handover）、新しいエージェントにそれを読んでもらってください。",
+  "agents.switch.detail": "作業を引き継ぐには、切り替える前にエージェントに引き継ぎメモを書いてもらい（Combwork MCP：cw_create_handover）、新しいエージェントにそれを読んでもらってください。",
   "agents.switch.message": "会話は「セッション履歴」タブに残りますが、{cli}は{was}の会話を再開できないため、{agent}は次回、新しく始めます。",
   "agents.switch.title": "{agent}を{cli}に切り替えますか？",
   "agents.template.nameTaken": "テンプレートの別のエージェントに「{name}」という名前が使われています。",

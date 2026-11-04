@@ -1,5 +1,5 @@
 // No line of Hive's before a launch's hive tools have connected (#865): a resumed Claude Code is ready at its SessionStart
-// before its hive MCP server has connected, and a doorbell typed then is a turn that can't call hive_inbox. The server
+// before its hive MCP server has connected, and a doorbell typed then is a turn that can't call cw_inbox. The server
 // says when the CLI has connected it (POST /v1/launch/connected → sessions.hiveToolsConnected); until then, at most
 // hive.mcp.connectSeconds (30 s) from when the launch first became ready, the line writer and the watch wakes wait. The
 // real SessionManager with hand-made live states.
@@ -45,14 +45,14 @@ describe("no line of Hive's before a launch's hive tools have connected (#865)",
   it('ready before they have connected: no line, and the reply says why', () => {
     launched()
     expect(sessions.hiveToolsWaiting(project, id)).toBe(true)
-    expect(whyNoLine(project, id)).toBe("its hive tools haven't connected yet")
+    expect(whyNoLine(project, id)).toBe("its Combwork tools haven't connected yet")
   })
 
   it('a watch that outlived its last launch (watching) waits too', () => {
     watched.current = true
     const e = launched()
     expect(e.state.status).toBe('watching')
-    expect(whyNoLine(project, id)).toBe("its hive tools haven't connected yet")
+    expect(whyNoLine(project, id)).toBe("its Combwork tools haven't connected yet")
   })
 
   it('once its server says the CLI has connected them, lines go to it', () => {

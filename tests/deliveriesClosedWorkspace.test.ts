@@ -50,7 +50,7 @@ describe("a closed workspace's deliveries", () => {
   const queued = async (): Promise<string> => {
     await w.open(wsA)
     await deliveries.loadsForTests()
-    const { id } = await deliveries.createDelivery(host, { agentId: 'b1', agentName: 'B1', conversation: null, kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, card: 7, body: '[Hive] #7 is in Review.' })
+    const { id } = await deliveries.createDelivery(host, { agentId: 'b1', agentName: 'B1', conversation: null, kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, card: 7, body: '[CW] #7 is in Review.' })
     await deliveries.settledForTests()
     expect(deliveries.deliveryNow(host, id)?.state).toBe('queued')
     return id

@@ -340,7 +340,7 @@
   "agents.settings.worktreeOn": "Worktree auf <code>{branch}</code> (von {base})",
   "agents.start.exited": "{cli} wurde mit Code {code} beendet.",
   "agents.switch.confirm": "Wechseln",
-  "agents.switch.detail": "Um die Arbeit mitzunehmen, bitte den Agenten vor dem Wechsel um eine Übergabe (Combwork MCP: hive_create_handover) und bitte dann den neuen Agenten, sie zu lesen.",
+  "agents.switch.detail": "Um die Arbeit mitzunehmen, bitte den Agenten vor dem Wechsel um eine Übergabe (Combwork MCP: cw_create_handover) und bitte dann den neuen Agenten, sie zu lesen.",
   "agents.switch.message": "Die Unterhaltungen bleiben im Tab „Sitzungen“, aber {cli} kann Unterhaltungen von {was} nicht fortsetzen, daher startet {agent} beim nächsten Mal neu.",
   "agents.switch.title": "Agent {agent} auf {cli} umstellen?",
   "agents.template.nameTaken": "Ein anderer Agent der Vorlage heißt „{name}“.",

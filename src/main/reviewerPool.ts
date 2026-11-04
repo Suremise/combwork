@@ -279,12 +279,13 @@ async function tell(ws: WorkspaceService, projectPath: string, wf: Workflow, slo
   const followUp = !!(wf.store.facts(c.card).find((f) => f.seq === c.submission)?.data as FactData['Submitted'] | undefined)?.followUp
   const body = withCardNames(ws, () =>
     c.design
-      ? `${cardRef(c.card)}${builder ? ` (${builder}'s card)` : ''}: its builder posted a design for a check (${c.rec.key}/s${c.submission}), which you take from the pool. Read it (the card's latest comment) and answer with hive_loop_step, step ok or gaps, design ${c.rec.key}/s${c.submission}; not a review: no verdict. You're then preferred to review the card when it is submitted.` // i18n-ignore: agent-facing (HI-2310)
+      ? `${cardRef(c.card)}${builder ? ` (${builder}'s card)` : ''}: its builder posted a design for a check (${c.rec.key}/s${c.submission}), which you take from the pool. Read it (the card's latest comment) and answer with cw_loop_step, step ok or gaps, design ${c.rec.key}/s${c.submission}; not a review: no verdict. You're then preferred to review the card when it is submitted.` // i18n-ignore: agent-facing (HI-2310)
       : followUp
-      ? `${cardRef(c.card)}${builder ? ` (${builder}'s card)` : ''}: follow-up submitted for review (submission ${c.submission}), still yours to review. Start your review again (hive_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused.` // i18n-ignore: agent-facing
+      ? `${cardRef(c.card)}${builder ? ` (${builder}'s card)` : ''}: follow-up submitted for review (submission ${c.submission}), still yours to review. Start your review again (cw_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused.` // i18n-ignore: agent-facing
       : `${cardRef(c.card)}${builder ? ` (${builder}'s card)` : ''} is in Review${c.loose ? ', outside a lane: you review it' : ': you review it from the pool'}. Review its latest submission with the review-agent-work skill; your verdict frees you for the next card.` // i18n-ignore: agent-facing (HI-2228: the skill, not its steps, which a model took for the whole review)
   )
-  const nd = { agentId: agent.id, agentName: agent.name, kind: 'card-event' as const, from: { kind: 'hive' as const, name: 'Hive' }, card: c.card, body, source: POOL_REVIEW, ref } // i18n-ignore: who a delivery is from, as agents read it
+  // agent-protocol: who a delivery is from: Combwork's own name (HI-2463)
+  const nd = { agentId: agent.id, agentName: agent.name, kind: 'card-event' as const, from: { kind: 'hive' as const, name: 'Combwork' }, card: c.card, body, source: POOL_REVIEW, ref } // i18n-ignore: who a delivery is from, as agents read it
   log.info(`Telling ${userText(agent.name)} of #${c.card} ${c.loose ? 'outside a lane' : 'from the pool'} (${st ? 'typed' : 'started'})`)
   const r = st
     ? // As a wake (HI-2333): a reviewer watching a card in its loop takes it, and its watch carries on (`free` would

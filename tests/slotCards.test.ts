@@ -973,7 +973,7 @@ describe("a slot that couldn't be prepared (HI-1796)", { timeout: 60_000 }, () =
     await settleSlotCards(ws, e.project)
     const notices = () => e.store.pendingActions().filter((a) => a.kind === 'notify')
     await vi.waitFor(() => expect(notices()).toHaveLength(1), { timeout: HUNG_MS })
-    await vi.waitFor(() => expect(startNow(e.project, 'B1')).toEqual({ starting: false, failed: "Hive couldn't get slot-a ready: git checkout failed (test)", waiting: null }), { timeout: HUNG_MS })
+    await vi.waitFor(() => expect(startNow(e.project, 'B1')).toEqual({ starting: false, failed: "Combwork couldn't get slot-a ready: git checkout failed (test)", waiting: null }), { timeout: HUNG_MS })
     const shown = notices()[0].payload.shown as { id: string; values: Record<string, string> }
     expect(shown).toEqual({ id: 'service.slots.notPrepared', values: { slot: 'slot-a', card: card.key, why: 'git checkout failed (test)' } })
     // A message the workflow knows: what the card's history line and the window resolve it by.
@@ -1342,7 +1342,7 @@ describe("a lane's brief in every placement of its cards (HI-1795)", { timeout: 
       await place(ws, e.project, e.wf, n, cycle, laneLease)
       expect(e.store.facts(n).filter((f) => f.kind === 'BuilderPlaced').map((f) => (f.data as { how: string }).how)).toEqual([how])
       expect(bodies()).toHaveLength(1)
-      expect(bodies()[0]).toMatch(/^Work on task AM-\d+ from the Hive task board: /)
+      expect(bodies()[0]).toMatch(/^Work on task AM-\d+ from the Combwork task board: /)
       expect(bodies()[0]).toMatch(BRIEF)
     })
   }

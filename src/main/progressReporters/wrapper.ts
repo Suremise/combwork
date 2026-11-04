@@ -17,10 +17,10 @@ import { agentMsg, inDefaultDialect, say, type AgentMsg } from '../../shared/age
 const A = {
   usage: agentMsg({
     id: 'progress.usage',
-    text: `Usage: hive-progress [--title <title>] [--card <card>] [--revision <commit>] -- <command> [args...]
-       hive-progress --check <name> [--isolated] [--title <title>] [--card <card>] [--revision <commit>]
+    text: `Usage: cw-progress [--title <title>] [--card <card>] [--revision <commit>] -- <command> [args...]
+       cw-progress --check <name> [--isolated] [--title <title>] [--card <card>] [--revision <commit>]
 
-Runs the command, passing its output through and returning its exit code, and shows it in Hive's Progress panel
+Runs the command, passing its output through and returning its exit code, and shows it in Combwork's Progress panel
 with the time it usually takes, and the card and revision it ran for.
   --card <card>       the card it runs for ("#1061", quoted); without it, the card you are working on (yours in Doing)
   --revision <commit> the commit it runs on: it must be what is checked out here, or nothing runs; without it,
@@ -30,14 +30,14 @@ with the time it usually takes, and the card and revision it ran for.
   --isolated          with --check: runs it in a check copy of its own at the card's revision, which nothing else
                       writes, so another agent's edits here can't spoil it (waits for a copy when none is free)
 A line the command prints like
-  ##hive-progress step=4 total=12 name=carddialog
+  ##cw-progress step=4 total=12 name=carddialog
 says step 4 of 12 (carddialog) is starting, and isn't shown. The first total given is the run's: give it within the
 first 2 seconds for a bar with steps from the start, or later for one from then on.
-  ##hive-progress wait=a test slot (held by B4)
+  ##cw-progress wait=a test slot (held by B4)
 says the command waits (for a queue, a lock) and for what: no time left is shown meanwhile, and the wait doesn't count
-against the usual time; "##hive-progress wait=" says it waits no more. A command interrupted by Ctrl+C shows as
-stopped, and one whose hive-progress is killed as ended without a report. Outside Hive it just runs the command.
-HIVE_PROGRESS=0 turns reporting off.`,
+against the usual time; "##cw-progress wait=" says it waits no more. A command interrupted by Ctrl+C shows as
+stopped, and one whose cw-progress is killed as ended without a report. Outside Combwork it just runs the command.
+CW_PROGRESS=0 turns reporting off.`,
     note: '#1220 (--card, --revision, --check), #1435 (--isolated), HI-1367 (focused:<test>), #549 (wait=). Printed by --help and after a wrong option.'
   }),
   focusedNeedsCommand: agentMsg({
@@ -78,43 +78,43 @@ HIVE_PROGRESS=0 turns reporting off.`,
   }),
   slow: agentMsg({
     id: 'progress.unanswered.slow',
-    text: 'Hive is slow to answer: no reply {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} in {seconds} s{retried, select, yes {, asked {asked} times} other {}}, so nothing was run. Try again; Settings → Advanced → "hive-progress: Hive\'s reply time" gives it longer.',
+    text: 'Combwork is slow to answer: no reply {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} in {seconds} s{retried, select, yes {, asked {asked} times} other {}}, so nothing was run. Try again; Settings → Advanced → "cw-progress: Combwork\'s reply time" gives it longer.',
     note: "HI-1892: Hive is there but busy. lend: yes for an isolated check's copy (#1435), else the check's command (check) was asked for. retried: yes when it was asked more than once (asked)."
   }),
   refused: agentMsg({
     id: 'progress.unanswered.refused',
-    text: "Hive couldn't be reached {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} (connection {refused, select, yes {refused} other {not allowed: {detail}}} at {url}), so nothing was run. Is Hive running? A sandbox that blocks local network access (Claude Code's Bash sandbox does) stops it too: run the command outside the sandbox.",
+    text: "Combwork couldn't be reached {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} (connection {refused, select, yes {refused} other {not allowed: {detail}}} at {url}), so nothing was run. Is Combwork running? A sandbox that blocks local network access (Claude Code's Bash sandbox does) stops it too: run the command outside the sandbox.",
     note: "HI-1892: nothing listens at Hive's address, or this process may not reach it. refused: yes for a refused connection, else detail is the error's code (EACCES, EPERM). url: Hive's address."
   }),
   answered: agentMsg({
     id: 'progress.unanswered.answered',
-    text: "Hive couldn't be reached {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} (Hive answered {status, select, none {with an error} other {{status}}}), so nothing was run.",
+    text: "Combwork couldn't be reached {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} (Combwork answered {status, select, none {with an error} other {{status}}}), so nothing was run.",
     note: 'HI-1892: Hive answered with no link (an older Hive without the call, an error). status: its HTTP status, or none.'
   }),
   failed: agentMsg({
     id: 'progress.unanswered.failed',
-    text: "Hive couldn't be reached {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} ({detail}), so nothing was run.",
+    text: "Combwork couldn't be reached {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} ({detail}), so nothing was run.",
     note: "HI-1892: the call failed some other way. detail: the error's message."
   }),
   noStart: agentMsg({
     id: 'progress.unrecorded.noStart',
-    text: "Hive didn't take this run's report (no reply in time), so check {check} wasn't recorded: run it again.",
+    text: "Combwork didn't take this run's report (no reply in time), so check {check} wasn't recorded: run it again.",
     note: "HI-1892: Hive never took the run's start."
   }),
   noReply: agentMsg({
     id: 'progress.unrecorded.noReply',
-    text: "Hive didn't confirm it recorded check {check} (no reply to its result, asked twice): if submitting says it hasn't passed, run it again.",
+    text: "Combwork didn't confirm it recorded check {check} (no reply to its result, asked twice): if submitting says it hasn't passed, run it again.",
     note: "HI-1892: the run's finish got no reply, sent twice."
   }),
-  refusedResult: agentMsg({ id: 'progress.unrecorded.refused', text: "Hive refused this run's result, so check {check} may not be recorded: run it again.", note: "HI-1892: Hive answered the finish with an error." }),
+  refusedResult: agentMsg({ id: 'progress.unrecorded.refused', text: "Combwork refused this run's result, so check {check} may not be recorded: run it again.", note: "HI-1892: Hive answered the finish with an error." }),
   endedBefore: agentMsg({
     id: 'progress.unrecorded.endedBefore',
-    text: "Hive recorded check {check}, but its reply was lost, so how it counted isn't known.",
+    text: "Combwork recorded check {check}, but its reply was lost, so how it counted isn't known.",
     note: 'HI-1892: a finish sent again found the first had arrived (its reply lost).'
   }),
   notCheck: agentMsg({
     id: 'progress.uncounted.notCheck',
-    text: "not counted as check {check}: Hive didn't see the check's configured command run. Run it again with hive-progress --check {check}.",
+    text: "not counted as check {check}: Combwork didn't see the check's configured command run. Run it again with cw-progress --check {check}.",
     note: '#1654: what happened, then what to do, so an agent is not left running the same command again for a submit that keeps refusing.'
   }),
   notContained: agentMsg({
@@ -138,15 +138,15 @@ HIVE_PROGRESS=0 turns reporting off.`,
   changeEdit: agentMsg({ id: 'progress.change.edit', text: "an agent's edit", note: "What a write log's :edit mark records, in the list of what changed while a check ran." }),
   checkOutsideHive: agentMsg({
     id: 'progress.check.outsideHive',
-    text: "--check runs the project's command for {check}, which only Hive knows: run it in a session Hive started, with reporting on.",
+    text: "--check runs the project's command for {check}, which only Combwork knows: run it in a session Combwork started, with reporting on.",
     note: '#1220.'
   }),
   waiting: agentMsg({ id: 'progress.check.waiting', text: 'waiting for {what}', note: '#1435: no check copy is free. what: what it waits for, in Hive\'s words.' }),
   exitCode: agentMsg({ id: 'progress.run.exitCode', text: 'exit code {code}', note: "A failed run's detail, stored with the run (the Default's words, whoever reads it)." }),
   launcherDidntStart: agentMsg({ id: 'progress.isolated.launcherDidntStart', text: "the check's launcher didn't start", note: '#1435.' }),
   notRunError: agentMsg({ id: 'progress.isolated.notRun', text: "the check wasn't run: {why}", note: "#1435: the launcher wasn't put in its copy's job. why: Hive's reason, or the error." }),
-  notRunStatus: agentMsg({ id: 'progress.isolated.notRunStatus', text: "the check wasn't run: Hive answered {status}", note: "#1435: Hive answered with an error and no reason. status: its HTTP status." }),
-  notRunUnreachable: agentMsg({ id: 'progress.isolated.notRunUnreachable', text: "the check wasn't run: Hive couldn't be reached ({detail})", note: "#1435. detail: the error's message." }),
+  notRunStatus: agentMsg({ id: 'progress.isolated.notRunStatus', text: "the check wasn't run: Combwork answered {status}", note: "#1435: Hive answered with an error and no reason. status: its HTTP status." }),
+  notRunUnreachable: agentMsg({ id: 'progress.isolated.notRunUnreachable', text: "the check wasn't run: Combwork couldn't be reached ({detail})", note: "#1435. detail: the error's message." }),
   commandNotFound: agentMsg({ id: 'progress.run.commandNotFound', text: '{file}: command not found', note: "The command doesn't exist (ENOENT), as a shell says it; exit code 127." })
 }
 
@@ -194,7 +194,12 @@ export function parseArgs(argv: string[]): WrapperArgs {
   return done([], false)
 }
 
-const STEP_PREFIX = '##hive-progress'
+const STEP_PREFIX = '##cw-progress'
+/**
+ * Step lines' opening before HI-2463, still read: a project's own scripts and test runners print it (it was documented),
+ * and keep working. Combwork prints only STEP_PREFIX.
+ */
+const LEGACY_STEP_PREFIX = '##hive-progress'
 
 /** What a step line says: the step starting now (from 1), how many there are, and its name; or a log the command wrote. */
 export interface StepLine {
@@ -209,7 +214,7 @@ export interface StepLine {
 
 /** A step line ("##hive-progress step=4 total=12 name=carddialog": name, log and wait are the rest of the line), or null. */
 export function stepLine(line: string): StepLine | null {
-  const m = /^##hive-progress(?:[ \t]+(.*?))?[ \t]*\r?\n?$/.exec(line)
+  const m = /^##(?:cw|hive)-progress(?:[ \t]+(.*?))?[ \t]*\r?\n?$/.exec(line)
   if (!m) return null
   const u: StepLine = {}
   let rest = m[1] ?? ''
@@ -237,7 +242,7 @@ export function stepLine(line: string): StepLine | null {
 export class StepFilter {
   private held: Buffer = Buffer.alloc(0)
   private atLineStart = true
-  private readonly prefix = Buffer.from(STEP_PREFIX)
+  private readonly prefixes = [Buffer.from(STEP_PREFIX), Buffer.from(LEGACY_STEP_PREFIX)]
   constructor(
     private readonly write: (b: Buffer) => void,
     private readonly onStep: (u: StepLine) => void
@@ -259,8 +264,7 @@ export class StepFilter {
       }
       if (nl === -1) {
         const rest = data.subarray(i)
-        const n = Math.min(rest.length, this.prefix.length)
-        if (rest.subarray(0, n).equals(this.prefix.subarray(0, n))) this.held = Buffer.from(rest)
+        if (this.prefixes.some((p) => rest.subarray(0, Math.min(rest.length, p.length)).equals(p.subarray(0, Math.min(rest.length, p.length))))) this.held = Buffer.from(rest)
         else {
           out.push(rest)
           this.atLineStart = false
@@ -268,7 +272,7 @@ export class StepFilter {
         break
       }
       const line = data.subarray(i, nl + 1)
-      const step = line.subarray(0, this.prefix.length).equals(this.prefix) ? stepLine(line.toString('utf8')) : null
+      const step = this.prefixes.some((p) => line.subarray(0, p.length).equals(p)) ? stepLine(line.toString('utf8')) : null
       if (step) this.onStep(step)
       else out.push(line)
       i = nl + 1
@@ -390,7 +394,7 @@ export interface WrapperIo {
   minIntervalMs?: number
   /**
    * How long it waits for Hive to say what the run is for, and for its start to be taken (default: Hive's setting, which
-   * it hands sessions as HIVE_PROGRESS_REPLY_SECONDS; `replyTimeoutMs`).
+   * it hands sessions as CW_PROGRESS_REPLY_SECONDS; `replyTimeoutMs`).
    */
   resolveTimeoutMs?: number
   /** How long it waits before asking Hive again, once, when a check's ask or finish got no reply (default 1 s, HI-1892). */
@@ -410,13 +414,13 @@ export interface WrapperIo {
 /**
  * How long hive-progress waits for Hive's reply (HI-1892: a fixed 5 s gave up on a Hive whose main was slow): Settings →
  * Advanced, "hive-progress: Hive's reply time" (hive.progress.replySeconds), handed to sessions as
- * HIVE_PROGRESS_REPLY_SECONDS; without it, 15 s. Kept within 1 s to 2 minutes whatever is set, so a hung Hive never holds
+ * CW_PROGRESS_REPLY_SECONDS; without it, 15 s. Kept within 1 s to 2 minutes whatever is set, so a hung Hive never holds
  * a command for long.
  */
 export const REPLY_DEFAULT_S = 15
 export const REPLY_MAX_S = 120
 export function replyTimeoutMs(env: Record<string, string | undefined>): number {
-  const s = Number(env.HIVE_PROGRESS_REPLY_SECONDS)
+  const s = Number(env.CW_PROGRESS_REPLY_SECONDS)
   return Math.round(Math.min(REPLY_MAX_S, Math.max(1, Number.isFinite(s) && s > 0 ? s : REPLY_DEFAULT_S)) * 1000)
 }
 /** How long it waits before asking again, once (a check's ask or finish that got no reply). */
@@ -588,16 +592,16 @@ export function uncountedLine(answer: unknown, isolated: boolean): string | null
 /**
  * The command's environment: the caller's, without what hive-progress was started with. Run by Hive's executable as
  * Node (its shims), ELECTRON_RUN_AS_NODE is the shims' own: the command gets the caller's value back (kept in
- * HIVE_PROGRESS_RUN_AS_NODE; usually none), so an Electron app it starts runs as an app.
+ * CW_PROGRESS_RUN_AS_NODE; usually none), so an Electron app it starts runs as an app.
  */
 export function commandEnv(env: Record<string, string | undefined>, viaElectron: boolean): Record<string, string | undefined> {
   const out = { ...env }
   if (viaElectron) {
     delete out.ELECTRON_RUN_AS_NODE
-    if (env.HIVE_PROGRESS_RUN_AS_NODE) out.ELECTRON_RUN_AS_NODE = env.HIVE_PROGRESS_RUN_AS_NODE
+    if (env.CW_PROGRESS_RUN_AS_NODE) out.ELECTRON_RUN_AS_NODE = env.CW_PROGRESS_RUN_AS_NODE
   }
-  delete out.HIVE_PROGRESS_RUN_AS_NODE
-  delete out.HIVE_PROGRESS_DATA
+  delete out.CW_PROGRESS_RUN_AS_NODE
+  delete out.CW_PROGRESS_DATA
   return out
 }
 
@@ -709,14 +713,14 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
     return 0
   }
   if ('error' in parsed) {
-    io.stderr.write(`hive-progress: ${parsed.error}\n\n${usage()}\n`)
+    io.stderr.write(`cw-progress: ${parsed.error}\n\n${usage()}\n`)
     return 2
   }
   const target = progressTarget(io.env)
   const replyMs = io.resolveTimeoutMs ?? replyTimeoutMs(io.env)
   // A check's command is the project's (#1220), which only Hive knows.
   if (parsed.check !== undefined && !target) {
-    io.stderr.write(`hive-progress: ${say(A.checkOutsideHive, { check: parsed.check })}\n`)
+    io.stderr.write(`cw-progress: ${say(A.checkOutsideHive, { check: parsed.check })}\n`)
     return 2
   }
   // What the run is for, checked before anything runs: a revision that isn't checked out, an unknown card or a check
@@ -734,19 +738,19 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
     const waitFrom = Date.now()
     let delay = 0
     while ('wait' in r) {
-      if (r.wait !== said) io.stderr.write(`hive-progress: ${say(A.waiting, { what: (said = r.wait) })}\n`)
+      if (r.wait !== said) io.stderr.write(`cw-progress: ${say(A.waiting, { what: (said = r.wait) })}\n`)
       delay = isolatedPollDelay(Date.now() - waitFrom, delay, io.isolatedPollMs)
       await new Promise((res) => setTimeout(res, delay))
       // Asked again with its ticket: the copy Hive is setting up for this run (none: a new ask).
       r = await resolveRun(target, { ...ask, ...(r.ticket ? { ticket: r.ticket } : {}) }, { fetch: io.fetch, timeoutMs: replyMs })
     }
     if ('refused' in r) {
-      io.stderr.write(`hive-progress: ${r.refused}\n`)
+      io.stderr.write(`cw-progress: ${r.refused}\n`)
       return 2
     }
     if ('link' in r) link = r.link
     else if (parsed.isolated || parsed.check !== undefined) {
-      io.stderr.write(`hive-progress: ${unansweredLine(r, parsed.isolated ? null : (parsed.check ?? ''), replyMs, target.url, retry !== undefined && r.why !== 'refused' ? 2 : 1)}\n`)
+      io.stderr.write(`cw-progress: ${unansweredLine(r, parsed.isolated ? null : (parsed.check ?? ''), replyMs, target.url, retry !== undefined && r.why !== 'refused' ? 2 : 1)}\n`)
       return 2
     }
   }
@@ -754,7 +758,7 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
   if (!link && parsed.revision !== undefined) {
     const wrong = revisionProblem(io.cwd, parsed.revision, io.env)
     if (wrong) {
-      io.stderr.write(`hive-progress: ${wrong}\n`)
+      io.stderr.write(`cw-progress: ${wrong}\n`)
       return 2
     }
   }
@@ -768,9 +772,9 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
   if (!target) return run(spec, env, io, null)
   // Its run is this one: a reporter inside it (Hive's test runners, another hive-progress) prints step lines instead
   // of reporting a second row (report.mts).
-  env.HIVE_PROGRESS_WRAPPED = '1'
+  env.CW_PROGRESS_WRAPPED = '1'
   const label = checkCommand ?? commandLabel(parsed.command)
-  const timings = io.env.HIVE_PROGRESS_DATA ? join(io.env.HIVE_PROGRESS_DATA, 'timings.json') : null
+  const timings = io.env.CW_PROGRESS_DATA ? join(io.env.CW_PROGRESS_DATA, 'timings.json') : null
   const key = timingKey(io.cwd, command)
   // A check is titled by its name (not its command line) unless given a title.
   const title = parsed.title?.trim() || link?.check?.name
@@ -820,7 +824,7 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
   const answer = await report.finish(passed, passed ? undefined : stopped ? 'interrupted' : inDefaultDialect(() => say(A.exitCode, { code: String(code) })), code, stopped, link?.check ? (io.checkFinishWaitMs ?? CHECK_FINISH_WAIT_MS) : undefined, link?.check ? (io.retryMs ?? RETRY_MS) : undefined)
   // A check that didn't count says why (#1654), or that it may not be recorded; its exit code is the command's all the same.
   const uncounted = link?.check ? (uncountedLine(answer, !!link.isolated) ?? unrecordedLine(report.finishedAs(), link.check.name)) : null
-  if (uncounted) io.stderr.write(`hive-progress: ${uncounted}\n`)
+  if (uncounted) io.stderr.write(`cw-progress: ${uncounted}\n`)
   return code
 }
 
@@ -850,7 +854,7 @@ function run(
         const l = startLauncher({ command: spec.file, args: spec.args, verbatim: spec.verbatim }, { cwd: isolated.folder, env: env as NodeJS.ProcessEnv })
         child = l.child
         const giveUp = (why: string): void => {
-          io.stderr.write(`hive-progress: ${why}\n`)
+          io.stderr.write(`cw-progress: ${why}\n`)
           child.stdin?.end()
           if (child.exitCode === null) child.kill()
         }
@@ -878,7 +882,7 @@ function run(
         })
       }
     } catch (e) {
-      io.stderr.write(`hive-progress: ${(e as Error).message}\n`)
+      io.stderr.write(`cw-progress: ${(e as Error).message}\n`)
       return resolve(127)
     }
     onChild?.(child)
@@ -900,7 +904,7 @@ function run(
     child.on('error', (e: NodeJS.ErrnoException) => {
       if (settled) return
       settled = true
-      io.stderr.write(`hive-progress: ${e.code === 'ENOENT' ? say(A.commandNotFound, { file: spec.file }) : e.message}\n`)
+      io.stderr.write(`cw-progress: ${e.code === 'ENOENT' ? say(A.commandNotFound, { file: spec.file }) : e.message}\n`)
       resolve(e.code === 'ENOENT' ? 127 : 1)
     })
     const done = (code: number | null, signal: NodeJS.Signals | null): void => {

@@ -78,16 +78,16 @@ export const lineBusy = (projectPath: string, agentId: string): boolean => writi
 /** Why Hive could not type a line into an agent now (whyNoLine), in the reply of the call that wanted it: said in its caller's dialect. */
 const T = {
   notRunning: agentMsg({ id: 'inbox.noLine.notRunning', text: "it isn't running", note: 'Why Hive could not type a line (a delivery given now, Deliver Now) into an agent, in the reply of the call that wanted it: the agent named.' }),
-  typing: agentMsg({ id: 'inbox.noLine.typing', text: 'Hive is already typing a line into it', note: 'Why Hive could not type a line into an agent now, in the reply of the call that wanted it.' }),
-  hooksMissing: agentMsg({ id: 'inbox.noLine.hooksMissing', text: "its CLI's hooks aren't reaching Hive, so Hive can't tell when it is free", note: 'Why Hive could not type a line into an agent now, in the reply of the call that wanted it.' }),
+  typing: agentMsg({ id: 'inbox.noLine.typing', text: 'Combwork is already typing a line into it', note: 'Why Hive could not type a line into an agent now, in the reply of the call that wanted it.' }),
+  hooksMissing: agentMsg({ id: 'inbox.noLine.hooksMissing', text: "its CLI's hooks aren't reaching Combwork, so Combwork can't tell when it is free", note: 'Why Hive could not type a line into an agent now, in the reply of the call that wanted it.' }),
   inputBlocked: agentMsg({ id: 'inbox.noLine.inputBlocked', text: 'something on its screen is taking its keys, and it waits for the user to answer it there', note: 'Why Hive could not type a line into an agent now (HI-2191), in the reply of the call that wanted it.' }),
   watching: agentMsg({ id: 'inbox.noLine.watching', text: 'it is waiting on cards, and takes no new work until it is woken', note: 'Why Hive could not type a line into an agent now: it waits on a watch, in the reply of the call that wanted it.' }),
   status: agentMsg({ id: 'inbox.noLine.status', text: 'it is {status}', note: "Why Hive could not type a line into an agent now, in the reply of the call that wanted it. status: the agent's status, as Hive names it (working, starting…)." }),
   userTyping: agentMsg({ id: 'inbox.noLine.userTyping', text: 'the user has just typed in its terminal and may still be writing there', note: 'Why Hive could not type a line into an agent now, in the reply of the call that wanted it.' }),
-  lineWaiting: agentMsg({ id: 'inbox.noLine.lineWaiting', text: "its CLI hasn't taken the line Hive typed before", note: 'Why Hive could not type a line into an agent now, in the reply of the call that wanted it.' }),
+  lineWaiting: agentMsg({ id: 'inbox.noLine.lineWaiting', text: "its CLI hasn't taken the line Combwork typed before", note: 'Why Hive could not type a line into an agent now, in the reply of the call that wanted it.' }),
   cliAsks: agentMsg({ id: 'inbox.noLine.cliAsks', text: 'its CLI shows a question for the user, which a line would answer', note: 'Why Hive could not type a line into an agent now (HI-1959), in the reply of the call that wanted it.' }),
   launchTask: agentMsg({ id: 'inbox.noLine.launchTask', text: "its CLI hasn't taken its launch's task yet", note: 'Why Hive could not type a line into an agent now, in the reply of the call that wanted it.' }),
-  toolsWaiting: agentMsg({ id: 'inbox.noLine.toolsWaiting', text: "its hive tools haven't connected yet", note: 'Why Hive could not type a line into an agent now (#865), in the reply of the call that wanted it.' }),
+  toolsWaiting: agentMsg({ id: 'inbox.noLine.toolsWaiting', text: "its Combwork tools haven't connected yet", note: 'Why Hive could not type a line into an agent now (#865), in the reply of the call that wanted it.' }),
   folder: agentMsg({ id: 'inbox.noLine.folder', text: 'its folder is being changed ({what})', note: "Why Hive could not type a line into an agent now (#646), in the reply of the call that wanted it. what: what is changing the agent's folder (a Git switch or pull)." }),
   wakeFirst: agentMsg({ id: 'inbox.noLine.wakeFirst', text: "a watch's wake goes first", note: "Why Hive could not type a line into an agent now (#1432): a watch's wake is being made for it, in the reply of the call that wanted it." })
 }
@@ -126,7 +126,7 @@ export const canTypeLine = (projectPath: string, agentId: string, need: Delivery
  * the doorbell carries no text), never for a launch that ended first; `lost` when that launch ended (or another began)
  * before its CLI took it; `left` when the user typed into it before its CLI took it (#652 round 1 finding 2), so it is
  * theirs now and never submitted by Hive. What it names doesn't decide whether it may still be submitted (#652): Hive's
- * lines are the doorbell, fixed words and ids, whose Enter again gives nothing that may no longer be given (hive_inbox
+ * lines are the doorbell, fixed words and ids, whose Enter again gives nothing that may no longer be given (cw_inbox
  * checks each delivery as it is read), or the user's own task.
  */
 export interface LineFollow {

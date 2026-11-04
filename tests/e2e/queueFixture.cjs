@@ -134,8 +134,8 @@ async function liveToken(fx, live, where = () => true, stale = null) {
     const s = await live()
     if (!s?.runId || !where(s)) return null
     const launch = launches(fx).find((l) => l.opts['--mcp-config'] && path.basename(path.dirname(l.opts['--mcp-config'])) === s.runId)
-    const hive = launch ? read(launch.opts['--mcp-config'])?.mcpServers?.hive : null
-    const token = hive ? read(hive.env.HIVE_API_TOKEN_FILE)?.token : null
+    const hive = launch ? read(launch.opts['--mcp-config'])?.mcpServers?.combwork : null
+    const token = hive ? read(hive.env.CW_API_TOKEN_FILE)?.token : null
     return token && token !== stale ? { launch, token } : null
   }, HUNG_MS, 200)
 }

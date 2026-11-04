@@ -214,7 +214,7 @@
   "board.details.line": "{label}: {text}",
   "board.details.log": "Log",
   "board.details.noInstall": "Nada instalado: o projeto não tem comando de preparação nem arquivo de lock",
-  "board.details.notCounted": "Não conta como verificação {name}: {why, select, notCheck {não foi iniciada como verificação (hive-progress --check), e seu comando não é um dos que o projeto tem para uma verificação} notContained {o que estava em checkout não contém a versão do cartão} dirty {a pasta tinha alterações não commitadas no início ou no fim} moved {outra coisa estava em checkout no fim} changed {arquivos da pasta mudaram durante a execução} revisionChanged {os arquivos do cartão mudaram durante a execução} other {não dá para saber se os arquivos mudaram}}",
+  "board.details.notCounted": "Não conta como verificação {name}: {why, select, notCheck {não foi iniciada como verificação (cw-progress --check), e seu comando não é um dos que o projeto tem para uma verificação} notContained {o que estava em checkout não contém a versão do cartão} dirty {a pasta tinha alterações não commitadas no início ou no fim} moved {outra coisa estava em checkout no fim} changed {arquivos da pasta mudaram durante a execução} revisionChanged {os arquivos do cartão mudaram durante a execução} other {não dá para saber se os arquivos mudaram}}",
   "board.details.provider": "Provedor",
   "board.details.revision": "Versão",
   "board.details.run": "Execução",

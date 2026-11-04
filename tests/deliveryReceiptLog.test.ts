@@ -1,4 +1,4 @@
-// A delivery's receipt and ack are logged (HI-2036): only "queued" was, so a message read through hive_inbox at once read
+// A delivery's receipt and ack are logged (HI-2036): only "queued" was, so a message read through cw_inbox at once read
 // in hive.log as queued for hours (m637, Legible's lane). Once each, as saved, with how it was received, its agent's
 // name as the user's text (left out of Copy Diagnostics), never what it says. The session layer is a stand-in.
 import { rmSync } from 'fs'
@@ -46,7 +46,7 @@ describe("a delivery's receipt and ack in the log (HI-2036)", async () => {
     logged.lines.length = 0
   })
 
-  it('received through hive_inbox and acked: a line each, with how it was received; never what it says', async () => {
+  it('received through cw_inbox and acked: a line each, with how it was received; never what it says', async () => {
     const r = await make()
     await deliveries.readInbox(alpha, 'b1')
     await deliveries.ackDeliveries(alpha, 'b1', [r.id])

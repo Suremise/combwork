@@ -1,6 +1,4 @@
 {
-  "prose|error|\"{}\" isn't an MCP server's name{}.": 1,
-  "prose|error|(the built-in hive server is always given)": 1,
   "prose|error|An agent can be given at most {} MCP servers.": 1,
   "prose|error|MCP servers is a list of the project's server names.": 1,
   "prose|return|all of the project's": 1,

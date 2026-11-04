@@ -324,10 +324,10 @@ export const DIALECT_FILE_NAME = 'dialect.json'
 
 /**
  * Writes a session's resolved chain (only the overrides, merged) into its launch's private folder, and returns the
- * environment that names it: `HIVE_DIALECT_FILE`, and `HIVE_DIALECT` (the chain's hash). processDialect.ts reads it.
+ * environment that names it: `CW_DIALECT_FILE`, and `CW_DIALECT` (the chain's hash). processDialect.ts reads it.
  */
-export async function writeDialectFile(folder: string, chain: DialectChain): Promise<{ file: string; env: { HIVE_DIALECT_FILE: string; HIVE_DIALECT: string } }> {
+export async function writeDialectFile(folder: string, chain: DialectChain): Promise<{ file: string; env: { CW_DIALECT_FILE: string; CW_DIALECT: string } }> {
   const file = join(folder, DIALECT_FILE_NAME)
   await writeJsonAtomic(file, { texts: { ...chain.texts }, files: [...chain.files], hash: chain.hash })
-  return { file, env: { HIVE_DIALECT_FILE: file, HIVE_DIALECT: chain.hash } }
+  return { file, env: { CW_DIALECT_FILE: file, CW_DIALECT: chain.hash } }
 }

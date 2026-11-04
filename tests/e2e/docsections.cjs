@@ -81,8 +81,8 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
     }
     const launch = await lib.until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
     if (!launch) throw new Error("the agent's launch wasn't recorded: the rest needs its token")
-    const mcpEnv = JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive.env
-    const agentToken = JSON.parse(fs.readFileSync(mcpEnv.HIVE_API_TOKEN_FILE, 'utf8')).token
+    const mcpEnv = JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork.env
+    const agentToken = JSON.parse(fs.readFileSync(mcpEnv.CW_API_TOKEN_FILE, 'utf8')).token
     const workspaceToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const call = async (token, p) => {
       const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { headers: { Authorization: `Bearer ${token}` } })
@@ -162,27 +162,27 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
 
     // --- Through hive-mcp.js, as the agent's tools: lean text.
     const tool = (name, args) => {
-      const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
+      const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
         input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
-        env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${PORT}`, HIVE_WORKSPACE: ws, HIVE_API_TOKEN_FILE: lib.tokenFile(agentToken), HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: agent.id }),
+        env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${PORT}`, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: lib.tokenFile(agentToken), CW_PROJECT: 'alpha', HIVE_AGENT_ID: agent.id }),
         timeout: 60000
       }).toString()
       const res = JSON.parse(out.split('\n')[0]).result
       return { text: res.content[0].text, isError: !!res.isError }
     }
-    let t = tool('hive_doc_outline', { path: 'docs/PLAN.md' })
-    check('hive_doc_outline: a line per heading with its [slug] and size', !t.isError && t.text.startsWith('docs/PLAN.md: 5 headings, ') && t.text.includes('\n  ## Core contracts [core-contracts] ') && t.text.endsWith('hive_read_section reads one as #<slug>.'), t.text)
-    t = tool('hive_doc_outline', { path: 'docs/PLAN.md', depth: 1 })
+    let t = tool('cw_doc_outline', { path: 'docs/PLAN.md' })
+    check('cw_doc_outline: a line per heading with its [slug] and size', !t.isError && t.text.startsWith('docs/PLAN.md: 5 headings, ') && t.text.includes('\n  ## Core contracts [core-contracts] ') && t.text.endsWith('cw_read_section reads one as #<slug>.'), t.text)
+    t = tool('cw_doc_outline', { path: 'docs/PLAN.md', depth: 1 })
     check('…depth=1: the top level only', !t.isError && !t.text.includes('Core contracts') && t.text.includes('# Plan (worktree)'), t.text)
-    t = tool('hive_doc_outline', { path: 'docs/PLAN.md', from: 'project', depth: 1 })
+    t = tool('cw_doc_outline', { path: 'docs/PLAN.md', from: 'project', depth: 1 })
     check('…from: "project": the project folder’s copy, not its worktree’s (#818)', !t.isError && t.text.includes('# Plan (alpha)'), t.text)
-    t = tool('hive_read_section', { path: 'docs/PLAN.md' })
-    check('hive_read_section with no heading: the whole document', !t.isError && t.text.startsWith('docs/PLAN.md (') && t.text.includes('## Setup'), t.text.slice(0, 200))
-    t = tool('hive_read_section', { path: 'docs/PLAN.md', heading: 'errors' })
-    check('hive_read_section: where it is, then its text', !t.isError && t.text.startsWith('docs/PLAN.md#errors (') && t.text.endsWith('### Errors\n\nErrors.'), t.text)
-    t = tool('hive_read_section', { path: 'docs/IDS.md', heading: 'setup' })
-    check('hive_read_section: an id two headings carry is an error listing both, never the first', t.isError && t.text.includes('#setup (First, line 7)') && t.text.includes('#setup-1 (Second, line 11)') && !t.text.includes('One.'), t.text)
-    t = tool('hive_read_section', { path: 'shared:plans/design.md', heading: 'nothing like it' })
+    t = tool('cw_read_section', { path: 'docs/PLAN.md' })
+    check('cw_read_section with no heading: the whole document', !t.isError && t.text.startsWith('docs/PLAN.md (') && t.text.includes('## Setup'), t.text.slice(0, 200))
+    t = tool('cw_read_section', { path: 'docs/PLAN.md', heading: 'errors' })
+    check('cw_read_section: where it is, then its text', !t.isError && t.text.startsWith('docs/PLAN.md#errors (') && t.text.endsWith('### Errors\n\nErrors.'), t.text)
+    t = tool('cw_read_section', { path: 'docs/IDS.md', heading: 'setup' })
+    check('cw_read_section: an id two headings carry is an error listing both, never the first', t.isError && t.text.includes('#setup (First, line 7)') && t.text.includes('#setup-1 (Second, line 11)') && !t.text.includes('One.'), t.text)
+    t = tool('cw_read_section', { path: 'shared:plans/design.md', heading: 'nothing like it' })
     check('…an unknown heading is an error naming the closest', t.isError && /Closest: /.test(t.text), t.text)
 
     // --- Two workspaces open (#817 round 2): an agent's and the Assistant's shared notes and projects are their own

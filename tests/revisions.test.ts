@@ -399,14 +399,14 @@ describe('limits', () => {
     writeFileSync(join(ok, 'SKILL.md'), '---\nname: ok\n---\n')
     const { syncAgentsSkills } = await import('../src/main/providers/common')
     const out: Record<string, unknown> = await syncAgentsSkills({ cwd: join(dir, 'launch-cwd'), skills: [{ name: 'big', sourcePath: big }, { name: 'ok', sourcePath: ok }] } as never, 'Codex')
-    expect(out.big).toEqual({ revision: null, problem: 'it is too big for Hive to check (it is over 1 MB)', lasting: true })
+    expect(out.big).toEqual({ revision: null, problem: 'it is too big for Combwork to check (it is over 1 MB)', lasting: true })
     expect(out.ok).toEqual({ revision: await contentHash(ok) })
 
     // A skill Codex had a copy of, grown too big: the old copy stays, and is what's reported as delivered.
     writeFileSync(join(ok, 'data.bin'), Buffer.alloc(OVER, 1))
-    const kept = join(dir, 'launch-cwd', '.agents', 'skills', 'hive-ok')
+    const kept = join(dir, 'launch-cwd', '.agents', 'skills', 'cw-ok')
     const again: Record<string, unknown> = await syncAgentsSkills({ cwd: join(dir, 'launch-cwd'), skills: [{ name: 'ok', sourcePath: ok }] } as never, 'Codex')
-    expect(again.ok).toEqual({ revision: await contentHash(kept), problem: 'it is too big for Hive to check (it is over 1 MB), so it kept its old copy', lasting: true })
+    expect(again.ok).toEqual({ revision: await contentHash(kept), problem: 'it is too big for Combwork to check (it is over 1 MB), so it kept its old copy', lasting: true })
     rmSync(join(ok, 'data.bin'))
   }))
 
@@ -428,8 +428,8 @@ describe('limits', () => {
     const before = readStats.bytes
     const delivered = await claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills: [{ name: 'deep', sourcePath: deep }, { name: 'big', sourcePath: big }, { name: 'ok', sourcePath: ok }], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/hive/hook-auth/x.txt', privateDir: `${project}-private` } as never)
     const skills = join(project, '.hive', 'launch-a1', 'plugin', 'skills')
-    expect(delivered.deep).toEqual({ revision: null, problem: 'it is too big for Hive to check (it has folders more than 12 deep)', lasting: true })
-    expect(delivered.big).toEqual({ revision: null, problem: 'it is too big for Hive to check (it is over 1 MB)', lasting: true })
+    expect(delivered.deep).toEqual({ revision: null, problem: 'it is too big for Combwork to check (it has folders more than 12 deep)', lasting: true })
+    expect(delivered.big).toEqual({ revision: null, problem: 'it is too big for Combwork to check (it is over 1 MB)', lasting: true })
     expect(delivered.ok).toEqual({ revision: await contentHash(join(skills, 'ok')) })
     expect(existsSync(join(skills, 'deep'))).toBe(false)
     expect(existsSync(join(skills, 'big'))).toBe(false)

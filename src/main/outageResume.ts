@@ -28,7 +28,7 @@ import { pausedFor } from './teamPause'
  * the wait.
  */
 const log = createLogger('outage')
-const HIVE = { kind: 'hive', name: 'Hive' } as const // i18n-ignore: the product's name, as a delivery's sender
+const HIVE = { kind: 'hive', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 
 const M = {
   waiting: msg({ id: 'session.status.waitingForConnection', defaultMessage: 'Waiting for the connection…', description: "An agent's status while Hive waits for its CLI's connection to come back, to resume it (Settings → Advanced, Resume agents after a connection drops)." }),
@@ -45,9 +45,9 @@ const M = {
 
 /** What the Assistant is told (agent messages, said in its dialect). */
 const A = {
-  resumed: agentMsg({ id: 'notice.outage.resumed', text: "{agent}'s connection dropped at {dropped}; it came back at {back} and Hive resumed it.", note: "HI-1612: the Assistant's notice that an agent's dropped connection came back and Hive resumed it. agent: its name; dropped, back: times of day (notice.outage.clock)." }),
-  gaveUp: agentMsg({ id: 'notice.outage.gaveUp', text: "{agent}'s connection dropped again after {resumes} resumes in an hour: Hive stopped resuming it. The PC's network may not have recovered; the user was told the likely fixes (ipconfig /renew, ipconfig /flushdns, a restart).", note: "HI-1612: the Assistant's notice that Hive stopped resuming an agent whose connection kept dropping. agent: its name; resumes: how many in the past hour. ipconfig /renew and /flushdns are Windows commands." }),
-  timedOut: agentMsg({ id: 'notice.outage.timedOut', text: "{agent}'s connection didn't come back within {minutes} minutes: Hive stopped waiting. The user was told the likely fixes.", note: "HI-1612: the Assistant's notice that Hive stopped waiting for an agent's connection. agent: its name; minutes: how long it waited." }),
+  resumed: agentMsg({ id: 'notice.outage.resumed', text: "{agent}'s connection dropped at {dropped}; it came back at {back} and Combwork resumed it.", note: "HI-1612: the Assistant's notice that an agent's dropped connection came back and Hive resumed it. agent: its name; dropped, back: times of day (notice.outage.clock)." }),
+  gaveUp: agentMsg({ id: 'notice.outage.gaveUp', text: "{agent}'s connection dropped again after {resumes} resumes in an hour: Combwork stopped resuming it. The PC's network may not have recovered; the user was told the likely fixes (ipconfig /renew, ipconfig /flushdns, a restart).", note: "HI-1612: the Assistant's notice that Hive stopped resuming an agent whose connection kept dropping. agent: its name; resumes: how many in the past hour. ipconfig /renew and /flushdns are Windows commands." }),
+  timedOut: agentMsg({ id: 'notice.outage.timedOut', text: "{agent}'s connection didn't come back within {minutes} minutes: Combwork stopped waiting. The user was told the likely fixes.", note: "HI-1612: the Assistant's notice that Hive stopped waiting for an agent's connection. agent: its name; minutes: how long it waited." }),
   after: agentMsg({ id: 'notice.outage.after', text: '(Settings → Advanced: Resume agents after a connection drops.)', note: "HI-1612: what ends the Assistant's connection notices: the setting that turns these resumes on and off." })
 }
 

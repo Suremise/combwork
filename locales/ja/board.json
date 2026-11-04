@@ -214,7 +214,7 @@
   "board.details.line": "{label}：{text}",
   "board.details.log": "ログ",
   "board.details.noInstall": "何もインストールされていません：プロジェクトにセットアップコマンドもロックファイルもありません",
-  "board.details.notCounted": "チェック「{name}」として数えられません：{why, select, notCheck {チェックとして開始されておらず（hive-progress --check）、そのコマンドはプロジェクトのチェック用コマンドではありません} notContained {チェックアウトされた内容にカードのリビジョンが含まれていません} dirty {開始時または終了時にフォルダーに未コミットの変更がありました} moved {終了時に別のものがチェックアウトされていました} changed {実行中にフォルダー内のファイルが変更されました} revisionChanged {実行中にカードのファイルが変更されました} other {ファイルが変更されたかどうか判断できません}}",
+  "board.details.notCounted": "チェック「{name}」として数えられません：{why, select, notCheck {チェックとして開始されておらず（cw-progress --check）、そのコマンドはプロジェクトのチェック用コマンドではありません} notContained {チェックアウトされた内容にカードのリビジョンが含まれていません} dirty {開始時または終了時にフォルダーに未コミットの変更がありました} moved {終了時に別のものがチェックアウトされていました} changed {実行中にフォルダー内のファイルが変更されました} revisionChanged {実行中にカードのファイルが変更されました} other {ファイルが変更されたかどうか判断できません}}",
   "board.details.provider": "プロバイダー",
   "board.details.revision": "リビジョン",
   "board.details.run": "実行",

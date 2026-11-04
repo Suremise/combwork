@@ -1,6 +1,6 @@
 // The canary dialect over lanes (dialects, HI-2435, card 3a; plans/2026-11-03-dialects-design.md, section 2, check 4):
-// every word the lane builders (shared/lanes.ts: a lane's line, its state, why it waits, hive_lane's replies) and the
-// lanes service (main/lanes.ts: hive_lane's refusals and notes) give an agent comes from the agent text catalogue, and
+// every word the lane builders (shared/lanes.ts: a lane's line, its state, why it waits, cw_lane's replies) and the
+// lanes service (main/lanes.ts: cw_lane's refusals and notes) give an agent comes from the agent text catalogue, and
 // each lane.* id shows in some output. Stored text (the journal's lane facts) stays the Default under any dialect.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -160,7 +160,7 @@ describe('the canary dialect over the lane builders (shared/lanes.ts)', () => {
     const view = { ...laneView(rec({ name: 'first' }), board), slot: 'slot-b' }
     expect(laneLine(view)).toBe('B1 / R1 (alpha, in slot-b) first: active, on #2; #1 Done, #2 Review, #3 Todo (blocked); rounds 10, wait 6 h. lane-1')
     expect(laneNextText({ lane: view, next: { card: 2, title: 'Card 2', carryOn: false }, waits: null, queue: [{ card: 1, line: 'x' }, { card: 4, line: 'y' }] })).toBe('#1: x #4: y Next: #2 Card 2, once they are Done.')
-    expect(laneNextText({ lane: view, next: { card: 2, title: 'Card 2', carryOn: false }, waits: null })).toBe('Next: #2 Card 2. Start it: it is built in slot-b, on a new branch Hive makes there.')
+    expect(laneNextText({ lane: view, next: { card: 2, title: 'Card 2', carryOn: false }, waits: null })).toBe('Next: #2 Card 2. Start it: it is built in slot-b, on a new branch Combwork makes there.')
     expect(laneStatusText({ reason: 'hooks', card: 2 } as LaneStatus)).toBe("paused: an agent's hooks aren't arriving")
     expect([waitText(90), waitText(45), waitText(1500)]).toEqual(['1.5 h', '45 min', '25 h'])
   })
@@ -194,7 +194,7 @@ describe('the canary dialect over the lanes service (main/lanes.ts)', () => {
     }
   }
 
-  it("say hive_lane's refusals and notes through the catalogue; a lane's journal fact stays the Default", async () => {
+  it("say cw_lane's refusals and notes through the catalogue; a lane's journal fact stays the Default", async () => {
     const facts: string[] = []
     const kept: Parameters<typeof journal.journalFact>[1][] = []
     const spy = vi.spyOn(journal, 'journalFact').mockImplementation((_ws, f) => {

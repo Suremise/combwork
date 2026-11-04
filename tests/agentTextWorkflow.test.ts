@@ -100,11 +100,11 @@ describe('the canary dialect over the merge queue lines (queueState.ts)', () => 
   })
 
   it('says each the same as before in the Default', () => {
-    expect(queueLine({ state: 'queued', target: 'main', position: 2 })).toBe("Hive merges this card (its rules): don't merge it yourself. It is in the merge queue for main, position 2; it moves to Done once merged.")
-    expect(queueLine({ state: 'testing', target: 'main', step: null })).toBe("Hive merges this card (its rules): don't merge it yourself. The merge queue is testing its merge into main now; it moves to Done once merged.")
-    expect(leftWake('HI-7', 'decision', 'active')).toBe('HI-7 left the merge queue: a decision since its approval needs it reviewed again. Read its decisions (hive_read_task), then submit again (hive_submit).')
+    expect(queueLine({ state: 'queued', target: 'main', position: 2 })).toBe("Combwork merges this card (its rules): don't merge it yourself. It is in the merge queue for main, position 2; it moves to Done once merged.")
+    expect(queueLine({ state: 'testing', target: 'main', step: null })).toBe("Combwork merges this card (its rules): don't merge it yourself. The merge queue is testing its merge into main now; it moves to Done once merged.")
+    expect(leftWake('HI-7', 'decision', 'active')).toBe('HI-7 left the merge queue: a decision since its approval needs it reviewed again. Read its decisions (cw_read_task), then submit again (cw_submit).')
     expect(resubmittedText('HI-7', { ...base, files: ['src/a.ts'] }, 'Coder')).toBe('HI-7 is back in Review after the merge queue returned it (a conflict with main in src/a.ts); Coder resolved it and submitted it again: review the resolution')
-    expect(returnedText('HI-7', { ...base, reason: 'checks', check: 'quick', transient: true })).toBe(`HI-7 ${CAME_BACK}: the merge check quick failed for the environment, not the work (temporary). Submit the same revision again (hive_submit): it goes straight back into the queue, at most twice in a row.`)
+    expect(returnedText('HI-7', { ...base, reason: 'checks', check: 'quick', transient: true })).toBe(`HI-7 ${CAME_BACK}: the merge check quick failed for the environment, not the work (temporary). Submit the same revision again (cw_submit): it goes straight back into the queue, at most twice in a row.`)
   })
 
   it("keeps the queue's comment on a returned card in the Default: it is stored, and any reader reads it", () => {

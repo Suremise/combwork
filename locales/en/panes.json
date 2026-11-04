@@ -520,8 +520,8 @@
     "description": "In the menu of an agent's unread messages: how many deliveries ({n}) it didn't ack in time."
   },
   "panes.messages.tip": {
-    "defaultMessage": "{n, plural, one {A message} other {# messages}} for {agent} that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with hive_inbox.",
-    "description": "The heading of the menu of an agent's unread messages, above the list of them: how many ({n}) for the agent ({agent}: its name). hive_inbox is a tool's name: keep it."
+    "defaultMessage": "{n, plural, one {A message} other {# messages}} for {agent} that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with cw_inbox.",
+    "description": "The heading of the menu of an agent's unread messages, above the list of them: how many ({n}) for the agent ({agent}: its name). cw_inbox is a tool's name: keep it."
   },
   "panes.messages.tipNoWakes": {
     "defaultMessage": "{n, plural, one {A message} other {# messages}} for {agent} that it hasn't fetched or acked yet",

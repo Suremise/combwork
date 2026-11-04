@@ -5,7 +5,7 @@
 // card by its workflow (the card stays its builder's); the builder can't review its own card; a second reviewer can't
 // start a review another's running session has in progress, and can once that session stops (HI-2487); ask the user leaves it
 // where it is; missing arguments are 400; the Assistant's intent is refused at Look and advise and runs at Control
-// agents; and an agent's hive tool (hive_start_card) runs the start intent. Dev build, throwaway profile, workspace and
+// agents; and an agent's hive tool (cw_start_card) runs the start intent. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -78,11 +78,11 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     const hiveOf = async (id) => {
       const sessionId = (await live(id))?.sessionId
       const launch = await until(() => launches().findLast((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-      return launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
+      return launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
     }
     const tokenOf = async (id) => {
       const hive = await hiveOf(id)
-      return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     const tokens = { builder: await tokenOf(builder.id), reviewer: await tokenOf(reviewer.id), second: await tokenOf(second.id) }
     check('each agent has its own token', !!tokens.builder && !!tokens.reviewer && !!tokens.second && new Set([tokens.builder, tokens.reviewer, tokens.second]).size === 3)
@@ -211,7 +211,7 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     // An agent asks the Assistant on a card (HI-1866): its comment and a history line, and the Assistant's inbox, whose
     // doorbell its idle session takes. Refused, with nothing written: a plain number, no text, the Assistant itself, and
     // at Look and advise (it can't act on it). What the Assistant's fake read: it follows Hive's doorbell with
-    // hive_inbox and logs what it read.
+    // cw_inbox and logs what it read.
     const asks = () => {
       const f = path.join(claudeHome, 'fake-wakes.jsonl')
       return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === 'Assistant').map((w) => w.text)
@@ -223,7 +223,7 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     check("…and the Assistant can't ask itself (403)", (await call(assistantToken, `/v1/tasks/${ref}/ask-assistant`, { text: 'Park it.' })).status === 403)
     await inv('settings:update', { assistant: { control: 'look' } })
     const lookAsk = await asBuilder(`/v1/tasks/${ref}/ask-assistant`, { text: 'Park it.' })
-    check('…and at Look and advise it is refused (409), saying to ask the user', lookAsk.status === 409 && /hive_ask_user/.test(JSON.stringify(lookAsk.body)), JSON.stringify(lookAsk.body))
+    check('…and at Look and advise it is refused (409), saying to ask the user', lookAsk.status === 409 && /cw_ask_user/.test(JSON.stringify(lookAsk.body)), JSON.stringify(lookAsk.body))
     check('…with nothing written', !(await card(n))?.comments.some((c) => c.text === 'Park it.'), JSON.stringify((await card(n))?.comments.slice(-2)))
     await inv('settings:update', { assistant: { control: 'agents' } })
     const askedAssistant = await asBuilder(`/v1/tasks/${ref}/ask-assistant`, { text: 'Please put this card On Hold: the user said so.' })
@@ -233,16 +233,16 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     check("…and the Assistant's idle session is woken and reads it, whole, as the builder's request", !!(await until(() => asks().slice(asksBefore).some((t) => t.includes("Builder (alpha) asks you on ") && t.includes('<<<Please put this card On Hold: the user said so.>>>')), HUNG_MS)), JSON.stringify(asks().slice(asksBefore)))
     await inv('session:stop', home, 'assistant')
 
-    // An agent's hive tool: hive_start_card runs the start intent. Called through hive-mcp.js with the builder's own
+    // An agent's hive tool: cw_start_card runs the start intent. Called through hive-mcp.js with the builder's own
     // hive server settings (from its launch), not typed into its pane, where Hive's own wakes may be typed meanwhile.
     const builderHive = await hiveOf(builder.id)
-    const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
-      input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'hive_start_card', arguments: { card: key } } }) + '\n',
+    const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
+      input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_start_card', arguments: { card: key } } }) + '\n',
       env: lib.childEnv(builderHive.env),
       timeout: HUNG_MS
     }).toString()
     const reply = JSON.parse(out.split('\n')[0]).result
-    check('hive_start_card starts it: a line saying where it went', !reply.isError && reply.content[0].text.startsWith(`${key}: todo → active.`), JSON.stringify(reply))
+    check('cw_start_card starts it: a line saying where it went', !reply.isError && reply.content[0].text.startsWith(`${key}: todo → active.`), JSON.stringify(reply))
     check("…and it is in Doing, the builder's", (await card(n))?.column === 'doing' && (await card(n))?.agent === builder.id, JSON.stringify(await card(n)))
 
     await inv('session:stop', alpha)

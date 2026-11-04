@@ -214,7 +214,7 @@ async function undoCard(ws: WorkspaceService, c: RecordedChange, by: UndoBy, gua
   if (c.fields.includes('created')) {
     const check = (now: TaskCard): void => {
       const since = historyAfter(now, c.target)
-      if (!since || since.some((h) => h.by !== 'Hive')) throw new ChangedSince(['created'])
+      if (!since || since.some((h) => h.by !== 'Combwork' && h.by !== 'Hive')) throw new ChangedSince(['created'])
       guard?.()
     }
     try {

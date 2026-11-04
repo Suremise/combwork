@@ -3,7 +3,7 @@
 // of its weekly limit. One (running, idle, on Max 1's Builder) reports Max 1's limits at 95% weekly ("planusage F W", as
 // Claude Code's status line does): it is switched to Max 2's Builder and resumed, and Two (stopped, on Max 1's Main) is
 // moved to Max 2's Main at once; a notice names who moved. The workspace's Hive Assistant, on Max 1 too, stays there. Nothing moves back when Max 1 reads low again. Screenshots of
-// the rule in Settings → Accounts & Connections, in both themes, and the Assistant's view of it (hive_connection list's
+// the rule in Settings → Accounts & Connections, in both themes, and the Assistant's view of it (cw_connection list's
 // usage, through GET /v1/connections).
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -106,7 +106,7 @@ const check = (name, ok, extra = '') => {
     // the user's (Settings → Assistant).
     check('the Hive Assistant stays where it was', JSON.stringify(assistantConnection()) === JSON.stringify(assistantBefore), JSON.stringify({ before: assistantBefore, now: assistantConnection() }))
 
-    // --- The Assistant's view: GET /v1/connections gives the limits and the rule (hive_connection list's lines).
+    // --- The Assistant's view: GET /v1/connections gives the limits and the rule (cw_connection list's lines).
     const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const conns = await lib.until(async () => {
       const r = await fetch(`http://127.0.0.1:${PORT}/v1/connections`, { headers: { Authorization: `Bearer ${token}`, 'X-Hive-Workspace': encodeURIComponent(ws) } }).then((x) => x.json()).catch(() => null)

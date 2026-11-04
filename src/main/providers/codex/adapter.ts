@@ -13,7 +13,7 @@ import type { StartHint } from '../../../shared/startFailure'
 import { CODEX, CODEX_DESCRIPTOR, CODEX_MODE_FLAGS, CODEX_PERMISSION_MODES } from '../../../shared/codex'
 import { providerSettings } from '../../../shared/providers'
 import type { TypedNewline } from '../../../shared/terminalInput'
-import { HIVE_TOOLS } from '../../../shared/assistantTools'
+import { HIVE_TOOLS, LEGACY_TOOLS_SERVER, TOOLS_SERVER } from '../../../shared/assistantTools'
 import { config } from '../../config'
 import { isFile, placeMatcher } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
@@ -391,13 +391,13 @@ function appServerAnswer(executable: string, args: string[], cwd: string, method
 
 /**
  * Only Hive's own server's tools run without Codex asking (#1166), as with Claude Code and Copilot; every other server's
- * follow Codex's approval policy for the agent's mode. ("hive" is reserved: no workspace server has that name.) The
+ * follow Codex's approval policy for the agent's mode. (TOOLS_SERVER is reserved: no workspace server has that name.) The
  * Assistant's only the ones its Control settings let it use without asking (`trusted`, #1174: Codex 0.163 takes a
  * per-tool `tools.<tool>.approval_mode`); none with the switch off (#1281). Hive's server is always on (`enabled`): a
- * native server named hive merges into Hive's table key by key, and could turn it off.
+ * native server of that name merges into Hive's table key by key, and could turn it off.
  */
 function hiveTable(name: string, hive: HiveServerOptions): Record<string, unknown> {
-  if (name !== 'hive') return {}
+  if (name !== TOOLS_SERVER) return {}
   if (!hive.preApprove) return { enabled: true }
   if (hive.trusted) return { enabled: true, tools: Object.fromEntries(hive.trusted.map((t) => [t, { approval_mode: 'approve' }])) }
   return { enabled: true, default_tools_approval_mode: 'approve' }
@@ -436,7 +436,7 @@ export function codexMcpServer(name: string, def: McpServerDef, hive: HiveServer
   if (!def.command) return { table: null }
   const table: Record<string, unknown> = { command: def.command, ...approval(name) }
   // Hive's own tools can wait minutes (for agents to finish, or for the user to answer the Assistant).
-  if (name === 'hive') table.tool_timeout_sec = advanced.number('codex.mcp.toolTimeoutSeconds')
+  if (name === TOOLS_SERVER) table.tool_timeout_sec = advanced.number('codex.mcp.toolTimeoutSeconds')
   if (def.args?.length) table.args = def.args.map(String)
   if (typeof def.cwd === 'string') table.cwd = def.cwd
   const env: Record<string, string> = {}
@@ -458,8 +458,8 @@ const HTTP_KEYS = ['url', 'bearer_token_env_var', 'http_headers', 'env_http_head
 /** Why a Codex agent can't start beside a native HTTP server named hive (outrankNativeHive). */
 const NATIVE_HIVE = msg({
   id: 'providers.codex.nativeHive',
-  defaultMessage: 'Your Codex config has an MCP server named hive, reached over HTTP ({file}). Codex merges it into Combwork’s own hive server, and can’t start with both. Rename yours there to start Codex agents.',
-  description: "Why a Codex agent didn't start: the user's own Codex config has an MCP server named hive. {file} is that config file's path. hive is the name of Hive's MCP server: keep it."
+  defaultMessage: 'Your Codex config has an MCP server named combwork, reached over HTTP ({file}). Codex merges it into Combwork’s own combwork server, and can’t start with both. Rename yours there to start Codex agents.',
+  description: "Why a Codex agent didn't start: the user's own Codex config has an MCP server named combwork. {file} is that config file's path. combwork is the name of Combwork's MCP server (HI-2463): keep it."
 })
 
 /**
@@ -481,12 +481,12 @@ export function outrankNativeHive(files: string[], table: Record<string, unknown
   const mode = (tool: string): string => (approved === 'all' || approved.includes(tool) ? 'approve' : 'auto')
   for (const file of files) {
     const servers = readToml(file).mcp_servers
-    const native = servers && typeof servers === 'object' ? (servers as Record<string, unknown>).hive : undefined
+    const native = servers && typeof servers === 'object' ? (servers as Record<string, unknown>)[TOOLS_SERVER] : undefined
     if (!native || typeof native !== 'object') continue
     const n = native as Record<string, unknown>
     const http = Object.keys(n).filter((k) => HTTP_KEYS.includes(k))
     if (http.length) {
-      log.warn(`Codex has an HTTP MCP server named hive in ${userText(file)} (${http.join(', ')}): Codex agents can't start beside Hive's own.`)
+      log.warn(`Codex has an HTTP MCP server named ${TOOLS_SERVER} in ${userText(file)} (${http.join(', ')}): Codex agents can't start beside Hive's own.`)
       throw hiveError(NATIVE_HIVE, { file })
     }
     if ('enabled_tools' in n) out.enabled_tools = [...HIVE_TOOLS]
@@ -509,7 +509,7 @@ export function outrankNativeHive(files: string[], table: Record<string, unknown
     const ownEnv = (table.env ?? {}) as Record<string, string>
     if (env.some((k) => !(k in ownEnv))) out.env = { ...((out.env ?? {}) as Record<string, string>), ...Object.fromEntries(env.filter((k) => !(k in ownEnv)).map((k) => [k, ''])), ...ownEnv }
     if ('env_vars' in n && !('env_vars' in table)) out.env_vars = []
-    log.warn(`Codex has an MCP server named hive in ${userText(file)}: Hive's own hive server is used instead, its keys over those of the same name (${Object.keys(n).join(', ')}).`)
+    log.warn(`Codex has an MCP server named ${TOOLS_SERVER} in ${userText(file)}: Hive's own server is used instead, its keys over those of the same name (${Object.keys(n).join(', ')}).`)
   }
   return out
 }
@@ -589,9 +589,9 @@ export class CodexAdapter implements ProviderAdapter {
     }
     if (process.platform === 'win32') {
       // The standalone installer adds this to the user PATH, which a Hive started before the install doesn't have yet.
-      if (process.env.LOCALAPPDATA) out.push({ path: join(process.env.LOCALAPPDATA, 'Programs', 'OpenAI', 'Codex', 'bin', 'codex.exe'), source: 'standalone install' }) // i18n-ignore: an install's source as Hive names it, in diagnostics and the Agent API's status
+      if (process.env.LOCALAPPDATA) out.push({ path: join(process.env.LOCALAPPDATA, 'Programs', 'OpenAI', 'Codex', 'bin', 'codex.exe'), source: 'standalone install' }) // i18n-ignore: an install's source as Combwork names it, in diagnostics and the Agent API's status
       if (process.env.APPDATA) out.push({ path: join(process.env.APPDATA, 'npm', 'codex.cmd'), source: 'npm' })
-    } else out.push({ path: join(homedir(), '.local', 'bin', 'codex'), source: 'standalone install' }) // i18n-ignore: an install's source as Hive names it, in diagnostics and the Agent API's status
+    } else out.push({ path: join(homedir(), '.local', 'bin', 'codex'), source: 'standalone install' }) // i18n-ignore: an install's source as Combwork names it, in diagnostics and the Agent API's status
     return out
   }
 
@@ -976,13 +976,18 @@ export class CodexAdapter implements ProviderAdapter {
       const { table, warning } = codexMcpServer(name, def, hive)
       if (warning) log.warn(warning)
       if (!table) continue
-      if (name === 'hive') Object.assign(table, outrankNativeHive(files, table, hive.preApprove ? (hive.trusted ?? 'all') : [], ctx.cwd))
+      if (name === TOOLS_SERVER) Object.assign(table, outrankNativeHive(files, table, hive.preApprove ? (hive.trusted ?? 'all') : [], ctx.cwd))
       args.push('-c', `mcp_servers.${name}=${toToml(table)}`)
     }
+    // A user's own server under Hive's name before HI-2463 ([mcp_servers.hive]: their copy of Hive's server, with the old
+    // hive_* tools): off for this launch whatever the isolation switch says, so the agent gets one set of Combwork's tools.
+    // A launch override: their config isn't changed.
+    const legacy = !!ctx.mcpServers[TOOLS_SERVER] && files.some((f) => LEGACY_TOOLS_SERVER in mcpServersIn(f))
+    if (legacy) args.push('-c', `mcp_servers.${LEGACY_TOOLS_SERVER}.enabled=false`)
     // Only the workspace's MCP servers: the user's own (and a project's own) are turned off, as for Claude Code; with the
     // switch off (#1281), they load beside Hive's (one of the workspace's name still merges into the workspace's).
     if (launchOverrides(ctx.overrides, CODEX, 'mcpIsolation')) {
-      const own = new Set(Object.keys(ctx.mcpServers))
+      const own = new Set([...Object.keys(ctx.mcpServers), ...(legacy ? [LEGACY_TOOLS_SERVER] : [])])
       const theirs = new Set(files.flatMap((f) => Object.keys(mcpServersIn(f))))
       for (const name of theirs) {
         if (own.has(name)) continue
@@ -1015,7 +1020,7 @@ export class CodexAdapter implements ProviderAdapter {
     const overrides = this.configByRun.get(ctx.runId) ?? []
     this.configByRun.delete(ctx.runId)
     const command = hookCommand(ctx.hookUrl, ctx.hookAuthFile)
-    const secrets = [ctx.hookAuthFile, ctx.env.HIVE_HOOK_TOKEN ?? '']
+    const secrets = [ctx.hookAuthFile, ctx.env.CW_HOOK_TOKEN ?? '']
     const hive: HookRow[] = HOOKS.map((h) => ({ event: h.event, source: 'hive', type: 'command', command: withoutHiveAuth(command, secrets), ...(h.matcher ? { matcher: h.matcher } : {}), status: 'passed', observed: true }))
     const listing: HookListing = { basis: 'cli', rows: hive, notes: [] }
     return {
@@ -1403,7 +1408,7 @@ export class CodexAdapter implements ProviderAdapter {
   }
 
   skillRoots(home = codexHome()): SkillRoots {
-    return { machine: [join(home, 'skills')], plugins: null, local: [AGENTS_SKILLS], hiveCopyPrefix: 'hive-' }
+    return { machine: [join(home, 'skills')], plugins: null, local: [AGENTS_SKILLS], hiveCopyPrefix: 'cw-' }
   }
 
   async projectMcpServers(projectPath: string): Promise<Record<string, McpServerDef>> {

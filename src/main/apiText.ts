@@ -12,15 +12,15 @@ export const API = {
     safeguardNotDetected: agentMsg({ id: 'api.activity.safeguardNotDetected', text: 'not detected' })
   },
   agent: {
-    alreadyRunning: agentMsg({ id: 'api.agent.alreadyRunning', text: '{agent} is already running. Use hive_prompt_agent to give it work once it\'s idle.' }),
-    freshFailed: agentMsg({ id: 'api.agent.freshFailed', text: '{agent} wasn\'t given the task in a new conversation: {error}{stopped, select, yes { It is stopped now (its conversation is kept): start it with the task (hive_start_agent with prompt).} other {}}' }),
+    alreadyRunning: agentMsg({ id: 'api.agent.alreadyRunning', text: '{agent} is already running. Use cw_prompt_agent to give it work once it\'s idle.' }),
+    freshFailed: agentMsg({ id: 'api.agent.freshFailed', text: '{agent} wasn\'t given the task in a new conversation: {error}{stopped, select, yes { It is stopped now (its conversation is kept): start it with the task (cw_start_agent with prompt).} other {}}' }),
     freshNotStarted: agentMsg({ id: 'api.agent.freshNotStarted', text: '{agent}\'s conversation ended (it is kept in the Sessions tab), but no new one was started: {why}. It is stopped now.' }),
     freshWhyControl: agentMsg({ id: 'api.agent.freshWhyControl', text: 'the user turned Settings → Assistant → Control down meanwhile', note: 'Why a new conversation was not started (api.agent.freshNotStarted).' }),
     freshWhySession: agentMsg({ id: 'api.agent.freshWhySession', text: 'the Assistant\'s session that asked for it ended meanwhile' }),
     inputDisabled: agentMsg({ id: 'api.agent.inputDisabled', text: 'Session input is disabled. Enable it in Settings → Agent API.' }),
     mcpServersArg: agentMsg({ id: 'api.agent.mcpServersArg', text: '{error} mcpServers is a list of the project\'s server names, [] for none, or ["*"] for all of them.' }),
     messageCardArg: agentMsg({ id: 'api.agent.messageCardArg', text: 'card must be a card: its number or key (12 or HI-12)' }),
-    messageNotRunning: agentMsg({ id: 'api.agent.messageNotRunning', text: '{agent} isn\'t running. Start it with the message as its task instead (hive_start_agent with prompt).' }),
+    messageNotRunning: agentMsg({ id: 'api.agent.messageNotRunning', text: '{agent} isn\'t running. Start it with the message as its task instead (cw_start_agent with prompt).' }),
     messageNotTyped: agentMsg({ id: 'api.agent.messageNotTyped', text: 'The message wasn\'t typed into {agent}: {why}.', note: 'why: the delivery\'s fate (cancelled, expired, refused, stale) and its detail.' }),
     messageTooLong: agentMsg({ id: 'api.agent.messageTooLong', text: 'text is at most {max} characters (this has {length})' }),
     noConversation: agentMsg({ id: 'api.agent.noConversation', text: '{agent} has no conversation to resume. Start it without resume.' }),
@@ -28,18 +28,18 @@ export const API = {
     none: agentMsg({ id: 'api.agent.none', text: 'This project has no agents yet' }),
     notPinned: agentMsg({ id: 'api.agent.notPinned', text: 'Agents aren\'t pinned to worktrees in 1.0: slots are lent per card or lane.', note: '#1451: why a worktree of an agent\'s own is refused.' }),
     notRunning: agentMsg({ id: 'api.agent.notRunning', text: 'That agent is not running' }),
-    ownProjectOnly: agentMsg({ id: 'api.agent.ownProjectOnly', text: '{what} is only for your own project\'s agents ({project}). Another project\'s work is for its own agents, the Hive Assistant and the user.', note: 'what: api.own.*. HI-2330.' }),
-    promptBackground: agentMsg({ id: 'api.agent.promptBackground', text: '{agent} is waiting on {total} {tasks, plural, one {background task} other {background tasks}} it started (such as a test run) and carries on by itself when they end. Wait for it (hive_wait_for_agents), then give it the task, or leave it a message it gets when it is idle (hive_message_agent). If it seems stuck, tell the user.' }),
+    ownProjectOnly: agentMsg({ id: 'api.agent.ownProjectOnly', text: '{what} is only for your own project\'s agents ({project}). Another project\'s work is for its own agents, the Assistant and the user.', note: 'what: api.own.*. HI-2330.' }),
+    promptBackground: agentMsg({ id: 'api.agent.promptBackground', text: '{agent} is waiting on {total} {tasks, plural, one {background task} other {background tasks}} it started (such as a test run) and carries on by itself when they end. Wait for it (cw_wait_for_agents), then give it the task, or leave it a message it gets when it is idle (cw_message_agent). If it seems stuck, tell the user.' }),
     promptFailed: agentMsg({ id: 'api.agent.promptFailed', text: '{agent} wasn\'t given the task: {error}.' }),
-    promptNotRunning: agentMsg({ id: 'api.agent.promptNotRunning', text: '{agent} isn\'t running. Start it with the task instead (hive_start_agent with prompt).' }),
-    promptNotTaken: agentMsg({ id: 'api.agent.promptNotTaken', text: '{agent}\'s CLI hasn\'t taken a line Hive typed into it (it wasn\'t reading its input). Tell the user: they can click its terminal and press Enter. Nothing is typed into it until then.' }),
-    promptPending: agentMsg({ id: 'api.agent.promptPending', text: '{agent} has just been given a prompt that its CLI hasn\'t taken yet. Wait for it (hive_wait_for_agents), then give it the task.' }),
+    promptNotRunning: agentMsg({ id: 'api.agent.promptNotRunning', text: '{agent} isn\'t running. Start it with the task instead (cw_start_agent with prompt).' }),
+    promptNotTaken: agentMsg({ id: 'api.agent.promptNotTaken', text: '{agent}\'s CLI hasn\'t taken a line Combwork typed into it (it wasn\'t reading its input). Tell the user: they can click its terminal and press Enter. Nothing is typed into it until then.' }),
+    promptPending: agentMsg({ id: 'api.agent.promptPending', text: '{agent} has just been given a prompt that its CLI hasn\'t taken yet. Wait for it (cw_wait_for_agents), then give it the task.' }),
     promptSignIn: agentMsg({ id: 'api.agent.promptSignIn', text: '{agent}\'s CLI needs the user to sign in again (its sign-in expired). Tell the user; nothing it is given runs until then.' }),
-    promptStarting: agentMsg({ id: 'api.agent.promptStarting', text: '{agent} is still starting. Wait for it (hive_wait_for_agents), then try again, or leave it a message (hive_message_agent).' }),
+    promptStarting: agentMsg({ id: 'api.agent.promptStarting', text: '{agent} is still starting. Wait for it (cw_wait_for_agents), then try again, or leave it a message (cw_message_agent).' }),
     promptUserTyping: agentMsg({ id: 'api.agent.promptUserTyping', text: 'The user has just typed in {agent}\'s terminal and may still be writing there. Ask the user before giving it a task.' }),
     promptWaiting: agentMsg({ id: 'api.agent.promptWaiting', text: '{agent} is waiting for the user{said, select, yes { ({message})} other {}}. Tell the user; don\'t answer for them.', note: 'message: its status message (what it asks), when it has one.' }),
-    promptWatching: agentMsg({ id: 'api.agent.promptWatching', text: '{agent} is {waiting} ({watch, select, agents {an agent watch} other {a card watch}}): it takes no new task until it is woken or the user cancels the watch. To tell it something for the work it is waiting on, leave it a message (hive_message_agent): it is woken by it and its watch carries on.', note: 'waiting: what its watch waits for, from its label ("waiting for HI-12 to change").' }),
-    promptWorking: agentMsg({ id: 'api.agent.promptWorking', text: '{agent} is working. Wait until it\'s idle (hive_wait_for_agents), then give it the task, or leave it a message it gets when it is (hive_message_agent).' }),
+    promptWatching: agentMsg({ id: 'api.agent.promptWatching', text: '{agent} is {waiting} ({watch, select, agents {an agent watch} other {a card watch}}): it takes no new task until it is woken or the user cancels the watch. To tell it something for the work it is waiting on, leave it a message (cw_message_agent): it is woken by it and its watch carries on.', note: 'waiting: what its watch waits for, from its label ("waiting for HI-12 to change").' }),
+    promptWorking: agentMsg({ id: 'api.agent.promptWorking', text: '{agent} is working. Wait until it\'s idle (cw_wait_for_agents), then give it the task, or leave it a message it gets when it is (cw_message_agent).' }),
     providerOff: agentMsg({ id: 'api.agent.providerOff', text: '{provider} is turned off in Settings → Providers.' }),
     sayWhich: agentMsg({ id: 'api.agent.sayWhich', text: 'This project has several agents: say which one with "agent" (its id or name)' }),
     stopAskDeclined: agentMsg({ id: 'api.agent.stopAskDeclined', text: 'The user chose not to stop {agent}. Leave it running.' }),
@@ -49,9 +49,9 @@ export const API = {
     textRequired: agentMsg({ id: 'api.agent.textRequired', text: 'text is required' }),
     unknown: agentMsg({ id: 'api.agent.unknown', text: 'Unknown agent' }),
     unknownNamed: agentMsg({ id: 'api.agent.unknownNamed', text: 'Unknown agent "{name}"' }),
-    usePromptAgent: agentMsg({ id: 'api.agent.usePromptAgent', text: 'Use hive_prompt_agent (POST /v1/projects/\'{\'name\'}\'/agents/\'{\'agent\'}\'/prompt) to give agents work.' }),
-    useStartAgent: agentMsg({ id: 'api.agent.useStartAgent', text: 'Use hive_start_agent (POST /v1/projects/\'{\'name\'}\'/agents/\'{\'agent\'}\'/start) to start agents.' }),
-    useStopAgent: agentMsg({ id: 'api.agent.useStopAgent', text: 'Use hive_stop_agent (POST /v1/projects/\'{\'name\'}\'/agents/\'{\'agent\'}\'/stop) to stop agents.' }),
+    usePromptAgent: agentMsg({ id: 'api.agent.usePromptAgent', text: 'Use cw_prompt_agent (POST /v1/projects/\'{\'name\'}\'/agents/\'{\'agent\'}\'/prompt) to give agents work.' }),
+    useStartAgent: agentMsg({ id: 'api.agent.useStartAgent', text: 'Use cw_start_agent (POST /v1/projects/\'{\'name\'}\'/agents/\'{\'agent\'}\'/start) to start agents.' }),
+    useStopAgent: agentMsg({ id: 'api.agent.useStopAgent', text: 'Use cw_stop_agent (POST /v1/projects/\'{\'name\'}\'/agents/\'{\'agent\'}\'/stop) to stop agents.' }),
     waitingOnCards: agentMsg({ id: 'api.agent.waitingOnCards', text: 'waiting on cards', note: 'What a watch waits for, when it has no label.' }),
     workflowRoleArg: agentMsg({ id: 'api.agent.workflowRoleArg', text: 'workflowRole is "builder", "reviewer", "either" or "generalist".' })
   },
@@ -59,7 +59,7 @@ export const API = {
     alreadyAttached: agentMsg({ id: 'api.attachment.alreadyAttached', text: 'Already attached' }),
     ambiguous: agentMsg({ id: 'api.attachment.ambiguous', text: 'Several of {card}\'s attachments are called "{name}": name one by its file{listed, select, yes {: {choices}} other {}}' }),
     attached: agentMsg({ id: 'api.attachment.attached', text: 'Attached' }),
-    badName: agentMsg({ id: 'api.attachment.badName', text: 'The attachment\'s name isn\'t a valid path segment: give it as hive_read_task lists it' }),
+    badName: agentMsg({ id: 'api.attachment.badName', text: 'The attachment\'s name isn\'t a valid path segment: give it as cw_read_task lists it' }),
     changed: agentMsg({ id: 'api.attachment.changed', text: '{card} or its attachment "{name}" changed while it was read: read the card again' }),
     fromCard: agentMsg({ id: 'api.attachment.fromCard', text: 'attached to the card' }),
     fromComment: agentMsg({ id: 'api.attachment.fromComment', text: 'comment by {by} at {at}' }),
@@ -133,7 +133,7 @@ export const API = {
     loadTemplate: agentMsg({ id: 'api.change.loadTemplate', text: 'load the template "{template}" into {project}' }),
     loadUnnamedTemplate: agentMsg({ id: 'api.change.loadUnnamedTemplate', text: 'load the template "a template" into {project}', note: 'A load that named no template (found by its other fields).' }),
     messageAgent: agentMsg({ id: 'api.change.messageAgent', text: 'leave {agent} in {project} a message' }),
-    onlyAssistant: agentMsg({ id: 'api.change.onlyAssistant', text: 'Only the Hive Assistant can {what} through the Agent API.', note: 'what: what the change is called (api.change.*).' }),
+    onlyAssistant: agentMsg({ id: 'api.change.onlyAssistant', text: 'Only the Assistant can {what} through the Agent API.', note: 'what: what the change is called (api.change.*).' }),
     pauseAQueue: agentMsg({ id: 'api.change.pauseAQueue', text: 'pause a merge queue' }),
     pauseQueue: agentMsg({ id: 'api.change.pauseQueue', text: 'pause the merge queue of {project}' }),
     pauseTeam: agentMsg({ id: 'api.change.pauseTeam', text: 'pause the team' }),
@@ -172,16 +172,16 @@ export const API = {
   connection: {
     context200k: agentMsg({ id: 'api.connection.context200k', text: 'context200k is "on", or "off" (or "") for the model\'s 1M.' }),
     controlOff: agentMsg({ id: 'api.connection.controlOff', text: 'The user\'s settings don\'t let you change connections (Settings → Assistant → Control → Change settings is off). Tell the user how to change it in Settings → Accounts & Connections, or that turning Change settings on lets you.' }),
-    nameAccount: agentMsg({ id: 'api.connection.nameAccount', text: 'Name the account it goes on (account: its id or name, from hive_connection list). Adding an account is the user\'s, in Settings → Accounts & Connections.' }),
+    nameAccount: agentMsg({ id: 'api.connection.nameAccount', text: 'Name the account it goes on (account: its id or name, from cw_connection list). Adding an account is the user\'s, in Settings → Accounts & Connections.' }),
     namesOn: agentMsg({ id: 'api.connection.namesOn', text: 'On {account}: {connections}.' }),
     needsName: agentMsg({ id: 'api.connection.needsName', text: 'A connection needs a name.' }),
-    noAccount: agentMsg({ id: 'api.connection.noAccount', text: 'No account named "{name}": hive_connection list names them. Adding one is the user\'s, in Settings → Accounts & Connections.' }),
+    noAccount: agentMsg({ id: 'api.connection.noAccount', text: 'No account named "{name}": cw_connection list names them. Adding one is the user\'s, in Settings → Accounts & Connections.' }),
     noAccountOn: agentMsg({ id: 'api.connection.noAccountOn', text: 'No account is on in this workspace: the user adds one in Settings → Accounts & Connections.' }),
     noneNamed: agentMsg({ id: 'api.connection.noneNamed', text: 'No connection named "{name}", and none has that id.' }),
-    noneNamedUsable: agentMsg({ id: 'api.connection.noneNamedUsable', text: 'No connection named "{name}" is usable in this workspace, and none has that id. hive_connection lists them.' }),
+    noneNamedUsable: agentMsg({ id: 'api.connection.noneNamedUsable', text: 'No connection named "{name}" is usable in this workspace, and none has that id. cw_connection lists them.' }),
     noneNamedUsableShort: agentMsg({ id: 'api.connection.noneNamedUsableShort', text: 'No connection named "{name}" is usable in this workspace, and none has that id.' }),
     nothingToChange: agentMsg({ id: 'api.connection.nothingToChange', text: 'Nothing to change: give name, model, effort, mode, context200k or extraArgs.' }),
-    oldFields: agentMsg({ id: 'api.connection.oldFields', text: 'An agent no longer takes {fields}: it runs on a connection, which holds its model, effort, context and mode, and its CLI follows from it. Pass connection (its id or name). {on} hive_connection lists every one, and makes one when the user agrees.' }),
+    oldFields: agentMsg({ id: 'api.connection.oldFields', text: 'An agent no longer takes {fields}: it runs on a connection, which holds its model, effort, context and mode, and its CLI follows from it. Pass connection (its id or name). {on} cw_connection lists every one, and makes one when the user agrees.' }),
     severalAccounts: agentMsg({ id: 'api.connection.severalAccounts', text: 'Several accounts are named "{name}": use its id ({ids}).' }),
     severalNamed: agentMsg({ id: 'api.connection.severalNamed', text: 'Several connections are named "{name}": use its id ({ids}).' })
   },
@@ -202,7 +202,7 @@ export const API = {
   },
   doc: {
     headingRow: agentMsg({ id: 'api.doc.headingRow', text: '#{slug} ({heading}, line {line})' }),
-    hidden: agentMsg({ id: 'api.doc.hidden', text: '{path} is in Hive\'s or git\'s own folder: read shared notes as shared:<path>' }),
+    hidden: agentMsg({ id: 'api.doc.hidden', text: '{path} is in Combwork\'s or git\'s own folder: read shared notes as shared:<path>' }),
     noHeadings: agentMsg({ id: 'api.doc.noHeadings', text: '{doc} has no headings.' }),
     noSection: agentMsg({ id: 'api.doc.noSection', text: 'No section "{asked}" in {doc}. Closest: {list}.' }),
     notFound: agentMsg({ id: 'api.doc.notFound', text: 'Not found: {path}' }),
@@ -252,9 +252,9 @@ export const API = {
   handover: {
     busy: agentMsg({ id: 'api.handover.busy', text: '{agent} is working, merging or on a card loop\'s card: its conversation isn\'t ended now. Hand it over when it has finished.' }),
     failedLine: agentMsg({ id: 'api.handover.failedLine', text: 'Hand over in {project}', note: 'The Assistant\'s activity line for a hand-over that failed later (stored).' }),
-    noTools: agentMsg({ id: 'api.handover.noTools', text: 'The project\'s agents don\'t have Hive\'s tools (Settings → Agent API is off, or Provide Hive tools to sessions), so they can\'t write or read a handover. Tell the user.' }),
+    noTools: agentMsg({ id: 'api.handover.noTools', text: 'The project\'s agents don\'t have Combwork\'s tools (Settings → Agent API is off, or Provide Combwork tools to sessions), so they can\'t write or read a handover. Tell the user.' }),
     noneYet: agentMsg({ id: 'api.handover.noneYet', text: 'There is no handover for {project} yet. Hand over with a new handover (handover: true) instead.' }),
-    started: agentMsg({ id: 'api.handover.started', text: 'Hive {ask, select, yes {asks {from} for a handover, waits until it exists, then } other {}}starts {to} on it. Use hive_wait_for_agents to follow; problems show as notifications and in your actions.' }),
+    started: agentMsg({ id: 'api.handover.started', text: 'Combwork {ask, select, yes {asks {from} for a handover, waits until it exists, then } other {}}starts {to} on it. Use cw_wait_for_agents to follow; problems show as notifications and in your actions.' }),
     toRequired: agentMsg({ id: 'api.handover.toRequired', text: 'to is required' }),
     userTyping: agentMsg({ id: 'api.handover.userTyping', text: 'The user has just typed in {agent}\'s terminal and may still be writing there. Ask the user before handing over.' })
   },
@@ -264,11 +264,11 @@ export const API = {
     bodyJson: agentMsg({ id: 'api.http.bodyJson', text: 'Body must be JSON' }),
     bodyTooLarge: agentMsg({ id: 'api.http.bodyTooLarge', text: 'Request body too large' }),
     crossOrigin: agentMsg({ id: 'api.http.crossOrigin', text: 'Cross-origin requests are not allowed' }),
-    eventsForCallers: agentMsg({ id: 'api.http.eventsForCallers', text: 'The event stream is for Agent API callers. Use hive_wait_for_agents to follow agents.' }),
+    eventsForCallers: agentMsg({ id: 'api.http.eventsForCallers', text: 'The event stream is for Agent API callers. Use cw_wait_for_agents to follow agents.' }),
     noRoute: agentMsg({ id: 'api.http.noRoute', text: 'No route for {method} {path}' }),
     portInUse: agentMsg({ id: 'api.http.portInUse', text: 'Port {port} is already in use' }),
-    tokenFileNote: agentMsg({ id: 'api.http.tokenFileNote', text: 'Bearer token for the Hive Agent API. Regenerate it in Settings → Agent API.' }),
-    viewerReadOnly: agentMsg({ id: 'api.http.viewerReadOnly', text: 'A viewer token is read-only: it can read Hive (GET) and follow its events (GET /v1/events), not change anything' })
+    tokenFileNote: agentMsg({ id: 'api.http.tokenFileNote', text: 'Bearer token for the Combwork Agent API. Regenerate it in Settings → Agent API.' }),
+    viewerReadOnly: agentMsg({ id: 'api.http.viewerReadOnly', text: 'A viewer token is read-only: it can read Combwork (GET) and follow its events (GET /v1/events), not change anything' })
   },
   inbox: {
     ackArg: agentMsg({ id: 'api.inbox.ackArg', text: 'ack is a list of delivery ids ("m12"), at most 200' }),
@@ -277,9 +277,9 @@ export const API = {
   },
   intent: {
     actionsArg: agentMsg({ id: 'api.intent.actionsArg', text: 'actions is a list of 1 to {max} actions, each \'{\'kind: {kinds}; reason?: text of at most {reasonMax} characters\'}\', each kind once.' }),
-    askAssistantAgentsOnly: agentMsg({ id: 'api.intent.askAssistantAgentsOnly', text: 'Only a project\'s agents ask the Hive Assistant on a card.' }),
+    askAssistantAgentsOnly: agentMsg({ id: 'api.intent.askAssistantAgentsOnly', text: 'Only a project\'s agents ask the Assistant on a card.' }),
     checklistArg: agentMsg({ id: 'api.intent.checklistArg', text: 'checklist is a list of 1 to {max} steps, each text of at most {stepMax} characters.' }),
-    connectionNewAgentOnly: agentMsg({ id: 'api.intent.connectionNewAgentOnly', text: 'connection is for a new agent: an existing agent runs on its own (hive_update_agent changes it).' }),
+    connectionNewAgentOnly: agentMsg({ id: 'api.intent.connectionNewAgentOnly', text: 'connection is for a new agent: an existing agent runs on its own (cw_update_agent changes it).' }),
     fieldRequired: agentMsg({ id: 'api.intent.fieldRequired', text: '{field} is required.' }),
     fieldText: agentMsg({ id: 'api.intent.fieldText', text: '{field} is text.' }),
     followUpArg: agentMsg({ id: 'api.intent.followUpArg', text: 'followUp is true or false.' }),
@@ -298,7 +298,7 @@ export const API = {
     entryId: agentMsg({ id: 'api.journal.entryId', text: 'An entry id is a whole number.' }),
     noEntry: agentMsg({ id: 'api.journal.noEntry', text: 'There is no entry {entry}.' }),
     off: agentMsg({ id: 'api.journal.off', text: 'The journal is off (Settings → Assistant → Journal): nothing is written or recalled. Its entries are kept.' }),
-    onlyAssistant: agentMsg({ id: 'api.journal.onlyAssistant', text: 'Only the Hive Assistant keeps a journal.' })
+    onlyAssistant: agentMsg({ id: 'api.journal.onlyAssistant', text: 'Only the Assistant keeps a journal.' })
   },
   lane: {
     agentStartsOwn: agentMsg({ id: 'api.lane.agentStartsOwn', text: 'An agent starts its own lane, as its builder: a reviewer joins its builder\'s lane (join)' }),
@@ -308,10 +308,10 @@ export const API = {
     builderRequired: agentMsg({ id: 'api.lane.builderRequired', text: 'builder is required: the name of the lane\'s builder' }),
     cardsArg: agentMsg({ id: 'api.lane.cardsArg', text: 'cards must be the card numbers, in order (at least one)' }),
     mergeCommitArg: agentMsg({ id: 'api.lane.mergeCommitArg', text: 'mergeCommit must be a commit (its hash)' }),
-    mergeCommitIgnored: agentMsg({ id: 'api.lane.mergeCommitIgnored', text: 'mergeCommit is ignored: Hive records the lane\'s merge from its cards\' facts.' }),
+    mergeCommitIgnored: agentMsg({ id: 'api.lane.mergeCommitIgnored', text: 'mergeCommit is ignored: Combwork records the lane\'s merge from its cards\' facts.' }),
     nextIsAgents: agentMsg({ id: 'api.lane.nextIsAgents', text: 'next is a lane agent\'s: read a lane with GET /v1/lanes/\'{\'id\'}\'' }),
     noReviewerNamed: agentMsg({ id: 'api.lane.noReviewerNamed', text: 'No agent "{reviewer}" in {project}: the lane has no reviewer until one joins it.' }),
-    noWatch: agentMsg({ id: 'api.lane.noWatch', text: 'No watch of yours follows this lane: watch the lanes (hive_wait_for_tasks with lanes ["all"], wake) to follow it to its end.' }),
+    noWatch: agentMsg({ id: 'api.lane.noWatch', text: 'No watch of yours follows this lane: watch the lanes (cw_wait_for_tasks with lanes ["all"], wake) to follow it to its end.' }),
     poolArg: agentMsg({ id: 'api.lane.poolArg', text: 'pool must be true or false' }),
     poolNoReviewer: agentMsg({ id: 'api.lane.poolNoReviewer', text: 'A lane reviewed by the pool has no reviewer of its own: leave reviewer out' }),
     poolStartedBy: agentMsg({ id: 'api.lane.poolStartedBy', text: 'A lane reviewed by the pool is started by the Assistant or the user (Start Lane): an agent\'s own lane names its reviewer' }),
@@ -340,7 +340,7 @@ export const API = {
     notFound: agentMsg({ id: 'api.note.notFound', text: 'Not found' }),
     pathRequired: agentMsg({ id: 'api.note.pathRequired', text: 'path is required' }),
     titleContentRequired: agentMsg({ id: 'api.note.titleContentRequired', text: 'title and content are required' }),
-    workspaceNotesReadOnly: agentMsg({ id: 'api.note.workspaceNotesReadOnly', text: 'The shared note "{path}" is the user\'s and the Hive Assistant\'s: project agents read it but don\'t change it. Tell the user what it should say.' })
+    workspaceNotesReadOnly: agentMsg({ id: 'api.note.workspaceNotesReadOnly', text: 'The shared note "{path}" is the user\'s and the Assistant\'s: project agents read it but don\'t change it. Tell the user what it should say.' })
   },
   notify: {
     sayProject: agentMsg({ id: 'api.notify.sayProject', text: 'Say which project the agent is in: target.project' }),
@@ -376,7 +376,7 @@ export const API = {
     notInstalled: agentMsg({ id: 'api.provider.notInstalled', text: 'not installed' })
   },
   queue: {
-    notAgents: agentMsg({ id: 'api.queue.notAgents', text: 'Project agents can\'t {what}: the merge queue\'s controls are the user\'s, and the Hive Assistant\'s within Settings → Assistant → Control. Tell the user if it should be done.' }),
+    notAgents: agentMsg({ id: 'api.queue.notAgents', text: 'Project agents can\'t {what}: the merge queue\'s controls are the user\'s, and the Assistant\'s within Settings → Assistant → Control. Tell the user if it should be done.' }),
     projectRequired: agentMsg({ id: 'api.queue.projectRequired', text: 'project is required' }),
     targetArg: agentMsg({ id: 'api.queue.targetArg', text: 'target is a branch name' }),
     targetRequired: agentMsg({ id: 'api.queue.targetRequired', text: 'target is required: the branch the queue merges into{listed, select, yes { ({targets})} other {}}' })
@@ -388,7 +388,7 @@ export const API = {
     line: agentMsg({ id: 'api.settings.line', text: 'Change {path}{where, select, project { in {project}} other {}}', note: 'The Assistant\'s activity line for a setting change it was refused (stored).' }),
     notAllowed: agentMsg({ id: 'api.settings.notAllowed', text: 'not allowed: Settings → Assistant → Control → Change settings is off', note: 'Why the Assistant\'s setting change was refused, in its activity (stored).' }),
     notAllowedReason: agentMsg({ id: 'api.settings.notAllowedReason', text: 'Not allowed: Settings → Assistant → Control → Change settings is off' }),
-    onlyAssistant: agentMsg({ id: 'api.settings.onlyAssistant', text: 'Only the Hive Assistant can change Hive\'s settings through the Agent API: the user changes them in {path}.' }),
+    onlyAssistant: agentMsg({ id: 'api.settings.onlyAssistant', text: 'Only the Assistant can change Combwork\'s settings through the Agent API: the user changes them in {path}.' }),
     projectNeedsName: agentMsg({ id: 'api.settings.projectNeedsName', text: 'A project\'s settings need its name: project=<name>.' }),
     readOnly: agentMsg({ id: 'api.settings.readOnly', text: '{readOnly} Tell the user how, instead.' }),
     sayProject: agentMsg({ id: 'api.settings.sayProject', text: '{setting} is a project\'s setting: say which project.' }),
@@ -402,38 +402,38 @@ export const API = {
     fileOutside: agentMsg({ id: 'api.skill.fileOutside', text: '"{file}" isn\'t a path inside the skill\'s folder' }),
     fileTooBig: agentMsg({ id: 'api.skill.fileTooBig', text: '"{file}" is larger than {kilobytes} KB' }),
     noFile: agentMsg({ id: 'api.skill.noFile', text: 'The skill "{skill}" has no file "{file}"' }),
-    unknown: agentMsg({ id: 'api.skill.unknown', text: 'The workspace has no Hive skill "{name}"' })
+    unknown: agentMsg({ id: 'api.skill.unknown', text: 'The workspace has no Combwork skill "{name}"' })
   },
   slot: {
     heldGone: agentMsg({ id: 'api.slot.heldGone', text: 'gone (process {pid})' }),
-    heldThisHive: agentMsg({ id: 'api.slot.heldThisHive', text: 'this Hive' }),
+    heldThisHive: agentMsg({ id: 'api.slot.heldThisHive', text: 'this Combwork' }),
     kindArg: agentMsg({ id: 'api.slot.kindArg', text: 'kind is carried or writer' }),
-    notAgents: agentMsg({ id: 'api.slot.notAgents', text: 'Project agents can\'t release a slot: that is the user\'s, and the Hive Assistant\'s within Settings → Assistant → Control once the user agrees. Tell the user if a slot is stuck.' })
+    notAgents: agentMsg({ id: 'api.slot.notAgents', text: 'Project agents can\'t release a slot: that is the user\'s, and the Assistant\'s within Settings → Assistant → Control once the user agrees. Tell the user if a slot is stuck.' })
   },
   status: {
-    hooksMissing: agentMsg({ id: 'api.status.hooksMissing', text: '{state}: its CLI\'s hooks aren\'t reaching Hive, so its status may be wrong and it isn\'t given work; the user can restart its session' }),
+    hooksMissing: agentMsg({ id: 'api.status.hooksMissing', text: '{state}: its CLI\'s hooks aren\'t reaching Combwork, so its status may be wrong and it isn\'t given work; the user can restart its session' }),
     notSignedIn: agentMsg({ id: 'api.status.notSignedIn', text: 'not signed in', note: 'The reason, when its CLI gave none.' }),
     retryWait: agentMsg({ id: 'api.status.retryWait', text: '{state}: its CLI is waiting to retry its model request and carries on by itself; it isn\'t given work meanwhile' }),
     signInExpired: agentMsg({ id: 'api.status.signInExpired', text: 'Its CLI\'s sign-in has expired: the user must sign in again ({reason})' }),
-    unknownState: agentMsg({ id: 'api.status.unknownState', text: '{state}: Hive has heard nothing of its turn and seen no sign of its end, so it isn\'t given work; the user can mark it idle' })
+    unknownState: agentMsg({ id: 'api.status.unknownState', text: '{state}: Combwork has heard nothing of its turn and seen no sign of its end, so it isn\'t given work; the user can mark it idle' })
   },
   team: {
-    notAgents: agentMsg({ id: 'api.team.notAgents', text: 'Project agents can\'t {what}: pausing the team is the user\'s, and the Hive Assistant\'s within Settings → Assistant → Control. Tell the user if it should be done.' }),
+    notAgents: agentMsg({ id: 'api.team.notAgents', text: 'Project agents can\'t {what}: pausing the team is the user\'s, and the Assistant\'s within Settings → Assistant → Control. Tell the user if it should be done.' }),
     otherNotParked: agentMsg({ id: 'api.team.otherNotParked', text: 'Another open workspace is paused, not parked yet.' }),
     otherNotPaused: agentMsg({ id: 'api.team.otherNotPaused', text: 'Another open workspace isn\'t paused: the user pauses it from its window, or with Pause the Team.' })
   },
   template: {
-    onlyAssistant: agentMsg({ id: 'api.template.onlyAssistant', text: 'Only the Hive Assistant can {what} through the Agent API: templates are loaded in Hive\'s window.' }),
+    onlyAssistant: agentMsg({ id: 'api.template.onlyAssistant', text: 'Only the Assistant can {what} through the Agent API: templates are loaded in Combwork\'s window.' }),
     workflowArg: agentMsg({ id: 'api.template.workflowArg', text: 'workflow is true or false' })
   },
   undo: {
     nameOne: agentMsg({ id: 'api.undo.nameOne', text: 'Name one change (change: its id) or one message\'s changes (group: its id, or "latest").' }),
     noneLeft: agentMsg({ id: 'api.undo.noneLeft', text: 'None of your changes of the last 7 days is left to undo.' }),
-    onlyAssistant: agentMsg({ id: 'api.undo.onlyAssistant', text: 'Only the Hive Assistant has changes to undo: they are its own.' })
+    onlyAssistant: agentMsg({ id: 'api.undo.onlyAssistant', text: 'Only the Assistant has changes to undo: they are its own.' })
   },
   watch: {
     agentsArg: agentMsg({ id: 'api.watch.agentsArg', text: 'agents must be a list of \'{ project, agent }\'' }),
-    agentsWithLanes: agentMsg({ id: 'api.watch.agentsWithLanes', text: 'agents goes with lanes (a lane watch, HI-1987): to watch agents alone, use hive_wait_for_agents (POST /v1/agents/wait)' }),
+    agentsWithLanes: agentMsg({ id: 'api.watch.agentsWithLanes', text: 'agents goes with lanes (a lane watch, HI-1987): to watch agents alone, use cw_wait_for_agents (POST /v1/agents/wait)' }),
     cancelled: agentMsg({ id: 'api.watch.cancelled', text: 'Cancelled your {kind} watch.' }),
     cancelledOne: agentMsg({ id: 'api.watch.cancelledOne', text: 'Cancelled your {kind, select, lane {lane} agent {agent} other {card}} watch.' }),
     laneWakes: agentMsg({ id: 'api.watch.laneWakes', text: 'A lane watch wakes you (wake: true), for an agent or the Assistant: a script waits on cards.' }),
@@ -452,21 +452,21 @@ export const API = {
     tooManyWaits: agentMsg({ id: 'api.watch.tooManyWaits', text: 'You already have {running} card waits running: wait for them to end.' }),
     usageAlone: agentMsg({ id: 'api.watch.usageAlone', text: 'usage goes alone, or beside cards or lanes' }),
     usageMax: agentMsg({ id: 'api.watch.usageMax', text: 'at most {max} accounts in one usage watch' }),
-    usageNoAccount: agentMsg({ id: 'api.watch.usageNoAccount', text: 'No account named "{name}": hive_connection list names them.' }),
+    usageNoAccount: agentMsg({ id: 'api.watch.usageNoAccount', text: 'No account named "{name}": cw_connection list names them.' }),
     usagePercent: agentMsg({ id: 'api.watch.usagePercent', text: 'percent must be a whole number from 1 to 100' }),
     usageShape: agentMsg({ id: 'api.watch.usageShape', text: 'usage must be a list of \'{\' account, percent, limit? \'}\', limit weekly, fiveHour or any' }),
     usageWakes: agentMsg({ id: 'api.watch.usageWakes', text: 'A usage watch wakes you (wake: true), for an agent or the Assistant.' }),
     wakeOnlyAgents: agentMsg({ id: 'api.watch.wakeOnlyAgents', text: 'Only an agent or the Assistant can be woken: a script waits without wake (timeoutSeconds).' })
   },
   workspace: {
-    agentNotOpen: agentMsg({ id: 'api.workspace.agentNotOpen', text: 'The agent\'s workspace isn\'t open in Hive' }),
-    assistantNotOpen: agentMsg({ id: 'api.workspace.assistantNotOpen', text: 'The Assistant\'s workspace isn\'t open in Hive' }),
+    agentNotOpen: agentMsg({ id: 'api.workspace.agentNotOpen', text: 'The agent\'s workspace isn\'t open in Combwork' }),
+    assistantNotOpen: agentMsg({ id: 'api.workspace.assistantNotOpen', text: 'The Assistant\'s workspace isn\'t open in Combwork' }),
     closed: agentMsg({ id: 'api.workspace.closed', text: 'The workspace was closed' }),
     noneOpen: agentMsg({ id: 'api.workspace.noneOpen', text: 'No workspace is open' }),
     projectInSeveral: agentMsg({ id: 'api.workspace.projectInSeveral', text: '"{project}" is a project in several open workspaces: name it as <workspace>/<project>, e.g. {workspace}/{project}' }),
-    sayWhich: agentMsg({ id: 'api.workspace.sayWhich', text: 'Several workspaces are open in Hive: say which with ?workspace=<name> or the X-Hive-Workspace header' }),
+    sayWhich: agentMsg({ id: 'api.workspace.sayWhich', text: 'Several workspaces are open in Combwork: say which with ?workspace=<name> or the X-Hive-Workspace header' }),
     severalNamed: agentMsg({ id: 'api.workspace.severalNamed', text: 'Several open workspaces are named "{name}" ({paths}): say which by its full path in the X-Hive-Workspace header or ?workspace=' }),
-    unknown: agentMsg({ id: 'api.workspace.unknown', text: 'Unknown workspace "{name}": it isn\'t open in Hive' }),
+    unknown: agentMsg({ id: 'api.workspace.unknown', text: 'Unknown workspace "{name}": it isn\'t open in Combwork' }),
     unknownProject: agentMsg({ id: 'api.workspace.unknownProject', text: 'Unknown project "{name}"' })
   }
 }

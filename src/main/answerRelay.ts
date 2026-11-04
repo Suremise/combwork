@@ -30,7 +30,7 @@ const log = createLogger('answerRelay')
 const SOURCE = 'answer-relay'
 const ASSISTANT = 'assistant'
 /** Hive's own deliveries come from it. */
-const HIVE = { kind: 'hive', name: 'Hive' } as const // i18n-ignore: the product's name, as a delivery's sender
+const HIVE = { kind: 'hive', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 
 /** The Assistant's line for an answer (relayLine), said in its dialect (agent-facing). */
 const T = {
@@ -39,13 +39,13 @@ const T = {
   replyIsDecision: agentMsg({ id: 'inbox.relay.replyIsDecision', text: "Their reply, whole, recorded as the card's decision too: <<<{reply}>>>", note: "In the Assistant's line for the user's answer to an agent's question: an approval's note, which is its reply and the card's decision too, said once (HI-2286)." }),
   said: agentMsg({
     id: 'inbox.relay.said',
-    text: "the user {outcome, select, approved {approved} declined {declined} other {answered}} {asker}'s question on {card}. The question, whole: <<<{question}>>>.{wrote, select, yes { {words}.} answered {} other { Nothing was written with it.}} (Both stay on the card: hive_read_task {card}.)",
+    text: "the user {outcome, select, approved {approved} declined {declined} other {answered}} {asker}'s question on {card}. The question, whole: <<<{question}>>>.{wrote, select, yes { {words}.} answered {} other { Nothing was written with it.}} (Both stay on the card: cw_read_task {card}.)",
     note: "What the user did with an agent's question, in the Assistant's line (HI-1734), after its opening (inbox.relay.declined, .needed, .check). asker: the asking agent's name; card: its card (HI-12); question: the question, whole; wrote: yes with words (the reply and decision: inbox.relay.reply, .decision), answered for an answer with none, no for a bare approval or decline."
   }),
   declined: agentMsg({ id: 'inbox.relay.declined', text: 'For your information: {said} The user declined: nothing is to be done for it.', note: "The Assistant's line when the user declined an agent's question (HI-1734): never worded as a grant. said: what the user did (inbox.relay.said)." }),
   needed: agentMsg({
     id: 'inbox.relay.needed',
-    text: "This needs you: {said} {asker} can't {need, select, done {move it to Done} noCode {make it no code} unblock {unblock it} other {skip its review}} by itself. {outcome, select, approved {Their approval is a yes, within any conditions its reply sets} other {Do it only if the answer agrees, within any conditions it sets}}, with the answer as the reason (hive_update_task).",
+    text: "This needs you: {said} {asker} can't {need, select, done {move it to Done} noCode {make it no code} unblock {unblock it} other {skip its review}} by itself. {outcome, select, approved {Their approval is a yes, within any conditions its reply sets} other {Do it only if the answer agrees, within any conditions it sets}}, with the answer as the reason (cw_update_task).",
     note: "The Assistant's line when the user answered or approved an agent's question on a card that needs what only the Assistant or the user can do (HI-1734). said: what the user did (inbox.relay.said); asker: the asking agent's name; need: done, noCode, unblock or skipReview; outcome: approved or answered."
   }),
   check: agentMsg({

@@ -1,4 +1,4 @@
-// A lane's brief for its builder (HI-1795, SPEC §16.10.2): `hive_lane start`'s `brief`, kept with the lane (lanes.ts,
+// A lane's brief for its builder (HI-1795, SPEC §16.10.2): `cw_lane start`'s `brief`, kept with the lane (lanes.ts,
 // shared/lanes.ts nextBrief). In slots, every placement of the lane's cards carries it (slotCards.ts' place, briefOf):
 // the conversation that works the card gets it with the card, whatever that conversation is. Outside slots there is no
 // placement, so it is delivered to the builder once per revision (source `lane-brief`, ref `<lane>:<rev>`): the lane
@@ -102,7 +102,7 @@ async function settleOnce(ws: WorkspaceService): Promise<void> {
       const made = (await deliveriesOf(projectPath, lane.builder.id)).some((r) => r.source === LANE_BRIEF_SOURCE && r.ref === current)
       if (!made) {
         // agent-protocol: the sender is the product's name, Hive
-        await createDelivery(projectPath, { agentId: lane.builder.id, agentName: lane.builder.name, kind: 'rebrief', from: { kind: 'hive', name: 'Hive' }, body: inDefaultDialect(() => briefText(lane, text)), source: LANE_BRIEF_SOURCE, ref: current, meta: { lane: lane.id, rev: b.rev, ...(b.notIn ? { notIn: b.notIn } : {}) } }) // i18n-ignore: who a delivery is from, as agents read it
+        await createDelivery(projectPath, { agentId: lane.builder.id, agentName: lane.builder.name, kind: 'rebrief', from: { kind: 'hive', name: 'Combwork' }, body: inDefaultDialect(() => briefText(lane, text)), source: LANE_BRIEF_SOURCE, ref: current, meta: { lane: lane.id, rev: b.rev, ...(b.notIn ? { notIn: b.notIn } : {}) } }) // i18n-ignore: who a delivery is from, as agents read it
         log.info(`Lane ${lane.id}'s brief (rev ${b.rev}) delivered to ${userText(lane.builder.name)}`)
       }
     }

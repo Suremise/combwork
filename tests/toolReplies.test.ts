@@ -80,7 +80,7 @@ describe('task rows', () => {
         'Doing (1, top first):',
         "#7 Card 7 · alpha · stalled: Coder isn't running. · 1 comment",
         '',
-        'hive_read_task gives a card in full.'
+        'cw_read_task gives a card in full.'
       ].join('\n')
     )
   })
@@ -157,7 +157,7 @@ describe("an agent's model, effort and retry waits (HI-1996)", () => {
     expect(one).toEqual({ waits: 1, ms: 400_000, latest: { since: wait.since, ended: wait.retryAt, tries: 1, status: 429 } })
     const two = addRetryWaited(one, { ...wait, since: '2026-10-29T11:00:00.000Z', retryAt: null, attempt: 3, status: null, network: true }, at('2026-10-29T11:01:00.000Z'))
     expect(two).toEqual({ waits: 2, ms: 460_000, latest: { since: '2026-10-29T11:00:00.000Z', ended: '2026-10-29T11:01:00.000Z', tries: 3, status: null, network: true } })
-    // As hive_agent_activity gives them: seconds; one under way counted to now, the latest.
+    // As cw_agent_activity gives them: seconds; one under way counted to now, the latest.
     expect(retryWaitsView({ retryWaited: two })).toEqual({ waits: 2, seconds: 460, latest: { since: '2026-10-29T11:00:00.000Z', seconds: 60, tries: 3, status: null, network: true } })
     expect(retryWaitsView({ retryWaited: two, retryWait: { ...wait, since: '2026-10-29T12:00:00.000Z', retryAt: '2026-10-29T12:05:00.000Z' } }, at('2026-10-29T12:01:30.000Z'))).toEqual({
       waits: 3,
@@ -242,7 +242,7 @@ describe('projects and notes', () => {
       { relPath: 'handovers', isDir: true, children: [{ relPath: 'handovers/2026-10-01-a.md', isDir: false, modified: '2026-10-01T12:00:00.000Z' }] },
       { relPath: 'conventions.md', isDir: false }
     ])
-    expect(text).toBe('handovers/2026-10-01-a.md (2026-10-01)\nconventions.md\n\nhive_read_shared_note reads one.')
+    expect(text).toBe('handovers/2026-10-01-a.md (2026-10-01)\nconventions.md\n\ncw_read_shared_note reads one.')
     expect(notesListText([])).toBe('No shared notes yet.')
   })
 
@@ -256,30 +256,30 @@ describe('projects and notes', () => {
   })
 })
 
-describe("hive_message_agent's queued reply (#1497)", () => {
+describe("cw_message_agent's queued reply (#1497)", () => {
   const queued = (tells: ('checkpoints' | 'stopContinuation' | 'idleWakes')[]) => messageQueuedText({ who: 'B1', id: 'm7', tied: '', status: 'working', queued: 2, tells })
-  const said = (how: string) => `Queued for B1 (m7, working): ${how}; 2 waiting. hive_agent_activity says when it is received and acked.`
+  const said = (how: string) => `Queued for B1 (m7, working): ${how}; 2 waiting. cw_agent_activity says when it is received and acked.`
   it('names only the ways the carrying-on switches on for the agent tell it, in their order, for each combination', () => {
     const cases: [('checkpoints' | 'stopContinuation' | 'idleWakes')[], string][] = [
-      [['checkpoints', 'stopContinuation', 'idleWakes'], "Hive tells it at its next tool call, at its turn's end or once it is idle"],
-      [['checkpoints', 'stopContinuation'], "Hive tells it at its next tool call or at its turn's end"],
-      [['checkpoints', 'idleWakes'], 'Hive tells it at its next tool call or once it is idle'],
-      [['stopContinuation', 'idleWakes'], "Hive tells it at its turn's end or once it is idle"],
-      [['checkpoints'], 'Hive tells it at its next tool call'],
-      [['stopContinuation'], "Hive tells it at its turn's end"],
-      [['idleWakes'], 'Hive tells it once it is idle'],
-      [[], 'it waits in its inbox until it reads it with hive_inbox (the user can Deliver Now)']
+      [['checkpoints', 'stopContinuation', 'idleWakes'], "Combwork tells it at its next tool call, at its turn's end or once it is idle"],
+      [['checkpoints', 'stopContinuation'], "Combwork tells it at its next tool call or at its turn's end"],
+      [['checkpoints', 'idleWakes'], 'Combwork tells it at its next tool call or once it is idle'],
+      [['stopContinuation', 'idleWakes'], "Combwork tells it at its turn's end or once it is idle"],
+      [['checkpoints'], 'Combwork tells it at its next tool call'],
+      [['stopContinuation'], "Combwork tells it at its turn's end"],
+      [['idleWakes'], 'Combwork tells it once it is idle'],
+      [[], 'it waits in its inbox until it reads it with cw_inbox (the user can Deliver Now)']
     ]
     for (const [tells, how] of cases) expect(queued(tells), tells.join('+') || 'none').toBe(said(how))
     // Given in any order, said in the switches' own.
-    expect(queued(['idleWakes', 'checkpoints'])).toBe(said('Hive tells it at its next tool call or once it is idle'))
+    expect(queued(['idleWakes', 'checkpoints'])).toBe(said('Combwork tells it at its next tool call or once it is idle'))
   })
   it("says the card's round it is tied to", () => {
-    expect(messageQueuedText({ who: 'B1', id: 'm7', tied: ', for HI-12 (#40) round 2', status: 'watching', queued: 1, tells: ['idleWakes'] })).toBe('Queued for B1 (m7, for HI-12 (#40) round 2, watching): Hive tells it once it is idle; 1 waiting. hive_agent_activity says when it is received and acked.')
+    expect(messageQueuedText({ who: 'B1', id: 'm7', tied: ', for HI-12 (#40) round 2', status: 'watching', queued: 1, tells: ['idleWakes'] })).toBe('Queued for B1 (m7, for HI-12 (#40) round 2, watching): Combwork tells it once it is idle; 1 waiting. cw_agent_activity says when it is received and acked.')
   })
 })
 
-describe('hive_notify (HI-1961)', () => {
+describe('cw_notify (HI-1961)', () => {
   it('says what a click opens, only when the notice has a target', () => {
     expect(notifiedText({})).toBe('Notification shown.')
     expect(notifiedText({ opens: 'HB4' })).toBe('Notification shown; a click opens HB4.')
@@ -291,7 +291,7 @@ describe('hive_notify (HI-1961)', () => {
 describe('a card read narrowed to its newest comments', () => {
   const card = { comments: ['a', 'b', 'c'] }
 
-  it('hive_read_task passes comments through whenever it is given, 0 included', () => {
+  it('cw_read_task passes comments through whenever it is given, 0 included', () => {
     expect(readTaskQuery({ comments: 0 })).toBe('history=false&comments=0')
     expect(readTaskQuery({ comments: 2 })).toBe('history=false&comments=2')
     expect(readTaskQuery({ comments: 2.7, summary: true, attachments: true, history: true })).toBe('comments=2&summary=true&attachments=true')

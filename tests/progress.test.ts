@@ -1157,17 +1157,17 @@ describe("Hive's set-up runs in review copies (HI-1710)", () => {
     expect(runAgentName(held, tr)).toBe('HR6')
     expect(runDetailsText(held, 'alpha', now)).toContain('copy-1')
     const idle = [s.start(hive({ copy: 'copy-1' }), { title: 'npm ci' }), s.start(hive({ copy: 'copy-2' }), { title: 'npm ci' })]
-    expect(idle.map((r) => [r.agentId, r.agentName, r.defaultName, r.copy])).toEqual([[null, 'Hive (review copies)', 'copy', 'copy-1'], [null, 'Hive (review copies)', 'copy', 'copy-2']])
+    expect(idle.map((r) => [r.agentId, r.agentName, r.defaultName, r.copy])).toEqual([[null, 'Combwork (review copies)', 'copy', 'copy-1'], [null, 'Combwork (review copies)', 'copy', 'copy-2']])
     expect(idle.map((r) => runAgentName(r, tr))).toEqual(['Combwork (review copies)', 'Combwork (review copies)'])
     // A slot's run never takes a reviewer.
-    expect(s.start(hive({ slot: 'slot-b', reviewer: { agentId: 'r-6', agentName: 'HR6' } }), { title: 'npm ci' })).toMatchObject({ agentId: null, agentName: 'Hive (slot slot-b)', defaultName: 'slot' })
+    expect(s.start(hive({ slot: 'slot-b', reviewer: { agentId: 'r-6', agentName: 'HR6' } }), { title: 'npm ci' })).toMatchObject({ agentId: null, agentName: 'Combwork (slot slot-b)', defaultName: 'slot' })
     // The reviewer's run is still Hive's: the agent can't change or end it.
     const r6: ProgressCaller = { ...alfie, agentId: 'r-6', agentName: 'HR6' }
     expect(status(() => s.update(r6, held.id, { step: 1 }))).not.toBeNull()
     expect(status(() => s.update(hive(), held.id, { step: 1 }))).toBeNull()
   })
 
-  it('keep their reviewer across a save; older "Hive (copy copy-1)" runs fold into "Hive (review copies)"', () => {
+  it('keep their reviewer across a save; older "Hive (copy copy-1)" runs fold into "Combwork (review copies)"', () => {
     const ended = { state: 'passed', startedAt: 1, finishedAt: 2, source: 'hive', projectPath: alfie.projectPath }
     const records = [
       { ...ended, id: 'c1', title: 'npm ci', copy: 'copy-1', agentId: 'r-6', agentName: 'HR6' },
@@ -1177,7 +1177,7 @@ describe("Hive's set-up runs in review copies (HI-1710)", () => {
       { ...ended, id: 'c4', title: 'npm ci', slot: 'slot-b', agentId: 'r-6', agentName: 'HR6' }
     ]
     const marks = (runs: ProgressRun[]): unknown[][] => runs.map((r) => [r.id, r.agentId, r.agentName, r.defaultName ?? null])
-    const want = [['c1', 'r-6', 'HR6', null], ['c2', null, 'Hive (review copies)', 'copy'], ['c3', null, 'Hive (review copies)', 'copy'], ['c4', null, 'Hive (slot slot-b)', 'slot']]
+    const want = [['c1', 'r-6', 'HR6', null], ['c2', null, 'Combwork (review copies)', 'copy'], ['c3', null, 'Combwork (review copies)', 'copy'], ['c4', null, 'Combwork (slot slot-b)', 'slot']]
     const once = keptRuns({ runs: records }, WS)
     expect(marks(once)).toEqual(want)
     expect(marks(keptRuns(JSON.parse(JSON.stringify({ runs: once })), WS))).toEqual(want)

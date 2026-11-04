@@ -438,12 +438,12 @@ describe('the turn ledger', () => {
     const mid = admit(a.ledger, { kind: 'prompt', text: 'a word from the user' }, ids('t1'))
     expect(mid).toMatchObject({ verdict: 'apply', note: 'a prompt in the running turn' })
     expect(a.ledger.active?.id).toBe('t1')
-    expectInjected(a.ledger, 'You have  2 messages:\ncall hive_inbox')
-    const own = admit(a.ledger, { kind: 'prompt', text: 'You have 2 messages: call hive_inbox' }, ids('t1'))
+    expectInjected(a.ledger, 'You have  2 messages:\ncall cw_inbox')
+    const own = admit(a.ledger, { kind: 'prompt', text: 'You have 2 messages: call cw_inbox' }, ids('t1'))
     expect(own).toMatchObject({ verdict: 'apply', event: { kind: 'prompt', injected: true } })
     expect(hookStep((own as { event: HookEvent }).event, input(a))).toEqual({ next: null, actions: [] })
     // Only once: the same text again is the CLI's own.
-    expect(admit(a.ledger, { kind: 'prompt', text: 'You have 2 messages: call hive_inbox' }, ids('t1'))).not.toMatchObject({ event: { injected: true } })
+    expect(admit(a.ledger, { kind: 'prompt', text: 'You have 2 messages: call cw_inbox' }, ids('t1'))).not.toMatchObject({ event: { injected: true } })
   })
 
   it('an interrupt, a refused sign-in and the CLI idle at its prompt end the running turn', () => {

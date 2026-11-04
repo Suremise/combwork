@@ -116,36 +116,36 @@ describe('a lane on slots (#1438)', () => {
     // Still a start's wait (never a wait for a slot): the builder is B1, and the session in the slot its own field.
     const session = view({ slot: 'slot-a', held: 'session', agent: 'CB1' })
     expect(session.status).toEqual({ reason: 'startWait', card: 2, why: 'refused', agent: 'B1', slot: 'slot-a', held: 'session', heldBy: 'CB1' })
-    expect(laneLine(session)).toContain("#2 waits to start: its start was refused for now, slot-a still in use (CB1's session is still in it); Hive tries again")
-    expect(laneLine(view({ slot: 'slot-a', held: 'process' }))).toContain('#2 waits to start: its start was refused for now, slot-a still in use (a process still has a file or folder in it open); Hive tries again')
+    expect(laneLine(session)).toContain("#2 waits to start: its start was refused for now, slot-a still in use (CB1's session is still in it); Combwork tries again")
+    expect(laneLine(view({ slot: 'slot-a', held: 'process' }))).toContain('#2 waits to start: its start was refused for now, slot-a still in use (a process still has a file or folder in it open); Combwork tries again')
     const broker = view({ slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer', idle: false })
     expect(broker.status).toMatchObject({ reason: 'startWait', why: 'refused', slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer', idle: false })
-    expect(laneLine(broker)).toContain("slot-a still in use (a process still has a file or folder in it open: Windows Sandbox's broker (WindowsSandboxServer) is working in it, with a Sandbox running); Hive tries again")
+    expect(laneLine(broker)).toContain("slot-a still in use (a process still has a file or folder in it open: Windows Sandbox's broker (WindowsSandboxServer) is working in it, with a Sandbox running); Combwork tries again")
     // No slot free, as its builder's own last run still holds it: what that run left there, or that it isn't known to have ended.
-    expect(laneLine(view({ slot: 'slot-a', held: 'left', agent: 'B1', program: 'node' }))).toContain("slot-a still in use (B1's last run left node running in it); Hive tries again")
-    expect(laneLine(view({ slot: 'slot-a', held: 'left', agent: 'B1', program: 'node', more: 2 }))).toContain("slot-a still in use (B1's last run left node and 2 more running in it); Hive tries again")
+    expect(laneLine(view({ slot: 'slot-a', held: 'left', agent: 'B1', program: 'node' }))).toContain("slot-a still in use (B1's last run left node running in it); Combwork tries again")
+    expect(laneLine(view({ slot: 'slot-a', held: 'left', agent: 'B1', program: 'node', more: 2 }))).toContain("slot-a still in use (B1's last run left node and 2 more running in it); Combwork tries again")
     expect(view({ slot: 'slot-a', held: 'left', agent: 'B1', program: 'node', more: 2 }).status).toMatchObject({ held: 'left', heldBy: 'B1', program: 'node', more: 2 })
-    expect(laneLine(view({ slot: 'slot-a', held: 'lastRun', agent: 'B1' }))).toContain("slot-a still in use (B1's last run there isn't known to have ended); Hive tries again")
+    expect(laneLine(view({ slot: 'slot-a', held: 'lastRun', agent: 'B1' }))).toContain("slot-a still in use (B1's last run there isn't known to have ended); Combwork tries again")
     // Refused for another reason, or nothing held any more: as before HI-2468.
     const bare = view()
     expect(bare.status).toEqual({ reason: 'startWait', card: 2, why: 'refused', agent: 'B1' })
-    expect(laneLine(bare)).toContain('#2 waits to start: its start was refused for now; Hive tries again')
+    expect(laneLine(bare)).toContain('#2 waits to start: its start was refused for now; Combwork tries again')
     // A held slot kept with another reason (the builder busy) never shows: only a refused start says it.
     expect(laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, null, undefined, { card: 2, why: 'busy', agent: 'B1', held: { slot: 'slot-a', held: 'process' } }).status).toEqual({ reason: 'startWait', card: 2, why: 'busy', agent: 'B1' })
   })
 
-  it("hive_lane next says where the next card is built", () => {
+  it("cw_lane next says where the next card is built", () => {
     const v = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false })
-    expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: false }, waits: null })).toBe('Next: #2 Card 2. Start it: it is built in slot-b, on a new branch Hive makes there.')
+    expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: false }, waits: null })).toBe('Next: #2 Card 2. Start it: it is built in slot-b, on a new branch Combwork makes there.')
     expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null })).toBe('Carry on with #2 Card 2 in slot-b.')
     const none = laneView(rec(), cards)
     expect(laneNextText({ lane: none, next: { card: 2, title: 'Card 2', carryOn: false }, waits: null })).toBe('Next: #2 Card 2. Start it.')
   })
 
-  it('HI-2245: hive_lane next says to hand over a card carried on with commits past its submission, and nothing more without them', () => {
+  it('HI-2245: cw_lane next says to hand over a card carried on with commits past its submission, and nothing more without them', () => {
     const v = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false })
     const u = [{ card: 2, count: 2, atLeast: false, since: 'ab30f52' }]
-    expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null, unsubmitted: u })).toBe('Carry on with #2 Card 2 in slot-b. First hand it over: its line has 2 commits since its submission (ab30f52); hive_submit with followUp: true.')
+    expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null, unsubmitted: u })).toBe('Carry on with #2 Card 2 in slot-b. First hand it over: its line has 2 commits since its submission (ab30f52); cw_submit with followUp: true.')
     // Another card's fact isn't this one's; with none, the reply is as before.
     expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null, unsubmitted: [{ ...u[0], card: 3 }] })).toBe('Carry on with #2 Card 2 in slot-b.')
     expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null, unsubmitted: [] })).toBe('Carry on with #2 Card 2 in slot-b.')
@@ -448,7 +448,7 @@ describe('the lanes service', () => {
     await lanes.endLane(w, abandoned.id, { abandoned: true })
     await expect(lanes.laneNext(w, 'alpha', 'b2')).rejects.toThrow(`Your lane ${abandoned.id} was abandoned: don't start it again; ask the user if there is more to do.`)
     // An agent that had no lane: as before.
-    await expect(lanes.laneNext(w, 'alpha', 'g1')).rejects.toThrow('No running lane of yours: start one with hive_lane start, or ask the user')
+    await expect(lanes.laneNext(w, 'alpha', 'g1')).rejects.toThrow('No running lane of yours: start one with cw_lane start, or ask the user')
   })
 
   it('a lane reviewed by the pool (#1443): kept with its row, nobody joins it, its builder keeps it; a reviewer named makes it one per lane', async () => {

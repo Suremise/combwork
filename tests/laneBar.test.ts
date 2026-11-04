@@ -433,8 +433,8 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
 
   it('a refused request (#1279): its reason and next step as the agent got them, the card named as the window names it; repeats counted after', () => {
     // Each a whole sentence on a line of its own (HI-1585), the repeats on one after them.
-    expect(workNotes(badge({ refused }), 'review', null, short, tr, names, 'AL-7')).toEqual(['AL-7: nothing committed to review.', "Commit the card's work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. A card that needs no change is no-code: ask for that with hive_ask_user (action noCode).", 'Under review: a3f2c1d'])
-    expect(workNotes(badge({ refused: { ...refused, times: 3 } }), 'doing', null, short, tr, names, 'AL-7').slice(0, 3)).toEqual(['AL-7: nothing committed to review.', "Commit the card's work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. A card that needs no change is no-code: ask for that with hive_ask_user (action noCode).", 'Refused 3 times in a row.'])
+    expect(workNotes(badge({ refused }), 'review', null, short, tr, names, 'AL-7')).toEqual(['AL-7: nothing committed to review.', "Commit the card's work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. A card that needs no change is no-code: ask for that with cw_ask_user (action noCode).", 'Under review: a3f2c1d'])
+    expect(workNotes(badge({ refused: { ...refused, times: 3 } }), 'doing', null, short, tr, names, 'AL-7').slice(0, 3)).toEqual(['AL-7: nothing committed to review.', "Commit the card's work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. A card that needs no change is no-code: ask for that with cw_ask_user (action noCode).", 'Refused 3 times in a row.'])
     // A rule's names in the window's words (move.notFromHere names the stage and the moves).
     expect(workNotes(badge({ revision: null, refused: { move: 'submit', rule: 'move.notFromHere', values: { card: 'alpha-7', stage: 'todo', move: 'submit', moves: 'start' }, at: '', times: 1 } }), 'todo', null, short, tr, names, 'AL-7')[0]).toMatch(/^AL-7 /)
   })
@@ -445,7 +445,7 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     // An agent's refusal says which next step fits its folder (HI-2227): uncommitted changes to commit, or none (no-code).
     const agent = { ...window, forUser: false }
     expect(refusalLines('submit.empty', { card: 'AL-7', changes: 'yes' }, agent).next).toBe("Commit the card's work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing.")
-    expect(refusalLines('submit.empty', { card: 'AL-7', changes: 'none' }, agent).next).toMatch(/^Its folder has no changes either\. .*no-code: ask for that with hive_ask_user \(action noCode\), or hive_ask_assistant where it's already decided\./)
+    expect(refusalLines('submit.empty', { card: 'AL-7', changes: 'none' }, agent).next).toMatch(/^Its folder has no changes either\. .*no-code: ask for that with cw_ask_user \(action noCode\), or cw_ask_assistant where it's already decided\./)
     expect(refusalLines('submit.unchanged', { card: 'AL-7' }, window).message).toBe("AL-7: its files haven't changed since it started.")
   })
 
@@ -462,7 +462,7 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     const seg = { kind: 'card', number: 7, name: 'AL-7', state: 'passed', failed: false, round: 1, label: 'AL-7 x · Passed', notes: [] } as CardSegment
     const o = { by: 'user' as const, move: 'active→done', rules: ['done.contained'], reason: '', at: '' }
     const b = badge({ refused, stalePass: { approved: 'a3f2c1d9e8', current: 'b71e09a4cc' }, override: o })
-    expect(segmentMarks({ frozen: null }, b, seg, short, tr, names)).toEqual({ refused: 'AL-7: nothing committed to review. Commit the card\'s work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. A card that needs no change is no-code: ask for that with hive_ask_user (action noCode).', stale: 'Pass was for a3f2c1d; now at b71e09a', override: 'You moved it past its rules: done.contained. No reason given.' })
+    expect(segmentMarks({ frozen: null }, b, seg, short, tr, names)).toEqual({ refused: 'AL-7: nothing committed to review. Commit the card\'s work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. A card that needs no change is no-code: ask for that with cw_ask_user (action noCode).', stale: 'Pass was for a3f2c1d; now at b71e09a', override: 'You moved it past its rules: done.contained. No reason given.' })
     expect(segmentMarks({ frozen: null }, badge(), seg, short, tr, names)).toEqual({})
     // Done, a stale pass no longer matters: no stale mark or line.
     expect(segmentMarks({ frozen: null }, b, { ...seg, state: 'done' }, short, tr, names)).not.toHaveProperty('stale')
@@ -485,7 +485,7 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     ])
     const marks = foldedMarks({ frozen: null }, badges, segs, [1, 2, 27], () => short, tr, names)
     expect(marks).toEqual({
-      refused: ['AL-27: AL-27: nothing committed to review. Commit the card\'s work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. A card that needs no change is no-code: ask for that with hive_ask_user (action noCode).'],
+      refused: ['AL-27: AL-27: nothing committed to review. Commit the card\'s work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. A card that needs no change is no-code: ask for that with cw_ask_user (action noCode).'],
       stale: ['AL-2: Pass was for a3f2c1d; now at b71e09a'],
       override: ['AL-1: You moved it past its rules: done.contained. Reason: Merged by hand'],
       oldRules: []

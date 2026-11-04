@@ -21,7 +21,7 @@ import { ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { formatDateTime } from '../shared/dates'
 import { formatSize } from '../shared/units'
 import { backgroundTaskMinutes } from '../shared/tasks'
-import { assistantTools } from '../shared/assistantTools'
+import { assistantTools, isReservedServerName, TOOLS_SERVER } from '../shared/assistantTools'
 import { HIVE_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, launchedWithOf, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
 import { defaultPurpose, legacySetupPending, legacyWorktree, namedFolders, type StoredAgent, resumeHold, resumeHome, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { holdText } from '../shared/sessionResume'
@@ -153,6 +153,15 @@ import { projectPreferences } from './workflow/preferences'
 import { driveExitKeys, type ExitKeysIO } from './exitKeys'
 
 const log = createLogger('sessions')
+
+/** The names a session's launches give it (SessionRecord.names, HI-2463): 2 is Combwork's (cw_ tools, [CW], cw-progress). */
+const SESSION_NAMES = 2 as const
+/** How long starts are quiet before the notice of conversations started fresh is shown (a restart resumes several at once). */
+const RENAMED_NOTICE_QUIET_MS = 5_000
+const RENAMED_FRESH = {
+  title: msg({ id: 'session.renamedFresh.title', defaultMessage: 'Agents started new conversations', description: 'A notice once after the update that renamed what agents see (HI-2463): conversations from before were started fresh.' }),
+  body: msg({ id: 'session.renamedFresh.body', defaultMessage: "{n, plural, one {# conversation} other {# conversations}} started fresh: Combwork renamed the tools agents use, so a conversation from before can't continue. The earlier ones are kept in Sessions to read.", description: 'The notice after the update that renamed what agents see (HI-2463). {n} counts the conversations that started fresh instead of resuming. Sessions is a tab of the window: keep it as the window names it.' })
+}
 
 /** The statuses in which a CLI's exit key cancels a turn (or its dialog) rather than arming its exit (HI-2272). */
 const EXIT_IN_TURN: ReadonlySet<SessionStatus> = new Set<SessionStatus>(['starting', 'working', 'waiting'])
@@ -425,7 +434,7 @@ interface LiveSession {
   handedOverFrom?: string
   /** The slot lease it started under (#1434): its session is bound to it once recorded. */
   lease?: string
-  /** Its slot's environment (HIVE_SLOT, HIVE_SLOT_PORT_BASE) while it runs in one. */
+  /** Its slot's environment (CW_SLOT, CW_SLOT_PORT_BASE) while it runs in one. */
   slotEnv?: Record<string, string>
   /** The folders its launch was granted outside its own (#1439: its project's review copies). */
   extraDirs?: string[]
@@ -534,7 +543,7 @@ interface LiveSession {
   launchEnv?: NodeJS.ProcessEnv
   /**
    * The dialect chain it speaks (dialects, HI-2443), pinned at its launch: what agent text says to it (the resolver
-   * below), and in hive-mcp.js and hive-progress.js through HIVE_DIALECT_FILE. `input`: what it was resolved from (its
+   * below), and in hive-mcp.js and hive-progress.js through CW_DIALECT_FILE. `input`: what it was resolved from (its
    * CLI, the real model ID it launched with, its pick), so the refresh can tell when its files would give another
    * (`key`) and show "restart to apply".
    */
@@ -1205,7 +1214,7 @@ const SIGNED_IN_AGAIN = msg({ id: 'session.status.signedInAgain', defaultMessage
 /** What Resume (n) types into such an agent. */
 /** Hive's own deliveries come from it (#649). */
 // agent-protocol: the app's name, as a delivery's sender
-const HIVE_SENDER = { kind: 'hive', name: 'Hive' } as const // i18n-ignore: the sender's name in deliveries, which agents read
+const HIVE_SENDER = { kind: 'hive', name: 'Combwork' } as const // i18n-ignore: the sender's name in deliveries, which agents read
 const CARRY_ON_PROMPT = SESSION.carryOn
 
 class SessionManager {
@@ -1255,6 +1264,8 @@ class SessionManager {
     /** A delivery its agent's launch carries, as the launch's task (launchWith): `start` launches it with the line. */
     launch: (host: string, nd: NewDelivery, start: (line: string) => Promise<{ runId: string }>) => Promise<unknown>
     cancel: (host: string, source: string, ref: string | null, why: string) => Promise<number>
+    /** HI-2463: what waits for a conversation, for the agent's next one instead (carryConversation). */
+    carry: (host: string, agentId: string, from: string) => Promise<number>
   } | null = null
   private delivery(): NonNullable<SessionManager['deliveries']> {
     if (!this.deliveries) throw hiveError(msg({ id: 'session.error.noDeliveries', defaultMessage: "Combwork's delivery service isn't running.", description: "Giving an agent a message failed: the part of Hive that delivers them hasn't started (or has stopped)." }), undefined, { kind: 'conflict' })
@@ -1321,7 +1332,7 @@ class SessionManager {
   /**
    * Whether an agent's launch was given Hive's tools and its CLI hasn't connected them yet (#865): a resumed Claude Code
    * is ready at its SessionStart before its hive server has connected, and a doorbell typed then is a turn that can't
-   * call hive_inbox. At most hive.mcp.connectSeconds from when it first became ready, for a CLI that never connects it
+   * call cw_inbox. At most hive.mcp.connectSeconds from when it first became ready, for a CLI that never connects it
    * (its server failed to start, or MCP is off in it).
    */
   hiveToolsWaiting(projectPath: string, agentId: string): boolean {
@@ -1594,7 +1605,7 @@ class SessionManager {
     return this.projectStates(projectPath)[0] ?? null
   }
 
-  /** When the agent's turn under way began (its ledger's), or null when it is in none (HI-2167: hive_lane start's safety net). */
+  /** When the agent's turn under way began (its ledger's), or null when it is in none (HI-2167: cw_lane start's safety net). */
   turnBegan(projectPath: string, agentId: string): number | null {
     const a = this.live.get(liveId(projectPath, agentId))?.ledger?.active
     return a && a.state === 'running' ? a.startedAt : null
@@ -1676,11 +1687,11 @@ class SessionManager {
     for (const m of await reads.servers()) {
       // Added there (HI-2059), as mcpAdded reads it: a list not yet converted keeps its old meaning.
       const on = assistant ? !!m.def && assistantMcpAdded(workspace.config.mcp).includes(m.name) : serverOnIn(m, pc.mcp, workspace.config.mcp.enabled)
-      if (on && m.def && agentGetsMcp(forAgent, m.name) && m.name.toLowerCase() !== 'hive') mcpServers[m.name] = toLaunchDef(m.def, workspace.mcpDir)
+      if (on && m.def && agentGetsMcp(forAgent, m.name) && !isReservedServerName(m.name)) mcpServers[m.name] = toLaunchDef(m.def, workspace.mcpDir)
     }
     const hive = this.hiveMcp(projectPath, agent?.id)
     // Its instructions name only the skills the session gets (#1431).
-    if (hive) mcpServers.hive = skillsOff.length ? { ...hive, env: { ...hive.env, HIVE_SKILLS_OFF: skillsOff.sort().join(',') } } : hive
+    if (hive) mcpServers[TOOLS_SERVER] = skillsOff.length ? { ...hive, env: { ...hive.env, HIVE_SKILLS_OFF: skillsOff.sort().join(',') } } : hive
 
     // Its connection (HI-2106; the Assistant's too): what it launches with, and the account it launches on, its own or
     // (decision H) its CLI's first usable here. A change of account asks for a restart; `connection` is null for an
@@ -1845,6 +1856,14 @@ class SessionManager {
     if (opts.agentId && !this.switchResuming.has(liveId(projectPath, opts.agentId))) this.switches.get(liveId(projectPath, opts.agentId))?.cancel('started by hand') // i18n-ignore: for the log
     if (opts.resumeId !== undefined) assertSessionId(opts.resumeId)
     const agentId = opts.agentId || (await this.soleAgent(projectPath))
+    // HI-2463: a conversation Combwork launched before what agents see was renamed remembers the hive_* tools, [Hive] and
+    // hive-progress, so it isn't resumed: a new one starts instead, as Start Fresh does, and the old one stays in Sessions
+    // to read. The first prompt this start was given (a restart's note: its card, round and lane) goes to the new one.
+    // Every resume comes here (a restart's, Resume All, a manual one, a lane's or a card's placement, the Assistant's).
+    const freshFrom = opts.resumeId && (await this.preRename(projectPath, opts.resumeId)) ? opts.resumeId : null
+    // It carries on the agent's own work, as a handover to itself does: its watch stays, and what waits for the old
+    // conversation (its wakes, messages, tasks) is for the new one.
+    if (freshFrom) opts = { ...opts, resumeId: undefined, keepWatch: true }
     // Again after the await, with nothing awaited before the start is reserved: a fence raised meanwhile holds.
     this.assertStartsAllowed(projectPath)
     const id = liveId(projectPath, agentId)
@@ -1862,11 +1881,14 @@ class SessionManager {
     // A start that takes over a second says where the time went (#1177: a resume waited ~45 s after an upgrade).
     const times = new StepTimes()
     // A new conversation (HI-2197): the agent's watch from before ended first, its wake cancelled, before anything launches.
-    const run = (opts.resumeId || opts.keepWatch ? Promise.resolve() : this.conversationEnds(projectPath, agentId)).then(() => this.startReserved(projectPath, agentId, id, opts, times))
+    const before = freshFrom ? (this.deliveries?.carry(projectPath, agentId, freshFrom) ?? Promise.resolve(0)).then(() => undefined) : opts.resumeId || opts.keepWatch ? Promise.resolve() : this.conversationEnds(projectPath, agentId)
+    const run = before.then(() => this.startReserved(projectPath, agentId, id, opts, times))
     pending.done = run.catch(() => undefined)
     pending.outcome = run
     try {
-      return await run
+      const started = await run
+      if (freshFrom) this.renamedFresh(projectPath, agentId, freshFrom)
+      return started
     } catch (e) {
       // Given up before any process of it ran: its slot's writer released now (#1434). One that ran is its exit's.
       if (!this.writers.get(pending.runId)?.spawned) this.settleWriterOf(pending.runId)
@@ -1876,6 +1898,43 @@ class SessionManager {
       const slow = times.slowLine()
       if (slow) log.info(`${opts.resumeId ? 'Resume' : 'Start'} of ${userText(agentId)} in ${userText(basename(projectPath))} ${slow}`)
     }
+  }
+
+  /**
+   * Whether a conversation was launched by Combwork before HI-2463 (its record has no `names`, but has what a launch of
+   * Combwork's writes: the agent it ran as, or the folder it ran in): it remembers the old names, so it starts fresh.
+   * A session adopted from outside (neither) never knew them, and resumes; a record that can't be read resumes as before.
+   */
+  private async preRename(projectPath: string, sessionId: string): Promise<boolean> {
+    const rec = await workspace.sessionRecord(projectPath, sessionId).catch(() => undefined)
+    return !!rec && rec.names !== SESSION_NAMES && !!(rec.agentId || rec.cwd)
+  }
+
+  /** Fresh conversations started for ones from before HI-2463, counted per workspace for one notice (renamedNotice). */
+  private renamedFreshCount = new Map<string, { n: number; timer: ReturnType<typeof setTimeout> | null }>()
+
+  /**
+   * A conversation from before HI-2463 started fresh (it ran): logged, and counted for the workspace's notice, which
+   * says how many once starts have been quiet for a moment (a restart resumes several at once), counting only those that
+   * started.
+   */
+  private renamedFresh(projectPath: string, agentId: string, oldSession: string): void {
+    log.info(`${userText(agentId)} in ${userText(basename(projectPath))} started a new conversation: ${oldSession.slice(0, 8)} was launched before the agents' names changed (HI-2463), and stays in Sessions`)
+    const ws = workspaceFor(projectPath)?.path
+    if (!ws) return
+    const had = this.renamedFreshCount.get(ws) ?? { n: 0, timer: null }
+    had.n++
+    if (had.timer) clearTimeout(had.timer)
+    had.timer = setTimeout(() => {
+      this.renamedFreshCount.delete(ws)
+      toast(
+        'info',
+        tr(RENAMED_FRESH.title),
+        tr(RENAMED_FRESH.body, { n: had.n })
+      )
+    }, RENAMED_NOTICE_QUIET_MS)
+    had.timer.unref?.()
+    this.renamedFreshCount.set(ws, had)
   }
 
   /**
@@ -2591,7 +2650,7 @@ class SessionManager {
     l.launchMode = mode
     state.permissionMode = mode ?? undefined
     // Given Hive's tools, it takes no line of Hive's until they have connected (#865).
-    l.hiveTools = eff.mcpServers.hive ? 'connecting' : undefined
+    l.hiveTools = eff.mcpServers[TOOLS_SERVER] ? 'connecting' : undefined
     // Its own Agent API token for this launch, which confines its board calls to its project (the Assistant has its own).
     if (!workspace.isAssistantHome(projectPath)) await newAgentToken({ workspace: workspaceOf(projectPath).path!, projectPath, agentId: agent.id }, state.runId)
     const assistantText = workspace.isAssistantHome(projectPath) ? await this.assistantInstructions(projectPath, agent).catch(() => null) : null
@@ -2637,7 +2696,7 @@ class SessionManager {
       resume,
       name: opts.name,
       skills: eff.skills,
-      mcpServers: eff.mcpServers.hive && dialectEnv.HIVE_DIALECT_FILE ? { ...eff.mcpServers, hive: { ...eff.mcpServers.hive, env: { ...eff.mcpServers.hive.env, ...dialectEnv } } } : eff.mcpServers,
+      mcpServers: eff.mcpServers[TOOLS_SERVER] && dialectEnv.CW_DIALECT_FILE ? { ...eff.mcpServers, [TOOLS_SERVER]: { ...eff.mcpServers[TOOLS_SERVER], env: { ...eff.mcpServers[TOOLS_SERVER].env, ...dialectEnv } } } : eff.mcpServers,
       model: eff.model,
       // An effort the model that runs doesn't take (HI-1770: one moved onto it, or a connection's default) is kept, not used.
       effort: eff.effort && eff.connection && !eff.connection.startsWith('!') && !effortUsable(adapter.id, eff.model, conn, eff.effort) ? null : eff.effort,
@@ -2662,14 +2721,14 @@ class SessionManager {
       // On a connection, without the variables its CLI would read as a login in its place (HI-1757).
       // A server connection's own variables (HI-1772: its server, models and key) after those left out, for this launch only.
       env: withBinOnPath(withServerEnv(conn?.server?.env, withoutAccountEnv(conn ? adapter : null, childEnv({
-        HIVE_HOOK_TOKEN: hookAuth.token,
-        HIVE_PROJECT: basename(projectPath),
-        HIVE_PROJECT_PATH: projectPath,
-        HIVE_WORKSPACE: workspaceOf(projectPath).path!,
-        HIVE_RUN_ID: state.runId,
-        ...(state.sessionId ? { HIVE_SESSION_ID: state.sessionId } : {}),
-        HIVE_AGENT: agent.name,
-        HIVE_PROVIDER: adapter.id,
+        CW_HOOK_TOKEN: hookAuth.token,
+        CW_PROJECT: basename(projectPath),
+        CW_PROJECT_PATH: projectPath,
+        CW_WORKSPACE: workspaceOf(projectPath).path!,
+        CW_RUN_ID: state.runId,
+        ...(state.sessionId ? { CW_SESSION_ID: state.sessionId } : {}),
+        CW_AGENT: agent.name,
+        CW_PROVIDER: adapter.id,
         // Its dialect's file (HI-2443), for hive-progress run in its shell; none while it speaks the Default.
         ...dialectEnv,
         // Its slot's name and port block (#1429's slotEnv), while it runs in one.
@@ -2881,6 +2940,9 @@ class SessionManager {
       id: sessionId,
       agent: state.provider,
       name: l.name,
+      // Launched with the names agents see now (HI-2463): only a launch sets it, so a conversation from before never
+      // passes for one of now by being read, listed or failing to start.
+      names: SESSION_NAMES,
       ...(state.titleAtRename !== undefined ? { titleAtRename: state.titleAtRename } : {}),
       lastActiveAt: new Date().toISOString(),
       // The agent running it now; a session can move between agents that share a folder. Its name too, for once it's gone.
@@ -4152,7 +4214,7 @@ class SessionManager {
 
   /**
    * Hands one agent's work over to another (any provider): the source writes a handover with Hive's
-   * hive_create_handover tool, then the target starts and picks it up with hive_read_latest_handover.
+   * cw_create_handover tool, then the target starts and picks it up with cw_read_latest_handover.
    * Conversations can't move between providers; a handover carries the work instead. To itself, it ends the agent's
    * conversation: only while it may (#1057, handOverCheck.ts: idle, not merging, on no running lane's card), checked as
    * it is asked and again just before the conversation ends.
@@ -4301,7 +4363,7 @@ class SessionManager {
   }
 
   /**
-   * Gives an idle running agent a task in a new conversation (hive_prompt_agent with newConversation): its conversation
+   * Gives an idle running agent a task in a new conversation (cw_prompt_agent with newConversation): its conversation
    * ends as when it hands over to itself (it stays in the Sessions tab), and a new one starts on the task, with no
    * handover. The caller has checked it is idle; refused while Hive is typing into it or its CLI hasn't taken a prompt
    * Hive typed (ending it would lose that prompt). Nothing awaits before the stop, so the caller's checks still hold.

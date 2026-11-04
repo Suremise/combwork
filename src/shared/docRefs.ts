@@ -1,6 +1,6 @@
 // A card's context references (#818): the doc sections an agent reads first, by file and heading, never by line:
 // `docs/ARCHITECTURE.md#core-contracts`, `shared:plans/2026-10-14-i18n-design.md#extraction-lanes`, or a whole document
-// (`docs/PLAN.md`). The heading is a slug as hive_doc_outline lists it (shared/docSections.ts, #817).
+// (`docs/PLAN.md`). The heading is a slug as cw_doc_outline lists it (shared/docSections.ts, #817).
 
 /** The most references a card has. */
 export const MAX_CONTEXT = 10

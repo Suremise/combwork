@@ -142,7 +142,7 @@
   "panes.messages.notDeliveredDetail": "It isn't idle, or you are typing in its terminal. Its messages stay in its inbox: try again once it's idle.",
   "panes.messages.overdue": "{n, plural, one {# overdue} other {# overdue}}",
   "panes.messages.overdueTip": "{n, plural, one {One delivery was not acked in time: the agent hasn't said it acted on it.} other {# deliveries were not acked in time: the agent hasn't said it acted on them.}}",
-  "panes.messages.tip": "{n, plural, one {A message} other {# messages}} for {agent} that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with hive_inbox.",
+  "panes.messages.tip": "{n, plural, one {A message} other {# messages}} for {agent} that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with cw_inbox.",
   "panes.messages.tipNoWakes": "{n, plural, one {A message} other {# messages}} for {agent} that it hasn't fetched or acked yet",
   "panes.messages.unread": "{n, plural, one {# unread} other {# unread}}",
   "panes.pages.agentsTip": "{button, select, none {Page {page}} other {{button} (page {page})}}: {agents}{added, select, yes {, with an agent the Assistant added} other {}}{key, select, none {} other { ({key} for the next page)}}",

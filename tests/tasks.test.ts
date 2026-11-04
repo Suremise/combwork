@@ -720,7 +720,7 @@ describe('card decisions', () => {
     await laterMs()
     expect(await notice()).toBeNull()
     await run(() => tasks.updateTask(n, { decision: 'Use the old API.' }, user))
-    expect(await notice()).toBe(`[Hive] #${n} has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.`)
+    expect(await notice()).toBe(`[CW] #${n} has 1 new decision since you last read it: read the card (cw_read_task) at your next checkpoint.`)
     // Read in full: not new any more. Its own records never are.
     noteCardRead(me, n)
     expect(await notice()).toBeNull()
@@ -731,7 +731,7 @@ describe('card decisions', () => {
     const mine = (await run(() => tasks.getTask(n))).decisions![0]
     await laterMs()
     await run(() => tasks.editDecision(n, mine.id, 'Use the old API, v2.', user))
-    expect(await notice()).toMatch(new RegExp(`^\\[Hive\\] #${n} has 1 new decision`))
+    expect(await notice()).toMatch(new RegExp(`^\\[CW\\] #${n} has 1 new decision`))
     expect(await notice({ projectPath: alpha, agentId: 'r1' }, 'Reviewer (alpha)')).toBeNull()
     // In Review with a reviewer: the reviewer hears of one recorded after its review began; the builder, out of Doing, doesn't.
     await run(() => tasks.updateTask(n, { column: 'review' }, coder))
@@ -766,15 +766,15 @@ describe('card decisions', () => {
   })
 
   it('the line for an agent waiting for the user names each card and how many (#401)', () => {
-    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }]]))).toBe('[Hive] #7 has 1 new decision from the user: read it (hive_read_task) and carry on from where you asked.')
-    expect(decisionWakes.decisionLine(new Map([[7, { count: 2 }]]))).toBe('[Hive] #7 has 2 new decisions from the user: read them (hive_read_task) and carry on from where you asked.')
-    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }], [9, { count: 3 }]]))).toBe('[Hive] #7 has 1 new decision, #9 has 3 new decisions from the user: read them (hive_read_task) and carry on from where you asked.')
+    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }]]))).toBe('[CW] #7 has 1 new decision from the user: read it (cw_read_task) and carry on from where you asked.')
+    expect(decisionWakes.decisionLine(new Map([[7, { count: 2 }]]))).toBe('[CW] #7 has 2 new decisions from the user: read them (cw_read_task) and carry on from where you asked.')
+    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }], [9, { count: 3 }]]))).toBe('[CW] #7 has 1 new decision, #9 has 3 new decisions from the user: read them (cw_read_task) and carry on from where you asked.')
   })
 
   it("the line for a card's reviewer asks it to read before its next verdict, never to carry on (HI-2261)", () => {
-    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }]]), new Set([7]))).toBe('[Hive] #7 has 1 new decision from the user: read it (hive_read_task) before your next verdict on it.')
-    expect(decisionWakes.decisionLine(new Map([[7, { count: 2 }]]), new Set([7]))).toBe('[Hive] #7 has 2 new decisions from the user: read them (hive_read_task) before your next verdict on it.')
-    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }], [9, { count: 1 }]]), new Set([7, 9]))).toBe('[Hive] #7 has 1 new decision, #9 has 1 new decision from the user: read them (hive_read_task) before your next verdict on them.')
+    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }]]), new Set([7]))).toBe('[CW] #7 has 1 new decision from the user: read it (cw_read_task) before your next verdict on it.')
+    expect(decisionWakes.decisionLine(new Map([[7, { count: 2 }]]), new Set([7]))).toBe('[CW] #7 has 2 new decisions from the user: read them (cw_read_task) before your next verdict on it.')
+    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }], [9, { count: 1 }]]), new Set([7, 9]))).toBe('[CW] #7 has 1 new decision, #9 has 1 new decision from the user: read them (cw_read_task) before your next verdict on them.')
     // A card of its own among them: the builder's line, as it has something to carry on with.
     expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }], [9, { count: 1 }]]), new Set([7]))).toMatch(/and carry on from where you asked\.$/)
   })
@@ -804,7 +804,7 @@ describe('card decisions', () => {
     let typing = false
     let waiting = false
     decisionWakes.testHooks.settleMs = 600_000
-    // What the agent read of each line Hive typed (#650: it follows the doorbell with hive_inbox).
+    // What the agent read of each line Hive typed (#650: it follows the doorbell with cw_inbox).
     const sent: string[] = []
     const send = vi.spyOn(sessions, 'sendPrompt').mockImplementation(async (p, id, text, guard) => {
       guard?.()
@@ -835,7 +835,7 @@ describe('card decisions', () => {
       await tell()
       expect(sent).toHaveLength(1)
       expect(sent[0]).toMatch(new RegExp(`#${n} has 2 new decisions`))
-      await expect.poll(async () => (await run(() => tasks.getTask(n))).history.some((h) => h.by === 'Hive' && h.what === 'Told Coder (alpha) of 2 new decisions'), { timeout: HUNG_MS }).toBe(true)
+      await expect.poll(async () => (await run(() => tasks.getTask(n))).history.some((h) => h.by === 'Combwork' && h.what === 'Told Coder (alpha) of 2 new decisions'), { timeout: HUNG_MS }).toBe(true)
       // Told once: not again, until another decision, which is told alone.
       await tell()
       expect(sent).toHaveLength(1)
@@ -899,7 +899,7 @@ describe('card decisions', () => {
     }
   })
 
-  it("hive_inbox gives out a decision line only while its decisions are still new to that agent: its card given to another meanwhile, it isn't (#649 round 3)", async () => {
+  it("cw_inbox gives out a decision line only while its decisions are still new to that agent: its card given to another meanwhile, it isn't (#649 round 3)", async () => {
     const deliveries = await import('../src/main/deliveries')
     const writer = await import('../src/main/lineWriter')
     const n = (await run(() => tasks.createTask({ title: 'Asked, then given away', project: 'alpha', column: 'doing', agent: 'a1' }, user))).number
@@ -962,11 +962,11 @@ describe('card decisions', () => {
     ]
     writer.testHooks.takeMs = 5000
     let release = (): void => undefined
-    const notes = async (): Promise<string[]> => (await run(() => tasks.getTask(n))).history.filter((h) => h.by === 'Hive' && h.what.startsWith('Told ')).map((h) => h.what)
+    const notes = async (): Promise<string[]> => (await run(() => tasks.getTask(n))).history.filter((h) => h.by === 'Combwork' && h.what.startsWith('Told ')).map((h) => h.what)
     try {
       // Typed: its doorbell, for one decision (#650).
       await decisionWakes.tellNow(w, alpha, 'a1')
-      expect(sent).toEqual([`[Hive] New in your inbox: 1 answer (#${n}) (m1). Call hive_inbox to read it, act on it, then ack it.`])
+      expect(sent).toEqual([`[CW] New in your inbox: 1 answer (#${n}) (m1). Call cw_inbox to read it, act on it, then ack it.`])
       // Its CLI takes the line and the agent reads its inbox (the receipt), whose save is held; a newer decision then.
       const held = new Promise<void>((r) => (release = r))
       let holding = false
@@ -996,7 +996,7 @@ describe('card decisions', () => {
       status = 'finished'
       await decisionWakes.tellNow(w, alpha, 'a1')
       expect(sent).toHaveLength(2)
-      expect(sent[1]).toBe(`[Hive] New in your inbox: 1 answer (#${n}) (m2). Call hive_inbox to read it, act on it, then ack it.`)
+      expect(sent[1]).toBe(`[CW] New in your inbox: 1 answer (#${n}) (m2). Call cw_inbox to read it, act on it, then ack it.`)
       taken = 2
       status = 'working'
       expect((await deliveries.readInbox(alpha, 'a1')).items.map((i) => i.text)).toEqual([expect.stringMatching(new RegExp(`#${n} has 1 new decision from the user`))])
@@ -1031,13 +1031,13 @@ describe('card decisions', () => {
     writer.testHooks.takeMs = 20
     try {
       await decisionWakes.tellNow(w, alpha, 'a1')
-      expect(sent).toEqual([`[Hive] New in your inbox: 1 answer (#${n}) (m1). Call hive_inbox to read it, act on it, then ack it.`])
+      expect(sent).toEqual([`[CW] New in your inbox: 1 answer (#${n}) (m1). Call cw_inbox to read it, act on it, then ack it.`])
       // Another decision before it reads, told again (the board's settle, its turn's end): the rung line covers it.
       await laterMs()
       await run(() => tasks.updateTask(n, { decision: 'Close on the counter.' }, assistant))
       await decisionWakes.tellNow(w, alpha, 'a1')
       expect(sent).toHaveLength(1)
-      expect((await deliveries.readInbox(alpha, 'a1')).items.map((i) => i.text)).toEqual([expect.stringMatching(new RegExp(`^\\[Hive\\] #${n} has 2 new decisions from the user`))])
+      expect((await deliveries.readInbox(alpha, 'a1')).items.map((i) => i.text)).toEqual([expect.stringMatching(new RegExp(`^\\[CW\\] #${n} has 2 new decisions from the user`))])
       expect((await deliveries.deliveriesOf(alpha, 'a1')).map((r) => `${r.id} ${r.state}`)).toEqual(['m1 received'])
     } finally {
       writer.testHooks.takeMs = undefined
@@ -1074,7 +1074,7 @@ describe('card decisions', () => {
     try {
       await decisionWakes.tellNow(w, alpha, 'a1')
       expect(saves).toBeGreaterThan(2)
-      expect(sent).toEqual([`[Hive] New in your inbox: 1 answer (#${n}) (m1). Call hive_inbox to read it, act on it, then ack it.`])
+      expect(sent).toEqual([`[CW] New in your inbox: 1 answer (#${n}) (m1). Call cw_inbox to read it, act on it, then ack it.`])
     } finally {
       deliveries.setBeforeSaveForTests(null)
       writer.testHooks.takeMs = undefined
@@ -1453,7 +1453,7 @@ describe("a project agent's board", () => {
       })
       expect([change, await noted]).toEqual([change, [kept]])
       expect((await run(() => tasks.getTask(x))).comments).toEqual([])
-      expect((await run(() => tasks.getTask(kept))).comments.map((c) => [c.by, c.text])).toEqual([['Hive', said]])
+      expect((await run(() => tasks.getTask(kept))).comments.map((c) => [c.by, c.text])).toEqual([['Combwork', said]])
       await run(() => tasks.deleteTask(x))
       await run(() => tasks.deleteTask(kept))
     }
@@ -1854,9 +1854,9 @@ describe('removal and board under faults', () => {
         expect([started.card.column, started.card.agent]).toEqual(['doing', 'r1'])
         expect(started.card.history.at(-1)).toMatchObject({ by: 'Assistant', what: 'Moved to Doing' })
         // Launched with its doorbell (#650), and the task, read from the agent's inbox, says what to do.
-        expect(prompts.at(-1)).toMatch(new RegExp(`^\\[Hive\\] New in your inbox: 1 task \\(#${c.number}\\) \\(m\\d+\\)\\. Call hive_inbox to read it, act on it, then ack it\\.$`))
+        expect(prompts.at(-1)).toMatch(new RegExp(`^\\[CW\\] New in your inbox: 1 task \\(#${c.number}\\) \\(m\\d+\\)\\. Call cw_inbox to read it, act on it, then ack it\\.$`))
         expect((await deliveries.deliveriesOf(join(wsPath, 'resumer'), 'r1')).at(-1)?.body).toMatch(
-          new RegExp(`^Work on task #${c.number} from the Hive task board: Back from ${from}\n\nIt was in ${from === 'review' ? 'Review' : 'Done'} and is back in Doing for more work\\.\n\nAddress the latest review comment\\.$`)
+          new RegExp(`^Work on task #${c.number} from the Combwork task board: Back from ${from}\n\nIt was in ${from === 'review' ? 'Review' : 'Done'} and is back in Doing for more work\\.\n\nAddress the latest review comment\\.$`)
         )
         // Its agent finishes: Review, whatever it came from.
         const finished = await run(() => tasks.updateTask(c.number, { column: 'review' }, r1))
@@ -2048,7 +2048,7 @@ describe('removal and board under faults', () => {
       // Its prompt has just gone in; the agent's hook hasn't said it's working yet: still refused.
       await expect(run(() => startTask(b.number, { kind: 'agent', agentId: 'o1' }, user))).rejects.toThrow(/being given another card/)
       expect(prompts.length).toBe(1)
-      expect(prompts[0]).toMatch(new RegExp(`^\\[Hive\\] New in your inbox: 1 task \\(#${a.number}\\) `))
+      expect(prompts[0]).toMatch(new RegExp(`^\\[CW\\] New in your inbox: 1 task \\(#${a.number}\\) `))
       const second = await run(() => tasks.getTask(b.number))
       expect([second.column, second.agent, second.history.length]).toEqual(['todo', null, 1])
     } finally {
@@ -2066,20 +2066,20 @@ describe('task prompt', () => {
     expect(rawTaskPrompt(card, '  Only the tests. ')).toBe('Fix it\n\nOnly the tests.\n\nThe details.')
     expect(rawTaskPrompt({ title: ' Fix it ', description: '' }, ' ')).toBe('Fix it')
     const raw = rawTaskPrompt({ ...card, blockedBy: [3], context: ['docs/A.md'], comments: [{ at: '2026-10-01T10:00:00Z', by: 'You', text: 'x' }] } as never)
-    expect(raw).not.toMatch(/Hive task board|work-on-card|depends on|Read these first|hive_read_task/)
+    expect(raw).not.toMatch(/Hive task board|work-on-card|depends on|Read these first|cw_read_task/)
   })
 
   it('says when a card is back for more work, and puts the note before the card', async () => {
     const { taskPrompt } = await import('../src/shared/tasks')
-    expect(taskPrompt(card, false)).toBe('Work on task #7 from the Hive task board: Fix it\n\nThe details.')
-    expect(taskPrompt(card, false, { from: 'todo', note: ' ' })).toBe('Work on task #7 from the Hive task board: Fix it\n\nThe details.')
+    expect(taskPrompt(card, false)).toBe('Work on task #7 from the Combwork task board: Fix it\n\nThe details.')
+    expect(taskPrompt(card, false, { from: 'todo', note: ' ' })).toBe('Work on task #7 from the Combwork task board: Fix it\n\nThe details.')
     expect(taskPrompt(card, false, { from: 'done', note: 'Only the tests.' })).toBe(
-      'Work on task #7 from the Hive task board: Fix it\n\nIt was in Done and is back in Doing for more work.\n\nOnly the tests.\n\nThe details.'
+      'Work on task #7 from the Combwork task board: Fix it\n\nIt was in Done and is back in Doing for more work.\n\nOnly the tests.\n\nThe details.'
     )
     // With Hive's tools: the work-on-card skill says how to carry it through, and the comments are a read away.
-    expect(taskPrompt(card, true)).toBe('Work on task #7 from the Hive task board: Fix it\n\nThe details.\n\nUse the work-on-card skill.')
+    expect(taskPrompt(card, true)).toBe('Work on task #7 from the Combwork task board: Fix it\n\nThe details.\n\nUse the work-on-card skill.')
     const commented = { ...card, comments: [{ at: '2026-10-01T10:00:00Z', by: 'You', text: 'First thoughts.' }, { at: '2026-10-02T10:00:00Z', by: 'Reviewer (alpha)', text: 'Failed: the redirect loops.' }] }
-    expect(taskPrompt(commented, true)).toMatch(/The card has 2 comments: read them with hive_read_task\.$/)
+    expect(taskPrompt(commented, true)).toMatch(/The card has 2 comments: read them with cw_read_task\.$/)
     expect(taskPrompt(commented, true)).not.toContain('redirect loops')
   })
 
@@ -2090,16 +2090,16 @@ describe('task prompt', () => {
     expect(text.indexOf('Fix what the review found.')).toBeLessThan(text.indexOf('The details.'))
     expect(text).toContain('Its latest comment (Reviewer (alpha), 2026-10-02):\n\nFailed: the redirect loops.')
     expect(text).not.toContain('First thoughts.')
-    expect(text).toMatch(/read the rest with hive_read_task/)
+    expect(text).toMatch(/read the rest with cw_read_task/)
     // Without tools it still has the card and the feedback; a long comment is cut, saying so.
     const long = { ...back, comments: [{ at: '2026-10-02T10:00:00Z', by: 'You', text: 'x'.repeat(5000) }] }
-    expect(taskPrompt(long, false, { from: 'done' })).toMatch(/x{4000}… \(cut short: hive_read_task has it all\)$/)
+    expect(taskPrompt(long, false, { from: 'done' })).toMatch(/x{4000}… \(cut short: cw_read_task has it all\)$/)
   })
 
   // HI-2047 (HI-2009's K10): a running lane's builder is pointed at card-loop, not at work-on-card as well.
   it("names card-loop for a running lane's builder, work-on-card elsewhere", async () => {
     const { taskPrompt } = await import('../src/shared/tasks')
-    expect(taskPrompt(card, true, { inLane: true })).toBe("Work on task #7 from the Hive task board: Fix it\n\nThe details.\n\nUse the card-loop skill as this lane's builder.")
+    expect(taskPrompt(card, true, { inLane: true })).toBe("Work on task #7 from the Combwork task board: Fix it\n\nThe details.\n\nUse the card-loop skill as this lane's builder.")
     expect(taskPrompt(card, true, { inLane: true })).not.toContain('work-on-card')
     expect(taskPrompt(card, true, { inLane: false })).toMatch(/Use the work-on-card skill\.$/)
     expect(taskPrompt(card, false, { inLane: true })).not.toMatch(/card-loop|work-on-card/)

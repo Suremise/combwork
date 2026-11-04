@@ -312,7 +312,7 @@ export interface AssistantSettings {
   /** What the Assistant may do beyond looking (see AssistantControl). */
   control: AssistantControl
   /**
-   * Whether it may change Hive's settings when the user asks (hive_update_setting), whatever its control level. It can
+   * Whether it may change Hive's settings when the user asks (cw_update_setting), whatever its control level. It can
    * always read and explain them; sensitive ones, and its own Control, are never its to change (#186).
    */
   changeSettings: boolean
@@ -2227,6 +2227,11 @@ export interface SessionRecord {
    * that launch gives, so instructions switched off or emptied since leave it (Claude Code keeps a conversation's first).
    */
   promptAdded?: true
+  /**
+   * The names its launches gave the agent (HI-2463): 2 when Combwork launched it with cw_ tools, [CW] and cw-progress.
+   * None on a conversation Combwork launched before: it remembers the old names, so it starts fresh rather than resume.
+   */
+  names?: 2
 }
 
 /**
@@ -3560,7 +3565,7 @@ export interface ToastAction {
 }
 
 /**
- * What a notice is about, which a click on it opens (HI-1961: `hive_notify`'s target): an agent's pane, or a card's
+ * What a notice is about, which a click on it opens (HI-1961: `cw_notify`'s target): an agent's pane, or a card's
  * dialog. Its names are as they were when it was shown, for saying it's gone.
  */
 export type ToastTarget =

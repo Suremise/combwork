@@ -19,7 +19,7 @@ const T = {
   unblocked: agentMsg({ id: 'wake.lane.unblocked', text: '{card} is no longer blocked', note: 'A lane watch wake\'s event (#922): a lane\'s card\'s block lifted. card: "HI-12".' }),
   stalled: agentMsg({ id: 'wake.lane.stalled', text: '{card} is stalled', note: 'A lane watch wake\'s event: a lane\'s card stalled (why follows). card: "HI-12".' }),
   moved: agentMsg({ id: 'wake.lane.moved', text: '{card} is in {column}', note: 'A lane watch wake\'s event: a lane\'s card moved. card: "HI-12"; column: the board column\'s name ("Review").' }),
-  asked: agentMsg({ id: 'wake.lane.waitsForUser', text: '{card} waits for the user{who, select, agent { ({by} asks)} hive { (Hive asks)} other {}}', note: 'A lane watch wake\'s event (HI-1991): a new request for the user on a lane\'s card (what it asks follows). card: "HI-12"; who: agent (by: the asking agent\'s name), hive (Hive asked), or none (not known).' }),
+  asked: agentMsg({ id: 'wake.lane.waitsForUser', text: '{card} waits for the user{who, select, agent { ({by} asks)} hive { (Combwork asks)} other {}}', note: 'A lane watch wake\'s event (HI-1991): a new request for the user on a lane\'s card (what it asks follows). card: "HI-12"; who: agent (by: the asking agent\'s name), hive (Hive asked), or none (not known).' }),
   mergeDue: agentMsg({ id: 'wake.lane.mergeDue', text: 'all its cards passed: its merge is due', note: "A lane watch wake's event: every card of the lane passed, so its merge is due." }),
   mergeStalled: agentMsg({ id: 'wake.lane.mergeStalled', text: 'its merge is stalled', note: "A lane watch wake's event (#869): the lane's merge is due but nobody is doing it (why follows)." }),
   pausedMerge: agentMsg({ id: 'wake.lane.pausedMerge', text: 'paused for a merge: {status}', note: 'A lane watch wake\'s event (#1270): the lane waits for a card to merge. status: the lane\'s status ("waiting: HI-12 not merged").' }),
@@ -28,7 +28,7 @@ const T = {
   waiting: agentMsg({ id: 'wake.lane.agentWaiting', text: '{name} ({project}) is waiting for the user{onCard, select, yes { on {card}} other {}}{what}', note: 'A lane watch wake (#726): an agent of the followed projects started waiting for the user. name, project: the agent\'s; card: "HI-12" when onCard is yes; what: what it asks, quoted after a colon, or nothing.' }),
   tail: agentMsg({
     id: 'wake.lane.tail',
-    text: 'Your lane watch has ended: read the cards named (hive_read_task), act on them, {asks, select, yes {tell the user what an agent waits for (hive_notify) and never answer it for them, } other {}}then watch the lanes again (hive_wait_for_tasks with lanes{keep, select, both {; your cards and agents stay unless you pass them, less the agents told here} cards {; your cards stay unless you pass cards} agents {; your agents stay unless you pass agents, less the agents told here} other {}}).',
+    text: 'Your lane watch has ended: read the cards named (cw_read_task), act on them, {asks, select, yes {tell the user what an agent waits for (cw_notify) and never answer it for them, } other {}}then watch the lanes again (cw_wait_for_tasks with lanes{keep, select, both {; your cards and agents stay unless you pass them, less the agents told here} cards {; your cards stay unless you pass cards} agents {; your agents stay unless you pass agents, less the agents told here} other {}}).',
     note: 'How a lane watch\'s wake ends: what to do. asks: yes when an agent waits for the user (#726, HI-1991); keep: what else the watch had beside its lanes, which stays when it is watched again (cards, agents (HI-1987), both or none).'
   }),
   lane: agentMsg({ id: 'wake.lane.lane', text: 'Lane {lane}: {events}', note: 'A lane watch wake: one lane and what happened in it. lane: its label ("B1 / R1 (greetings)") or id; events: its events, "; " between.' }),
@@ -39,17 +39,17 @@ const T = {
   countCards: agentMsg({ id: 'wake.lane.countCards', text: '{n} of your cards changed', note: 'A lane watch wake with only counts left: how many of the cards beside its lanes changed.' }),
   countWaits: agentMsg({ id: 'wake.lane.countWaits', text: '{n, plural, one {{n} agent is waiting for the user} other {{n} agents are waiting for the user}}', note: 'A lane watch wake with only counts left: how many agents wait for the user.' }),
   countAgents: agentMsg({ id: 'wake.lane.countAgents', text: '{n} of your agents changed', note: 'A lane watch wake with only counts left: how many of the agents it follows changed.' }),
-  counted: agentMsg({ id: 'wake.lane.counted', text: '{what}: list them (hive_lane list, hive_list_projects, hive_agent_activity) and read their cards.', note: 'A lane watch wake with only counts left. what: the counts, ", " between ("2 lanes changed, 1 of your cards changed").' }),
+  counted: agentMsg({ id: 'wake.lane.counted', text: '{what}: list them (cw_lane list, cw_list_projects, cw_agent_activity) and read their cards.', note: 'A lane watch wake with only counts left. what: the counts, ", " between ("2 lanes changed, 1 of your cards changed").' }),
   label: agentMsg({ id: 'wake.lane.label', text: 'Waiting on {lanes, select, all {all running lanes} one {lane {lane}} other {{n} lanes}}{also, select, yes { and {list}} other {}}', note: 'A lane watch\'s label (a watching agent\'s status, the Agent API). lanes: all (every running lane), one (lane: its id) or some (n: how many); also: yes with the cards and agents beside them (list: "HI-12, HI-14, B2").' }),
   limit: agentMsg({
     id: 'wake.lane.limit',
-    text: 'Nothing to tell on {lanes, select, all {the running lanes} one {lane {lane}} other {{n} lanes}}{also, select, yes { or {list}} other {}} in {hours, select, yes {{time} h} other {{time} min}}: your lane watch has ended. Check them (hive_lane list{agents, select, yes {, hive_agent_activity} other {}}), then watch again, or tell the user (hive_notify) if one seems stuck.',
+    text: 'Nothing to tell on {lanes, select, all {the running lanes} one {lane {lane}} other {{n} lanes}}{also, select, yes { or {list}} other {}} in {hours, select, yes {{time} h} other {{time} min}}: your lane watch has ended. Check them (cw_lane list{agents, select, yes {, cw_agent_activity} other {}}), then watch again, or tell the user (cw_notify) if one seems stuck.',
     note: 'Typed when a lane watch\'s limit passes with nothing to tell. lanes: all, one (lane: its id) or some (n: how many); also: yes with the cards and agents beside them (list); hours: yes when time is in hours ("1.5"), else minutes; agents: yes when it follows agents (HI-1987).'
   }),
   badCards: agentMsg({ id: 'wake.lane.badCards', text: 'cards must be card numbers (no repeats), or [] for none', note: "A lane watch's refusal: its cards argument isn't a list of card numbers." }),
   tooManyCards: agentMsg({ id: 'wake.lane.tooManyCards', text: 'at most {max} cards', note: "A lane watch's refusal: too many cards beside its lanes. max: the most." }),
   badChanges: agentMsg({ id: 'wake.lane.badChanges', text: 'changes must be any of {changes}', note: 'A lane watch\'s refusal: its changes argument names none it knows. changes: those it takes ("comment, column, …").' }),
-  badLanes: agentMsg({ id: 'wake.lane.badLanes', text: 'lanes must be lane ids (hive_lane list), at most {max}, or ["all"]', note: "A lane watch's refusal: its lanes argument isn't lane ids or [\"all\"]. max: how many it takes." }),
+  badLanes: agentMsg({ id: 'wake.lane.badLanes', text: 'lanes must be lane ids (cw_lane list), at most {max}, or ["all"]', note: "A lane watch's refusal: its lanes argument isn't lane ids or [\"all\"]. max: how many it takes." }),
   badEvents: agentMsg({ id: 'wake.lane.badEvents', text: 'events must be any of {events}', note: 'A lane watch\'s refusal: its events argument names none it knows. events: those it takes ("failed, blocked, …").' })
 }
 
@@ -101,7 +101,7 @@ export interface LaneCardMark {
    */
   r?: string
   /**
-   * When its newest open request for the user was made (HI-1991: a For you request, such as an agent's hive_ask_user)
+   * When its newest open request for the user was made (HI-1991: a For you request, such as an agent's cw_ask_user)
    * (ISO), '' for none. Absent in marks from before, and where its requests aren't known.
    */
   q?: string
@@ -251,7 +251,7 @@ export function laneHits(before: LaneMark | null | undefined, now: LaneNow, even
     if (on.has('unblocked') && !is.b && was.b) parts.push({ n: c.number, event: 'unblocked', text: say(T.unblocked, { card }) })
     if (on.has('stalled') && is.s && !was.s) parts.push({ n: c.number, event: 'stalled', text: say(T.stalled, { card }), ...(c.stalled ? { detail: c.stalled } : {}) })
     if (on.has('moved') && is.c !== was.c) parts.push({ n: c.number, event: 'moved', text: say(T.moved, { card, column: columnLabel(is.c) }) })
-    // A new request for the user on it (HI-1991): an agent's question (hive_ask_user) or Hive's own, under For you. The
+    // A new request for the user on it (HI-1991): an agent's question (cw_ask_user) or Hive's own, under For you. The
     // agent asking isn't waiting at a prompt, so `waiting` never tells it. A mark from before has no `q`.
     if (on.has('paused-user') && was.q !== undefined && is.q !== undefined && is.q > was.q) parts.push({ n: c.number, event: 'paused-user', text: say(T.asked, { card, who: !c.asked ? 'none' : c.asked.by ? 'agent' : 'hive', by: c.asked?.by ?? '' }), ...(c.asked?.text ? { detail: firstLine(storedForAgents(c.asked.text, c.asked.shown)) } : {}) })
   }

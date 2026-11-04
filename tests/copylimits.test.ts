@@ -100,9 +100,9 @@ const changes = {
   valid: (src: string) => writeFileSync(join(src, 'b.md'), 'b, edited while it was being copied')
 }
 const reason = {
-  bytes: 'it is too big for Hive to check (it is over 1 MB)',
-  entries: 'it is too big for Hive to check (it has more than 200 files and folders)',
-  depth: 'it is too big for Hive to check (it has folders more than 12 deep)',
+  bytes: 'it is too big for Combwork to check (it is over 1 MB)',
+  entries: 'it is too big for Combwork to check (it has more than 200 files and folders)',
+  depth: 'it is too big for Combwork to check (it has folders more than 12 deep)',
   vanish: 'a file in it went while it was being copied',
   unreadable: 'its folder in the workspace could not be read (access denied)'
 } as const
@@ -119,11 +119,11 @@ describe('Codex: a source changing while it is copied', () => {
       const bad = source(root, 'bad')
       const ok = source(root, 'ok')
       await launch(cwd, [{ name: 'bad', sourcePath: bad }])
-      const copy = join(cwd, '.agents', 'skills', 'hive-bad')
+      const copy = join(cwd, '.agents', 'skills', 'cw-bad')
       const old = await contentHash(copy)
       // A new version, then the change while it is copied.
       writeFileSync(join(bad, 'SKILL.md'), '---\nname: bad\n---\n\nv2\n')
-      hooks.beforeWrite = { match: /hive-bad\.hive-new-[^\\/]*[\\/]a\.md$/, run: () => changes[kind](bad) }
+      hooks.beforeWrite = { match: /cw-bad\.hive-new-[^\\/]*[\\/]a\.md$/, run: () => changes[kind](bad) }
       const out = await launch(cwd, [{ name: 'bad', sourcePath: bad }, { name: 'ok', sourcePath: ok }])
       const lasting = kind === 'bytes' || kind === 'entries' || kind === 'depth'
       expect(out.bad).toEqual({ revision: old, problem: `${reason[kind]}, so it kept its old copy`, ...(lasting ? { lasting: true } : {}) })
@@ -139,7 +139,7 @@ describe('Codex: a source changing while it is copied', () => {
     const cwd = join(root, 'project')
     mkdirSync(cwd, { recursive: true })
     const bad = source(root, 'bad')
-    hooks.beforeWrite = { match: /hive-bad\.hive-new-[^\\/]*[\\/]a\.md$/, run: () => changes.bytes(bad) }
+    hooks.beforeWrite = { match: /cw-bad\.hive-new-[^\\/]*[\\/]a\.md$/, run: () => changes.bytes(bad) }
     const out = await launch(cwd, [{ name: 'bad', sourcePath: bad }])
     expect(out.bad).toEqual({ revision: null, problem: reason.bytes, lasting: true })
     expect(readdirSync(join(cwd, '.agents', 'skills'))).toEqual([])
@@ -150,9 +150,9 @@ describe('Codex: a source changing while it is copied', () => {
     const cwd = join(root, 'project')
     mkdirSync(cwd, { recursive: true })
     const s = source(root, 'mine')
-    hooks.beforeWrite = { match: /hive-mine\.hive-new-[^\\/]*[\\/]a\.md$/, run: () => changes.valid(s) }
+    hooks.beforeWrite = { match: /cw-mine\.hive-new-[^\\/]*[\\/]a\.md$/, run: () => changes.valid(s) }
     const out = await launch(cwd, [{ name: 'mine', sourcePath: s }])
-    const copy = join(cwd, '.agents', 'skills', 'hive-mine')
+    const copy = join(cwd, '.agents', 'skills', 'cw-mine')
     expect(readFileSync(join(copy, 'b.md'), 'utf8')).toBe('b, edited while it was being copied')
     expect(out.mine).toEqual({ revision: await contentHash(copy) })
     expect(await contentHash(copy)).toBe(await contentHash(s))
@@ -214,7 +214,7 @@ describe('writes that take less than they are given', () => {
     const s = rich(root, 'rich')
     hooks.writes = 'short'
     const out = (await codex.prepareLaunch({ projectPath: cwd, agentId: 'a1', runId: 'short', cwd, skills: [{ name: 'rich', sourcePath: s }], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, executable: 'codex' } as never)) as Record<string, Delivery>
-    const copy = join(cwd, '.agents', 'skills', 'hive-rich')
+    const copy = join(cwd, '.agents', 'skills', 'cw-rich')
     for (const f of ['SKILL.md', 'refs/data.bin']) same(s, copy, f)
     expect(out.rich).toEqual({ revision: await contentHash(s) })
     // Many partial writes were made: it wasn't one write per chunk.
@@ -251,7 +251,7 @@ describe('writes that take less than they are given', () => {
     const s = source(root, 'stuck')
     const launchCodex = () => codex.prepareLaunch({ projectPath: cwd, agentId: 'a1', runId: `none${++n}`, cwd, skills: [{ name: 'stuck', sourcePath: s }], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, executable: 'codex' } as never) as Promise<Record<string, Delivery>>
     await launchCodex()
-    const copy = join(cwd, '.agents', 'skills', 'hive-stuck')
+    const copy = join(cwd, '.agents', 'skills', 'cw-stuck')
     const old = await contentHash(copy)
     writeFileSync(join(s, 'SKILL.md'), '---\nname: stuck\n---\n\nv2\n')
     hooks.writes = 'none'
@@ -291,7 +291,7 @@ describe('a skill at the entry limit', () => {
     mkdirSync(cwd, { recursive: true })
     const s = sized(root, 'full', full)
     const first = await launchCodex(cwd, [{ name: 'full', sourcePath: s }])
-    const copy = join(cwd, '.agents', 'skills', 'hive-full')
+    const copy = join(cwd, '.agents', 'skills', 'cw-full')
     expect(existsSync(join(copy, '.hive-copy'))).toBe(true)
     expect(first.full).toEqual({ revision: await contentHash(s) })
     expect(await launchCodex(cwd, [{ name: 'full', sourcePath: s }])).toEqual(first)
@@ -305,12 +305,12 @@ describe('a skill at the entry limit', () => {
     const big = sized(root, 'big', full + 1)
     const first = await launchCodex(cwd, [{ name: 'big', sourcePath: big }, { name: 'ok', sourcePath: ok }])
     expect(first.big).toEqual({ revision: null, problem: reason.entries, lasting: true })
-    expect(existsSync(join(cwd, '.agents', 'skills', 'hive-big'))).toBe(false)
+    expect(existsSync(join(cwd, '.agents', 'skills', 'cw-big'))).toBe(false)
     expect(first.ok).toEqual({ revision: await contentHash(ok) })
 
     const grows = source(root, 'grows')
     await launchCodex(cwd, [{ name: 'grows', sourcePath: grows }])
-    const copy = join(cwd, '.agents', 'skills', 'hive-grows')
+    const copy = join(cwd, '.agents', 'skills', 'cw-grows')
     const old = await contentHash(copy)
     for (let i = 0; i < full - 4; i++) writeFileSync(join(grows, 'refs', `r${i}.md`), '')
     const update = await launchCodex(cwd, [{ name: 'grows', sourcePath: grows }])

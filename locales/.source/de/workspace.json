@@ -160,7 +160,7 @@
   "workspace.folder.home": "{hasAgent, select, yes {{agent}'s old folder} other {an old reviewer folder}}",
   "workspace.folder.slot": "{carried, select, yes {{name} (carried, {agent})} other {{hasAgent, select, yes {{hasCards, select, yes {{name} ({agent}, {cards})} other {{name} ({agent})}}} other {{hasCards, select, yes {{name} ({cards})} other {{name}}}}}}}",
   "workspace.mcpView.builtIn": "Built-in Combwork MCP server",
-  "workspace.mcpView.builtInText": "Every session started from Combwork gets a <code>hive</code> MCP server that connects to the Agent API{hasUrl, select, yes { at {url}} other {}}. Turn it off in Settings → Agent API.",
+  "workspace.mcpView.builtInText": "Every session started from Combwork gets a <code>combwork</code> MCP server that connects to the Agent API{hasUrl, select, yes { at {url}} other {}}. Turn it off in Settings → Agent API.",
   "workspace.mcpView.deleteServer": "Delete server",
   "workspace.mcpView.dir": "Use {variable} to point at server code stored in `.hive/mcp`.",
   "workspace.mcpView.format": "**Format** — one server per file, in Claude Code's .mcp.json format (Combwork converts it for other providers) plus an optional `description`:",

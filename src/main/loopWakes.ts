@@ -40,20 +40,20 @@ import { rulesEnforced } from './workflow/recorder'
  * by the delivery service as everything is (#650: the doorbell when its agent is idle, a notice in its hooks while it
  * works). Made again just before it is offered or read, from the card and the lane as they are then (#652: what lands
  * with the handoff is in it, with no settle of its own): one no longer due is cancelled. Each one received (read with
- * hive_inbox) is noted in the card's history, as Hive.
+ * cw_inbox) is noted in the card's history, as Hive.
  */
 
 const log = createLogger('loopWakes')
 
 /** Hive's own deliveries come from it. */
 // agent-protocol: the sender's name a delivery is labelled with (deliveries name their senders)
-const HIVE = { kind: 'hive', name: 'Hive' } as const
+const HIVE = { kind: 'hive', name: 'Combwork' } as const
 /** The user's answer comes from them, as a decision does (decisionWakes.ts). */
 // agent-protocol: the sender's name a delivery is labelled with (deliveries name their senders)
 const USER = { kind: 'user', name: 'the user' } as const
 
 const T = {
-  unreadable: agentMsg({ id: 'inbox.loopEnded.unreadable', text: 'not a loop wake Hive can read', note: "Why a loop wake (#405, a delivery) was cancelled just before it was given: what it was made from can't be read back." }),
+  unreadable: agentMsg({ id: 'inbox.loopEnded.unreadable', text: 'not a loop wake Combwork can read', note: "Why a loop wake (#405, a delivery) was cancelled just before it was given: what it was made from can't be read back." }),
   projectClosed: agentMsg({ id: 'inbox.loopEnded.projectClosed', text: 'its project is no longer open', note: 'Why a loop wake was cancelled just before it was given: its workspace closed, or its window opened another.' }),
   notDue: agentMsg({ id: 'inbox.loopEnded.notDue', text: 'no longer due', note: 'Why a loop wake was cancelled just before it was given: the card moved on, the agent acted on it, or its own watch told it (#578).' }),
   otherAgent: agentMsg({ id: 'inbox.loopEnded.otherAgent', text: "it is another agent's wake now", note: "Why a loop wake was cancelled just before it was given: the card's roles changed (another reviewer), and that agent gets it instead." })

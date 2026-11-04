@@ -1,5 +1,5 @@
 // HI-2245: a builder's own cards in Review whose line has commits past their submission, said in its card watch's reply
-// and hive_lane next's (agent-facing, shared/unsubmitted.ts's text): the column alone read as handed over.
+// and cw_lane next's (agent-facing, shared/unsubmitted.ts's text): the column alone read as handed over.
 
 import type { WorkspaceService } from './workspace'
 import type { UnsubmittedCard } from '../shared/unsubmitted'

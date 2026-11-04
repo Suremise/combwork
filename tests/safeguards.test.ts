@@ -358,7 +358,7 @@ describe('usage', () => {
       ['a tagged text block', [{ type: 'text', text: '<task>Continue with this task</task>' }]],
       ['images alone', [image]],
       ['a command', '<command-name>/review</command-name>\n<command-args></command-args>'],
-      ["Hive's typed line", '[Hive] #12 is in Review: HR5 failed it']
+      ["Hive's typed line", '[CW] #12 is in Review: HR5 failed it']
     ]
     for (const [what, content] of prompts) {
       // Turn p1: a stop Claude Code recorded by itself (no prompt shown). Turn p2: the person's next prompt, then a stop

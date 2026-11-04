@@ -3,7 +3,7 @@
 // never a retry time or a total it doesn't say), Claude Code's transcript read by its adapter while its turn is quiet
 // (a read that comes back after a hook loses to it), and the Assistant told once a turn when a wait goes on past
 // Settings → Advanced's while (a wait that ends sooner tells nothing; a later turn's is told again). Each wait that ends
-// is kept in the launch's tally (HI-1996), which hive_agent_activity reads.
+// is kept in the launch's tally (HI-1996), which cw_agent_activity reads.
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -241,7 +241,7 @@ describe("other CLIs' retry waits (HI-1973)", () => {
     expect(st.retryWait).toBeUndefined()
   })
 
-  it('HI-1996: each wait that ends, on progress or with its turn, is kept in the launch’s tally that hive_agent_activity reads', async () => {
+  it('HI-1996: each wait that ends, on progress or with its turn, is kept in the launch’s tally that cw_agent_activity reads', async () => {
     const { st } = agent('tally', copilot, 'copilot')
     const tally = () => (st as unknown as { retryWaited?: { waits: number; ms: number; latest: { since: string; ended: string; tries: number; status: number | null } } }).retryWaited
     await hook(st, { hook_event_name: 'UserPromptSubmit', prompt: 'go' })

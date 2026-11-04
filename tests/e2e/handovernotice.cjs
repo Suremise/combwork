@@ -128,7 +128,7 @@ const check = (name, ok, extra = '') => {
         await inv('settings:update', { sessions: { transcriptWarnMB: 1 } })
       }
     }
-    // The handover the agent is asked for, written as hive_create_handover would (its session in the header).
+    // The handover the agent is asked for, written as cw_create_handover would (its session in the header).
     let written = 0
     const writeHandover = (name, sessionId) => fs.writeFileSync(path.join(hdir, `2026-10-18-alpha-${name.toLowerCase()}-${++written}.md`), `# ${name}'s work\n\n- **Project:** alpha\n- **Session:** ${sessionId}\n\nCarry on.\n`)
     const writing = (name) => page.locator('.toast', { hasText: `${name} is writing a handover` })

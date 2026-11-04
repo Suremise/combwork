@@ -7,7 +7,7 @@ import { recordTestToken } from './testQuiet'
 /**
  * Each launch's own hook token and private folder (#345). The hook server takes a hook call only with the token of the
  * launch it names (`?run=<runId>`), and a launch's token ends with it: a token that leaks can't speak for another
- * session or outlive its own. CLIs that send hooks over HTTP read it from the session's environment (`HIVE_HOOK_TOKEN`);
+ * session or outlive its own. CLIs that send hooks over HTTP read it from the session's environment (`CW_HOOK_TOKEN`);
  * hook commands (curl) read the header from the launch's auth file.
  *
  * The auth file, and whatever else of a launch may hold a secret (Claude Code's settings, with a user's `--settings`

@@ -148,11 +148,11 @@ describe('what comes next on a card (#1530)', () => {
 
   it('says each step in a line of the reply', () => {
     const line = (next: NextStep): string => intentText({ ok: true, card: 'HI-1', from: 'active', to: 'approved', next })
-    expect(line({ step: 'intents', intents: ['start review', 'verdict'] })).toBe('HI-1: active → approved. Next on it: hive_start_review or hive_verdict.')
+    expect(line({ step: 'intents', intents: ['start review', 'verdict'] })).toBe('HI-1: active → approved. Next on it: cw_start_review or cw_verdict.')
     expect(line({ step: 'review' })).toBe("HI-1: active → approved. Next: a reviewer's verdict.")
     expect(line({ step: 'user' })).toBe("HI-1: active → approved. Next: the user's OK, asked under For you: wait for it.")
-    expect(line({ step: 'merge' })).toBe('HI-1: active → approved. Next: its builder merges it, then reports the merge (hive_report_merge).')
-    expect(line({ step: 'queue' })).toBe("HI-1: active → approved. Next: Hive's merge queue merges it.")
+    expect(line({ step: 'merge' })).toBe('HI-1: active → approved. Next: its builder merges it, then reports the merge (cw_report_merge).')
+    expect(line({ step: 'queue' })).toBe("HI-1: active → approved. Next: Combwork's merge queue merges it.")
     expect(line({ step: 'done' })).toBe('HI-1: active → approved. Done: nothing more on it.')
   })
 })

@@ -141,6 +141,8 @@
   "session.purge.reading": "Combwork liest gerade das Transkript (ein Export oder eine Suche). Versuche es gleich noch einmal.",
   "session.purge.running": "Sie läuft.",
   "session.purge.unread": "Combwork konnte die Nutzung der Sitzung nicht erfassen, daher bleibt sie erhalten.",
+  "session.renamedFresh.body": "{n, plural, one {# Unterhaltung hat} other {# Unterhaltungen haben}} neu begonnen: Combwork hat die Tools umbenannt, die Agenten nutzen, daher kann eine Unterhaltung von vorher nicht weitergehen. Die früheren bleiben unter Sitzungen zum Nachlesen.",
+  "session.renamedFresh.title": "Agenten haben neue Unterhaltungen begonnen",
   "session.restartMode.didntStop": "Agent {agent} hat nicht rechtzeitig angehalten und wurde daher nicht im neuen Modus neu gestartet. Versuche es erneut, sobald er angehalten hat.",
   "session.setup.failed": "Der Einrichtungsbefehl wurde mit Code {code} beendet. Seine Ausgabe steht im Terminal des Agenten. Behebe den Fehler und starte den Agenten erneut, oder starte ihn ohne Einrichtung.",
   "session.setup.failedTitle": "{project} · {agent}: Einrichtung fehlgeschlagen",

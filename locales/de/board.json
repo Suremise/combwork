@@ -214,7 +214,7 @@
   "board.details.line": "{label}: {text}",
   "board.details.log": "Log",
   "board.details.noInstall": "Nichts installiert: Das Projekt hat keinen Einrichtungsbefehl und keine Lock-Datei",
-  "board.details.notCounted": "Zählt nicht als Check {name}: {why, select, notCheck {nicht als Check gestartet (hive-progress --check), und sein Befehl ist keiner der Check-Befehle des Projekts} notContained {der ausgecheckte Stand enthält die Revision der Karte nicht} dirty {der Ordner hatte beim Start oder Ende nicht committete Änderungen} moved {beim Ende war etwas anderes ausgecheckt} changed {im Ordner haben sich während des Laufs Dateien geändert} revisionChanged {die Dateien der Karte haben sich während des Laufs geändert} other {es lässt sich nicht sagen, ob sich seine Dateien geändert haben}}",
+  "board.details.notCounted": "Zählt nicht als Check {name}: {why, select, notCheck {nicht als Check gestartet (cw-progress --check), und sein Befehl ist keiner der Check-Befehle des Projekts} notContained {der ausgecheckte Stand enthält die Revision der Karte nicht} dirty {der Ordner hatte beim Start oder Ende nicht committete Änderungen} moved {beim Ende war etwas anderes ausgecheckt} changed {im Ordner haben sich während des Laufs Dateien geändert} revisionChanged {die Dateien der Karte haben sich während des Laufs geändert} other {es lässt sich nicht sagen, ob sich seine Dateien geändert haben}}",
   "board.details.provider": "Anbieter",
   "board.details.revision": "Revision",
   "board.details.run": "Lauf",

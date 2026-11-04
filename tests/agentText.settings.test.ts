@@ -45,8 +45,8 @@ describe('the settings catalogue in the Default', () => {
     expect(checkSettingValue(entry('general.showTips'), 'maybe')).toEqual({ error: `${entry('general.showTips').title} takes true or false.` })
     expect(settingValueText(entry('board.colors'), { a: 1, b: 2 })).toBe('(2 keys)')
     expect(settingValueText(entry('codex.modelFallback'), [1])).toBe('(1 entries)')
-    expect(settingValueText(entry('codex.modelFallback'), [])).toBe("(Hive's list)")
-    expect(settingChangeTexts(entry('codex.prices'), {}, {}, { old: ['m'], new: [] })).toEqual({ oldText: 'm: removed', newText: "m: Hive's price" })
+    expect(settingValueText(entry('codex.modelFallback'), [])).toBe("(Combwork's list)")
+    expect(settingChangeTexts(entry('codex.prices'), {}, {}, { old: ['m'], new: [] })).toEqual({ oldText: 'm: removed', newText: "m: Combwork's price" })
     // A number above a thousand stays as the tools wrote it, never grouped.
     expect(checkSettingValue(entry('sessions.usageCacheSize'), 1)).toEqual({ error: `${entry('sessions.usageCacheSize').title} takes 100 to 50000.` })
   })

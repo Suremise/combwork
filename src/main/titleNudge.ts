@@ -5,7 +5,7 @@ import { agentList, agentMsg, say } from '../shared/agentText'
 
 const T = {
   long: agentMsg({ id: 'notice.title.long', text: 'Titles over {limit} characters are cut in git and on the board: consider a shorter one (the detail belongs in the description).', note: 'HI-1872: a line in a tool\'s reply when an agent gave a card a title longer than Settings → Advanced allows. limit: that length.' }),
-  details: agentMsg({ id: 'notice.title.details', text: 'A title says the outcome or the problem in words: retitle it without {list} (hive_update_task with title), keeping {n, plural, one {it} other {them}} in the description.', note: 'HI-2061, HI-2260: a line in a tool\'s reply when an agent\'s card title names paths, files, cards or measurements: a step to take (told to put them in a description that already had them, agents kept the title). list: what it named, each in double quotes, joined ("a.ts" and "20 MB"); n: how many.' })
+  details: agentMsg({ id: 'notice.title.details', text: 'A title says the outcome or the problem in words: retitle it without {list} (cw_update_task with title), keeping {n, plural, one {it} other {them}} in the description.', note: 'HI-2061, HI-2260: a line in a tool\'s reply when an agent\'s card title names paths, files, cards or measurements: a step to take (told to put them in a description that already had them, agents kept the title). list: what it named, each in double quotes, joined ("a.ts" and "20 MB"); n: how many.' })
 }
 
 /** A file name's extension, of code, docs, data or logs (a title naming a file: HI-2061). */

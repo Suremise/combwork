@@ -133,7 +133,7 @@ describe("cleaning up archived cards' attachments (HI-1842)", () => {
     const after = await inWorkspace(w, () => tasks.getTask(archived.n))
     expect(after.archived).toBe(true)
     const said = after.comments.at(-1)!
-    expect(said.by).toBe('Hive')
+    expect(said.by).toBe('Combwork')
     expect(said.text).toMatch(/^Removed 2 attachments \(.*shot\.png.*\): this project removes archived cards' attachments 30 days after archiving \(Project Settings → Storage\)\. They are in the Recycle Bin\.$/)
     expect(said.hiveText).toBeTruthy()
     expect([rows(w, open.n), rows(w, done.n)]).toEqual([2, 2])
@@ -141,7 +141,7 @@ describe("cleaning up archived cards' attachments (HI-1842)", () => {
     // Used once: its Move again is refused, and the automatic run finds nothing more.
     await expect(apply(w, p, shown.plan!, 31)).rejects.toThrow(/out of date/)
     expect((await run(w, p, 31)).cards).toBe(0)
-    expect((await inWorkspace(w, () => tasks.getTask(archived.n))).comments.filter((c) => c.by === 'Hive').length).toBe(1)
+    expect((await inWorkspace(w, () => tasks.getTask(archived.n))).comments.filter((c) => c.by === 'Combwork').length).toBe(1)
   })
 
   it('follows the project: 3 days removes sooner; Never keeps them', async () => {

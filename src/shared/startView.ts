@@ -5,6 +5,7 @@
  * decision). Pure: main gathers the input (main/startView.ts). Agent-facing, so English.
  */
 
+import { NOTICE_PREFIX } from './doorbell'
 import { agentMsg, say, type AgentMsg } from './agentText'
 import { utf8Bytes as bytes } from './metrics'
 import { cardRef } from './projectKeys'
@@ -124,7 +125,7 @@ const A = {
   }),
   foot: agentMsg({
     id: 'startView.foot',
-    text: 'More with hive_journal_recall (small first; hive_journal_entry for one in full): the journal skill says how.',
+    text: 'More with cw_journal_recall (small first; cw_journal_entry for one in full): the journal skill says how.',
     note: "The state view's last line (#1032): the view is a snapshot within a budget, and recall is how to get more."
   }),
   waiting: agentMsg({ id: 'startView.section.waiting', text: 'Waiting on the user:', note: "A section's title: blocked cards and agents asking the user." }),
@@ -136,15 +137,15 @@ const A = {
   agents: agentMsg({ id: 'startView.section.agents', text: 'Agents running:', note: "A section's title: running agents, by project." }),
   board: agentMsg({ id: 'startView.section.board', text: 'Board:', note: "A section's title: each project's open cards per column." }),
   digest: agentMsg({ id: 'startView.section.digest', text: 'Weekly digest:', note: "A section's title: a week the journal has no digest of." }),
-  moreWaiting: agentMsg({ id: 'startView.more.waiting', text: '{n} more: hive_list_tasks and hive_list_projects', note: "In place of the Waiting on the user lines that don't fit (#1078). n: how many." }),
-  moreHold: agentMsg({ id: 'startView.more.hold', text: '{n} more On Hold: hive_list_tasks column hold', note: "In place of the Waiting on the user lines that don't fit, when all of them are On Hold cards (#1078). n: how many." }),
-  moreDecisions: agentMsg({ id: 'startView.more.decisions', text: '{n} more: hive_journal_recall kinds decision, plan', note: "In place of the section's lines that don't fit. n: how many." }),
-  moreActive: agentMsg({ id: 'startView.more.active', text: '{n} more: hive_list_tasks', note: "In place of the section's lines that don't fit. n: how many." }),
-  moreOnCards: agentMsg({ id: 'startView.more.onCards', text: '{n} more: hive_journal_recall with link card', note: "In place of the section's lines that don't fit. n: how many." }),
-  moreIncidents: agentMsg({ id: 'startView.more.incidents', text: '{n} more: hive_journal_recall kinds incident', note: "In place of the section's lines that don't fit. n: how many." }),
-  moreLanes: agentMsg({ id: 'startView.more.lanes', text: '{n} more: hive_lane list', note: "In place of the section's lines that don't fit. n: how many." }),
-  moreAgents: agentMsg({ id: 'startView.more.agents', text: '{n} more: hive_list_projects', note: "In place of the section's lines that don't fit. n: how many." }),
-  moreBoard: agentMsg({ id: 'startView.more.board', text: '{n} more: hive_list_tasks', note: "In place of the section's lines that don't fit. n: how many." }),
+  moreWaiting: agentMsg({ id: 'startView.more.waiting', text: '{n} more: cw_list_tasks and cw_list_projects', note: "In place of the Waiting on the user lines that don't fit (#1078). n: how many." }),
+  moreHold: agentMsg({ id: 'startView.more.hold', text: '{n} more On Hold: cw_list_tasks column hold', note: "In place of the Waiting on the user lines that don't fit, when all of them are On Hold cards (#1078). n: how many." }),
+  moreDecisions: agentMsg({ id: 'startView.more.decisions', text: '{n} more: cw_journal_recall kinds decision, plan', note: "In place of the section's lines that don't fit. n: how many." }),
+  moreActive: agentMsg({ id: 'startView.more.active', text: '{n} more: cw_list_tasks', note: "In place of the section's lines that don't fit. n: how many." }),
+  moreOnCards: agentMsg({ id: 'startView.more.onCards', text: '{n} more: cw_journal_recall with link card', note: "In place of the section's lines that don't fit. n: how many." }),
+  moreIncidents: agentMsg({ id: 'startView.more.incidents', text: '{n} more: cw_journal_recall kinds incident', note: "In place of the section's lines that don't fit. n: how many." }),
+  moreLanes: agentMsg({ id: 'startView.more.lanes', text: '{n} more: cw_lane list', note: "In place of the section's lines that don't fit. n: how many." }),
+  moreAgents: agentMsg({ id: 'startView.more.agents', text: '{n} more: cw_list_projects', note: "In place of the section's lines that don't fit. n: how many." }),
+  moreBoard: agentMsg({ id: 'startView.more.board', text: '{n} more: cw_list_tasks', note: "In place of the section's lines that don't fit. n: how many." }),
   column: agentMsg({
     id: 'startView.column',
     text: '{column, select, todo {Todo} doing {Doing} review {Review} passed {Passed} hold {On hold} done {Done} other {{column}}}',
@@ -186,7 +187,7 @@ const yes = (v: unknown): string => (v ? 'yes' : 'no')
 
 const cardLine = (c: ViewCard): string => `- ${say(A.card, { card: cardRef(c.number), column: columnName(c.column), project: c.project, hasAgent: yes(c.agent), agent: c.agent ?? '', hasReviewer: yes(c.reviewer), reviewer: c.reviewer ?? '', title: clip(c.title, TITLE) })}`
 
-// agent-protocol: a journal entry's id, date, kind and project, and its summary as written: no wording of Hive's.
+// agent-protocol: a journal entry's id, date, kind and project, and its summary as written: no wording of Combwork's.
 const entryLine = (e: ViewEntry): string => `- #${e.id} ${e.at.slice(0, 10)} ${e.kind}${e.project ? ` (${e.project})` : ''}${e.importance >= 2 ? ' !' : ''}: ${clip(e.summary, SUMMARY)}`
 
 const laneLine = (l: ViewLane): string => {
@@ -217,8 +218,8 @@ const urgency = (c: ViewCard): number => (c.column !== 'hold' ? 0 : DECIDE.test(
 export function startView(v: StartViewInput): string {
   const when = v.now.toISOString().slice(0, 16).replace('T', ' ')
   const source = v.source === 'compact' ? 'compact' : v.source === 'resume' ? 'resume' : 'start'
-  // agent-protocol: "[Hive] " is the fixed prefix of what Hive types into a session.
-  const head = `[Hive] ${say(A.head, { source, when })}`
+  // agent-protocol: NOTICE_PREFIX is the fixed prefix of what Combwork types into a session.
+  const head = `${NOTICE_PREFIX}${say(A.head, { source, when })}`
   const foot = say(A.foot)
 
   const cards = v.blocked.map((c) => ({ hold: c.column === 'hold', line: `- ${say(A.blocked, { card: cardRef(c.number), project: c.project, column: columnName(c.column), hasAgent: yes(c.agent), agent: c.agent ?? '', reason: clip(c.blocked ?? '', REASON) })}` }))

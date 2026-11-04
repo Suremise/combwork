@@ -71,7 +71,7 @@ describe('the Store PowerShell first on PATH (#585)', () => {
       const install = text.indexOf('winget install --id Microsoft.PowerShell --source winget --installer-type wix')
       expect(uninstall, `${lang}: the uninstall command`).toBeGreaterThan(0)
       expect(install, `${lang}: the install command after it`).toBeGreaterThan(uninstall)
-      expect(text.indexOf('Hive', install), `${lang}: Hive restarted after the install`).toBeGreaterThan(install)
+      expect(text.indexOf('Combwork', install), `${lang}: Combwork restarted after the install`).toBeGreaterThan(install)
     }
     order(storePwshIssue().detail!.at(-1)!, 'en')
     for (const lang of ['de', 'es', 'fr', 'ja', 'pl', 'pt-BR', 'zh-CN']) {

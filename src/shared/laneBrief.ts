@@ -28,26 +28,26 @@ export type LaneRole = 'builder' | 'reviewer'
 
 /** The brief's text (dialects, HI-2438): the project's rules a line each (brief.rule.*), and the brief's own lines (brief.lane.*). */
 const B = {
-  rulesOff: agentMsg({ id: 'brief.rule.off', text: 'Workflow rules are off in this project: the cards move as you put them (hive_update_task).', note: 'The only rule while workflow rules are off.' }),
+  rulesOff: agentMsg({ id: 'brief.rule.off', text: 'Workflow rules are off in this project: the cards move as you put them (cw_update_task).', note: 'The only rule while workflow rules are off.' }),
   reviewNone: agentMsg({ id: 'brief.rule.review.none', text: 'No review is needed.', note: 'Review: none.' }),
   reviewAgent: agentMsg({ id: 'brief.rule.review.agent', text: 'A reviewer agent reviews each card before it is merged.', note: 'Review: an agent.' }),
   reviewAgentThenYou: agentMsg({ id: 'brief.rule.review.agentThenYou', text: 'A reviewer agent reviews each card, then the user does, before it is merged.', note: 'Review: an agent, then the user.' }),
   reviewYou: agentMsg({ id: 'brief.rule.review.you', text: 'The user reviews each card before it is merged.', note: 'Review: the user.' }),
   preChecks: agentMsg({
     id: 'brief.rule.preChecks',
-    text: 'Checks that pass before review: {checks}. Run each as `hive-progress --check <name> --card "<key>"` before submitting.',
+    text: 'Checks that pass before review: {checks}. Run each as `cw-progress --check <name> --card "<key>"` before submitting.',
     note: 'The checks the project runs before review, by name, joined ("typecheck and lint").'
   }),
-  finishHive: agentMsg({ id: 'brief.rule.finish.hiveMerges', text: 'Hive merges each approved card.', note: 'Finish: Hive merges.' }),
-  finishAgent: agentMsg({ id: 'brief.rule.finish.agentMerges', text: 'The builder merges each approved card (merge-ready), then reports it with hive_report_merge; Hive checks it is in.', note: 'Finish: the builder merges.' }),
+  finishHive: agentMsg({ id: 'brief.rule.finish.hiveMerges', text: 'Combwork merges each approved card.', note: 'Finish: Hive merges.' }),
+  finishAgent: agentMsg({ id: 'brief.rule.finish.agentMerges', text: 'The builder merges each approved card (merge-ready), then reports it with cw_report_merge; Combwork checks it is in.', note: 'Finish: the builder merges.' }),
   finishCommitted: agentMsg({ id: 'brief.rule.finish.committed', text: 'A card is done once its work is committed.', note: 'Finish: committed is done.' }),
-  finishNotChecked: agentMsg({ id: 'brief.rule.finish.notChecked', text: 'Hive does not check merges: report each one with hive_report_merge.', note: "Finish: merges aren't checked." }),
+  finishNotChecked: agentMsg({ id: 'brief.rule.finish.notChecked', text: 'Combwork does not check merges: report each one with cw_report_merge.', note: "Finish: merges aren't checked." }),
   finishAccept: agentMsg({ id: 'brief.rule.finish.accept', text: 'An approved card is accepted where it is (no merge).', note: 'Finish: accepted where it is.' }),
-  okEvery: agentMsg({ id: 'brief.rule.okBefore.every', text: "Every card waits for the user's OK before it is merged (Hive asks them).", note: "The user's OK before every merge." }),
-  okLabels: agentMsg({ id: 'brief.rule.okBefore.labels', text: "Cards labelled {labels} wait for the user's OK before they are merged (Hive asks them).", note: 'The user\'s OK before merging cards with these labels, joined ("ui and api").' }),
+  okEvery: agentMsg({ id: 'brief.rule.okBefore.every', text: "Every card waits for the user's OK before it is merged (Combwork asks them).", note: "The user's OK before every merge." }),
+  okLabels: agentMsg({ id: 'brief.rule.okBefore.labels', text: "Cards labelled {labels} wait for the user's OK before they are merged (Combwork asks them).", note: 'The user\'s OK before merging cards with these labels, joined ("ui and api").' }),
   builder: agentMsg({
     id: 'brief.lane.builder',
-    text: 'You are the builder of a lane in {project} that the user started: use the card-loop skill as the builder{reviewer, select, agent {, with {reviewerName} as the reviewer} pool {, reviewed by the pool ({pool}): Hive gives each card you submit to a free reviewer of it, and its lane is registered already, so give hive_lane no reviewer} other {, with no reviewer}}; rounds: {rounds}.',
+    text: 'You are the builder of a lane in {project} that the user started: use the card-loop skill as the builder{reviewer, select, agent {, with {reviewerName} as the reviewer} pool {, reviewed by the pool ({pool}): Combwork gives each card you submit to a free reviewer of it, and its lane is registered already, so give cw_lane no reviewer} other {, with no reviewer}}; rounds: {rounds}.',
     note: "#1280: the builder's brief's first line. reviewer: agent (reviewerName reviews), pool (#1443: the project's reviewer pool, its agents joined, or brief.lane.poolEmpty) or none."
   }),
   poolEmpty: agentMsg({ id: 'brief.lane.poolEmpty', text: 'nobody in it yet', note: 'The reviewer pool, with no agent in it yet: in brief.lane.builder.' }),
@@ -55,18 +55,18 @@ const B = {
   cards: agentMsg({ id: 'brief.lane.cards', text: 'The cards, one at a time in this order:', note: 'Above the cards, one a line ("1. AL-1 Lane data").' }),
   where: agentMsg({
     id: 'brief.lane.where',
-    text: '{place, select, slot {{builder} works in {slot}, a new branch per card (Hive makes each card\'s branch there from the target and gives the card to {builder} there)} folder {{builder} works in {folder}{hasBranch, select, yes { (branch {branch})} other {}}} other {{builder} works in the project folder}}{hasTarget, select, yes {; work goes to {target}} other {}}.',
+    text: '{place, select, slot {{builder} works in {slot}, a new branch per card (Combwork makes each card\'s branch there from the target and gives the card to {builder} there)} folder {{builder} works in {folder}{hasBranch, select, yes { (branch {branch})} other {}}} other {{builder} works in the project folder}}{hasTarget, select, yes {; work goes to {target}} other {}}.',
     note: '#1438: where the builder works: its slot (a new branch per card), its folder (and branch), or the project folder; and the target its work goes to.'
   }),
   rules: agentMsg({ id: 'brief.lane.rules', text: "The project's rules:", note: "Above the project's rules (brief.rule.*), a line each." }),
   builderMoves: agentMsg({
     id: 'brief.lane.builderMoves',
-    text: 'Ask Hive for your next card with hive_lane next. Move cards by what you did: hive_start_card, hive_submit with a summary, and hive_report_merge after a merge. A refused move says what to do next; do that. Questions for the user go through hive_ask_user, requests for the Hive Assistant through hive_ask_assistant, reports as comments on the card.',
+    text: 'Ask Combwork for your next card with cw_lane next. Move cards by what you did: cw_start_card, cw_submit with a summary, and cw_report_merge after a merge. A refused move says what to do next; do that. Questions for the user go through cw_ask_user, requests for the Assistant through cw_ask_assistant, reports as comments on the card.',
     note: "How the builder moves cards and asks: the intents, and where questions go."
   }),
   reviewerMoves: agentMsg({
     id: 'brief.lane.reviewerMoves',
-    text: 'Wait for each card in Review, then hive_start_review and hive_verdict on the revision it names. Questions for the builder go through hive_request_builder, for the user through hive_ask_user, for the Hive Assistant through hive_ask_assistant.',
+    text: 'Wait for each card in Review, then cw_start_review and cw_verdict on the revision it names. Questions for the builder go through cw_request_builder, for the user through cw_ask_user, for the Assistant through cw_ask_assistant.',
     note: 'How the reviewer reviews and asks.'
   }),
   note: agentMsg({ id: 'brief.lane.note', text: "The user's note: {note}", note: 'The note the user wrote as they started the lane, as they wrote it.' })

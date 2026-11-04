@@ -1,3 +1,4 @@
+import { TOOLS_SERVER } from '@shared/assistantTools'
 import { Children, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AssistantMark } from '../components/AssistantMark'
 import { CardChip, WatchedCardChip, WatchedCardChips } from '../components/CardChip'
@@ -1677,7 +1678,7 @@ export function ProjectMcpTab({ project }: { project: ProjectInfo }) {
           <div className="toggle-item">
             <Icon name="hubot" />
             <div className="ti-text">
-              <div className="ti-name">{'hive' /* i18n-ignore: the server's name */}</div>
+              <div className="ti-name">{TOOLS_SERVER /* i18n-ignore: the server's name */}</div>
               <div className="ti-desc">{tr(C.hiveDesc)}</div>
             </div>
             <span className={cx('badge', hiveOn ? 'success' : '')}>{tr(hiveOn ? C.onAll : C.off)}</span>

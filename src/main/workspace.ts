@@ -132,7 +132,7 @@ usage.db-*
 const HANDOVER_README = `# Handovers
 
 Notes written at the end of a session so the next session (or another project) can pick up where it left off.
-Agents can create these with the Hive MCP tool \`hive_create_handover\`.
+Agents can create these with the Hive MCP tool \`cw_create_handover\`.
 `
 
 export interface SessionsFile {

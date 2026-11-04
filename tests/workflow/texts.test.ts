@@ -168,7 +168,7 @@ describe('the workflow text in every locale', () => {
     expect(refusal('move.notFromHere', { ...SAMPLE, moves: '' }).next).toBe('Nothing waits to be done there now.')
     // A start or submit on a card in Done (HI-2227): more work the user asked for takes it back to Doing, a separate
     // follow-up is a new card; any other move refused there (an answer to a closed request) keeps the line above.
-    for (const move of ['start', 'submit']) expect(refusal('move.notFromHere', { ...SAMPLE, stage: 'done', move, moves: '' }).next).toBe("It's finished. More work on it that the user asked for: move it back with hive_update_task (column: doing), then work on it as usual. Separate follow-up work goes on a new card (hive_create_task).")
+    for (const move of ['start', 'submit']) expect(refusal('move.notFromHere', { ...SAMPLE, stage: 'done', move, moves: '' }).next).toBe("It's finished. More work on it that the user asked for: move it back with cw_update_task (column: doing), then work on it as usual. Separate follow-up work goes on a new card (cw_create_task).")
     expect(refusalLines('move.notFromHere', { ...SAMPLE, stage: 'done', move: 'start', moves: '' }, WINDOW).next).toBe("It's finished. More work on it that you ask for takes it back to Doing; separate follow-up work goes on a new card.")
     expect(refusal('move.notFromHere', { ...SAMPLE, stage: 'done', move: 'answer', moves: '' }).next).toBe('Nothing waits to be done there now.')
     const de = await loadCatalogue('de')

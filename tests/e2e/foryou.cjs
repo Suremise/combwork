@@ -83,7 +83,7 @@ const check = (name, ok, extra = '') => {
     await inv('tasks:update', n, { column: 'doing', agent: builder.id })
     const key = (await card(n)).key
     // The builder registers its lane (card-loop does) with one round before the user is asked.
-    await say(builder.id, `hive hive_lane ${JSON.stringify({ action: 'start', cards: [n], reviewer: 'Reviewer', rounds: 1 })}`)
+    await say(builder.id, `hive cw_lane ${JSON.stringify({ action: 'start', cards: [n], reviewer: 'Reviewer', rounds: 1 })}`)
     check('the lane is registered, with one round', !!(await lib.until(async () => (await lane())?.rounds === 1, HUNG_MS)), JSON.stringify(await lane()))
     await lib.until(() => idle(builder.id), HUNG_MS)
     check('nothing waits for the user yet', (await inv('tasks:forYou')).count === 0)
@@ -113,7 +113,7 @@ const check = (name, ok, extra = '') => {
     await inv('tasks:answer', n, item.request, { outcome: 'answered', choice: 'carryOn', rounds: 1 })
     check('answered: nothing waits for the user', (await inv('tasks:forYou')).count === 0)
     check('the lane runs again', !!(await lib.until(async () => (await lane())?.state === 'active', HUNG_MS)), JSON.stringify(await lane()))
-    const answerWake = (w) => w.startsWith(`[Hive] ${key}`) && w.includes('carry on (1 more round)')
+    const answerWake = (w) => w.startsWith(`[CW] ${key}`) && w.includes('carry on (1 more round)')
     check('the builder is woken with the answer', !!(await lib.until(async () => wakes('Builder').some(answerWake), HUNG_MS)), JSON.stringify(wakes('Builder')))
     const again = await inv('tasks:answer', n, item.request, { outcome: 'answered', choice: 'carryOn', rounds: 1 }).then(() => null, (e) => String(e.message ?? e))
     check('an answer to it again is refused', !!again, String(again))
@@ -121,7 +121,7 @@ const check = (name, ok, extra = '') => {
     check('…and the builder was woken once for it', wakes('Builder').filter(answerWake).length === 1, JSON.stringify(wakes('Builder')))
     // The card's history says whom Hive told of the answer (#1269 round 2), as the card dialog shows it.
     const toldLine = 'Told agent Builder (alpha) of your answer'
-    check("the card's history says whom Hive told of the answer", !!(await lib.until(async () => (await card(n))?.history.some((h) => h.by === 'Hive' && h.what === toldLine), HUNG_MS)), JSON.stringify((await card(n))?.history.map((h) => h.what)))
+    check("the card's history says whom Hive told of the answer", !!(await lib.until(async () => (await card(n))?.history.some((h) => h.by === 'Combwork' && h.what === toldLine), HUNG_MS)), JSON.stringify((await card(n))?.history.map((h) => h.what)))
     await showBoard(page)
     await openByTitle(page, n)
     const dialog = lib.cardDialog(page, await lib.cardLabel(inv, n))
@@ -152,10 +152,10 @@ const check = (name, ok, extra = '') => {
     const moved = await inv('tasks:move', q, 'doing', { agent: maker.id })
     check('the ui card starts in its builder’s worktree', !!moved.moved && (await card(q))?.column === 'doing', JSON.stringify(moved))
     const qKey = (await card(q)).key
-    const wakeAbout = (text) => wakes('Maker').some((w) => w.startsWith(`[Hive] ${qKey}`) && w.includes(text))
+    const wakeAbout = (text) => wakes('Maker').some((w) => w.startsWith(`[CW] ${qKey}`) && w.includes(text))
 
     // #922's case: its builder asks for a push OK.
-    await makerSays(`hive hive_ask_user ${JSON.stringify({ card: `#${q}`, kind: 'approve', text: 'OK to push the release tag?' })}`)
+    await makerSays(`hive cw_ask_user ${JSON.stringify({ card: `#${q}`, kind: 'approve', text: 'OK to push the release tag?' })}`)
     const chip = page.locator(`.task-card[data-task="${q}"] .task-for-you`)
     await showBoard(page)
     check('an agent’s ask shows the For you chip on its card', !!(await lib.until(async () => (await chip.count()) === 1, HUNG_MS)))
@@ -231,7 +231,7 @@ const check = (name, ok, extra = '') => {
     await page.keyboard.press('Escape')
 
     // A Decide question: the reply reaches the builder.
-    await makerSays(`hive hive_cannot_within_rules ${JSON.stringify({ card: `#${q}`, rule: 'submit.checksPassed', why: 'Which database should the tests use?' })}`)
+    await makerSays(`hive cw_cannot_within_rules ${JSON.stringify({ card: `#${q}`, rule: 'submit.checksPassed', why: 'Which database should the tests use?' })}`)
     qDialog = await openQ()
     check('a Decide question shows with a reply box', !!(await lib.until(async () => (await section.locator('textarea').count()) === 1, HUNG_MS)), await section.innerText().catch(() => ''))
     await section.locator('textarea').fill('SQLite in memory')
@@ -285,7 +285,7 @@ const check = (name, ok, extra = '') => {
     // HI-2286: on Hive's own OK the note is a comment only.
     check("Approve's note on Hive's OK says it is your comment", ((await rSection.locator('.for-you-approve-note').getAttribute('placeholder')) ?? '').includes('added as your comment'), await rSection.locator('.for-you-approve-note').getAttribute('placeholder'))
     await rSection.getByRole('button', { name: 'Approve' }).click()
-    const toldR = () => wakes('Maker').some((w) => w.startsWith(`[Hive] ${rKey}`) && w.includes('merge it and report the merge'))
+    const toldR = () => wakes('Maker').some((w) => w.startsWith(`[CW] ${rKey}`) && w.includes('merge it and report the merge'))
     check('the OK given: the builder is told to merge it', !!(await lib.until(async () => toldR() && (await rSection.count()) === 0, HUNG_MS)), JSON.stringify(wakes('Maker')))
     check('nothing waits for you now', (await inv('tasks:forYou')).count === 0 && (await badge.count()) === 0)
     await page.keyboard.press('Escape')
@@ -294,7 +294,7 @@ const check = (name, ok, extra = '') => {
     const s = (await inv('tasks:create', { title: 'Done elsewhere', project: 'beta' })).number
     await inv('tasks:move', s, 'doing', { agent: maker.id })
     const sKey = (await card(s)).key
-    await makerSays(`hive hive_ask_user ${JSON.stringify({ card: `#${s}`, kind: 'decide', text: 'Already done by #1277: how do I close it?', actions: [{ kind: 'done', reason: 'already done by #1277' }, { kind: 'unblock' }] })}`)
+    await makerSays(`hive cw_ask_user ${JSON.stringify({ card: `#${s}`, kind: 'decide', text: 'Already done by #1277: how do I close it?', actions: [{ kind: 'done', reason: 'already done by #1277' }, { kind: 'unblock' }] })}`)
     await openByTitle(page, s)
     const sDialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
     await sDialog.waitFor({ timeout: HUNG_MS })
@@ -311,7 +311,7 @@ const check = (name, ok, extra = '') => {
     check('one click moves it to Done and answers the question', !!(await lib.until(async () => (await card(s))?.column === 'done' && (await inv('tasks:forYou')).count === 0, HUNG_MS)), JSON.stringify({ column: (await card(s))?.column }))
     const chose = (await inv('tasks:facts', s)).find((f) => f.kind === 'Approval')
     check('…recording the action and its reason', chose?.data.action === 'done' && chose?.data.note === 'already done by #1277', JSON.stringify(chose))
-    check('…and the builder hears what was chosen', !!(await lib.until(async () => wakes('Maker').some((w) => w.startsWith(`[Hive] ${sKey}`) && w.includes('moved it to Done (already done by #1277)')), HUNG_MS)), JSON.stringify(wakes('Maker')))
+    check('…and the builder hears what was chosen', !!(await lib.until(async () => wakes('Maker').some((w) => w.startsWith(`[CW] ${sKey}`) && w.includes('moved it to Done (already done by #1277)')), HUNG_MS)), JSON.stringify(wakes('Maker')))
     await page.keyboard.press('Escape')
 
     // HI-1734: a question offering one action (Skip Review): beside Send Reply, "Skip Review With This Reply" does it with
@@ -321,7 +321,7 @@ const check = (name, ok, extra = '') => {
     await inv('workflow:setOptions', beta, { preset: null, options: { ...betaOptions, review: 'you', okBefore: { mode: 'never', labels: [] } } })
     const k = (await inv('tasks:create', { title: 'Checks only', project: 'beta' })).number
     await inv('tasks:move', k, 'doing', { agent: maker.id })
-    await makerSays(`hive hive_ask_user ${JSON.stringify({ card: `#${k}`, kind: 'decide', text: 'May we skip review for this checks-only change?', actions: [{ kind: 'skipReview' }] })}`)
+    await makerSays(`hive cw_ask_user ${JSON.stringify({ card: `#${k}`, kind: 'decide', text: 'May we skip review for this checks-only change?', actions: [{ kind: 'skipReview' }] })}`)
     await openByTitle(page, k)
     const kDialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
     await kDialog.waitFor({ timeout: HUNG_MS })
@@ -350,7 +350,7 @@ const check = (name, ok, extra = '') => {
     const design = [
       'HI-1630 design: OK to build it this way?',
       '',
-      point(1, 'Agent side', '`hive_ask_user` gets an optional `actions` list, at most 3: `done`, `noCode`, `unblock`.'),
+      point(1, 'Agent side', '`cw_ask_user` gets an optional `actions` list, at most 3: `done`, `noCode`, `unblock`.'),
       point(2, 'For you', 'each action shows as a button with its reason, which you can edit.'),
       point(3, 'One click', 'it does what the board does today, as you, with the reason.'),
       point(4, 'Send Reply and Record as Decision', 'get tooltips that say what each does.'),
@@ -358,13 +358,13 @@ const check = (name, ok, extra = '') => {
       '',
       ...Array.from({ length: 8 }, (_, i) => `A further paragraph ${i + 1}, so the question is longer than the fold.`)
     ].join('\n')
-    await makerSays(`hive hive_ask_user ${JSON.stringify({ card: `#${m}`, kind: 'decide', text: design })}`)
+    await makerSays(`hive cw_ask_user ${JSON.stringify({ card: `#${m}`, kind: 'decide', text: design })}`)
     await openByTitle(page, m)
     const mDialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
     await mDialog.waitFor({ timeout: HUNG_MS })
     const question = mDialog.locator('[data-section="for-you"] .for-you-question')
     check('an agent’s question renders as Markdown: numbered points', !!(await lib.until(async () => (await question.locator('ol > li').count()) === 5, HUNG_MS)), await question.innerHTML().catch(() => ''))
-    check('…bold labels and code', (await question.locator('strong', { hasText: 'Agent side:' }).count()) === 1 && (await question.locator('code', { hasText: 'hive_ask_user' }).count()) === 1)
+    check('…bold labels and code', (await question.locator('strong', { hasText: 'Agent side:' }).count()) === 1 && (await question.locator('code', { hasText: 'cw_ask_user' }).count()) === 1)
     check('…none of the raw marks', !/\*\*|`/.test(await question.innerText()), await question.innerText())
     check('…its line breaks kept', (await question.locator('p br').count()) >= 7, await question.innerHTML())
     const more = mDialog.locator('.for-you-more')
@@ -383,7 +383,7 @@ const check = (name, ok, extra = '') => {
     const f = (await inv('tasks:create', { title: 'Fits at first', project: 'beta' })).number
     await inv('tasks:move', f, 'doing', { agent: maker.id })
     const fits = Array.from({ length: 6 }, (_, i) => `Line ${i + 1}: a sentence that fits on one line here, and wraps once the window is zoomed in.`).join('\n')
-    await makerSays(`hive hive_ask_user ${JSON.stringify({ card: `#${f}`, kind: 'decide', text: fits })}`)
+    await makerSays(`hive cw_ask_user ${JSON.stringify({ card: `#${f}`, kind: 'decide', text: fits })}`)
     await openByTitle(page, f)
     const fDialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
     await fDialog.waitFor({ timeout: HUNG_MS })
@@ -409,7 +409,7 @@ const check = (name, ok, extra = '') => {
     const before = await needCount()
     const t = (await inv('tasks:create', { title: 'Three questions', project: 'beta' })).number
     await inv('tasks:move', t, 'doing', { agent: maker.id })
-    for (const text of ['First: which icon?', 'Second: which colour?', 'Third: ship it today?']) await makerSays(`hive hive_ask_user ${JSON.stringify({ card: `#${t}`, kind: 'decide', text })}`)
+    for (const text of ['First: which icon?', 'Second: which colour?', 'Third: ship it today?']) await makerSays(`hive cw_ask_user ${JSON.stringify({ card: `#${t}`, kind: 'decide', text })}`)
     const forYouOf = async (num) => ((await inv('tasks:forYou')).items ?? []).filter((i) => i.card === num).length
     check('three requests on one card', !!(await lib.until(async () => (await forYouOf(t)) === 3, HUNG_MS)), String(await forYouOf(t)))
     check('…the status bar counts the card once', !!(await lib.until(async () => (await needCount()) === before + 1, HUNG_MS)), JSON.stringify({ before, now: await needCount() }))
@@ -432,7 +432,7 @@ const check = (name, ok, extra = '') => {
     // HI-1932: the user's answer, given in a chat with the Assistant, recorded by it as a decision naming the questions
     // it answers, closes those: in one write, the asker told, the card's resolved list and history saying who recorded
     // it. Maker's lane on the card pauses while any question waits for the user, and goes on once none does.
-    await makerSays(`hive hive_lane ${JSON.stringify({ action: 'start', cards: [`#${t}`] })}`)
+    await makerSays(`hive cw_lane ${JSON.stringify({ action: 'start', cards: [`#${t}`] })}`)
     const betaLane = async () => (await inv('lanes:list')).find((l) => l.project === 'beta' && l.cards.some((c) => c.number === t))
     check("Maker's lane on the card pauses: waiting for the user", !!(await lib.until(async () => (await betaLane())?.state === 'paused' && (await betaLane())?.pausedOn === t, HUNG_MS)), JSON.stringify(await betaLane()))
     const home = (await inv('workspace:refresh')).assistant.path
@@ -449,9 +449,9 @@ const check = (name, ok, extra = '') => {
     }
     const read = await asAssistant('GET', `/v1/tasks/${t}`)
     const waiting = read.json?.forYou ?? []
-    check("hive_read_task lists the card's open requests with their ids", read.status === 200 && waiting.length === 3 && waiting.every((x) => /\/r\d+$/.test(x.request)) && waiting[0].text === 'First: which icon?', JSON.stringify(read.json?.forYou))
+    check("cw_read_task lists the card's open requests with their ids", read.status === 200 && waiting.length === 3 && waiting.every((x) => /\/r\d+$/.test(x.request)) && waiting[0].text === 'First: which icon?', JSON.stringify(read.json?.forYou))
     // HI-1992: at the top, just after its decisions (it has none yet: after its title), each with who asked and when; in
-    // every form of hive_read_task, the latest comment's too.
+    // every form of cw_read_task, the latest comment's too.
     const keys = Object.keys(read.json ?? {})
     check('…at the top, after its title, each saying who asked and when', keys.indexOf('forYou') === keys.indexOf('title') + 1 && waiting.every((x) => x.asker === 'Maker' && !Number.isNaN(Date.parse(x.since))), JSON.stringify({ keys: keys.slice(0, 4), waiting }))
     const forms = { comments: `/v1/tasks/${t}?comments=1&history=false`, summary: `/v1/tasks/${t}?summary=true&history=false`, latest: `/v1/tasks/${t}/comments/latest`, latestSummary: `/v1/tasks/${t}/comments/latest?summary=true` }

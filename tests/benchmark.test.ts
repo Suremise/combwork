@@ -185,7 +185,7 @@ describe('scenario benchmarks', () => {
     const c = scenario(compareArtifacts(withUsage(0.01, { reasoning: 0 }), withUsage(0.02, { reasoning: 150, estimated: true })), 'card-detail')
     expect(c.usage!.map((u) => u.key)).toEqual(['inputTokens', 'cacheReadTokens', 'cacheWriteTokens', 'outputTokens', 'reasoningTokens', 'requests', 'costUsd'])
     expect(c.usage!.find((u) => u.key === 'outputTokens')!.delta).toBe(0)
-    expect(c.notes.join(' ')).toMatch(/Hive’s estimates/)
+    expect(c.notes.join(' ')).toMatch(/Combwork’s estimates/)
     expect(scenario(compareArtifacts(withUsage(0.01), withUsage(0.01, { reasoning: 5 })), 'card-detail').usage!.some((u) => u.key === 'reasoningTokens')).toBe(false)
     expect(scenario(compareArtifacts(withUsage(0.01), withUsage(null)), 'card-detail').usage!.some((u) => u.key === 'costUsd')).toBe(false)
     const resumed = scenario(compareArtifacts(withUsage(0.01), withUsage(0.01, { resumed: true })), 'card-detail')
@@ -196,7 +196,7 @@ describe('scenario benchmarks', () => {
 
   it('reads a file as untrusted input: bounds, junk, escapes; a kept file is re-read into a fresh, bounded object', () => {
     expect(parseArtifact('{', WS)).toMatchObject({ error: expect.stringMatching(/JSON/) })
-    expect(parseArtifact('{"schema":"other"}', WS)).toMatchObject({ error: expect.stringMatching(/isn’t a Hive benchmark/) })
+    expect(parseArtifact('{"schema":"other"}', WS)).toMatchObject({ error: expect.stringMatching(/isn’t a Combwork benchmark/) })
     const big = JSON.stringify({ schema: 'hive-benchmark/1', pad: '日'.repeat(BENCHMARK_LIMITS.fileBytes / 3 + 10) })
     expect(big.length).toBeLessThan(BENCHMARK_LIMITS.fileBytes)
     expect(parseArtifact(big, WS)).toMatchObject({ error: expect.stringMatching(/over 2 MB/) })
@@ -233,7 +233,7 @@ function exportFile(opts: { scope?: any; sanitized?: boolean; own?: boolean; obs
   const to = Date.parse('2026-10-03T12:00:00Z')
   const from = to - hours * 3_600_000
   const api = (n: number) => (opts.brokenApi ? {} : [{ route: '/v1/tasks', method: 'GET', role: 'agent', outcome: 'ok', count: n, totalMs: n, maxMs: 1, histogram: [], requestBytes: 0, responseBytes: n * 100 }])
-  const part = (n: number) => ({ api: api(n), mcp: [{ tool: 'hive_list_tasks', role: 'agent', mode: 'compact', outcome: 'ok', count: n, totalMs: 0, maxMs: 0, histogram: [], chars: n * 50, bytes: n * 50 }], guidance: [{ provider: 'claude-code', role: 'agent', launches: 1, guidanceBytes: 1000, customBytes: 50, roleBytes: 0, modeBytes: 0, skillCatalogBytes: 300 }], catalog: [] })
+  const part = (n: number) => ({ api: api(n), mcp: [{ tool: 'cw_list_tasks', role: 'agent', mode: 'compact', outcome: 'ok', count: n, totalMs: 0, maxMs: 0, histogram: [], chars: n * 50, bytes: n * 50 }], guidance: [{ provider: 'claude-code', role: 'agent', launches: 1, guidanceBytes: 1000, customBytes: 50, roleBytes: 0, modeBytes: 0, skillCatalogBytes: 300 }], catalog: [] })
   const reqs = opts.requests ?? { alpha: 10, beta: 20 }
   const scope = opts.scope ?? { kind: 'workspace' }
   const report = {
@@ -443,7 +443,7 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
       { name: 'b', ok: true },
       { name: 'only a model', ok: null }
     ],
-    measures: measuresOf(report(0), report(2), { hiveCalls: [{ tool: 'hive_read_task', ok: true, args: '{"number":1}' }], skillsRead: ['work-on-card'] }, null),
+    measures: measuresOf(report(0), report(2), { hiveCalls: [{ tool: 'cw_read_task', ok: true, args: '{"number":1}' }], skillsRead: ['work-on-card'] }, null),
     coverage: { recording: true, dropped: 0, partial: [] },
     guidance: { atStart: { revision: 'g1' }, delivered: { guidance: 'g1', skills: { 'work-on-card': 'rev-a' } } },
     metricsOverheadMs: 12,

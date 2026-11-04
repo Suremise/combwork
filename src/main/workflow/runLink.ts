@@ -70,12 +70,12 @@ const A = {
   checkForm: agentMsg({ id: 'check.link.checkForm', text: 'check is the name of one of the project\'s checks, such as "typecheck"', note: 'A check name with characters no check has.' }),
   checkNeedsCard: agentMsg({
     id: 'check.link.checkNeedsCard',
-    text: "A check runs its project's command for it: name the card too, so Hive knows the project",
+    text: "A check runs its project's command for it: name the card too, so Combwork knows the project",
     note: 'A check named by a caller with no project (a script), and no card.'
   }),
   noCommand: agentMsg({
     id: 'check.link.noCommand',
-    text: '{project} has no command configured for the check "{name}", so nothing was run. hive-progress --check runs the command the project\'s options give for that name',
+    text: '{project} has no command configured for the check "{name}", so nothing was run. cw-progress --check runs the command the project\'s options give for that name',
     note: "#1220: a check runs the command the project's options give for it. project: its folder name; name: the check."
   })
 }

@@ -79,10 +79,10 @@ function seed(cards, secondKey) {
     await inv('tasks:update', second.number, { column: 'doing' })
     await inv('tasks:update', first.number, { column: 'done' })
     check("Hive's fact made the journal", !!(await lib.until(async () => (await inv('journal:status')).entries === 1, HUNG_MS)))
-    // The plan links its card by key (HI-1661: as hive_journal_write's link asks), the decision by number (written before).
+    // The plan links its card by key (HI-1661: as cw_journal_write's link asks), the decision by number (written before).
     seed([first.number, second.number], second.key)
 
-    await page.locator('.activity-btn[aria-label="Hive Assistant"]').click()
+    await page.locator('.activity-btn[aria-label="Assistant"]').click()
     await page.locator('.row[data-section="journal"]').click()
     const view = page.locator('.journal')
     const rows = view.locator('.journal-row')
@@ -95,7 +95,7 @@ function seed(cards, secondKey) {
     const plan = rows.filter({ hasText: 'Build the timeline first' })
     check('a card linked by its key is its card chip too (HI-1661)', (await plan.locator(`.card-chip[data-task="${second.number}"]`).count()) === 1, await plan.innerHTML())
     check('a superseded entry is marked', (await view.locator('.journal-row.superseded').count()) === 1)
-    check("Hive's fact is there, by Hive", (await view.locator('.journal-row', { hasText: '"Journal browser" is Done' }).locator('.journal-source-mark[aria-label="Hive"]').count()) === 1, await view.locator('.journal-row').last().innerHTML())
+    check("Combwork's fact is there, by Combwork", (await view.locator('.journal-row', { hasText: '"Journal browser" is Done' }).locator('.journal-source-mark[aria-label="Combwork"]').count()) === 1, await view.locator('.journal-row').last().innerHTML())
     /** The notices in the corner closed, so a screenshot shows the browser. */
     const dismissToasts = async () => {
       const close = page.locator('.toast .icon-btn[aria-label="Dismiss"]')

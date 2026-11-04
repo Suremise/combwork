@@ -806,7 +806,7 @@ export const QUEUE_SEEN_STEP: SchemaStep = {
 export const SLOTS_STEP: SchemaStep = {
   name: 'slots',
   ddl: [
-    // A slot: its generic name (`slot-a`…, or a migrated worktree's own), folder, state, its port block (HIVE_SLOT_PORT_BASE,
+    // A slot: its generic name (`slot-a`…, or a migrated worktree's own), folder, state, its port block (CW_SLOT_PORT_BASE,
     // unique in the project), the branch it was made from, and its last install's revision and lock files' hash. A setup
     // or install that failed leaves `warm_error` (its exit, in English) and `warm_log` (the run's log): lending skips it.
     `CREATE TABLE slots (

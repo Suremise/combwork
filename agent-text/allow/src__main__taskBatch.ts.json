@@ -1,5 +1,5 @@
 {
-  "prose|call|A batch sets column, position, blocked, labels, addLabels, removeLabels or agent on its cards: {} goes on one card (hive_update_task).": 1,
+  "prose|call|A batch sets column, position, blocked, labels, addLabels, removeLabels or agent on its cards: {} goes on one card (cw_update_task).": 1,
   "prose|call|Give what to change on the cards: column, position, blocked, labels, addLabels, removeLabels or agent.": 1,
   "prose|call|Unknown column \"{}\": {}.": 1,
   "prose|call|Unknown position \"{}\": top or bottom.": 1,

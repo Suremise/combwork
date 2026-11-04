@@ -34,7 +34,7 @@ afterEach(() => Object.assign(state, { on: true, continuation: true, control: 'a
 
 const lane = (id: string, builder: string, st = 'active') => ({ id, state: st, builder: { id: builder.toLowerCase(), name: builder } })
 const assistant = { projectPath: HOME, agentId: 'assistant', sessionId: 's1' } as never
-const LINE = '[Hive] Lanes are running (HB1, HB2) and nothing will wake you about them: watch the lanes (hive_wait_for_tasks with lanes ["all"], wake) before you finish.'
+const LINE = '[CW] Lanes are running (HB1, HB2) and nothing will wake you about them: watch the lanes (cw_wait_for_tasks with lanes ["all"], wake) before you finish.'
 
 describe('the Assistant ending a turn with lanes running and no watch (HI-2069)', () => {
   it('gets the line, naming their builders, at its turn\'s end only (not at a checkpoint)', async () => {
@@ -89,13 +89,13 @@ describe('the Assistant ending a turn with lanes running and no watch (HI-2069)'
     state.lanes = [lane('l1', 'HB1')]
     state.control = 'look'
     state.unread = [{ id: 'm7', kind: 'rebrief', state: 'offered', expires: new Date(Date.now() + 3600_000).toISOString() }]
-    expect(await noticeFor(assistant, 'drain')).toBe("[Hive] Before you finish: your inbox has 1 message (m7) you haven't read. Call hive_inbox, act on it and ack it before you end your turn.")
+    expect(await noticeFor(assistant, 'drain')).toBe("[CW] Before you finish: your inbox has 1 message (m7) you haven't read. Call cw_inbox, act on it and ack it before you end your turn.")
   })
 
   // HR1's round 1: agent names aren't limited to what the line keeps of them.
   it('a builder whose name has nothing the line keeps (an emoji) still gets the line: counted, never dropped', async () => {
     state.lanes = [lane('l1', '🤖')]
-    expect(await noticeFor(assistant, 'drain')).toBe('[Hive] Lanes are running (1 lane) and nothing will wake you about them: watch the lanes (hive_wait_for_tasks with lanes ["all"], wake) before you finish.')
+    expect(await noticeFor(assistant, 'drain')).toBe('[CW] Lanes are running (1 lane) and nothing will wake you about them: watch the lanes (cw_wait_for_tasks with lanes ["all"], wake) before you finish.')
     state.lanes = [lane('l1', '🤖'), lane('l2', 'HB2'), lane('l3', '✨')]
     expect(await noticeFor(assistant, 'drain')).toContain('Lanes are running (HB2 and 2 more) and nothing')
   })
@@ -103,7 +103,7 @@ describe('the Assistant ending a turn with lanes running and no watch (HI-2069)'
   it('after its unread inbox, in the same drain', async () => {
     state.lanes = [lane('l1', 'HB1'), lane('l2', 'HB2')]
     state.unread = [{ id: 'm7', kind: 'rebrief', state: 'offered', expires: new Date(Date.now() + 3600_000).toISOString() }]
-    expect(await noticeFor(assistant, 'drain')).toBe(`[Hive] Before you finish: your inbox has 1 message (m7) you haven't read. Call hive_inbox, act on it and ack it before you end your turn. ${LINE}`)
+    expect(await noticeFor(assistant, 'drain')).toBe(`[CW] Before you finish: your inbox has 1 message (m7) you haven't read. Call cw_inbox, act on it and ack it before you end your turn. ${LINE}`)
   })
 })
 

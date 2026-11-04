@@ -105,8 +105,8 @@ const commitIn = (dir, files, message, trailer) => {
     const tokenOf = async (p, id) => {
       const sessionId = await until(async () => (await live(p, id))?.sessionId, HUNG_MS)
       const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     const intent = async (token, n, name, body = {}) => {
       const res = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${encodeURIComponent(`#${n}`)}/${name}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -117,7 +117,7 @@ const commitIn = (dir, files, message, trailer) => {
       const v = await (await fetch(`http://127.0.0.1:${PORT}/v1/projects/${project}/agents/${encodeURIComponent(agent)}/deliveries?limit=10`, { headers: { Authorization: `Bearer ${workspaceToken}` } })).json()
       return (v.items ?? v.deliveries ?? []).map((d) => d.body ?? d.text ?? '')
     }
-    /** An agent's deliveries in full (their text and state: `received` once it read it with hive_inbox). */
+    /** An agent's deliveries in full (their text and state: `received` once it read it with cw_inbox). */
     const deliveryRows = async (project, agent) => {
       const v = await (await fetch(`http://127.0.0.1:${PORT}/v1/projects/${project}/agents/${encodeURIComponent(agent)}/deliveries?limit=20`, { headers: { Authorization: `Bearer ${workspaceToken}` } })).json()
       return (v.items ?? v.deliveries ?? []).map((d) => ({ text: d.body ?? d.text ?? '', state: d.state }))
@@ -175,7 +175,7 @@ const commitIn = (dir, files, message, trailer) => {
     fs.writeFileSync(path.join(shots, 'brief-builder.txt'), brief ?? '')
     check("B1's brief: reviewed by the pool, naming its reviewers", !!brief && brief.includes(`reviewed by the pool (${r1.name}, ${r2.name} and E1)`), String(brief).slice(0, 500))
     check('…and only B1 started', !(await live(alpha, r1.id)) && !(await live(alpha, r2.id)) && !(await live(alpha, e1.id)))
-    // B2's through the Agent API (HI-1581: the Assistant's hive_lane start with pool, here as a script): refused with a
+    // B2's through the Agent API (HI-1581: the Assistant's cw_lane start with pool, here as a script): refused with a
     // reviewer of its own, then started as Start Lane's is, its builder alone.
     const lanesApi = async (body) => {
       const res = await fetch(`http://127.0.0.1:${PORT}/v1/lanes`, { method: 'POST', headers: { Authorization: `Bearer ${workspaceToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -338,7 +338,7 @@ const commitIn = (dir, files, message, trailer) => {
     const tdr1 = await tokenOf(delta, dr1.id)
     await idle(delta, dr1.id)
     // DE-R1 watches X (a loop's watch: it is in X's loop), then answers with gaps, still watching.
-    await lib.typeLine(inv, lib.ptyKey(delta, dr1.id), home, null, `hive hive_wait_for_tasks ${JSON.stringify({ cards: [`#${x}`], changes: ['comment'], wake: true })}`, { live: () => live(delta, dr1.id) })
+    await lib.typeLine(inv, lib.ptyKey(delta, dr1.id), home, null, `hive cw_wait_for_tasks ${JSON.stringify({ cards: [`#${x}`], changes: ['comment'], wake: true })}`, { live: () => live(delta, dr1.id) })
     check('DE-R1 watches X', !!(await until(async () => (await live(delta, dr1.id))?.status === 'watching', HUNG_MS)), JSON.stringify(await live(delta, dr1.id)))
     check('DE-R1 answers with gaps', (await intent(tdr1, x, 'loop-step', { step: 'gaps', design: await designId(), text: 'X: more, please' })).status === 200)
     // Its watch doesn't hold it (HI-2333): Y, submitted, goes to DE-R1 (running, so before the stopped DE-R2), which
@@ -357,7 +357,7 @@ const commitIn = (dir, files, message, trailer) => {
     // HI-2384: DE-R1's watch on X wakes it for these loop steps; read before r1Clear cancels that watch. Cancelled first,
     // the wake goes untold, and DE-R1's next watch of X counts them from its own last change (its gaps, HI-2302): it
     // fires at once, and DE-R1 ends with no watch where the suite waits for it watching.
-    const toldStep = await until(async () => (await deliveryRows('delta', dr1.name)).some((w) => w.text.startsWith(`[Hive] ${keyX} `) && w.text.includes('a card loop step') && ['received', 'acked'].includes(w.state)), HUNG_MS)
+    const toldStep = await until(async () => (await deliveryRows('delta', dr1.name)).some((w) => w.text.startsWith(`[CW] ${keyX} `) && w.text.includes('a card loop step') && ['received', 'acked'].includes(w.state)), HUNG_MS)
     check("…DE-R1's watch on X tells it, and it reads the wake", !!toldStep, JSON.stringify(await deliveryRows('delta', dr1.name)))
     check('DE-R1 passes Y: Done', (await intent(tdr1, y, 'verdict', { pass: true, comment: 'Y: passed' })).status === 200 && !!(await until(async () => (await card(y))?.column === 'done', HUNG_MS)), (await card(y))?.column)
     // DE-R1 ends with no card watch, as HR1 did on HI-2320: once its own grace check has run (loops:checks, counted
@@ -377,21 +377,21 @@ const commitIn = (dir, files, message, trailer) => {
     await idle(delta, dr2.id)
     check('DE-R2 starts its review', (await intent(tdr2, x, 'start-review')).status === 200)
     // DE-R2 watches X, then ends with no watch: X in Review is its move, so after the grace it is flagged.
-    await lib.typeLine(inv, lib.ptyKey(delta, dr2.id), home, null, `hive hive_wait_for_tasks ${JSON.stringify({ cards: [`#${x}`], changes: ['verdict'], wake: true })}`, { live: () => live(delta, dr2.id) })
+    await lib.typeLine(inv, lib.ptyKey(delta, dr2.id), home, null, `hive cw_wait_for_tasks ${JSON.stringify({ cards: [`#${x}`], changes: ['verdict'], wake: true })}`, { live: () => live(delta, dr2.id) })
     check('DE-R2 watches X', !!(await until(async () => (await live(delta, dr2.id))?.status === 'watching', HUNG_MS)), JSON.stringify(await live(delta, dr2.id)))
     await inv('watch:cancel', delta, dr2.id)
     const r2Flag = await until(async () => JSON.stringify((await live(delta, dr2.id))?.notWatching) === JSON.stringify([x]), HUNG_MS)
     check("DE-R2, X's reviewer now, ending with no watch is flagged as not watching X", !!r2Flag, JSON.stringify(await live(delta, dr2.id)))
     // DE-R1 watches X again and ends with no watch, X in Review with DE-R2: its grace check runs and finds nothing of its.
     await idle(delta, dr1.id)
-    await lib.typeLine(inv, lib.ptyKey(delta, dr1.id), home, null, `hive hive_wait_for_tasks ${JSON.stringify({ cards: [`#${x}`], changes: ['verdict'], wake: true })}`, { live: () => live(delta, dr1.id) })
+    await lib.typeLine(inv, lib.ptyKey(delta, dr1.id), home, null, `hive cw_wait_for_tasks ${JSON.stringify({ cards: [`#${x}`], changes: ['verdict'], wake: true })}`, { live: () => live(delta, dr1.id) })
     check('DE-R1 watches X again', !!(await until(async () => (await live(delta, dr1.id))?.status === 'watching', HUNG_MS)), JSON.stringify(await live(delta, dr1.id)))
     await r1Clear('X in Review with DE-R2')
     check('…and X\'s stall names DE-R2, not DE-R1', (lib.unkey(await stalledOf(x)) ?? '').startsWith("DE-R2 isn't watching"), String(await stalledOf(x)))
 
     // --- 5. epsilon (HI-2333, the cli project's stall on rc.19): one pooled reviewer, EP-R1, watching Z in its loop. It
     // is still free: Z's revised design and then Z's submission are given to it and typed at its prompt, each told once
-    // and read (`received`: it read it with hive_inbox), with no other line for them from the watch or a loop wake.
+    // and read (`received`: it read it with cw_inbox), with no other line for them from the watch or a loop wake.
     await inv('workflow:setOptions', epsilon, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project', preChecks: [], identity, okBefore: { mode: 'never', labels: [] }, reviewerMode: 'pool' } })
     const eb1 = await lib.addAgent(inv, epsilon, { name: 'EP-B1', workflowRole: 'builder' })
     const er1 = await lib.addAgent(inv, epsilon, { name: 'EP-R1', workflowRole: 'reviewer' })
@@ -416,7 +416,7 @@ const commitIn = (dir, files, message, trailer) => {
     /** EP-R1 watches Z (a loop's watch), as card-loop's reviewer does: `watching` then. */
     const watchZ = async (changes) => {
       await idle(epsilon, er1.id)
-      await lib.typeLine(inv, lib.ptyKey(epsilon, er1.id), home, null, `hive hive_wait_for_tasks ${JSON.stringify({ cards: [`#${z}`], changes, wake: true })}`, { live: () => live(epsilon, er1.id) })
+      await lib.typeLine(inv, lib.ptyKey(epsilon, er1.id), home, null, `hive cw_wait_for_tasks ${JSON.stringify({ cards: [`#${z}`], changes, wake: true })}`, { live: () => live(epsilon, er1.id) })
       return until(async () => (await live(epsilon, er1.id))?.status === 'watching', HUNG_MS)
     }
     check('EP-B1 posts a design: the pool gives it to EP-R1', (await intent(teb, z, 'loop-step', { step: 'design', text: 'Z: the plan' })).status === 200 && !!(await until(async () => JSON.stringify(await designsZ()) === JSON.stringify([er1.id]), HUNG_MS)), JSON.stringify(await designsZ()))

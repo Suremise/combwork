@@ -289,7 +289,7 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
   installNote:
     'Install the GitHub Copilot CLI with WinGet (`winget install GitHub.Copilot`) or npm (`npm install -g @github/copilot`), then sign in once with `copilot login` in a terminal (or with the GitHub CLI, which Copilot also uses). Copilot Free runs the Auto model only; choosing a model needs a paid plan. If the CLI is installed somewhere else, set its path in Settings → GitHub Copilot.', // i18n-ignore: English, as main's notices use it (text has the window's)
   extensionNote:
-    "You have GitHub Copilot in VS Code (or a similar editor). Hive doesn't use the editor's copy — it moves with every extension update. Install the Copilot CLI; your extension keeps working as before.", // i18n-ignore: English, as main's notices use it (text has the window's)
+    "You have GitHub Copilot in VS Code (or a similar editor). Combwork doesn't use the editor's copy — it moves with every extension update. Install the Copilot CLI; your extension keeps working as before.", // i18n-ignore: English, as main's notices use it (text has the window's)
   signInHelp: 'Sign in again: run copilot login in a terminal (Help → Provider Setup → GitHub Copilot shows how).', // i18n-ignore: English for main's notices (text has the window's)
   // Its session events have no record of a safety classifier stopping a response or rerouting it (checked with 1.0.x, #606).
   safeguardHelp: null,

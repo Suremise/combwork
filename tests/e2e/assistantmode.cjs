@@ -1,5 +1,5 @@
 // The Hive Assistant's working modes (#259). Switching mode from the panel's header while it runs keeps the
-// conversation: Hive types "[Hive] Mode: <name> (chosen by the user). <summary> Your tools and permissions are
+// conversation: Hive types "[CW] Mode: <name> (chosen by the user). <summary> Your tools and permissions are
 // unchanged." into it (no restart, the same session), and saves the mode for the workspace. While it is working, the
 // message waits until it has finished. Restart in This Mode… (asking first) resumes the same conversation with the
 // mode's full instructions: its system prompt is the new mode's at once, not the one its conversation recorded (the
@@ -55,7 +55,7 @@ const check = (name, ok, extra = '') => {
     for (const d of fs.existsSync(dir) ? fs.readdirSync(dir) : []) if (fs.existsSync(path.join(dir, d, `${id}.jsonl`))) return fs.readFileSync(path.join(dir, d, `${id}.jsonl`), 'utf8')
     return ''
   }
-  const told = (id, mode) => transcript(id).split('\n').filter((l) => l.includes('"type":"user"') && l.includes(`[Hive] Mode: ${mode} (chosen by the user)`)).length
+  const told = (id, mode) => transcript(id).split('\n').filter((l) => l.includes('"type":"user"') && l.includes(`[CW] Mode: ${mode} (chosen by the user)`)).length
   // Each prompt is typed once the fake takes prompts, and waited for by its own turn (#684: under load the status still
   // said the last turn had finished while the fake was still in Hive's mode message's turn, and dropped "whatmode").
   const prompts = lib.fakePrompts(inv, key, live, { home: claudeHome })
@@ -109,7 +109,7 @@ const check = (name, ok, extra = '') => {
   // At once, but under load the fake can lose the Enter after Hive's line, which Hive presses again 10 s later (#684): so
   // it is waited for, bounded for a hung run.
   await pick('Planner')
-  check('switching to Planner tells it at once, in its conversation', !!(await lib.until(async () => (await buffer()).includes('[Hive] Mode: Planner (chosen by the user). Lead with the open design questions'), lib.TURN_HUNG_MS)), (await buffer()).slice(-400))
+  check('switching to Planner tells it at once, in its conversation', !!(await lib.until(async () => (await buffer()).includes('[CW] Mode: Planner (chosen by the user). Lead with the open design questions'), lib.TURN_HUNG_MS)), (await buffer()).slice(-400))
   check('…ending with Hive\'s own sentence', !!(await lib.until(async () => (await buffer()).includes('Your tools and permissions are unchanged.'), 10000)), JSON.stringify((await buffer()).slice(-600)))
   check('…without a restart: the same session', (await live())?.sessionId === session, `${session} → ${(await live())?.sessionId}`)
   check('…saved for the workspace, and the header shows it', !!(await lib.until(async () => agentFile().mode === 'planner' && (await panel.locator('.assistant-mode').innerText()).includes('Planner'), 10000)), `${JSON.stringify(agentFile())}; header: ${await panel.locator('.assistant-mode').innerText()}`)
@@ -120,9 +120,9 @@ const check = (name, ok, extra = '') => {
   check('it works on something', !!(await lib.until(async () => (await live())?.turn?.id !== working.before && (await live())?.status === 'working', lib.TURN_HUNG_MS)), JSON.stringify((await live())?.turn))
   await pick('QA triager')
   await lib.sleep(1000) // on purpose: nothing is typed into a working Assistant
-  check('switching while it works types nothing yet', !(await buffer()).includes('[Hive] Mode: QA triager'))
+  check('switching while it works types nothing yet', !(await buffer()).includes('[CW] Mode: QA triager'))
   check('…and is saved at once', agentFile().mode === 'qa-triager', JSON.stringify(agentFile()))
-  check('…then told once it has finished', !!(await lib.until(async () => (await buffer()).includes('[Hive] Mode: QA triager (chosen by the user). Take a report'), lib.TURN_HUNG_MS)))
+  check('…then told once it has finished', !!(await lib.until(async () => (await buffer()).includes('[CW] Mode: QA triager (chosen by the user). Take a report'), lib.TURN_HUNG_MS)))
   check('…and sent (in its conversation once)', !!(await lib.until(async () => told(session, 'QA triager') === 1, lib.TURN_HUNG_MS)), String(told(session, 'QA triager')))
   check('…still the same session', (await live())?.sessionId === session)
   await idle()

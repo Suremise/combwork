@@ -77,13 +77,13 @@ const mode = ({ name, word: w }) =>
   // None until its first message is in.
   const items = async (id) => (await inv('transcript:read', home, id).catch(() => null))?.items ?? []
   /**
-   * Where it was told a mode (#650: Hive's doorbell, then its hive_inbox read, whose result has the notice): one per read
+   * Where it was told a mode (#650: Hive's doorbell, then its cw_inbox read, whose result has the notice): one per read
    * that gave it, as the doorbell that began that read's turn. Counted by reads, not doorbells: a doorbell its turn
    * couldn't read (a resumed CLI whose hive tools hadn't connected yet, under load) is rung again (#650), and both
    * doorbells precede the one read that told it (#863).
    */
   const toldAt = (list, m) =>
-    list.flatMap((y, k) => (y.kind === 'tool' && /hive_inbox/.test(y.tool.name) && String(y.tool.result ?? '').includes(`[Hive] Mode: ${m.name} (chosen by the user)`) ? [list.slice(0, k).findLast((i) => i.kind === 'user' && i.text.startsWith('[Hive] New in your inbox: '))].filter(Boolean) : []))
+    list.flatMap((y, k) => (y.kind === 'tool' && /cw_inbox/.test(y.tool.name) && String(y.tool.result ?? '').includes(`[CW] Mode: ${m.name} (chosen by the user)`) ? [list.slice(0, k).findLast((i) => i.kind === 'user' && i.text.startsWith('[CW] New in your inbox: '))].filter(Boolean) : []))
   const told = async (id, m) => toldAt(await items(id), m).length
   const turnEnded = (state, user) => state?.status === 'finished' && Date.parse(state.statusSince) >= Date.parse(user?.timestamp)
   /** A recorded notice can precede its UserPromptSubmit hook: idle alone may still be the previous turn (#398/#473). */

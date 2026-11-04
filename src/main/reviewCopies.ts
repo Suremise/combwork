@@ -109,7 +109,7 @@ const T = {
   returned: agentMsg({ id: 'copy.inUse.returned', text: '{all}; {copy}, returned {ago} ago, is {held, select, yes {held back by {by}} other {being freed}}', note: 'copy.inUse.all, then the copy likely to come free first: one given back, and what still holds it ({by}: copy.held.*, a run or an agent), else being freed. {ago} is copy.inUse.minutes.' }),
   longest: agentMsg({ id: 'copy.inUse.longest', text: '{all}; the longest lent, {copy}, for {time} (a {kind} of {card})', note: "copy.inUse.all, then the copy lent longest: {time} is copy.inUse.minutes, {kind} the lease's kind (review or check), {card} the card's key." }),
   ready: agentMsg({ id: 'copy.review.ready', text: "{named, select, yes {{card}'s review copy is ready. } other {}}Review in {folder} at {revision}: read and run commands there, with it as their working directory; your session stays where it is.", note: "A reviewer's review copy (#1435): in start review's reply, or its later message (which names the card first). {revision} is the submission's first 12 characters." }),
-  waiting: agentMsg({ id: 'copy.review.waiting', text: 'Waiting for a review copy ({why}): Hive tells you when one is ready, with its folder. Meanwhile git can show the submission from where you are.', note: "Start review's reply while no review copy is free yet. {why} is why (copy.inUse.*, copy.refusal.*)." }),
+  waiting: agentMsg({ id: 'copy.review.waiting', text: 'Waiting for a review copy ({why}): Combwork tells you when one is ready, with its folder. Meanwhile git can show the submission from where you are.', note: "Start review's reply while no review copy is free yet. {why} is why (copy.inUse.*, copy.refusal.*)." }),
   none: agentMsg({ id: 'copy.review.none', text: "No review copy ({why}): review the builder's work read-only from where you are.", note: 'Start review\'s reply, or a later message, when the reviewer gets no review copy. {why} is why.' }),
   notGoing: agentMsg({ id: 'copy.review.notGoing', text: 'the review is not going', note: 'Why a reviewer gets no review copy: its review of the card has ended or not started. The end of copy.review.none.' }),
   noRevision: agentMsg({ id: 'copy.review.noRevision', text: 'the card has no submitted revision', note: 'Why a reviewer gets no review copy: nothing was submitted to review. The end of copy.review.none.' }),
@@ -347,7 +347,7 @@ function reviewCopiesOff(): Reason | null {
  */
 export async function tellReviewer(projectPath: string, agent: Reviewer, card: number, text: () => string): Promise<void> {
   // agent-protocol: the sender is the product's name, Hive
-  await leaveMessage(projectPath, agent.id, agent.name, { kind: 'hive', name: 'Hive' }, inDialectOf({ projectPath, agentId: agent.id }, text), card) // i18n-ignore: the sender's name agents read
+  await leaveMessage(projectPath, agent.id, agent.name, { kind: 'hive', name: 'Combwork' }, inDialectOf({ projectPath, agentId: agent.id }, text), card) // i18n-ignore: the sender's name agents read
 }
 
 /** A project's review copies in a workspace (made on first use, for the workspace's life). */

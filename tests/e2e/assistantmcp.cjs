@@ -83,7 +83,7 @@ const check = (name, ok, extra = '') => {
 
     // --- + opens the picker: search, what it runs, Add.
     await page.locator('.sidebar').getByRole('button', { name: 'Add Server…', exact: true }).click()
-    const picker = page.getByRole('dialog', { name: 'Add a server for the Hive Assistant' })
+    const picker = page.getByRole('dialog', { name: 'Add a server for the Assistant' })
     const pickRow = (n) => picker.locator(`.mcp-picker-row[data-mcp="${n}"]`)
     check('the picker lists every server not added for it', !!(await lib.until(async () => (await picker.locator('.mcp-picker-row').count()) === 3, HUNG_MS)))
     const addButton = picker.getByRole('button', { name: 'Add', exact: true })
@@ -102,7 +102,7 @@ const check = (name, ok, extra = '') => {
     await page.keyboard.press('Control+Shift+M')
     const row = (name) => page.locator('.pane-body .row', { has: page.locator('.label', { hasText: new RegExp(`^${name}\\s*$`) }) })
     const where = (name) => row(name).locator('.mcp-where').innerText().catch(() => '')
-    check('notes: added in other and for the Hive Assistant', !!(await lib.until(async () => (await where('notes')) === 'Added in other and for the Hive Assistant', HUNG_MS)), await where('notes'))
+    check('notes: added in other and for the Hive Assistant', !!(await lib.until(async () => (await where('notes')) === 'Added in other and for the Assistant', HUNG_MS)), await where('notes'))
     check('sandbox: added in demo', (await where('sandbox')) === 'Added in demo', await where('sandbox'))
     check('extra: not added anywhere, and no switch in the list', (await where('extra')) === 'Not added anywhere' && (await row('extra').getByRole('switch').count()) === 0, await where('extra'))
     await shots('mcp-view')
@@ -111,15 +111,15 @@ const check = (name, ok, extra = '') => {
     const places = page.getByRole('dialog', { name: 'Add extra to…' })
     const group = places.getByRole('group', { name: 'Projects to add it to' })
     const box = (name) => group.getByRole('checkbox', { name, exact: true })
-    check("extra's Add to… lists the Hive Assistant after the projects, unticked", !!(await lib.until(async () => (await box('Hive Assistant').count()) === 1, HUNG_MS)) && !(await box('Hive Assistant').isChecked()) && (await group.locator('label').last().getAttribute('data-assistant')) !== null)
+    check("extra's Add to… lists the Hive Assistant after the projects, unticked", !!(await lib.until(async () => (await box('Assistant').count()) === 1, HUNG_MS)) && !(await box('Assistant').isChecked()) && (await group.locator('label').last().getAttribute('data-assistant')) !== null)
     check('…and what it runs', (await places.innerText()).includes('Runs: node extra.js'))
     await shots('add-to')
     // All projects and No projects: the Assistant only ever by its own box.
     await places.getByRole('button', { name: 'All projects', exact: true }).click()
-    check('…All projects ticks the projects, not the Assistant', (await box('demo').isChecked()) && (await box('other').isChecked()) && !(await box('Hive Assistant').isChecked()))
-    await box('Hive Assistant').check()
+    check('…All projects ticks the projects, not the Assistant', (await box('demo').isChecked()) && (await box('other').isChecked()) && !(await box('Assistant').isChecked()))
+    await box('Assistant').check()
     await places.getByRole('button', { name: 'No projects', exact: true }).click()
-    check('…and No projects unticks them, leaving the Assistant as ticked', !(await box('demo').isChecked()) && (await box('Hive Assistant').isChecked()))
+    check('…and No projects unticks them, leaving the Assistant as ticked', !(await box('demo').isChecked()) && (await box('Assistant').isChecked()))
     await places.getByRole('button', { name: 'Cancel' }).click()
     check('…cancelled, nothing changes', !!(await lib.until(async () => (await places.count()) === 0, HUNG_MS)) && JSON.stringify(wsMcp().assistant) === '["notes"]' && projectMcp(proj).enabled.join() === 'sandbox')
 
@@ -136,22 +136,22 @@ const check = (name, ok, extra = '') => {
       for (const l of lines.map((x) => JSON.parse(x)).reverse()) {
         const f = l.opts?.['--mcp-config']
         const servers = f && fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')).mcpServers : null
-        if (agentId === 'assistant' ? l.cwd?.toLowerCase() === ws.toLowerCase() : servers?.hive?.env?.HIVE_AGENT_ID === agentId) return servers
+        if (agentId === 'assistant' ? l.cwd?.toLowerCase() === ws.toLowerCase() : servers?.combwork?.env?.HIVE_AGENT_ID === agentId) return servers
       }
       return null
     }
     const a = await lib.until(() => launched('assistant'), 30000)
     const b = await lib.until(() => launched(agent.id), 30000)
     const c = await lib.until(() => launched(otherAgent.id), 30000)
-    check("the Assistant's launch has notes and the hive server, not sandbox", !!a?.notes && !!a?.hive && !a?.sandbox && !a?.extra, JSON.stringify(Object.keys(a ?? {})))
-    check("demo's agent has sandbox and the hive server, not notes or extra", !!b?.sandbox && !!b?.hive && !b?.notes && !b?.extra, JSON.stringify(Object.keys(b ?? {})))
+    check("the Assistant's launch has notes and the hive server, not sandbox", !!a?.notes && !!a?.combwork && !a?.sandbox && !a?.extra, JSON.stringify(Object.keys(a ?? {})))
+    check("demo's agent has sandbox and the hive server, not notes or extra", !!b?.sandbox && !!b?.combwork && !b?.notes && !b?.extra, JSON.stringify(Object.keys(b ?? {})))
     check("…without Hive's own fields (its tags)", !('tags' in (c?.notes ?? { tags: 1 })) && !('description' in (c?.notes ?? {})), JSON.stringify(c?.notes))
 
     // --- The Agent API: where each is added for the workspace's token; only its own project's for an agent's.
     const of = (body, n) => body?.find((m) => m.name === n)
     const wide = await api('/v1/mcp', apiToken)
     check('GET /v1/mcp says where notes is added', wide.status === 200 && JSON.stringify(of(wide.body, 'notes')?.added) === JSON.stringify({ projects: ['other'], assistant: true }) && JSON.stringify(of(wide.body, 'extra')?.added) === JSON.stringify({ projects: [], assistant: false }) && !('globallyEnabled' in (of(wide.body, 'notes') ?? {})), JSON.stringify(wide))
-    const tokenOf = (servers) => JSON.parse(fs.readFileSync(servers.hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token
+    const tokenOf = (servers) => JSON.parse(fs.readFileSync(servers.combwork.env.CW_API_TOKEN_FILE, 'utf8')).token
     const demoView = await api('/v1/mcp', tokenOf(b))
     check("demo's agent hears only about demo: sandbox added, notes not, no projects or Assistant", demoView.status === 200 && of(demoView.body, 'sandbox')?.added === true && of(demoView.body, 'notes')?.added === false && demoView.body.every((m) => typeof m.added === 'boolean' && !('assistant' in m) && !('projects' in m)) && !JSON.stringify(demoView.body).includes('other'), JSON.stringify(demoView))
     const otherView = await api('/v1/mcp', tokenOf(c))
@@ -165,7 +165,7 @@ const check = (name, ok, extra = '') => {
     const restartNeeded = async () => (await inv('workspace:refresh')).assistant?.agents?.[0]?.restartNeeded
     await lib.until(async () => (await inv('session:live')).some((x) => x.projectPath.toLowerCase() === assistantHome.toLowerCase()), HUNG_MS)
     check('the running Assistant needs no restart yet', (await restartNeeded()) === false)
-    await page.locator('.activity-btn[aria-label="Hive Assistant"]').click()
+    await page.locator('.activity-btn[aria-label="Assistant"]').click()
     const added = section.locator('.row[data-mcp="notes"]')
     await lib.until(async () => (await added.count()) === 1, HUNG_MS)
     await added.hover()

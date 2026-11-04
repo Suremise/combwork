@@ -52,7 +52,7 @@ function views(): { name: string; text: string }[] {
   out.push({ name: 'all on hold', text: startView(empty({ blocked: Array.from({ length: 20 }, (_, i) => card(300 + i, { column: 'hold', blocked: 'Later' })) })) })
   return out
 }
-const VALUES = ['[Hive]', 'alpha', 'beta', 'Asking', 'Later', 'decision', 'incident', 'plan', 'working', 'waiting', 'signin', 'idle', 'active', 'paused', ...Array.from({ length: 400 }, (_, i) => [`Title${i}`, `Summary${i}`, `Reason${i}`, `B${i}`, `A${i}`]).flat(), 'B1', 'B2', 'B3', 'R1']
+const VALUES = ['[CW]', 'alpha', 'beta', 'Asking', 'Later', 'decision', 'incident', 'plan', 'working', 'waiting', 'signin', 'idle', 'active', 'paused', ...Array.from({ length: 400 }, (_, i) => [`Title${i}`, `Summary${i}`, `Reason${i}`, `B${i}`, `A${i}`]).flat(), 'B1', 'B2', 'B3', 'R1']
 
 describe('the canary dialect over the state view and the activity texts (card 5)', () => {
   it('finds every word of them in the catalogue, and every startView and activity id in some output', () => {

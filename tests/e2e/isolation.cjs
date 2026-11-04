@@ -1,6 +1,6 @@
 // The run context (runContext.cjs, #203): nothing from the environment a test is started from reaches what it starts,
 // but the allowlist. With the variables an agent's shell or an outer hive-progress sets put into this suite's own
-// environment (NO_COLOR, HIVE_PROGRESS_WRAPPED, an Agent API token…), checked: under the runner, the suite itself got
+// environment (NO_COLOR, CW_PROGRESS_WRAPPED, an Agent API token…), checked: under the runner, the suite itself got
 // nothing else; a test Hive's main process (whose environment its agents' shells get), a child that is part of Hive,
 // and the hive-progress wrapper (#202: it reports, not taking itself for nested) see none of them; a test Hive's git
 // reads the suite's global config, with the test identity (#1466); and a test Hive
@@ -26,12 +26,12 @@ const upper = (keys) => keys.filter((k) => !k.startsWith('=')).map((k) => k.toUp
 const LEAKS = {
   NO_COLOR: '1',
   FORCE_COLOR: '1',
-  HIVE_PROGRESS_WRAPPED: '1',
-  HIVE_PROGRESS_RUN_AS_NODE: '1',
-  HIVE_PROGRESS_DATA: 'C:\\leaked\\progress',
-  HIVE_API_URL: 'http://127.0.0.1:9',
+  CW_PROGRESS_WRAPPED: '1',
+  CW_PROGRESS_RUN_AS_NODE: '1',
+  CW_PROGRESS_DATA: 'C:\\leaked\\progress',
+  CW_API_URL: 'http://127.0.0.1:9',
   HIVE_API_TOKEN: 'leaked-token',
-  HIVE_PROJECT: 'leaked',
+  CW_PROJECT: 'leaked',
   HIVE_TEST_SLOW_IPC: 'tasks:list=1',
   HIVE_E2E_NATIVE: '1',
   CLAUDE_CONFIG_DIR: 'C:\\leaked\\claude',
@@ -102,15 +102,15 @@ const leaked = (env) => Object.entries(env).filter(([k, v]) => LEAKS[k.toUpperCa
 
   // A child that is part of Hive (the hive MCP server, a bridge): the allowlist and what it is given.
   const child = await new Promise((resolve) => {
-    const p = spawn(process.execPath, ['-e', 'process.stdout.write(JSON.stringify(process.env))'], { env: lib.childEnv({ HIVE_API_URL: 'http://127.0.0.1:1' }) })
+    const p = spawn(process.execPath, ['-e', 'process.stdout.write(JSON.stringify(process.env))'], { env: lib.childEnv({ CW_API_URL: 'http://127.0.0.1:1' }) })
     let out = ''
     p.stdout.on('data', (d) => (out += d))
     p.on('close', () => resolve(JSON.parse(out || '{}')))
   })
-  check("a child gets none of the suite's environment, and what it is given", !leaked(child).length && child.HIVE_API_URL === 'http://127.0.0.1:1', leaked(child).join(', '))
+  check("a child gets none of the suite's environment, and what it is given", !leaked(child).length && child.CW_API_URL === 'http://127.0.0.1:1', leaked(child).join(', '))
 
   // #202: the hive-progress wrapper, started by a suite while the suite runs inside an outer hive-progress
-  // (HIVE_PROGRESS_WRAPPED above), reports its run rather than taking itself for nested.
+  // (CW_PROGRESS_WRAPPED above), reports its run rather than taking itself for nested.
   const calls = []
   const srv = http.createServer((req, res) => {
     req.resume()
@@ -122,8 +122,8 @@ const leaked = (env) => Object.entries(env).filter(([k, v]) => LEAKS[k.toUpperCa
   })
   await new Promise((r) => srv.listen(0, '127.0.0.1', r))
   const wrapped = await new Promise((resolve) => {
-    const env = lib.childEnv({ ELECTRON_RUN_AS_NODE: '1', HIVE_PROGRESS_DATA: data, HIVE_API_URL: `http://127.0.0.1:${srv.address().port}`, HIVE_API_TOKEN_FILE: lib.tokenFile('agent-token') })
-    const p = spawn(lib.ELECTRON, [path.join(lib.ROOT, 'out', 'main', 'hive-progress.js'), '--', 'node', '-e', "console.log('##hive-progress step=1 total=1 name=one')"], { env, cwd: lib.WORK })
+    const env = lib.childEnv({ ELECTRON_RUN_AS_NODE: '1', CW_PROGRESS_DATA: data, CW_API_URL: `http://127.0.0.1:${srv.address().port}`, CW_API_TOKEN_FILE: lib.tokenFile('agent-token') })
+    const p = spawn(lib.ELECTRON, [path.join(lib.ROOT, 'out', 'main', 'cw-progress.js'), '--', 'node', '-e', "console.log('##hive-progress step=1 total=1 name=one')"], { env, cwd: lib.WORK })
     let out = ''
     p.stdout.on('data', (d) => (out += d))
     p.on('close', (code) => resolve({ code, out: out.replace(/\r/g, '') }))

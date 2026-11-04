@@ -65,7 +65,7 @@ The checks are positive and negative:
 - **Notes**: a lasting rule goes to a shared note, while progress goes on the card.
 - **A plan** starts nothing.
 - **Tagging cards** (#1131): a label added to several cards keeps each card's own labels (`addLabels`, never `labels`),
-  in one `hive_update_tasks` call.
+  in one `cw_update_tasks` call.
 - **A script against the API** runs with the agent's own token, lists its project's card, is refused for another
   project's, and never prints a token.
 - **Ordinary coding** reads no Hive skill.
@@ -85,15 +85,15 @@ The checks are positive and negative:
   failed one too. A builder starting a loop registers its lane (the cards in order, its reviewer, rounds and wait) before
   its first card's review; a reviewer joins its builder's lane by name, starting none of its own (#483).
   A builder at the lane's end whose commit needs the user's OK (a hook refuses it until they allow it) asks the user on
-  the card (`hive_cannot_within_rules`, under For you), bypasses nothing, and once allowed commits and moves the cards to
+  the card (`cw_cannot_within_rules`, under For you), bypasses nothing, and once allowed commits and moves the cards to
   Done (#869, HI-2222).
   A reviewer whose card its builder blocks while it waits (to ask the user) keeps watching it rather than moving on, and
   reviews it when Hive wakes it once the card is unblocked and back in Review (#481).
   A reviewer woken by Hive's own loop wake, with no watch of its own, reviews the card and waits for the next (#405).
   A builder told no rounds or wait gets the workspace's Card loop settings for its lane and its wait; one told its own keeps them (#412).
-  The Assistant at Look and advise lists the running lanes when asked, and changes none (#500). A builder whose card's decision needs what only the Assistant may do (park another card, move its own to Done) asks it with `hive_ask_assistant`, not in a comment, and doesn't ask the user again (HI-1866).
+  The Assistant at Look and advise lists the running lanes when asked, and changes none (#500). A builder whose card's decision needs what only the Assistant may do (park another card, move its own to Done) asks it with `cw_ask_assistant`, not in a comment, and doesn't ask the user again (HI-1866).
 - **The intents and their gates** (1.0): an agent starts, puts back, submits, reviews and gives verdicts with the intent
-  tools (`hive_start_card`, `hive_submit`, `hive_start_review`, `hive_verdict`…). **work-on-card** runs in a project
+  tools (`cw_start_card`, `cw_submit`, `cw_start_review`, `cw_verdict`…). **work-on-card** runs in a project
   whose work an agent reviews and requires them: started, committed, submitted, stopping in Review. Most other
   scenarios' projects have every rule off (a new project's options before a preset). There a submission goes past
   Review, since nothing reviews the work, so a builder's check takes either: the card in Review, or past it by the
@@ -101,13 +101,13 @@ The checks are positive and negative:
   verdict leaves the card (`verdictLeft`): a fail back with its builder in Doing, a pass in Passed, or Done where nothing
   comes after review. The `old-move-*` scenarios test Hive translating the old moves.
 - **The fakes act as the shipped guidance does** (#1536): their scripts use the intents (`fakeStart`, `fakeSubmit`,
-  `fakeStartReview`, `fakeVerdict`, `hive_report_merge`), so a passing fake run shows the checks take what a model
+  `fakeStartReview`, `fakeVerdict`, `cw_report_merge`), so a passing fake run shows the checks take what a model
   following the skills does. A fixture whose card a failed verdict would have sent back is in Doing, and one whose
   loop has a reviewer runs in a reviewed project. The old moves left in the fakes, each for a reason:
   - **old-move-submit** and **old-move-review**: they test the translation.
-  - **done-card-more-work**: `hive_update_task` with `column: "doing"` is what work-on-card says for a card back from
+  - **done-card-more-work**: `cw_update_task` with `column: "doing"` is what work-on-card says for a card back from
     Passed or Done.
-  - **assistant-override-***, **assistant-bulk-move**: the Assistant moves cards with `hive_update_task(s)` and an
+  - **assistant-override-***, **assistant-bulk-move**: the Assistant moves cards with `cw_update_task(s)` and an
     override reason.
   - **prioritise**: an order within Todo, not a move between stages.
 - **A gate's refusal and its next step** (#1536):
@@ -127,7 +127,7 @@ The checks are positive and negative:
   - at Look and advise, changes nothing;
   - at Control agents, starts a card (which worked), waits for it, and the card gets done;
   - with full control, plans as cards without starting them.
-  - in Coordinator mode with a team (#402): reads run-lanes, starts each lane with `hive_lane start` (its builder,
+  - in Coordinator mode with a team (#402): reads run-lanes, starts each lane with `cw_lane start` (its builder,
     reviewer and cards, the builder's card-loop brief in `brief`; HI-2222), its reviewer briefed by Hive's start of it or
     a prompt, and ends its turn with one live watch on every lane's last card (scored on the watch it
     ends with, which replaces any before it, and on any move of those cards); woken by a failed review or an agent's
@@ -254,7 +254,7 @@ its hive tool does, so a model trial gets the same fixture as a fake (#1545).
   again after changing Hive's guidance, a skill or a tool's description, and compare.
 - **Progress** (#1457): run in a Hive agent's session, a run shows in that Hive's Progress panel with a step per trial,
   named with the results so far (`review-card · 11 ok, 1 failed`), and an estimate from the trials timed before (by
-  provider); under `hive-progress` it gives the wrapper's row those steps. `--no-progress` or `HIVE_PROGRESS=0` turns
+  provider); under `hive-progress` it gives the wrapper's row those steps. `--no-progress` or `CW_PROGRESS=0` turns
   it off.
 
 Bump `FIXTURES_VERSION` in `scenarios.cjs` when a scenario's setup or checks change.

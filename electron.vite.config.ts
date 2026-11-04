@@ -33,7 +33,7 @@ export function monacoDompurify(): Plugin {
 export default defineConfig({
   main: {
     // Agent text's formatter (HI-2433, shared/agentText/icu.ts) is bundled into the chunks, not loaded from node_modules:
-    // hive-mcp.js and hive-progress.js run outside the asar, where they find only Node's built-ins and Hive's chunks.
+    // cw-mcp.js and cw-progress.js run outside the asar, where they find only Node's built-ins and Combwork's chunks.
     plugins: [externalizeDepsPlugin({ exclude: ['intl-messageformat', '@formatjs/icu-messageformat-parser'] })],
     build: {
       rollupOptions: {
@@ -42,10 +42,11 @@ export default defineConfig({
         external: ['original-fs', 'original-fs/promises'],
         input: {
           index: resolve(__dirname, 'src/main/index.ts'),
-          'hive-mcp': resolve(__dirname, 'src/main/mcp/hive-mcp.ts'),
-          'hive-progress': resolve(__dirname, 'src/main/progressReporters/hive-progress.ts'),
+          // The scripts agents' sessions run, named for what agents see (HI-2463: cw-*); their sources keep hive-* names.
+          'cw-mcp': resolve(__dirname, 'src/main/mcp/hive-mcp.ts'),
+          'cw-progress': resolve(__dirname, 'src/main/progressReporters/hive-progress.ts'),
           // The close commands' runner (HI-1368), run as Node outside the asar.
-          'hive-close-runner': resolve(__dirname, 'src/main/closeCommand/hive-close-runner.ts'),
+          'cw-close-runner': resolve(__dirname, 'src/main/closeCommand/hive-close-runner.ts'),
           // The usage history's worker thread (#1106).
           'usage-worker': resolve(__dirname, 'src/main/usageWorker.ts'),
           // The repository lock's worker thread (HI-1680).

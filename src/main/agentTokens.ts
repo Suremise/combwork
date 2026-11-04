@@ -55,7 +55,7 @@ function ended(t: EndedLaunch): void {
 }
 
 /** The note in an agent's token file (dialects, HI-2447): written for any reader, so said in the Default. */
-const FILE_NOTE = agentMsg({ id: 'token.file.agentNote', text: "One Hive agent's Agent API token. Hive replaces it each time the agent starts.", note: "The note beside the token in an agent's token file, for whoever opens it." })
+const FILE_NOTE = agentMsg({ id: 'token.file.agentNote', text: "One Combwork agent's Agent API token. Combwork replaces it each time the agent starts.", note: "The note beside the token in an agent's token file, for whoever opens it." })
 
 /** A new token for an agent's launch (`runId`); the previous one stops working. */
 export async function newAgentToken(id: AgentIdentity, runId: string): Promise<string> {

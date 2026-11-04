@@ -340,7 +340,7 @@
   "agents.settings.worktreeOn": "Worktree en <code>{branch}</code> (desde {base})",
   "agents.start.exited": "{cli} terminó con el código {code}.",
   "agents.switch.confirm": "Cambiar",
-  "agents.switch.detail": "Para llevar el trabajo al nuevo proveedor, pide al agente un traspaso antes de cambiar (Combwork MCP: hive_create_handover) y luego pide al agente nuevo que lo lea.",
+  "agents.switch.detail": "Para llevar el trabajo al nuevo proveedor, pide al agente un traspaso antes de cambiar (Combwork MCP: cw_create_handover) y luego pide al agente nuevo que lo lea.",
   "agents.switch.message": "Sus conversaciones siguen en la pestaña Sesiones, pero {cli} no puede reanudar conversaciones de {was}, así que el agente {agent} empieza de cero la próxima vez.",
   "agents.switch.title": "¿Cambiar el agente {agent} a {cli}?",
   "agents.template.nameTaken": "Otro agente de la plantilla se llama “{name}”.",

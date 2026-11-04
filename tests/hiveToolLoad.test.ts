@@ -32,27 +32,27 @@ describe("a refused call is told its tool's arguments (HI-2229)", () => {
   }
 
   it('a guessed name: what it takes, the required first, and what it gave that it does not take', () => {
-    expect(argumentHint('hive_read_task', readTask, { key: 'AL-1', comments: 5 })).toBe('hive_read_task takes number (required), comments, latestComment, summary, history; missing: number; not: key.')
+    expect(argumentHint('cw_read_task', readTask, { key: 'AL-1', comments: 5 })).toBe('cw_read_task takes number (required), comments, latestComment, summary, history; missing: number; not: key.')
   })
 
   it('names the arguments, never the values given', () => {
-    const hint = argumentHint('hive_read_task', readTask, { task_id: 'secret value AL-1' })!
+    const hint = argumentHint('cw_read_task', readTask, { task_id: 'secret value AL-1' })!
     expect(hint).toContain('task_id')
     expect(hint).not.toContain('secret')
   })
 
   it('nothing when the arguments match the schema: the refusal is about something else', () => {
-    expect(argumentHint('hive_read_task', readTask, { number: 'AL-1' })).toBeNull()
-    expect(argumentHint('hive_list_projects', { properties: {} }, {})).toBeNull()
+    expect(argumentHint('cw_read_task', readTask, { number: 'AL-1' })).toBeNull()
+    expect(argumentHint('cw_list_projects', { properties: {} }, {})).toBeNull()
   })
 
   it('a tool with no arguments says so', () => {
-    expect(argumentHint('hive_list_projects', { properties: {} }, { project: 'alpha' })).toBe('hive_list_projects takes no arguments; not: project.')
+    expect(argumentHint('cw_list_projects', { properties: {} }, { project: 'alpha' })).toBe('cw_list_projects takes no arguments; not: project.')
   })
 
   it('stays short: at most six names of each kind', () => {
     const many = Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`x${i}`, i]))
-    const hint = argumentHint('hive_read_task', readTask, many)!
+    const hint = argumentHint('cw_read_task', readTask, many)!
     expect(hint).toContain('not: x0, x1, x2, x3, x4, x5, …')
     expect(hint).not.toContain('x6')
   })

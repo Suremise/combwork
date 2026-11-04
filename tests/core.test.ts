@@ -517,7 +517,7 @@ describe('Claude Code hooks', () => {
 
   it('refuses extra arguments with a bare "--" (#523: Hive doesn\'t guess what it meant)', async () => {
     const { extraArgsProblem } = await import('../src/shared/providers')
-    const refused = 'Hive passes the task after "--"; remove it from extra arguments.'
+    const refused = 'Combwork passes the task after "--"; remove it from extra arguments.'
     for (const args of ['--', '--allowedTools Read Bash --', '--append-system-prompt -- --allowedTools Read', '-- hello', '--verbose "--"']) expect(extraArgsProblem(args)).toContain(refused)
     expect(extraArgsProblem(['--model', 'opus', '--'])).toContain('--option=--')
     for (const args of ['', '--append-system-prompt=--', '--allowedTools a b', '--add-dir "../my -- lib"', '---', '--x']) expect(extraArgsProblem(args)).toBeNull()
@@ -531,7 +531,7 @@ describe('ConversationParser', () => {
     line({ type: 'assistant', timestamp: 't1', message: { model: 'claude-opus-5-5', content: [{ type: 'tool_use', id: 'a', name: 'Bash', input: { command: 'npm test', description: 'Run tests' } }] } }),
     line({ type: 'assistant', isSidechain: true, timestamp: 't1', message: { content: [{ type: 'text', text: 'subagent chatter' }] } }),
     line({ type: 'user', timestamp: 't2', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'a', content: 'zebra failed', is_error: true }] } }),
-    line({ type: 'assistant', timestamp: 't3', message: { model: 'claude-opus-5-5', content: [{ type: 'tool_use', id: 'b', name: 'mcp__hive__hive_notify', input: { message: 'done' } }] } }),
+    line({ type: 'assistant', timestamp: 't3', message: { model: 'claude-opus-5-5', content: [{ type: 'tool_use', id: 'b', name: 'mcp__combwork__cw_notify', input: { message: 'done' } }] } }),
     line({ type: 'user', timestamp: 't4', message: { role: 'user', content: [{ type: 'text', text: 'look' }, { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' } }] } }),
     line({ type: 'user', isMeta: true, timestamp: 't4', message: { role: 'user', content: [{ type: 'text', text: '[Image: source: C:\\p\\.hive\\images\\x.png]' }] } }),
     line({ type: 'user', isMeta: true, timestamp: 't4', message: { role: 'user', content: '<local-command-caveat>ignore</local-command-caveat>' } }),
@@ -551,7 +551,7 @@ describe('ConversationParser', () => {
     expect(p.items.map((i) => i.kind)).toEqual(['user', 'tool', 'tool', 'user', 'compaction', 'command', 'assistant', 'notice'])
     const [, bash, mcp, user, compaction, command] = p.items as any[]
     expect(bash.tool).toMatchObject({ name: 'Bash', summary: 'Run tests', input: 'npm test', result: 'zebra failed', isError: true })
-    expect(mcp.tool).toMatchObject({ name: 'hive · hive_notify', summary: 'done', result: null })
+    expect(mcp.tool).toMatchObject({ name: 'combwork · cw_notify', summary: 'done', result: null })
     expect(user.images).toEqual([{ id: 0, path: 'C:\\p\\.hive\\images\\x.png' }])
     expect(compaction).toMatchObject({ trigger: 'manual', preTokens: 100000, postTokens: 5000, nextRequestTokens: 40100, summary: 'Summary: zebra fixed' })
     expect(command).toMatchObject({ name: '/compact', args: 'keep notes', output: 'Compacted' })

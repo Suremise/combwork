@@ -198,7 +198,7 @@ describe('the Assistant moves cards across rules only with a reason (#1265, SPEC
     expect(items[1].error).toMatch(/would be in Active with nobody on it\.$/)
     const one = apiErrorReply(await update(w, b, { column: 'doing' }, assistant).catch((e) => e)).body
     expect(items[1].refused).toEqual({ rule: 'move.doingNobody', next: one.next, ...(one.change ? { change: one.change } : {}) })
-    expect(items[1].refused?.next).toMatch(/override.*\(agent\).*hive_start_task/)
+    expect(items[1].refused?.next).toMatch(/override.*\(agent\).*cw_start_task/)
     expect(items[0].refused).toBeUndefined()
     expect((await inWorkspace(w, () => tasks.getTask(b, w))).column).toBe('todo')
     const nobody = await inWorkspace(w, () => tasks.updateTasks([b], { column: 'doing', override: { reason: 'The user takes it' } }, assistant))
@@ -672,7 +672,7 @@ describe('the Assistant puts a card in Doing with someone on it, or nobody by th
           const body = apiErrorReply(err).body
           expect(body).toMatchObject({ refused: true, rule: 'move.doingNobody', override: 'the user or the Assistant' })
           expect(body.message).toMatch(/would be in Active with nobody on it\.$/)
-          expect(body.next).toMatch(/override.*\(agent\).*hive_start_task/)
+          expect(body.next).toMatch(/override.*\(agent\).*cw_start_task/)
           expect(await column(w, card)).toBe('todo')
         }
         expect(overrides(w, card)).toEqual([])

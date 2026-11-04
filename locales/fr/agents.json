@@ -340,7 +340,7 @@
   "agents.settings.worktreeOn": "Worktree sur <code>{branch}</code> (depuis {base})",
   "agents.start.exited": "{cli} s’est arrêté avec le code {code}.",
   "agents.switch.confirm": "Changer",
-  "agents.switch.detail": "Pour transférer le travail, demande une passation à l’agent avant de changer (Combwork MCP : hive_create_handover), puis demande au nouvel agent de la lire.",
+  "agents.switch.detail": "Pour transférer le travail, demande une passation à l’agent avant de changer (Combwork MCP : cw_create_handover), puis demande au nouvel agent de la lire.",
   "agents.switch.message": "Ses conversations restent dans l’onglet Sessions, mais {cli} ne peut pas reprendre les conversations de {was}, donc l’agent {agent} repart de zéro la prochaine fois.",
   "agents.switch.title": "Passer l’agent {agent} à {cli} ?",
   "agents.template.nameTaken": "Un autre agent du modèle s’appelle « {name} ».",

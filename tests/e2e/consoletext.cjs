@@ -1,7 +1,7 @@
 // The developer console showing text (#699): with Settings → Advanced → Developer console: show prompt, reply and
 // command text off, the console's live view is redacted and says so, and a recording's text box starts unticked; turned
 // on in Settings, the open console shows an "Unredacted" banner and, from then on, the prompt's text live (and after a
-// pause, filled in with text), never a token in it, and a recording starts with text ticked; the agents' hive_console
+// pause, filled in with text), never a token in it, and a recording starts with text ticked; the agents' cw_console
 // stays redacted meanwhile, and Copy Diagnostics names the setting; turned off, the banner goes and no text stays on
 // screen.
 // Fake Claude Code; dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
@@ -132,10 +132,10 @@ const check = (name, ok, extra = '') => {
     check('resume fills in what came while paused, with its text', held.raw.includes(HELD), held.raw.slice(0, 300))
     check('…and a recording starts with its text box ticked', (await recordBoxTicked()) === true)
 
-    // --- The agents' hive_console stays redacted, and Copy Diagnostics names the setting.
+    // --- The agents' cw_console stays redacted, and Copy Diagnostics names the setting.
     const read = await api(`/v1/console/events?agent=${encodeURIComponent(b1.id)}&project=alpha&seq=${held.seq}`)
     const readText = JSON.stringify(read.body)
-    check("hive_console stays redacted while it's on", read.status === 200 && read.body?.events?.length === 1 && readText.includes('<text:') && !readText.includes(HELD) && !readText.includes(SHOWN), readText.slice(0, 400))
+    check("cw_console stays redacted while it's on", read.status === 200 && read.body?.events?.length === 1 && readText.includes('<text:') && !readText.includes(HELD) && !readText.includes(SHOWN), readText.slice(0, 400))
     const diagnostics = await inv('app:diagnostics', {})
     check('Copy Diagnostics names the setting', diagnostics.includes('hive.console.showText'), diagnostics.split('\n').find((l) => l.includes('Advanced settings')) ?? '')
 

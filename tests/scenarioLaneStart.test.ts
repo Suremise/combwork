@@ -12,7 +12,7 @@ const { helpers } = require('./scenarios/scenarios.cjs') as { helpers: { laneSta
 const { laneStartLanded } = helpers
 
 const N = 3
-const DOORBELL = '› [Hive] New in your inbox: 1 task (AL-3) (m4). Call hive_inbox to read it, act on it, then ack it.'
+const DOORBELL = '› [CW] New in your inbox: 1 task (AL-3) (m4). Call cw_inbox to read it, act on it, then ack it.'
 const task = (state: string, more: Partial<Delivery> = {}): Delivery => ({ id: 'm4', kind: 'task', card: N, state, ...more })
 const seen = (more: Partial<Seen> = {}): Seen => ({ column: 'doing', live: { status: 'ready' }, deliveries: [task('offered')], shown: DOORBELL, ...more })
 

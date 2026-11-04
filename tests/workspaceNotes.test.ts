@@ -16,7 +16,7 @@ const homes = { CODEX_HOME: process.env.CODEX_HOME, COPILOT_HOME: process.env.CO
 const { advanced } = await import('../src/main/advanced')
 const { appendedInstructions, claudeCode } = await import('../src/main/providers/claude/adapter')
 const { codex } = await import('../src/main/providers/codex/adapter')
-const { copilot, HIVE_TOOL_NAMES } = await import('../src/main/providers/copilot/adapter')
+const { copilot, toolNamesLine } = await import('../src/main/providers/copilot/adapter')
 const { DELIVER_WORKSPACE_NOTES, WORKSPACE_NOTES_MAX_ID, advancedDef, overrideId } = await import('../src/shared/advanced')
 const { overridesNow } = await import('../src/main/advancedValues')
 const { deliveredNotes, notesFor, WORKSPACE_NOTES_MAX, WORKSPACE_NOTES_PATH, workspaceNotesPath } = await import('../src/shared/workspaceNotes')
@@ -131,7 +131,7 @@ function context(over: Partial<LaunchContext> = {}): LaunchContext {
   mkdirSync(cwd, { recursive: true })
   return {
     projectPath: cwd, agentId: 'a-1', executable: 'C:\\bin\\cli.exe', cwd, workspacePath: base, runId: `r-${Math.random()}`, sessionId: '0cb916db-26aa-40f2-86b5-1ba81b225fd2',
-    resume: false, name: '', skills: [], mcpServers: { hive: { command: 'node', args: ['hive-mcp.js'] } }, model: null, effort: null, permissionMode: null, extraArgs: [],
+    resume: false, name: '', skills: [], mcpServers: { combwork: { command: 'node', args: ['cw-mcp.js'] } }, model: null, effort: null, permissionMode: null, extraArgs: [],
     hookUrl: 'http://127.0.0.1:5000/hook?run=r1', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, `private-${Math.random()}`), guidance: 'Hive guidance', allowBackgroundSessions: false, use200kContext: false,
     env: { PATH: 'C:\\Windows' },
     ...over
@@ -183,14 +183,14 @@ describe('delivered at launch, on every CLI, after Hive\'s guidance', () => {
     const agent = context({ notes: NOTES })
     await copilot.prepareLaunch(agent)
     // The guidance comes as the hive server's instructions (the switch on): the file has the tools' names and the notes.
-    expect(file(agent)).toBe(`---\napplyTo: '**'\n---\n${HIVE_TOOL_NAMES}\n\n${NOTES}\n`)
+    expect(file(agent)).toBe(`---\napplyTo: '**'\n---\n${toolNamesLine()}\n\n${NOTES}\n`)
     expect(copilot.buildCommand('C:\\bin\\copilot.exe', agent).env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBe(join(agent.privateDir, 'instructions'))
     const assistant = context({ notes: NOTES, instructions: 'You are in Planner mode.' })
     await copilot.prepareLaunch(assistant)
-    expect(file(assistant)).toBe(`---\napplyTo: '**'\n---\n${HIVE_TOOL_NAMES}\n\nYou are in Planner mode.\n\n${NOTES}\n`)
+    expect(file(assistant)).toBe(`---\napplyTo: '**'\n---\n${toolNamesLine()}\n\nYou are in Planner mode.\n\n${NOTES}\n`)
     const none = context()
     await copilot.prepareLaunch(none)
-    expect(file(none)).toBe(`---\napplyTo: '**'\n---\n${HIVE_TOOL_NAMES}\n`)
+    expect(file(none)).toBe(`---\napplyTo: '**'\n---\n${toolNamesLine()}\n`)
   })
 
   it("Codex: in developer_instructions after the user's own and Hive's guidance; Codex unable to say, an agent's are left alone", async () => {

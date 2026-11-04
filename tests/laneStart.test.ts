@@ -324,7 +324,7 @@ describe("a lane's briefs say its own rounds, as recorded, never today's default
 
 describe('a lane the Assistant or a script starts over stopped agents (HI-1900)', () => {
   const ALPHA = 'D:\\ws\\alpha'
-  /** The lane as `hive_lane start` recorded it: B2 builds, R1 reviews, both stopped. */
+  /** The lane as `cw_lane start` recorded it: B2 builds, R1 reviews, both stopped. */
   const recorded = (): void => void (state.lanes = [{ id: 'lane-9', state: 'active', builder: { id: 'b2', name: 'B2' }, reviewer: { id: 'r1', name: 'R1' }, cards: [1, 2], rounds: 3 }])
   const inSlots = (): void => {
     state.enforced = true
@@ -387,12 +387,12 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
     const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
     expect(state.calls).toEqual([])
     // The rules on: Hive gives the builder its first card itself (HI-2029), so the caller tells only the reviewer (HR1).
-    expect(recordedLaneNote(l)).toBe("B2 is running, so Hive left it as it is: Hive gives it the lane's first card itself once it is free, so don't prompt it. R1 is running, so Hive left it as it is: tell it about the lane.")
+    expect(recordedLaneNote(l)).toBe("B2 is running, so Combwork left it as it is: Combwork gives it the lane's first card itself once it is free, so don't prompt it. R1 is running, so Combwork left it as it is: tell it about the lane.")
     // The rules off: nothing starts the builder's card, so the caller tells both (a busy builder: an idle one outside
     // slots gets the lane in a new conversation, HI-2232).
     state.enforced = false
     state.live.set('b2', { status: 'working', sessionId: 's-b2' })
-    expect(recordedLaneNote(await launchRecordedLane(ws, ALPHA, 'lane-9'))).toBe('B2 and R1 are running, so Hive left them as they are: tell them about the lane.')
+    expect(recordedLaneNote(await launchRecordedLane(ws, ALPHA, 'lane-9'))).toBe('B2 and R1 are running, so Combwork left them as they are: tell them about the lane.')
   })
 
   it('its builder running and its reviewer stopped: only the reviewer starts, with no slot lent for the builder', async () => {
@@ -402,7 +402,7 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
     const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
     expect(state.calls).toEqual(['start r1'])
     expect(state.live.get('b2')?.sessionId).toBe('s-b2')
-    expect(recordedLaneNote(l)).toBe("Started R1 with the lane's brief. B2 is running, so Hive left it as it is: Hive gives it the lane's first card itself once it is free, so don't prompt it.")
+    expect(recordedLaneNote(l)).toBe("Started R1 with the lane's brief. B2 is running, so Combwork left it as it is: Combwork gives it the lane's first card itself once it is free, so don't prompt it.")
   })
 
   it('its builder stopped and its reviewer idle: the builder starts in its slot, the reviewer keeps its conversation', async () => {
@@ -411,7 +411,7 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
     state.live.set('r1', { status: 'ready', sessionId: 's-r1' })
     const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
     expect(state.calls).toEqual(['lend lane-9', 'start b2'])
-    expect(recordedLaneNote(l)).toBe("Started B2 with the lane's brief, in slot-c. R1 is running, so Hive left it as it is: tell it about the lane.")
+    expect(recordedLaneNote(l)).toBe("Started B2 with the lane's brief, in slot-c. R1 is running, so Combwork left it as it is: tell it about the lane.")
   })
 
   describe('an idle builder outside slots (HI-2232, decision (a)): given the lane in a new conversation, as Start Lane… gives it', () => {
@@ -431,7 +431,7 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
         expect(state.briefs).toHaveLength(1)
         expect(state.briefs[0]).toContain('AL-1')
         expect(l?.started.map((s) => [s.name, s.how])).toEqual([['B2', 'fresh']])
-        expect(recordedLaneNote(l)).toBe("Gave B2 the lane in a new conversation (its last stays in its Sessions history): don't prompt it. R1 is running, so Hive left it as it is: tell it about the lane.")
+        expect(recordedLaneNote(l)).toBe("Gave B2 the lane in a new conversation (its last stays in its Sessions history): don't prompt it. R1 is running, so Combwork left it as it is: tell it about the lane.")
       })
     }
 
@@ -453,7 +453,7 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
         expect(state.calls).toEqual(['start r1'])
         expect(state.owed).toEqual([])
         expect(state.live.get('b2')?.sessionId).toBe('s-b2')
-        expect(recordedLaneNote(l)).toBe("Started R1 with the lane's brief. B2 is running, so Hive left it as it is: Hive gives it the lane's first card itself once it is free, so don't prompt it.")
+        expect(recordedLaneNote(l)).toBe("Started R1 with the lane's brief. B2 is running, so Combwork left it as it is: Combwork gives it the lane's first card itself once it is free, so don't prompt it.")
       })
     }
 
@@ -465,7 +465,7 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
       const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
       expect(state.calls).toEqual([])
       expect(state.owed).toEqual([{ lane: 'lane-9', agent: 'b2', role: 'builder', oldSession: 's-b2' }])
-      expect(recordedLaneNote(l)).toBe("B2 wasn't free: Hive gives it the lane in a new conversation once it is, so don't prompt it. R1 is running, so Hive left it as it is: tell it about the lane.")
+      expect(recordedLaneNote(l)).toBe("B2 wasn't free: Combwork gives it the lane in a new conversation once it is, so don't prompt it. R1 is running, so Combwork left it as it is: tell it about the lane.")
     })
 
     // HR1's round 1: the lane is read before the awaits of the launch; it is checked again just before the old run stops
@@ -516,7 +516,7 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
       state.onGetTask = () => void state.live.delete('b2')
       const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
       expect(state.calls).toEqual(['start b2'])
-      expect(recordedLaneNote(l)).toBe("Started B2 with the lane's brief. R1 is running, so Hive left it as it is: tell it about the lane.")
+      expect(recordedLaneNote(l)).toBe("Started B2 with the lane's brief. R1 is running, so Combwork left it as it is: tell it about the lane.")
     })
   })
 
@@ -526,7 +526,7 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
     state.onStart = (id) => void (id === 'b2' && state.live.set('r1', { status: 'ready', sessionId: 's-r1' }))
     const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
     expect(state.calls).toEqual(['start b2'])
-    expect(recordedLaneNote(l)).toBe("Started B2 with the lane's brief. R1 is running, so Hive left it as it is: tell it about the lane.")
+    expect(recordedLaneNote(l)).toBe("Started B2 with the lane's brief. R1 is running, so Combwork left it as it is: tell it about the lane.")
   })
 
   it("its builder running when it looked and stopped meanwhile (HR6's round 1, finding 1): left out of this start, never started with no slot", async () => {
@@ -537,7 +537,7 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
     state.onGetTask = () => void state.live.delete('b2')
     const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
     expect(state.calls).toEqual(['start r1'])
-    expect(recordedLaneNote(l)).toBe("Started R1 with the lane's brief. B2 is running, so Hive left it as it is: Hive gives it the lane's first card itself once it is free, so don't prompt it.")
+    expect(recordedLaneNote(l)).toBe("Started R1 with the lane's brief. B2 is running, so Combwork left it as it is: Combwork gives it the lane's first card itself once it is free, so don't prompt it.")
   })
 
   for (const status of ['working', 'watching']) {
@@ -547,7 +547,7 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
       const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
       expect(state.calls).toEqual(['start b2'])
       expect(l?.started.map((s) => [s.name, s.how])).toEqual([['B2', 'started']])
-      expect(recordedLaneNote(l)).toBe("Started B2 with the lane's brief. R1 is running, so Hive left it as it is: tell it about the lane.")
+      expect(recordedLaneNote(l)).toBe("Started B2 with the lane's brief. R1 is running, so Combwork left it as it is: tell it about the lane.")
     })
   }
 
@@ -581,7 +581,7 @@ describe("a lane's brief names its own workspace's cards, never the default work
     named(state.briefs[0])
   })
 
-  it('a lane the Assistant or a script recorded (hive_lane start, the reported case)', async () => {
+  it('a lane the Assistant or a script recorded (cw_lane start, the reported case)', async () => {
     state.lanes = [{ id: 'lane-o', state: 'active', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' }, cards: [324], rounds: 3 }]
     await launchRecordedLane(second, ALPHA, 'lane-o')
     named(state.briefs[0])

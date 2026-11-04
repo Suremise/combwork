@@ -77,7 +77,7 @@ describe('agentApiCall (#371)', () => {
   })
 
   it("passes on Hive's X-Hive-Notice header (#357's new-decision flag), still encoded", async () => {
-    const line = encodeURIComponent('[Hive] #4 has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.')
+    const line = encodeURIComponent('[CW] #4 has 1 new decision since you last read it: read the card (cw_read_task) at your next checkpoint.')
     server = createServer((_req, res) => {
       res.setHeader('X-Hive-Notice', line)
       res.end('{}')

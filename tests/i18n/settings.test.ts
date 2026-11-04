@@ -250,7 +250,7 @@ describe("a number setting's box", () => {
   })
 })
 
-describe("the Assistant's hive_read_setting (#793: shownAs)", () => {
+describe("the Assistant's cw_read_setting (#793: shownAs)", () => {
   const e = settingEntry('sessions.transcriptWarnMB')!
 
   it('in English, names the setting once: no shownAs', () => {
