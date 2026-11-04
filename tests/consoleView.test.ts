@@ -52,16 +52,17 @@ describe('filterEvents', () => {
 
 describe('sourceGroups', () => {
   const src = (over: Partial<ConsoleSource>): ConsoleSource => ({ id: over.label ?? 'x', kind: 'session', label: 'x', workspacePath: 'C:\\ws', capturing: false, events: 0, ...over })
-  it('Hive and its Assistant first, then each project by name with its agents by name', () => {
+  it('Combwork and its Assistant first, then each project by name with its agents by name', () => {
     const groups = sourceGroups([
       src({ label: 'beta · B10', project: 'beta', agent: 'B10' }),
-      src({ label: 'Hive Assistant', kind: 'assistant' }),
+      src({ label: 'Assistant', kind: 'assistant' }),
       src({ label: 'beta · B2', project: 'beta', agent: 'B2' }),
       src({ label: 'alpha · B1', project: 'alpha', agent: 'B1' }),
-      src({ label: 'Hive', kind: 'hive' })
+      src({ label: 'Combwork', kind: 'hive' })
     ])
+    // The app's own group says its name (HI-2511), never Hive's.
     expect(groups.map((g) => [g.label, g.sources.map((s) => s.label)])).toEqual([
-      ['Hive', ['Hive', 'Hive Assistant']],
+      ['Combwork', ['Combwork', 'Assistant']],
       ['alpha', ['alpha · B1']],
       ['beta', ['beta · B2', 'beta · B10']]
     ])
@@ -69,7 +70,7 @@ describe('sourceGroups', () => {
 
   it("names an agent's session by the agent, with its events when it has some", () => {
     expect(sourceOption(src({ label: 'alpha · B1', project: 'alpha', agent: 'B1' }))).toBe('B1')
-    expect(sourceOption(src({ label: 'Hive', kind: 'hive', events: 12 }))).toBe('Hive (12)')
+    expect(sourceOption(src({ label: 'Combwork', kind: 'hive', events: 12 }))).toBe('Combwork (12)')
     expect(sourceOption(src({ label: 'Assistant', kind: 'assistant' }))).toBe('Assistant')
   })
 })

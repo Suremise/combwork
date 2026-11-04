@@ -5,7 +5,7 @@
   },
   "console.assistant": {
     "defaultMessage": "Assistant",
-    "description": "The developer console's source picker: the Hive Assistant's session as a source. Hive's name stays as it is."
+    "description": "The developer console's source picker: the Assistant's session as a source."
   },
   "console.bytes": {
     "defaultMessage": "{n, plural, one {# byte} other {# bytes}}",
@@ -273,7 +273,7 @@
   },
   "console.sourceCount": {
     "defaultMessage": "{name} ({n, number})",
-    "description": "The developer console's source picker: a source ({name}: an agent, the Assistant or Hive) with how many events it has captured."
+    "description": "The developer console's source picker: a source ({name}: an agent, the Assistant or Combwork itself) with how many events it has captured."
   },
   "console.startRecording": {
     "defaultMessage": "Start recording",

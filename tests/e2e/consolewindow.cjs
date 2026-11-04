@@ -112,12 +112,12 @@ const check = (name, ok, extra = '') => {
     check("…and its page may call only the console's channels", /Not allowed/.test(outside) && (await inv('settings:get')).general.userName !== 'console-page', outside)
     check('…watching nothing until a source is picked', (await dc.locator('.dc-live').textContent()).includes('Not watching') && (await inv('console:sources')).every((s) => !s.capturing))
 
-    // --- The source picker: Hive, the Assistant, and the project's agent.
+    // --- The source picker: Combwork itself, the Assistant, and the project's agent (HI-2511: the app's name, never Hive's).
     const options = await lib.until(async () => {
       const o = await dc.locator('.dc-source option').evaluateAll((els) => els.map((e) => [e.value, e.textContent, e.parentElement.getAttribute('label')]))
       return o.some(([, t]) => t.startsWith('B1')) ? o : null
     }, HUNG_MS)
-    check('the picker lists Hive, the Assistant and the project\'s agents', options?.some(([, t, g]) => t.startsWith('Hive') && g === 'Hive') && options.some(([, t]) => t.startsWith('Hive Assistant')) && options.some(([, t, g]) => t.startsWith('B1') && g === 'alpha'), JSON.stringify(options))
+    check('the picker lists Combwork, the Assistant and the project\'s agents', options?.some(([v, t, g]) => v.startsWith('hive:') && t.startsWith('Combwork') && g === 'Combwork') && options.some(([v, t, g]) => v.includes('#assistant') && t.startsWith('Assistant') && g === 'Combwork') && options.some(([, t, g]) => t.startsWith('B1') && g === 'alpha') && !options.some(([, t, g]) => /Hive/.test(`${t} ${g ?? ''}`)), JSON.stringify(options))
     const b1Option = options.find(([, t]) => t.startsWith('B1'))[0]
     await dc.locator('.dc-source').selectOption(b1Option)
     await lib.until(async () => (await inv('console:sources')).find((s) => s.agentId === b1.id)?.capturing, HUNG_MS)
@@ -167,8 +167,10 @@ const check = (name, ok, extra = '') => {
     await dc.screenshot({ path: path.join(lib.WORK, 'consolewindow-paused.png') })
     check('paused: the list holds, and the indicator counts what came', /Paused \(\d+ new\)/.test(held) && (await rows()).length === before, `${held}; ${(await rows()).length} vs ${before}`)
     await dc.locator('.dc-pause').click()
-    const prompt = await row((r) => r.name === 'UserPromptSubmit')
-    check('resume fills in what came while paused', !!prompt && (await rows()).some((r) => r.name === 'Stop') && (await dc.locator('.dc-live').textContent()).includes('Live'))
+    // Waits for the whole fill-in: the held rows and the indicator can land in separate renders.
+    const resumed = async () => { const list = await rows(); return list.some((r) => r.name === 'UserPromptSubmit') && list.some((r) => r.name === 'Stop') && (await dc.locator('.dc-live').textContent()).includes('Live') }
+    await lib.until(resumed, HUNG_MS)
+    check('resume fills in what came while paused', await resumed(), `${await dc.locator('.dc-live').textContent()}; ${JSON.stringify((await rows()).map((r) => r.name))}`)
     check("the prompt's words reach no row", !JSON.stringify(await rows()).includes(PRIVATE))
 
     // --- Clear empties the list.
