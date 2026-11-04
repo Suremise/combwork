@@ -5012,9 +5012,6 @@ h2.section#unused-worktrees {
     margin-top: -2px;
   }
 }
-.account-settings-dialog {
-  min-width: min(520px, 80vw);
-}
 /* Its connections, a small table inside the card (HI-2528; Darren 21:40: kept where they are, broken up as a table). */
 .connection-list {
   container: connection-list / inline-size;

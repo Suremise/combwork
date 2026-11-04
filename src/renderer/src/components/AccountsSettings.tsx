@@ -595,6 +595,7 @@ export function AccountsSettings() {
           <Modal
             title={tr(M.accountSettingsTitle, { name: a.name })}
             icon="settings-gear"
+            wide
             onClose={() => setAccountDialog(null)}
             footer={
               <button className="btn primary" onClick={() => setAccountDialog(null)}>
