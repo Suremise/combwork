@@ -79,7 +79,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
 
     // --- Asker's edit is refused, Hive asks, and Asker ends its turn to wait (as Codex does, within seconds).
     const since = await say(asker.id, 'patch x.txt')
-    check("Asker's edit is held back: it is told Hive has asked the user", !!(await until(() => edits('Asker').some((e) => !e.allowed && /Hive has asked the user/.test(e.reason ?? '')))), JSON.stringify(edits('Asker')))
+    check("Asker's edit is held back: it is told Hive has asked the user", !!(await until(() => edits('Asker').some((e) => !e.allowed && /Combwork has asked the user/.test(e.reason ?? '')))), JSON.stringify(edits('Asker')))
     check("…and Asker's blocked turn ends", !!(await until(turnOver(asker.id, since))), JSON.stringify(await live(asker.id)))
     const asking = page.locator('.toast', { hasText: 'wants to edit x.txt' })
     // Exactly Allow: the entry's own text is a button too (it opens the agent), and says "Allow Asker to edit it too?".

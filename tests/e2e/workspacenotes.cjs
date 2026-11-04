@@ -177,7 +177,7 @@ const check = (name, ok, extra = '') => {
     const read = await call(agentToken, 'GET', at)
     check('a project agent reads the note', read.status === 200 && /NOTE-ALL-2/.test(read.body?.content ?? ''), JSON.stringify(read).slice(0, 200))
     const refused = await call(agentToken, 'PUT', at, { content: 'mine now' })
-    check("…but its write is refused, and says whose it is", refused.status === 403 && /the user's and the Hive Assistant's/.test(refused.body?.error ?? JSON.stringify(refused.body)), JSON.stringify(refused))
+    check("…but its write is refused, and says whose it is", refused.status === 403 && /the user's and the Assistant's/.test(refused.body?.error ?? JSON.stringify(refused.body)), JSON.stringify(refused))
     const appended = await call(agentToken, 'PUT', `/v1/shared/file?path=${encodeURIComponent('./workspace NOTES.md')}`, { content: 'x', append: true })
     check('…by another spelling of its path too', appended.status === 403, JSON.stringify(appended))
     check('…and the note is as it was', fs.readFileSync(noteFile, 'utf8') === note(2))

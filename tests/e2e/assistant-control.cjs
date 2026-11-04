@@ -242,7 +242,7 @@ const check = (name, ok, extra = '') => {
   // Handing over: refused at once while project agents lack Hive's tools (the Agent API is off), then done.
   await inv('settings:update', { agentApi: { enabled: false } })
   const noTools = await api('POST', '/v1/projects/alpha/handover', { from: 'Builder', to: 'Fixer', handover: false })
-  check("no hand-over while agents can't use Hive's tools", noTools.status === 409 && /Hive's tools/.test(noTools.body?.error), JSON.stringify(noTools.body))
+  check("no hand-over while agents can't use Hive's tools", noTools.status === 409 && /Combwork's tools/.test(noTools.body?.error), JSON.stringify(noTools.body))
   await inv('settings:update', { agentApi: { enabled: true } })
   await lib.until(async () => (await api('GET', '/v1/status').catch(() => ({}))).status === 200, 10000)
   const typedIn = await api('POST', '/v1/projects/alpha/handover', { from: 'Builder', to: 'Fixer', handover: false })
@@ -307,7 +307,7 @@ const check = (name, ok, extra = '') => {
   // lane once it is free, not to prompt it (HI-2029, HR1: a prompt would race Hive's start). The reply comes once the lane's launch
   // is over, so a new conversation given now would show by now.
   const nowLive = await live(alpha, builderId)
-  check("…its builder, idle but not free (the user typed there), is owed the lane's new conversation, and the reply says not to prompt it (HI-2232, HI-2034)", wasLive?.status === 'finished' && !!wasLive.sessionId && nowLive?.sessionId === wasLive.sessionId && nowLive?.runId === wasLive.runId && /Builder wasn't free: Hive gives it the lane in a new conversation once it is, so don't prompt it\./.test(unwatched.body?.note ?? ''), JSON.stringify({ note: unwatched.body?.note, status: wasLive?.status, before: wasLive?.sessionId, after: nowLive?.sessionId }))
+  check("…its builder, idle but not free (the user typed there), is owed the lane's new conversation, and the reply says not to prompt it (HI-2232, HI-2034)", wasLive?.status === 'finished' && !!wasLive.sessionId && nowLive?.sessionId === wasLive.sessionId && nowLive?.runId === wasLive.runId && /Builder wasn't free: Combwork gives it the lane in a new conversation once it is, so don't prompt it\./.test(unwatched.body?.note ?? ''), JSON.stringify({ note: unwatched.body?.note, status: wasLive?.status, before: wasLive?.sessionId, after: nowLive?.sessionId }))
   const watching = await api('POST', '/v1/tasks/wait', { lanes: ['all'], wake: true })
   const rewatched = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'Builder', cards: [o1, o2] })
   check('…and with one, no nudge', watching.status === 200 && rewatched.status === 200 && !/No watch of yours/.test(rewatched.body?.note ?? ''), JSON.stringify({ watching: watching.body, rewatched: rewatched.body }))

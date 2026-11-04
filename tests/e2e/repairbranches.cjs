@@ -162,7 +162,7 @@ const samePath = (a, b) => path.resolve(a).toLowerCase() === path.resolve(b).toL
       } finally {
         fs.chmodSync(cfgFile, 0o644)
       }
-      check('with project.json unwritable: JB2’s rename fails, JB1’s isn’t recorded yet', refused.failed.some((l) => /branch hive\/Elsewhere\/juniper\/jb2 of agent JB2 couldn't be renamed/.test(l)) && refused.failed.some((l) => /the branch of agent JB1 is now hive\/Tools\/juniper\/jb1-3, but Hive couldn't record it yet/.test(l)), JSON.stringify(refused))
+      check('with project.json unwritable: JB2’s rename fails, JB1’s isn’t recorded yet', refused.failed.some((l) => /branch hive\/Elsewhere\/juniper\/jb2 of agent JB2 couldn't be renamed/.test(l)) && refused.failed.some((l) => /the branch of agent JB1 is now hive\/Tools\/juniper\/jb1-3, but Combwork couldn't record it yet/.test(l)), JSON.stringify(refused))
       // Its rows: JB2's (failed before git) is at its old name, JB1's (git's step done, not recorded) at its new one.
       const row = (agent) => refused.rows.find((r) => r.what.kind === 'branch' && r.what.agent === agent)
       check('…the report’s rows say where each branch is now, as git has it', row('JB2')?.outcome === 'failed' && row('JB2')?.now === 'hive/Elsewhere/juniper/jb2' && branches(proj).includes(row('JB2').now) && row('JB1')?.outcome === 'failed' && row('JB1')?.now === 'hive/Tools/juniper/jb1-3' && branches(proj).includes(row('JB1').now), JSON.stringify({ rows: refused.rows, git: branches(proj) }))

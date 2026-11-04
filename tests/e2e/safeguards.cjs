@@ -115,7 +115,7 @@ const check = (name, ok, extra = '') => {
       const c = await api('GET', `/v1/tasks/${card.number}/comments/latest`)
       return /now runs on/.test(JSON.stringify(c.body)) && c.body
     }, HUNG_MS)
-    check('its Doing card gets a note from Hive', !!comment && /"by":"Hive"/.test(JSON.stringify(comment)), JSON.stringify(comment))
+    check('its Doing card gets a note from Hive', !!comment && /"by":"Combwork"/.test(JSON.stringify(comment)), JSON.stringify(comment))
     const activity = await api('GET', '/v1/projects/alpha/agents/Tester/activity')
     const field = activity.body?.safeguard
     check('cw_agent_activity has the safeguard field', field?.switchedTo === 'claude-opus-4-8' && field.stops === 1 && field.toolsBefore?.includes('Bash'), JSON.stringify(field))

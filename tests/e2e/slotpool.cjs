@@ -1,7 +1,7 @@
 // The slot pool in the app (#1429, SPEC §16.10.1–16.10.2): a test Hive's main process lends a Git project's slots
 // (through the test copies' `slots:test` channel, as #1438's card start will), with a setup command:
 // - two builders, two slots: slot-a and slot-b, each a worktree of the project's, their setup runs shown in the
-//   Progress panel as "Hive (slot slot-a)" / "Hive (slot slot-b)" (slot-a's while it runs, screenshot);
+//   Progress panel as "Combwork (slot slot-a)" / "Combwork (slot slot-b)" (slot-a's while it runs, screenshot);
 // - slot-a released with an untracked file is dirty and isn't lent again: the next lend gets slot-b;
 // - with one builder left and a day gone by, the idle removal removes only the clean slot (slot-b), never the dirty one.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR (no agent is started).
@@ -50,7 +50,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     const lendA = op({ op: 'lend', agent: b1.id, card: 101 })
     const runOf = async (name) => (await inv('progress:snapshot')).runs.find((r) => r.source === 'hive' && r.slot === name)
     const runA = await until(() => runOf('slot-a'), HUNG_MS)
-    check("slot-a's setup is a run of Hive's, attributed to the slot", runA?.agentName === 'Hive (slot slot-a)' && runA.defaultName === 'slot' && runA.state === 'running', JSON.stringify(runA))
+    check("slot-a's setup is a run of Hive's, attributed to the slot", runA?.agentName === 'Combwork (slot slot-a)' && runA.defaultName === 'slot' && runA.state === 'running', JSON.stringify(runA))
     await panel.locator('.progress-tab[data-tab="runs"]').click()
     const rowA = panel.locator(`.progress-tab-runs [data-run="${runA?.id}"]`)
     check('…shown in Runs as "Combwork (slot slot-a)"', !!(await until(async () => (await rowA.count()) === 1 && (await rowA.innerText()).includes('Combwork (slot slot-a)'), HUNG_MS)), await panel.innerText().catch(() => ''))
@@ -71,7 +71,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     const openRuns = async () => {
       for (const t of await panel.locator('.progress-tab-runs .progress-card-toggle[aria-expanded="false"]').all()) await t.click().catch(() => undefined)
     }
-    check('…its setup shown as "Hive (slot slot-b)"', !!(await until(async () => {
+    check('…its setup shown as "Combwork (slot slot-b)"', !!(await until(async () => {
       await openRuns()
       return (await runOf('slot-b'))?.state === 'passed' && (await panel.locator('.progress-tab-runs').innerText()).includes('Combwork (slot slot-b)')
     }, HUNG_MS)), await panel.innerText().catch(() => ''))

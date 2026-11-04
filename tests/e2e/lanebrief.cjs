@@ -106,7 +106,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
       return s && same(s.cwd, st1.folder) && s.sessionId !== before.sessionId ? s : null
     }, HUNG_MS)
     check('1. …B1 works it in its slot, in that new conversation', !!working, JSON.stringify(await live(b1.id)))
-    check("1. …whose first prompt carries the card and the lane's brief", !!(await until(async () => /Work on task .* from the Hive task board/.test(await transcript(working.sessionId)) && /LANE-BRIEF-ONE: stay off src\/renderer; card one first\./.test(await transcript(working.sessionId)), HUNG_MS)), (await transcript(working?.sessionId)).slice(0, 600))
+    check("1. …whose first prompt carries the card and the lane's brief", !!(await until(async () => /Work on task .* from the Combwork task board/.test(await transcript(working.sessionId)) && /LANE-BRIEF-ONE: stay off src\/renderer; card one first\./.test(await transcript(working.sessionId)), HUNG_MS)), (await transcript(working?.sessionId)).slice(0, 600))
 
     // --- 2. In its turn, it edits the brief and moves on to card two (card one put back); Hive is quit with card two's
     // placement owed; the next start resumes its conversation there with card two and the edited brief.

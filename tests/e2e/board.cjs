@@ -227,7 +227,7 @@ const check = (name, ok, extra = '') => {
   check('the card is in Doing, given to the agent', c1b.column === 'doing' && c1b.agent === agent.id, JSON.stringify({ column: c1b.column, agent: c1b.agent }))
   const tr = fs.readdirSync(path.join(claudeHome, 'projects'), { recursive: true }).filter((f) => String(f).endsWith('.jsonl'))
   const text = tr.map((f) => fs.readFileSync(path.join(claudeHome, 'projects', String(f)), 'utf8')).join('\n')
-  check('the agent got the card as its prompt, named by key alone (#1219, HI-1661)', /Work on task [A-Z]{2,4}-1 from the Hive task board: Add a greeting/.test(text) && text.includes('hello()'), text.slice(0, 200))
+  check('the agent got the card as its prompt, named by key alone (#1219, HI-1661)', /Work on task [A-Z]{2,4}-1 from the Combwork task board: Add a greeting/.test(text) && text.includes('hello()'), text.slice(0, 200))
   check('its tile shows the agent finished', !!(await until(async () => ((await tile(1).getAttribute('class')) ?? '').includes('finished') && /Finished/.test(await tile(1).innerText()), 8000)), await tile(1).innerText())
   await page.screenshot({ path: path.join(lib.WORK, 'board.png') })
 
@@ -459,7 +459,7 @@ const check = (name, ok, extra = '') => {
   }
   // Every cell's content fits it: a long name or branch wraps inside itself, never cut (only the folder's short name is).
   const cellsFit = () => d.locator('.removal-list tbody td').evaluateAll((tds) => tds.length > 0 && tds.every((td) => td.scrollWidth <= td.clientWidth + 1))
-  for (const [choice, happens] of [['Hide', 'stays, hidden from Hive'], ['Remove from Hive', 'stays where it is'], ['Delete', 'to the Recycle Bin']]) {
+  for (const [choice, happens] of [['Hide', 'stays, hidden from Combwork'], ['Remove from Combwork', 'stays where it is'], ['Delete', 'to the Recycle Bin']]) {
     await d.locator('label.choice').filter({ has: page.getByText(choice, { exact: true }) }).click()
     check(`…${choice}: the folder ${happens}`, !!(await until(async () => (await folderRow())[1] === happens, HUNG_MS)), JSON.stringify(await touched()))
     check(`…${choice}: the long agent's worktree whole, its name and branch, every cell fitting`, !!longBranch && (await touched()).some((cells) => cells[0] === `${longName} (${longBranch})`) && !!(await until(cellsFit, HUNG_MS)), JSON.stringify({ longBranch, rows: await touched() }))
