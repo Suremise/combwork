@@ -77,6 +77,7 @@ import type {
   GitStatus,
   HiveEvent,
   LiveSessionState,
+  StartedSession,
   McpFileServer,
   McpShown,
   McpPlacesResult,
@@ -549,7 +550,7 @@ export interface HiveRequests {
   /** own: Hive's own sessions alone, for a view that shows them before the others (HI-1681). */
   'session:list': (projectPath: string, opts?: { own?: boolean }) => SessionListItem[]
   /** agentId: without one, the project's only agent. skipSetup starts the agent even though the worktree's setup command hasn't succeeded. */
-  'session:start': (projectPath: string, opts: { resumeId?: string; name?: string; agentId?: string; skipSetup?: boolean; auto?: boolean }) => LiveSessionState
+  'session:start': (projectPath: string, opts: { resumeId?: string; name?: string; agentId?: string; skipSetup?: boolean; auto?: boolean; freshAsked?: boolean }) => StartedSession
   /** Stops the CLI's background job holding a conversation, then resumes it in the agent. */
   'session:stopBackgroundAndResume': (projectPath: string, agentId: string, jobId: string, sessionId: string, offer?: string) => void
   'session:stop': (projectPath: string, agentId?: string) => void

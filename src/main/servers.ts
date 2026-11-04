@@ -1488,7 +1488,8 @@ route('POST', '/v1/projects/:name/agents/:agent/start', async ({ params, body })
     }
     const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
     const st = prompt ? await startOnTask(p, agentId, a.name, prompt, (line) => sessions.start(p, { agentId, resumeId, prompt: line, allowed: guard })) : await sessions.start(p, { agentId, resumeId, allowed: guard })
-    return { done: [API.done.startedAgent, { agent: a.name, project: basename(p), resumed: resumeId ? 'yes' : 'no' }], said: prompt ? ` on: ${clip(prompt.replace(/\s+/g, ' '), 80)}` : undefined, result: st, ...(st?.runId ? { started: { project: basename(p), agentId, run: st.runId } } : {}) }
+    // A resume that started a new conversation says so, and why (HI-2540).
+    return { done: [API.done.startedAgent, { agent: a.name, project: basename(p), resumed: resumeId && !st?.startedFresh ? 'yes' : 'no', fresh: st?.startedFresh ?? 'none' }], said: prompt ? ` on: ${clip(prompt.replace(/\s+/g, ' '), 80)}` : undefined, result: st, ...(st?.runId ? { started: { project: basename(p), agentId, run: st.runId } } : {}) }
   })
 })
 
@@ -1618,7 +1619,7 @@ function callerSender(): DeliverySender {
 }
 
 /** Starts an agent on a task (#649): a task delivery its launch carries as its prompt, received once its CLI takes it. */
-const startOnTask = (p: string, agentId: string, agentName: string, prompt: string, start: (line: string) => Promise<LiveSessionState>): Promise<LiveSessionState> =>
+const startOnTask = <T extends LiveSessionState>(p: string, agentId: string, agentName: string, prompt: string, start: (line: string) => Promise<T>): Promise<T> =>
   launchWith(p, { agentId, agentName, kind: 'task', from: callerSender(), body: prompt }, start).then((x) => x.launched)
 
 // The Assistant's journal (#1031): its tools (cw_journal_*) only, only while it is on (Settings → Assistant → Journal).

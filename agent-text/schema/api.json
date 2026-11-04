@@ -1025,7 +1025,8 @@
     "placeholders": {
       "resumed": "select",
       "agent": "plain",
-      "project": "plain"
+      "project": "plain",
+      "fresh": "select"
     }
   },
   "api.done.stoppedAgent": {

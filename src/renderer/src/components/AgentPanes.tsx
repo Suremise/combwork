@@ -22,6 +22,7 @@ import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { watchText } from '@shared/agentWatch'
 import { formatDateTime, formatTime, formatWhen } from '@shared/dates'
 import * as actions from '../actions'
+import { freshShort, freshTip } from '../freshResume'
 import { HAND_OVER_TEXT, handOverNow, onRunningLane } from '@shared/handOver'
 import { call } from '../api'
 import { templateList, templatesStillHere } from '../templateList'
@@ -157,7 +158,8 @@ function sessionPickerItems(project: ProjectInfo, a: AgentInfo, list: SessionLis
     if (holder) bits.push(tr(msg({ id: 'panes.resume.openIn', defaultMessage: 'open in {agent} — click to show it', description: "A session in the session picker that another agent has open ({agent}: its name). Lower case: it follows how long ago it ran." }), { agent: holder.name }))
     else {
       if (many && !legacyOf(a) && ranBy && ranBy.id !== a.id) bits.push(tr(msg({ id: 'panes.resume.lastRunBy', defaultMessage: 'last run by {agent}', description: 'A session in the session picker that another agent ({agent}: its name) ran last. Lower case.' }), { agent: ranBy.name }))
-      if (s.recache && !s.recache.warm && s.recache.tokens > 20000) bits.push(tr(msg({ id: 'panes.resume.recache', defaultMessage: 'cache expired, ~{tokens} to re-cache', description: "A session in the session picker whose prompt cache has expired: resuming it re-reads about {tokens} tokens (\"120K\"). Lower case." }), { tokens: formatTokens(s.recache.tokens) }))
+      if (s.fresh) bits.push(freshShort())
+      else if (s.recache && !s.recache.warm && s.recache.tokens > 20000) bits.push(tr(msg({ id: 'panes.resume.recache', defaultMessage: 'cache expired, ~{tokens} to re-cache', description: "A session in the session picker whose prompt cache has expired: resuming it re-reads about {tokens} tokens (\"120K\"). Lower case." }), { tokens: formatTokens(s.recache.tokens) }))
     }
     items.push({
       label: sessionLabel(s, project.name, tr),
@@ -193,6 +195,8 @@ function useSessionPicker() {
 }
 
 function resumeTip(project: ProjectInfo, a: AgentInfo): string {
+  // HI-2540: its conversation can't continue, so Resume starts a new one: said before it is pressed.
+  if (a.resume?.fresh) return freshTip(a.resume.fresh, sessionLabel(a.resume, project.name))
   if (a.resume) return tr(msg({ id: 'panes.resume.tip', defaultMessage: 'Resume "{session}", last active {when}', description: "Tooltip of an agent's Resume button: the session it resumes ({session}: its name) and when it was last active ({when}: \"5 min ago\")." }), { session: sessionLabel(a.resume, project.name), when: timeAgo(a.resume.lastActiveAt) })
   if (project.agents.length > 1) return tr(msg({ id: 'panes.resume.noneOfAgent', defaultMessage: '{agent} has no session of its own to resume. Choose one with ▾, or start a new one.', description: "Tooltip of an agent's Resume button when the agent ({agent}: its name) has no session to resume. ▾ is the button beside it." }), { agent: a.name })
   return tr(msg({ id: 'panes.resume.noneOwn', defaultMessage: 'There is no session of its own to resume. Choose one with ▾, or start a new one.', description: "Tooltip of the Resume button when the project's agent has no session to resume. ▾ is the button beside it." }))

@@ -143,6 +143,7 @@ export const SUITES = [
   { name: 'footerfit' },
   { name: 'foryou' },
   { name: 'freshpath' },
+  { name: 'freshresume' },
   { name: 'gitbranchcards' },
   { name: 'gitcleanup' },
   { name: 'gitdirect' },

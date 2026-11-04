@@ -8,6 +8,7 @@ import { buildSessionTree, countText, countsIn, pathTo, sessionKey, sessionsIn, 
 import { holdText, removedAgentNote, resumeBlock, type ResumeContext } from '@shared/sessionResume'
 import { ProviderIcon } from '../components/ProviderIcon'
 import * as actions from '../actions'
+import { freshShort, freshTip } from '../freshResume'
 import { call, errorMessage } from '../api'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { Icon, IconButton, InfoTip, LoadFailed, Markdown, Modal, SearchInput, StaleNote, Tooltip, useContextMenu, type MenuEntry } from '../components/ui'
@@ -333,7 +334,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
       // Its agent starting already (#1177).
       const target = actions.resumeTarget(project, s)
       const busy = target ? get().starting[startingKey(project.path, target)] : undefined
-      entries.push({ label: tr(RESUME), icon: 'debug-continue', action: 'resume', disabled: !!block || !!busy, detail: block ?? (busy ? startingLabel(busy) : undefined), onClick: () => void actions.resumeSession(project.path, s) })
+      entries.push({ label: tr(RESUME), icon: 'debug-continue', action: 'resume', disabled: !!block || !!busy, detail: block ?? (busy ? startingLabel(busy) : s.fresh ? freshShort() : undefined), onClick: () => void actions.resumeSession(project.path, s) })
     }
     if (s.source === 'external' && !s.sub) entries.push({ label: tr(ADOPT), icon: 'add', onClick: () => void actions.attempt(tr(ADOPT_FAILED), () => call('session:adopt', project.path, s.id)).then(reload) })
     if (s.source === 'hive') entries.push({ label: tr(msg({ id: 'sessions.menu.rename', defaultMessage: 'Rename…', description: 'Menu item on a session: renames it.' })), icon: 'tag', keybinding: 'F2', onClick: () => void rename(s) })
@@ -626,7 +627,8 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
                   const targetAgent = agents.find((a) => a.id === target) ?? null
                   const targetName = targetAgent?.name
                   // Its slot free and as it left it (#1434): this Resume takes it again, as Resume All doesn't.
-                  const note = (selected.hold?.is === 'byHand' ? shownText(holdText(selected.hold, targetName ?? selected.agentName ?? '')) : null) ?? removedAgentNote(selected, project.agents, targetAgent)
+                  // HI-2540: one that can't continue starts a new conversation, said before Resume is pressed.
+                  const note = (selected.hold?.is === 'byHand' ? shownText(holdText(selected.hold, targetName ?? selected.agentName ?? '')) : null) ?? removedAgentNote(selected, project.agents, targetAgent) ?? (selected.fresh ? freshTip(selected.fresh, sessionName(selected)) : null)
                   if (agents.length < 2) {
                     const button = (
                       <button className="btn small act-resume" disabled={!!resuming || targetStarting} aria-busy={!!resuming || undefined} onClick={() => void actions.resumeSession(project.path, selected)}>

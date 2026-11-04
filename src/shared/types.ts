@@ -8,6 +8,7 @@ import type { ActivityKind, ActivityTarget, UndoFinalWhy } from './assistantActi
 import type { AttachmentKind } from './attachments'
 import type { AgentProcess } from './agentProcesses'
 import type { StartFailure } from './startFailure'
+import type { FreshReason } from './sessionFresh'
 import type { TipsState } from './tips'
 import type { SuggestedPreset, TemplateAgent, TemplateScope } from './templates'
 import type { ConnectionOption } from './templateConnections'
@@ -1956,6 +1957,8 @@ export interface ResumeTarget {
   titleAtRename?: string | null
   /** Why it can't resume now in the slot it ran in (#1434): Resume All and startup leave an agent with one. */
   hold?: ResumeHold
+  /** Why a resume of it starts a new conversation instead (HI-2540: shared/sessionFresh); absent: it resumes. */
+  fresh?: FreshReason
   /** The retired home it resumes in (#1441), by its folder's name, while a new conversation starts elsewhere (#1552). */
   home?: string
 }
@@ -2388,6 +2391,9 @@ export interface RetryWaited {
   ms: number
   latest: { since: string; ended: string; tries: number; status: number | null; network?: true }
 }
+
+/** What a start replies (sessions.start): the session as it starts, and why a resume asked for started a new conversation instead (HI-2540). */
+export type StartedSession = LiveSessionState & { startedFresh?: FreshReason }
 
 export interface LiveSessionState {
   provider: ProviderId
@@ -3289,6 +3295,8 @@ export interface SessionListItem extends Partial<SessionRecord> {
   slot?: string
   /** Why it can't resume in its slot now, or that only its own Resume takes the slot (`byHand`); absent: it may. */
   hold?: ResumeHold
+  /** Why a resume of it starts a new conversation instead (HI-2540: shared/sessionFresh); absent: it resumes. */
+  fresh?: FreshReason
 }
 
 /**

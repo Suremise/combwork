@@ -1,0 +1,8 @@
+{
+  "freshResume.confirm": "开始新对话",
+  "freshResume.detail": "{assistant, select, yes {助手将改为开始一个新对话，旧对话保留在它的对话列表中，可以阅读。} other {{agent} 将改为开始一个新对话。新对话会继续该智能体的工作（它的监视、消息和任务），旧对话保留在会话历史中，可以阅读。}}",
+  "freshResume.message": "{why, select, moved {此对话运行所在的文件夹已随 .hive 移动到 .combwork，因此无法在那里继续。} other {此对话开始于 Combwork 重命名智能体使用的工具之前，因此无法继续。}}",
+  "freshResume.short": "将开始新对话",
+  "freshResume.tip": "{why, select, moved {将开始新对话：“{session}”运行所在的文件夹已随 .hive 移动到 .combwork，因此无法继续} other {将开始新对话：“{session}”来自 Combwork 重命名智能体使用的工具之前，因此无法继续}}",
+  "freshResume.title": "开始新对话？"
+}

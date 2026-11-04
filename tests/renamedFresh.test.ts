@@ -17,6 +17,9 @@ vi.mock('../src/main/events', async (orig) => ({
 }))
 
 const base = tempDir('renamedfresh-')
+// The session list (HI-2540) reads the CLIs' homes: this test's own, never the user's.
+process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
+process.env.CODEX_HOME = join(base, 'codex-home')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const { sessions } = await import('../src/main/sessions')
@@ -52,6 +55,21 @@ beforeAll(async () => {
   internals.deliveries = { give: async () => undefined, now: async () => undefined, launch: async () => undefined, cancel: async () => 0, carry: async (_h: string, _a: string, from: string) => (seen.carried.push(from), 1) }
   internals.conversationEnds = async (_p: string, agentId: string) => void seen.ended.push(agentId)
 })
+
+/**
+ * HI-2462's fixture, which a case sets up itself (it runs alone too; doing it again changes nothing): alpha's .hive moved
+ * to .combwork, b3's current conversation (6) ran in a slot inside it, b4's (7) in the project folder. Returns the slot.
+ */
+async function movedFixture(): Promise<string> {
+  // alpha's .hive moved to .combwork: its folder holds the move's marker (combworkMove.ts writes it before the rename).
+  writeFileSync(join(project, '.combwork', 'combwork-move-id'), JSON.stringify({ kind: 'combwork-move', version: 1, id: 'test', from: '.hive' }))
+  // Folders move only at the move's boundaries, which publish the map readers use: this one stands in for the move.
+  await (await import('../src/main/combworkMove')).moveFolders(wsPath)
+  const slot = join(project, '.hive', 'slots', 'HI-1')
+  await run(() => ws.upsertSession(project, { id: '00000000-0000-4000-8000-000000000006', agent: 'claude-code', agentId: 'b3', cwd: slot, names: 2, name: 'x', lastActiveAt: '2026-11-02T00:00:00.000Z' }))
+  await run(() => ws.upsertSession(project, { id: '00000000-0000-4000-8000-000000000007', agent: 'claude-code', agentId: 'b4', cwd: project, names: 2, name: 'y', lastActiveAt: '2026-11-02T00:00:00.000Z' }))
+  return slot
+}
 
 afterAll(async () => {
   await disposeWorkspaceService(ws)
@@ -91,13 +109,7 @@ describe('a conversation from before the rename (HI-2463)', () => {
     told.toasts.length = 0
     seen.launches.length = 0
     seen.carried.length = 0
-    // alpha's .hive moved to .combwork: its folder holds the move's marker (combworkMove.ts writes it before the rename).
-    writeFileSync(join(project, '.combwork', 'combwork-move-id'), JSON.stringify({ kind: 'combwork-move', version: 1, id: 'test', from: '.hive' }))
-    // Folders move only at the move's boundaries, which publish the map readers use: this one stands in for the move.
-    await (await import('../src/main/combworkMove')).moveFolders(wsPath)
-    const slot = join(project, '.hive', 'slots', 'HI-1')
-    await run(() => ws.upsertSession(project, { id: '00000000-0000-4000-8000-000000000006', agent: 'claude-code', agentId: 'b3', cwd: slot, names: 2, name: 'x', lastActiveAt: '2026-11-02T00:00:00.000Z' }))
-    await run(() => ws.upsertSession(project, { id: '00000000-0000-4000-8000-000000000007', agent: 'claude-code', agentId: 'b4', cwd: project, names: 2, name: 'y', lastActiveAt: '2026-11-02T00:00:00.000Z' }))
+    const slot = await movedFixture()
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     try {
       await run(() => sessions.start(project, { agentId: 'b3', resumeId: '00000000-0000-4000-8000-000000000006' }))
@@ -131,6 +143,42 @@ describe('a conversation from before the rename (HI-2463)', () => {
     } finally {
       vi.useRealTimers()
       internals.startReserved = launch
+    }
+  })
+
+  it('HI-2540: the window knows beforehand, by the rule the start reads; a start the user was asked about says so, with no notice', async () => {
+    // Its own fixture beside beforeAll's (1–4), so it runs alone too: b1's second conversation from before the rename (5),
+    // and HI-2462's move with b3's moved (6) and b4's current (7) conversations.
+    await run(() => ws.upsertSession(project, { id: '00000000-0000-4000-8000-000000000005', agent: 'claude-code', agentId: 'b1', cwd: project, name: 'x', lastActiveAt: '2026-11-01T00:00:00.000Z' }))
+    await movedFixture()
+    // The list and the agents' resume targets: renamed (before HI-2463), moved (HI-2462), or neither.
+    const list = await run(() => sessions.list(project))
+    const fresh = (n: number) => list.find((x) => x.id === `00000000-0000-4000-8000-00000000000${n}`)?.fresh
+    expect([1, 2, 3, 4, 5, 6, 7].map(fresh)).toEqual(['renamed', 'renamed', undefined, undefined, 'renamed', 'moved', undefined])
+    const info = await run(async () => sessions.liveInfo(project, await ws.projectConfig(project)))
+    const resume = (id: string) => info.agents.find((a) => a.id === id)?.resume
+    expect(resume('b1')?.fresh).toBe('renamed')
+    // b3's is its conversation in the folder it works in (the project's): a current one.
+    expect(resume('b3')?.id).toBe('00000000-0000-4000-8000-000000000003')
+    expect(resume('b3')?.fresh).toBeUndefined()
+    expect(resume('b4')?.id).toBe('00000000-0000-4000-8000-000000000007')
+    expect(resume('b4')?.fresh).toBeUndefined()
+    told.toasts.length = 0
+    seen.launches.length = 0
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      // Asked first (the window's Start New Conversation): it starts fresh, carrying the agent's work, and says why.
+      const asked = await run(() => sessions.start(project, { agentId: 'b2', resumeId: '00000000-0000-4000-8000-000000000002', freshAsked: true }))
+      expect(asked.startedFresh).toBe('renamed')
+      expect(seen.launches).toEqual([{ agentId: 'b2', resumeId: undefined, prompt: undefined, keepWatch: true }])
+      // One that resumes says nothing of the kind.
+      const resumed = await run(() => sessions.start(project, { agentId: 'b4', resumeId: '00000000-0000-4000-8000-000000000007' }))
+      expect(resumed.startedFresh).toBeUndefined()
+      // No notice afterwards: the user was asked.
+      await vi.runAllTimersAsync()
+      expect(told.toasts).toEqual([])
+    } finally {
+      vi.useRealTimers()
     }
   })
 })
