@@ -15,6 +15,7 @@ const log = createLogger('api')
 export const discoveryFile = (): string => join(app.getPath('userData'), 'agent-api-discovery.json')
 
 export async function writeDiscovery(d: { url: string; port: number; version: string; api: number }): Promise<void> {
+  // agent-protocol: the discovery file's fields for other apps (the app's name, a fixed note for whoever opens the file)
   const body = { app: 'Combwork', version: d.version, api: d.api, url: d.url, port: d.port, pid: process.pid, startedAt: new Date().toISOString(), note: "Combwork's Agent API while it runs (no token: make a viewer token in Settings → Agent API). Removed when Combwork quits." }
   await writeJsonAtomic(discoveryFile(), body).catch((e) => log.warn('could not write the Agent API discovery file', e))
 }
