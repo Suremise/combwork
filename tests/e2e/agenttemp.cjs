@@ -104,7 +104,8 @@ const allAt = (temp, dir) => ['TEMP', 'TMP', 'TMPDIR'].every((n) => Object.keys(
     // --- The Assistant: its own folder, apart from any project's.
     await inv('session:start', assistantHome, { agentId: 'assistant' })
     check('the Assistant starts', !!(await ready(assistantHome, 'assistant')))
-    const a1 = claudeLaunches(assistantHome).at(-1)
+    // The Assistant runs in the workspace's folder, its home apart: found by its name.
+    const a1 = lines(path.join(claudeHome, 'fake-launches.jsonl')).filter((l) => l.env?.CW_AGENT === 'Assistant').at(-1)
     const assistantDir = path.join(tempRoot, `_assistant-${hash(assistantHome)}`, 'assistant')
     check("the Assistant's TEMP, TMP, TMPDIR and CLAUDE_CODE_TMPDIR are its own folder", allAt(a1?.temp, assistantDir) && same(a1?.env?.CLAUDE_CODE_TMPDIR, assistantDir) && fs.existsSync(assistantDir), JSON.stringify({ temp: a1?.temp, assistantDir }))
     await stop(assistantHome, 'assistant')
@@ -115,7 +116,7 @@ const allAt = (temp, dir) => ['TEMP', 'TMP', 'TMPDIR'].every((n) => Object.keys(
     await stop(proj, clara.id)
     const before = claudeLaunches(proj).length
     const err = await inv('session:start', proj, { agentId: clara.id }).then(() => null, (e) => String(e?.message ?? e))
-    const said = err ?? (await lib.until(async () => (await live(proj, clara.id))?.error ?? null, 3000).catch(() => null))
+    const said = err ?? (await lib.until(async () => (await live(proj, clara.id))?.error ?? null, HUNG_MS).catch(() => null))
     check('a folder inside a project stops the launch, saying so', /temp folder/i.test(String(said ?? '')) && /inside/i.test(String(said ?? '')), String(said))
     check('…Clara never launched, and nothing was made in the project', claudeLaunches(proj).length === before && !fs.existsSync(insideProj), String(claudeLaunches(proj).length - before))
 
