@@ -146,7 +146,7 @@ const check = (name, ok, extra = '') => {
     await inv('session:stop', alpha, 'a-one')
     await lib.until(async () => !(await live('a-one')), HUNG_MS)
     check('Two, moved back by hand, stays on Max 1 for the period', (await agentConnection('a-two')) === max1.main)
-    check('…and One stays on Max 2', (await agentConnection('a-one')) === max2.builder)
+    check('…and One stays on Max 2', (await agentConnection('a-one')) === max2Builders.id, String(await agentConnection('a-one')))
   } catch (e) {
     check('the suite ran to its end', false, e.stack)
   } finally {
