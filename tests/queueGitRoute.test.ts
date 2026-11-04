@@ -62,15 +62,15 @@ async function identifyHook(file: string, since: number): Promise<Listed> {
   const p = list.find((x) => x.pid === pid)
   if (!p) throw new Error(`process ${pid} isn't running`)
   let root = p
-  // The hook's ancestors created by this launch, up to the test worker or the older lease host. Capture while the
-  // launcher still lives: its timeout can leave both the real git and its conhost as siblings below that launcher.
+  // Follow the hook's live ancestors created by this launch, up to the test worker or the older lease host. If the
+  // launcher has already exited, its surviving Git subtree is still ours. Never claim an unobserved sibling by a dead
+  // parent's pid: stop the proven clients and let their console host exit with them.
   for (;;) {
     const parent = list.find((x) => x.pid === root.parent)
     if (!parent || parent.pid === process.pid || parent.started < since || parent.started > root.started) break
     root = parent
   }
   made.push(...treeOf(list, root))
-  expect(list.some((x) => x.pid === root.parent && (x.pid === process.pid || x.started < since)), 'the fixture tree was captured before its launcher exited').toBe(true)
   return p
 }
 
@@ -331,31 +331,41 @@ describe('git() through the runner, against the worker (HI-2078)', { timeout: 12
     }
   })
 
-  it('a timeout: timed out either way, never an answer; the routed one ended with its git', async ({ signal }) => {
-    const w = world()
-    const runner = await acquire(w)
-    try {
-      const plainHook = blockingHook(signal)
-      const plainRead = git(w.project, plainHook.args, undefined, undefined, { timeout: 3000 })
-      reading.push(plainRead)
-      // Observe before awaiting the timeout: Git's launcher can exit leaving its real git, conhost and hook behind.
-      await plainHook.ready
-      const plain = await plainRead
-      const hook = blockingHook(signal)
-      const hostedRead = withGitRoute((m) => runner.gitOutcome(m), () => git(w.project, hook.args, undefined, undefined, { timeout: 3000 }))
-      reading.push(hostedRead)
-      const left = await hook.ready
-      const viaHost = await hostedRead
-      expect(shape(viaHost)).toMatchObject({ ok: false, code: -1, notRun: 'SIGTERM', timedOut: true })
-      expect(shape(viaHost)).toEqual({ ...shape(plain), err: shape(viaHost).err })
-      // Its hook is in the lease's job: the release ends it.
-      await runner.release()
-      await ends(left)
-    } finally {
-      await runner.release()
-      w.close()
-    }
-  })
+  for (const delayedEnumeration of [false, true]) {
+    it(delayedEnumeration ? 'a timeout: process enumeration can finish after the launcher has exited' : 'a timeout: timed out either way, never an answer; the routed one ended with its git', async ({ signal }) => {
+      const w = world()
+      const runner = await acquire(w)
+      try {
+        const plainHook = blockingHook(signal)
+        const plainRead = git(w.project, plainHook.args, undefined, undefined, { timeout: 3000 })
+        reading.push(plainRead)
+        if (delayedEnumeration) {
+          const list = windowsProbe.list
+          // Hold the actual snapshot until the launcher has exited, with no sleep and the same real Git timeout.
+          vi.spyOn(windowsProbe, 'list').mockImplementationOnce(async () => {
+            await plainRead
+            return list()
+          })
+        }
+        // Start observing immediately; cleanup also handles the launcher exiting before the asynchronous snapshot.
+        await plainHook.ready
+        const plain = await plainRead
+        const hook = blockingHook(signal)
+        const hostedRead = withGitRoute((m) => runner.gitOutcome(m), () => git(w.project, hook.args, undefined, undefined, { timeout: 3000 }))
+        reading.push(hostedRead)
+        const left = await hook.ready
+        const viaHost = await hostedRead
+        expect(shape(viaHost)).toMatchObject({ ok: false, code: -1, notRun: 'SIGTERM', timedOut: true })
+        expect(shape(viaHost)).toEqual({ ...shape(plain), err: shape(viaHost).err })
+        // Its hook is in the lease's job: the release ends it.
+        await runner.release()
+        await ends(left)
+      } finally {
+        await runner.release()
+        w.close()
+      }
+    })
+  }
 
   it('a read blocked in a hook when the lease is released: ended with the job, and never an answer', async ({ signal }) => {
     const w = world()
