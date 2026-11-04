@@ -892,13 +892,16 @@ export function settleSlotCards(ws: WorkspaceService, projectPath: string): Prom
     running.again = true
     return running.done
   }
+  // Admission owns the token: an earlier step may still be awaiting when the service stops (HI-2469).
+  const life = ws.lifetime
+  const generation = holdGeneration
   const pass = { again: false, done: Promise.resolve() }
   pass.done = withoutWriteFence(async () => {
     try {
       do {
         pass.again = false
-        await settleOnce(ws, projectPath).catch((e) => failedStep(`settling the slots of ${userText(projectPath)}`, e)) // i18n-ignore: a log line (failedStep logs it)
-      } while (pass.again && !ended(ws))
+        await settleOnce(ws, projectPath, life, generation).catch((e) => failedStep(`settling the slots of ${userText(projectPath)}`, e)) // i18n-ignore: a log line (failedStep logs it)
+      } while (pass.again && !ended(ws) && !life.aborted && ws.lifetime === life && generation === holdGeneration)
     } finally {
       passes.delete(key)
     }
@@ -1083,8 +1086,8 @@ export async function finishedSlot(projectPath: string, wf: Workflow, n: number,
   return detached
 }
 
-async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<void> {
-  if (!ws.path || ended(ws)) return
+async function settleOnce(ws: WorkspaceService, projectPath: string, life: AbortSignal, generation: number): Promise<void> {
+  if (!ws.path || ended(ws) || life.aborted || ws.lifetime !== life || generation !== holdGeneration) return
   const wf = await workflowFor(ws, projectPath).catch(() => null)
   if (!wf) return
   const pool = await poolFor(ws, projectPath)
@@ -1196,7 +1199,7 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
   }
   // 4. Lanes started from the window waiting for a slot.
   if (ended(ws)) return
-  await startWaitingLanes(ws, projectPath, pool)
+  await startWaitingLanes(ws, projectPath, pool, life, generation)
   // 5. Adopted slots, once free, renamed to generic names (#1441).
   if (ended(ws)) return
   await renameAdopted(ws, projectPath, pool)
@@ -1815,10 +1818,9 @@ async function lendLaneSlot(ws: WorkspaceService, projectPath: string, lane: str
  * A lend refused because the free slot is held (HI-2466: a session or a process in it) is kept for the lane's status
  * and tried again by a later pass (`heldRetries`), as nothing may say when what holds it has gone.
  */
-async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool: SlotPool): Promise<void> {
-  const life = ws.lifetime
-  const generation = holdGeneration
+async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool: SlotPool, life: AbortSignal, generation: number): Promise<void> {
   const stopped = (): boolean => !workflowEnforced() || ended(ws) || life.aborted || ws.lifetime !== life || generation !== holdGeneration || !ws.info()?.projects.some((p) => samePlace(p.path, projectPath))
+  if (stopped()) return
   const name = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.name
   const waiting = (await lanesWaitingForSlot(ws)).filter((l) => l.project.toLowerCase() === name?.toLowerCase()).sort((a, b) => a.slotWait!.since.localeCompare(b.slotWait!.since))
   // The rules off, or Hive quitting (#1628): looked at again after each await, nothing more lent or started.
