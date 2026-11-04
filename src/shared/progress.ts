@@ -399,7 +399,7 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
           msg({
             id: 'board.details.notCounted',
             defaultMessage:
-              "Doesn't count as check {name}: {why, select, notCheck {it wasn't started as a check (hive-progress --check), and its command isn't one the project has for a check} notContained {what was checked out doesn't contain the card's revision} dirty {the folder had uncommitted changes when it started or ended} moved {something else was checked out when it ended} changed {files changed in the folder while it ran} revisionChanged {the card's files changed while it ran} other {it can't be told whether its files changed}}",
+              "Doesn't count as check {name}: {why, select, notCheck {it wasn't started as a check (cw-progress --check), and its command isn't one the project has for a check} notContained {what was checked out doesn't contain the card's revision} dirty {the folder had uncommitted changes when it started or ended} moved {something else was checked out when it ended} changed {files changed in the folder while it ran} revisionChanged {the card's files changed while it ran} other {it can't be told whether its files changed}}",
             description: "A run's details in the Progress panel: why the run doesn't count as the card's check named {name} (\"typecheck\", or the run's title when it wasn't a check). {why} picks the reason: keep each branch's key as it is."
           }),
           { name: r.counts.name, why: r.counts.whyNot ?? 'other' } // i18n-ignore: a select's key, never shown

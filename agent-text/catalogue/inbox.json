@@ -39,6 +39,10 @@
     "text": "{body} (with {more} more {n, plural, one {change} other {changes}}: read the card)",
     "note": "A card's events in one inbox item, led by the merge queue's return of the card while only comments came after it (HI-2087). body: the return's own line; n and more: how many events came after it."
   },
+  "inbox.carried.notice": {
+    "text": "Your earlier conversation read {n, plural, one {a message} other {# messages}} it never acked ({ids}). cw_inbox shows {n, plural, one {it} other {them}} again now: act on {n, plural, one {it} other {them}}, then ack {n, plural, one {it} other {them}}.",
+    "note": "HI-2463: a conversation from before the rename started fresh; what the earlier one had received and not acked is shown again in the new one. After \"[CW] \". n: how many; ids: their delivery ids (\"m3, m7\")."
+  },
   "inbox.create.badKey": {
     "text": "Not a delivery Combwork can keep: its source or key is too long.",
     "note": "Why a delivery isn't made: what names its producer is too long to keep."
@@ -274,6 +278,10 @@
   "inbox.relay.said": {
     "text": "the user {outcome, select, approved {approved} declined {declined} other {answered}} {asker}'s question on {card}. The question, whole: <<<{question}>>>.{wrote, select, yes { {words}.} answered {} other { Nothing was written with it.}} (Both stay on the card: cw_read_task {card}.)",
     "note": "What the user did with an agent's question, in the Assistant's line (HI-1734), after its opening (inbox.relay.declined, .needed, .check). asker: the asking agent's name; card: its card (HI-12); question: the question, whole; wrote: yes with words (the reply and decision: inbox.relay.reply, .decision), answered for an answer with none, no for a bare approval or decline."
+  },
+  "inbox.renamedNote": {
+    "text": "(Combwork has renamed what agents use: a hive_<tool> named here is now cw_<tool>, mcp__hive__ is mcp__{server}__, and hive-progress is cw-progress.)",
+    "note": "HI-2463: after a line or message from Combwork that names an old tool or command outside what it quotes (one written before the rename, or a lane's brief written that way). Its words are kept as written (they may be a person's or an agent's): this says how the old names map. server: Combwork's MCP server's name."
   },
   "inbox.round.noCard": {
     "text": "There is no card {card}.",

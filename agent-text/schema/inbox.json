@@ -46,6 +46,12 @@
       "n": "plural"
     }
   },
+  "inbox.carried.notice": {
+    "placeholders": {
+      "n": "plural",
+      "ids": "plain"
+    }
+  },
   "inbox.create.badKey": {
     "placeholders": {}
   },
@@ -281,6 +287,11 @@
       "question": "plain",
       "wrote": "select",
       "words": "plain"
+    }
+  },
+  "inbox.renamedNote": {
+    "placeholders": {
+      "server": "plain"
     }
   },
   "inbox.round.noCard": {

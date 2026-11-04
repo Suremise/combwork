@@ -214,7 +214,7 @@
   "board.details.line": "{label} : {text}",
   "board.details.log": "Journal",
   "board.details.noInstall": "Rien n’a été installé : le projet n’a ni commande de préparation ni fichier de verrouillage",
-  "board.details.notCounted": "Ne compte pas comme vérification {name} : {why, select, notCheck {elle n’a pas été lancée comme vérification (hive-progress --check), et sa commande n’est pas l’une de celles du projet pour une vérification} notContained {ce qui était extrait ne contient pas la révision de la carte} dirty {le dossier avait des modifications non commitées au début ou à la fin} moved {autre chose était extrait à la fin} changed {des fichiers du dossier ont changé pendant l’exécution} revisionChanged {les fichiers de la carte ont changé pendant l’exécution} other {impossible de savoir si ses fichiers ont changé}}",
+  "board.details.notCounted": "Ne compte pas comme vérification {name} : {why, select, notCheck {elle n’a pas été lancée comme vérification (cw-progress --check), et sa commande n’est pas l’une de celles du projet pour une vérification} notContained {ce qui était extrait ne contient pas la révision de la carte} dirty {le dossier avait des modifications non commitées au début ou à la fin} moved {autre chose était extrait à la fin} changed {des fichiers du dossier ont changé pendant l’exécution} revisionChanged {les fichiers de la carte ont changé pendant l’exécution} other {impossible de savoir si ses fichiers ont changé}}",
   "board.details.provider": "Fournisseur",
   "board.details.revision": "Révision",
   "board.details.run": "Exécution",

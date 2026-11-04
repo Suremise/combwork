@@ -214,7 +214,7 @@
   "board.details.line": "{label}: {text}",
   "board.details.log": "Registro",
   "board.details.noInstall": "No se instaló nada: el proyecto no tiene comando de preparación ni archivo de bloqueo",
-  "board.details.notCounted": "No cuenta como comprobación {name}: {why, select, notCheck {no se inició como comprobación (hive-progress --check) y su comando no es uno de los que el proyecto tiene para una comprobación} notContained {lo extraído no contiene la versión de la tarjeta} dirty {la carpeta tenía cambios sin confirmar al empezar o al terminar} moved {al terminar había otra cosa extraída} changed {cambiaron archivos en la carpeta mientras se ejecutaba} revisionChanged {los archivos de la tarjeta cambiaron mientras se ejecutaba} other {no se puede saber si sus archivos cambiaron}}",
+  "board.details.notCounted": "No cuenta como comprobación {name}: {why, select, notCheck {no se inició como comprobación (cw-progress --check) y su comando no es uno de los que el proyecto tiene para una comprobación} notContained {lo extraído no contiene la versión de la tarjeta} dirty {la carpeta tenía cambios sin confirmar al empezar o al terminar} moved {al terminar había otra cosa extraída} changed {cambiaron archivos en la carpeta mientras se ejecutaba} revisionChanged {los archivos de la tarjeta cambiaron mientras se ejecutaba} other {no se puede saber si sus archivos cambiaron}}",
   "board.details.provider": "Proveedor",
   "board.details.revision": "Versión",
   "board.details.run": "Ejecución",

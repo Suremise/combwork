@@ -1942,7 +1942,7 @@ describe('watches (main/watches.ts)', async () => {
     await disposeWorkspaceService(w)
   })
 
-  it('a wake fired before HI-2463 ("[Hive] ", hive_ tools) is read back and handed over with the current names (HI-2463)', async () => {
+  it('a wake fired before HI-2463 ("[Hive] ", hive_ tools) is read back and handed over word for word: its prefix made current, a note on the old names (HR1, HI-2463)', async () => {
     const { w, path, alpha } = await open()
     const st = fake(alpha)
     const c = await inWorkspace(w, () => tasks.createTask({ title: 'Renamed', project: 'alpha' }, user))
@@ -1950,14 +1950,16 @@ describe('watches (main/watches.ts)', async () => {
     await watches.settled()
     // As an older build left it: fired, not handed over yet, in its own words.
     const data = savedOf(path)
-    data[0].fired = { line: `[Hive] #${c.number} has news. Read it (hive_read_task), then watch again (hive_wait_for_tasks); hive-progress for long runs.`, at: new Date().toISOString(), cards: [c.number] }
+    // Its latest comment, quoted, names the old tools: a person's words, never rewritten.
+    const words = `#${c.number} has news; latest comment by the user: "keep hive_inbox and hive-progress in the old example". Read it (hive_read_task), then watch again (hive_wait_for_tasks).`
+    data[0].fired = { line: `[Hive] ${words}`, at: new Date().toISOString(), cards: [c.number] }
     await putSaved(path, data)
     watches.forgetWatches(w)
     watches.watchFor(alpha, 'a1')
     await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
     await watches.settled()
     expect(st.typed[0]).toMatch(/^\[CW\] New in your inbox: /)
-    expect(st.told[0]).toBe(`[CW] #${c.number} has news. Read it (cw_read_task), then watch again (cw_wait_for_tasks); cw-progress for long runs.`)
+    expect(st.told[0]).toBe(`[CW] ${words} (Combwork has renamed what agents use: a hive_<tool> named here is now cw_<tool>, mcp__hive__ is mcp__combwork__, and hive-progress is cw-progress.)`)
     await disposeWorkspaceService(w)
   })
 

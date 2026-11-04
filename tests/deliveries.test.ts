@@ -109,19 +109,50 @@ describe('delivery records (#647)', () => {
     expect(offerLine([rec({ id: 'm9', seq: 9 })], 'Waiting for #607 → Review')).toBe('[CW] New in your inbox: 1 message (m9). Call cw_inbox to read it, act on it, then ack it. (Your watch is still on, waiting for #607 → Review: do what this asks, then end your turn, and Combwork wakes you when it changes.)')
   })
 
-  it("hands out Combwork's own lines written before HI-2463 with the current names, never anyone else's words", () => {
+  // HR1's round 1 on HI-2463: Combwork's text quotes people and agents (a relayed answer between <<< >>>, a card's latest
+  // comment, a lane's brief): never rewritten. Only a leading "[Hive] " becomes "[CW] ", and one naming an old tool or
+  // command gets a note on how the names map.
+  it("hands out Combwork's own text word for word: an old prefix made current, a note where it names old names outside its quotes", async () => {
+    const { relayLine } = await import('../src/main/answerRelay')
     const hive: DeliverySender = { kind: 'hive', name: 'Hive' }
+    const NOTE = '(Combwork has renamed what agents use: a hive_<tool> named here is now cw_<tool>, mcp__hive__ is mcp__combwork__, and hive-progress is cw-progress.)'
     const old = '[Hive] HI-46 came back from the merge queue: commit and submit again (hive_submit), then wait (mcp__hive__hive_wait_for_tasks); hive-progress shows it.'
-    const now = '[CW] HI-46 came back from the merge queue: commit and submit again (cw_submit), then wait (mcp__combwork__cw_wait_for_tasks); cw-progress shows it.'
+    // The relay's real line (answerRelay.relayLine): the question, the reply and the decision quoted whole.
+    const relay = relayLine({ card: 9, key: 'HI-9', project: 'alpha', asker: 'b1', askerName: 'B1', request: 'r1', question: 'Rename hive_inbox in the example?', outcome: 'answered', reply: 'Keep hive-progress and hive_inbox unchanged in the archived example.', decision: 'Archived examples keep hive_inbox.', need: null })
+    const brief = "Your lane's brief (lane L, from the Assistant):\nRun hive-progress for the suites, as before."
     const quoted = 'Use hive_submit as [Hive] said; hive-progress too.'
     const items = inboxItems([
       rec({ id: 'm1', seq: 1, from: hive, body: old }),
-      rec({ id: 'm2', seq: 2, body: quoted }),
-      rec({ id: 'm3', seq: 3, from: { kind: 'user', name: 'Darren' }, kind: 'answer', body: quoted }),
-      rec({ id: 'm4', seq: 4, kind: 'card-event', from: hive, card: 46, body: '[Hive] HI-46 is in Doing; latest comment by B1: "use hive_submit"' }),
-      rec({ id: 'm5', seq: 5, from: hive, body: 'Unknown hive_not_a_tool stays.' })
+      rec({ id: 'm2', seq: 2, from: hive, kind: 'control', body: relay }),
+      rec({ id: 'm3', seq: 3, from: hive, body: brief }),
+      rec({ id: 'm4', seq: 4, body: quoted }),
+      rec({ id: 'm5', seq: 5, from: { kind: 'user', name: 'Darren' }, kind: 'answer', body: quoted }),
+      rec({ id: 'm6', seq: 6, kind: 'card-event', from: hive, card: 46, body: '[Hive] HI-46 is in Doing; latest comment by B1: "use hive_submit"' }),
+      rec({ id: 'm7', seq: 7, from: hive, body: 'Unknown hive_not_a_tool stays.' })
     ])
-    expect(items.map((i) => i.text)).toEqual([now, quoted, quoted, '[CW] HI-46 is in Doing; latest comment by B1: "use hive_submit"', 'Unknown hive_not_a_tool stays.'])
+    expect(items.map((i) => i.text)).toEqual([
+      `[CW] ${old.slice(7)} ${NOTE}`,
+      relay,
+      `${brief} ${NOTE}`,
+      quoted,
+      quoted,
+      '[CW] HI-46 is in Doing; latest comment by B1: "use hive_submit"',
+      'Unknown hive_not_a_tool stays.'
+    ])
+    // The quoted words reach the agent exactly as the user wrote them.
+    expect(items[1].text).toContain('<<<Keep hive-progress and hive_inbox unchanged in the archived example.>>>')
+    expect(items[1].text).toContain('<<<Archived examples keep hive_inbox.>>>')
+  })
+
+  it('lists again what an earlier conversation received and never acked, once carried to a fresh one (HI-2463)', () => {
+    const carried = rec({ id: 'm3', seq: 3, state: 'received', received: at, carriedFrom: 'old-conversation' })
+    const items = inboxItems([rec({ id: 'm1', seq: 1 }), carried, rec({ id: 'm2', seq: 2, state: 'received', received: at })])
+    expect(items.map((i) => [i.ids.join(','), i.text])).toEqual([['m1', 'Rebase first.'], ['m3', 'Rebase first.']])
+    // Read back as written: the conversation it came from and when it was shown again.
+    const back = rec({ state: 'received', received: at, carriedFrom: 'old-conversation', replayed: at })
+    expect(readDelivery(JSON.parse(JSON.stringify(back)))).toEqual(back)
+    expect(readDelivery({ ...back, carriedFrom: '' })).toBeNull()
+    expect(readDelivery({ ...back, replayed: 'yesterday' })).toBeNull()
   })
 
   it('reads back only what checks out (the file can be edited by hand)', () => {

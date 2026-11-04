@@ -214,7 +214,7 @@
   "board.details.line": "{label}：{text}",
   "board.details.log": "日志",
   "board.details.noInstall": "未安装任何内容：项目没有初始化命令，也没有锁文件",
-  "board.details.notCounted": "不计为检查 {name}：{why, select, notCheck {它不是作为检查启动的（hive-progress --check），其命令也不是项目为检查配置的命令} notContained {检出的内容不包含卡片的修订版本} dirty {开始或结束时文件夹有未提交的更改} moved {结束时检出的是别的内容} changed {运行期间文件夹中的文件发生了变化} revisionChanged {运行期间卡片的文件发生了变化} other {无法判断其文件是否发生了变化}}",
+  "board.details.notCounted": "不计为检查 {name}：{why, select, notCheck {它不是作为检查启动的（cw-progress --check），其命令也不是项目为检查配置的命令} notContained {检出的内容不包含卡片的修订版本} dirty {开始或结束时文件夹有未提交的更改} moved {结束时检出的是别的内容} changed {运行期间文件夹中的文件发生了变化} revisionChanged {运行期间卡片的文件发生了变化} other {无法判断其文件是否发生了变化}}",
   "board.details.provider": "提供方",
   "board.details.revision": "修订版本",
   "board.details.run": "运行",

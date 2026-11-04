@@ -7,7 +7,7 @@
  */
 import type { InboxBrief, InboxSummary } from './types'
 import { agentMsg, say } from './agentText'
-import { currentPrefix, currentProtocolText, inboxNotice } from './doorbell'
+import { inboxNotice, withCurrentNames } from './doorbell'
 import { cardRef } from './projectKeys'
 
 /** What a delivery is: a task, a re-brief (a message for the work it is on), a card event, the user's answer, a handover, a control notice. */
@@ -86,6 +86,13 @@ export interface DeliveryRecord {
   detail?: string
   /** Why it may repeat (#649: it was offered when Hive stopped or its launch ended): said when it is offered once more. */
   again?: string
+  /**
+   * HI-2463: received, not acked, in the conversation named here, which its agent left for a fresh one (a conversation
+   * from before the rename): the new conversation's next inbox read shows it again (`replayed` then), its receipt kept.
+   */
+  carriedFrom?: string
+  /** When the fresh conversation's inbox read showed it again (carriedFrom). */
+  replayed?: string
   /**
    * What made it (#649: a watch, a loop wake…), told when it is received or ends, and its key there (`ref`): a live
    * delivery with the same source and ref is that one, never made twice.
@@ -177,14 +184,15 @@ export interface InboxItem {
 }
 
 /**
- * The unread deliveries as the inbox lists them, oldest first: a card's events in one item, where its first one was.
- * Combwork's own unread messages written before HI-2463 are handed out with the current names (currentProtocolText);
- * a person's or an agent's words never change.
+ * The unread deliveries as the inbox lists them, oldest first: a card's events in one item, where its first one was;
+ * with them, those received in a conversation its agent left for a fresh one (`carriedFrom`, HI-2463), shown again.
+ * Combwork's own text keeps every word as written (it may quote a person's or an agent's): one from before HI-2463 that
+ * names an old tool or command gets a note on how the names map (withCurrentNames).
  */
 export function inboxItems(records: readonly DeliveryRecord[]): InboxItem[] {
   const out: InboxItem[] = []
   const byCard = new Map<number, { item: InboxItem; events: DeliveryRecord[] }>()
-  for (const r of [...records].filter(isUnread).sort((a, b) => a.seq - b.seq)) {
+  for (const r of [...records].filter((x) => isUnread(x) || x.carriedFrom !== undefined).sort((a, b) => a.seq - b.seq)) {
     if (r.kind === 'card-event' && r.card) {
       const had = byCard.get(r.card)
       if (had) {
@@ -199,10 +207,10 @@ export function inboxItems(records: readonly DeliveryRecord[]): InboxItem[] {
       out.push(item)
       continue
     }
-    out.push({ ids: [r.id], kind: r.kind, from: r.from.name, ...(r.card ? { card: r.card } : {}), text: r.from.kind === 'hive' ? currentProtocolText(r.body) : r.body, at: r.created })
+    out.push({ ids: [r.id], kind: r.kind, from: r.from.name, ...(r.card ? { card: r.card } : {}), text: r.from.kind === 'hive' ? withCurrentNames(r.body) : r.body, at: r.created })
   }
-  // A card's events quote people's and agents' comments, kept as written: only Combwork's own prefix is made current.
-  for (const { item, events } of byCard.values()) item.text = currentPrefix(coalesced(events))
+  // A card's events quote people's and agents' comments, kept as written.
+  for (const { item, events } of byCard.values()) item.text = withCurrentNames(coalesced(events))
   return out
 }
 
@@ -356,6 +364,8 @@ export function readDelivery(v: unknown): DeliveryRecord | null {
   if (r.agentName !== undefined && !str(r.agentName, 300)) return null
   if (r.offerRun !== undefined && !str(r.offerRun, 200)) return null
   if (r.action !== undefined && !(Number.isInteger(r.action) && (r.action as number) > 0)) return null
+  if (r.carriedFrom !== undefined && !(str(r.carriedFrom, 200) && r.carriedFrom)) return null
+  if (!optTime(r.replayed)) return null
   const out: DeliveryRecord = { id: r.id, seq: r.seq as number, agentId: r.agentId, conversation: (r.conversation as string | null) || null, kind: r.kind as DeliveryKind, from, body: r.body, state: r.state as DeliveryState, created: r.created, expires: r.expires }
   if (r.agentName) out.agentName = r.agentName as string
   if (r.card) out.card = r.card as number
@@ -368,6 +378,8 @@ export function readDelivery(v: unknown): DeliveryRecord | null {
   if (r.need) out.need = r.need as 'free' | 'stalled'
   if (r.meta) out.meta = { ...(r.meta as Record<string, string | number | boolean>) }
   if (r.action) out.action = r.action as number
+  if (r.carriedFrom) out.carriedFrom = r.carriedFrom as string
+  if (r.replayed) out.replayed = r.replayed as string
   return out
 }
 

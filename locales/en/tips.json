@@ -1028,8 +1028,8 @@
     "description": "A tip's title."
   },
   "tips.isolatedChecks.text": {
-    "defaultMessage": "In a shared folder, another agent's edit during a check makes it not count. hive-progress --check typecheck --isolated runs it in a copy of its own at the card's revision, which nothing else writes. Stop in the Progress panel ends it and all it started.",
-    "description": "A tip. hive-progress --check typecheck --isolated is a command: keep it as it is. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "defaultMessage": "In a shared folder, another agent's edit during a check makes it not count. cw-progress --check typecheck --isolated runs it in a copy of its own at the card's revision, which nothing else writes. Stop in the Progress panel ends it and all it started.",
+    "description": "A tip. cw-progress --check typecheck --isolated is a command: keep it as it is. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.isolatedChecks.title": {
     "defaultMessage": "A check nobody else can spoil",
@@ -1492,7 +1492,7 @@
     "description": "A tip's title."
   },
   "tips.progressCommand.text": {
-    "defaultMessage": "Agents run long commands such as tests and builds through hive-progress, so the Progress panel shows them under the agent's name, with about how long is left from the second time. Settings can have them do it only when you ask.",
+    "defaultMessage": "Agents run long commands such as tests and builds through cw-progress, so the Progress panel shows them under the agent's name, with about how long is left from the second time. Settings can have them do it only when you ask.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.progressCommand.title": {

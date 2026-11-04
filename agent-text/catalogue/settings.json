@@ -1435,8 +1435,8 @@
     "audience": "both"
   },
   "settings.advanced.hive.copies.review.desc": {
-    "text": "A reviewer reads a card's work, and runs its commands, in a review copy: a folder at exactly the revision under review, which nothing else writes, so what it checks is what was submitted. Turned off, reviewers read the builder's folder as before. Isolated checks (hive-progress --check with --isolated) use the same copies either way.",
-    "note": "What the advanced setting \"Reviewers review in review copies\" does (Settings → Advanced, under Hive). hive-progress --check and --isolated are a command and its options: keep them as they are.",
+    "text": "A reviewer reads a card's work, and runs its commands, in a review copy: a folder at exactly the revision under review, which nothing else writes, so what it checks is what was submitted. Turned off, reviewers read the builder's folder as before. Isolated checks (cw-progress --check with --isolated) use the same copies either way.",
+    "note": "What the advanced setting \"Reviewers review in review copies\" does (Settings → Advanced, under Hive). cw-progress --check and --isolated are a command and its options: keep them as they are.",
     "audience": "both"
   },
   "settings.advanced.hive.copies.review.title": {
@@ -1805,13 +1805,13 @@
     "audience": "both"
   },
   "settings.advanced.hive.progress.replySeconds.desc": {
-    "text": "How long hive-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 2 minutes at most.",
-    "note": "What the advanced setting \"hive-progress: Hive's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "text": "How long cw-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 2 minutes at most.",
+    "note": "What the advanced setting \"cw-progress: Hive's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
     "audience": "both"
   },
   "settings.advanced.hive.progress.replySeconds.title": {
-    "text": "hive-progress: Combwork's reply time",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. hive-progress is the command agents run long commands and checks through: keep it as it is.",
+    "text": "cw-progress: Combwork's reply time",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. cw-progress is the command agents run long commands and checks through: keep it as it is.",
     "audience": "both"
   },
   "settings.advanced.hive.prompt.asTyped.desc": {
@@ -3488,7 +3488,7 @@
     "audience": "both"
   },
   "settings.general.progressCommands.desc": {
-    "text": "Agents run tests, builds and other commands that take more than about 30 seconds through hive-progress without being asked, so they show in the panel. Off: only when you ask.",
+    "text": "Agents run tests, builds and other commands that take more than about 30 seconds through cw-progress without being asked, so they show in the panel. Off: only when you ask.",
     "note": "What the setting \"Agents show long commands in the Progress panel\" does, under its title (Settings → General).",
     "audience": "both"
   },
@@ -3498,7 +3498,7 @@
     "audience": "both"
   },
   "settings.general.progressCommands.tip": {
-    "text": "hive-progress runs the command unchanged (same output and exit code). Combwork's session guidance tells agents to use it, so a change applies to agents started or restarted afterwards. With the Progress panel off, agents aren't told to use it either.",
+    "text": "cw-progress runs the command unchanged (same output and exit code). Combwork's session guidance tells agents to use it, so a change applies to agents started or restarted afterwards. With the Progress panel off, agents aren't told to use it either.",
     "note": "The info tip of the setting \"Agents show long commands in the Progress panel\" (Settings → General): more on what it does and when it applies.",
     "audience": "both"
   },

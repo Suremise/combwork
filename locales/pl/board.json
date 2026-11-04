@@ -214,7 +214,7 @@
   "board.details.line": "{label}: {text}",
   "board.details.log": "Log",
   "board.details.noInstall": "Nic nie zainstalowano: projekt nie ma polecenia konfiguracji ani pliku blokady",
-  "board.details.notCounted": "Nie liczy się jako sprawdzenie {name}: {why, select, notCheck {nie uruchomiono go jako sprawdzenia (hive-progress --check), a jego polecenie nie jest żadnym z poleceń sprawdzeń projektu} notContained {wybrany stan nie zawiera rewizji karty} dirty {folder miał zmiany bez commita na początku lub na końcu} moved {na końcu wybrane było coś innego} changed {w trakcie działania zmieniły się pliki w folderze} revisionChanged {w trakcie działania zmieniły się pliki karty} other {nie da się stwierdzić, czy jego pliki się zmieniły}}",
+  "board.details.notCounted": "Nie liczy się jako sprawdzenie {name}: {why, select, notCheck {nie uruchomiono go jako sprawdzenia (cw-progress --check), a jego polecenie nie jest żadnym z poleceń sprawdzeń projektu} notContained {wybrany stan nie zawiera rewizji karty} dirty {folder miał zmiany bez commita na początku lub na końcu} moved {na końcu wybrane było coś innego} changed {w trakcie działania zmieniły się pliki w folderze} revisionChanged {w trakcie działania zmieniły się pliki karty} other {nie da się stwierdzić, czy jego pliki się zmieniły}}",
   "board.details.provider": "Dostawca",
   "board.details.revision": "Rewizja",
   "board.details.run": "Uruchomienie",

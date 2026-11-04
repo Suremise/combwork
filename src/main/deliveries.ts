@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto'
 import { app } from 'electron'
 import { agentMsg, inDialectOf, say } from '../shared/agentText'
 import { ASSISTANT_AGENT_ID } from '../shared/assistant'
+import { NOTICE_PREFIX } from '../shared/doorbell'
 import { HIVE_DIR } from '../shared/defaults'
 import {
   DELIVERY_BODY_MAX_CHARS,
@@ -145,6 +146,11 @@ const LAUNCHING = 'launching'
  * agent with the doorbell), why it ended or went back (its `detail`, which its sender reads), and why one isn't made.
  */
 const T = {
+  carried: agentMsg({
+    id: 'inbox.carried.notice',
+    text: 'Your earlier conversation read {n, plural, one {a message} other {# messages}} it never acked ({ids}). cw_inbox shows {n, plural, one {it} other {them}} again now: act on {n, plural, one {it} other {them}}, then ack {n, plural, one {it} other {them}}.',
+    note: 'HI-2463: a conversation from before the rename started fresh; what the earlier one had received and not acked is shown again in the new one. After "[CW] ". n: how many; ids: their delivery ids ("m3, m7").'
+  }),
   againRestart: agentMsg({ id: 'inbox.again.restart', text: 'Combwork restarted while offering it', note: 'Why a delivery may repeat (#649), after the doorbell (inbox.offer.again): Hive stopped while it was being offered.' }),
   againLaunch: agentMsg({ id: 'inbox.again.launch', text: 'its session ended or restarted before it was read', note: 'Why a delivery may repeat (#649), after the doorbell (inbox.offer.again), and in why it is uncertain (inbox.ended.uncertain).' }),
   uncertainRestart: agentMsg({ id: 'inbox.ended.uncertainRestart', text: 'may not have reached it: Combwork stopped while offering it', note: "Why a delivery is uncertain (#649), as its sender reads it: Hive stopped while it was being offered; it is offered once more." }),
@@ -1221,10 +1227,14 @@ export async function readInbox(host: string, agentId: string): Promise<{ items:
           const may = gate(d)
           const mine = d.records.filter((x) => x.agentId === agentId)
           const give = mine.filter((x) => may(x) && !held.has(x.id))
-          const before = mine.filter((x) => x.state === 'received' && needsAck(x.kind)).map((x) => x.id)
+          // HI-2463: what the agent's earlier conversation received and didn't ack, shown again once to the fresh one it
+          // was carried to (still received, never acked for it), while its source still holds it.
+          const replay = mine.filter((x) => x.state === 'received' && x.carriedFrom !== undefined && !x.replayed && sourceHolds(store, x, 'read'))
+          const before = mine.filter((x) => x.state === 'received' && needsAck(x.kind) && !replay.includes(x)).map((x) => x.id)
           for (const x of give) set(store, d, x, 'received', undefined, 'inbox')
+          for (const x of replay) put(d, x, { ...x, replayed: nowIso() })
           const refused = (x: DeliveryRecord): boolean => isUnread(x) && !give.includes(x) && !held.has(x.id) && !sourceHolds(store, x, 'read')
-          return { give, before, missed: mine.some((x) => (x.state === 'offered' && !give.includes(x)) || refused(x)) }
+          return { give: [...give, ...replay], before, missed: mine.some((x) => (x.state === 'offered' && !give.includes(x)) || refused(x)) }
         },
         overtaken
       )
@@ -2014,18 +2024,37 @@ export async function rebaseHeld(workspacePath: string, since: string): Promise<
  */
 export async function carryConversation(host: string, agentId: string, from: string): Promise<number> {
   const store = await load(host)
-  const n = await transact(store, (d) => {
+  const { n, replay, name } = await transact(store, (d) => {
     let count = 0
+    const ids: string[] = []
+    let agentName: string | undefined
     for (const r of [...d.records]) {
-      if (r.agentId !== agentId || r.conversation !== from || !isLive(r)) continue
-      put(d, r, { ...r, conversation: null })
-      count++
+      if (r.agentId !== agentId || !isLive(r)) continue
+      // Received, not acked (HR1's round 1): the old conversation read it, the new one never did. Whatever conversation it
+      // was bound to (an agent runs one at a time, so the one it left received it), it is shown again on the new one's
+      // next inbox read, its receipt kept (carriedFrom; never acked for it).
+      if (r.state === 'received') {
+        put(d, r, { ...r, conversation: null, carriedFrom: from })
+        ids.push(r.id)
+        agentName ??= r.agentName
+        count++
+      } else if (r.conversation === from) {
+        put(d, r, { ...r, conversation: null })
+        count++
+      }
     }
-    return count
+    return { n: count, replay: ids, name: agentName }
   })
   if (n) show(store, agentId)
+  // The doorbell rings for what is unread: a notice of its own says what is shown again, so the new conversation reads it.
+  if (replay.length)
+    await createDelivery(host, { agentId, ...(name ? { agentName: name } : {}), conversation: null, kind: 'control', from: CARRIED_SENDER, body: `${NOTICE_PREFIX}${say(T.carried, { n: replay.length, ids: replay.join(', ') })}`, source: 'carried', ref: from }).catch((e) => log.warn(`Could not tell ${userText(agentId)} of the messages its earlier conversation hadn't acked`, e))
   return n
 }
+
+/** Who tells a fresh conversation what its earlier one received and didn't ack: Combwork itself. */
+// agent-protocol: the product's name, as a delivery's sender
+const CARRIED_SENDER = { kind: 'hive', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 
 // The workspace's database replaced (#1207 round 2: the upgrade to 1.0, a restore): its hosts' deliveries, read from the
 // file before, go from memory (a save begun from them is refused by their generation). The next use of a host (an agent's

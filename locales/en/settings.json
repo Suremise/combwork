@@ -1504,8 +1504,8 @@
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in minutes (\"10 min\"). A copy is a folder Hive keeps at one revision for a review or an isolated check."
   },
   "settings.advanced.hive.copies.review.desc": {
-    "defaultMessage": "A reviewer reads a card's work, and runs its commands, in a review copy: a folder at exactly the revision under review, which nothing else writes, so what it checks is what was submitted. Turned off, reviewers read the builder's folder as before. Isolated checks (hive-progress --check with --isolated) use the same copies either way.",
-    "description": "What the advanced setting \"Reviewers review in review copies\" does (Settings → Advanced, under Hive). hive-progress --check and --isolated are a command and its options: keep them as they are."
+    "defaultMessage": "A reviewer reads a card's work, and runs its commands, in a review copy: a folder at exactly the revision under review, which nothing else writes, so what it checks is what was submitted. Turned off, reviewers read the builder's folder as before. Isolated checks (cw-progress --check with --isolated) use the same copies either way.",
+    "description": "What the advanced setting \"Reviewers review in review copies\" does (Settings → Advanced, under Hive). cw-progress --check and --isolated are a command and its options: keep them as they are."
   },
   "settings.advanced.hive.copies.review.title": {
     "defaultMessage": "Reviewers review in review copies",
@@ -1800,12 +1800,12 @@
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
   "settings.advanced.hive.progress.replySeconds.desc": {
-    "defaultMessage": "How long hive-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 2 minutes at most.",
-    "description": "What the advanced setting \"hive-progress: Hive's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+    "defaultMessage": "How long cw-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 2 minutes at most.",
+    "description": "What the advanced setting \"cw-progress: Hive's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
   },
   "settings.advanced.hive.progress.replySeconds.title": {
-    "defaultMessage": "hive-progress: Combwork's reply time",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. hive-progress is the command agents run long commands and checks through: keep it as it is."
+    "defaultMessage": "cw-progress: Combwork's reply time",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. cw-progress is the command agents run long commands and checks through: keep it as it is."
   },
   "settings.advanced.hive.prompt.asTyped.desc": {
     "defaultMessage": "Combwork puts each prompt it types into an agent (a message, a wake, a card's start) on one line: runs of spaces become one, line breaks become spaces, and control characters are left out. Turned on, Claude Code and Copilot get the text as written, spacing and line breaks included. Codex, and a slash command in any CLI, still get each line break and tab as a space: Combwork types those key by key, where a line break would send the prompt early and a tab complete a word. For Codex, Typed prompts: line breaks (under Codex) can press a new-line key instead. Other control characters are left out either way: they would press keys.",
@@ -3620,7 +3620,7 @@
     "description": "A setting's title (Settings → General): a command of the user's that Hive runs as it quits."
   },
   "settings.general.progressCommands.desc": {
-    "defaultMessage": "Agents run tests, builds and other commands that take more than about 30 seconds through hive-progress without being asked, so they show in the panel. Off: only when you ask.",
+    "defaultMessage": "Agents run tests, builds and other commands that take more than about 30 seconds through cw-progress without being asked, so they show in the panel. Off: only when you ask.",
     "description": "What the setting \"Agents show long commands in the Progress panel\" does, under its title (Settings → General)."
   },
   "settings.general.progressCommands.disabled": {
@@ -3628,7 +3628,7 @@
     "description": "Under the setting \"Agents show long commands in the Progress panel\" (Settings → General) while the Progress panel is off."
   },
   "settings.general.progressCommands.tip": {
-    "defaultMessage": "hive-progress runs the command unchanged (same output and exit code). Combwork's session guidance tells agents to use it, so a change applies to agents started or restarted afterwards. With the Progress panel off, agents aren't told to use it either.",
+    "defaultMessage": "cw-progress runs the command unchanged (same output and exit code). Combwork's session guidance tells agents to use it, so a change applies to agents started or restarted afterwards. With the Progress panel off, agents aren't told to use it either.",
     "description": "The info tip of the setting \"Agents show long commands in the Progress panel\" (Settings → General): more on what it does and when it applies."
   },
   "settings.general.progressCommands.title": {

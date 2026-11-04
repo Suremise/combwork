@@ -31,16 +31,35 @@ export const LEGACY_NOTICE_PREFIX = '[Hive] '
 /** A line's leading prefix as it is now ("[Hive] " written before HI-2463): nothing after it changes. */
 export const currentPrefix = (text: string): string => (text.startsWith(LEGACY_NOTICE_PREFIX) ? NOTICE_PREFIX + text.slice(LEGACY_NOTICE_PREFIX.length) : text)
 
+const RENAMED = agentMsg({
+  id: 'inbox.renamedNote',
+  text: '(Combwork has renamed what agents use: a hive_<tool> named here is now cw_<tool>, mcp__hive__ is mcp__{server}__, and hive-progress is cw-progress.)',
+  note: "HI-2463: after a line or message from Combwork that names an old tool or command outside what it quotes (one written before the rename, or a lane's brief written that way). Its words are kept as written (they may be a person's or an agent's): this says how the old names map. server: Combwork's MCP server's name."
+})
+
+/** What a person or an agent wrote, as Combwork's text quotes it: whole between <<< >>> (a relayed answer), or in quotes. */
+const QUOTED = /<<<[\s\S]*?>>>|"[^"\n]*"|“[^”]*”/g
+
 /**
- * A line or message Combwork itself wrote before HI-2463, as it is said now: the prefix, its tools' names (hive_x →
- * cw_x, mcp__hive__ → mcp__combwork__) and hive-progress → cw-progress. Only for Combwork's own pending protocol text
- * (a fired watch's line, an unread inbox message from Combwork): never a user's or agent's words, nor stored history.
+ * Whether a text names a Combwork tool or command by its name before HI-2463 (hive_<tool>, mcp__hive__, hive-progress)
+ * outside what it quotes: words quoted are someone's, and say what they say.
  */
-export function currentProtocolText(text: string): string {
-  return currentPrefix(text)
-    .replace(/mcp__hive__hive_(\w+)/g, (_, t: string) => `mcp__${TOOLS_SERVER}__${currentToolName(`hive_${t}`)}`)
-    .replace(/\bhive_[a-z_]+\b/g, (t) => currentToolName(t))
-    .replace(/\bhive-progress\b/g, 'cw-progress')
+export function namesOldProtocol(text: string): boolean {
+  const own = text.replace(QUOTED, ' ')
+  if (/\bmcp__hive__/.test(own) || /\bhive-progress\b/.test(own)) return true
+  for (const m of own.matchAll(/\bhive_[a-z_]+\b/g)) if (currentToolName(m[0]) !== m[0]) return true
+  return false
+}
+
+/**
+ * A line or message of Combwork's own as it is handed out (HR1's round 1): every word kept as written, since its text may
+ * quote a person's or an agent's (a relayed answer, a card's latest comment, a lane's brief). Only a leading "[Hive] "
+ * (written before HI-2463) becomes "[CW] ", and one that names an old tool or command outside its quotes gets a note
+ * after it saying how the names map. Anything else is unchanged.
+ */
+export function withCurrentNames(text: string): string {
+  const head = currentPrefix(text)
+  return namesOldProtocol(text) ? `${head} ${say(RENAMED, { server: TOOLS_SERVER })}` : head
 }
 /**
  * What the doorbell and the checkpoint's notice say first, after the prefix: fixed, outside the catalogue (dialects,
