@@ -143,7 +143,7 @@ const check = (name, ok, extra = '') => {
     check('…and Codex, its own folder', has(await lib.until(async () => has(codexTold(codexW.cwd), 2) && codexTold(codexW.cwd), HUNG_MS, 200), 2), codexTold(codexW.cwd).slice(-300))
 
     // --- Off in Settings → Advanced: nothing from the next launch.
-    await inv('advanced:set', 'hive.notes.deliverWorkspaceNotes', false)
+    await inv('advanced:set', 'cw.notes.deliverWorkspaceNotes', false)
     check(`${codexW.name} stops`, await stopped(codexW.id))
     const launches = lines(path.join(codexHome, 'fake-launches.jsonl')).length
     await inv('session:start', proj, { agentId: codexW.id })
@@ -162,7 +162,7 @@ const check = (name, ok, extra = '') => {
     const resumed = await lib.until(async () => lines(path.join(claudeHome, 'fake-launches.jsonl')).slice(claudeLaunches).find((x) => x.cwd.toLowerCase() === proj.toLowerCase()), HUNG_MS, 200)
     check('switched off, a resumed Claude Code conversation that had the note appends nothing and renders its prompt fresh', resumed?.opts['--resume'] === claudeSession && !resumed?.opts['--append-system-prompt-file'] && resumed?.opts['--system-prompt-snapshot'] === 'off', JSON.stringify(resumed?.opts))
     agents.push({ ...second, cwd: proj })
-    await inv('advanced:set', 'hive.notes.deliverWorkspaceNotes', null)
+    await inv('advanced:set', 'cw.notes.deliverWorkspaceNotes', null)
 
     // --- A project agent reads the note but can't write it; a script with the workspace's token can.
     const launch = lines(path.join(claudeHome, 'fake-launches.jsonl')).filter((x) => x.cwd.toLowerCase() === claudeP.cwd.toLowerCase()).at(-1)

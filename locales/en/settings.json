@@ -377,7 +377,7 @@
   },
   "settings.advanced.claude-code.accounts.dropEnv.title": {
     "defaultMessage": "Connections: sign-in variables left out",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.accounts.emailField.desc": {
     "defaultMessage": "The field of `claude auth status --json` with the email a connection's folder is signed in as. Wrong, Combwork can't tell who a connection is signed in as, and can't warn when its login changes.",
@@ -385,7 +385,7 @@
   },
   "settings.advanced.claude-code.accounts.emailField.title": {
     "defaultMessage": "Connections: email field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.accounts.loggedInField.desc": {
     "defaultMessage": "The field of `claude auth status --json` that says whether a connection's folder is signed in. Wrong, Combwork can't tell, and its sign-in connections show \"Couldn't check\".",
@@ -393,7 +393,7 @@
   },
   "settings.advanced.claude-code.accounts.loggedInField.title": {
     "defaultMessage": "Connections: signed-in field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.accounts.loginFiles.desc": {
     "defaultMessage": "The names of the files in a connection's folder that change when Claude Code signs in or out there, as a regular expression. Combwork watches them (it never reads them) and checks the connection again when one changes. Wrong, a /login or /logout typed in an agent's pane is only found at the connection's next check.",
@@ -401,7 +401,7 @@
   },
   "settings.advanced.claude-code.accounts.loginFiles.title": {
     "defaultMessage": "Connections: login files",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.accounts.onboardedField.desc": {
     "defaultMessage": "The field of a connection folder's `.claude.json` that says Claude Code's first-run screens were answered there (read only). Wrong, every Claude Code connection shows \"Needs set up\" in Settings → Accounts & Connections.",
@@ -409,7 +409,7 @@
   },
   "settings.advanced.claude-code.accounts.onboardedField.title": {
     "defaultMessage": "Connections: set-up field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.accounts.orgField.desc": {
     "defaultMessage": "The field of `claude auth status --json` with the organisation's id a connection's folder is signed in to. With the email, it tells two logins apart. Wrong, Combwork can't tell who a connection is signed in as.",
@@ -417,7 +417,7 @@
   },
   "settings.advanced.claude-code.accounts.orgField.title": {
     "defaultMessage": "Connections: organisation field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.accounts.planField.desc": {
     "defaultMessage": "The field of `claude auth status --json` with a connection's plan (\"max\"), shown beside its email in Settings → Accounts & Connections. Wrong, no plan is shown.",
@@ -425,7 +425,7 @@
   },
   "settings.advanced.claude-code.accounts.planField.title": {
     "defaultMessage": "Connections: plan field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.accounts.statusSeconds.desc": {
     "defaultMessage": "How long Combwork gives `claude auth status` to say who a connection's folder is signed in as. Past it, the connection shows \"Couldn't check\", never signed out.",
@@ -433,7 +433,7 @@
   },
   "settings.advanced.claude-code.accounts.statusSeconds.title": {
     "defaultMessage": "Connections: sign-in check timeout",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.accounts.trustField.desc": {
     "defaultMessage": "The field of a folder's entry under `projects` in a connection folder's `.claude.json` that says Claude Code was told to trust that folder (read only). Wrong, every Claude Code connection on in a workspace shows \"Needs set up\" in Settings → Accounts & Connections.",
@@ -441,7 +441,7 @@
   },
   "settings.advanced.claude-code.accounts.trustField.title": {
     "defaultMessage": "Connections: trusted folder field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.autoModeSetup.offer.desc": {
     "defaultMessage": "Claude Code offers, now and then in auto mode, to read the project, your recent sessions and optionally your shell history and other repositories, to teach auto mode about your environment. Combwork never answers it: the agent waits for you. Off, Combwork's Claude Code agents are started with the offer turned off for that launch (nothing is written to Claude Code's files, and auto mode decides as before); /auto-mode-setup still runs it when you want.",
@@ -449,7 +449,7 @@
   },
   "settings.advanced.claude-code.autoModeSetup.offer.title": {
     "defaultMessage": "Offer auto mode's environment setup",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Auto mode is one of Claude Code's permission modes."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Auto mode is one of Claude Code's permission modes."
   },
   "settings.advanced.claude-code.connections.remoteModels.desc": {
     "defaultMessage": "The model names Ollama runs on ollama.com rather than on this PC (its cloud models, such as gpt-oss:120b-cloud), as a regular expression, for an Ollama connection's models typed in rather than read from Ollama (Read Models asks Ollama, which says). Such a connection's sessions aren't free (local). Wrong, a cloud model typed in is counted as free, or a local one as not free.",
@@ -457,7 +457,7 @@
   },
   "settings.advanced.claude-code.connections.remoteModels.title": {
     "defaultMessage": "Connections: Ollama cloud models",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Ollama is a product's name; its cloud models run on ollama.com."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Ollama is a product's name; its cloud models run on ollama.com."
   },
   "settings.advanced.claude-code.exit.command.desc": {
     "defaultMessage": "What Combwork types into Claude Code, then Enter, to end it once its lane has ended and its turn is over, so it exits by itself rather than being killed. Wrong, Claude Code isn't ended by it and is killed after the exit grace.",
@@ -465,7 +465,7 @@
   },
   "settings.advanced.claude-code.exit.command.title": {
     "defaultMessage": "Lane's end: exit command",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.exit.graceSeconds.desc": {
     "defaultMessage": "How long Combwork gives Claude Code to exit by itself after typing its exit command at a lane's end, before killing it. It took {took, plural, one {# second} other {# seconds}} when recorded.",
@@ -473,7 +473,7 @@
   },
   "settings.advanced.claude-code.exit.graceSeconds.title": {
     "defaultMessage": "Lane's end: exit grace",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.hooks.knownEvents.desc": {
     "defaultMessage": "The hook events Combwork knows Claude Code sends. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook named outside this list saves a capture of the agent's recent events.",
@@ -481,7 +481,7 @@
   },
   "settings.advanced.claude-code.hooks.knownEvents.title": {
     "defaultMessage": "Hooks: known events",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.hooks.knownFields.desc": {
     "defaultMessage": "The top-level fields Combwork knows Claude Code sends in its hooks. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook with a field outside this list saves a capture of the agent's recent events: often the first sign that a Claude Code update changed something. Add a field here once you know it is harmless.",
@@ -489,7 +489,7 @@
   },
   "settings.advanced.claude-code.hooks.knownFields.title": {
     "defaultMessage": "Hooks: known fields",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.hooks.preToolUseTimeoutSeconds.desc": {
     "defaultMessage": "How long Claude Code waits for Combwork's answer before a tool runs (an edit waits for a file lock). If Combwork doesn't answer in time, the tool goes ahead.",
@@ -497,7 +497,7 @@
   },
   "settings.advanced.claude-code.hooks.preToolUseTimeoutSeconds.title": {
     "defaultMessage": "Hooks: before a tool, timeout",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.hooks.timeoutSeconds.desc": {
     "defaultMessage": "How long Claude Code waits for Combwork to take one of its hooks (a turn starting or ending, a notification). Combwork answers at once; raise it only if Combwork's log shows hooks timing out on a slow machine.",
@@ -505,7 +505,7 @@
   },
   "settings.advanced.claude-code.hooks.timeoutSeconds.title": {
     "defaultMessage": "Hooks: timeout",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.memory.realPath.desc": {
     "defaultMessage": "A connection's projects folder is a link to Claude Code's own, so Claude Code asked you before each memory it saved there. Each Claude Code agent on a connection is given its project's auto memory folder by its real path: the same folder, so it saves memories without asking, as it does without a connection. Nothing more is allowed, and nothing is written to Claude Code's files. Off, Claude Code asks before each memory on a connection.",
@@ -513,7 +513,7 @@
   },
   "settings.advanced.claude-code.memory.realPath.title": {
     "defaultMessage": "Auto memory by its real path on connections",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Auto memory is Claude Code's own notes it keeps per project; a connection is an account Hive signs a CLI in with."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Auto memory is Claude Code's own notes it keeps per project; a connection is an account Hive signs a CLI in with."
   },
   "settings.advanced.claude-code.memory.setting.desc": {
     "defaultMessage": "The Claude Code setting that names its auto memory folder, which Combwork sets on a connection (Auto memory by its real path on connections) and leaves alone where you set it yourself. Wrong, Claude Code ignores it and asks before each memory on a connection.",
@@ -521,7 +521,7 @@
   },
   "settings.advanced.claude-code.memory.setting.title": {
     "defaultMessage": "Auto memory folder setting",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Auto memory is Claude Code's own notes it keeps per project."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Auto memory is Claude Code's own notes it keeps per project."
   },
   "settings.advanced.claude-code.mouse.rightClickToCli.desc": {
     "defaultMessage": "Right-click in a Claude Code pane is Combwork's, as in every pane: it copies the terminal's selection, or pastes. Turned on, Combwork passes right-clicks to Claude Code instead. Claude Code doesn't use the mouse at its prompt, so there a right-click then does nothing: copy and paste with Ctrl+C and Ctrl+V.",
@@ -529,7 +529,7 @@
   },
   "settings.advanced.claude-code.mouse.rightClickToCli.title": {
     "defaultMessage": "Pass right-click to Claude Code",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.outage.connectionError.desc": {
     "defaultMessage": "What a StopFailure hook's message says when Claude Code couldn't reach its API after its retries: with Resume agents after a connection drops on, Combwork waits for the connection and resumes the agent. Wrong, such agents stay stopped.",
@@ -537,7 +537,7 @@
   },
   "settings.advanced.claude-code.outage.connectionError.title": {
     "defaultMessage": "Connection dropped: StopFailure message",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.override.mcpIsolation.desc": {
     "defaultMessage": "Combwork starts Claude Code with --strict-mcp-config, so its sessions get only the MCP servers the workspace gives them. Turned off, the servers in your own Claude Code config and the project's .mcp.json load beside them, as they would outside Combwork (Claude Code may ask you to approve a project's new servers first). The workspace's servers, Combwork's own hive among them, win over yours of the same name.",
@@ -577,7 +577,7 @@
   },
   "settings.advanced.claude-code.prompt.clearKeySeconds.title": {
     "defaultMessage": "Clearing the input: wait for each key",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.prompt.cliTurn.desc": {
     "defaultMessage": "What a prompt hook's text starts with when Claude Code starts a turn by itself, such as when a background task ends. Combwork never reports such a turn to the Assistant as your reply. Wrong, a background task's end soon after you pressed Enter in the agent's pane can be reported as your reply.",
@@ -585,7 +585,7 @@
   },
   "settings.advanced.claude-code.prompt.cliTurn.title": {
     "defaultMessage": "Prompt hook: Claude Code's own turn",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.retry.attemptField.desc": {
     "defaultMessage": "The field of that entry with which try it is (1, 2…). Wrong, a waiting agent just shows Working.",
@@ -593,7 +593,7 @@
   },
   "settings.advanced.claude-code.retry.attemptField.title": {
     "defaultMessage": "Transcript: retry entry's try field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.retry.checkAfterSeconds.desc": {
     "defaultMessage": "How long a working Claude Code session has to go without a hook before Combwork looks at the end of its transcript for a wait to retry its model request, then every 15 seconds while it stays quiet.",
@@ -609,7 +609,7 @@
   },
   "settings.advanced.claude-code.retry.maxField.title": {
     "defaultMessage": "Transcript: retry entry's tries field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.retry.statusField.desc": {
     "defaultMessage": "The field of that entry's error with the HTTP status that refused the request (429: rate-limited). With none, the service couldn't be reached. Wrong, every wait shows as the service unreachable.",
@@ -617,7 +617,7 @@
   },
   "settings.advanced.claude-code.retry.statusField.title": {
     "defaultMessage": "Transcript: retry error's status field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.retry.subtype.desc": {
     "defaultMessage": "The kind of transcript entry Claude Code writes each time its model request fails and it tries again (rate-limited, or the service unreachable). Combwork reads the latest and shows the wait as the agent's status. Wrong, a waiting agent just shows Working.",
@@ -625,7 +625,7 @@
   },
   "settings.advanced.claude-code.retry.subtype.title": {
     "defaultMessage": "Transcript: retry entry",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A retry: the coding agent trying its model request again after it failed."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A retry: the coding agent trying its model request again after it failed."
   },
   "settings.advanced.claude-code.retry.waitField.desc": {
     "defaultMessage": "The field of that entry with how long Claude Code waits before the next try, in milliseconds. Wrong, a waiting agent just shows Working.",
@@ -633,7 +633,7 @@
   },
   "settings.advanced.claude-code.retry.waitField.title": {
     "defaultMessage": "Transcript: retry entry's wait field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.safeguard.note.desc": {
     "defaultMessage": "Claude Code's note in its transcript when its safety classifier stops a response, and the notice it adds for the model (#606). Wrong, Combwork misses such stops: no shield on the agent's pane, and Performance doesn't count them.",
@@ -641,7 +641,7 @@
   },
   "settings.advanced.claude-code.safeguard.note.title": {
     "defaultMessage": "Safeguard stop: transcript note",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.safeguard.prompt.desc": {
     "defaultMessage": "Claude Code's question after a safeguard stop, whether to switch models, told by its open dialog's choices in the lines it wrote last. Combwork shows the agent waiting for you, and why, while it is open; wrong, the agent shows only \"Claude needs your permission\".",
@@ -649,7 +649,7 @@
   },
   "settings.advanced.claude-code.safeguard.prompt.title": {
     "defaultMessage": "Safeguard stop: question",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.screen.idleQuestion.desc": {
     "defaultMessage": "A question Claude Code puts on its screen by itself after a turn, sending Combwork nothing (\"Teach auto mode about your environment?\"), as a line of its own in a dialog that replaces its input box or is drawn under it (the same words above the input box, in a prompt or a reply, aren't it). While it shows, Combwork shows the agent waiting for you with the question, and types nothing into it: Enter would answer it. Wrong, Combwork types its wakes into the question.",
@@ -657,7 +657,7 @@
   },
   "settings.advanced.claude-code.screen.idleQuestion.title": {
     "defaultMessage": "Screen: question while idle",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.screen.input.desc": {
     "defaultMessage": "Claude Code's input box, between two rules, its first group what it holds after its prompt mark. Combwork reads it to tell that a line it typed is gone from the input (a screen of the CLI's took it), and then types it again. Wrong, such a line stays held, and nothing more is typed into the agent until you press Enter there.",
@@ -665,7 +665,7 @@
   },
   "settings.advanced.claude-code.screen.input.title": {
     "defaultMessage": "Screen: input box",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.signIn.stopError.desc": {
     "defaultMessage": "The error a StopFailure hook names when Claude Code's sign-in was refused (expired, revoked, an invalid key): Combwork shows the agent signed out and offers to carry on once it's renewed (#309). Any other error ends the turn as failed.",
@@ -673,7 +673,7 @@
   },
   "settings.advanced.claude-code.signIn.stopError.title": {
     "defaultMessage": "Sign-in refused: StopFailure error",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.statusLine.fiveHour.desc": {
     "defaultMessage": "The plan limits' field for the 5-hour window.",
@@ -681,7 +681,7 @@
   },
   "settings.advanced.claude-code.statusLine.fiveHour.title": {
     "defaultMessage": "Status line: 5-hour limit field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.statusLine.knownFields.desc": {
     "defaultMessage": "The top-level fields Combwork knows Claude Code sends in its status line. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a status line with a field outside this list saves a capture of the agent's recent events. Add a field here once you know it is harmless.",
@@ -689,7 +689,7 @@
   },
   "settings.advanced.claude-code.statusLine.knownFields.title": {
     "defaultMessage": "Status line: known fields",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.statusLine.rateLimits.desc": {
     "defaultMessage": "The status line's field with a subscription's limits (the 5-hour and weekly use the status bar shows). Wrong, Combwork shows no plan limits for Claude Code.",
@@ -697,7 +697,7 @@
   },
   "settings.advanced.claude-code.statusLine.rateLimits.title": {
     "defaultMessage": "Status line: plan limits field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.statusLine.usedPercent.desc": {
     "defaultMessage": "A limit's field with the percentage used.",
@@ -705,7 +705,7 @@
   },
   "settings.advanced.claude-code.statusLine.usedPercent.title": {
     "defaultMessage": "Status line: percentage used field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.statusLine.weekly.desc": {
     "defaultMessage": "The plan limits' field for the weekly window.",
@@ -713,7 +713,7 @@
   },
   "settings.advanced.claude-code.statusLine.weekly.title": {
     "defaultMessage": "Status line: weekly limit field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.subagent.descriptionField.desc": {
     "defaultMessage": "The field of that result with what the subagent was asked to do, in a few words. Wrong, Combwork still counts it but has no description of it.",
@@ -721,7 +721,7 @@
   },
   "settings.advanced.claude-code.subagent.descriptionField.title": {
     "defaultMessage": "Transcript: background subagent's description field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.subagent.idField.desc": {
     "defaultMessage": "The field of that result with the subagent's id, which its notification names when it ends. Wrong, Combwork doesn't count background subagents.",
@@ -729,7 +729,7 @@
   },
   "settings.advanced.claude-code.subagent.idField.title": {
     "defaultMessage": "Transcript: background subagent's id field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.subagent.launched.desc": {
     "defaultMessage": "The status of the Agent tool's result when it runs a subagent (or a workflow) in the background (#1584). Wrong, Combwork doesn't count those subagents, and shows the agent finished while they work.",
@@ -737,7 +737,7 @@
   },
   "settings.advanced.claude-code.subagent.launched.title": {
     "defaultMessage": "Transcript: background subagent launched",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.subagent.resumedField.desc": {
     "defaultMessage": "The field of a message's result with the id of a finished subagent the message started again. Wrong, Combwork doesn't count a resumed subagent while it works.",
@@ -745,7 +745,7 @@
   },
   "settings.advanced.claude-code.subagent.resumedField.title": {
     "defaultMessage": "Transcript: resumed subagent field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.trust.prompt.desc": {
     "defaultMessage": "Claude Code's question before a folder's first session. Combwork shows the agent as waiting for you while it is on screen.",
@@ -753,7 +753,7 @@
   },
   "settings.advanced.claude-code.trust.prompt.title": {
     "defaultMessage": "Trust question",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.turnScreen.done.desc": {
     "defaultMessage": "Claude Code's line above its input when the last turn is done (\"✻ Worked for 12s · done 16:52\"). When Combwork missed a turn's end, it takes this on screen to mean the agent is idle; wrong, it leaves such an agent's status unknown, with Mark idle.",
@@ -761,7 +761,7 @@
   },
   "settings.advanced.claude-code.turnScreen.done.title": {
     "defaultMessage": "Screen: turn done",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claudeFooter.desc": {
     "defaultMessage": "Claude Code's footer in the {mode} mode (\"{footer}\"). Combwork reads an agent's permission mode from its footer (the mode found last on screen), and switches modes by pressing Shift+Tab until the footer shows the one wanted; wrong, Combwork doesn't see the agent in {mode}, and can't switch to it without a restart.",
@@ -777,7 +777,7 @@
   },
   "settings.advanced.codex.accounts.accountField.title": {
     "defaultMessage": "Connections: account field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.accounts.dropEnv.desc": {
     "defaultMessage": "The environment variables Combwork leaves out when it runs Codex on a connection (its sign-in, its checks and its agents), so a key or token set on this PC can't stand in for the connection's own login. Wrong, a variable Codex reads as a login could make a connection run as someone else.",
@@ -785,7 +785,7 @@
   },
   "settings.advanced.codex.accounts.dropEnv.title": {
     "defaultMessage": "Connections: sign-in variables left out",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.accounts.emailField.desc": {
     "defaultMessage": "The field of Codex's account with the email a connection's folder is signed in as. Wrong, Combwork can't tell who a connection is signed in as, and can't warn when its login changes.",
@@ -793,7 +793,7 @@
   },
   "settings.advanced.codex.accounts.emailField.title": {
     "defaultMessage": "Connections: email field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.accounts.loginFiles.desc": {
     "defaultMessage": "The names of the files in a connection's folder that change when Codex signs in or out there, as a regular expression. Combwork watches them (it never reads them) and checks the connection again when one changes. Wrong, a sign-in or sign-out in an agent's pane is only found at the connection's next check.",
@@ -801,7 +801,7 @@
   },
   "settings.advanced.codex.accounts.loginFiles.title": {
     "defaultMessage": "Connections: login files",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.accounts.planField.desc": {
     "defaultMessage": "The field of Codex's account with a connection's plan (\"plus\", \"pro\"), shown beside its email in Settings → Accounts & Connections. Wrong, no plan is shown.",
@@ -809,7 +809,7 @@
   },
   "settings.advanced.codex.accounts.planField.title": {
     "defaultMessage": "Connections: plan field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.accounts.readMethod.desc": {
     "defaultMessage": "The request Combwork sends Codex's app server to ask who a connection's folder is signed in as. Wrong, Combwork can't tell, and its Codex connections show \"Couldn't check\".",
@@ -817,7 +817,7 @@
   },
   "settings.advanced.codex.accounts.readMethod.title": {
     "defaultMessage": "Connections: sign-in request",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.accounts.statusSeconds.desc": {
     "defaultMessage": "How long Combwork gives Codex's app server to say who a connection's folder is signed in as (`account/read`). Past it, the connection shows \"Couldn't check\", never signed out.",
@@ -825,7 +825,7 @@
   },
   "settings.advanced.codex.accounts.statusSeconds.title": {
     "defaultMessage": "Connections: sign-in check timeout",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.accounts.unelevatedSandbox.desc": {
     "defaultMessage": "Turned on, Combwork runs Codex on a connection (its agents, its Set Up and its checks) in Codex's non-admin Windows sandbox, passing -c windows.sandbox=\"unelevated\" each time, unless the connection's own config.toml chooses a sandbox. Nothing is written to Codex's config, and Codex on its own folder (~/.codex) runs as you've set it up. What it gains: no Administrator (UAC) prompts, and setting up one Codex folder no longer resets the sandbox's shared password, which makes the others ask for Administrator permission again. What it loses: commands run as you rather than as separate sandbox accounts, and their network is blocked by environment settings only, not by the firewall. Unchanged: writes outside the project's folders are still refused, and the first time a connection works in a project it still grants its permissions over the project's files once. Either way, Codex's commands can still read other connections' login files. Windows only.",
@@ -833,7 +833,7 @@
   },
   "settings.advanced.codex.accounts.unelevatedSandbox.title": {
     "defaultMessage": "Connections: use Codex's non-admin sandbox",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Codex's non-admin sandbox is its Windows sandbox that needs no Administrator permission."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Codex's non-admin sandbox is its Windows sandbox that needs no Administrator permission."
   },
   "settings.advanced.codex.appServer.closeSeconds.desc": {
     "defaultMessage": "How long Codex's app server gets to end by itself once Combwork has its answer (a connection's sign-in check, its hooks' check). Past it, Combwork ends it with everything it started. Too short, Codex is cut off as it ends; too long, its processes stay a little longer.",
@@ -841,7 +841,7 @@
   },
   "settings.advanced.codex.appServer.closeSeconds.title": {
     "defaultMessage": "App server: time to close",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.exit.command.desc": {
     "defaultMessage": "What Combwork types into Codex, then Enter, to end it once its lane has ended and its turn is over, so it exits by itself rather than being killed. Wrong, Codex isn't ended by it and is killed after the exit grace.",
@@ -849,7 +849,7 @@
   },
   "settings.advanced.codex.exit.command.title": {
     "defaultMessage": "Lane's end: exit command",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.exit.graceSeconds.desc": {
     "defaultMessage": "How long Combwork gives Codex to exit by itself after typing its exit command at a lane's end, before killing it. It took {took, plural, one {# second} other {# seconds}} when recorded.",
@@ -857,7 +857,7 @@
   },
   "settings.advanced.codex.exit.graceSeconds.title": {
     "defaultMessage": "Lane's end: exit grace",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.fullAccess.answerSeconds.desc": {
     "defaultMessage": "How long Combwork's switch to Full Access waits for you to answer Codex's own warning in its terminal. Meanwhile Combwork types nothing into the agent; once it passes, Combwork says Codex didn't confirm the switch, and still notices it later if you answer Yes.",
@@ -865,7 +865,7 @@
   },
   "settings.advanced.codex.fullAccess.answerSeconds.title": {
     "defaultMessage": "Full Access warning: wait for your answer",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Full Access is Codex's mode: keep it."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Full Access is Codex's mode: keep it."
   },
   "settings.advanced.codex.fullAccess.warning.desc": {
     "defaultMessage": "Codex's own warning after Full Access is picked in its /permissions menu, which you answer in its terminal. While it is on screen, Combwork's switch to Full Access waits for your answer; if it doesn't match, Combwork may say Codex didn't confirm the switch while the warning is still waiting.",
@@ -873,7 +873,7 @@
   },
   "settings.advanced.codex.fullAccess.warning.title": {
     "defaultMessage": "Full Access warning",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Full Access is Codex's mode: keep it."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Full Access is Codex's mode: keep it."
   },
   "settings.advanced.codex.fullAccess.warningAfterSeconds.desc": {
     "defaultMessage": "How long Codex has, after Combwork picks a preset in its /permissions menu before its first message, to show its own warning (Full Access). With no session file to read the switch back from, Combwork takes the preset as switched once this passes with no warning; raise it if a slow machine draws the warning later.",
@@ -881,7 +881,7 @@
   },
   "settings.advanced.codex.fullAccess.warningAfterSeconds.title": {
     "defaultMessage": "Full Access warning: time to appear",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Full Access is Codex's mode: keep it."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Full Access is Codex's mode: keep it."
   },
   "settings.advanced.codex.hooks.knownEvents.desc": {
     "defaultMessage": "The hook events Combwork knows Codex sends. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook named outside this list saves a capture of the agent's recent events.",
@@ -889,7 +889,7 @@
   },
   "settings.advanced.codex.hooks.knownEvents.title": {
     "defaultMessage": "Hooks: known events",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.hooks.knownFields.desc": {
     "defaultMessage": "The top-level fields Combwork knows Codex sends in its hooks. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook with a field outside this list saves a capture of the agent's recent events: often the first sign that a Codex update changed something. Add a field here once you know it is harmless.",
@@ -897,7 +897,7 @@
   },
   "settings.advanced.codex.hooks.knownFields.title": {
     "defaultMessage": "Hooks: known fields",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.hooks.listMethod.desc": {
     "defaultMessage": "The request Combwork sends Codex's app server for the hooks a session has. Wrong, an agent's Hooks dialog lists only Combwork's own and says Codex couldn't list the rest, and Combwork trusts its hooks by its own hashes.",
@@ -905,7 +905,7 @@
   },
   "settings.advanced.codex.hooks.listMethod.title": {
     "defaultMessage": "Hooks: listing request",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.hooks.listSeconds.desc": {
     "defaultMessage": "How long Combwork gives Codex's app server to list a session's hooks (`hooks/list`). Past it, an agent's Hooks dialog lists only Combwork's own and says Codex couldn't list the rest.",
@@ -913,7 +913,7 @@
   },
   "settings.advanced.codex.hooks.listSeconds.title": {
     "defaultMessage": "Hooks: listing timeout",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.hooks.preToolUseTimeoutSeconds.desc": {
     "defaultMessage": "How long Codex waits for Combwork's answer before a tool runs (an edit waits for a file lock). If Combwork doesn't answer in time, the tool goes ahead.",
@@ -921,7 +921,7 @@
   },
   "settings.advanced.codex.hooks.preToolUseTimeoutSeconds.title": {
     "defaultMessage": "Hooks: before a tool, timeout",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.hooks.timeoutSeconds.desc": {
     "defaultMessage": "How long Codex waits for Combwork to take one of its hooks. Codex itself holds the interrupt and session-end hooks to {most, plural, one {# second} other {# seconds}} at most. Combwork approves its hooks for Codex itself, so a change needs no review in Codex.",
@@ -929,7 +929,7 @@
   },
   "settings.advanced.codex.hooks.timeoutSeconds.title": {
     "defaultMessage": "Hooks: timeout",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.mcp.startupTimeoutSeconds.desc": {
     "defaultMessage": "How long Codex waits for Combwork's hive server to start, when your own Codex config has a server named hive with a startup timeout of its own: Combwork gives Codex this one instead (otherwise Codex's own, 10 s, applies). Too short, and Codex agents start without Combwork's tools.",
@@ -937,7 +937,7 @@
   },
   "settings.advanced.codex.mcp.startupTimeoutSeconds.title": {
     "defaultMessage": "hive tools: startup timeout in Codex",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.mcp.toolTimeoutSeconds.desc": {
     "defaultMessage": "How long Codex lets one of Combwork's tools run (its tool_timeout_sec for the hive server). Combwork's waits stay a minute under it.",
@@ -945,7 +945,7 @@
   },
   "settings.advanced.codex.mcp.toolTimeoutSeconds.title": {
     "defaultMessage": "hive tools: timeout in Codex",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.mouse.rightClickToCli.desc": {
     "defaultMessage": "Right-click in a Codex pane is Combwork's, as in every pane: it copies the terminal's selection (Shift+drag), or pastes. Turned on, Combwork passes right-clicks to Codex instead, which tracks the mouse itself.",
@@ -953,7 +953,7 @@
   },
   "settings.advanced.codex.mouse.rightClickToCli.title": {
     "defaultMessage": "Pass right-click to Codex",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.outage.connectionError.desc": {
     "defaultMessage": "A turn's error, in Codex's session file, that means it lost its connection to its API: with Resume agents after a connection drops on, Combwork waits for the connection and resumes the agent. Wrong, such agents stay stopped.",
@@ -961,7 +961,7 @@
   },
   "settings.advanced.codex.outage.connectionError.title": {
     "defaultMessage": "Connection dropped: error message",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.override.mcpIsolation.desc": {
     "defaultMessage": "Combwork's Codex sessions get the MCP servers the workspace gives them, and Combwork turns off the ones in your own Codex config and the project's (enabled=false, for those sessions only). Turned off, those load beside the workspace's too, as they would outside Combwork. Combwork's own hive server always wins over one of yours with that name.",
@@ -993,7 +993,7 @@
   },
   "settings.advanced.codex.prompt.drawnSeconds.title": {
     "defaultMessage": "Typed line: wait to be drawn",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.prompt.newlineKey.altEnter": {
     "defaultMessage": "Alt+Enter",
@@ -1025,7 +1025,7 @@
   },
   "settings.advanced.codex.promptInput.timeoutSeconds.title": {
     "defaultMessage": "Reading a session's instructions: timeout",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.queue.hint.desc": {
     "defaultMessage": "Codex's hint on the last line it draws while it is busy and queues what is typed. Combwork waits for it to go before typing into Codex (a message, its /permissions menu at setup); wrong, what Combwork types can be queued rather than run.",
@@ -1033,7 +1033,7 @@
   },
   "settings.advanced.codex.queue.hint.title": {
     "defaultMessage": "Screen: holding what was typed",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.rateLimits.field.desc": {
     "defaultMessage": "The field of Codex's token counts with a subscription's limits. Wrong, Combwork shows no plan limits for Codex.",
@@ -1041,7 +1041,7 @@
   },
   "settings.advanced.codex.rateLimits.field.title": {
     "defaultMessage": "Session file: plan limits field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.rateLimits.usedPercent.desc": {
     "defaultMessage": "A limit's field with the percentage used.",
@@ -1049,7 +1049,7 @@
   },
   "settings.advanced.codex.rateLimits.usedPercent.title": {
     "defaultMessage": "Session file: percentage used field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.rateLimits.windowMinutes.desc": {
     "defaultMessage": "A limit's field with its window in minutes (300 is the 5-hour limit, 10080 the weekly one).",
@@ -1057,7 +1057,7 @@
   },
   "settings.advanced.codex.rateLimits.windowMinutes.title": {
     "defaultMessage": "Session file: limit's window field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.ready.placeholder.desc": {
     "defaultMessage": "The text Codex's empty input shows. Codex only says it has started with the first prompt, so Combwork takes this text on screen to mean it is ready, and an input line showing only this to mean it is idle.",
@@ -1065,7 +1065,7 @@
   },
   "settings.advanced.codex.ready.placeholder.title": {
     "defaultMessage": "Composer placeholder",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.retry.checkAfterSeconds.desc": {
     "defaultMessage": "How long a working Codex session has to go without a hook before Combwork looks in Codex's log for a wait to retry its model request, then every 15 seconds while it stays quiet.",
@@ -1081,7 +1081,7 @@
   },
   "settings.advanced.codex.retry.logTarget.title": {
     "defaultMessage": "Retry wait: log entries",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A retry wait: the coding agent waiting to try its model request again (after being rate-limited)."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A retry wait: the coding agent waiting to try its model request again (after being rate-limited)."
   },
   "settings.advanced.codex.retry.pattern.desc": {
     "defaultMessage": "How Codex words that log entry: a regular expression whose named groups give the try (attempt), the tries allowed (max), the wait (seconds, or millis) and the HTTP status that refused the request (status: 429 is a rate limit). Wrong, a waiting agent just shows Working.",
@@ -1089,7 +1089,7 @@
   },
   "settings.advanced.codex.retry.pattern.title": {
     "defaultMessage": "Retry wait: message",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A retry wait: the coding agent waiting to try its model request again."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A retry wait: the coding agent waiting to try its model request again."
   },
   "settings.advanced.codex.signIn.expired.desc": {
     "defaultMessage": "A turn's error, in Codex's session file, that means its sign-in was refused or has expired, when Codex doesn't mark the error itself (#309).",
@@ -1097,7 +1097,7 @@
   },
   "settings.advanced.codex.signIn.expired.title": {
     "defaultMessage": "Sign-in refused: error message",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.subagent.item.desc": {
     "defaultMessage": "The kind of item Codex records when a subagent it spawned starts or ends (#1584). Wrong, Combwork doesn't count Codex's subagents among an agent's background tasks.",
@@ -1105,7 +1105,7 @@
   },
   "settings.advanced.codex.subagent.item.title": {
     "defaultMessage": "Session file: subagent's activity",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.subagent.started.desc": {
     "defaultMessage": "The kind of that activity when the subagent starts; any other kind ends it. Wrong, Combwork doesn't count Codex's subagents.",
@@ -1113,7 +1113,7 @@
   },
   "settings.advanced.codex.subagent.started.title": {
     "defaultMessage": "Session file: subagent started",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.subagent.taskField.desc": {
     "defaultMessage": "The field of that activity with the subagent's task name. Wrong, Combwork still counts it but has no description of it.",
@@ -1121,7 +1121,7 @@
   },
   "settings.advanced.codex.subagent.taskField.title": {
     "defaultMessage": "Session file: subagent's task field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.subagent.threadField.desc": {
     "defaultMessage": "The field of that activity with the subagent's thread, which tells its start and its end apart from another's. Wrong, Combwork doesn't count Codex's subagents.",
@@ -1129,7 +1129,7 @@
   },
   "settings.advanced.codex.subagent.threadField.title": {
     "defaultMessage": "Session file: subagent's thread field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.title.items.desc": {
     "defaultMessage": "What Combwork asks Codex to put in its terminal title (tui.terminal_title): its activity, which shows the busy spinner and \"Action Required\", and the project's name. Without activity, Combwork can't tell from the title that Codex is working or needs you.",
@@ -1137,7 +1137,7 @@
   },
   "settings.advanced.codex.title.items.title": {
     "defaultMessage": "Terminal title items",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.trust.perLaunch.desc": {
     "defaultMessage": "Each Codex agent is started with its own folder (its project, slot or review copy) trusted for that launch, so Codex doesn't ask whether to trust it. Nothing is written to Codex's files. Off, Codex asks once per project on each connection, and Set Up walks you through them.",
@@ -1145,7 +1145,7 @@
   },
   "settings.advanced.codex.trust.perLaunch.title": {
     "defaultMessage": "Trust Combwork's folders on each launch",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.trust.prompt.desc": {
     "defaultMessage": "Codex's question before a folder's first session (in a Git repository). Combwork shows the agent as waiting for you while it is on screen.",
@@ -1153,7 +1153,7 @@
   },
   "settings.advanced.codex.trust.prompt.title": {
     "defaultMessage": "Trust question",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.turnScreen.working.desc": {
     "defaultMessage": "Codex's Working line, drawn only while a turn runs. When Combwork missed a turn's start or end, it takes this on screen to mean the agent is working; wrong, it can take a working agent for idle.",
@@ -1161,7 +1161,7 @@
   },
   "settings.advanced.codex.turnScreen.working.title": {
     "defaultMessage": "Screen: working",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codexPermissions.desc": {
     "defaultMessage": "The label Codex's /permissions menu shows for its {label} preset. Combwork types the number beside it to give an agent the {mode} mode; wrong, Combwork can't find it, and says so rather than choosing another.",
@@ -1177,7 +1177,7 @@
   },
   "settings.advanced.copilot.compaction.conversationTokens.title": {
     "defaultMessage": "Compaction: conversation tokens field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.compaction.summary.desc": {
     "defaultMessage": "The field of a compaction's end, in Copilot's session file, with the summary it carries on from: the Sessions tab shows it with the compaction.",
@@ -1185,7 +1185,7 @@
   },
   "settings.advanced.copilot.compaction.summary.title": {
     "defaultMessage": "Compaction: summary field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.compaction.systemTokens.desc": {
     "defaultMessage": "The field of a compaction's start and end, in Copilot's session file, with the system prompt's tokens: one of the three parts of the context before and after it, in usage and the Sessions tab.",
@@ -1193,7 +1193,7 @@
   },
   "settings.advanced.copilot.compaction.systemTokens.title": {
     "defaultMessage": "Compaction: system prompt tokens field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.compaction.toolTokens.desc": {
     "defaultMessage": "The field of a compaction's start and end, in Copilot's session file, with the tool definitions' tokens: one of the three parts of the context before and after it, in usage and the Sessions tab.",
@@ -1201,7 +1201,7 @@
   },
   "settings.advanced.copilot.compaction.toolTokens.title": {
     "defaultMessage": "Compaction: tool definition tokens field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.exit.armed.desc": {
     "defaultMessage": "What Copilot shows after one Ctrl+C at its prompt, meaning the next one exits. When Combwork stops Copilot, it presses Ctrl+C again once this shows. If it no longer matches, Combwork keeps pressing Ctrl+C until Copilot exits, which takes longer.",
@@ -1209,7 +1209,7 @@
   },
   "settings.advanced.copilot.exit.armed.title": {
     "defaultMessage": "Stop: exit hint",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.exit.graceSeconds.desc": {
     "defaultMessage": "When Combwork stops Copilot (Stop, Restart, closing a project or quitting), how long it gives Copilot to exit by itself after its Ctrl+C before killing it. Copilot writes the session's token totals only as it exits by itself: one killed first loses them. It took up to {took, plural, one {# second} other {# seconds}} on a busy machine (#716); quitting Combwork or closing a workspace waits up to this long, and a second more, for a Copilot that hangs.",
@@ -1217,7 +1217,7 @@
   },
   "settings.advanced.copilot.exit.graceSeconds.title": {
     "defaultMessage": "Stop: exit grace",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.hooks.knownEvents.desc": {
     "defaultMessage": "The hook events Combwork knows GitHub Copilot sends. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook named outside this list saves a capture of the agent's recent events.",
@@ -1225,7 +1225,7 @@
   },
   "settings.advanced.copilot.hooks.knownEvents.title": {
     "defaultMessage": "Hooks: known events",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.hooks.knownFields.desc": {
     "defaultMessage": "The top-level fields Combwork knows GitHub Copilot sends in its hooks. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook with a field outside this list saves a capture of the agent's recent events: often the first sign that a GitHub Copilot update changed something. Add a field here once you know it is harmless.",
@@ -1233,7 +1233,7 @@
   },
   "settings.advanced.copilot.hooks.knownFields.title": {
     "defaultMessage": "Hooks: known fields",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.hooks.preToolUseTimeoutSeconds.desc": {
     "defaultMessage": "How long Copilot waits for Combwork's answer before a tool runs (an edit waits for a file lock). If Combwork doesn't answer in time, the tool goes ahead.",
@@ -1241,7 +1241,7 @@
   },
   "settings.advanced.copilot.hooks.preToolUseTimeoutSeconds.title": {
     "defaultMessage": "Hooks: before a tool, timeout",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.hooks.timeoutSeconds.desc": {
     "defaultMessage": "How long Copilot waits for Combwork to take one of its hooks.",
@@ -1249,7 +1249,7 @@
   },
   "settings.advanced.copilot.hooks.timeoutSeconds.title": {
     "defaultMessage": "Hooks: timeout",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.mouse.rightClickToCli.desc": {
     "defaultMessage": "Right-click in a Copilot pane is Combwork's, as in every pane: it copies the terminal's selection (Shift+drag), or pastes. Turned on, Combwork passes right-clicks to Copilot instead, which copies its own selection (a drag) with them, as its footer says.",
@@ -1257,7 +1257,7 @@
   },
   "settings.advanced.copilot.mouse.rightClickToCli.title": {
     "defaultMessage": "Pass right-click to Copilot",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.outage.connectionError.desc": {
     "defaultMessage": "What Copilot's error says when it couldn't reach its model's API after its retries: with Resume agents after a connection drops on, Combwork waits for the connection and resumes the agent. Wrong, such agents stay stopped.",
@@ -1265,7 +1265,7 @@
   },
   "settings.advanced.copilot.outage.connectionError.title": {
     "defaultMessage": "Connection dropped: error message",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.override.allMcpInstructions.desc": {
     "defaultMessage": "Combwork starts Copilot with --allow-all-mcp-server-instructions, so Copilot puts the hive server's instructions (Combwork's guidance for agents) in its system prompt, and the instructions of the other servers its agents get too. Turned off, Copilot includes only the servers it allows by itself, and Combwork gives its guidance as custom instructions instead.",
@@ -1313,7 +1313,7 @@
   },
   "settings.advanced.copilot.question.field.title": {
     "defaultMessage": "Question: text field",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.question.tool.desc": {
     "defaultMessage": "The name Copilot's hooks give its tool that asks you a question. Combwork shows that tool's question while the agent waits for your answer; when it doesn't match, the agent shows only Copilot's own notice.",
@@ -1321,7 +1321,7 @@
   },
   "settings.advanced.copilot.question.tool.title": {
     "defaultMessage": "Question: tool name",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.ready.footer.desc": {
     "defaultMessage": "Copilot only says it has started with the first prompt, so Combwork takes its footer on screen to mean it is ready.",
@@ -1329,7 +1329,7 @@
   },
   "settings.advanced.copilot.ready.footer.title": {
     "defaultMessage": "Ready footer",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.retry.context.desc": {
     "defaultMessage": "Where Copilot's error hook says a recoverable error happened when it is a model call it tries again (rate-limited, or the service unreachable). Combwork shows the agent's status as waiting to retry until Copilot goes on. Wrong, a waiting agent just shows Working.",
@@ -1337,7 +1337,7 @@
   },
   "settings.advanced.copilot.retry.context.title": {
     "defaultMessage": "Retry: error context",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A retry: the coding agent trying its model request again after it failed."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A retry: the coding agent trying its model request again after it failed."
   },
   "settings.advanced.copilot.retry.message.desc": {
     "defaultMessage": "How that hook words why the call failed: a regular expression whose named group status is the HTTP status that refused it, whose group limited matches the words of a rate limit (429), or whose group network matches when the service couldn't be reached. Copilot's hook gives the service's own error, often with no status. Wrong, the wait shows without its reason.",
@@ -1345,7 +1345,7 @@
   },
   "settings.advanced.copilot.retry.message.title": {
     "defaultMessage": "Retry: error message",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.signIn.errorMessage.desc": {
     "defaultMessage": "A session error's message, in Copilot's session file, that means its sign-in was refused, when its type doesn't say so.",
@@ -1353,7 +1353,7 @@
   },
   "settings.advanced.copilot.signIn.errorMessage.title": {
     "defaultMessage": "Sign-in refused: error message",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.signIn.errorType.desc": {
     "defaultMessage": "A session error's type, in Copilot's session file, that means its sign-in was refused or is missing (#309): Combwork shows the agent signed out.",
@@ -1361,7 +1361,7 @@
   },
   "settings.advanced.copilot.signIn.errorType.title": {
     "defaultMessage": "Sign-in refused: error type",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.signIn.hookMessage.desc": {
     "defaultMessage": "The message of Copilot's ErrorOccurred hook that means a model call was refused for the sign-in: the turn ends signed out. Another error that ends the turn ends it as failed.",
@@ -1369,7 +1369,7 @@
   },
   "settings.advanced.copilot.signIn.hookMessage.title": {
     "defaultMessage": "Sign-in refused: ErrorOccurred hook",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.trust.prompt.desc": {
     "defaultMessage": "Copilot's question before a folder's first session. Combwork shows the agent as waiting for you while it is on screen.",
@@ -1377,7 +1377,7 @@
   },
   "settings.advanced.copilot.trust.prompt.title": {
     "defaultMessage": "Trust question",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.turnFailed.errorType.desc": {
     "defaultMessage": "A session error's type, in Copilot's session file, that means its turn ended because a model call failed after Copilot's retries (it sends no Stop then): Combwork ends the turn as failed, with Copilot's message. Wrong, such an agent shows working until you look.",
@@ -1385,7 +1385,7 @@
   },
   "settings.advanced.copilot.turnFailed.errorType.title": {
     "defaultMessage": "Turn failed: error type",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilotFooter.desc": {
     "defaultMessage": "Copilot's footer in the {mode} mode (\"{footer}\"){shared, select, yes {, which Ask and Accept edits share (Combwork tells them apart by the mode the session started in)} other {}}. Combwork reads an agent's mode from its footer (the mode found last on screen), and switches modes by pressing Shift+Tab until the footer shows the one wanted; wrong, Combwork doesn't see the agent in that mode, and can't switch to it without a restart.",
@@ -1509,7 +1509,7 @@
   },
   "settings.advanced.hive.console.showText.title": {
     "defaultMessage": "Developer console: show prompt, reply and command text",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.hive.copies.quietWaitMinutes.desc": {
     "defaultMessage": "A returned review or check copy is used again only once nothing is running in it: no run, no process its check started, its reviewer idle. Past this many minutes, a check waiting for a copy says which copy is still in use and by what. Combwork never resets a copy something is still running in.",
@@ -1533,7 +1533,7 @@
   },
   "settings.advanced.hive.disableHardwareAcceleration.title": {
     "defaultMessage": "Disable hardware acceleration",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.hive.focused.pickSeconds.desc": {
     "defaultMessage": "How long the project’s command that chooses a card’s focused tests may run, when it is submitted and at its merge. Past it, the command is ended and no tests count as chosen: the builder then names them itself.",
@@ -1557,7 +1557,7 @@
   },
   "settings.advanced.hive.heapSnapshotNearLimit.title": {
     "defaultMessage": "Save a memory snapshot if Combwork is about to run out of memory",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.hive.hooks.missingSeconds.desc": {
     "defaultMessage": "How long an agent's CLI may go without a hook, from its start (a CLI that sends one then) or from a prompt it went to work on, before Combwork says its hooks aren't arriving and shows its status as unknown (#1336). A long think after a prompt's hook never counts. Raise it if a slow machine shows that notice for agents that are fine.",
@@ -1565,7 +1565,7 @@
   },
   "settings.advanced.hive.hooks.missingSeconds.title": {
     "defaultMessage": "Hooks missing: wait",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Hooks: the calls an agent's coding agent makes to Hive as it works."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Hooks: the calls an agent's coding agent makes to Hive as it works."
   },
   "settings.advanced.hive.inbox.checkpoints.desc": {
     "defaultMessage": "When something arrives in a working agent's inbox, Combwork tells it at the end of its next tool call, in that tool's reply, so it can read it without stopping. Turned off, a working agent isn't told until its turn ends or it is idle; nothing is lost, as it stays in the inbox. A project can set its own in Project Settings → Sessions.",
@@ -1637,7 +1637,7 @@
   },
   "settings.advanced.hive.lanes.waitReviewerMinutes.title": {
     "defaultMessage": "Lanes: a long wait for a reviewer",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.hive.lanes.waitYouMinutes.desc": {
     "defaultMessage": "After how long a lane waiting for you (a request in For you, or a card at its round limit) has its wait marked in the Progress panel's Lanes. Too short marks every wait; too long, a lane can sit unnoticed.",
@@ -1645,7 +1645,7 @@
   },
   "settings.advanced.hive.lanes.waitYouMinutes.title": {
     "defaultMessage": "Lanes: a long wait for you",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.hive.lostLine.steadySeconds.desc": {
     "defaultMessage": "A line Combwork typed into an agent that its CLI didn't take, gone from its input since (a screen of the CLI's took it): how long its input must stay empty, at its prompt, with nothing taken, before Combwork types it again or, with nothing to type again, tells you. Raise it if a slow machine has a line typed twice.",
@@ -1653,7 +1653,7 @@
   },
   "settings.advanced.hive.lostLine.steadySeconds.title": {
     "defaultMessage": "Lost line: wait",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A line: a message Hive typed into an agent's terminal."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A line: a message Hive typed into an agent's terminal."
   },
   "settings.advanced.hive.mcp.connectSeconds.desc": {
     "defaultMessage": "How long Combwork waits, once an agent is ready, for its CLI to connect Combwork's tools before it tells the agent of new work anyway. A resumed session can be ready before its tools are, and a message then is a turn spent without them (#865). Lower it if messages reach agents late when their CLI doesn't connect Combwork's tools.",
@@ -1661,7 +1661,7 @@
   },
   "settings.advanced.hive.mcp.connectSeconds.title": {
     "defaultMessage": "hive tools: wait to connect",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.hive.mcp.replySeconds.desc": {
     "defaultMessage": "How long the hive MCP server waits for Combwork to answer one of its tools (a wait's own time comes on top). Raise it when a slow or very busy machine makes hive tools fail with \"Combwork didn't reply within 300 s\" (#371).",
@@ -1669,7 +1669,7 @@
   },
   "settings.advanced.hive.mcp.replySeconds.title": {
     "defaultMessage": "hive tools: reply timeout",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.hive.mcpCatalog.downloadSeconds.desc": {
     "defaultMessage": "How long Install and Update wait for a catalogue server's zip, redirects included, before they stop with nothing installed. Raise it on a slow connection.",
@@ -1781,7 +1781,7 @@
   },
   "settings.advanced.hive.outage.resume.title": {
     "defaultMessage": "Resume agents after a connection drops",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.hive.outage.resumesPerHour.desc": {
     "defaultMessage": "How many times in an hour Combwork resumes the same agent. Once its turn ends on a connection error again after that many, Combwork stops: the PC's own network may not have recovered.",
@@ -1813,7 +1813,7 @@
   },
   "settings.advanced.hive.progress.lanesShown.title": {
     "defaultMessage": "Progress panel: lanes shown",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.hive.progress.replySeconds.desc": {
     "defaultMessage": "How long cw-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 2 minutes at most.",
@@ -1821,7 +1821,7 @@
   },
   "settings.advanced.hive.progress.replySeconds.title": {
     "defaultMessage": "cw-progress: Combwork's reply time",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. cw-progress is the command agents run long commands and checks through: keep it as it is."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. cw-progress is the command agents run long commands and checks through: keep it as it is."
   },
   "settings.advanced.hive.prompt.asTyped.desc": {
     "defaultMessage": "Combwork puts each prompt it types into an agent (a message, a wake, a card's start) on one line: runs of spaces become one, line breaks become spaces, and control characters are left out. Turned on, Claude Code and Copilot get the text as written, spacing and line breaks included. Codex, and a slash command in any CLI, still get each line break and tab as a space: Combwork types those key by key, where a line break would send the prompt early and a tab complete a word. For Codex, Typed prompts: line breaks (under Codex) can press a new-line key instead. Other control characters are left out either way: they would press keys.",
@@ -1925,7 +1925,7 @@
   },
   "settings.advanced.hive.recorder.pattern.title": {
     "defaultMessage": "Flight recorder: capture events matching",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. The flight recorder saves the developer console's recent events when something rare happens."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The flight recorder saves the developer console's recent events when something rare happens."
   },
   "settings.advanced.hive.recorder.safeguard.desc": {
     "defaultMessage": "Save a capture when a model's safeguards stop a response or switch the model: the agent's newest developer console events, redacted, in Combwork's console-recordings folder, with a notice. With any flight recorder trigger on, Combwork keeps each agent's newest developer console events in memory (redacted), whether a console is open or not.",
@@ -1933,7 +1933,7 @@
   },
   "settings.advanced.hive.recorder.safeguard.title": {
     "defaultMessage": "Flight recorder: capture safeguard stops",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. The flight recorder saves the developer console's recent events when something rare happens."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The flight recorder saves the developer console's recent events when something rare happens."
   },
   "settings.advanced.hive.recorder.stalled.desc": {
     "defaultMessage": "Save a capture when an agent working on a turn goes silent past its limit, so Combwork can't tell what it is doing.",
@@ -1941,7 +1941,7 @@
   },
   "settings.advanced.hive.recorder.stalled.title": {
     "defaultMessage": "Flight recorder: capture an agent gone silent",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. The flight recorder saves the developer console's recent events when something rare happens."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The flight recorder saves the developer console's recent events when something rare happens."
   },
   "settings.advanced.hive.recorder.unknown.desc": {
     "defaultMessage": "Save a capture when a CLI sends a hook or a status line with a field Combwork doesn't know: often the first sign that a CLI update changed something.",
@@ -1949,7 +1949,7 @@
   },
   "settings.advanced.hive.recorder.unknown.title": {
     "defaultMessage": "Flight recorder: capture something unknown from a CLI",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. The flight recorder saves the developer console's recent events when something rare happens."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The flight recorder saves the developer console's recent events when something rare happens."
   },
   "settings.advanced.hive.recorder.version.desc": {
     "defaultMessage": "Save a capture when an agent starts on a version of its CLI other than the one the last agent of that CLI started on.",
@@ -1957,7 +1957,7 @@
   },
   "settings.advanced.hive.recorder.version.title": {
     "defaultMessage": "Flight recorder: capture a CLI version change",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. The flight recorder saves the developer console's recent events when something rare happens."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The flight recorder saves the developer console's recent events when something rare happens."
   },
   "settings.advanced.hive.restart.resumeAfterUpdate.desc": {
     "defaultMessage": "When Combwork restarts for an update (Restart to Update, or an installer closing it), the agents that were working, watching their cards or in a card loop start again in their conversations, one at a time, each told where it was. Off: Combwork offers to resume them instead, as it does after you quit.",
@@ -1965,7 +1965,7 @@
   },
   "settings.advanced.hive.restart.resumeAfterUpdate.title": {
     "defaultMessage": "Resume agents after an update",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.hive.restart.resumeReadySeconds.desc": {
     "defaultMessage": "How long an agent Combwork resumes after a restart has to be ready. One that isn't is stopped and listed as not resumed, and the next one starts.",
@@ -1997,7 +1997,7 @@
   },
   "settings.advanced.hive.showDeveloperFeatures.title": {
     "defaultMessage": "Show developer features",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.hive.skills.removeIdleCopies.desc": {
     "defaultMessage": "Codex and Copilot read Combwork's skills from copies Combwork puts in each agent's folder (.agents/skills/hive-…); Claude Code gets them at each launch and leaves nothing behind. Once the last of Combwork's agents in a folder stops, Combwork can remove its copies, so a CLI you run there yourself doesn't see them. Slots only removes them from slots and agents' worktrees, never the project folder. Everywhere removes them from the project folder too. Never keeps them. Only copies Combwork made, and nobody changed since, are removed: never your own skills.",
@@ -2101,7 +2101,7 @@
   },
   "settings.advanced.hive.wait.agentsMaxSeconds.title": {
     "defaultMessage": "Agent waits: longest",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.hive.wait.cardMaxSeconds.desc": {
     "defaultMessage": "The longest an agent's cw_wait_for_tasks call (without wake) waits before it answers. It has to stay under the CLIs' own tool timeouts, so Combwork keeps it a minute below Codex's hive tool timeout whatever is set here.",
@@ -2109,7 +2109,7 @@
   },
   "settings.advanced.hive.wait.cardMaxSeconds.title": {
     "defaultMessage": "Card waits: longest",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.hive.workflow.enforce.desc": {
     "defaultMessage": "Combwork keeps each project's workflow rules as cards move: what its Version Control options ask for before a card reaches Review, Approved or Done, and what follows when Combwork sees a card's work merged or changed outside Combwork. Turned off, every rule is off at once in every project: cards move wherever they are put, nothing is refused or asked, and Combwork only records what happens to each card's work, without moving cards or waking agents for it.",

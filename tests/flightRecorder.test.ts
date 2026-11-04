@@ -100,9 +100,9 @@ describe('the events and fields each CLI is known to send', () => {
   })
 
   it('the pattern trigger is off by default: its default never matches; the others are off', () => {
-    expect(ADVANCED_DEFS.find((d) => d.id === 'hive.recorder.pattern')?.default).toBe(FLIGHT_PATTERN_OFF)
+    expect(ADVANCED_DEFS.find((d) => d.id === 'cw.recorder.pattern')?.default).toBe(FLIGHT_PATTERN_OFF)
     expect(new RegExp(FLIGHT_PATTERN_OFF, 'i').test('hook Stop: anything at all')).toBe(false)
-    for (const t of ['safeguard', 'unknown', 'version', 'stalled']) expect(ADVANCED_DEFS.find((d) => d.id === `hive.recorder.${t}`)?.default).toBe(false)
+    for (const t of ['safeguard', 'unknown', 'version', 'stalled']) expect(ADVANCED_DEFS.find((d) => d.id === `cw.recorder.${t}`)?.default).toBe(false)
   })
 })
 
@@ -191,7 +191,7 @@ describe('captures and triggers', async () => {
   })
 
   it('a trigger saves the events before it and a notice, once per agent per period', async () => {
-    set({ 'hive.recorder.safeguard': true })
+    set({ 'cw.recorder.safeguard': true })
     const who = agent()
     const source = sessionSourceId(who.projectPath, who.agentId)
     devConsole.capture([source], () => ({ kind: 'hook', name: 'PreToolUse', summary: 'before it', raw: { prompt: 'secret words' } }))
@@ -216,7 +216,7 @@ describe('captures and triggers', async () => {
   })
 
   it('unknown events and fields, a version change, a silence and a pattern each fire when on', async () => {
-    set({ 'hive.recorder.unknown': true, 'hive.recorder.version': true, 'hive.recorder.stalled': true, 'hive.recorder.pattern': 'needle' })
+    set({ 'cw.recorder.unknown': true, 'cw.recorder.version': true, 'cw.recorder.stalled': true, 'cw.recorder.pattern': 'needle' })
     const who = agent()
     const label = () => 'proj · C'
     flightRecorder.arrived(who, label, 'hook', { hook_event_name: 'Stop', session_id: 's', stop_hook_active: false })
@@ -241,7 +241,7 @@ describe('captures and triggers', async () => {
   it("the notice and the list say what a capture saw in Hive's language; the file keeps its English beside it", async () => {
     const PL = join(__dirname, '..', 'locales', 'pl')
     const polish = Object.assign({}, ...readdirSync(PL).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(PL, f), 'utf8'))))
-    set({ 'hive.recorder.safeguard': true, 'hive.recorder.unknown': true })
+    set({ 'cw.recorder.safeguard': true, 'cw.recorder.unknown': true })
     setLanguage('pl', polish, 'pl-PL')
     try {
       flightRecorder.safeguard(agent(), () => 'proj · P', { kind: 'stop', model: 'opus' })
@@ -261,7 +261,7 @@ describe('captures and triggers', async () => {
   })
 
   it('what a capture says it saw is masked in its file, its notice and the list, as events are', async () => {
-    set({ 'hive.recorder.unknown': true, 'hive.recorder.safeguard': true })
+    set({ 'cw.recorder.unknown': true, 'cw.recorder.safeguard': true })
     flightRecorder.arrived(agent(), () => 'proj · D', 'hook', { hook_event_name: SECRET, unexpected: 1 })
     flightRecorder.safeguard(agent(), () => 'proj · E', { kind: 'switch', from: SECRET, to: 'sonnet' })
     await vi.waitFor(() => expect(toasts.list.length).toBe(2), { timeout: 10_000 })
@@ -273,7 +273,7 @@ describe('captures and triggers', async () => {
   })
 
   it('holds a bounded number of cooldowns and captures, waiting or being written, and nothing once every trigger is off', async () => {
-    set({ 'hive.recorder.pattern': 'needle' })
+    set({ 'cw.recorder.pattern': 'needle' })
     // A burst on many agents: at most so many captures are held at once.
     const many = Array.from({ length: 60 }, () => run(agent()))
     let release!: () => void
@@ -299,20 +299,20 @@ describe('captures and triggers', async () => {
     const needle = () => devConsole.capture([sessionSourceId(w.projectPath, w.agentId)], () => ({ kind: 'terminal', name: 'title', summary: 'a needle' }))
     needle()
     expect(toasts.list).toEqual([])
-    set({ 'hive.recorder.pattern': 'needle' })
+    set({ 'cw.recorder.pattern': 'needle' })
     needle()
     await vi.waitFor(() => expect(toasts.list.length).toBe(1), { timeout: 10_000 })
     expect(toasts.list[0].title).toBe('Captured an event matching your pattern on proj · S')
     await settled()
     set({})
-    set({ 'hive.recorder.pattern': 'needle' })
+    set({ 'cw.recorder.pattern': 'needle' })
     needle()
     await vi.waitFor(() => expect(toasts.list.length).toBe(2), { timeout: 10_000 })
     // An agent no longer running: nothing to say it is, so nothing captured.
     running.delete(sessionSourceId(w.projectPath, w.agentId))
     await settled()
     set({})
-    set({ 'hive.recorder.pattern': 'needle' })
+    set({ 'cw.recorder.pattern': 'needle' })
     needle()
     expect(flightRecorder.sizes().pending).toBe(0)
   })
@@ -321,12 +321,12 @@ describe('captures and triggers', async () => {
     process.env.HIVE_TEST_FLIGHT_AFTER_MS = '300'
     try {
       // Many kept, so this test's capture isn't pruned by the earlier ones.
-      set({ 'hive.recorder.safeguard': true, 'hive.recorder.stalled': true, 'hive.recorder.keep': 200 })
+      set({ 'cw.recorder.safeguard': true, 'cw.recorder.stalled': true, 'cw.recorder.keep': 200 })
       const before = captures().length
       flightRecorder.safeguard(agent(), () => 'proj · F', { kind: 'stop' })
       flightRecorder.stalled(agent(), () => 'proj · G', 1000)
       expect(flightRecorder.sizes().pending).toBe(2)
-      set({ 'hive.recorder.stalled': true, 'hive.recorder.keep': 200 })
+      set({ 'cw.recorder.stalled': true, 'cw.recorder.keep': 200 })
       expect(flightRecorder.sizes().pending).toBe(1)
       await vi.waitFor(() => expect(toasts.list.length).toBe(1), { timeout: 10_000 })
       expect(toasts.list[0].title).toBe('Captured a silence past its limit on proj · G')
@@ -344,7 +344,7 @@ describe('captures and triggers', async () => {
   it('a damaged versions file counts as none: no failure, and versions are kept from then on', async () => {
     const { flightRecorder: fresh } = await import('../src/main/flightRecorder?damaged' as string)
     writeFileSync(join(profile.dir, 'flight-recorder.json'), '{broken')
-    set({ 'hive.recorder.version': true })
+    set({ 'cw.recorder.version': true })
     const rejected: unknown[] = []
     const onRejection = (e: unknown) => rejected.push(e)
     process.on('unhandledRejection', onRejection)

@@ -3,10 +3,10 @@
  * with one owner each, apart from whether it can read one at all (its hive tools: Settings → Agent API → Provide Hive
  * tools to sessions, `agentReadsInbox`).
  *
- * - **checkpoints** (`hive.inbox.checkpoints`): a working agent is told of new items at the end of a tool of its own.
- * - **stopContinuation** (`hive.inbox.stopContinuation`): an agent stopping with items unread is kept going (Codex and
+ * - **checkpoints** (`cw.inbox.checkpoints`): a working agent is told of new items at the end of a tool of its own.
+ * - **stopContinuation** (`cw.inbox.stopContinuation`): an agent stopping with items unread is kept going (Codex and
  *   Copilot: its Stop blocked; Claude Code: context added to its Stop).
- * - **idleWakes** (`hive.inbox.idleWakes`): an idle agent is woken with a doorbell line, for every kind of item (a card
+ * - **idleWakes** (`cw.inbox.idleWakes`): an idle agent is woken with a doorbell line, for every kind of item (a card
  *   loop's wakes, `loopWakes`, are one kind). Off, nothing is typed for what waits, and the pane's Deliver now types it
  *   once. A task given now (a card started on an agent, hive_send_task) isn't a wake: it is typed as it is asked for.
  *
@@ -22,9 +22,9 @@ export const INBOX_SWITCHES: readonly InboxSwitch[] = ['checkpoints', 'stopConti
 
 /** Each switch's Settings → Advanced value. */
 export const INBOX_SWITCH_ID: Record<InboxSwitch, string> = {
-  checkpoints: 'hive.inbox.checkpoints',
-  stopContinuation: 'hive.inbox.stopContinuation',
-  idleWakes: 'hive.inbox.idleWakes'
+  checkpoints: 'cw.inbox.checkpoints',
+  stopContinuation: 'cw.inbox.stopContinuation',
+  idleWakes: 'cw.inbox.idleWakes'
 }
 
 /** Each switch's project override in project.json (and Project Settings → Sessions). */

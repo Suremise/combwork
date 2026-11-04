@@ -146,7 +146,7 @@ describe('the settings catalogue as Settings shows it', () => {
 })
 
 describe("Settings → Advanced's text", () => {
-  const reply = advancedDef('hive.mcp.replySeconds')!
+  const reply = advancedDef('cw.mcp.replySeconds')!
 
   it('keeps each value\'s English for the tools and errors; Settings shows its messages', () => {
     for (const d of ADVANCED_DEFS) {
@@ -170,10 +170,10 @@ describe("Settings → Advanced's text", () => {
 
   it("an override that isn't taken, or no longer finds the CLI's text, says so as shown; the English stays for the log", () => {
     const state = (values: Record<string, unknown>, workspace: Record<string, unknown> | null = null) => ({ values, madeFor: {}, workspace, cli: {} })
-    const row = advancedRow(reply, state({ 'hive.mcp.replySeconds': 5 }))
+    const row = advancedRow(reply, state({ 'cw.mcp.replySeconds': 5 }))
     expect(row.problem).toBe('hive tools: reply timeout takes a whole number from 30 to 3600.')
-    const lanes = advancedDef('hive.progress.lanesShown')!
-    const own = advancedRow(lanes, state({}, { 'hive.progress.lanesShown': 99 }))
+    const lanes = advancedDef('cw.progress.lanesShown')!
+    const own = advancedRow(lanes, state({}, { 'cw.progress.lanesShown': 99 }))
     expect(own.problem).toBe("This workspace's: Progress panel: lanes shown takes a whole number from 1 to 24.")
     const placeholder = advancedDef('codex.ready.placeholder')!
     const miss = advancedRow(placeholder, state({ 'codex.ready.placeholder': 'zzz' }))
@@ -188,11 +188,11 @@ describe("Settings → Advanced's text", () => {
 
   it("shows a value's unit in the language shown, with plurals", () => {
     expect(advancedShown(reply, 300)).toBe('300 s')
-    expect(advancedShown(advancedDef('hive.progress.lanesShown')!, 1)).toBe('1 lane')
-    expect(advancedShown(advancedDef('hive.progress.lanesShown')!, 4)).toBe('4 lanes')
-    expect(advancedShown(advancedDef('hive.showDeveloperFeatures')!, true)).toBe('on')
+    expect(advancedShown(advancedDef('cw.progress.lanesShown')!, 1)).toBe('1 lane')
+    expect(advancedShown(advancedDef('cw.progress.lanesShown')!, 4)).toBe('4 lanes')
+    expect(advancedShown(advancedDef('cw.showDeveloperFeatures')!, true)).toBe('on')
     pseudo()
-    expect(advancedShown(advancedDef('hive.progress.lanesShown')!, 4)).toMatch(/^\[4 ļáñéš/)
+    expect(advancedShown(advancedDef('cw.progress.lanesShown')!, 4)).toMatch(/^\[4 ļáñéš/)
   })
 })
 

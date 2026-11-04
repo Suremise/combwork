@@ -63,12 +63,12 @@ const check = (name, ok, extra = '') => {
 
     // --- Remove idle slots after a day, off: one builder left, a day later, nothing is removed.
     await inv('agents:remove', fx.alpha, b2.id, { deleteWorktree: false })
-    await inv('advanced:set', 'hive.slots.removeIdle', false)
+    await inv('advanced:set', 'cw.slots.removeIdle', false)
     const later = Date.now() + DAY_MS + 60_000
     const kept = await op({ op: 'tidy', at: later })
     check('Remove idle slots off: a day later the tidy removes nothing', JSON.stringify(kept) === '[]', JSON.stringify(kept))
     check('…both slots stay, their folders too', JSON.stringify(await names()) === '["slot-a","slot-b"]' && fs.existsSync(a.slot.folder) && fs.existsSync(b.slot.folder), JSON.stringify(await names()))
-    await inv('advanced:set', 'hive.slots.removeIdle', true)
+    await inv('advanced:set', 'cw.slots.removeIdle', true)
     const removed = await op({ op: 'tidy', at: later })
     check('…turned on, the same tidy removes the one beyond the pool of one', Array.isArray(removed) && removed.length === 1 && (await slots()).length === 1, JSON.stringify({ removed, left: await names() }))
     const left = (await slots())[0]

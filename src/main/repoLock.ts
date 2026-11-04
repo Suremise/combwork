@@ -112,7 +112,7 @@ export function useLockWorker(file: string | null): void {
 }
 
 /** How long a merge waits for another Hive's (Settings → Advanced). */
-export const REPO_LOCK_WAIT = 'hive.merge.lockWaitSeconds'
+export const REPO_LOCK_WAIT = 'cw.merge.lockWaitSeconds'
 /** How long a wait goes before the user is told who holds the lock. */
 const NOTICE_AFTER_MS = 1000
 

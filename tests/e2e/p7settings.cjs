@@ -41,7 +41,7 @@ const values = () => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'ut
     const list = page.locator('.advanced-list')
     check('Settings → Advanced shows the list', !!(await until(async () => (await list.count()) === 1, HUNG_MS)))
     const row = (id) => list.locator(`.advanced-row[data-advanced="${id}"]`)
-    for (const id of ['hive.slots.removeIdle', 'hive.slots.deleteMergedLines', 'hive.slots.renameAdopted']) {
+    for (const id of ['cw.slots.removeIdle', 'cw.slots.deleteMergedLines', 'cw.slots.renameAdopted']) {
       const sw = row(id).getByRole('switch').first()
       await sw.scrollIntoViewIfNeeded()
       check(`${id}: on by default`, (await sw.getAttribute('aria-checked')) === 'true' && !(id in values()))
@@ -52,22 +52,22 @@ const values = () => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'ut
     await page.screenshot({ path: at('1-switches.png') })
 
     // Copies: wait for one to be free, in minutes.
-    const quiet = row('hive.copies.quietWaitMinutes')
+    const quiet = row('cw.copies.quietWaitMinutes')
     const box = quiet.getByLabel('Combwork: Copies: wait for one to be free', { exact: true })
     await box.scrollIntoViewIfNeeded()
-    check('hive.copies.quietWaitMinutes: 10 by default', (await box.inputValue()) === '10')
+    check('cw.copies.quietWaitMinutes: 10 by default', (await box.inputValue()) === '10')
     await box.fill('3')
     await box.press('Enter')
-    check('…set to 3 in the window: in advanced.json', !!(await until(() => values()['hive.copies.quietWaitMinutes'] === 3, HUNG_MS)), JSON.stringify(values()))
-    check('…read by the main process', !!(await until(async () => (await inMain('hive.copies.quietWaitMinutes')) === 3, HUNG_MS)))
+    check('…set to 3 in the window: in advanced.json', !!(await until(() => values()['cw.copies.quietWaitMinutes'] === 3, HUNG_MS)), JSON.stringify(values()))
+    check('…read by the main process', !!(await until(async () => (await inMain('cw.copies.quietWaitMinutes')) === 3, HUNG_MS)))
 
     // Remove Hive's skill copies when no agent works in the folder: Slots only, Everywhere, Never.
-    const copies = row('hive.skills.removeIdleCopies').locator('select').first()
+    const copies = row('cw.skills.removeIdleCopies').locator('select').first()
     await copies.scrollIntoViewIfNeeded()
-    check('hive.skills.removeIdleCopies: Slots only by default', (await copies.inputValue()) === 'slots')
+    check('cw.skills.removeIdleCopies: Slots only by default', (await copies.inputValue()) === 'slots')
     for (const v of ['never', 'everywhere']) {
       await copies.selectOption(v)
-      check(`…set to ${v} in the window: in advanced.json, read by the main process`, !!(await until(async () => values()['hive.skills.removeIdleCopies'] === v && (await inMain('hive.skills.removeIdleCopies')) === v, HUNG_MS)), JSON.stringify(values()))
+      check(`…set to ${v} in the window: in advanced.json, read by the main process`, !!(await until(async () => values()['cw.skills.removeIdleCopies'] === v && (await inMain('cw.skills.removeIdleCopies')) === v, HUNG_MS)), JSON.stringify(values()))
     }
     await page.screenshot({ path: at('2-copies.png') })
 

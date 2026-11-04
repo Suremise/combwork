@@ -1,7 +1,7 @@
 // Resuming an agent after its connection drops (HI-1612). The fake Claude Code ends a turn as Claude Code 2.1.312 does
 // when its API can't be reached ("netdown": the ECONNREFUSED message, StopFailure server_error). With Settings →
 // Advanced → Resume agents after a connection drops on, the agent shows "Waiting for the connection…" and a Progress
-// run while a stand-in for its API host (hive.outage.checkUrl.claude-code) drops every connection; once the stand-in
+// run while a stand-in for its API host (cw.outage.checkUrl.claude-code) drops every connection; once the stand-in
 // answers, its conversation gets the note once, it carries on, and the run ends resumed. With the switch off, the same
 // failed turn is left as it was: no wait, no run, no note. Quiet test build, throwaway profile, workspace and test home.
 const lib = require('./lib.cjs')
@@ -48,7 +48,7 @@ function standIn() {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   // On, checking the stand-in every second or two (the defaults: 30 s, backing off to 5 min).
-  const values = { 'hive.outage.resume': true, 'hive.outage.checkFirstSeconds': 1, 'hive.outage.checkMostSeconds': 2, 'hive.outage.checkUrl.claude-code': `http://127.0.0.1:${host.port}/` }
+  const values = { 'cw.outage.resume': true, 'cw.outage.checkFirstSeconds': 1, 'cw.outage.checkMostSeconds': 2, 'cw.outage.checkUrl.claude-code': `http://127.0.0.1:${host.port}/` }
   fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values }, null, 2))
 
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47921), ...claude })
@@ -106,7 +106,7 @@ function standIn() {
     await page.screenshot({ path: path.join(shots, 'outage-3-resumed.png') })
 
     // --- Off: the same failed turn is left for the user, as before.
-    await inv('advanced:set', 'hive.outage.resume', false)
+    await inv('advanced:set', 'cw.outage.resume', false)
     host.up = false
     const hitsBefore = host.hits
     await failTurn(2)

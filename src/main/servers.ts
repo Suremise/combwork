@@ -416,7 +416,7 @@ export function apiEnv(projectPath: string, agentId: string): Record<string, str
   const token = agentToken(projectPath, agentId)
   if (!info.running || !info.url || !token) return {}
   // How long hive-progress waits for the API's answers (HI-1892: Settings → Advanced, its reply time).
-  return { CW_API_URL: info.url, CW_API_TOKEN_FILE: agentTokenFile(projectPath, agentId),CW_PROGRESS_REPLY_SECONDS: String(advanced.number('hive.progress.replySeconds')) }
+  return { CW_API_URL: info.url, CW_API_TOKEN_FILE: agentTokenFile(projectPath, agentId),CW_PROGRESS_REPLY_SECONDS: String(advanced.number('cw.progress.replySeconds')) }
 }
 
 /** An open workspace by its folder path or its name. A name two open workspaces share is refused (409): use the path. */

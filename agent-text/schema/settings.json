@@ -1894,6 +1894,12 @@
       "id": "plain"
     }
   },
+  "settings.agent.tool.renamed": {
+    "placeholders": {
+      "id": "plain",
+      "now": "plain"
+    }
+  },
   "settings.agent.tool.restart.assistant": {
     "placeholders": {}
   },

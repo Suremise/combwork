@@ -12,7 +12,7 @@ import { call } from '../api'
 import { commandKeybinding, runCommand } from '../commands'
 import { get, leaveSettingsForSidePanel, notify, projectKeyOf, projectStarting, projectState, startingLabel, prompt, set, setProjectTab, toggleCompactSidebar, useStore } from '../store'
 import { cx, formatKeybinding } from '../util'
-import { Icon, IconButton, InfoTip, LoadFailed, OneLineTitle, SearchInput, StaleNote, StatusDot, STATUS_TEXT, Switch, Tooltip, useContextMenu, type MenuEntry } from './ui'
+import { Icon, IconButton, InfoTip, LoadFailed, OneLineDesc, OneLineTitle, SearchInput, StaleNote, StatusDot, STATUS_TEXT, Switch, Tooltip, useContextMenu, type MenuEntry } from './ui'
 import { addSkill, deleteSkill, DeliveredSwitch, HiveSkillsWarning, restoreBundled, SKILL_LEVEL_TIP, skillDescription, SkillRow } from './Skills'
 import { DialectsPanel } from './Dialects'
 import { TemplatesPanel } from './Templates'
@@ -877,14 +877,8 @@ function McpPanel() {
                     </Tooltip>
                   )}
                 </div>
-                <div className="desc" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {actions.mcpErrorText(m) ?? m.def?.description ?? m.def?.command ?? m.def?.url}
-                </div>
-                {!m.error && (
-                  <div className="desc mcp-where" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {actions.mcpWhereText(m, workspace.projects)}
-                  </div>
-                )}
+                <OneLineDesc text={actions.mcpErrorText(m) ?? m.def?.description ?? m.def?.command ?? m.def?.url} />
+                {!m.error && <OneLineDesc className="mcp-where" text={actions.mcpWhereText(m, workspace.projects)} />}
               </div>
               <div className="row-actions" onClick={(e) => e.stopPropagation()}>
                 <IconButton icon="trash" title={tr(M.deleteServer)} onClick={() => void actions.deleteMcpServer(m)} />
