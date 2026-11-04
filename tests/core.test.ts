@@ -517,7 +517,7 @@ describe('Claude Code hooks', () => {
 
   it('refuses extra arguments with a bare "--" (#523: Hive doesn\'t guess what it meant)', async () => {
     const { extraArgsProblem } = await import('../src/shared/providers')
-    const refused = 'Hive passes the task after "--"; remove it from extra arguments.'
+    const refused = 'Combwork passes the task after "--"; remove it from extra arguments.'
     for (const args of ['--', '--allowedTools Read Bash --', '--append-system-prompt -- --allowedTools Read', '-- hello', '--verbose "--"']) expect(extraArgsProblem(args)).toContain(refused)
     expect(extraArgsProblem(['--model', 'opus', '--'])).toContain('--option=--')
     for (const args of ['', '--append-system-prompt=--', '--allowedTools a b', '--add-dir "../my -- lib"', '---', '--x']) expect(extraArgsProblem(args)).toBeNull()

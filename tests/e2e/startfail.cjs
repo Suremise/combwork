@@ -101,10 +101,10 @@ const check = (name, ok, extra = '') => {
   check('a stop shows no failure', !!(await until(async () => (await pane.locator('.session-ended:not(.start-failed)').count()) === 1, HUNG_MS)) && (await bar.count()) === 0)
   await page.screenshot({ path: path.join(lib.WORK, 'startfail-3-stopped.png') })
 
-  // --- A bare "--" in extra arguments (#523): Hive passes the task after its own, so a connection's are refused with
+  // --- A bare "--" in extra arguments (#523): Combwork passes the task after its own, so a connection's are refused with
   // one (HI-2122: extra arguments are a connection's), and one saved before (a config.json edited by hand) stops the
   // launch, saying why, before the CLI starts.
-  const refused = 'Hive passes the task after "--"; remove it from extra arguments.'
+  const refused = 'Combwork passes the task after "--"; remove it from extra arguments.'
   const connectionOf = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8')).agents.find((x) => x.id === agent.id).connection
   const saved = () => JSON.parse(fs.readFileSync(cfgFile, 'utf8')).connections.find((c) => c.id === connectionOf())
   const before = connectionOf()

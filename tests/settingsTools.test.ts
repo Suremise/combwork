@@ -132,7 +132,7 @@ describe('extra arguments with a bare "--" (#523)', () => {
   it("are refused when saved, the providers' and the Assistant's, and the settings stay as they were", () => {
     const was = structuredClone(config.settings)
     try {
-      const refused = 'Hive passes the task after "--"; remove it from extra arguments.'
+      const refused = 'Combwork passes the task after "--"; remove it from extra arguments.'
       expect(() => config.updateSettings({ providers: { 'claude-code': { extraArgs: '--allowedTools Read Bash --' } } } as never)).toThrow(refused)
       expect(() => config.updateSettings({ assistant: { providers: { codex: { extraArgs: '-- hello' } } } } as never)).toThrow(refused)
       expect(config.settings.providers['claude-code'].extraArgs).toBe(was.providers['claude-code'].extraArgs)
