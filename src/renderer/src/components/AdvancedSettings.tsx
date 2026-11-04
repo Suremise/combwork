@@ -278,7 +278,11 @@ const boxText = (def: AdvancedDef, v: unknown): string => (v === null || v === u
 function ValueBox({ def, value, label, placeholder, onCommit }: { def: AdvancedDef; value: unknown; label: string; placeholder?: string; onCommit: (v: unknown) => Promise<void> }) {
   const shown = (v: unknown): string => boxText(def, v)
   const [draft, setDraft] = useState(shown(value))
-  useEffect(() => setDraft(boxText(def, value)), [def, value])
+  // Follows the value only when its text changes (HI-2537): Settings reloads the advanced state on every change, its own
+  // or the workspace's, and each reload gives a list value as a new array. Keyed on the array, a reload landing while
+  // something was typed reset the box, and Enter then saved nothing (the text was the value's again).
+  const text = shown(value)
+  useEffect(() => setDraft(text), [text])
   // A workspace's own switch or choice (HI-2344): a select whose first option follows Settings' value (null, so no
   // override), shown as that value, then each value; a bare switch couldn't show inheriting or go back to it.
   if (placeholder !== undefined && (def.kind === 'boolean' || def.kind === 'choice')) {
