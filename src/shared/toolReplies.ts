@@ -977,7 +977,7 @@ export interface WaitChange {
  * card, where it is now, who changed it, the latest comment's author and first line), or no change; with `since` for the
  * next wait. Short: the full comment is cw_read_task with latestComment.
  */
-type WaitReply = { done?: string; unsubmitted?: UnsubmittedCard[]; idle?: number; watching?: string; limitAt?: string; already?: WaitChange; usageAlready?: string[]; changes?: WaitChange[]; timedOut?: boolean; since?: string; events?: string[]; replaced?: string; cards?: LaneWatchCards; agents?: LaneWatchAgents; lanesLeft?: string[]; names?: Record<string, string> }
+type WaitReply = { done?: string; unsubmitted?: UnsubmittedCard[]; idle?: number; watching?: string; limitAt?: string; already?: WaitChange; usageAlready?: string[]; lanesAlready?: string[]; changes?: WaitChange[]; timedOut?: boolean; since?: string; events?: string[]; replaced?: string; cards?: LaneWatchCards; agents?: LaneWatchAgents; lanesLeft?: string[]; names?: Record<string, string> }
 
 /**
  * HI-1987: a card or agent watch that replaces a lane watch while its lanes run says what it drops, and how to keep them
@@ -1018,6 +1018,8 @@ function waitText(r: WaitReply): string {
   if (r.watching) return `${say(R.waitWatching, { watching: r.watching, step: first ?? say(R.waitEndTurn, { limit }) })}${lanesLeftText(r.lanesLeft)}`
   if (r.already) return `${say(R.already, { what: line(r.already) })}${r.unsubmitted?.length ? ` ${unsubmittedText(r.unsubmitted)}` : ''}${lanesLeftText(r.lanesLeft)}`
   // A usage watch whose account is there already (HI-2195): no watch started, the one before it ended.
+  // A lane watch naming a lane that has ended (HI-2521): no watch started, the one before it ended.
+  if (r.lanesAlready) return `${say(R.already, { what: r.lanesAlready.join('; ') })}${r.replaced ? ` ${say(R.waitEnded, { watch: lowerWaiting(r.replaced) })}` : ''}`
   if (r.usageAlready) return `${say(R.already, { what: r.usageAlready.join('; ') })}${r.replaced ? ` ${say(R.waitEnded, { watch: lowerWaiting(r.replaced) })}` : ''}${lanesLeftText(r.lanesLeft)}`
   const since = r.since ? `\n${say(R.since, { since: r.since })}` : ''
   if (r.timedOut || !r.changes?.length) return `${say(R.waitNoChange)}${since}`

@@ -60,7 +60,7 @@ interface HiveMessageValues {
   'dialects.note': undefined
   'dialects.onFailed': { name: string | number }
   'dialects.onSwitch': { name: string | number }
-  'dialects.onTip': undefined
+  'dialects.onTip': { to: string; name: string | number }
   'dialects.outdatedBadge': { count: number }
   'dialects.outdatedGroup': undefined
   'dialects.override': undefined

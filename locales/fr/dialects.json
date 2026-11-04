@@ -58,7 +58,7 @@
   "dialects.note": "Note",
   "dialects.onFailed": "Impossible d’activer ou de désactiver {name}",
   "dialects.onSwitch": "{name} activé",
-  "dialects.onTip": "Activé : ses textes s’appliquent. Désactivé : sa place dans la chaîne est vide, donc ses textes reviennent à la couche du dessous. S’applique au prochain lancement de chaque agent.",
+  "dialects.onTip": "Activé : ses textes s’appliquent. Désactivé : {to, select, cli {il revient au fichier {name}} workspace {il revient au fichier de l’espace de travail} other {il revient au texte par défaut de Combwork}}. Les changements s’appliquent au prochain lancement de chaque agent.",
   "dialects.outdatedBadge": "{count, plural, one {# obsolète} many {# obsolètes} other {# obsolètes}}",
   "dialects.outdatedGroup": "Obsolètes",
   "dialects.override": "Modifier ici",

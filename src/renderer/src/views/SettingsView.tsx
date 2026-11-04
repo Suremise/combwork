@@ -1,7 +1,7 @@
 import { WorkflowLevelForm } from '../components/WorkflowOptions'
 import { JournalSettingsPanel } from '../components/JournalSettings'
 import { HiveCommands, QuitPoint, WorkspaceCommands, WorkspacePoint } from '../components/CommandsSettings'
-import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { AppSettings, ChimeSound, EffortOption, FallbackModel, McpCatalogSettings, ModelPrice, ProviderId, TaskColumn } from '@shared/types'
 import { DEFAULT_COLUMN_COLORS, TASK_COLUMNS, columnColor, columnName } from '@shared/tasks'
 import { DEFAULT_MODE } from '@shared/assistant'
@@ -31,6 +31,23 @@ import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { LANGUAGES, SOURCE_LANGUAGE, languageOf } from '@shared/i18n/languages'
 import { LANGUAGE_TEXT } from '@shared/i18n/languageText'
 import { cx, timeAgo } from '../util'
+
+/**
+ * What is half typed in a box that only saves on its button (a model to add, a viewer token's name…), kept while Combwork
+ * runs (HI-2525): leaving Settings for the side panel or the activity bar closes it, and reopening it shows the text again.
+ */
+const drafts = new Map<string, string>()
+
+/** A box's text, kept in `drafts` under `key` while Settings is closed and opened again. */
+function useSettingsDraft(key: string): [string, (v: string) => void] {
+  const [value, setValue] = useState(() => drafts.get(key) ?? '')
+  const change = useCallback((v: string): void => {
+    if (v) drafts.set(key, v)
+    else drafts.delete(key)
+    setValue(v)
+  }, [key])
+  return [value, change]
+}
 
 /** A settings section: a group of AppSettings, "providers" (turning them on), one provider's page ("provider:<id>"), or "advanced". */
 type Section = SettingsSection
@@ -124,7 +141,7 @@ function PriceTable({ provider }: { provider: ProviderId }) {
   const p = providerDescriptor(provider)
   const listed = useMemo(() => listedPriceModels(provider, catalog), [provider, catalog])
   const rows = priceRows(provider, settings, listed)
-  const [adding, setAdding] = useState('')
+  const [adding, setAdding] = useSettingsDraft(`prices:${provider}`)
   const newHint = tr(msg({ id: 'settings.prices.newPlaceholder', defaultMessage: 'Model ID, e.g. a new model', description: "Placeholder of the box under a price table where a model's ID is typed to add it." }))
   const [newBox, hintClipped] = usePlaceholderClipped(newHint)
   const cols: { key: keyof ModelPrice; label: string }[] = [
@@ -231,7 +248,7 @@ function PriceTable({ provider }: { provider: ProviderId }) {
  * stores the whole list as the user's; Reset to defaults removes it, so Hive's own list (and its updates) applies again.
  */
 function FallbackRows<T extends FallbackModel | EffortOption>({ provider, kind, rows, edited, valueLabel, newLabel, placeholder, open: startOpen }: { provider: ProviderId; kind: 'models' | 'efforts'; rows: T[]; edited: boolean; valueLabel: string; newLabel: string; placeholder: string; open: boolean }) {
-  const [adding, setAdding] = useState('')
+  const [adding, setAdding] = useSettingsDraft(`fallback:${provider}:${kind}`)
   // Folded while the CLI's answer is in use and the list is Hive's own: it is only used without one.
   const [open, setOpen] = useState(startOpen)
   useEffect(() => {
@@ -557,7 +574,7 @@ function AssistantMcpServers() {
 /** Settings → MCP Catalogues (HI-545): ours first (on or off), then the user's, each on or off, reordered, removed, and one added by its address. */
 function McpCatalogSources() {
   const saved = useStore((s) => s.settings?.mcpCatalogs ?? null)
-  const [url, setUrl] = useState('')
+  const [url, setUrl] = useSettingsDraft('mcpCatalogs:url')
   const [error, setError] = useState<string | null>(null)
   if (!saved) return null
   const save = (next: McpCatalogSettings): void => {
@@ -694,6 +711,10 @@ function ResetMetricsButton() {
 function ColumnColors() {
   const board = useStore((st) => st.settings!.board)
   const [draft, setDraft] = useState<Partial<Record<TaskColumn, string>>>({})
+  // A pick not saved yet when Settings closes (HI-2525) is saved then, not lost.
+  const pending = useRef(draft)
+  pending.current = draft
+  useEffect(() => () => void (Object.keys(pending.current).length && saveSettings({ board: { colors: pending.current } } as SettingsPatch)), [])
   useEffect(() => {
     if (!Object.keys(draft).length) return
     const t = setTimeout(() => {
@@ -829,7 +850,7 @@ function ApiToken() {
 /** Settings → Agent API → Viewer tokens (#620): read-only tokens for apps that show Hive, made and revoked here. */
 function ViewerTokens() {
   const api = useStore((s) => s.api)
-  const [name, setName] = useState('')
+  const [name, setName] = useSettingsDraft('viewers:name')
   const [shown, setShown] = useState<string | null>(null)
   if (!api) return null
   const create = async (): Promise<void> => {

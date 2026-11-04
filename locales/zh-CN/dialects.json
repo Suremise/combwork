@@ -58,7 +58,7 @@
   "dialects.note": "注释",
   "dialects.onFailed": "无法开启或关闭“{name}”",
   "dialects.onSwitch": "“{name}”已开启",
-  "dialects.onTip": "开启：其文本生效。关闭：它在链中的位置为空，其文本落到下一层。在每个智能体下次启动时生效。",
+  "dialects.onTip": "开启：其文本生效。关闭：{to, select, cli {回退到 {name} 的文件} workspace {回退到工作区文件} other {回退到 Combwork 的“默认”}}。更改在每个智能体下次启动时生效。",
   "dialects.outdatedBadge": "{count, plural, other {# 条已过时}}",
   "dialects.outdatedGroup": "已过时",
   "dialects.override": "在此更改",

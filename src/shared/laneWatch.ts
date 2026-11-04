@@ -74,6 +74,13 @@ export type LaneEvent = (typeof LANE_EVENTS)[number]
 export const LANE_DEFAULT_EVENTS: LaneEvent[] = ['failed', 'blocked', 'unblocked', 'reblocked', 'stalled', 'merge-due', 'ended', 'abandoned', 'waiting', 'paused-user']
 /** What every lane watch counts, whatever its `events` (HI-1991): a question for the user is never filtered out. */
 export const LANE_ALWAYS_EVENTS: LaneEvent[] = ['paused-user']
+/**
+ * What a watch naming lanes always counts (HI-2521): their end. Once its lanes end it has nothing left to watch, so a
+ * watch that filtered the end out (a reviewer watching only for `failed`) would sit until its limit.
+ */
+export const LANE_END_EVENTS: LaneEvent[] = ['ended', 'abandoned']
+/** A lane watch's events with those it always counts (LANE_ALWAYS_EVENTS, and named lanes' end): as asked, read back or made. */
+export const withAlwaysEvents = (ids: LaneWatchCondition['ids'], events: readonly LaneEvent[]): LaneEvent[] => [...new Set([...events, ...LANE_ALWAYS_EVENTS, ...(ids === 'all' ? [] : LANE_END_EVENTS)])]
 /** Event names from before, still accepted (HI-1991): `paused` told only a lane paused for a merge. */
 const LANE_EVENT_ALIASES: Readonly<Record<string, LaneEvent>> = { paused: 'paused-merge' }
 /** What counts on the cards beside a lane watch's lanes by default (#726); a card becoming blocked always does. */
@@ -268,6 +275,18 @@ export function laneHits(before: LaneMark | null | undefined, now: LaneNow, even
 }
 
 /**
+ * A lane that has ended or been abandoned, as a lane watch's reply tells it at once (HI-2521: WR1 watched a lane that
+ * had ended 2 s before, and sat watching it for its 6 h limit): "Lane B1 / R1 (greetings): ended: merged at …". Null
+ * while it runs.
+ */
+export function laneOverPart(now: Pick<LaneNow, 'label' | 'mark' | 'mergeCommit'>): string | null {
+  const s = now.mark.state
+  if (s !== 'ended' && s !== 'abandoned') return null
+  const events = s === 'ended' ? say(T.ended, { merged: now.mergeCommit ? 'yes' : 'no', commit: now.mergeCommit?.slice(0, 12) ?? '' }) : say(T.abandoned)
+  return say(T.lane, { lane: now.label, events })
+}
+
+/**
  * A lane's mark with its cards' requests for the user carried over where they couldn't be read (HI-1991 round 1 finding):
  * a card with no `q` keeps its last mark's, or, new to the watch, `since` (when the watch began), so a question asked
  * meanwhile is told once they are read again. A card whose last mark is from before (no `q`) stays without one.
@@ -409,10 +428,11 @@ export function readLaneCondition(args: { lanes?: unknown; events?: unknown }): 
   else if (Array.isArray(l) && l.length && l.length <= LANE_WATCH_MAX && l.every((x) => typeof x === 'string' && /^[\w-]{1,64}$/.test(x)) && new Set(l).size === l.length) ids = l as string[]
   else return say(T.badLanes, { max: String(LANE_WATCH_MAX) })
   const e = Array.isArray(args.events) ? args.events.map((x) => (typeof x === 'string' && Object.hasOwn(LANE_EVENT_ALIASES, x) ? LANE_EVENT_ALIASES[x] : x)) : args.events
-  if (e === undefined) return { ids, events: [...LANE_DEFAULT_EVENTS] }
+  if (e === undefined) return { ids, events: withAlwaysEvents(ids, LANE_DEFAULT_EVENTS) }
   if (!Array.isArray(e) || !e.length || e.some((x) => !LANE_EVENTS.includes(x as LaneEvent))) return say(T.badEvents, { events: LANE_EVENTS.join(', ') })
-  // A question for the user always counts (HI-1991), whatever was asked for.
-  return { ids, events: [...new Set([...(e as LaneEvent[]), ...LANE_ALWAYS_EVENTS])] }
+  // A question for the user always counts (HI-1991), whatever was asked for; so does named lanes' end (HI-2521), in a
+  // watch read back from before too.
+  return { ids, events: withAlwaysEvents(ids, e as LaneEvent[]) }
 }
 
 /** A saved lane watch condition, checked (null: not one Hive would have made). */

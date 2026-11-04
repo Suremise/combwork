@@ -63,7 +63,7 @@
   "settings.accounts.setUpChecking": "確認中…",
   "settings.accounts.setUpDone": "セットアップ済み",
   "settings.accounts.setUpIn": "{project}のフォルダー（{folder}）で開きます。{cli}の質問に答えて信頼してください。",
-  "settings.accounts.setUpInWorkspace": "このワークスペースのフォルダー（{folder}）で開きます。{cli}の質問に答えて信頼すると、その中のすべてのプロジェクトも信頼されます。",
+  "settings.accounts.setUpInWorkspace": "このワークスペースのフォルダー（{folder}）で開きます。{cli}の質問に答えて信頼すると、その中の Git リポジトリではないプロジェクトも信頼されます。Git リポジトリは、続けてそれぞれのフォルダーで尋ねられます。",
   "settings.accounts.setUpNeeded": "セットアップが必要",
   "settings.accounts.signIn": "サインイン",
   "settings.accounts.signInAgain": "サインインし直す",

@@ -63,7 +63,7 @@
   "settings.accounts.setUpChecking": "正在检查…",
   "settings.accounts.setUpDone": "已完成初始设置",
   "settings.accounts.setUpIn": "它会在 {project} 的文件夹 {folder} 中打开：回答 {cli} 的问题以信任它。",
-  "settings.accounts.setUpInWorkspace": "它会在此工作区的文件夹 {folder} 中打开：回答 {cli} 的问题以信任它，其中的每个项目也会一并受信任。",
+  "settings.accounts.setUpInWorkspace": "它会在此工作区的文件夹 {folder} 中打开：回答 {cli} 的问题以信任它，其中不是 Git 仓库的项目也会一并受信任。之后会在每个 Git 仓库自己的文件夹中再询问。",
   "settings.accounts.setUpNeeded": "需要初始设置",
   "settings.accounts.signIn": "登录",
   "settings.accounts.signInAgain": "重新登录",

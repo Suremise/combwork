@@ -3444,7 +3444,9 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     const r = await registerLaneWatch(ws, who.projectPath, who.agentId, lc, limit, { ...extra, ...(laneAgents ? { agents: { agents: laneAgents, ignoreBackground: false } } : {}) }).catch((e: Error) => {
       throw e instanceof HttpError ? e : httpFrom(/^(No such lane|Unknown task)/.test(e.message) ? 404 : /^(You can't watch yourself|Not a project)/.test(e.message) ? 400 : 409, e)
     })
-    return { watching: await withUsage(r.watching.label), limitAt: r.watching.limitAt, events: lc.events, ...(r.replaced ? { replaced: r.replaced } : {}), ...(r.cards ? { cards: r.cards, ...withNames([...r.cards.now, ...(r.cards.replaced ?? []), ...(r.cards.dropped ?? [])]) } : {}), ...(r.agents ? { agents: r.agents } : {}) }
+    // HI-2521: a named lane that has already ended is the answer at once; no watch started, so no usage beside it.
+    if ('already' in r) return { lanesAlready: r.already, ...(r.replaced ? { replaced: r.replaced } : {}) }
+    return { watching: await withUsage(r.watching.label), limitAt: r.watching.limitAt, events: lc.events,...(r.replaced ? { replaced: r.replaced } : {}), ...(r.cards ? { cards: r.cards, ...withNames([...r.cards.now, ...(r.cards.replaced ?? []), ...(r.cards.dropped ?? [])]) } : {}), ...(r.agents ? { agents: r.agents } : {}) }
   }
   if (body?.agents !== undefined) throw new HttpError(400, say(API.watch.agentsWithLanes))
   const cond = readCondition(body ?? {})

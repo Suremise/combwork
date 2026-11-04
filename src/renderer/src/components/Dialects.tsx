@@ -38,6 +38,7 @@ import { confirm, notify, prompt, set, useStore } from '../store'
 import { useScopedLoad } from '../scopedLoad'
 import { cx } from '../util'
 import { CodeEditor } from './Editors'
+import { dialectOnTip } from './dialectOnTip'
 import { Section } from './Sidebar'
 import { Icon, IconButton, LoadFailed, SearchInput, Switch, Tooltip } from './ui'
 
@@ -73,7 +74,6 @@ const M = {
   claimTaken: msg({ id: 'dialects.claimTaken', defaultMessage: 'Another file of this folder, {by}, claims model {model} first: Auto never picks this one.', description: "A warning on a dialect file whose model another file of the same CLI folder claims too (made outside Hive): {by} is that file, {model} the model ID. Glossary: dialect." }),
   usedBy: msg({ id: 'dialects.usedBy', defaultMessage: '{count, plural, one {Used by # running agent: {agents}} other {Used by # running agents: {agents}}}', description: 'Tooltip on the agents count of a dialect file in the Dialects view: the running agents whose dialect chain has it, by name. Glossary: dialect.' }),
   onSwitch: msg({ id: 'dialects.onSwitch', defaultMessage: '{name} on', description: "A dialect file's on/off switch in the Dialects view, for screen readers. {name} is the file's name. Glossary: dialect." }),
-  onTip: msg({ id: 'dialects.onTip', defaultMessage: "On: its texts apply. Off: its place in the chain is empty, so its texts fall through to the layer below. Applies at each agent's next launch.", description: "Tooltip on a dialect file's on/off switch in the Dialects view. Glossary: dialect, chain." }),
   onFailed: msg({ id: 'dialects.onFailed', defaultMessage: "Couldn't switch {name} on or off", description: 'A notice: switching a dialect file on or off failed. {name} is the file. Glossary: dialect.' }),
   // The file
   save: msg({ id: 'dialects.save', defaultMessage: 'Save', description: "The Dialects view's Save button: writes the file's changes, checked against this Hive's texts first." }),
@@ -359,7 +359,7 @@ function DialectListRow({ row, selected, users }: { row: DialectRow; selected: b
         </Tooltip>
       )}
       <div className="skill-delivered" onClick={(e) => e.stopPropagation()}>
-        <Tooltip content={tr(M.onTip)}>
+        <Tooltip content={dialectOnTip(row, folderName, tr)}>
           <Switch small checked={row.on} label={tr(M.onSwitch, { name: row.name })} onChange={change} />
         </Tooltip>
       </div>
@@ -601,7 +601,7 @@ function DialectFilePane({ ws, view, catalogue, usage }: { ws: string; view: Dia
           </div>
           <span className={cx('badge', view.row.state === 'edited' && 'accent')}>{tr(M.state[view.row.state])}</span>
           {view.row.outdated > 0 && <span className="badge warn">{tr(M.outdatedBadge, { count: view.row.outdated })}</span>}
-          <Tooltip content={tr(M.onTip)}>
+          <Tooltip content={dialectOnTip(view.row, folderName, tr)}>
             <Switch small checked={view.row.on} label={tr(M.onSwitch, { name: view.row.name })} onChange={(on) => void actions.attempt(tr(M.onFailed, { name: view.row.name }), () => call('dialects:setOn', path, on))} />
           </Tooltip>
         </div>
