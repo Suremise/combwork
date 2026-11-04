@@ -132,7 +132,7 @@ async function notes(c, id, project = alpha) {
   const s = (await c.inv('session:live')).find((x) => x.projectPath.toLowerCase() === project.toLowerCase() && x.agentId === id)
   if (!s?.sessionId) return []
   const t = await c.inv('transcript:read', project, s.sessionId).catch(() => null)
-  return (t?.items ?? []).filter((x) => x.kind === 'user' && /^\[CW\] Hive (restarted|was quit)/.test(x.text ?? '')).map((x) => x.text)
+  return (t?.items ?? []).filter((x) => x.kind === 'user' && /^\[CW\] Combwork (restarted|was quit)/.test(x.text ?? '')).map((x) => x.text)
 }
 /** A notice's text in whichever window shows it (a notice goes to one window of several), and that window. */
 async function anyToast(c, re) {
@@ -231,12 +231,12 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     check('Worker, Builder and Reviewer resume in their conversations', !!(await lib.until(async () => (await Promise.all(['Worker', 'Builder', 'Reviewer'].map((n) => c.live(agents[n].id)))).every((s) => s && s.status !== 'starting'), HUNG_MS, 300)))
     for (const n of ['Worker', 'Builder', 'Reviewer']) check(`…${n} in the conversation it had`, (await c.live(agents[n].id))?.sessionId === entries[n].sessionId)
     const workerNote = (await lib.until(async () => (await notes(c, agents.Worker.id))[0], HUNG_MS)) ?? ''
-    check("Worker's note says it restarted for an update, and when", /^\[CW\] Hive restarted for an update.* at \d\d:\d\d UTC; your session was stopped and is resumed now\./.test(workerNote), workerNote)
+    check("Worker's note says it restarted for an update, and when", /^\[CW\] Combwork restarted for an update.* at \d\d:\d\d UTC; your session was stopped and is resumed now\./.test(workerNote), workerNote)
     const builderNote = (await lib.until(async () => (await notes(c, agents.Builder.id))[0], HUNG_MS)) ?? ''
     check("Builder's note names its card, round and lane, and to re-arm its watch", builderNote.includes(`You were on ${laneKey}, round 1, in lane 'restart lane' (its builder).`) && builderNote.includes('re-arm your card watch'), builderNote)
     // Other, in the second workspace's window (restored with the first), resumes too: Watcher's failure holds up no one.
     const otherNote = (await lib.until(async () => (await notes(c, agents.Other.id, beta))[0], HUNG_MS)) ?? ''
-    check("Other resumes in the second workspace, in its conversation, with its note", otherNote.startsWith('[CW] Hive restarted for an update') && (await c.inv('session:live')).find((s) => s.agentId === agents.Other.id)?.sessionId === entries.Other?.sessionId, otherNote)
+    check("Other resumes in the second workspace, in its conversation, with its note", otherNote.startsWith('[CW] Combwork restarted for an update') && (await c.inv('session:live')).find((s) => s.agentId === agents.Other.id)?.sessionId === entries.Other?.sessionId, otherNote)
     const report = await lib.until(async () => {
       for (const p of c.app.windows()) {
         const t = await toastText(p, /Resumed 4 agents after the update/).catch(() => '')
@@ -259,7 +259,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     const serial = order.every((n) => spawned(agents[n]) >= 0) && order.slice(1).every((n, i) => settledAt(order[i]) >= 0 && spawned(agents[n]) > settledAt(order[i]))
     check('…one at a time: each started after the one before it was resumed, or stopped', serial, JSON.stringify(order.map((n) => [n, spawned(agents[n]), settledAt(n)])))
     check('Watcher was stopped, not left starting', !(await c.live(agents.Watcher.id)))
-    check('every agent was told before the quit (its inbox has the line)', (await Promise.all(order.map(async (n) => (await c.api('GET', `/v1/projects/alpha/agents/${n}/deliveries?limit=50`)).body?.deliveries?.some((d) => /Hive is restarting for an update/.test(d.text ?? d.body ?? ''))))).every(Boolean))
+    check('every agent was told before the quit (its inbox has the line)', (await Promise.all(order.map(async (n) => (await c.api('GET', `/v1/projects/alpha/agents/${n}/deliveries?limit=50`)).body?.deliveries?.some((d) => /Combwork is restarting for an update/.test(d.text ?? d.body ?? ''))))).every(Boolean))
     check('the record is gone: every entry has its outcome', !!(await lib.until(() => !fs.existsSync(recordFile), HUNG_MS)), JSON.stringify(record()))
 
     // --- 2. Ended from outside while an agent is starting: resumed once at the next start, nothing else twice.
@@ -302,10 +302,10 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     check('the quit recorded Worker alone, and the record is a quit', record()?.reason === 'quit' && record()?.entries?.length === 1 && record()?.entries?.[0]?.agentName === 'Worker' && record()?.entries?.[0]?.state === 'pending', JSON.stringify(record()))
     c = await start()
     const offer = await lib.until(async () => (await anyToast(c, /Resume the agent that was working\?/))?.text, HUNG_MS)
-    check('the next start offers to resume Worker', !!offer && /Hive was quit while they were working or in a card loop: Worker \(alpha\)/.test(offer), offer)
+    check('the next start offers to resume Worker', !!offer && /Combwork was quit while they were working or in a card loop: Worker \(alpha\)/.test(offer), offer)
     check('…and resumes nothing meanwhile (the record has it offered)', record()?.entries?.find((e) => e.agentName === 'Worker')?.state === 'offered' && !(await c.live(agents.Worker.id)), JSON.stringify(record()))
     await clickToast(c, 'Resume the agent that was working?', 'Resume')
-    check('Resume resumes it, its note saying Hive was quit', !!(await lib.until(async () => ((await notes(c, agents.Worker.id)).at(-1) ?? '').startsWith('[CW] Hive was quit and started again'), HUNG_MS)))
+    check('Resume resumes it, its note saying Hive was quit', !!(await lib.until(async () => ((await notes(c, agents.Worker.id)).at(-1) ?? '').startsWith('[CW] Combwork was quit and started again'), HUNG_MS)))
 
     // --- 4. An offer left unanswered, then another quit with Builder working too: one offer of both; Don't Resume.
     await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Worker.id), 'holduntil go-worker-4', { submitted: async () => (await c.live(agents.Worker.id))?.status === 'working' })
@@ -334,7 +334,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     c = null
     c = await start()
     const offered = await lib.until(async () => (await anyToast(c, /Resume the agent that was working\?/))?.text, HUNG_MS)
-    check('with the switch off, an install offers to resume, saying it was an update', !!offered && /Hive restarted for an update while they were working or in a card loop: Worker \(alpha\)/.test(offered) && !(await c.live(agents.Worker.id)), offered)
+    check('with the switch off, an install offers to resume, saying it was an update', !!offered && /Combwork restarted for an update while they were working or in a card loop: Worker \(alpha\)/.test(offered) && !(await c.live(agents.Worker.id)), offered)
   } catch (e) {
     check('no error', false, e?.stack ?? String(e))
   } finally {

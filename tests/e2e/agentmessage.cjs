@@ -119,7 +119,7 @@ const check = (name, ok, extra = '') => {
   const queued = tool('cw_message_agent', { project: 'alpha', agent: 'Builder', text: `Add #${c1}'s follow-up to your lane after it.` })
   // Its id: the project's next (the reviewer's wake was a delivery too, #649).
   const mid = /^Queued for Builder \((m\d+), working\)/.exec(queued.text)?.[1] ?? '?'
-  check('a message to a working agent is queued', !queued.isError && queued.text === `Queued for Builder (${mid}, working): Hive tells it at its next tool call, at its turn's end or once it is idle; 1 waiting. cw_agent_activity says when it is received and acked.`, queued.text)
+  check('a message to a working agent is queued', !queued.isError && queued.text === `Queued for Builder (${mid}, working): Combwork tells it at its next tool call, at its turn's end or once it is idle; 1 waiting. cw_agent_activity says when it is received and acked.`, queued.text)
   // Its pane's ⋯ (#977): a badge, "1 unread" in its name's description, and an entry whose menu lists the messages.
   const pane = page.locator('.pane-header-bar', { hasText: 'Builder' }).locator('.pane-more')
   const unread = async () => /unread/.test((await pane.getAttribute('aria-description').catch(() => null)) ?? '')
@@ -257,7 +257,7 @@ const check = (name, ok, extra = '') => {
   await say(builder.id, 'work 6')
   await until(async () => (await live(alpha, builder.id))?.status === 'working', 10000)
   const turnEnd = tool('cw_message_agent', { project: 'alpha', agent: 'Builder', text: 'Told at its turn’s end only.' })
-  check("with the project's checkpoints and idle wakes off, the queued reply names only its turn's end", !turnEnd.isError && /\): Hive tells it at its turn's end; \d+ waiting\./.test(turnEnd.text), turnEnd.text)
+  check("with the project's checkpoints and idle wakes off, the queued reply names only its turn's end", !turnEnd.isError && /\): Combwork tells it at its turn's end; \d+ waiting\./.test(turnEnd.text), turnEnd.text)
   await inv('project:updateConfig', alpha, { inboxStopContinuation: 'off' })
   const none = tool('cw_message_agent', { project: 'alpha', agent: 'Builder', text: 'Nothing tells it of this one.' })
   check('…all three off: it waits in its inbox, the user can Deliver Now', !none.isError && none.text.includes('): it waits in its inbox until it reads it with cw_inbox (the user can Deliver Now);'), none.text)

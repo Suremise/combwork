@@ -50,7 +50,7 @@ async function call(h, who, method, url, body) {
 
     const report = await q.intent(h, card.builder, card.n, 'report-merge')
     check('report merge: refused (409) by merge.hiveMerges', report.status === 409 && report.body?.rule === 'merge.hiveMerges', JSON.stringify(report))
-    check('…saying Hive merges it, and where the rule is set', String(report.body?.message).startsWith(`Hive merges ${key}`) && String(report.body?.change).includes('Who merges'), JSON.stringify(report.body))
+    check('…saying Hive merges it, and where the rule is set', String(report.body?.message).startsWith(`Combwork merges ${key}`) && String(report.body?.change).includes('Who merges'), JSON.stringify(report.body))
     // The first card is the one testing now (its checks run in this Hive's queue: the window's order, #1353): this one is next.
     check('…its next step: its place in the queue (next, behind the card being tested), and wait for Done or a return', String(report.body?.next) === 'It is in the merge queue for integration (position 1) and moves to Done once merged: wait for that, or for it to come back.', String(report.body?.next))
     const slot = await call(h, card.builder, 'POST', '/v1/projects/alpha/merge-slot/claim', { cards: [card.n], timeoutSeconds: 0 })
@@ -60,7 +60,7 @@ async function call(h, who, method, url, body) {
     check('…the card untouched: not Done, the target unmoved', (await column(card.n)) !== 'done' && q.head(fx) === before)
     check('…both refusals recorded on the card', (await h.facts(card.n)).filter((f) => f.kind === 'Refused' && f.data?.rule === 'merge.hiveMerges').length === 2, JSON.stringify(await h.kinds(card.n)))
     const read = await call(h, card.builder, 'GET', `/v1/tasks/${encodeURIComponent(key)}`)
-    check("its card read says Hive merges it and where it is", read.status === 200 && String(read.body?.merge).startsWith('Hive merges this card (its rules)'), JSON.stringify(read.body?.merge))
+    check("its card read says Hive merges it and where it is", read.status === 200 && String(read.body?.merge).startsWith('Combwork merges this card (its rules)'), JSON.stringify(read.body?.merge))
 
     // HI-2087: its builder watches it for Done, as a builder whose card passed does (HB2 on HI-2046): when the queue
     // returns it, that watch's line must say so too, never lead with the review's pass.

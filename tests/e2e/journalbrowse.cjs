@@ -82,7 +82,7 @@ function seed(cards, secondKey) {
     // The plan links its card by key (HI-1661: as cw_journal_write's link asks), the decision by number (written before).
     seed([first.number, second.number], second.key)
 
-    await page.locator('.activity-btn[aria-label="Hive Assistant"]').click()
+    await page.locator('.activity-btn[aria-label="Assistant"]').click()
     await page.locator('.row[data-section="journal"]').click()
     const view = page.locator('.journal')
     const rows = view.locator('.journal-row')

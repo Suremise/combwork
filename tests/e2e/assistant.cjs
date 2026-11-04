@@ -135,7 +135,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   await inv('modes:restore', 'qa-triager')
   check('and restores', (await inv('modes:list')).find((p) => p.id === 'qa-triager')?.bundled === 'same')
   // The Hive Assistant view: a summary, its conversations and its modes.
-  await page.locator('.activity-btn[aria-label="Hive Assistant"]').click()
+  await page.locator('.activity-btn[aria-label="Assistant"]').click()
   check('the Assistant view has a summary', await becomes(async () => (await page.locator('.assistant-summary .assistant-stat').count()) === 4))
   // The summary's stats are drawn at once (showing "…" until its conversations are read), the list once they are: so
   // the list is waited for, not read once after the stats (#710: it failed under load).

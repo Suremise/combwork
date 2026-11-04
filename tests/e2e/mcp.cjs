@@ -24,7 +24,7 @@ const srv = http.createServer((req, res) => {
 srv.listen(0, async () => {
   const port = srv.address().port
   const run = (project, msgs) => new Promise((resolve) => {
-    const p = spawn(process.execPath, [path.join(lib.ROOT, 'out/main/hive-mcp.js')], { env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${port}`, CW_API_TOKEN_FILE: lib.tokenFile('t'), CW_PROJECT: project }) })
+    const p = spawn(process.execPath, [path.join(lib.ROOT, 'out/main/cw-mcp.js')], { env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${port}`, CW_API_TOKEN_FILE: lib.tokenFile('t'), CW_PROJECT: project }) })
     let out = ''
     p.stdout.on('data', (d) => { out += d; if (out.trim().split('\n').length >= msgs.length) { p.kill(); resolve(out.trim().split('\n').map((l) => JSON.parse(l))) } })
     for (const m of msgs) p.stdin.write(JSON.stringify(m) + '\n')

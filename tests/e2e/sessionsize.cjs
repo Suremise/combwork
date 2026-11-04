@@ -180,7 +180,7 @@ const sizeText = (n) => (n < MB ? `${Math.max(1, Math.round(n / 1024))} KB` : `$
     check(`a size that grew shows when the list opens again (${grown})`, !!(await lib.until(async () => (await shown('Small session')) === grown, HUNG_MS)), await shown('Small session'))
 
     // --- The Assistant's conversations.
-    await page.locator('.activity-btn[aria-label="Hive Assistant"]').click()
+    await page.locator('.activity-btn[aria-label="Assistant"]').click()
     await lib.until(async () => (await page.locator('.assistant-summary').count()) > 0, HUNG_MS)
     await page.locator('.row', { hasText: 'All Conversations' }).click()
     const conv = page.locator('.sessions-tree .session-row', { hasText: 'Planning the week' })

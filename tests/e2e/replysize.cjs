@@ -276,7 +276,7 @@ const prose = (seed, n) => {
     try {
       const checked = JSON.parse(tool('cw_read_task', { number: todo[0] }).text)
       measure('cw_read_task (checks fields)', JSON.stringify({ checks: checked.checks, checksHint: checked.checksHint }), 200)
-      check('…and its checks where they name one: the names as data, a hint with <name>', JSON.stringify(checked.checks) === '["quick"]' && /^before review: run one with hive-progress --check <name> --card "[A-Z]+-\d+"/.test(checked.checksHint ?? ''), JSON.stringify([checked.checks, checked.checksHint]))
+      check('…and its checks where they name one: the names as data, a hint with <name>', JSON.stringify(checked.checks) === '["quick"]' && /^before review: run one with cw-progress --check <name> --card "[A-Z]+-\d+"/.test(checked.checksHint ?? ''), JSON.stringify([checked.checks, checked.checksHint]))
     } finally {
       await inv('workflow:setOptions', alpha, { preset: rules.preset, options: rules.own })
     }
@@ -380,7 +380,7 @@ const prose = (seed, n) => {
   // The merge queue (#1353): alpha's workflow doesn't have Hive merge, so it has none, said in a line.
   check('cw_queue (list): no queue, in a line', measure('cw_queue (list)', tool('cw_queue', { action: 'list' }), 200).startsWith('No merge queue in alpha: '), texts['cw_queue (list)'])
   const skillList = measure('cw_list_skills', tool('cw_list_skills', {}), 4000)
-  check('skills: a line each, who they are for, no folders', /^work-on-card \(Hive, for agents\): /m.test(skillList) && !skillList.includes(ws), skillList.slice(0, 300))
+  check('skills: a line each, who they are for, no folders', /^work-on-card \(Combwork, for agents\): /m.test(skillList) && !skillList.includes(ws), skillList.slice(0, 300))
   // Who each listing is about: an agent's lists what its project's agents get (not the Assistant's skills); the
   // Assistant's lists them all with who gets each, and with a project what that project's agents get.
   for (const [name, audience] of [['for-assistant', 'assistant'], ['for-both', 'all'], ['for-default', null]]) {
@@ -389,9 +389,9 @@ const prose = (seed, n) => {
   }
   const has = (list, re) => new RegExp(re, 'm').test(list)
   const agentSkills = tool('cw_list_skills', {}).text
-  check("skills (agent): its project's agents' skills, without the Assistant's", has(agentSkills, '^for-default \\(Hive, for agents\\)') && has(agentSkills, '^for-both \\(Hive, for agents and the Assistant\\)') && !has(agentSkills, '^for-assistant ') && !has(agentSkills, '^coordinate-agents '), agentSkills.slice(0, 400))
+  check("skills (agent): its project's agents' skills, without the Assistant's", has(agentSkills, '^for-default \\(Combwork, for agents\\)') && has(agentSkills, '^for-both \\(Combwork, for agents and the Assistant\\)') && !has(agentSkills, '^for-assistant ') && !has(agentSkills, '^coordinate-agents '), agentSkills.slice(0, 400))
   const allSkills = tool('cw_list_skills', {}, 'assistant').text
-  check("skills (Assistant): every Hive skill with who gets it", has(allSkills, '^for-assistant \\(Hive, for the Assistant\\)') && has(allSkills, '^coordinate-agents \\(Hive, for the Assistant\\)') && has(allSkills, '^for-both \\(Hive, for agents and the Assistant\\)') && has(allSkills, '^for-default \\(Hive, for agents\\)'), allSkills.slice(0, 400))
+  check("skills (Assistant): every Hive skill with who gets it", has(allSkills, '^for-assistant \\(Combwork, for the Assistant\\)') && has(allSkills, '^coordinate-agents \\(Combwork, for the Assistant\\)') && has(allSkills, '^for-both \\(Combwork, for agents and the Assistant\\)') && has(allSkills, '^for-default \\(Combwork, for agents\\)'), allSkills.slice(0, 400))
   const projectSkills = tool('cw_list_skills', { project: 'alpha' }, 'assistant').text
   check("skills (Assistant, a project): what that project's agents get", !has(projectSkills, '^for-assistant ') && has(projectSkills, '^for-both ') && has(projectSkills, '^for-default '), projectSkills.slice(0, 400))
   check('skills: the descriptions say a listing, not what a session loaded', /not of what a running session loaded/.test(toolDescription('cw_list_skills')) && /for agents \(not those for the Assistant alone\)/.test(toolDescription('cw_list_skills')) && /user and plugin skills/.test(toolDescription('cw_list_skills', 'assistant')))
@@ -566,7 +566,7 @@ const prose = (seed, n) => {
   check('cancel with no watch says so', measure('cw_wait_for_agents (cancel)', tool('cw_wait_for_agents', { cancel: true }, 'assistant'), 100) === 'You had no watch.', texts['cw_wait_for_agents (cancel)'])
   // A lane watch (#531): begun, saying what it counts; cancelled.
   const laneWatch = measure('cw_wait_for_tasks (lanes, wake)', tool('cw_wait_for_tasks', { lanes: ['all'], wake: true }, 'assistant'), 300)
-  check('a lane watch begun (default events, not repeated): to end the turn', laneWatch.startsWith('Waiting on all running lanes. End your turn now: Hive types a line into this session on a lane event'), laneWatch)
+  check('a lane watch begun (default events, not repeated): to end the turn', laneWatch.startsWith('Waiting on all running lanes. End your turn now: Combwork types a line into this session on a lane event'), laneWatch)
   check('…cancelled', measure('cw_wait_for_tasks (lanes, cancel)', tool('cw_wait_for_tasks', { cancel: true }, 'assistant'), 100) === 'Cancelled your lane watch.', texts['cw_wait_for_tasks (lanes, cancel)'])
   check('activating a project confirms it', measure('cw_activate_project', tool('cw_activate_project', { project: 'gamma' }, 'assistant'), 300) === 'gamma is on.')
   measure('cw_create_project', tool('cw_create_project', { name: 'epsilon' }, 'assistant'), 300)
@@ -675,7 +675,7 @@ const prose = (seed, n) => {
   check("the status has the new skill's revision", /^[0-9a-f]{16}$/.test(statusAgain.guidance.skills.find((x) => x.name === 'bulky')?.revision ?? ''), JSON.stringify(statusAgain.guidance.skills.find((x) => x.name === 'bulky')))
   fs.rmSync(bulky, { recursive: true, force: true })
   const doc = (await api('GET', '/v1/docs/agent-api')).body
-  check("the API's own reference, from the running Hive", doc?.content?.startsWith('# Hive Agent API') && doc.api === status.api.version, JSON.stringify(doc).slice(0, 120))
+  check("the API's own reference, from the running Hive", doc?.content?.startsWith('# Combwork Agent API') && doc.api === status.api.version, JSON.stringify(doc).slice(0, 120))
   await route('GET /v1/workspace', 'GET', '/v1/workspace')
   await route('GET /v1/workspaces', 'GET', '/v1/workspaces')
   await route('GET /v1/projects/alpha/sessions', 'GET', '/v1/projects/alpha/sessions')
@@ -881,7 +881,7 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
   }
   // A request for the Assistant (HI-1866): the card, and its id in the Assistant's inbox.
   const askedAssistant = measure('cw_ask_assistant', intent('cw_ask_assistant', { card: `#${todo[40]}`, text: 'Please put this card On Hold.' }), 120)
-  check('asking the Assistant names the card and its inbox id', /^[A-Z]+-\d+: asked the Hive Assistant \(m\d+ in its inbox\)\. Its answer comes to your inbox\.$/.test(askedAssistant), askedAssistant)
+  check('asking the Assistant names the card and its inbox id', /^[A-Z]+-\d+: asked the Assistant \(m\d+ in its inbox\)\. Its answer comes to your inbox\.$/.test(askedAssistant), askedAssistant)
   // HI-2245: the builder's card watch on its card in Review whose folder has a commit past its submission: hand it over
   // first, then end the turn (the watch is registered as ever); without one, the plain watch.
   // A reviewer agent reviews it (alpha's rules have none): set for this card's start, put back after it (a card keeps
