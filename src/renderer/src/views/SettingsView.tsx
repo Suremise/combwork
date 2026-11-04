@@ -16,7 +16,7 @@ import { ProviderIcon } from '../components/ProviderIcon'
 import * as actions from '../actions'
 import { call, errorMessage } from '../api'
 import { playChime } from '../chime'
-import { Icon, IconButton, InfoTip, SearchInput, Switch, Tooltip, usePlaceholderClipped } from '../components/ui'
+import { Icon, IconButton, InfoTip, SearchInput, SectionNavRow, Switch, Tooltip, usePlaceholderClipped } from '../components/ui'
 import { UpdateStatusRow } from '../components/Updates'
 import { KeybindingsEditor } from '../components/Keybindings'
 import { HiddenProjectsList } from '../components/ProjectRemoval'
@@ -1080,13 +1080,11 @@ export function SettingsView() {
       <div className="settings-body">
         <div className="settings-nav">
           {sections.map((s) => (
-            <div key={s.id} className={cx('row', !query && !modifiedOnly && section === s.id && 'selected')} data-section={s.id} onClick={() => {
+            <SectionNavRow key={s.id} id={s.id} icon={navIcon(s)} label={sectionText(s).label} sub={!!s.provider} selected={!query && !modifiedOnly && section === s.id} onSelect={() => {
                 set({ settingsSection: s.id, settingsQuery: '' })
                 setModifiedOnly(false)
               }}
-            >
-              {navIcon(s)} <span className={cx('label', s.provider && 'settings-sub')}>{sectionText(s).label}</span>
-            </div>
+            />
           ))}
         </div>
         <div className="settings-content">

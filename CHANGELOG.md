@@ -24,6 +24,7 @@
 
 ### Fixed
 
+- **Settings section names cut short show in full on hover** (HI-2531). In a narrow window, Settings and Project Settings cut long section names ("Accounts & C…", "Keyboard Sho…"); hovering one now shows its whole name in a tooltip, and the list keeps its compact rows.
 - **Cut-off descriptions in side-panel lists show in full on hover** (HI-2527). Modes, MCP servers, Skills, Dialects, Templates and the MCP catalogue keep each row's description on one line, cut with "…"; hovering a cut one, or reaching it with Tab, now shows the whole text in a tooltip.
 - **Clicking the side panel leaves Settings** (HI-2525). With Settings open, the side panel kept showing the last view (Dialects, say), and clicking a row in it changed nothing in the main area, so Settings felt like a modal. A click anywhere in the side panel now takes you to that view, as its activity bar button does, and the gear brings Settings back on the section you were on. Text half typed in a box that only saves on its button (a viewer token's name, a model to price, a catalogue's address) is still there when you come back.
 - **Agents started by a Combwork inbox line read their inbox first** (HI-2516). The generalist skill's description said to use it when no other skill fits, so an agent woken only by "[CW] New in your inbox…" read it before its task named the right skill. Its description now says it isn't for an inbox line.
