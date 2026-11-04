@@ -40,7 +40,7 @@ import { gitProblem } from './gitTool'
 import { duplicateAgentNames, suggestAgentName } from '../shared/agentNames'
 import { NO_PROJECT_IDS, isProjectId, settleProjectIds, type ProjectIdEntry, type ProjectIdIndex } from '../shared/projectIds'
 import { migrateProjectPreferences } from '../shared/workflow/preferences'
-import { classify, finishMove, moveFolders, type MoveOptions } from './combworkMove'
+import { classify, finishMove, moveFolders, type MoveOptions, type MoveOutcome } from './combworkMove'
 import { movedPathOf } from '../shared/hiveFolderMove'
 
 const log = createLogger('workspace')
@@ -415,6 +415,7 @@ export class WorkspaceService {
     await this.itemsSynced
     // One workspace inside another would make its projects belong to both. Windows claim their folders one
     // at a time, so two opening at once can't both pass the check before either has claimed its own.
+    let folderMove: MoveOutcome = { late: false, moved: 0 }
     const claim = admission.then(async () => {
       // By real paths: the same folder by another name (an 8.3 short name, a junction) is the same workspace (#455).
       for (const w of services) {
@@ -425,6 +426,11 @@ export class WorkspaceService {
       }
       await this.close()
       this.generation++
+      // Its `.hive` folders, and its projects', move to `.combwork` (HI-2462, combworkMove.ts) before the window holds the
+      // folder: nothing of it is admitted, read or written until they have (a settings change at start looks at every
+      // open workspace). A move that can't be done refuses the open, the folder not this window's.
+      const openGen = this.generation
+      folderMove = await moveFolders(abs, { stillOurs: () => this.generation === openGen })
       // Launches wait until this open has moved its MCP settings (HI-1472): the path is the workspace's from now on.
       this.mcpMoving = gate()
       this.path = abs
@@ -440,7 +446,7 @@ export class WorkspaceService {
     const gen = this.generation
     const moving = this.mcpMoving
     try {
-      return await this.opened(abs)
+      return await this.opened(abs, folderMove)
     } catch (e) {
       moving.done()
       if (this.generation === gen && this.path === abs) await this.close().catch((c) => log.warn('closing a workspace whose open failed', c))
@@ -449,7 +455,7 @@ export class WorkspaceService {
   }
 
   /** The rest of open, once the window holds the folder. */
-  private async opened(abs: string): Promise<WorkspaceInfo> {
+  private async opened(abs: string, folderMove: MoveOutcome): Promise<WorkspaceInfo> {
     // Each part's time, in the line saying it opened (HI-1694: an ordinary open of a workspace took 4–11 s, the log silent
     // between the board's open and "Opened workspace").
     const parts: string[] = []
@@ -460,11 +466,9 @@ export class WorkspaceService {
       parts.push(`${what} ${Math.round(now - mark)} ms`)
       mark = now
     }
-    // Before anything reads it (HI-2462): its `.hive` folders, and its projects', move to `.combwork` (combworkMove.ts).
+    // The folder move's late phases (below) stop with this open.
     const openGen = this.generation
     const moveOpts = { signal: this.life.signal, stillOurs: () => this.generation === openGen && this.path === abs }
-    const folderMove = await moveFolders(abs, moveOpts)
-    if (folderMove.moved) done('its .hive folders moved to .combwork') // i18n-ignore: a part of a log line's timing
     const fresh = !existsSync(join(abs, HIVE_DIR))
     await this.ensureWorkspaceStructure()
     this.wsConfig = loadedConfig(await readKeptJson(join(this.hiveDir, 'workspace.json'), {}, { holder: this }))

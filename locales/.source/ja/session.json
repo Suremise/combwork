@@ -108,6 +108,7 @@
   "session.modeOffer.one": "Switch {agent} now? Otherwise the new mode applies from its next session.",
   "session.modeOffer.switch": "Switch Now",
   "session.modeOffer.title": "Permission mode changed to {modes}",
+  "session.movedFresh.body": "{n, plural, one {# conversation} other {# conversations}} started fresh: {n, plural, one {its folder} other {their folders}} moved with .hive to .combwork, so {n, plural, one {it} other {they}} can't continue there. The earlier ones are kept in Sessions to read.",
   "session.newConversation.didntStop": "It didn't stop, so no new conversation was started.",
   "session.newConversation.notRunning": "It isn't running.",
   "session.newConversation.pending": "It has just been given a prompt that its CLI has not taken yet.",

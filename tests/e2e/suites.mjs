@@ -153,6 +153,7 @@ export const SUITES = [
   { name: 'handovernotice' },
   { name: 'harnessleftovers' },
   { name: 'hiddenredraw' },
+  { name: 'hivefolder' },
   { name: 'hivetools' },
   { name: 'hivevcs' },
   { name: 'hookscopilot', needs: ['copilot'] },

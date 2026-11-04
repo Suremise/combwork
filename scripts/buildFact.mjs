@@ -39,16 +39,22 @@ export function installerOf(lines) {
   return null
 }
 
+/**
+ * A workspace's folder of Combwork's: `.combwork` from 1.1 (HI-2462), else `.hive` in a workspace no 1.1 has opened yet
+ * (the installed 1.0's), where that Hive reads its markers and the first open of 1.1 moves them with it. Null: neither.
+ */
+const dataOf = (dir) => ['.combwork', '.hive'].map((f) => join(dir, f)).find((d) => existsSync(join(d, 'workspace.json'))) ?? null
+
 /** The workspace a checkout's builds are recorded in, or null. */
 export function workspaceOf(root, env = process.env) {
   const named = env.CW_WORKSPACE
-  if (named && existsSync(join(named, '.combwork', 'workspace.json'))) return named
+  if (named && dataOf(named)) return named
   let dir = checkoutOf(root)?.main ?? root
   for (;;) {
     const up = dirname(dir)
     if (up === dir) return null
     dir = up
-    if (existsSync(join(dir, '.combwork', 'workspace.json'))) return dir
+    if (dataOf(dir)) return dir
   }
 }
 
@@ -114,7 +120,7 @@ export function postBuild(fact, { url, token, workspace }, timeoutMs = 10_000) {
 
 /** Leaves the fact for Hive as a marker in the workspace (written whole: a temp file renamed). Returns its path. */
 export function leaveBuild(fact, workspace) {
-  const dir = join(workspace, '.combwork', BUILD_MARKERS_DIR)
+  const dir = join(dataOf(workspace) ?? join(workspace, '.combwork'), BUILD_MARKERS_DIR)
   mkdirSync(dir, { recursive: true })
   const name = `${fact.builtAt.replace(/[:.]/g, '-')}-${randomBytes(4).toString('hex')}`
   const file = join(dir, `${name}.json`)

@@ -87,6 +87,33 @@ describe('a conversation from before the rename (HI-2463)', () => {
     }
   })
 
+  it('HI-2462: a current conversation whose folder moved with .hive starts fresh, its record (and transcript key) kept; one in the project folder resumes', async () => {
+    told.toasts.length = 0
+    seen.launches.length = 0
+    seen.carried.length = 0
+    // The move's map: alpha's .hive moved to .combwork (combworkMove.ts writes it as the folder is renamed).
+    writeFileSync(join(wsPath, '.combwork', 'combwork-moved.json'), JSON.stringify({ version: 1, moves: [{ from: join(project, '.hive'), to: join(project, '.combwork') }] }))
+    const slot = join(project, '.hive', 'slots', 'HI-1')
+    await run(() => ws.upsertSession(project, { id: '00000000-0000-4000-8000-000000000006', agent: 'claude-code', agentId: 'b3', cwd: slot, names: 2, name: 'x', lastActiveAt: '2026-11-02T00:00:00.000Z' }))
+    await run(() => ws.upsertSession(project, { id: '00000000-0000-4000-8000-000000000007', agent: 'claude-code', agentId: 'b4', cwd: project, names: 2, name: 'y', lastActiveAt: '2026-11-02T00:00:00.000Z' }))
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      await run(() => sessions.start(project, { agentId: 'b3', resumeId: '00000000-0000-4000-8000-000000000006' }))
+      await run(() => sessions.start(project, { agentId: 'b4', resumeId: '00000000-0000-4000-8000-000000000007' }))
+      expect(seen.launches).toEqual([
+        { agentId: 'b3', resumeId: undefined, prompt: undefined, keepWatch: true },
+        { agentId: 'b4', resumeId: '00000000-0000-4000-8000-000000000007', prompt: undefined, keepWatch: undefined }
+      ])
+      expect(seen.carried).toEqual(['00000000-0000-4000-8000-000000000006'])
+      // The record keeps the folder it ran in: Claude Code files its transcript by that, so it stays readable.
+      expect((await run(() => ws.sessionRecord(project, '00000000-0000-4000-8000-000000000006')))?.cwd).toBe(slot)
+      await vi.runAllTimersAsync()
+      expect(told.toasts.map((t) => t.body)).toEqual([expect.stringMatching(/^1 conversation started fresh: its folder moved with \.hive to \.combwork/)])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it("a start that fails isn't counted in the notice", async () => {
     told.toasts.length = 0
     await run(() => ws.upsertSession(project, { id: '00000000-0000-4000-8000-000000000005', agent: 'claude-code', agentId: 'b1', cwd: project, name: 'x', lastActiveAt: '2026-11-01T00:00:00.000Z' }))

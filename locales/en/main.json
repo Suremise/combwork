@@ -419,6 +419,42 @@
     "defaultMessage": "Git couldn't read this repository: {why}",
     "description": "Why a folder can't be made a git repository. {why} is git's own message."
   },
+  "main.hiveMove.bothBody": {
+    "defaultMessage": "Combwork uses .combwork and leaves .hive as it is. Move anything you still need out of .hive yourself.",
+    "description": "The warning's text (HI-2462): which of the two folders Combwork uses, and that it never changes the other. Keep .hive and .combwork as they are."
+  },
+  "main.hiveMove.bothTitle": {
+    "defaultMessage": "{folder} has both a .hive and a .combwork folder",
+    "description": "A warning's title as a workspace opens (HI-2462): the folder {folder} has Combwork's folder under both its old name (.hive) and its new one (.combwork). Keep .hive and .combwork as they are."
+  },
+  "main.hiveMove.linkBody": {
+    "defaultMessage": "It is a link to another folder, or the project is a link to a folder outside the workspace, so Combwork leaves it as it is. To use it, rename it .combwork yourself with Combwork closed.",
+    "description": "The warning's text (HI-2462): why the .hive folder wasn't renamed, and how the user can do it. Keep .hive and .combwork as they are."
+  },
+  "main.hiveMove.linkTitle": {
+    "defaultMessage": "{folder}'s .hive folder wasn't moved",
+    "description": "A warning's title as a workspace opens (HI-2462): the folder {folder}'s .hive wasn't renamed .combwork. Keep .hive and .combwork as they are."
+  },
+  "main.hiveMove.what.cards": {
+    "defaultMessage": "the paths in cards",
+    "description": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): links and paths in cards' descriptions and comments."
+  },
+  "main.hiveMove.what.excludes": {
+    "defaultMessage": "git's exclude lines",
+    "description": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): the lines that keep the folder out of git."
+  },
+  "main.hiveMove.what.folders": {
+    "defaultMessage": "the agents' folders inside it",
+    "description": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): slots and other agents' folders kept inside the moved folder."
+  },
+  "main.hiveMove.what.notes": {
+    "defaultMessage": "the paths in shared notes and handovers",
+    "description": "What the folder move was updating when it failed (service.hiveMove.phaseFailed)."
+  },
+  "main.hiveMove.what.worktrees": {
+    "defaultMessage": "the worktrees inside it",
+    "description": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): git worktrees kept inside the moved folder."
+  },
   "main.installDir.close": {
     "defaultMessage": "Close",
     "description": "A button of the message window when Hive can't start from its install folder: closes it (Hive then quits)."

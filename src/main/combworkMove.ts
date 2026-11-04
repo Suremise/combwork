@@ -344,20 +344,20 @@ async function movedUnderLock(ws: string, hosts: { host: string; kind: HostKind 
   }
   const found = await planNow(ws)
   const plan: MovePlan = found?.plan ?? { version: 1, id: randomUUID(), startedAt: new Date().toISOString(), hosts: [], moves: [], pending: [...EARLY, ...LATE] }
-  // A late host joins a finished plan's map as a plan of its own; its phases are its own.
-  const byHost = new Map(plan.hosts.map((h) => [lower(h.host), h]))
-  // The hosts as they are now, judged against this plan: the Assistant's home follows its outer folder.
+  // A late host joins a finished plan's map as a plan of its own; its phases are its own. The Assistant's home is one
+  // host wherever it is: it follows its outer folder (inside the workspace's, which may have moved since the plan).
+  const key = (h: { host: string; kind: HostKind }): string => (h.kind === 'assistant' ? 'assistant' : lower(h.host))
+  for (const h of plan.hosts) if (h.kind === 'assistant') h.host = assistantOf(ws)
+  const byHost = new Map(plan.hosts.map((h) => [key(h), h]))
   const now = o.only ? hosts : hostsOf(ws, assistantOf(ws))
   for (const h of now) {
-    const state = await classify(ws, h.host, h.kind, plan.id)
-    const had = byHost.get(lower(h.host))
-    if (had) had.state = state
-    else {
-      const ph: PlanHost = { host: h.host, kind: h.kind, state }
-      plan.hosts.push(ph)
-      byHost.set(lower(h.host), ph)
-    }
+    if (byHost.has(key(h))) continue
+    const ph: PlanHost = { host: h.host, kind: h.kind, state: 'current' }
+    plan.hosts.push(ph)
+    byHost.set(key(h), ph)
   }
+  // Every host of the plan judged again, as it is now, against this plan.
+  for (const h of plan.hosts) h.state = await classify(ws, h.host, h.kind, plan.id)
   const toMove = plan.hosts.filter((h) => h.state === 'planned')
   if (!toMove.length && !found) return { late: false, moved: 0 }
   // The plan and each host's mark before the first rename: a crash after any rename is recovered from them.

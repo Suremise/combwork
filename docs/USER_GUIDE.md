@@ -186,6 +186,16 @@ Where Combwork can't do that, the project's **Overview** and **Project Settings*
 
 The Overview's notice has ✕ to stop showing it for that project; it comes back if the situation changes, and Project Settings always shows it.
 
+### From `.hive` to `.combwork` <a id="from-hive-to-combwork"></a>
+
+Before Combwork 1.1 these folders were called `.hive`. The first time you open a workspace in 1.1, Combwork renames each `.hive` folder of its own to `.combwork`: the workspace's (with the board, shared notes, handovers, attachments and the Assistant's home in it), and each project's. A project you copy into the workspace later is renamed when it first appears. Nothing is copied or deleted, only renamed, and links to attachments, notes and handovers in cards and notes are updated to the new folder.
+
+- **Close Hive 1.0 first.** If another copy of Hive or Combwork has the workspace open, or a program has a file open in a `.hive` folder, Combwork doesn't open the workspace and says which folder it couldn't rename. Close that program and open the workspace again. Nothing is lost, and a move that stopped part-way finishes when you open the workspace again.
+- **A folder with both** `.hive` and `.combwork`: Combwork uses `.combwork` and leaves `.hive` exactly as it is, with a warning. Move anything you still need out of `.hive` yourself.
+- **Another tool's `.hive`** (colonyops' Hive writes one into repositories, say) is never touched: Combwork only renames a `.hive` with its own files in it. A `.hive` that is a link to another folder, or a project that is a link to a folder outside the workspace, isn't renamed either: a warning says so, and you can rename it to `.combwork` yourself with Combwork closed.
+- **Conversations**: an agent whose conversation ran in a folder inside a `.hive` (an agent's slot kept there, say) starts a new conversation in its folder's new place, carrying on its work; the earlier one stays in Sessions to read. Conversations in project folders carry on as before.
+- A workspace committed to git with its `.hive` folder shows that folder as deleted and `.combwork` as new: commit the rename.
+
 ### Recent workspaces <a id="recent-workspaces"></a>
 
 **File → Open Recent** and the welcome page list the 12 workspaces you opened last, the most recent first.

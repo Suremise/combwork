@@ -304,6 +304,31 @@
     "note": "Why a folder can't be made a git repository. {why} is git's own message.",
     "audience": "both"
   },
+  "main.hiveMove.what.cards": {
+    "text": "the paths in cards",
+    "note": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): links and paths in cards' descriptions and comments.",
+    "audience": "both"
+  },
+  "main.hiveMove.what.excludes": {
+    "text": "git's exclude lines",
+    "note": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): the lines that keep the folder out of git.",
+    "audience": "both"
+  },
+  "main.hiveMove.what.folders": {
+    "text": "the agents' folders inside it",
+    "note": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): slots and other agents' folders kept inside the moved folder.",
+    "audience": "both"
+  },
+  "main.hiveMove.what.notes": {
+    "text": "the paths in shared notes and handovers",
+    "note": "What the folder move was updating when it failed (service.hiveMove.phaseFailed).",
+    "audience": "both"
+  },
+  "main.hiveMove.what.worktrees": {
+    "text": "the worktrees inside it",
+    "note": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): git worktrees kept inside the moved folder.",
+    "audience": "both"
+  },
   "main.keys.maskingFull": {
     "text": "Combwork can't keep masking for another key: it already keeps the most it can. The key wasn't saved.",
     "note": "An error saving a server connection's API key: Hive keeps a fingerprint of every key ever saved (to hide it in logs and exports) and has reached its limit.",

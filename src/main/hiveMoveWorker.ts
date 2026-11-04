@@ -40,7 +40,7 @@ export function rewriteCards(job: CardsRewrite): CardsAnswer {
     const run = (select: string, update: string, keyCols: string[], col: string, f: (s: string) => string): void => {
       let after: unknown[] | null = null
       for (;;) {
-        const rows = (after ? db.prepare(`${select} AND (${keyCols.join(', ')}) > (${keyCols.map(() => '?').join(', ')}) ORDER BY ${keyCols.join(', ')} LIMIT ${BATCH}`).all(...(after as never[])) : db.prepare(`${select} ORDER BY ${keyCols.join(', ')} LIMIT ${BATCH}`).all()) as Record<string, unknown>[]
+        const rows = (after ? db.prepare(`${select} AND (${keyCols.join(', ')}) > (${keyCols.map(() => '?').join(', ')}) ORDER BY ${keyCols.join(', ')} LIMIT ${BATCH}`).all(...(after as never[])) : db.prepare(`${select} ORDER BY ${keyCols.join(', ')} LIMIT ${BATCH}`).all()) as Record<string, unknown>[] // i18n-ignore: SQL
         if (!rows.length) return
         db.exec('BEGIN IMMEDIATE')
         try {

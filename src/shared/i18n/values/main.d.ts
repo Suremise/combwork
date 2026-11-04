@@ -106,6 +106,15 @@ interface HiveMessageValues {
   'main.gitInit.stopped': { what: string | number; why: string | number }
   'main.gitInit.stoppedAfter': { done: string | number; what: string | number; why: string | number }
   'main.gitInit.unreadable': { why: string | number }
+  'main.hiveMove.bothBody': undefined
+  'main.hiveMove.bothTitle': { folder: string | number }
+  'main.hiveMove.linkBody': undefined
+  'main.hiveMove.linkTitle': { folder: string | number }
+  'main.hiveMove.what.cards': undefined
+  'main.hiveMove.what.excludes': undefined
+  'main.hiveMove.what.folders': undefined
+  'main.hiveMove.what.notes': undefined
+  'main.hiveMove.what.worktrees': undefined
   'main.installDir.close': undefined
   'main.installDir.copied': undefined
   'main.installDir.copy': undefined

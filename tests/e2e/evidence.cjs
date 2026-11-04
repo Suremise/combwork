@@ -92,7 +92,8 @@ function citedBy(rel, cards, children = [], label = 'hive-test') {
 
 /**
  * The workspace's board for the repository at root, found up from its main checkout: its database (.combwork\hive.db, Hive 0.9
- * and later, #1017) or, before that, its cards folder (.combwork\tasks); null when there is none. A workspace moved to the
+ * and later, #1017; .hive\hive.db until a 1.1 has opened the workspace, HI-2462) or, before that, its cards folder
+ * (.combwork\tasks); null when there is none. A workspace moved to the
  * database keeps a stub tasks folder for older versions: the database is looked for first, so the stub never counts.
  */
 function findBoard(root) {
@@ -103,10 +104,15 @@ function findBoard(root) {
     dir = root
   }
   for (;;) {
-    const db = path.join(dir, '.combwork', 'hive.db')
-    if (fs.existsSync(db)) return db
-    const tasks = path.join(dir, '.combwork', 'tasks')
-    if (fs.existsSync(path.join(tasks, 'board.json'))) return tasks
+    // Its folder is .combwork from 1.1 (HI-2462), .hive in a workspace no 1.1 has opened yet (the installed 1.0's).
+    for (const folder of ['.combwork', '.hive']) {
+      const db = path.join(dir, folder, 'hive.db')
+      if (fs.existsSync(db)) return db
+    }
+    for (const folder of ['.combwork', '.hive']) {
+      const tasks = path.join(dir, folder, 'tasks')
+      if (fs.existsSync(path.join(tasks, 'board.json'))) return tasks
+    }
     const up = path.dirname(dir)
     if (up === dir) return null
     dir = up

@@ -104,6 +104,7 @@
   "session.modeOffer.one": "¿Cambiar ahora el agente {agent}? Si no, el modo nuevo se aplica a partir de su próxima sesión.",
   "session.modeOffer.switch": "Cambiar ahora",
   "session.modeOffer.title": "El modo de permisos cambió a {modes}",
+  "session.movedFresh.body": "{n, plural, one {# conversación empezó} other {# conversaciones empezaron}} de cero: {n, plural, one {su carpeta se movió} other {sus carpetas se movieron}} con .hive a .combwork, así que no {n, plural, one {puede} other {pueden}} continuar allí. Las anteriores se conservan en Sesiones para leerlas.",
   "session.newConversation.didntStop": "No se detuvo, así que no se empezó ninguna conversación nueva.",
   "session.newConversation.notRunning": "No está en ejecución.",
   "session.newConversation.pending": "Acaba de recibir un prompt que su CLI todavía no ha tomado.",

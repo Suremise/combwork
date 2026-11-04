@@ -7,7 +7,7 @@ metadata:
 
 # Workspace note
 
-Combwork's shared notes (the workspace's `.combwork/shared`) are read by every project and agent. They are for knowledge that outlives this conversation: decisions and their reasons, conventions, setup steps, and gotchas that cost time to find.
+The workspace's shared notes (`.combwork/shared`) are read by every project and agent. They are for knowledge that outlives this conversation: decisions and their reasons, conventions, setup steps, and gotchas that cost time to find.
 
 They are not for:
 
