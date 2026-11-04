@@ -184,7 +184,7 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
     const sharedCheck = await until(() => quick(a, sharedId), HUNG_MS)
     check("…but doesn't count: files changed in the folder while it ran", sharedCheck?.counted === false && sharedCheck.whyNot === 'changed', JSON.stringify(sharedCheck))
     // #1654: hive-progress says so as it ends, naming what changed and the remedy, its exit code the command's.
-    const said = 'hive-progress: not counted as check quick: files changed in the folder while it ran (a.ts'
+    const said = 'cw-progress: not counted as check quick: files changed in the folder while it ran (a.ts'
     check('…and hive-progress says why, with what to do', sharedRun.stderr.includes(said) && sharedRun.stderr.includes('or with --isolated'), sharedRun.stderr)
 
     // --- The same check, isolated: in copies/copy-1 at the card's revision; the same edit doesn't touch it. The first copy's

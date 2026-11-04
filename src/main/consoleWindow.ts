@@ -1,4 +1,5 @@
 import { msg, tr } from '../shared/i18n'
+import { APP_NAME } from '../shared/appName'
 import { basename, join } from 'path'
 import { app, BrowserWindow, nativeTheme, screen, shell, type WebContents } from 'electron'
 import type { HiveEvent, WindowState } from '../shared/types'
@@ -89,7 +90,7 @@ export function openConsoleWindow(owner: HiveWindow): BrowserWindow {
     minHeight: CONSOLE_MIN.height,
     show: false,
     focusable: !offScreen,
-    title: tr(msg({ id: 'main.console.title', defaultMessage: 'Developer Console — {workspace}', description: "The developer console's window title. {workspace} is the workspace's folder name." }), { workspace: basename(owner.ws.path ?? '') || 'Hive' /* i18n-ignore: the app's name */ }),
+    title: tr(msg({ id: 'main.console.title', defaultMessage: 'Developer Console — {workspace}', description: "The developer console's window title. {workspace} is the workspace's folder name." }), { workspace: basename(owner.ws.path ?? '') || APP_NAME }),
     icon: join(resourcesDir(), 'icon.png'),
     backgroundColor: dark() ? '#1e1e1e' : '#ffffff',
     autoHideMenuBar: true,

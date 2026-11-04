@@ -1,4 +1,4 @@
-// Templates view and tab, export and import (#127): the Templates view on the activity bar (next to Skills) lists Hive's
+// Templates view and tab, export and import (#127): the Templates view on the activity bar (after Skills and Dialects, HI-2444) lists Hive's
 // own (#1436), the workspace's templates and each project's, with a filter; selecting one shows its agents and layout; Rename…,
 // Duplicate… (into another project), Load into Project… (the project chosen, then loading's own confirmation),
 // Export… to a test folder (nothing personal in the file), Import… of that file (where to keep it; a name clash offers
@@ -86,9 +86,9 @@ const check = (name, ok, extra = '') => {
   await lib.addAgent(inv, beta, { name: 'Old' })
   await inv('workspace:refresh')
 
-  // --- The Templates view, next to Skills.
+  // --- The Templates view, after Skills and Dialects (HI-2444).
   const bar = await page.locator('.activitybar .activity-btn').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))
-  check('the Templates icon is next to Skills on the activity bar', bar.indexOf('Templates') === bar.indexOf('Skills') + 1, JSON.stringify(bar))
+  check('the Templates icon follows Skills and Dialects on the activity bar', bar.indexOf('Dialects') === bar.indexOf('Skills') + 1 && bar.indexOf('Templates') === bar.indexOf('Dialects') + 1, JSON.stringify(bar))
   await page.locator('.activitybar [aria-label="Templates"]').click()
   check("the view lists Combwork's own, the workspace's templates, then each project's under its name", !!(await lib.until(async () => JSON.stringify(await groups()) === '["combwork 6","workspace 1","alpha 1"]', 5000)) && JSON.stringify(await rowNames(sidebar)) === '["Pair","Solo"]' && JSON.stringify(await sidebar.locator('.template-row[data-scope="hive"]').evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))) === JSON.stringify(HIVE_NAMES), JSON.stringify([await groups(), await rowNames(sidebar)]))
   await sidebar.locator('select[aria-label="Show templates of"]').selectOption({ label: 'alpha' })

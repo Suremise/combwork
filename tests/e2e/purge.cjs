@@ -1,6 +1,6 @@
 // Purge… (#1138) from its three places, on fixtures: a project with a session the "CLI" still has, an archived one it
 // lost, a third for the session's own purge, a running session, a deleted session's attachments and a leftover spare of a
-// backup; and a second project. The Sessions tab's Purge Hive's Files… lists and removes one session's files to the
+// backup; and a second project. The Sessions tab's Purge Combwork's Files… lists and removes one session's files to the
 // Recycle Bin, the record staying; Project Settings → Storage's Purge… lists every file of Hive's with its size, the
 // last copy tagged and the running session left alone, and with Delete permanently removes them for good (nothing in the
 // Recycle Bin), deleting the lost session as Delete does; Settings → Workspace's Purge… covers the other project too. The
@@ -128,8 +128,8 @@ const write = (file, text) => {
     await page.getByRole('button', { name: 'Expand All' }).click()
     check('the sessions are listed', await lib.until(async () => (await row('Purged alone').count()) > 0, HUNG_MS))
     await row('Purged alone').first().click({ button: 'right' })
-    await lib.menuEntry(page, "Purge Hive's Files…").click()
-    check('the dialog names the session', await lib.until(async () => /Purge Hive's Files of "Purged alone"/.test(await dialogText()), HUNG_MS), await dialogText())
+    await lib.menuEntry(page, "Purge Combwork's Files…").click()
+    check('the dialog names the session', await lib.until(async () => /Purge Combwork's Files of "Purged alone"/.test(await dialogText()), HUNG_MS), await dialogText())
     let listed = await lib.until(async () => {
       const r = rel(await rows(), alpha)
       return JSON.stringify(r) === JSON.stringify([`attachments/${ONE}/shot.png`, `sessions/${ONE}.jsonl.gz`]) && r
@@ -147,8 +147,8 @@ const write = (file, text) => {
     const liveRow = page.locator(`.sessions-tree [data-key="s:${state?.sessionId}"]`)
     check('the running session is listed', await lib.until(async () => (await liveRow.count()) === 1, HUNG_MS))
     await liveRow.click({ button: 'right' })
-    const entry = lib.menuEntry(page, "Purge Hive's Files…")
-    check("a running session's Purge Hive's Files… is off", await lib.until(async () => /\bdisabled\b/.test((await entry.getAttribute('class').catch(() => '')) ?? ''), HUNG_MS), await entry.getAttribute('class').catch(() => 'none'))
+    const entry = lib.menuEntry(page, "Purge Combwork's Files…")
+    check("a running session's Purge Combwork's Files… is off", await lib.until(async () => /\bdisabled\b/.test((await entry.getAttribute('class').catch(() => '')) ?? ''), HUNG_MS), await entry.getAttribute('class').catch(() => 'none'))
     await page.keyboard.press('Escape')
 
     // --- Project Settings → Storage: everything of the project's, permanently.
@@ -191,7 +191,7 @@ const write = (file, text) => {
     await wsPurge.click()
     const b = fixtures.find((s) => s.id === BETA)
     check("the workspace's preview lists beta's files, with its project", await lib.until(async () => rel(await rows(), beta).includes(`sessions/${BETA}.jsonl.gz`) && (await dialog.locator('tbody tr', { hasText: 'beta' }).count()) >= 2, HUNG_MS), JSON.stringify(await rows()))
-    check('…and its title names the workspace', /Purge What Hive Keeps in purge-ws/.test(await dialogText()))
+    check('…and its title names the workspace', /Purge What Combwork Keeps in purge-ws/.test(await dialogText()))
     await page.screenshot({ path: path.join(lib.WORK, 'purge-4-workspace.png') })
     await dialog.locator('.btn.primary').click()
     check("beta's files went to the Recycle Bin", await lib.until(() => !fs.existsSync(backup(b)) && !fs.existsSync(shot(b)), HUNG_MS) && lib.trashed(hiveOf(beta)).some((e) => e.from.toLowerCase() === backup(b).toLowerCase()))

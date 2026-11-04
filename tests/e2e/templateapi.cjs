@@ -84,7 +84,7 @@ const cfgOf = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'proje
 
     // --- 1. A script and a project agent are refused, before any template is read.
     for (const [what, r] of [['list', await list('alpha')], ['plan', await plan('alpha', { template: 'team-3x3.json' })], ['load', await load('alpha', { template: 'team-3x3.json' })]]) {
-      check(`a script's ${what} is refused (403), naming the Assistant`, r.status === 403 && /Only the Hive Assistant/.test(r.body?.error ?? ''), JSON.stringify(r))
+      check(`a script's ${what} is refused (403), naming the Assistant`, r.status === 403 && /Only the Assistant/.test(r.body?.error ?? ''), JSON.stringify(r))
     }
     await inv('session:start', beta, { agentId: bea.id })
     const beaToken = await tokenOf(beta, bea.id)

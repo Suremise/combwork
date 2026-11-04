@@ -140,7 +140,7 @@ const check = (name, ok, extra = '') => {
   script('Reviewer', [`work 1 then ${wait(c1, { column: 'passed' })}`])
   await inv('tasks:update', c1, { column: 'doing' })
   await inv('tasks:update', c1, { column: 'review' })
-  const reason = `Reviewer hasn't taken the wake Hive typed for #${c1}: it waits in its prompt.`
+  const reason = `Reviewer hasn't taken the wake Combwork typed for #${c1}: it waits in its prompt.`
   check('a wake never taken: after the grace, the card is stalled, saying who and why', !!(await until(async () => (await stalledOf(c1)) === reason, 30000)), String(await stalledOf(c1)))
   check('…naming the card by key alone (#1219, HI-1661)', lib.KEYED.test(String(await rawStalled(c1))), String(await rawStalled(c1)))
   check('…the line was never sent, and Combwork says so', !!(await until(async () => /still wasn't taken/.test(hiveLog()), 8000)) && wakes('Reviewer').length === 1)
