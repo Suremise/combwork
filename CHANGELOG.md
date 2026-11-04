@@ -36,6 +36,7 @@
 ### Fixes
 
 - **Work on other cards no longer interrupts a waiting agent's wake** (HI-2486). Loop handoffs and answers to For you questions kept restarting their delivery when unrelated board changes arrived, sometimes leaving an idle builder waiting. Delivery now checks its own card, lanes and project settings, so unrelated traffic lets it carry on.
+- **Advanced settings keep their latest values when reads overlap** (HI-2454). A slow read of advanced.json could finish after a newer load or saved setting and put old values back in memory. Superseded reads are now ignored; a read still pending when the store stops is ignored too.
 
 - **Switch Them When Their Turn Is Over switches to another connection on the same sign-in.** An agent moved to another connection on the account it runs on, say with another model or effort, kept running on its old one after its turn ended: the switch compared accounts, not connections. Settings → Accounts & Connections' banner now counts the agents its button switches, too (HI-2413).
 - **Turning the Assistant's Control down, or stopping it, stops a card or comment it already asked for.** A new card or comment the Assistant asked for just before, still waiting behind another change to the board, was still made. Now it's refused and nothing of it is saved, its files included (HI-2415).

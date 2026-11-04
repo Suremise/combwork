@@ -1121,11 +1121,16 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
     const placing = place(ws, e.project, e.wf, n, cycle, lease)
     await vi.waitFor(() => expect(notices(e)).toHaveLength(1), { timeout: HUNG_MS })
     expect(notices(e)[0]).toMatch(/can't give AM-\d+ to B1 yet: its conversation in slot-a can't resume now \(slot-a still has another session in it \(test\)\)/)
+    // HI-2454: a mock start is recorded before its awaited error import rejects. Wait for launchWith to cancel
+    // each refused launch's delivery before sending another status; the call alone can precede the next wait.
+    const refused = () => state.deliveries.filter((delivery) => delivery.state === 'cancelled').length
     // Each look refused again: still a wait, not told again, never given up on.
     for (const tries of [2, 3]) {
+      await vi.waitFor(() => expect(refused()).toBe(tries - 1), { timeout: HUNG_MS })
       status()
       await vi.waitFor(() => expect(state.calls).toHaveLength(tries), { timeout: HUNG_MS })
     }
+    await vi.waitFor(() => expect(refused()).toBe(3), { timeout: HUNG_MS })
     expect(notices(e)).toHaveLength(1)
     // The slot ready: the next look resumes it.
     status()

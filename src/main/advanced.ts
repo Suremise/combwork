@@ -40,6 +40,8 @@ export class AdvancedStore {
   private loaded = false
   private watcher: FSWatcher | null = null
   private reloadTimer: NodeJS.Timeout | null = null
+  /** A read is current only until a newer read, load, saved value or stop supersedes it (HI-2454). */
+  private readVersion = 0
   private cli: Partial<Record<ProviderId, string | null>> = {}
   /** The values that apply when Hive restarts, as this Hive started with them (read before the app was ready). */
   private atStart: Record<string, unknown> = {}
@@ -57,6 +59,7 @@ export class AdvancedStore {
 
   /** Reads advanced.json at startup (none: no overrides) and follows changes to it. `folder`: Hive's profile folder. */
   load(folder = app.getPath('userData')): void {
+    this.stop()
     this.folder = folder
     this.loaded = true
     let text: string | null = null
@@ -116,12 +119,17 @@ export class AdvancedStore {
   private follow(): void {
     if (this.watcher) return
     try {
-      this.watcher = watch(this.folder ?? app.getPath('userData'), (_evt, name) => {
+      const watcher = watch(this.folder ?? app.getPath('userData'), (_evt, name) => {
+        if (this.watcher !== watcher) return
         if (String(name ?? '').toLowerCase() !== 'advanced.json') return
         if (this.reloadTimer) clearTimeout(this.reloadTimer)
-        this.reloadTimer = setTimeout(() => void this.reload(), 150)
+        this.reloadTimer = setTimeout(() => {
+          this.reloadTimer = null
+          if (this.watcher === watcher) void this.reload()
+        }, 150)
       })
-      this.watcher.on('error', (e) => log.warn('Stopped following advanced.json', e))
+      this.watcher = watcher
+      watcher.on('error', (e) => log.warn('Stopped following advanced.json', e))
     } catch (e) {
       log.warn("Can't follow changes to advanced.json", e)
     }
@@ -129,12 +137,14 @@ export class AdvancedStore {
 
   /** Reads advanced.json again; tells Settings when it changed. */
   async reload(): Promise<void> {
+    const version = ++this.readVersion
     let text: string | null = null
     try {
       text = await readFile(this.path, 'utf8')
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') return log.warn("Couldn't read advanced.json", e)
     }
+    if (version !== this.readVersion) return
     if (this.take(text)) {
       log.info(`advanced.json changed: ${Object.keys(this.values).length} override(s)${this.fileError ? `; ${this.fileError}` : ''}`)
       this.changed()
@@ -163,9 +173,11 @@ export class AdvancedStore {
   }
 
   stop(): void {
+    this.readVersion++
     this.watcher?.close()
     this.watcher = null
     if (this.reloadTimer) clearTimeout(this.reloadTimer)
+    this.reloadTimer = null
   }
 
   /** Called when an override or the installed CLIs change. */
@@ -314,6 +326,7 @@ export class AdvancedStore {
       }
       throw e
     }
+    this.readVersion++
     this.take(text)
     this.changed()
     // A version learnt while it was written: its record goes in next.
