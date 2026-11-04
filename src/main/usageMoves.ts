@@ -1,6 +1,6 @@
 import { randomBytes } from 'crypto'
 import { basename } from 'path'
-import type { Account, AgentDef, PlanLimit, UsageMoveRecord, UsageMoveRule } from '../shared/types'
+import type { Account, AgentDef, PlanLimit, ProviderId, UsageMoveRecord, UsageMoveRule } from '../shared/types'
 import { USAGE_MOVES, englishText } from '../shared/advanced'
 import { accountOnIn, resolveAgentConnection } from '../shared/accounts'
 import { projectAgents } from '../shared/defaults'
@@ -8,7 +8,7 @@ import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { agentProvider } from '../shared/providers'
 import { limitDue, limitKind, liveRecords, matchConnection, type MatchedBy, movedOffWithinPeriod, periodRecord, ruleLimits, samePeriod, sameRule, targetProblem, USAGE_MOVE_TRIES, type UsageMoveProblem } from '../shared/usageMoves'
 import { advanced } from './advanced'
-import { accountById, allAccounts, allConnections, getConnection, onConnectionSignedIn } from './accounts'
+import { accountById, allAccounts, allConnections, firstUsableAccount, getConnection, onConnectionSignedIn } from './accounts'
 import { choiceCount, onManualChoice } from './agentChoice'
 import { coalesced } from './coalesce'
 import { config } from './config'
@@ -67,6 +67,16 @@ const pending = new Map<string, Pending>()
 function agentKey(ws: WorkspaceService, projectPath: string, projectId: string | undefined, agentId: string): string {
   const project = ws.isAssistantHome(projectPath) ? `assistant:${(ws.path ?? '').toLowerCase()}` : (projectId ?? projectPath.toLowerCase())
   return `${project}/${agentId}`
+}
+
+/**
+ * The CLI an agent launches with, as sessions.ts works it out (HR3 on HI-2530): its own; but an Assistant that names
+ * neither a CLI nor a connection yet (a new workspace's, HI-2108) launches on the first usable account's CLI here, so it
+ * is that CLI's rules that move it, never another's.
+ */
+function launchCli(ws: WorkspaceService, projectPath: string, a: Pick<AgentDef, 'provider' | 'connection'>): ProviderId {
+  if (ws.isAssistantHome(projectPath) && !a.provider && !a.connection) return firstUsableAccount(ws.config)?.provider ?? agentProvider(a, config.settings)
+  return agentProvider(a, config.settings)
 }
 
 const records = (): Record<string, Record<string, UsageMoveRecord>> => config.get().usageMoves ?? {}
@@ -232,7 +242,7 @@ async function fire(acc: Account, rule: UsageMoveRule, l: PlanLimit, now: number
       for (const a of projectAgents(pc)) {
         const key = agentKey(ws, projectPath, pc.id, a.id)
         if (records()[acc.id]?.[l.id]?.handled[key] || pending.has(key)) continue
-        if (agentProvider(a, config.settings) !== acc.provider) continue
+        if (launchCli(ws, projectPath, a) !== acc.provider) continue
         const choice = resolveAgentConnection(ws.config, acc.provider, a.connection, allAccounts(), allConnections())
         if (!choice.ok || choice.account.id !== acc.id) continue
         if (!accountOnIn(ws.config, target, allAccounts())) {
@@ -310,7 +320,7 @@ function manualChoice(projectPath: string, before: AgentDef): void {
     changeRecord(m.account, m.limit, m.firing, (r) => (r.handled[key] = 'kept'))
     sessions.dropUsageMove(m.projectPath, m.agentId, 'the user chose its connection') // i18n-ignore: for the log
   }
-  const cli = agentProvider(before, config.settings)
+  const cli = launchCli(ws, projectPath, before)
   const choice = resolveAgentConnection(ws.config, cli, before.connection, allAccounts(), allConnections())
   if (!choice.ok) return
   const now = Date.now()

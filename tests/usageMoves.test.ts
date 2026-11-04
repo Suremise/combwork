@@ -19,7 +19,7 @@ vi.mock('electron', () => ({
   }
 }))
 
-const H = vi.hoisted(() => ({ advanced: true as boolean, notices: [] as { title: string; api?: string; message?: string }[] }))
+const H = vi.hoisted(() => ({ advanced: true as boolean, notices: [] as { title: string; api?: string; message?: string }[], firstUsable: null as { provider: string } | null }))
 vi.mock('../src/main/advanced', () => ({ advanced: { get: (id: string) => (id === 'hive.accounts.usageMoves' ? H.advanced : undefined) } }))
 // Told once through tell() (HI-2320): what it tells, by its title and its English one.
 vi.mock('../src/main/notify', () => ({ tell: (t: { title: string; apiTitle?: string; message?: string }) => void H.notices.push({ title: t.title, api: t.apiTitle, message: t.message }) }))
@@ -31,6 +31,8 @@ vi.mock('../src/main/accounts', async () => {
     allConnections: () => config.get().connections ?? [],
     accountById: (id: string | null | undefined) => (config.get().accounts ?? []).find((a) => a.id === id),
     getConnection: (id: string | null | undefined) => (config.get().connections ?? []).find((c) => c.id === id),
+    // The first usable account here (decision A): what an Assistant naming no CLI launches on (HR3 on HI-2530).
+    firstUsableAccount: () => H.firstUsable,
     onConnectionSignedIn: () => undefined
   }
 })
@@ -278,6 +280,7 @@ describe('usageMoves.ts', () => {
     G.atLock = 0
     H.advanced = true
     H.notices.length = 0
+    H.firstUsable = null
     for (const s of [S.running, S.busy]) s.clear()
     S.quits.length = 0
     S.resumed.length = 0
@@ -351,6 +354,28 @@ describe('usageMoves.ts', () => {
     setUsage('a2', [weekly(99)])
     await settle()
     expect(assistantPc.agents[0].connection).toBe('c2a')
+  })
+
+  it("an Assistant naming no CLI or connection is moved by its launch CLI's rules only: the first usable account's (HR3)", async () => {
+    // A new workspace's Assistant (HI-2108): it launches on the first usable account's CLI, here Codex's.
+    assistantPc.agents = [{ id: 'assistant', name: 'Assistant' } as AgentDef]
+    H.firstUsable = { provider: 'codex' }
+    setUsage('a1', [weekly(99)])
+    await settle()
+    await vi.waitFor(() => expect(S.resumed).toContain(key('idle')), { timeout: HUNG_MS })
+    expect(assistantPc.agents[0].connection).toBeUndefined()
+    expect(usageMovesPending().some((k) => k.startsWith('assistant:'))).toBe(false)
+    expect(H.notices.map((n) => n.api)).toEqual(['3 agents move from Anthropic-1 to Anthropic-2'])
+  })
+
+  it('…and moved when that first usable account is the rule’s CLI, onto the target’s matching connection (HR3)', async () => {
+    assistantPc.agents = [{ id: 'assistant', name: 'Assistant' } as AgentDef]
+    H.firstUsable = { provider: 'claude-code' }
+    setUsage('a1', [weekly(99)])
+    await settle()
+    // Not running: written at once, to Anthropic-2's first (its connection resolved as Anthropic-1's first, Main: by name).
+    await vi.waitFor(() => expect(assistantPc.agents[0].connection).toBe('c2'), { timeout: HUNG_MS })
+    expect(H.notices[0]?.message).toContain('Assistant (by name)')
   })
 
   it('the Assistant, chosen by the user while its move waits, stays where the user put it (HI-2530)', async () => {
