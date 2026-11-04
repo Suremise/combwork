@@ -115,7 +115,7 @@ const check = (name, ok, extra = '') => {
     await update('loose').click()
     const ld = dialog('loose')
     await lib.until(async () => (await ld.count()) === 1, HUNG_MS)
-    check('loose: checked out nowhere, updated in a temporary folder', /loose is checked out nowhere: Hive updates it in a temporary folder, removed after\./.test(await text(ld)), await text(ld))
+    check('loose: checked out nowhere, updated in a temporary folder', /loose is checked out nowhere: Combwork updates it in a temporary folder, removed after\./.test(await text(ld)), await text(ld))
     await ld.locator('select').selectOption('rebase')
     await ld.getByRole('button', { name: 'Update', exact: true }).click()
     check('Rebase: loose replayed onto main', !!(await lib.until(async () => (await page.locator('.toast', { hasText: /Rebased loose's 1 commit onto main/ }).count()) >= 1, HUNG_MS)) && g(alpha, 'rev-parse', 'loose~1') === main)

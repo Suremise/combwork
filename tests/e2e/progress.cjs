@@ -741,7 +741,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   await inv('session:start', alpha, { agentId: alfie.id })
   await until(async () => (await live(alfie.id))?.status === 'ready', 25000)
   let told = await instructionsOf(alpha)
-  check("a session's guidance says to run long commands through hive-progress", /over 30 s.*`hive-progress --title "<what and why, in a few words>" -- <command>`/.test(told), told.slice(-400))
+  check("a session's guidance says to run long commands through cw-progress", /over 30 s.*`cw-progress --title "<what and why, in a few words>" -- <command>`/.test(told), told.slice(-400))
   await page.keyboard.press('Control+Comma')
   const wrapSwitch = page.getByRole('switch', { name: 'Agents show long commands in the Progress panel' })
   check('Settings → General shows it, on', !!(await until(async () => (await wrapSwitch.count()) === 1, HUNG_MS)) && (await wrapSwitch.getAttribute('aria-checked')) === 'true' && (await wrapSwitch.isEnabled()))
@@ -760,7 +760,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   await inv('session:start', alpha, { agentId: alfie.id })
   check('the agent starts again', !!(await until(async () => (await live(alfie.id))?.status === 'ready', 25000)))
   told = await instructionsOf(alpha)
-  check('a session started afterwards is told: only when the user asks', /hive-progress --title "[^"]+" -- <command>`.*only when the user asks/.test(told) && !/over 30 s/.test(told), told.slice(-400))
+  check('a session started afterwards is told: only when the user asks', /cw-progress --title "[^"]+" -- <command>`.*only when the user asks/.test(told) && !/over 30 s/.test(told), told.slice(-400))
   await inv('settings:update', { general: { progressCommands: true } })
 
   // --- Switching the window to another workspace and back: its open runs are gone, old ids unknown, the taskbar clear;

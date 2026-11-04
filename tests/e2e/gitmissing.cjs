@@ -12,7 +12,7 @@ const userData = path.join(lib.WORK, 'gitmissing-profile')
 const ws = path.join(lib.WORK, 'gitmissing-ws')
 const repo = path.join(ws, 'repo')
 const tree = path.join(`${ws}.worktrees`, 'repo', 'wt')
-const MISSING = "Git isn't installed (or isn't on Hive's PATH)"
+const MISSING = "Git isn't installed (or isn't on Combwork's PATH)"
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++

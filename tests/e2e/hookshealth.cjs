@@ -143,7 +143,7 @@ const hooksOff = (agent, off) => {
     check("its lane is paused, saying whose hooks aren't arriving", paused?.status?.reason === 'hooks' && paused?.status?.agent === 'Builder', JSON.stringify(paused))
     const project = await api('GET', '/v1/projects/alpha')
     const shown = JSON.stringify(project.body ?? {})
-    check("the Agent API says its hooks aren't reaching Hive and it isn't given work", /hooks aren't reaching Hive, so its status may be wrong and it isn't given work/.test(shown), shown.slice(0, 400))
+    check("the Agent API says its hooks aren't reaching Combwork and it isn't given work", /hooks aren't reaching Combwork, so its status may be wrong and it isn't given work/.test(shown), shown.slice(0, 400))
 
     // Told once in Notifications.
     await page.locator('.activitybar button[aria-label="Notifications"]').click()
