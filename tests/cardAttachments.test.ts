@@ -422,15 +422,16 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
     expect(checkAdvanced(def, 'C:\\a;D:\\b')).toEqual({ value: ['C:\\a', 'D:\\b'] })
   })
 
-  it('folders joined by a comma are refused, not kept as one folder (HI-2538); a comma inside a folder stays', () => {
+  it('only ";" separates folders: a comma, and a %NAME% after one, stay part of a folder (HI-2538, HR1)', () => {
     const def = advancedDef(CARD_ATTACHMENT_FOLDERS_ID)!
     const one = advancedDef(AGENT_TEMP_FOLDER_ID)!
-    for (const joined of ['%LOCALAPPDATA%\\combwork-cli,%LOCALAPPDATA%\\hive-test\\scratch', 'C:\\a, D:\\b', 'C:\\a,\\\\server\\share', ['C:\\a,D:/b']]) {
-      const r = checkAdvanced(def, joined)
-      expect('error' in r && r.error, JSON.stringify(joined)).toMatch(/separated by semicolons\.$/)
-      expect('error' in checkAdvanced(one, joined), JSON.stringify(joined)).toBe(true)
+    // HR1's case: one valid folder, typed or as an override already saved, never refused or split.
+    for (const d of [def, one]) {
+      expect(checkAdvanced(d, 'C:\\Evidence,%ARCHIVE%\\runs')).toEqual({ value: ['C:\\Evidence,%ARCHIVE%\\runs'] })
+      expect(checkAdvanced(d, ['C:\\Evidence,%ARCHIVE%\\runs'])).toEqual({ value: ['C:\\Evidence,%ARCHIVE%\\runs'] })
     }
     expect(checkAdvanced(def, 'C:\\Evidence, runs;D:\\x,y')).toEqual({ value: ['C:\\Evidence, runs', 'D:\\x,y'] })
+    expect(foldersText(['C:\\Evidence,%ARCHIVE%\\runs', 'D:\\b'])).toBe('C:\\Evidence,%ARCHIVE%\\runs;D:\\b')
   })
 
   it("Attach to card from a pane: only that host's session attachments", async () => {

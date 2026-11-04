@@ -198,10 +198,10 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     await foldersHive.press('Enter')
     check('…edited as shown, each folder kept apart', !!(await lib.until(() => JSON.stringify(readFile().values['hive.cards.attachmentFolders']) === JSON.stringify(['C:\\Evidence, runs', 'D:\\Runs', '%LOCALAPPDATA%\\combwork-cli']), HUNG_MS)), JSON.stringify(readFile().values['hive.cards.attachmentFolders']))
     check('…a space typed after a semicolon is trimmed, not kept or added', !!(await lib.until(async () => (await foldersHive.inputValue()) === 'C:\\Evidence, runs;D:\\Runs;%LOCALAPPDATA%\\combwork-cli', HUNG_MS)), await foldersHive.inputValue())
-    // Two folders joined by a comma (Darren's, HI-2538) are refused, not saved as one folder; the box goes back to the list kept.
-    await foldersHive.fill('%LOCALAPPDATA%\\combwork-cli,%LOCALAPPDATA%\\hive-test\\scratch')
+    // The value edited as Darren did (HI-2538): typed "a; b" saves exactly a and b, shown back "a;b", never a comma.
+    await foldersHive.fill('%LOCALAPPDATA%\\combwork-cli; %LOCALAPPDATA%\\hive-test\\scratch')
     await foldersHive.press('Enter')
-    check('…folders joined by a comma are refused, saying semicolons, the list kept', !!(await lib.until(async () => /separated by semicolons/.test(await folders.innerText()) && (await foldersHive.inputValue()) === 'C:\\Evidence, runs;D:\\Runs;%LOCALAPPDATA%\\combwork-cli', HUNG_MS)) && readFile().values['hive.cards.attachmentFolders'].length === 3, `${await foldersHive.inputValue()} ${JSON.stringify(readFile().values['hive.cards.attachmentFolders'])}`)
+    check('…"a; b" saves exactly the folders typed, shown "a;b"', !!(await lib.until(async () => JSON.stringify(readFile().values['hive.cards.attachmentFolders']) === JSON.stringify(['%LOCALAPPDATA%\\combwork-cli', '%LOCALAPPDATA%\\hive-test\\scratch']) && (await foldersHive.inputValue()) === '%LOCALAPPDATA%\\combwork-cli;%LOCALAPPDATA%\\hive-test\\scratch', HUNG_MS)), `${await foldersHive.inputValue()} ${JSON.stringify(readFile().values['hive.cards.attachmentFolders'])}`)
     await folders.screenshot({ path: path.join(lib.WORK, 'advanced-folders.png') })
     await foldersOwn.fill('F:\\Workspace evidence')
     await foldersOwn.press('Enter')
