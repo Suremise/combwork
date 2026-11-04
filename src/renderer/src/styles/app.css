@@ -5024,7 +5024,7 @@ h2.section#unused-worktrees {
 /* Each row is the same grid, so the columns line up: order, name, tag, five values, who uses it, its buttons. */
 .connection-row {
   display: grid;
-  grid-template-columns: 44px minmax(90px, 1.4fr) minmax(56px, 0.8fr) minmax(60px, 1fr) minmax(48px, 0.7fr) minmax(48px, 0.7fr) minmax(60px, 1fr) minmax(48px, 0.8fr) minmax(64px, 0.9fr) 76px;
+  grid-template-columns: 44px minmax(84px, 1.2fr) minmax(72px, 1.1fr) minmax(56px, 0.9fr) minmax(54px, 0.6fr) minmax(54px, 0.6fr) minmax(56px, 0.9fr) minmax(44px, 0.6fr) minmax(60px, 0.8fr) 76px;
   gap: 6px;
   align-items: center;
   min-height: 28px;
@@ -5046,6 +5046,19 @@ h2.section#unused-worktrees {
 }
 .connection-cell {
   overflow-wrap: anywhere;
+}
+/* No cell grows past its column (HR1 on HI-2528: a long tag painted over Model). */
+.connection-row > * {
+  min-width: 0;
+}
+.connection-tag-cell .connection-tag {
+  max-width: 100%;
+}
+.connection-tag-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 .connection-cell.cli-own {
   color: var(--fg-faint);
@@ -5077,7 +5090,7 @@ h2.section#unused-worktrees {
 }
 /* A card narrower than the table (Settings beside the sidebar, a small window): each connection on two lines, its name,
    tag, who uses it and its buttons, then its values in a line. */
-@container connection-list (max-width: 640px) {
+@container connection-list (max-width: 660px) {
   .connection-head {
     display: none;
   }

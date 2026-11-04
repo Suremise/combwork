@@ -330,8 +330,9 @@ export function AccountsSettings() {
               <span className={cx('connection-cell', 'connection-tag-cell', !c.tag && 'faint')} data-cell="tag">
                 <span className="connection-cell-label">{tr(M.colTag)}</span>
                 {c.tag ? (
-                  <span className="connection-tag" data-tag title={tr(M.tagTip)}>
-                    <Icon name="tag" /> {c.tag}
+                  // Cut to its column with an ellipsis (HR1 on HI-2528): the whole tag in its tooltip, above what it is for.
+                  <span className="connection-tag" data-tag title={`${c.tag}\n${tr(M.tagTip)}`}>
+                    <Icon name="tag" /> <span className="connection-tag-text">{c.tag}</span>
                   </span>
                 ) : (
                   '—' /* i18n-ignore: no tag, a dash */
@@ -353,6 +354,13 @@ export function AccountsSettings() {
               {/* The whole summary, for a narrow card's second line and screen readers' sake. */}
               <span className="connection-summary muted" data-summary>
                 {connectionSummary(c, a, settings)}
+                {/* The compact row's values (HR1 on HI-2528): its effort warning too, where the Effort cell is hidden. */}
+                {c.effortUnusable && (
+                  <span className="connection-warning" data-effort-unusable-summary title={effortUnusableText(c, a.provider, settings)}>
+                    <Icon name="warning" />
+                    <span className="connection-cell-label">{effortUnusableText(c, a.provider, settings)}</span>
+                  </span>
+                )}
               </span>
               <span className={cx('connection-users', c.users.length ? 'muted' : 'faint')} data-used-by title={c.users.length ? connectionUsers(c) : undefined}>
                 {tr(M.usedBy, { assistant: assistant ? 'yes' : 'no', n: agents })}

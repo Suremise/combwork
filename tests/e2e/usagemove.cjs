@@ -155,6 +155,22 @@ const check = (name, ok, extra = '') => {
     check('…its bar is red at 95%', (await weekly.locator('.account-usage-bar.full').count()) === 1)
     check('Max 2’s says its usage isn’t reported yet', /not reported yet/.test(await page.locator(`.account-block[data-account="${max2.id}"] [data-usage="none"]`).innerText().catch(() => '')))
     check('…and Max 1’s plan and email have their own places', (await block.locator('[data-fact="email"] .account-fact-value').innerText()) === 'one@example.com')
+    // HR1 on HI-2528: a long tag stays inside its column, ellipsised, at a wide and an intermediate width.
+    await inv('connection:update', max1.main, { tag: 'Reviewers and builders' })
+    const mainRow = block.locator(`[data-connection="${max1.main}"]`)
+    await lib.until(async () => ((await mainRow.locator('[data-tag]').getAttribute('title').catch(() => '')) ?? '').startsWith('Reviewers and builders'), HUNG_MS)
+    // Wide, a table: the tag ends before the Model column. Narrower (a compact row, its value cells hidden): inside the row.
+    for (const width of [1400, 1300]) {
+      await page.setViewportSize({ width, height: 900 })
+      const fits = await lib.until(async () => {
+        const tag = await mainRow.locator('[data-tag]').boundingBox()
+        const model = await mainRow.locator('[data-cell="model"]').boundingBox()
+        const row = await mainRow.boundingBox()
+        if (!tag || !row) return null
+        return (model ? tag.x + tag.width <= model.x + 0.5 : tag.x + tag.width <= row.x + row.width + 0.5) ? { tag, model, row } : null
+      }, HUNG_MS)
+      check(`a long tag stays inside its column at a ${width}px window, its whole text in its tooltip`, !!fits && (await mainRow.locator('[data-tag]').getAttribute('title')).startsWith('Reviewers and builders\n'), JSON.stringify({ tag: await mainRow.locator('[data-tag]').boundingBox(), model: await mainRow.locator('[data-cell="model"]').boundingBox() }))
+    }
     await page.mouse.move(5, 5)
     const pane = page.locator('.accounts-settings')
     for (const [width, label] of [[1400, 'wide'], [820, 'narrow']]) {
