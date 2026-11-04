@@ -425,6 +425,13 @@
       "title": "plain"
     }
   },
+  "wake.lane.oneLane": {
+    "placeholders": {
+      "kind": "select",
+      "name": "plain",
+      "builder": "plain"
+    }
+  },
   "wake.lane.passed": {
     "placeholders": {
       "card": "plain",

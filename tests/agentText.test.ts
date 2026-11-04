@@ -387,6 +387,7 @@ describe("the canary dialect over the inbox's, lane, agent and usage watches' an
     // Lane, agent and usage watches.
     add('lane label', laneWatchLabel({ ids: 'all', events: [] }, [4], [{ name: 'HB2' }]))
     add('lane label, ids', laneWatchLabel({ ids: ['l-1'], events: [] }))
+    add('lane label, named', laneWatchLabel({ ids: ['l-1'], events: [] }, [], [], { 'l-1': { name: 'greetings', builder: 'HB2', twin: true } }), ['greetings'])
     add('lane limit', laneLimitLine({ ids: ['l-1', 'l-2'], events: [] }, 90, [4], [{ name: 'HB2' }]), ['l-2'])
     add('lane waits', laneWakeLine([], { cards: [], waits: [{ name: 'HB1', project: 'alpha', card: 12, what: 'Ship it' }, { name: 'HB2', project: 'alpha', card: null, what: null }], watching: true, following: true }))
     add('lane cards', readLaneCards({ cards: 'x' }) as string)
