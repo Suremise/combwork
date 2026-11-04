@@ -104,9 +104,13 @@ A sleep that is the point of the test is fine: checking that something does *not
 keystrokes, a fake standing in for a slow CLI. Say so in a comment beside it. Something that is truly waited for with
 a sleep, where nothing can be observed, is the exception: say why in the comment.
 
-**`npm run test:waits`** (`scripts/testWaits.mjs`) finds every wait in the tests that states no bound of its own, or one
-under 5 s with no comment, and the sleeps a branch adds or changes in the tests since main (uncommitted and new files
-too) that a check follows within three lines, with no comment beside or above saying why; it exits 1 when there is one, and 2 when it can't compare (no `main`, a bad `--base`, git failing): nothing was
+**`npm run test:waits`** (`scripts/testWaits.mjs`) checks waits and sleeps a branch adds or changes since main
+(uncommitted and new files too; `-- --base <ref>` chooses another base, and cards targeting an integration branch
+pass that branch, for example `npm run test:waits -- --base 1.1.0`). It finds waits that state no bound of their
+own, or one under 5 s with no comment, and sleeps that a check follows within three lines with no comment beside or
+above saying why. A change anywhere in a multiline wait counts, including removing its timeout. Existing findings
+are left to the full audit (HI-2491), so unrelated cards can run this lean builder check. It exits 1 when there is a
+new or changed finding, and 2 when it can't compare (no `main`, a bad `--base`, git failing): nothing was
 checked, so that isn't a pass. Only the first check after a sleep counts, and the sleep is let through only when that
 check itself waits (`until`, `waitFor`, `poll`): a wait in a later check doesn't cover an earlier one. A short sleep
 needs its comment like a long one. A pause inside a loop that polls state is the loop's way of
@@ -115,8 +119,8 @@ leaves on an `if` with `break` or `return`, with the check after the loop. A loo
 `for`, `for…of`, a `while` on a count or a clock) is no poll: a sleep in it before a check, inside the loop or after
 it, is found like any other. What it can't see: a single read with no sleep before it, a sleep more than three
 lines before its check, and a wait under another helper's name; and a comment counts as the reason whatever it says.
-Reviewers look for those and judge the reasons. `-- --all` lists every such sleep in the tests, the older ones too (the
-backlog in #524's audit). Builders run it before Review, and reviewers fail a new or changed test that sleeps and then
+Reviewers look for those and judge the reasons. `-- --all` lists every such wait and sleep in the tests, the older
+ones too (the backlog in #524's audit); it is a report and exits 0. Builders run the default check before Review, and reviewers fail a new or changed test that sleeps and then
 checks, reads state once after an action, or raises a timeout with no stated reason.
 
 A test that flakes anyway is investigated with the `investigate-flake` skill (`.claude/skills`, `.agents/skills`).
