@@ -69,6 +69,19 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     if ((await page.locator('.assistant-panel').count()) === 0) await page.keyboard.press('Control+Alt+I')
     check("the Assistant asks for a connection too: it can't start without one", !!(await lib.until(async () => /so the Assistant can't start/.test(await page.locator('[data-connection-setup="assistant"]').innerText().catch(() => '')), HUNG_MS)))
     await shots('setup')
+    // In narrow panes (HI-2535: 900 px with the sidebar and the Assistant open), each banner's button goes under its
+    // message rather than squeezing it into a narrow column beside the button.
+    await lib.fitWindow(app, page, { width: 900, height: 860 })
+    const stacked = (where) =>
+      page.locator(`[data-connection-setup="${where}"]`).first().evaluate((b) => {
+        const text = b.querySelector('.wrap-banner-text')
+        const btn = b.querySelector('.wrap-banner-actions .btn')
+        if (!text || !btn) return false
+        return btn.getBoundingClientRect().top >= text.getBoundingClientRect().bottom - 1
+      })
+    for (const where of ['project', 'assistant']) check(`at 900 px the ${where} banner's Add an Account goes under its message (HI-2535)`, !!(await lib.until(() => stacked(where), HUNG_MS)))
+    await shots('setup-narrow')
+    await lib.fitWindow(app, page, { width: 1400, height: 900 })
     await page.keyboard.press('Control+Alt+I')
     await page.keyboard.press('Control+Shift+P')
     await page.locator('.palette input').waitFor({ timeout: HUNG_MS })

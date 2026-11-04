@@ -26,6 +26,7 @@
 
 ### Fixed
 
+- **The "No account is on" warning fits narrow panes** (HI-2535). In a narrow window, with the sidebar and the Assistant open, the warning in a project and in the Assistant's panel squeezed its message into a thin column of six or seven lines beside **Add an Account**. The button now goes under the message when there isn't room beside it.
 - **Folder lists in Settings keep what you type** (HI-2538). Card attachments: more folders and Agents' temp folder take folders separated by semicolons, but the box and the Assistant showed a space after each semicolon that you hadn't typed. The box now shows the folders `;` apart, as you typed them, and `a; b` and `a;b` are the same list. Only a semicolon separates folders: a comma is kept as part of a folder's name.
 - **Settings' sections can be chosen from the keyboard** (HI-2532). Tab skipped the list of sections in Settings and Project Settings, so only the mouse could change section. Tab now reaches it, the arrow keys, Home and End move through the sections, and Enter or Space opens one.
 - **Settings section names cut short show in full on hover** (HI-2531). In a narrow window, Settings and Project Settings cut long section names ("Accounts & C…", "Keyboard Sho…"); hovering one now shows its whole name in a tooltip, and the list keeps its compact rows.
