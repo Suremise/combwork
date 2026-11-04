@@ -441,7 +441,7 @@ const prose = (seed, n) => {
   const consoleOne = measure('cw_console (an event in full)', tool('cw_console', { agent: 'Coder', seq: [promptSeq] }), 3000)
   check('…one in full: the raw hook and what Hive made of it, its prompt still hidden', consoleOne.includes('"raw"') && consoleOne.includes('"made"') && /"prompt":"<text: \d+ chars>"/.test(consoleOne), consoleOne)
   const consoleList = measure('cw_console (sources, as the Assistant)', tool('cw_console', { action: 'sources' }, 'assistant'), 1200)
-  check('the sources: a line each, with how to name it', /^alpha · Coder \(claude-code\): captured, \d+ events \[agent="a-[\w-]+" project="alpha"\]$/m.test(consoleList) && /^Hive: not captured \[source="hive"\]$/m.test(consoleList), consoleList)
+  check('the sources: a line each, with how to name it', /^alpha · Coder \(claude-code\): captured, \d+ events \[agent="a-[\w-]+" project="alpha"\]$/m.test(consoleList) && /^Combwork: not captured \[source="hive"\]$/m.test(consoleList), consoleList)
   // On a connection of its own (agent: false): after the slow tool calls above, fetch's kept-alive socket can be the one
   // Hive's server is closing for idleness, which reset this request once under load.
   const sourcePage = await new Promise((resolve, reject) => {
