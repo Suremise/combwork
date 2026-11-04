@@ -209,6 +209,14 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     await foldersOwn.fill('')
     await foldersOwn.press('Enter')
     check("…emptied, it goes from workspace.json: Hive's list applies", !!(await lib.until(() => !('cw.cards.attachmentFolders' in wsOwn()), HUNG_MS)), JSON.stringify(wsOwn()))
+    // HI-2537: every change reloads the advanced state, giving each list a new array. One landing while a box is being
+    // typed in (the workspace's save above, late under load) reset it, so the Enter below saved nothing. Here a hand edit
+    // of advanced.json reloads it while text is typed and not saved: shown in its row, the typed text is still there.
+    await foldersHive.fill('C:\\Half typed')
+    const typing = readFile()
+    typing.values['codex.hooks.timeoutSeconds'] = 11
+    fs.writeFileSync(file, JSON.stringify(typing, null, 2))
+    check('…a reload while a list is being typed keeps what is typed', !!(await lib.until(async () => (await row('codex.hooks.timeoutSeconds').locator('input').inputValue()) === '11', HUNG_MS)) && (await foldersHive.inputValue()) === 'C:\\Half typed', await foldersHive.inputValue())
     await foldersHive.fill('')
     await foldersHive.press('Enter')
     check("…Hive's emptied goes from advanced.json: the default, none", !!(await lib.until(() => !('cw.cards.attachmentFolders' in readFile().values), HUNG_MS)), JSON.stringify(readFile().values))
