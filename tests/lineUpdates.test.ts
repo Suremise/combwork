@@ -238,7 +238,10 @@ describe("an agent's branch between a lane's cards (#1271)", () => {
     expect(facts(w, cards[0]).some((f) => f.kind === 'LineMoved')).toBe(true)
   })
 
-  it('a commit made after approval is work not in main: asked of the user (Decide), once, and nothing moves', async () => {
+  // GIT_HEAVY_MS (HI-2494, HI-2453's policy): about 50 real Git commands for approval, a late commit, squash and
+  // two update passes; 94% of its 2.5 s isolated time was Git. At ~100% CPU it exceeded 20 s with every step slow
+  // (workspace 4.0 s, submit 2.9 s, verdict 4.9 s, reportMerge 3.3 s), rather than one condition left unawaited.
+  it('a commit made after approval is work not in main: asked of the user (Decide), once, and nothing moves', { timeout: GIT_HEAVY_MS }, async () => {
     const { w, repo, wt, cards } = await workspace()
     const rev = await approved(w, wt, cards[0], 'one.txt')
     commit(wt, 'late.txt')
