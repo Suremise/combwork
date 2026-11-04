@@ -262,7 +262,15 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
   // Revert the shipped file Promote changed (Edited), which puts back its model.
   await page.locator('.dialect-detail[data-dialect-file="claude-code/Opus 5.5.json"] [data-dialect-revert]').click()
   await answer()
-  check('Revert to shipped puts back the file as Hive ships it', !!(await until(() => JSON.parse(read('claude-code/Opus 5.5.json')).model === 'claude-opus-5-5', HUNG_MS)))
+  // Revert replaces the file: it may be missing for a moment while it is put back, so the wait reads it until it is there.
+  const modelOf = (rel) => {
+    try {
+      return JSON.parse(read(rel)).model
+    } catch {
+      return undefined
+    }
+  }
+  check('Revert to shipped puts back the file as Hive ships it', !!(await until(() => modelOf('claude-code/Opus 5.5.json') === 'claude-opus-5-5', HUNG_MS)))
   // A file deleted, or renamed, outside while it is shown: it says it is no longer there, never loading forever (HR2 r1).
   const goneShown = () => until(() => page.locator('[data-dialect-gone]').count(), HUNG_MS)
   await row('claude-code/Opus 5.5 v2.json').click()
