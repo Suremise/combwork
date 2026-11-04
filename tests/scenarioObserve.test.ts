@@ -59,6 +59,8 @@ describe('skills read', () => {
     const crlf = (s: string) => s.replace(/\n/g, '\r\n')
     const read = observeTranscript([sol('Get-Content .agents/skills/hive-work-on-card/SKILL.md', crlf(SKILL_TEXT('work-on-card')))], SKILLS)
     expect(read.skillsRead).toEqual(['work-on-card'])
+    // Hive's copies since 1.1 (HI-2463) are cw-<name>.
+    expect(observeTranscript([sol('Get-Content .agents/skills/cw-work-on-card/SKILL.md', crlf(SKILL_TEXT('work-on-card')))], SKILLS).skillsRead).toEqual(['work-on-card'])
     // Escaped twice (a result nested in another JSON string), and a quoted name, count too.
     const nested = tool('Script', 'text(await tools.exec_command({cmd:"Get-Content .agents/skills/hive-handover/SKILL.md"}))', JSON.stringify({ result: JSON.stringify({ output: crlf(SKILL_TEXT('"handover"')) }) }))
     expect(observeTranscript([nested], SKILLS).skillsRead).toEqual(['handover'])
@@ -93,6 +95,7 @@ describe("a skill's reference files read (skillRefsRead)", () => {
     expect(claude).toMatchObject({ skillsRead: [], skillRefsRead: ['card-loop/builder.md'] })
     const copilot = observe([tool('view', { path: '.agents/skills/hive-card-loop/builder.md' }, `1. ${HEAD}\n2.\n3. ## Builder`)], NAMES, REFS)
     expect(copilot.skillRefsRead).toEqual(['card-loop/builder.md'])
+    expect(observe([tool('view', { path: '.agents/skills/cw-card-loop/builder.md' }, `1. ${HEAD}\n2.\n3. ## Builder`)], NAMES, REFS).skillRefsRead).toEqual(['card-loop/builder.md'])
     const nested = tool('Script', 'text(await tools.exec_command({cmd:"Get-Content -Raw .agents/skills/hive-card-loop/builder.md"}))', JSON.stringify({ result: JSON.stringify({ output: BODY.replace(/\n/g, '\r\n') }) }))
     expect(observe([nested], NAMES, REFS).skillRefsRead).toEqual(['card-loop/builder.md'])
     // Both read: each counted where it belongs.

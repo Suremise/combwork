@@ -181,7 +181,8 @@ function observeTranscript(items, skillNames, skillRefs = new Map()) {
       if (skillsRead.includes(n)) continue
       const viaTool = /^skill$/i.test(t.name) && new RegExp(`(^|[":\\s])(hive:)?${escape(n)}(\\b|$)`).test(t.input)
       const nameLine = new RegExp(`(^|\\s)name:\\s*["']?${escape(n)}["']?\\s*$`, 'm')
-      const viaRead = new RegExp(`skills[\\\\/]+(hive-)?${escape(n)}[\\\\/]+SKILL\\.md`, 'i').test(t.input) && (nameLine.test(t.result) || nameLine.test(unescaped(t.result)))
+      // Hive's copies for Codex and Copilot are `cw-<name>` (HI-2463), `hive-<name>` before 1.1.
+      const viaRead = new RegExp(`skills[\\\\/]+(?:cw-|hive-)?${escape(n)}[\\\\/]+SKILL\\.md`, 'i').test(t.input) && (nameLine.test(t.result) || nameLine.test(unescaped(t.result)))
       if (viaTool || viaRead) skillsRead.push(n)
     }
   }
@@ -198,9 +199,9 @@ function observeTranscript(items, skillNames, skillRefs = new Map()) {
       for (const [file, head] of files) {
         const ref = `${n}/${file}`
         if (skillRefsRead.includes(ref)) continue
-        const at = new RegExp(`skills[\\\\/]+(hive-)?${escape(n)}[\\\\/]+${escape(file)}`, 'gi')
+        const at = new RegExp(`skills[\\\\/]+(?:cw-|hive-)?${escape(n)}[\\\\/]+${escape(file)}`, 'gi')
         // One file a call: a command naming two of the skill's files is no evidence of either.
-        const named = [...t.input.matchAll(new RegExp(`skills[\\\\/]+(?:hive-)?${escape(n)}[\\\\/]+[\\w.-]+\\.md`, 'gi'))].length
+        const named = [...t.input.matchAll(new RegExp(`skills[\\\\/]+(?:cw-|hive-)?${escape(n)}[\\\\/]+[\\w.-]+\\.md`, 'gi'))].length
         if ((t.input.match(at) ?? []).length && named === 1 && (t.result.includes(head) || unescaped(t.result).includes(head))) skillRefsRead.push(ref)
       }
     }
