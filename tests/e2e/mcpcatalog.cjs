@@ -120,7 +120,7 @@ function publish(dir, version, script, name = 'Test catalogue') {
     await row('demo').click()
     await page.locator('[data-action="catalog-update"]').click()
     const upd = page.getByRole('dialog', { name: 'Update demo from 1.0.0 to 1.1.0?' })
-    check('Update says where it is added and what changes', !!(await lib.until(async () => (await upd.count()) === 1, HUNG_MS)) && (await upd.innerText()).includes('Added in demo') && (await upd.innerText()).includes('+ Runs: node ${HIVE_MCP_DIR}/demo-cat/server2.js'), await upd.innerText().catch(() => ''))
+    check('Update says where it is added and what changes', !!(await lib.until(async () => (await upd.count()) === 1, HUNG_MS)) && (await upd.innerText()).includes('Added in demo') && (await upd.innerText()).includes('+ Runs: node ${CW_MCP_DIR}/demo-cat/server2.js'), await upd.innerText().catch(() => ''))
     await shots('update')
     await upd.getByRole('button', { name: 'Update', exact: true }).click()
     check('updated, and demo keeps it', !!(await lib.until(async () => installed().catalog?.version === '1.1.0', HUNG_MS)) && (projectMcp().enabled ?? []).includes('demo-cat') && String(installed().args?.[0]).includes('demo-cat/server2.js'), JSON.stringify([installed(), projectMcp()]))
