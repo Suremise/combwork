@@ -672,6 +672,7 @@ const routeColumns = (): DataColumn<RouteRow>[] => [
   {
     key: 'route',
     header: tr(M.route),
+    className: 'nowrap',
     cell: (r) => (
       <>
         <span className="faint">{r.method}</span> {r.route}

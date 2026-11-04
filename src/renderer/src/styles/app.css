@@ -12033,6 +12033,11 @@ textarea.input.task-blocked-input {
 .perf-scenarios td:first-child {
   white-space: nowrap;
 }
+/* A card's name keeps a readable width in a narrow window (HI-2534): the table scrolls in its .table-wrap rather than
+   squeezing the title to a word a line. */
+.table td.perf-name {
+  min-width: 16em;
+}
 .perf-detail-body p {
   margin: 0 0 6px;
 }
