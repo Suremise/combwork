@@ -292,6 +292,7 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
   modelGroups: CLAUDE_MODEL_GROUPS,
   modelPlaceholder: 'Full model ID, e.g. claude-opus-5-5 or claude-opus-4-6[1m]', // i18n-ignore: English (text.modelPlaceholder is the window's)
   capabilities: {
+    modelAliases: ['fable', 'opus', 'sonnet', 'haiku', 'default', 'best', 'opusplan'],
     fixedSessionId: true,
     liveModeSwitch: 'cycle',
     planModeToggle: false,

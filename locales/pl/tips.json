@@ -198,6 +198,8 @@
   "tips.developerConsole.title": "Zobacz, co CLI wysyła do Combwork",
   "tips.dialects.text": "Widok Dialekty pokazuje każdy tekst, który Combwork przekazuje agentom, i pozwala modelowi, CLI lub obszarowi roboczemu sformułować część z nich po swojemu. Zduplikuj plik, aby wypróbować zmianę na jednym agencie (Ustawienia agenta → Dialekt); zmiana obowiązuje od następnego uruchomienia agenta.",
   "tips.dialects.title": "Dostosuj słowa, które Combwork przekazuje agentom",
+  "tips.dialectsNewModel.text": "W widoku Dialekty przycisk Nowy plik modelu w grupie CLI zaczyna plik dla modelu, nawet takiego, na którym nie działa jeszcze żaden agent: wpisz jego identyfikator. Duplikuj też może podać model kopii, a Ustaw model daje jeden z Twoich plików modelowi. Obowiązuje od następnego uruchomienia każdego agenta.",
+  "tips.dialectsNewModel.title": "Plik dialektu dla dowolnego modelu",
   "tips.editTemplates.text": "Zaznacz szablon w widoku Szablony i wybierz Edytuj…: dodawaj, kopiuj, zmieniaj kolejność lub usuwaj jego agentów, zmieniaj każdego w oknie Ustawienia agenta (jego Zapisz zapisuje też szablon), zmień nazwę szablonu i wybierz jego układ.",
   "tips.editTemplates.title": "Edytuj szablon na miejscu",
   "tips.fileLinks.text": "Ścieżki plików wypisywane przez agenta, np. src/app.ts:42, są linkami: kliknij z Ctrl, żeby otworzyć plik w tym wierszu w zakładce Pliki.",

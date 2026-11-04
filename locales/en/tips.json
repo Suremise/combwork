@@ -795,6 +795,14 @@
     "defaultMessage": "Tune the words Combwork gives agents",
     "description": "A tip's title (HI-2444). Glossary: dialect."
   },
+  "tips.dialectsNewModel.text": {
+    "defaultMessage": "In the Dialects view, New Model File on a CLI's group starts a file for a model, even one no agent runs yet: type its ID. Duplicate can name the copy's model too, and Set Model gives one of your files to a model. It applies at each agent's next launch.",
+    "description": "A tip (HI-2523). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: dialect."
+  },
+  "tips.dialectsNewModel.title": {
+    "defaultMessage": "A dialect file for any model",
+    "description": "A tip's title (HI-2523). Glossary: dialect."
+  },
   "tips.editTemplates.text": {
     "defaultMessage": "Select a template in the Templates view and choose Edit…: add, copy, reorder or remove its agents, change each in the Agent Settings dialog (its Save saves the template too), rename it and pick its layout.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

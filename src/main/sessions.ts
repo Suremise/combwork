@@ -121,6 +121,7 @@ import { chainGuidanceRevision, GUIDANCE_REVISION, launchParts, launchRecord } f
 import { say, setChainResolver } from '../shared/agentText'
 import { inDefaultDialect, inDialectOf } from '../shared/agentText/asyncScope'
 import { agentTextSchema, chainKey, dialectsDir, loadDialects, pickOf, sessionChainOf, writeDialectFile, type DialectSet, type ModelSlot, type ResolvedChain, type SessionDialect } from './dialects'
+import { dialectModelSuggestions } from './dialects/suggestions'
 import { apiChainChanged, forgetApiChain, requestApiChain } from './dialects/apiChain'
 import type { DialectUsage } from '../shared/dialects'
 import { SESSION } from './sessionText'
@@ -2610,6 +2611,15 @@ class SessionManager {
     )
   }
 
+  /**
+   * The model IDs Combwork has seen a CLI run, for a workspace's Dialects view (HI-2523): its own running sessions'
+   * launch model IDs, then the CLI's connections' models (dialectModelSuggestions says which, in what order).
+   */
+  dialectModelsSeen(workspacePath: string | null | undefined, cli: ProviderId): string[] {
+    const live = [...this.live.values()].flatMap((l) => (l.dialect ? [{ cli: l.dialect.input.cli, modelId: l.dialect.input.modelId, workspace: workspaceFor(l.state.projectPath)?.path }] : []))
+    return dialectModelSuggestions(cli, workspacePath, live, allAccounts(), allConnections())
+  }
+
   /** The chain a running session speaks (the resolver's session scope): null for the Default, or one not running. */
   pinnedChain(projectPath: string, agentId: string): ResolvedChain | null {
     const d = this.live.get(liveId(projectPath, agentId))?.dialect
@@ -2662,7 +2672,7 @@ class SessionManager {
     // Its dialect chain, pinned for this launch (HI-2443): from its CLI, the real model ID it runs and its Dialect
     // setting as saved now, before any text of this launch is said. Files that can't be read: the Default.
     const pick = pickOf(((await workspaceOf(projectPath).savedAgent(projectPath, agent.id)) ?? agent).dialect)
-    l.dialect = (await this.launchDialect(projectPath, { cli: adapter.id, modelId: dialectModelId(info, chosenModel), pick }).catch((e) => {
+    l.dialect = (await this.launchDialect(projectPath, { cli: adapter.id, modelId: dialectModelId(adapter.id, info, chosenModel), pick }).catch((e) => {
       log.warn(`${userText(this.label(state))}: its dialect couldn't be resolved, so it speaks the Default`, e)
       return null
     })) ?? undefined

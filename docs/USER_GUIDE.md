@@ -1450,7 +1450,15 @@ Select a file to see **every text**, even when the file is empty, grouped by are
 
 **Outdated texts.** After a Combwork update, a text whose id was removed or renamed, or whose placeholders changed, no longer applies: it's listed first, under **Outdated**, with what's wrong and the Default now beside it (or "No current Default" for a text Combwork no longer has), and falls through to the layer below until you edit or remove it. Combwork never rewrites it.
 
-**Files.** **Duplicate** makes a **test copy** beside a model file: the same texts and no model, so no agent uses it until one picks it. **Use for a Model** gives a test copy a model ID: agents on Auto running that model get it from their next launch, and the file that had the model keeps its texts as a test copy. **Import Dialect File** adds a file from disk to a CLI's folder (as a test copy if its model is already claimed there); **Export** writes a file as it is; **Delete** moves a copy or import to the Recycle Bin (the Workspace, CLI and shipped files can't be deleted).
+**Files.** **New Model File…** (the **+** on a CLI's group: Claude Code, Codex, Copilot) makes an empty file in that CLI's folder: it inherits every text until you change one in it. Give it a **name** and a **model ID**. **Duplicate…** on a model file or test copy opens the same dialog with the name filled in ("*name* copy") and the same texts. With a model ID, agents on Auto running that model get the file from their next launch. Without one, it's a **test copy**, which no agent uses until its Dialect setting picks it. **Set Model…** on a file of yours (a copy, an import, a file you made) gives it a model ID, or another one.
+
+The model ID is whatever you type, so a file can be ready before any agent runs that model (an Ollama model such as `qwen3:32b`, say). The models Combwork has seen that CLI run are offered as you type, and under the field Combwork says:
+- the ID it will save, when you typed an alias or a form the CLI knows ("opus" saves as `claude-opus-5-5`, and a `[1m]` ending or a snapshot date is dropped);
+- which file already has that model (it becomes a test copy, keeping its texts);
+- when no agent has run that model yet;
+- when you typed one of the CLI's aliases that Combwork can't resolve now, so agents running it would show as model unknown.
+
+An ID the CLI doesn't know is kept exactly as typed. A name must be one Windows takes for a file, must not be `cli` (the CLI's own file), and must be new in the folder. **Import Dialect File** adds a file from disk to a CLI's folder (as a test copy if its model is already claimed there); **Export** writes a file as it is; **Delete** moves a copy or import to the Recycle Bin (the Workspace, CLI and shipped files can't be deleted).
 
 **Per agent.** Agent Settings → **Dialect**: **Auto** (the file for the model it runs) or a file of its CLI's folder, to try a test copy on one agent beside the others. A change of the agent's CLI sets it back to Auto. The Agent API's project status shows each running agent's chain in `launched.dialect`.
 

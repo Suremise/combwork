@@ -255,6 +255,7 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
   modelGroups: COPILOT_MODEL_GROUPS,
   modelPlaceholder: 'Model ID, e.g. claude-sonnet-5.5 or auto', // i18n-ignore: English (text.modelPlaceholder is the window's)
   capabilities: {
+    modelAliases: ['auto'],
     // --session-id <uuid> names a new session; --resume <id> reopens it.
     fixedSessionId: true,
     liveModeSwitch: 'cycle',
