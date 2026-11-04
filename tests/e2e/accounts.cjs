@@ -227,6 +227,24 @@ const check = (name, ok, extra = '') => {
     fs.mkdirSync(path.join(ws1, 'delta'), { recursive: true })
     await inv('workspace:refresh')
     check('a project with no agent on this CLI isn’t counted', (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1 && JSON.stringify(await trustOf(inv, personal.id)) === JSON.stringify({ pending: [], unknown: false }))
+    // A Git repository in the trusted workspace folder (HI-2520): Claude Code asks for it anyway (a folder above a
+    // repository doesn't cover it), so it needs Set Up, at its own folder, not the workspace's again. Then removed.
+    const epsilon = path.join(ws1, 'epsilon')
+    lib.gitProject(epsilon)
+    projectWithAgent(epsilon)
+    await inv('workspace:refresh')
+    check('a Git project in the trusted workspace folder: its agent put on it', await onPersonal(inv, epsilon))
+    const epsilonReal = fs.realpathSync.native(epsilon)
+    const gitTrust = await lib.until(async () => {
+      const t = await trustOf(inv, personal.id)
+      return t && !t.checking && t.pending.length ? t : null
+    }, HUNG_MS)
+    check('…it needs set up, naming it: the workspace folder’s trust doesn’t cover a repository', !!gitTrust && JSON.stringify(gitTrust.pending) === JSON.stringify([{ project: 'epsilon', folder: epsilonReal, git: true }]) && !!(await lib.until(async () => /epsilon/.test(await row('Personal').locator('[data-not-trusted]').innerText().catch(() => '')), HUNG_MS)), JSON.stringify(gitTrust))
+    check('…its Set Up would open in the repository’s own folder, not the workspace’s', !!gitTrust && gitTrust.setUpIn?.folder === epsilonReal && !gitTrust.setUpIn.workspace, JSON.stringify(gitTrust?.setUpIn))
+    await shots('git-not-covered')
+    fs.rmSync(epsilon, { recursive: true, force: true })
+    await inv('workspace:refresh')
+    check('…removed, it is set up again', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
 
     // --- Rename: the name only.
     await menuOf('Personal', 'Rename…')

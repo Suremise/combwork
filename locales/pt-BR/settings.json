@@ -63,7 +63,7 @@
   "settings.accounts.setUpChecking": "Verificando…",
   "settings.accounts.setUpDone": "Configurada",
   "settings.accounts.setUpIn": "Ele abre na pasta de {project}, {folder}: responda à pergunta do {cli} para confiar nela.",
-  "settings.accounts.setUpInWorkspace": "Ele abre na pasta deste espaço de trabalho, {folder}: responda à pergunta do {cli} para confiar nela e, com ela, em cada projeto dentro dela.",
+  "settings.accounts.setUpInWorkspace": "Ele abre na pasta deste espaço de trabalho, {folder}: responda à pergunta do {cli} para confiar nela e, com ela, em cada projeto dentro dela que não seja um repositório Git. Depois, cada repositório Git é perguntado na própria pasta.",
   "settings.accounts.setUpNeeded": "Precisa ser configurada",
   "settings.accounts.signIn": "Entrar",
   "settings.accounts.signInAgain": "Entrar de novo",

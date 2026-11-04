@@ -63,7 +63,7 @@
   "settings.accounts.setUpChecking": "Sprawdzanie…",
   "settings.accounts.setUpDone": "Skonfigurowane",
   "settings.accounts.setUpIn": "Otwiera się w folderze projektu {project}, {folder}: odpowiedz na pytanie {cli}, aby mu zaufać.",
-  "settings.accounts.setUpInWorkspace": "Otwiera się w folderze tego obszaru roboczego, {folder}: odpowiedz na pytanie {cli}, aby mu zaufać, a wraz z nim każdemu projektowi w nim.",
+  "settings.accounts.setUpInWorkspace": "Otwiera się w folderze tego obszaru roboczego, {folder}: odpowiedz na pytanie {cli}, aby mu zaufać, a wraz z nim każdemu projektowi w nim, który nie jest repozytorium Git. O każde repozytorium Git pytanie pada potem w jego własnym folderze.",
   "settings.accounts.setUpNeeded": "Wymaga konfiguracji",
   "settings.accounts.signIn": "Zaloguj",
   "settings.accounts.signInAgain": "Zaloguj ponownie",

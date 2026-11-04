@@ -180,8 +180,10 @@ export interface ProviderCapabilities {
     orgs: boolean
     setUp: Msg
     /**
-     * HI-1871: the CLI's trust of a folder covers the folders inside it (measured: Claude Code 2.1.311), so Set Up asks
-     * it once, in the workspace's folder, for every project there. Absent: once per project (Codex: its main root).
+     * HI-1871: the CLI's trust of a folder covers the folders inside it that aren't Git repositories (HI-2520, measured:
+     * Claude Code 2.1.316–2.1.318; a repository asks unless its own root is trusted), so Set Up asks it once, in the
+     * workspace's folder, for every such project there, then at each Git root. Absent: once per project (Codex: its
+     * main root).
      */
     trustInherits?: true
     server?: ServerCaps

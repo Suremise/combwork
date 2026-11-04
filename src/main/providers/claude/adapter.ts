@@ -363,9 +363,10 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   }
 
   /**
-   * Its trust of each folder in the folder's `.claude.json` (HI-1870), as Claude Code 2.1.311 looks it up: the real path
-   * or an ancestor's entry with the trust field, forward slashes, letter case as on disk (it asked with an entry in
-   * another case, and for an 8.3 path whatever the long one's entry said: unknown then).
+   * Its trust of each folder in the folder's `.claude.json` (HI-1870), as Claude Code looks it up: the real path's entry
+   * with the trust field, forward slashes, letter case as on disk (it asked with an entry in another case, and for an
+   * 8.3 path whatever the long one's entry said: unknown then). An ancestor's entry covers a folder without Git, never a
+   * Git root (HI-2520: a repository under a trusted folder asked, 2.1.316–2.1.318; a plain folder there didn't).
    */
   async connectionTrusts(home: string, targets: readonly TrustTarget[]): Promise<TrustReading[]> {
     let entries: Record<string, unknown>
@@ -382,6 +383,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       if (!t.root || t.short) return null
       for (let p = t.root.replace(/\\/g, '/').replace(/\/+$/, ''); ; ) {
         if (trusted.has(p)) return true
+        if (t.git) return false
         const up = p.slice(0, p.lastIndexOf('/'))
         if (!up || up === p || !up.includes(':')) return false
         p = up

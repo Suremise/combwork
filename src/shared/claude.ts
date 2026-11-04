@@ -321,7 +321,8 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
       shared: ['projects'],
       userHome: '.claude',
       orgs: true,
-      // A trusted folder covers the folders inside it (HI-1871, measured with 2.1.311): one answer for the workspace.
+      // A trusted folder covers the folders inside it without Git, never a repository (HI-1871; HI-2520, measured with
+      // 2.1.316–2.1.318): one answer for the workspace's plain folders, then one per Git root.
       trustInherits: true,
       setUp: msg({ id: 'providers.claude.connections.setUp', defaultMessage: "Set Up runs Claude Code on this connection for its one-time first-run questions (its look, its notes) and to trust this workspace's folders. Answer them in the terminal.", description: "Settings → Accounts & Connections, above a Claude Code connection's Set Up terminal and on one that still needs it: what Set Up is for. Set Up names a button." }),
       // A server of the user's (HI-1772), as Claude Code's environment variables reference has it (checked 27 Oct 2026):

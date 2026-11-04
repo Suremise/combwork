@@ -69,7 +69,7 @@
   "settings.accounts.setUpChecking": "Checking…",
   "settings.accounts.setUpDone": "Set up",
   "settings.accounts.setUpIn": "It opens in {project}'s folder, {folder}: answer {cli}'s question to trust it.",
-  "settings.accounts.setUpInWorkspace": "It opens in this workspace's folder, {folder}: answer {cli}'s question to trust it, and every project in it with it.",
+  "settings.accounts.setUpInWorkspace": "It opens in this workspace's folder, {folder}: answer {cli}'s question to trust it, and with it every project in it that isn't a Git repository. A Git repository is asked in its own folder next.",
   "settings.accounts.setUpNeeded": "Needs set up",
   "settings.accounts.signIn": "Sign In",
   "settings.accounts.signInAgain": "Sign In Again",

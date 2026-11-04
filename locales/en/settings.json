@@ -256,8 +256,8 @@
     "description": "Above a connection's Set Up terminal when it opens in a project's folder its coding agent CLI ({cli}) doesn't trust yet (HI-1870): {project} is the project's name, {folder} the folder."
   },
   "settings.accounts.setUpInWorkspace": {
-    "defaultMessage": "It opens in this workspace's folder, {folder}: answer {cli}'s question to trust it, and every project in it with it.",
-    "description": "Above a connection's Set Up terminal when it opens in the open workspace's folder (HI-1871): the coding agent CLI ({cli}) asks once whether to trust that folder, and trusting it covers every project inside it. {folder} is the folder."
+    "defaultMessage": "It opens in this workspace's folder, {folder}: answer {cli}'s question to trust it, and with it every project in it that isn't a Git repository. A Git repository is asked in its own folder next.",
+    "description": "Above a connection's Set Up terminal when it opens in the open workspace's folder (HI-1871): the coding agent CLI ({cli}) asks once whether to trust that folder; trusting it covers the projects inside it that aren't Git repositories, and Set Up then asks in each Git repository's own folder (HI-2520). {folder} is the folder."
   },
   "settings.accounts.setUpNeeded": {
     "defaultMessage": "Needs set up",

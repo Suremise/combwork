@@ -29,6 +29,10 @@ const HIVE_EXE = fs.existsSync(COMBWORK_EXE) ? COMBWORK_EXE : HIVE1_EXE
 const PROFILE = [path.join(process.env.APPDATA, 'Combwork'), path.join(process.env.APPDATA, 'Hive')].find((p) => fs.existsSync(p)) ?? path.join(process.env.APPDATA, HIVE_EXE === COMBWORK_EXE ? 'Combwork' : 'Hive')
 // A file the upgrade must carry across in the local profile folder (accounts live there), written before it.
 const LOCAL_MARK = 'sandbox-mark.txt'
+// A connection's Claude Code home in the local folder (HI-2520): its folder trust must arrive as it was, nothing more
+// trusted. One folder trusted, one answered no; a third never listed must stay unlisted.
+const TRUST_HOME = path.join('accounts', 'a-sandbox')
+const TRUST_JSON = { hasCompletedOnboarding: true, projects: { 'C:/Sandbox/trusted': { hasTrustDialogAccepted: true }, 'C:/Sandbox/untrusted': { hasTrustDialogAccepted: false } } }
 const MARK = { userName: 'Sandbox Check', theme: 'light' }
 // Scenario 4's workspace, made before the upgrade and opened after it (HI-2506), and its card.
 const KEPT_WS = path.join(process.env.USERPROFILE, 'Workspaces', 'Kept')
@@ -254,6 +258,8 @@ const steps = {
     const local = path.join(process.env.LOCALAPPDATA, 'Hive')
     fs.mkdirSync(local, { recursive: true })
     fs.writeFileSync(path.join(local, LOCAL_MARK), 'kept across the upgrade')
+    fs.mkdirSync(path.join(local, TRUST_HOME), { recursive: true })
+    fs.writeFileSync(path.join(local, TRUST_HOME, '.claude.json'), JSON.stringify(TRUST_JSON, null, 2))
     res.facts.runBefore = runValues()
     check('4.login-registered', 'Before the upgrade: Launch at login starts Hive.exe', res.facts.runBefore.some((v) => /\\Hive\.exe/i.test(v.command)), JSON.stringify(res.facts.runBefore))
     // A workspace the release before makes in .hive (HI-2462, HI-2506): a project and a card naming a note by its path,
@@ -303,6 +309,10 @@ const steps = {
     check('4.combwork-runs', 'Combwork.exe runs after the upgrade, from %APPDATA%\\Combwork', HIVE_EXE === COMBWORK_EXE && PROFILE === path.join(process.env.APPDATA, 'Combwork'), `${HIVE_EXE}, ${PROFILE}`)
     const localNew = path.join(process.env.LOCALAPPDATA, 'Combwork')
     check('4.local-moved', 'The local folder moved with its data: %LOCALAPPDATA%\\Combwork, no %LOCALAPPDATA%\\Hive', fs.existsSync(path.join(localNew, LOCAL_MARK)) && !fs.existsSync(path.join(process.env.LOCALAPPDATA, 'Hive')), fs.readdirSync(process.env.LOCALAPPDATA).filter((n) => /hive|combwork/i.test(n)).join(', '))
+    let trustAfter = null
+    try { trustAfter = JSON.parse(fs.readFileSync(path.join(localNew, TRUST_HOME, '.claude.json'), 'utf8')) } catch { /* below */ }
+    const trustEntries = (j) => Object.entries(j?.projects ?? {}).map(([k, v]) => [k, v?.hasTrustDialogAccepted])
+    check('4.trust-kept', "A connection home's Claude Code folder trust moved as it was: trusted stays trusted, untrusted stays untrusted, nothing added", JSON.stringify(trustEntries(trustAfter)) === JSON.stringify(trustEntries(TRUST_JSON)), JSON.stringify(trustAfter))
     check('4.roaming-moved', 'The roaming folder moved: no %APPDATA%\\Hive left', !fs.existsSync(path.join(process.env.APPDATA, 'Hive')), fs.readdirSync(process.env.APPDATA).filter((n) => /hive|combwork/i.test(n)).join(', '))
     let rec = null
     try { rec = JSON.parse(fs.readFileSync(path.join(localNew, 'profile-move.json'), 'utf8')) } catch { /* below */ }

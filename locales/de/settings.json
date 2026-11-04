@@ -63,7 +63,7 @@
   "settings.accounts.setUpChecking": "Wird geprüft…",
   "settings.accounts.setUpDone": "Eingerichtet",
   "settings.accounts.setUpIn": "Es öffnet sich im Ordner von {project}, {folder}: Beantworte die Frage von {cli}, um ihm zu vertrauen.",
-  "settings.accounts.setUpInWorkspace": "Es öffnet sich im Ordner dieses Arbeitsbereichs, {folder}: Beantworte die Frage von {cli}, um ihm zu vertrauen, und damit jedem Projekt darin.",
+  "settings.accounts.setUpInWorkspace": "Es öffnet sich im Ordner dieses Arbeitsbereichs, {folder}: Beantworte die Frage von {cli}, um ihm zu vertrauen, und damit jedem Projekt darin, das kein Git-Repository ist. Ein Git-Repository wird danach in seinem eigenen Ordner gefragt.",
   "settings.accounts.setUpNeeded": "Einrichtung nötig",
   "settings.accounts.signIn": "Anmelden",
   "settings.accounts.signInAgain": "Erneut anmelden",
