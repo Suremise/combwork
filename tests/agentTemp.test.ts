@@ -137,14 +137,14 @@ describe('prepareAgentTemp', () => {
 })
 
 describe('protectedFolders', () => {
-  it("lists every open workspace's projects, hidden ones, slots, Assistant home and .hive", async () => {
+  it("lists every open workspace's folder, projects, hidden ones, slots, Assistant home and .hive", async () => {
     const list = await protectedFolders([fakeWs('D:\\w1', ['D:\\w1\\a'], ['D:\\w1\\h']), fakeWs('E:\\w2', ['E:\\w2\\a'])])
-    expect(list).toEqual(expect.arrayContaining(['D:\\w1\\a', 'D:\\w1\\h', 'D:\\w1.worktrees', join('D:\\w1', '.hive', 'assistant'), join('D:\\w1', '.hive'), 'E:\\w2\\a', 'E:\\w2.worktrees']))
+    expect(list).toEqual(expect.arrayContaining(['D:\\w1', 'E:\\w2', 'D:\\w1\\a', 'D:\\w1\\h', 'D:\\w1.worktrees', join('D:\\w1', '.hive', 'assistant'), join('D:\\w1', '.hive'), 'E:\\w2\\a', 'E:\\w2.worktrees']))
   })
   it('skips a workspace with no folder (closing) and one whose list fails', async () => {
     const failing = { ...fakeWs('F:\\w3', []), listProjectPaths: async () => Promise.reject(new Error('closed')) } as unknown as FakeWs
     const list = await protectedFolders([{ path: null } as unknown as FakeWs, failing])
-    expect(list).toEqual(['F:\\w3.worktrees', join('F:\\w3', '.hive', 'assistant'), join('F:\\w3', '.hive')])
+    expect(list).toEqual(['F:\\w3', 'F:\\w3.worktrees', join('F:\\w3', '.hive', 'assistant'), join('F:\\w3', '.hive')])
   })
 })
 

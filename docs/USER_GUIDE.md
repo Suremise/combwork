@@ -1868,7 +1868,7 @@ Agents write temporary files as they work: Claude Code keeps its working scripts
 
 - Each agent, and the Assistant, gets a folder of its own in it, `<folder>\<project>-<code>\<agent id>` (the code tells apart projects with the same name), made when it starts. Combwork starts it with `TEMP`, `TMP` and `TMPDIR` set to that folder, and Claude Code also with `CLAUDE_CODE_TMPDIR`, so its scratchpad goes there.
 - It applies to agents started afterwards: restart a running agent to move it.
-- It can't be inside a project, a slot or Combwork's own folders: an agent that would start with such a folder doesn't start, and says why, as it does when the folder can't be made. Its files never go back to Windows' Temp folder unasked.
+- It can't be inside a workspace's folder, a project, a slot or Combwork's own folders: an agent that would start with such a folder doesn't start, and says why, as it does when the folder can't be made. Its files never go back to Windows' Temp folder unasked.
 - What moves is what each CLI puts in its temp folder: Claude Code's scratchpad, and what Codex, Copilot and their commands write to `%TEMP%`. A CLI's own caches and helper files elsewhere stay where the CLI keeps them (Codex's helpers under its home, for one), and a `CLAUDE_CODE_TMPDIR` set in Claude Code's own settings file still wins there.
 - Combwork never deletes anything in it: an agent resumed later finds its scratchpad where it left it. To tidy up, stop the agents, then delete the folders you no longer want in Explorer.
 - Only you can change it: the Assistant can read and explain it, but not set it, as it moves the Assistant's own files too.
