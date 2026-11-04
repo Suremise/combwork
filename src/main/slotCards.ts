@@ -1199,7 +1199,7 @@ async function settleOnce(ws: WorkspaceService, projectPath: string, life: Abort
     }
   }
   // 4. Lanes started from the window waiting for a slot.
-  if (ended(ws)) return
+  if (ended(ws) || life.aborted || ws.lifetime !== life || generation !== holdGeneration) return
   await startWaitingLanes(ws, projectPath, pool, life, generation)
   // 5. Adopted slots, once free, renamed to generic names (#1441).
   if (ended(ws)) return
@@ -1821,7 +1821,6 @@ async function lendLaneSlot(ws: WorkspaceService, projectPath: string, lane: str
  */
 async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool: SlotPool, life: AbortSignal, generation: number): Promise<void> {
   const stopped = (): boolean => !workflowEnforced() || ended(ws) || life.aborted || ws.lifetime !== life || generation !== holdGeneration || !ws.info()?.projects.some((p) => samePlace(p.path, projectPath))
-  if (stopped()) return
   const name = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.name
   const waiting = (await lanesWaitingForSlot(ws)).filter((l) => l.project.toLowerCase() === name?.toLowerCase()).sort((a, b) => a.slotWait!.since.localeCompare(b.slotWait!.since))
   // The rules off, or Hive quitting (#1628): looked at again after each await, nothing more lent or started.
