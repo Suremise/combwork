@@ -142,7 +142,7 @@ const LOOK_AT_ONCE = 8
 
 /** Each host looked at once, a few at a time (HI-2510: an open no longer waits on each host's calls in turn). */
 async function lookAt(hosts: { host: string; kind: HostKind }[]): Promise<Looked[]> {
-  const out: Looked[] = new Array(hosts.length)
+  const out: Looked[] = []
   let next = 0
   const lane = async (): Promise<void> => {
     for (let i = next++; i < hosts.length; i = next++) out[i] = { ...hosts[i], marked: existsSync(current(hosts[i].host)) && (await movedHost(hosts[i].host)) }
