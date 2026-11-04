@@ -37,6 +37,8 @@ import * as actions from '../actions'
 import { confirm, notify, prompt, set, useStore } from '../store'
 import { useScopedLoad } from '../scopedLoad'
 import { cx } from '../util'
+// Its own line, apart from the ui import below that HB5's HI-2523 changes (HI-2527).
+import { OneLineDesc } from './ui'
 import { CodeEditor } from './Editors'
 import { dialectOnTip } from './dialectOnTip'
 import { Section } from './Sidebar'
@@ -347,9 +349,7 @@ function DialectListRow({ row, selected, users }: { row: DialectRow; selected: b
           {row.outdated > 0 && <span className="badge warn" data-outdated={row.outdated}>{tr(M.outdatedBadge, { count: row.outdated })}</span>}
           {row.broken && <span className="badge warn">{tr(M.brokenBadge)}</span>}
         </div>
-        <div className="desc" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {kindText(row)}
-        </div>
+        <OneLineDesc text={kindText(row)} />
       </div>
       {users.length > 0 && (
         <Tooltip content={tr(M.usedBy, { count: users.length, agents: fmt.list(users.map((u) => u.agent)) })}>

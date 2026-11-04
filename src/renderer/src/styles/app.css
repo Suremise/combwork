@@ -668,6 +668,12 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A list row's description kept to one line, its full text on hover (OneLineDesc, HI-2527). */
+.one-line-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .pane-header .actions {
   margin-left: auto;
   display: flex;
