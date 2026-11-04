@@ -165,14 +165,52 @@ describe('Add MCP Server from File', () => {
   it("added under another name, the definition runs that name's folder; a flat zip's folder is the zip's name", async () => {
     const z = zipSync({ 'ollama/hive-mcp.json': json(OLLAMA), 'ollama/server.js': strToU8('// server') })
     const m = await run(() => mcp.addMcpFromFile(file('ollama.zip', z), 'local-models'))
-    expect(m.def?.args).toEqual(['${HIVE_MCP_DIR}/local-models/server.js'])
+    // Its old ${HIVE_MCP_DIR} reference, moved, is written with the new name (HI-2503).
+    expect(m.def?.args).toEqual(['${CW_MCP_DIR}/local-models/server.js'])
     expect(existsSync(join(mcpDir, 'local-models', 'server.js'))).toBe(true)
     const flat = zipSync({ 'hive-mcp.json': json({ command: 'node', args: ['${HIVE_MCP_DIR}/notes-server/index.js'] }), 'index.js': strToU8('//') })
     const f = file('notes-server.zip', flat)
     expect((await run(() => mcp.previewMcpFile(f))).name).toBe('notes-server')
     const n = await run(() => mcp.addMcpFromFile(f, 'notes'))
-    expect(n.def?.args).toEqual(['${HIVE_MCP_DIR}/notes/index.js'])
+    expect(n.def?.args).toEqual(['${CW_MCP_DIR}/notes/index.js'])
     expect(existsSync(join(mcpDir, 'notes', 'index.js'))).toBe(true)
+  })
+
+  it("reads Combwork's definition name and variable, and the old ones (HI-2503): the new definition wins, neither is copied", async () => {
+    const CW = { description: 'Notes', command: 'node', args: ['${CW_MCP_DIR}/notes/server.js'], cwd: '${CW_MCP_DIR}/notes' }
+    // Only the new name, in a folder.
+    const added = await run(() => mcp.addMcpFromFile(file('notes.zip', zipSync({ 'notes/combwork-mcp.json': json(CW), 'notes/server.js': strToU8('// new') })), 'notes'))
+    expect(added.def?.args).toEqual(['${CW_MCP_DIR}/notes/server.js'])
+    expect(readFileSync(join(mcpDir, 'notes', 'server.js'), 'utf8')).toBe('// new')
+    expect(existsSync(join(mcpDir, 'notes', 'combwork-mcp.json'))).toBe(false)
+    // The mcp repo's example under the new name, flat, added under another name: its references move, as the new variable.
+    const ex = await run(() => mcp.addMcpFromFile(file('notes.zip', zipSync({ 'combwork-mcp.example.json': json(CW), 'server.js': strToU8('// flat') })), 'notes-2'))
+    expect(ex.def).toMatchObject({ args: ['${CW_MCP_DIR}/notes-2/server.js'], cwd: '${CW_MCP_DIR}/notes-2' })
+    expect(readFileSync(join(mcpDir, 'notes-2', 'server.js'), 'utf8')).toBe('// flat')
+    // Both names (a zip from the mcp repo's move): the new one is read, and no definition is copied into the folder.
+    const OLD = { command: 'node', args: ['${HIVE_MCP_DIR}/both/old.js'] }
+    const both = zipSync({ 'both/hive-mcp.json': json(OLD), 'both/hive-mcp.example.json': json(OLD), 'both/combwork-mcp.example.json': json(OLD), 'both/combwork-mcp.json': json({ command: 'node', args: ['${CW_MCP_DIR}/both/new.js'] }), 'both/new.js': strToU8('//') })
+    const preview = await run(() => mcp.previewMcpFile(file('both.zip', both)))
+    expect(preview).toMatchObject({ name: 'both', files: 1 })
+    expect(preview.runs).toEqual(['Runs: node ${CW_MCP_DIR}/both/new.js'])
+    await run(() => mcp.addMcpFromFile(file('both.zip', both), 'both'))
+    expect(readdirSync(join(mcpDir, 'both'))).toEqual(['new.js'])
+    // The example beats the old name: the new names come first.
+    expect((await run(() => mcp.previewMcpFile(file('mixed.zip', zipSync({ 'hive-mcp.json': json(OLD), 'combwork-mcp.example.json': json(CW) }))))).def?.args).toEqual(['${CW_MCP_DIR}/notes/server.js'])
+    // A .json named as a definition is named after its folder, under either name.
+    const dir = join(files, `case-${cases}`, 'cw-notes')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'combwork-mcp.example.json'), JSON.stringify(CW))
+    expect((await run(() => mcp.previewMcpFile(join(dir, 'combwork-mcp.example.json')))).name).toBe('cw-notes')
+  })
+
+  it("a definition's old and new MCP folder variables both point at the workspace's MCP folder", async () => {
+    const def = { command: '${CW_MCP_DIR}/a/run.cmd', args: ['${HIVE_MCP_DIR}/a/x.js', '--cw=${CW_MCP_DIR}/b', '${OTHER_DIR}'], env: { A: '${HIVE_MCP_DIR}', B: '${CW_MCP_DIR}/c' }, cwd: '${HIVE_MCP_DIR}/a' }
+    expect(mcp.toLaunchDef(def, 'C:\\ws\\.hive\\mcp')).toEqual({ command: 'C:/ws/.hive/mcp/a/run.cmd', args: ['C:/ws/.hive/mcp/a/x.js', '--cw=C:/ws/.hive/mcp/b', '${OTHER_DIR}'], env: { A: 'C:/ws/.hive/mcp', B: 'C:/ws/.hive/mcp/c' }, cwd: 'C:/ws/.hive/mcp/a' })
+    // A folder named with $ in it is used as it is, never as a replacement pattern.
+    expect(mcp.toLaunchDef({ command: '${CW_MCP_DIR}/x' }, 'C:\\a$&b')).toEqual({ command: 'C:/a$&b/x' })
+    // Moving a server's folder references finds either variable and writes the new one.
+    expect(mcp.retarget({ command: 'node', args: ['${HIVE_MCP_DIR}/a/x.js', '${CW_MCP_DIR}\\a\\y.js', '${HIVE_MCP_DIR}/ab/z.js'] }, 'a', 'b').args).toEqual(['${CW_MCP_DIR}/b/x.js', '${CW_MCP_DIR}/b\\y.js', '${HIVE_MCP_DIR}/ab/z.js'])
   })
 
   it('a .zip replacing a server replaces its folder; deleting the server takes its folder too', async () => {
@@ -200,8 +238,9 @@ describe('Add MCP Server from File', () => {
     await refused(zipSync({ 'hive-mcp.json': def, 'x/file.js:stream': strToU8('x') }), 'unsafe path')
     await refused(zipSync({ 'hive-mcp.json': def, 'con.js': strToU8('x') }), 'unsafe path')
     await refused(withLink({ 'hive-mcp.json': def }, 'escape'), "has a link, which Combwork doesn't unpack: escape")
-    await refused(zipSync({ 'server.js': strToU8('x') }), 'No hive-mcp.json or hive-mcp.example.json found')
-    await refused(zipSync({ 'a/hive-mcp.json': def, 'b/x.js': strToU8('x') }), 'No hive-mcp.json')
+    // It names the current names only (HI-2503), though the old ones are read too.
+    await refused(zipSync({ 'server.js': strToU8('x') }), 'No combwork-mcp.json or combwork-mcp.example.json found')
+    await refused(zipSync({ 'a/hive-mcp.json': def, 'b/x.js': strToU8('x') }), 'No combwork-mcp.json')
     await refused(zipSync({ 'hive-mcp.json': strToU8('{oops') }), "hive-mcp.json isn't valid JSON")
     await refused(zipSync({ 'hive-mcp.json': json({ description: 'nothing to run' }) }), 'needs a "command"')
     // Nothing of them was written.
