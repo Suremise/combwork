@@ -37,7 +37,8 @@ afterEach(async () => {
   env?.close()
   env = null
   const owned = made.splice(0)
-  await windowsProbe.end(owned)
+  // Stop parents first: a live git can retry fsmonitor when its hook is ended, creating a child outside the snapshot.
+  await windowsProbe.end(owned.reverse())
   await Promise.allSettled(reading.splice(0))
   if (!owned.length) return
   await vi.waitFor(async () => {
