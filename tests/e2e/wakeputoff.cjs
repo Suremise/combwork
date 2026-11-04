@@ -74,7 +74,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const homeOf = (a) => (a.provider === 'codex' ? codexHome : claudeHome)
     /** The doorbells the agent was sent, each line as its CLI took it. */
     const wakes = (a) => lines(path.join(homeOf(a), 'fake-wakes.jsonl')).filter((w) => w.agent === a.name && w.doorbell).map((w) => w.doorbell)
-    const setSwitch = (which, value) => inv('advanced:set', `hive.inbox.${which}`, value)
+    const setSwitch = (which, value) => inv('advanced:set', `cw.inbox.${which}`, value)
     const hiveLog = () => {
       const f = path.join(userData, 'logs', 'hive.log')
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''

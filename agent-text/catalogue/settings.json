@@ -21,7 +21,7 @@
   },
   "settings.advanced.claude-code.accounts.dropEnv.title": {
     "text": "Connections: sign-in variables left out",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.accounts.emailField.desc": {
@@ -31,7 +31,7 @@
   },
   "settings.advanced.claude-code.accounts.emailField.title": {
     "text": "Connections: email field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.accounts.loggedInField.desc": {
@@ -41,7 +41,7 @@
   },
   "settings.advanced.claude-code.accounts.loggedInField.title": {
     "text": "Connections: signed-in field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.accounts.loginFiles.desc": {
@@ -51,7 +51,7 @@
   },
   "settings.advanced.claude-code.accounts.loginFiles.title": {
     "text": "Connections: login files",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.accounts.onboardedField.desc": {
@@ -61,7 +61,7 @@
   },
   "settings.advanced.claude-code.accounts.onboardedField.title": {
     "text": "Connections: set-up field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.accounts.orgField.desc": {
@@ -71,7 +71,7 @@
   },
   "settings.advanced.claude-code.accounts.orgField.title": {
     "text": "Connections: organisation field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.accounts.planField.desc": {
@@ -81,7 +81,7 @@
   },
   "settings.advanced.claude-code.accounts.planField.title": {
     "text": "Connections: plan field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.accounts.statusSeconds.desc": {
@@ -91,7 +91,7 @@
   },
   "settings.advanced.claude-code.accounts.statusSeconds.title": {
     "text": "Connections: sign-in check timeout",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.accounts.trustField.desc": {
@@ -101,7 +101,7 @@
   },
   "settings.advanced.claude-code.accounts.trustField.title": {
     "text": "Connections: trusted folder field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.autoModeSetup.offer.desc": {
@@ -111,7 +111,7 @@
   },
   "settings.advanced.claude-code.autoModeSetup.offer.title": {
     "text": "Offer auto mode's environment setup",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Auto mode is one of Claude Code's permission modes.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Auto mode is one of Claude Code's permission modes.",
     "audience": "both"
   },
   "settings.advanced.claude-code.connections.remoteModels.desc": {
@@ -121,7 +121,7 @@
   },
   "settings.advanced.claude-code.connections.remoteModels.title": {
     "text": "Connections: Ollama cloud models",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Ollama is a product's name; its cloud models run on ollama.com.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Ollama is a product's name; its cloud models run on ollama.com.",
     "audience": "both"
   },
   "settings.advanced.claude-code.exit.command.desc": {
@@ -131,7 +131,7 @@
   },
   "settings.advanced.claude-code.exit.command.title": {
     "text": "Lane's end: exit command",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.exit.graceSeconds.desc": {
@@ -141,7 +141,7 @@
   },
   "settings.advanced.claude-code.exit.graceSeconds.title": {
     "text": "Lane's end: exit grace",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.hooks.knownEvents.desc": {
@@ -151,7 +151,7 @@
   },
   "settings.advanced.claude-code.hooks.knownEvents.title": {
     "text": "Hooks: known events",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.hooks.knownFields.desc": {
@@ -161,7 +161,7 @@
   },
   "settings.advanced.claude-code.hooks.knownFields.title": {
     "text": "Hooks: known fields",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.hooks.preToolUseTimeoutSeconds.desc": {
@@ -171,7 +171,7 @@
   },
   "settings.advanced.claude-code.hooks.preToolUseTimeoutSeconds.title": {
     "text": "Hooks: before a tool, timeout",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.hooks.timeoutSeconds.desc": {
@@ -181,7 +181,7 @@
   },
   "settings.advanced.claude-code.hooks.timeoutSeconds.title": {
     "text": "Hooks: timeout",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.memory.realPath.desc": {
@@ -191,7 +191,7 @@
   },
   "settings.advanced.claude-code.memory.realPath.title": {
     "text": "Auto memory by its real path on connections",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Auto memory is Claude Code's own notes it keeps per project; a connection is an account Hive signs a CLI in with.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Auto memory is Claude Code's own notes it keeps per project; a connection is an account Hive signs a CLI in with.",
     "audience": "both"
   },
   "settings.advanced.claude-code.memory.setting.desc": {
@@ -201,7 +201,7 @@
   },
   "settings.advanced.claude-code.memory.setting.title": {
     "text": "Auto memory folder setting",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Auto memory is Claude Code's own notes it keeps per project.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Auto memory is Claude Code's own notes it keeps per project.",
     "audience": "both"
   },
   "settings.advanced.claude-code.mouse.rightClickToCli.desc": {
@@ -211,7 +211,7 @@
   },
   "settings.advanced.claude-code.mouse.rightClickToCli.title": {
     "text": "Pass right-click to Claude Code",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.outage.connectionError.desc": {
@@ -221,7 +221,7 @@
   },
   "settings.advanced.claude-code.outage.connectionError.title": {
     "text": "Connection dropped: StopFailure message",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.override.mcpIsolation.desc": {
@@ -271,7 +271,7 @@
   },
   "settings.advanced.claude-code.prompt.clearKeySeconds.title": {
     "text": "Clearing the input: wait for each key",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.prompt.cliTurn.desc": {
@@ -281,7 +281,7 @@
   },
   "settings.advanced.claude-code.prompt.cliTurn.title": {
     "text": "Prompt hook: Claude Code's own turn",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.retry.attemptField.desc": {
@@ -291,7 +291,7 @@
   },
   "settings.advanced.claude-code.retry.attemptField.title": {
     "text": "Transcript: retry entry's try field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.retry.checkAfterSeconds.desc": {
@@ -311,7 +311,7 @@
   },
   "settings.advanced.claude-code.retry.maxField.title": {
     "text": "Transcript: retry entry's tries field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.retry.statusField.desc": {
@@ -321,7 +321,7 @@
   },
   "settings.advanced.claude-code.retry.statusField.title": {
     "text": "Transcript: retry error's status field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.retry.subtype.desc": {
@@ -331,7 +331,7 @@
   },
   "settings.advanced.claude-code.retry.subtype.title": {
     "text": "Transcript: retry entry",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A retry: the coding agent trying its model request again after it failed.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A retry: the coding agent trying its model request again after it failed.",
     "audience": "both"
   },
   "settings.advanced.claude-code.retry.waitField.desc": {
@@ -341,7 +341,7 @@
   },
   "settings.advanced.claude-code.retry.waitField.title": {
     "text": "Transcript: retry entry's wait field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.safeguard.note.desc": {
@@ -351,7 +351,7 @@
   },
   "settings.advanced.claude-code.safeguard.note.title": {
     "text": "Safeguard stop: transcript note",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.safeguard.prompt.desc": {
@@ -361,7 +361,7 @@
   },
   "settings.advanced.claude-code.safeguard.prompt.title": {
     "text": "Safeguard stop: question",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.screen.idleQuestion.desc": {
@@ -371,7 +371,7 @@
   },
   "settings.advanced.claude-code.screen.idleQuestion.title": {
     "text": "Screen: question while idle",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.screen.input.desc": {
@@ -381,7 +381,7 @@
   },
   "settings.advanced.claude-code.screen.input.title": {
     "text": "Screen: input box",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.signIn.stopError.desc": {
@@ -391,7 +391,7 @@
   },
   "settings.advanced.claude-code.signIn.stopError.title": {
     "text": "Sign-in refused: StopFailure error",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.statusLine.fiveHour.desc": {
@@ -401,7 +401,7 @@
   },
   "settings.advanced.claude-code.statusLine.fiveHour.title": {
     "text": "Status line: 5-hour limit field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.statusLine.knownFields.desc": {
@@ -411,7 +411,7 @@
   },
   "settings.advanced.claude-code.statusLine.knownFields.title": {
     "text": "Status line: known fields",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.statusLine.rateLimits.desc": {
@@ -421,7 +421,7 @@
   },
   "settings.advanced.claude-code.statusLine.rateLimits.title": {
     "text": "Status line: plan limits field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.statusLine.usedPercent.desc": {
@@ -431,7 +431,7 @@
   },
   "settings.advanced.claude-code.statusLine.usedPercent.title": {
     "text": "Status line: percentage used field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.statusLine.weekly.desc": {
@@ -441,7 +441,7 @@
   },
   "settings.advanced.claude-code.statusLine.weekly.title": {
     "text": "Status line: weekly limit field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.subagent.descriptionField.desc": {
@@ -451,7 +451,7 @@
   },
   "settings.advanced.claude-code.subagent.descriptionField.title": {
     "text": "Transcript: background subagent's description field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.subagent.idField.desc": {
@@ -461,7 +461,7 @@
   },
   "settings.advanced.claude-code.subagent.idField.title": {
     "text": "Transcript: background subagent's id field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.subagent.launched.desc": {
@@ -471,7 +471,7 @@
   },
   "settings.advanced.claude-code.subagent.launched.title": {
     "text": "Transcript: background subagent launched",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.subagent.resumedField.desc": {
@@ -481,7 +481,7 @@
   },
   "settings.advanced.claude-code.subagent.resumedField.title": {
     "text": "Transcript: resumed subagent field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.trust.prompt.desc": {
@@ -491,7 +491,7 @@
   },
   "settings.advanced.claude-code.trust.prompt.title": {
     "text": "Trust question",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.turnScreen.done.desc": {
@@ -501,7 +501,7 @@
   },
   "settings.advanced.claude-code.turnScreen.done.title": {
     "text": "Screen: turn done",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claudeFooter.desc": {
@@ -521,7 +521,7 @@
   },
   "settings.advanced.codex.accounts.accountField.title": {
     "text": "Connections: account field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.accounts.dropEnv.desc": {
@@ -531,7 +531,7 @@
   },
   "settings.advanced.codex.accounts.dropEnv.title": {
     "text": "Connections: sign-in variables left out",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.accounts.emailField.desc": {
@@ -541,7 +541,7 @@
   },
   "settings.advanced.codex.accounts.emailField.title": {
     "text": "Connections: email field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.accounts.loginFiles.desc": {
@@ -551,7 +551,7 @@
   },
   "settings.advanced.codex.accounts.loginFiles.title": {
     "text": "Connections: login files",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.accounts.planField.desc": {
@@ -561,7 +561,7 @@
   },
   "settings.advanced.codex.accounts.planField.title": {
     "text": "Connections: plan field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.accounts.readMethod.desc": {
@@ -571,7 +571,7 @@
   },
   "settings.advanced.codex.accounts.readMethod.title": {
     "text": "Connections: sign-in request",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.accounts.statusSeconds.desc": {
@@ -581,7 +581,7 @@
   },
   "settings.advanced.codex.accounts.statusSeconds.title": {
     "text": "Connections: sign-in check timeout",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.accounts.unelevatedSandbox.desc": {
@@ -591,7 +591,7 @@
   },
   "settings.advanced.codex.accounts.unelevatedSandbox.title": {
     "text": "Connections: use Codex's non-admin sandbox",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Codex's non-admin sandbox is its Windows sandbox that needs no Administrator permission.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Codex's non-admin sandbox is its Windows sandbox that needs no Administrator permission.",
     "audience": "both"
   },
   "settings.advanced.codex.appServer.closeSeconds.desc": {
@@ -601,7 +601,7 @@
   },
   "settings.advanced.codex.appServer.closeSeconds.title": {
     "text": "App server: time to close",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.exit.command.desc": {
@@ -611,7 +611,7 @@
   },
   "settings.advanced.codex.exit.command.title": {
     "text": "Lane's end: exit command",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.exit.graceSeconds.desc": {
@@ -621,7 +621,7 @@
   },
   "settings.advanced.codex.exit.graceSeconds.title": {
     "text": "Lane's end: exit grace",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.fullAccess.answerSeconds.desc": {
@@ -631,7 +631,7 @@
   },
   "settings.advanced.codex.fullAccess.answerSeconds.title": {
     "text": "Full Access warning: wait for your answer",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Full Access is Codex's mode: keep it.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Full Access is Codex's mode: keep it.",
     "audience": "both"
   },
   "settings.advanced.codex.fullAccess.warning.desc": {
@@ -641,7 +641,7 @@
   },
   "settings.advanced.codex.fullAccess.warning.title": {
     "text": "Full Access warning",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Full Access is Codex's mode: keep it.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Full Access is Codex's mode: keep it.",
     "audience": "both"
   },
   "settings.advanced.codex.fullAccess.warningAfterSeconds.desc": {
@@ -651,7 +651,7 @@
   },
   "settings.advanced.codex.fullAccess.warningAfterSeconds.title": {
     "text": "Full Access warning: time to appear",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Full Access is Codex's mode: keep it.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Full Access is Codex's mode: keep it.",
     "audience": "both"
   },
   "settings.advanced.codex.hooks.knownEvents.desc": {
@@ -661,7 +661,7 @@
   },
   "settings.advanced.codex.hooks.knownEvents.title": {
     "text": "Hooks: known events",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.hooks.knownFields.desc": {
@@ -671,7 +671,7 @@
   },
   "settings.advanced.codex.hooks.knownFields.title": {
     "text": "Hooks: known fields",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.hooks.listMethod.desc": {
@@ -681,7 +681,7 @@
   },
   "settings.advanced.codex.hooks.listMethod.title": {
     "text": "Hooks: listing request",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.hooks.listSeconds.desc": {
@@ -691,7 +691,7 @@
   },
   "settings.advanced.codex.hooks.listSeconds.title": {
     "text": "Hooks: listing timeout",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.hooks.preToolUseTimeoutSeconds.desc": {
@@ -701,7 +701,7 @@
   },
   "settings.advanced.codex.hooks.preToolUseTimeoutSeconds.title": {
     "text": "Hooks: before a tool, timeout",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.hooks.timeoutSeconds.desc": {
@@ -711,7 +711,7 @@
   },
   "settings.advanced.codex.hooks.timeoutSeconds.title": {
     "text": "Hooks: timeout",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.mcp.startupTimeoutSeconds.desc": {
@@ -721,7 +721,7 @@
   },
   "settings.advanced.codex.mcp.startupTimeoutSeconds.title": {
     "text": "hive tools: startup timeout in Codex",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.mcp.toolTimeoutSeconds.desc": {
@@ -731,7 +731,7 @@
   },
   "settings.advanced.codex.mcp.toolTimeoutSeconds.title": {
     "text": "hive tools: timeout in Codex",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.mouse.rightClickToCli.desc": {
@@ -741,7 +741,7 @@
   },
   "settings.advanced.codex.mouse.rightClickToCli.title": {
     "text": "Pass right-click to Codex",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.outage.connectionError.desc": {
@@ -751,7 +751,7 @@
   },
   "settings.advanced.codex.outage.connectionError.title": {
     "text": "Connection dropped: error message",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.override.mcpIsolation.desc": {
@@ -791,7 +791,7 @@
   },
   "settings.advanced.codex.prompt.drawnSeconds.title": {
     "text": "Typed line: wait to be drawn",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.prompt.newlineKey.altEnter": {
@@ -831,7 +831,7 @@
   },
   "settings.advanced.codex.promptInput.timeoutSeconds.title": {
     "text": "Reading a session's instructions: timeout",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.queue.hint.desc": {
@@ -841,7 +841,7 @@
   },
   "settings.advanced.codex.queue.hint.title": {
     "text": "Screen: holding what was typed",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.rateLimits.field.desc": {
@@ -851,7 +851,7 @@
   },
   "settings.advanced.codex.rateLimits.field.title": {
     "text": "Session file: plan limits field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.rateLimits.usedPercent.desc": {
@@ -861,7 +861,7 @@
   },
   "settings.advanced.codex.rateLimits.usedPercent.title": {
     "text": "Session file: percentage used field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.rateLimits.windowMinutes.desc": {
@@ -871,7 +871,7 @@
   },
   "settings.advanced.codex.rateLimits.windowMinutes.title": {
     "text": "Session file: limit's window field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.ready.placeholder.desc": {
@@ -881,7 +881,7 @@
   },
   "settings.advanced.codex.ready.placeholder.title": {
     "text": "Composer placeholder",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.retry.checkAfterSeconds.desc": {
@@ -901,7 +901,7 @@
   },
   "settings.advanced.codex.retry.logTarget.title": {
     "text": "Retry wait: log entries",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A retry wait: the coding agent waiting to try its model request again (after being rate-limited).",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A retry wait: the coding agent waiting to try its model request again (after being rate-limited).",
     "audience": "both"
   },
   "settings.advanced.codex.retry.pattern.desc": {
@@ -911,7 +911,7 @@
   },
   "settings.advanced.codex.retry.pattern.title": {
     "text": "Retry wait: message",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A retry wait: the coding agent waiting to try its model request again.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A retry wait: the coding agent waiting to try its model request again.",
     "audience": "both"
   },
   "settings.advanced.codex.signIn.expired.desc": {
@@ -921,7 +921,7 @@
   },
   "settings.advanced.codex.signIn.expired.title": {
     "text": "Sign-in refused: error message",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.subagent.item.desc": {
@@ -931,7 +931,7 @@
   },
   "settings.advanced.codex.subagent.item.title": {
     "text": "Session file: subagent's activity",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.subagent.started.desc": {
@@ -941,7 +941,7 @@
   },
   "settings.advanced.codex.subagent.started.title": {
     "text": "Session file: subagent started",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.subagent.taskField.desc": {
@@ -951,7 +951,7 @@
   },
   "settings.advanced.codex.subagent.taskField.title": {
     "text": "Session file: subagent's task field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.subagent.threadField.desc": {
@@ -961,7 +961,7 @@
   },
   "settings.advanced.codex.subagent.threadField.title": {
     "text": "Session file: subagent's thread field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.title.items.desc": {
@@ -971,7 +971,7 @@
   },
   "settings.advanced.codex.title.items.title": {
     "text": "Terminal title items",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.trust.perLaunch.desc": {
@@ -981,7 +981,7 @@
   },
   "settings.advanced.codex.trust.perLaunch.title": {
     "text": "Trust Combwork's folders on each launch",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.trust.prompt.desc": {
@@ -991,7 +991,7 @@
   },
   "settings.advanced.codex.trust.prompt.title": {
     "text": "Trust question",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codex.turnScreen.working.desc": {
@@ -1001,7 +1001,7 @@
   },
   "settings.advanced.codex.turnScreen.working.title": {
     "text": "Screen: working",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.codexPermissions.desc": {
@@ -1021,7 +1021,7 @@
   },
   "settings.advanced.copilot.compaction.conversationTokens.title": {
     "text": "Compaction: conversation tokens field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilot.compaction.summary.desc": {
@@ -1031,7 +1031,7 @@
   },
   "settings.advanced.copilot.compaction.summary.title": {
     "text": "Compaction: summary field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilot.compaction.systemTokens.desc": {
@@ -1041,7 +1041,7 @@
   },
   "settings.advanced.copilot.compaction.systemTokens.title": {
     "text": "Compaction: system prompt tokens field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilot.compaction.toolTokens.desc": {
@@ -1051,7 +1051,7 @@
   },
   "settings.advanced.copilot.compaction.toolTokens.title": {
     "text": "Compaction: tool definition tokens field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilot.exit.armed.desc": {
@@ -1061,7 +1061,7 @@
   },
   "settings.advanced.copilot.exit.armed.title": {
     "text": "Stop: exit hint",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilot.exit.graceSeconds.desc": {
@@ -1071,7 +1071,7 @@
   },
   "settings.advanced.copilot.exit.graceSeconds.title": {
     "text": "Stop: exit grace",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilot.hooks.knownEvents.desc": {
@@ -1081,7 +1081,7 @@
   },
   "settings.advanced.copilot.hooks.knownEvents.title": {
     "text": "Hooks: known events",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilot.hooks.knownFields.desc": {
@@ -1091,7 +1091,7 @@
   },
   "settings.advanced.copilot.hooks.knownFields.title": {
     "text": "Hooks: known fields",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilot.hooks.preToolUseTimeoutSeconds.desc": {
@@ -1101,7 +1101,7 @@
   },
   "settings.advanced.copilot.hooks.preToolUseTimeoutSeconds.title": {
     "text": "Hooks: before a tool, timeout",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilot.hooks.timeoutSeconds.desc": {
@@ -1111,7 +1111,7 @@
   },
   "settings.advanced.copilot.hooks.timeoutSeconds.title": {
     "text": "Hooks: timeout",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilot.mouse.rightClickToCli.desc": {
@@ -1121,7 +1121,7 @@
   },
   "settings.advanced.copilot.mouse.rightClickToCli.title": {
     "text": "Pass right-click to Copilot",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilot.outage.connectionError.desc": {
@@ -1131,7 +1131,7 @@
   },
   "settings.advanced.copilot.outage.connectionError.title": {
     "text": "Connection dropped: error message",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilot.override.allMcpInstructions.desc": {
@@ -1191,7 +1191,7 @@
   },
   "settings.advanced.copilot.question.field.title": {
     "text": "Question: text field",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilot.question.tool.desc": {
@@ -1201,7 +1201,7 @@
   },
   "settings.advanced.copilot.question.tool.title": {
     "text": "Question: tool name",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilot.ready.footer.desc": {
@@ -1211,7 +1211,7 @@
   },
   "settings.advanced.copilot.ready.footer.title": {
     "text": "Ready footer",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilot.retry.context.desc": {
@@ -1221,7 +1221,7 @@
   },
   "settings.advanced.copilot.retry.context.title": {
     "text": "Retry: error context",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A retry: the coding agent trying its model request again after it failed.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A retry: the coding agent trying its model request again after it failed.",
     "audience": "both"
   },
   "settings.advanced.copilot.retry.message.desc": {
@@ -1231,7 +1231,7 @@
   },
   "settings.advanced.copilot.retry.message.title": {
     "text": "Retry: error message",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilot.signIn.errorMessage.desc": {
@@ -1241,7 +1241,7 @@
   },
   "settings.advanced.copilot.signIn.errorMessage.title": {
     "text": "Sign-in refused: error message",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilot.signIn.errorType.desc": {
@@ -1251,7 +1251,7 @@
   },
   "settings.advanced.copilot.signIn.errorType.title": {
     "text": "Sign-in refused: error type",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilot.signIn.hookMessage.desc": {
@@ -1261,7 +1261,7 @@
   },
   "settings.advanced.copilot.signIn.hookMessage.title": {
     "text": "Sign-in refused: ErrorOccurred hook",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilot.trust.prompt.desc": {
@@ -1271,7 +1271,7 @@
   },
   "settings.advanced.copilot.trust.prompt.title": {
     "text": "Trust question",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilot.turnFailed.errorType.desc": {
@@ -1281,7 +1281,7 @@
   },
   "settings.advanced.copilot.turnFailed.errorType.title": {
     "text": "Turn failed: error type",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.copilotFooter.desc": {
@@ -1436,7 +1436,7 @@
   },
   "settings.advanced.hive.console.showText.title": {
     "text": "Developer console: show prompt, reply and command text",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.hive.copies.quietWaitMinutes.desc": {
@@ -1466,7 +1466,7 @@
   },
   "settings.advanced.hive.disableHardwareAcceleration.title": {
     "text": "Disable hardware acceleration",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.hive.focused.pickSeconds.desc": {
@@ -1496,7 +1496,7 @@
   },
   "settings.advanced.hive.heapSnapshotNearLimit.title": {
     "text": "Save a memory snapshot if Combwork is about to run out of memory",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.hive.hooks.missingSeconds.desc": {
@@ -1506,7 +1506,7 @@
   },
   "settings.advanced.hive.hooks.missingSeconds.title": {
     "text": "Hooks missing: wait",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Hooks: the calls an agent's coding agent makes to Hive as it works.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Hooks: the calls an agent's coding agent makes to Hive as it works.",
     "audience": "both"
   },
   "settings.advanced.hive.inbox.checkpoints.desc": {
@@ -1596,7 +1596,7 @@
   },
   "settings.advanced.hive.lanes.waitReviewerMinutes.title": {
     "text": "Lanes: a long wait for a reviewer",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.hive.lanes.waitYouMinutes.desc": {
@@ -1606,7 +1606,7 @@
   },
   "settings.advanced.hive.lanes.waitYouMinutes.title": {
     "text": "Lanes: a long wait for you",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.hive.lostLine.steadySeconds.desc": {
@@ -1616,7 +1616,7 @@
   },
   "settings.advanced.hive.lostLine.steadySeconds.title": {
     "text": "Lost line: wait",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A line: a message Hive typed into an agent's terminal.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A line: a message Hive typed into an agent's terminal.",
     "audience": "both"
   },
   "settings.advanced.hive.mcp.connectSeconds.desc": {
@@ -1626,7 +1626,7 @@
   },
   "settings.advanced.hive.mcp.connectSeconds.title": {
     "text": "hive tools: wait to connect",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.hive.mcp.replySeconds.desc": {
@@ -1636,7 +1636,7 @@
   },
   "settings.advanced.hive.mcp.replySeconds.title": {
     "text": "hive tools: reply timeout",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.hive.mcpCatalog.downloadSeconds.desc": {
@@ -1776,7 +1776,7 @@
   },
   "settings.advanced.hive.outage.resume.title": {
     "text": "Resume agents after a connection drops",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.hive.outage.resumesPerHour.desc": {
@@ -1816,7 +1816,7 @@
   },
   "settings.advanced.hive.progress.lanesShown.title": {
     "text": "Progress panel: lanes shown",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.hive.progress.replySeconds.desc": {
@@ -1826,7 +1826,7 @@
   },
   "settings.advanced.hive.progress.replySeconds.title": {
     "text": "cw-progress: Combwork's reply time",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. cw-progress is the command agents run long commands and checks through: keep it as it is.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. cw-progress is the command agents run long commands and checks through: keep it as it is.",
     "audience": "both"
   },
   "settings.advanced.hive.prompt.asTyped.desc": {
@@ -1956,7 +1956,7 @@
   },
   "settings.advanced.hive.recorder.pattern.title": {
     "text": "Flight recorder: capture events matching",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. The flight recorder saves the developer console's recent events when something rare happens.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The flight recorder saves the developer console's recent events when something rare happens.",
     "audience": "both"
   },
   "settings.advanced.hive.recorder.safeguard.desc": {
@@ -1966,7 +1966,7 @@
   },
   "settings.advanced.hive.recorder.safeguard.title": {
     "text": "Flight recorder: capture safeguard stops",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. The flight recorder saves the developer console's recent events when something rare happens.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The flight recorder saves the developer console's recent events when something rare happens.",
     "audience": "both"
   },
   "settings.advanced.hive.recorder.stalled.desc": {
@@ -1976,7 +1976,7 @@
   },
   "settings.advanced.hive.recorder.stalled.title": {
     "text": "Flight recorder: capture an agent gone silent",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. The flight recorder saves the developer console's recent events when something rare happens.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The flight recorder saves the developer console's recent events when something rare happens.",
     "audience": "both"
   },
   "settings.advanced.hive.recorder.unknown.desc": {
@@ -1986,7 +1986,7 @@
   },
   "settings.advanced.hive.recorder.unknown.title": {
     "text": "Flight recorder: capture something unknown from a CLI",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. The flight recorder saves the developer console's recent events when something rare happens.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The flight recorder saves the developer console's recent events when something rare happens.",
     "audience": "both"
   },
   "settings.advanced.hive.recorder.version.desc": {
@@ -1996,7 +1996,7 @@
   },
   "settings.advanced.hive.recorder.version.title": {
     "text": "Flight recorder: capture a CLI version change",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. The flight recorder saves the developer console's recent events when something rare happens.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The flight recorder saves the developer console's recent events when something rare happens.",
     "audience": "both"
   },
   "settings.advanced.hive.restart.resumeAfterUpdate.desc": {
@@ -2006,7 +2006,7 @@
   },
   "settings.advanced.hive.restart.resumeAfterUpdate.title": {
     "text": "Resume agents after an update",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.hive.restart.resumeReadySeconds.desc": {
@@ -2046,7 +2046,7 @@
   },
   "settings.advanced.hive.showDeveloperFeatures.title": {
     "text": "Show developer features",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.hive.skills.removeIdleCopies.desc": {
@@ -2176,7 +2176,7 @@
   },
   "settings.advanced.hive.wait.agentsMaxSeconds.title": {
     "text": "Agent waits: longest",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.hive.wait.cardMaxSeconds.desc": {
@@ -2186,7 +2186,7 @@
   },
   "settings.advanced.hive.wait.cardMaxSeconds.title": {
     "text": "Card waits: longest",
-    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive.",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.hive.workflow.enforce.desc": {
@@ -2720,6 +2720,10 @@
   "settings.agent.tool.projectSetting": {
     "text": "{id} is a project's setting: say which project.",
     "note": "A project's setting read or changed without naming the project. {id} is the setting's id."
+  },
+  "settings.agent.tool.renamed": {
+    "text": "{id} was renamed: use {now}.",
+    "note": "A setting named by its id from before HI-2518 (an advanced setting's hive.* id, now cw.*). {id} is the id as given, {now} its id now."
   },
   "settings.agent.tool.restart.assistant": {
     "text": "to the Assistant after it restarts",

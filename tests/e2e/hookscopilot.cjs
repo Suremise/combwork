@@ -56,7 +56,7 @@ const jsonl = (file) => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'hive.hooks.missingSeconds': 3 } }, null, 2))
+  fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'cw.hooks.missingSeconds': 3 } }, null, 2))
 
   const api = await startFakeCopilotApi({ log: apiLog })
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47847), HIVE_TEST_TIPS: 'off', HIVE_TEST_HOOKS_HOLD: hold, HIVE_TEST_DROP_HOOKS: drop, ...copilotTestEnv(api, copilotDir, { above: lib.WORK }) })

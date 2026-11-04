@@ -33,7 +33,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
   fs.mkdirSync(userData, { recursive: true })
   const claudeEnv = lib.fakeClaude(userData, claudeHome)
   // An override made for an older Claude Code, one that isn't valid, and one this Hive doesn't know.
-  fs.writeFileSync(file, JSON.stringify({ format: 1, values: { 'claude-code.trust.prompt': 'trust (this|the) folder', 'hive.mcp.replySeconds': 'soon', 'hive.someday': 1 }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.0', value: 'trust (this|the) folder' } } }, null, 2))
+  fs.writeFileSync(file, JSON.stringify({ format: 1, values: { 'claude-code.trust.prompt': 'trust (this|the) folder', 'cw.mcp.replySeconds': 'soon', 'hive.someday': 1 }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.0', value: 'trust (this|the) folder' } } }, null, 2))
 
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
@@ -64,7 +64,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     const providers = (await inv('settings:get')).providers
     const enabled = (id) => !!providers?.[id]?.enabled
     check('a CLI turned off: its tab dimmed, its name saying so; one on: not', t0.slice(1).every((t) => t.muted === !enabled(t.id) && (!t.muted || /is turned off: these settings apply once you turn it on/.test(t.name ?? ''))), JSON.stringify([t0.map((t) => [t.id, t.muted, t.name]), providers]))
-    const prefix = { hive: 'hive.', 'claude-code': 'claude-code.', codex: 'codex.', copilot: 'copilot.' }
+    const prefix = { cw: 'cw.', 'claude-code': 'claude-code.', codex: 'codex.', copilot: 'copilot.' }
     for (const t of t0) {
       await tab(t.id).click()
       check(`the ${t.label} tab shows only its own values`, !!(await lib.until(async () => { const v = await visibleIds(); return (await selectedTab()) === t.id && v.length > 5 && v.every((id) => id.startsWith(prefix[t.id])) }, HUNG_MS)), JSON.stringify((await visibleIds()).slice(0, 5)))
@@ -85,12 +85,12 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
       }
       await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     }
-    await tab('hive').click()
-    await lib.until(async () => (await selectedTab()) === 'hive', HUNG_MS)
+    await tab('cw').click()
+    await lib.until(async () => (await selectedTab()) === 'cw', HUNG_MS)
     const first = list.locator('.advanced-row').first()
-    check('Show developer features is first, under its advanced.json name', (await first.getAttribute('data-advanced')) === 'hive.showDeveloperFeatures')
+    check('Show developer features is first, under its advanced.json name', (await first.getAttribute('data-advanced')) === 'cw.showDeveloperFeatures')
     const row = (id) => list.locator(`.advanced-row[data-advanced="${id}"]`)
-    check('a value not valid in advanced.json is listed so, and the default used', /Not valid, so Combwork uses the default/.test(await row('hive.mcp.replySeconds').innerText()) && (await row('hive.mcp.replySeconds').locator('input').inputValue()) === '300')
+    check('a value not valid in advanced.json is listed so, and the default used', /Not valid, so Combwork uses the default/.test(await row('cw.mcp.replySeconds').innerText()) && (await row('cw.mcp.replySeconds').locator('input').inputValue()) === '300')
     check("an id this Combwork doesn't know is named, not used", /hive\.someday, which this Combwork doesn't know/.test(await list.innerText()))
     const trust = row('claude-code.trust.prompt')
     await tab('claude-code').click()
@@ -101,14 +101,14 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     check('Keep records the installed version', !!(await lib.until(async () => readFile().madeFor['claude-code.trust.prompt']?.version === '2.1.999' && !/Made for/.test(await trust.innerText()), HUNG_MS)))
 
     // --- Changing one: modified, its default beside it, in advanced.json; Reset.
-    await tab('hive').click()
-    const reply = row('hive.mcp.replySeconds')
+    await tab('cw').click()
+    const reply = row('cw.mcp.replySeconds')
     await reply.locator('input').fill('600')
     await reply.locator('input').press('Enter')
-    check('a change is written to advanced.json', !!(await lib.until(() => readFile().values['hive.mcp.replySeconds'] === 600, HUNG_MS)), JSON.stringify(readFile().values))
+    check('a change is written to advanced.json', !!(await lib.until(() => readFile().values['cw.mcp.replySeconds'] === 600, HUNG_MS)), JSON.stringify(readFile().values))
     check('…and shown modified, with the default beside it', !!(await lib.until(async () => (await reply.locator('.modified').count()) === 1 && /Default: 300 s/.test(await reply.innerText()) && !/Not valid/.test(await reply.innerText()), HUNG_MS)))
     await reply.getByRole('button', { name: /^Reset to default \(300 s\)/ }).click()
-    check('Reset takes it out of advanced.json', !!(await lib.until(async () => !('hive.mcp.replySeconds' in readFile().values) && (await reply.locator('.modified').count()) === 0, HUNG_MS)))
+    check('Reset takes it out of advanced.json', !!(await lib.until(async () => !('cw.mcp.replySeconds' in readFile().values) && (await reply.locator('.modified').count()) === 0, HUNG_MS)))
 
     // --- A value refused: the box says why, the file keeps what it had.
     await tab('codex').click()
@@ -126,7 +126,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     const edited = readFile()
     edited.values['codex.hooks.timeoutSeconds'] = 9
     // A number written as text is read as the number, and shown so.
-    edited.values['hive.mcp.replySeconds'] = '600'
+    edited.values['cw.mcp.replySeconds'] = '600'
     fs.writeFileSync(file, JSON.stringify(edited, null, 2))
     check('a hand edit of advanced.json shows in the list', !!(await lib.until(async () => (await row('codex.hooks.timeoutSeconds').locator('input').inputValue()) === '9' && (await row('codex.hooks.timeoutSeconds').locator('.modified').count()) === 1, HUNG_MS)))
     check('…a number written as text shows as that number, valid', (await reply.locator('input').inputValue()) === '600' && !/Not valid/.test(await reply.innerText()), await reply.locator('input').inputValue())
@@ -138,100 +138,100 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     await lib.until(async () => !/isn't valid JSON/.test(await list.innerText()), HUNG_MS)
 
     // --- The developer switch and advanced.json are one value.
-    await tab('hive').click()
-    const dev = row('hive.showDeveloperFeatures')
+    await tab('cw').click()
+    const dev = row('cw.showDeveloperFeatures')
     await dev.getByRole('switch').click()
-    check('turning on Show developer features writes it to advanced.json', !!(await lib.until(() => readFile().values['hive.showDeveloperFeatures'] === true, HUNG_MS)), JSON.stringify(readFile().values))
+    check('turning on Show developer features writes it to advanced.json', !!(await lib.until(() => readFile().values['cw.showDeveloperFeatures'] === true, HUNG_MS)), JSON.stringify(readFile().values))
     check('…and turns on the setting, under its own key', !!(await lib.until(async () => (await inv('settings:get')).advanced.showDeveloperFeatures === true, HUNG_MS)))
     const off = readFile()
-    delete off.values['hive.showDeveloperFeatures']
+    delete off.values['cw.showDeveloperFeatures']
     fs.writeFileSync(file, JSON.stringify(off, null, 2))
     check('taking it out of advanced.json by hand turns the setting off', !!(await lib.until(async () => (await inv('settings:get')).advanced.showDeveloperFeatures === false && (await dev.getByRole('switch').getAttribute('aria-checked')) === 'false', HUNG_MS)))
 
     // --- A workspace's own value (workspace.json).
-    const lanes = row('hive.progress.lanesShown')
+    const lanes = row('cw.progress.lanesShown')
     const own = lanes.getByLabel('Progress panel: lanes shown, this workspace', { exact: false })
     await own.fill('2')
     await own.press('Enter')
     const wsFile = path.join(ws, '.combwork', 'workspace.json')
-    check("a workspace's own value goes in workspace.json", !!(await lib.until(() => fs.existsSync(wsFile) && JSON.parse(fs.readFileSync(wsFile, 'utf8')).advanced?.['hive.progress.lanesShown'] === 2, HUNG_MS)))
-    check('…and not in advanced.json', !('hive.progress.lanesShown' in readFile().values))
+    check("a workspace's own value goes in workspace.json", !!(await lib.until(() => fs.existsSync(wsFile) && JSON.parse(fs.readFileSync(wsFile, 'utf8')).advanced?.['cw.progress.lanesShown'] === 2, HUNG_MS)))
+    check('…and not in advanced.json', !('cw.progress.lanesShown' in readFile().values))
     const state = await inv('advanced:state')
-    check('the window uses it', state.workspace?.['hive.progress.lanesShown'] === 2, JSON.stringify(state.workspace))
+    check('the window uses it', state.workspace?.['cw.progress.lanesShown'] === 2, JSON.stringify(state.workspace))
     check("Settings' own value stays beside it", (await lanes.getByLabel('Combwork: Progress panel: lanes shown', { exact: true }).inputValue()) === '6')
 
     // --- A workspace's own switch (HI-2344): it inherits Settings' value and shows it, takes on and off, and goes back.
-    const resume = row('hive.restart.resumeAfterUpdate')
+    const resume = row('cw.restart.resumeAfterUpdate')
     const resumeOwn = resume.getByLabel('Combwork: Resume agents after an update, this workspace', { exact: true })
     const wsOwn = () => (fs.existsSync(wsFile) ? JSON.parse(fs.readFileSync(wsFile, 'utf8')).advanced ?? {} : {})
     const shownOwn = () => resumeOwn.evaluate((s) => s.options[s.selectedIndex].textContent)
-    check("a workspace's switch untouched inherits, showing Settings' value", (await resumeOwn.inputValue()) === '' && (await shownOwn()) === "on (Settings')" && !('hive.restart.resumeAfterUpdate' in wsOwn()), await shownOwn())
+    check("a workspace's switch untouched inherits, showing Settings' value", (await resumeOwn.inputValue()) === '' && (await shownOwn()) === "on (Settings')" && !('cw.restart.resumeAfterUpdate' in wsOwn()), await shownOwn())
     await resume.screenshot({ path: path.join(lib.WORK, 'advanced-ws-switch-inherited.png') })
     await resumeOwn.selectOption({ label: 'off' })
-    check('…off goes in workspace.json as false', !!(await lib.until(() => wsOwn()['hive.restart.resumeAfterUpdate'] === false, HUNG_MS)), JSON.stringify(wsOwn()))
-    check('…and the window uses it', (await inv('advanced:state')).workspace?.['hive.restart.resumeAfterUpdate'] === false)
+    check('…off goes in workspace.json as false', !!(await lib.until(() => wsOwn()['cw.restart.resumeAfterUpdate'] === false, HUNG_MS)), JSON.stringify(wsOwn()))
+    check('…and the window uses it', (await inv('advanced:state')).workspace?.['cw.restart.resumeAfterUpdate'] === false)
     await resume.screenshot({ path: path.join(lib.WORK, 'advanced-ws-switch-off.png') })
     await resumeOwn.selectOption({ label: 'on' })
-    check('…on as true', !!(await lib.until(() => wsOwn()['hive.restart.resumeAfterUpdate'] === true, HUNG_MS)), JSON.stringify(wsOwn()))
+    check('…on as true', !!(await lib.until(() => wsOwn()['cw.restart.resumeAfterUpdate'] === true, HUNG_MS)), JSON.stringify(wsOwn()))
     await resume.screenshot({ path: path.join(lib.WORK, 'advanced-ws-switch-on.png') })
     await resumeOwn.selectOption({ index: 0 })
-    check('…and Settings\' choice takes it out of workspace.json', !!(await lib.until(() => !('hive.restart.resumeAfterUpdate' in wsOwn()), HUNG_MS)), JSON.stringify(wsOwn()))
-    check('…not in advanced.json either', !('hive.restart.resumeAfterUpdate' in readFile().values))
+    check('…and Settings\' choice takes it out of workspace.json', !!(await lib.until(() => !('cw.restart.resumeAfterUpdate' in wsOwn()), HUNG_MS)), JSON.stringify(wsOwn()))
+    check('…not in advanced.json either', !('cw.restart.resumeAfterUpdate' in readFile().values))
     // Inheriting again, it follows a later change of Settings' value.
     await resume.getByRole('switch').click()
-    check("…inheriting, it follows Settings' value changed afterwards", !!(await lib.until(async () => readFile().values['hive.restart.resumeAfterUpdate'] === false && (await shownOwn()) === "off (Settings')" && (await resumeOwn.inputValue()) === '', HUNG_MS)), await shownOwn())
-    check('…and stays out of workspace.json', !('hive.restart.resumeAfterUpdate' in wsOwn()))
+    check("…inheriting, it follows Settings' value changed afterwards", !!(await lib.until(async () => readFile().values['cw.restart.resumeAfterUpdate'] === false && (await shownOwn()) === "off (Settings')" && (await resumeOwn.inputValue()) === '', HUNG_MS)), await shownOwn())
+    check('…and stays out of workspace.json', !('cw.restart.resumeAfterUpdate' in wsOwn()))
     await resume.getByRole('button', { name: /^Reset to default \(on\)/ }).click()
-    await lib.until(async () => !('hive.restart.resumeAfterUpdate' in readFile().values) && (await shownOwn()) === "on (Settings')", HUNG_MS)
+    await lib.until(async () => !('cw.restart.resumeAfterUpdate' in readFile().values) && (await shownOwn()) === "on (Settings')", HUNG_MS)
 
     // --- A list of folders (HI-2480): written and shown semicolons apart (a comma can be in a folder's name), edited as
     // shown, a workspace's own over Hive's, and an empty box back to the default (Hive's) or to Hive's (a workspace's).
-    const folders = row('hive.cards.attachmentFolders')
+    const folders = row('cw.cards.attachmentFolders')
     const foldersHive = folders.getByLabel('Combwork: Card attachments: more folders', { exact: true })
     const foldersOwn = folders.getByLabel('Combwork: Card attachments: more folders, this workspace', { exact: true })
     await foldersHive.fill('C:\\Evidence, runs;D:\\Runs')
     await foldersHive.press('Enter')
-    check('a list of folders goes in advanced.json, a comma kept inside a folder', !!(await lib.until(() => JSON.stringify(readFile().values['hive.cards.attachmentFolders']) === JSON.stringify(['C:\\Evidence, runs', 'D:\\Runs']), HUNG_MS)), JSON.stringify(readFile().values['hive.cards.attachmentFolders']))
+    check('a list of folders goes in advanced.json, a comma kept inside a folder', !!(await lib.until(() => JSON.stringify(readFile().values['cw.cards.attachmentFolders']) === JSON.stringify(['C:\\Evidence, runs', 'D:\\Runs']), HUNG_MS)), JSON.stringify(readFile().values['cw.cards.attachmentFolders']))
     // HI-2538: shown as typed, ";" alone (no space added), so editing it saves exactly the folders typed.
     check('…shown back semicolons apart, as typed', !!(await lib.until(async () => (await foldersHive.inputValue()) === 'C:\\Evidence, runs;D:\\Runs', HUNG_MS)), await foldersHive.inputValue())
     await foldersHive.fill(`${await foldersHive.inputValue()}; %LOCALAPPDATA%\\combwork-cli`)
     await foldersHive.press('Enter')
-    check('…edited as shown, each folder kept apart', !!(await lib.until(() => JSON.stringify(readFile().values['hive.cards.attachmentFolders']) === JSON.stringify(['C:\\Evidence, runs', 'D:\\Runs', '%LOCALAPPDATA%\\combwork-cli']), HUNG_MS)), JSON.stringify(readFile().values['hive.cards.attachmentFolders']))
+    check('…edited as shown, each folder kept apart', !!(await lib.until(() => JSON.stringify(readFile().values['cw.cards.attachmentFolders']) === JSON.stringify(['C:\\Evidence, runs', 'D:\\Runs', '%LOCALAPPDATA%\\combwork-cli']), HUNG_MS)), JSON.stringify(readFile().values['cw.cards.attachmentFolders']))
     check('…a space typed after a semicolon is trimmed, not kept or added', !!(await lib.until(async () => (await foldersHive.inputValue()) === 'C:\\Evidence, runs;D:\\Runs;%LOCALAPPDATA%\\combwork-cli', HUNG_MS)), await foldersHive.inputValue())
     // The value edited as Darren did (HI-2538): typed "a; b" saves exactly a and b, shown back "a;b", never a comma.
     await foldersHive.fill('%LOCALAPPDATA%\\combwork-cli; %LOCALAPPDATA%\\hive-test\\scratch')
     await foldersHive.press('Enter')
-    check('…"a; b" saves exactly the folders typed, shown "a;b"', !!(await lib.until(async () => JSON.stringify(readFile().values['hive.cards.attachmentFolders']) === JSON.stringify(['%LOCALAPPDATA%\\combwork-cli', '%LOCALAPPDATA%\\hive-test\\scratch']) && (await foldersHive.inputValue()) === '%LOCALAPPDATA%\\combwork-cli;%LOCALAPPDATA%\\hive-test\\scratch', HUNG_MS)), `${await foldersHive.inputValue()} ${JSON.stringify(readFile().values['hive.cards.attachmentFolders'])}`)
+    check('…"a; b" saves exactly the folders typed, shown "a;b"', !!(await lib.until(async () => JSON.stringify(readFile().values['cw.cards.attachmentFolders']) === JSON.stringify(['%LOCALAPPDATA%\\combwork-cli', '%LOCALAPPDATA%\\hive-test\\scratch']) && (await foldersHive.inputValue()) === '%LOCALAPPDATA%\\combwork-cli;%LOCALAPPDATA%\\hive-test\\scratch', HUNG_MS)), `${await foldersHive.inputValue()} ${JSON.stringify(readFile().values['cw.cards.attachmentFolders'])}`)
     await folders.screenshot({ path: path.join(lib.WORK, 'advanced-folders.png') })
     await foldersOwn.fill('F:\\Workspace evidence')
     await foldersOwn.press('Enter')
-    check("…a workspace's own list goes in workspace.json", !!(await lib.until(() => JSON.stringify(wsOwn()['hive.cards.attachmentFolders']) === JSON.stringify(['F:\\Workspace evidence']), HUNG_MS)), JSON.stringify(wsOwn()))
+    check("…a workspace's own list goes in workspace.json", !!(await lib.until(() => JSON.stringify(wsOwn()['cw.cards.attachmentFolders']) === JSON.stringify(['F:\\Workspace evidence']), HUNG_MS)), JSON.stringify(wsOwn()))
     await foldersOwn.fill('')
     await foldersOwn.press('Enter')
-    check("…emptied, it goes from workspace.json: Hive's list applies", !!(await lib.until(() => !('hive.cards.attachmentFolders' in wsOwn()), HUNG_MS)), JSON.stringify(wsOwn()))
+    check("…emptied, it goes from workspace.json: Hive's list applies", !!(await lib.until(() => !('cw.cards.attachmentFolders' in wsOwn()), HUNG_MS)), JSON.stringify(wsOwn()))
     await foldersHive.fill('')
     await foldersHive.press('Enter')
-    check("…Hive's emptied goes from advanced.json: the default, none", !!(await lib.until(() => !('hive.cards.attachmentFolders' in readFile().values), HUNG_MS)), JSON.stringify(readFile().values))
+    check("…Hive's emptied goes from advanced.json: the default, none", !!(await lib.until(() => !('cw.cards.attachmentFolders' in readFile().values), HUNG_MS)), JSON.stringify(readFile().values))
     await foldersHive.fill('evidence')
     await foldersHive.press('Enter')
-    check('…a folder that is not a full path is refused, saying what it takes', !!(await lib.until(async () => /takes up to 20 folders, each a full path/.test(await folders.innerText()), HUNG_MS)) && !('hive.cards.attachmentFolders' in readFile().values), await folders.innerText())
+    check('…a folder that is not a full path is refused, saying what it takes', !!(await lib.until(async () => /takes up to 20 folders, each a full path/.test(await folders.innerText()), HUNG_MS)) && !('cw.cards.attachmentFolders' in readFile().values), await folders.innerText())
     await foldersHive.fill('')
     await foldersHive.press('Enter')
 
     // --- Agents' temp folder (HI-2496): one folder, empty by default; two refused, saying it takes one; emptied, the default.
-    const temp = row('hive.agents.tempFolder')
+    const temp = row('cw.agents.tempFolder')
     const tempHive = temp.getByLabel("Combwork: Agents' temp folder", { exact: true })
     check("Agents' temp folder is listed, empty, with what it does", (await tempHive.inputValue()) === '' && /instead of Windows' Temp folder/.test(await temp.innerText()), await temp.innerText())
     await tempHive.fill('%LOCALAPPDATA%\\hive-test\\agent-tmp')
     await tempHive.press('Enter')
-    check('…a folder goes in advanced.json, its variable kept', !!(await lib.until(() => JSON.stringify(readFile().values['hive.agents.tempFolder']) === JSON.stringify(['%LOCALAPPDATA%\\hive-test\\agent-tmp']), HUNG_MS)), JSON.stringify(readFile().values['hive.agents.tempFolder']))
+    check('…a folder goes in advanced.json, its variable kept', !!(await lib.until(() => JSON.stringify(readFile().values['cw.agents.tempFolder']) === JSON.stringify(['%LOCALAPPDATA%\\hive-test\\agent-tmp']), HUNG_MS)), JSON.stringify(readFile().values['cw.agents.tempFolder']))
     await temp.screenshot({ path: path.join(lib.WORK, 'advanced-tempfolder.png') })
     await tempHive.fill('D:\\a; E:\\b')
     await tempHive.press('Enter')
-    check("…two folders are refused, saying it takes one folder's full path", !!(await lib.until(async () => /takes one folder's full path/.test(await temp.innerText()), HUNG_MS)) && JSON.stringify(readFile().values['hive.agents.tempFolder']) === JSON.stringify(['%LOCALAPPDATA%\\hive-test\\agent-tmp']), await temp.innerText())
+    check("…two folders are refused, saying it takes one folder's full path", !!(await lib.until(async () => /takes one folder's full path/.test(await temp.innerText()), HUNG_MS)) && JSON.stringify(readFile().values['cw.agents.tempFolder']) === JSON.stringify(['%LOCALAPPDATA%\\hive-test\\agent-tmp']), await temp.innerText())
     await tempHive.fill('')
     await tempHive.press('Enter')
-    check('…emptied, it goes from advanced.json: the system Temp', !!(await lib.until(() => !('hive.agents.tempFolder' in readFile().values), HUNG_MS)), JSON.stringify(readFile().values))
+    check('…emptied, it goes from advanced.json: the system Temp', !!(await lib.until(() => !('cw.agents.tempFolder' in readFile().values), HUNG_MS)), JSON.stringify(readFile().values))
 
     // Agents per project and its note moved to Version Control → Workflow (HI-2001): maxagents and agents24.
     check('Agents per project is no longer listed', (await page.locator('.advanced-row[data-advanced="hive.agents.perProject"]').count()) === 0)
@@ -289,7 +289,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     await page.locator('.settings-nav .row', { hasText: 'Advanced' }).click()
     await list.getByLabel('Filter advanced settings').fill('')
     check('…all cleared: the remembered Codex again', !!(await lib.until(async () => (await selectedTab()) === 'codex' && (await tabs()).every((t) => t.count === null), HUNG_MS)), JSON.stringify(await tabs()))
-    const changedIds = 'hive.mcp.replySeconds,hive.progress.lanesShown,claude-code.trust.prompt,codex.trust.prompt,codex.hooks.timeoutSeconds'
+    const changedIds = 'cw.mcp.replySeconds,cw.progress.lanesShown,claude-code.trust.prompt,codex.trust.prompt,codex.hooks.timeoutSeconds'
     const ids = () => list.locator('.advanced-row').evaluateAll((rows) => rows.map((r) => r.getAttribute('data-advanced')).join())
     // Settings' own Modified only, at the top, filters the list too.
     await page.locator('.settings-top').getByLabel('Modified only').check()
@@ -307,14 +307,14 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
 
     // --- Copy Diagnostics names them, never their values.
     const diag = await inv('app:diagnostics')
-    check('Copy Diagnostics lists the overrides by name, not value', /- Advanced settings: 4 overrides \(claude-code\.trust\.prompt, codex\.hooks\.timeoutSeconds, codex\.trust\.prompt, hive\.mcp\.replySeconds\); 1 workspace value/.test(diag) && !diag.includes('trust the repository'), diag.split('\n').filter((l) => /Advanced/.test(l)).join(' / '))
+    check('Copy Diagnostics lists the overrides by name, not value', /- Advanced settings: 4 overrides \(claude-code\.trust\.prompt, codex\.hooks\.timeoutSeconds, codex\.trust\.prompt, cw\.mcp\.replySeconds\); 1 workspace value/.test(diag) && !diag.includes('trust the repository'), diag.split('\n').filter((l) => /Advanced/.test(l)).join(' / '))
 
     // --- Reset all settings: advanced.json's overrides too, a workspace's own kept.
     await list.getByLabel('Modified only').uncheck()
     await page.locator('.setting', { hasText: 'Reset all settings' }).getByRole('button', { name: 'Reset' }).click()
     await page.locator('[role="dialog"]').getByRole('button', { name: 'Reset' }).click()
     check('Reset all settings clears advanced.json (keeping ids this Hive doesn\'t know)', !!(await lib.until(() => JSON.stringify(readFile().values) === '{"hive.someday":1}', HUNG_MS)), JSON.stringify(readFile().values))
-    check("…and the list shows the defaults, the workspace's own kept", !!(await lib.until(async () => (await row('codex.trust.prompt').locator('.modified').count()) === 0 && JSON.parse(fs.readFileSync(wsFile, 'utf8')).advanced?.['hive.progress.lanesShown'] === 2, HUNG_MS)))
+    check("…and the list shows the defaults, the workspace's own kept", !!(await lib.until(async () => (await row('codex.trust.prompt').locator('.modified').count()) === 0 && JSON.parse(fs.readFileSync(wsFile, 'utf8')).advanced?.['cw.progress.lanesShown'] === 2, HUNG_MS)))
   } finally {
     await app.close()
   }

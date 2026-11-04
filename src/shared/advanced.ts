@@ -148,7 +148,7 @@ export interface AdvancedChoice {
 }
 
 /** Where a value is listed: Hive's own, or one CLI's. */
-export type AdvancedGroup = 'hive' | ProviderId
+export type AdvancedGroup = 'cw' | ProviderId
 
 /**
  * A recording of the CLI: for a value Hive reads, the text a pattern or text must find, or the field names a field is
@@ -208,82 +208,82 @@ export interface AdvancedDef {
 }
 
 /** Hive draws without the graphics card (#676): read from advanced.json before the app is ready (main/gpu.ts). */
-export const HARDWARE_ACCELERATION_OFF = 'hive.disableHardwareAcceleration'
+export const HARDWARE_ACCELERATION_OFF = 'cw.disableHardwareAcceleration'
 
 /** Hive writes a heap snapshot as its main process nears its memory limit (#1005): read from advanced.json at start (main/memory.ts). */
-export const HEAP_SNAPSHOT_NEAR_LIMIT = 'hive.heapSnapshotNearLimit'
+export const HEAP_SNAPSHOT_NEAR_LIMIT = 'cw.heapSnapshotNearLimit'
 
 /** Agents resume by themselves after Hive restarts for an update (HI-1707): read by main's restartResume. */
-export const RESUME_AFTER_UPDATE = 'hive.restart.resumeAfterUpdate'
+export const RESUME_AFTER_UPDATE = 'cw.restart.resumeAfterUpdate'
 /** How long an agent resumed after a restart has to be ready, in seconds (HI-1707): read by main's restartResume. */
-export const RESTART_READY_SECONDS = 'hive.restart.resumeReadySeconds'
+export const RESTART_READY_SECONDS = 'cw.restart.resumeReadySeconds'
 
 /** Agents whose turn a dropped connection ended are resumed once it is back (HI-1612): read by main's outageResume. */
-export const OUTAGE_RESUME = 'hive.outage.resume'
+export const OUTAGE_RESUME = 'cw.outage.resume'
 /** Errors that are never a dropped connection (a usage limit, a sign-in, "overloaded"), whatever a CLI's pattern finds (HI-1612). */
-export const OUTAGE_NOT_CONNECTION = 'hive.outage.notConnection'
+export const OUTAGE_NOT_CONNECTION = 'cw.outage.notConnection'
 /** The first check for the connection, in seconds, and the longest between two (HI-1612): backing off from one to the other. */
-export const OUTAGE_CHECK_FIRST_SECONDS = 'hive.outage.checkFirstSeconds'
-export const OUTAGE_CHECK_MOST_SECONDS = 'hive.outage.checkMostSeconds'
+export const OUTAGE_CHECK_FIRST_SECONDS = 'cw.outage.checkFirstSeconds'
+export const OUTAGE_CHECK_MOST_SECONDS = 'cw.outage.checkMostSeconds'
 /** How long Hive waits for the connection before it gives up, in minutes (HI-1612). */
-export const OUTAGE_WAIT_MINUTES = 'hive.outage.waitMinutes'
+export const OUTAGE_WAIT_MINUTES = 'cw.outage.waitMinutes'
 /** The resumes in an hour after which a turn ending on a connection error again stops them (HI-1612). */
-export const OUTAGE_RESUMES_PER_HOUR = 'hive.outage.resumesPerHour'
+export const OUTAGE_RESUMES_PER_HOUR = 'cw.outage.resumesPerHour'
 /** The address Hive checks for a CLI's connection (HI-1612): its API host. */
-export const outageCheckUrlId = (provider: ProviderId): string => `hive.outage.checkUrl.${provider}`
+export const outageCheckUrlId = (provider: ProviderId): string => `cw.outage.checkUrl.${provider}`
 /** A CLI's words for a turn that its connection's failure ended (HI-1612): `<provider>.outage.connectionError`. */
 export const outagePatternId = (provider: ProviderId): string => `${provider}.outage.connectionError`
 
 /** The longest one of the merge queue's checks or installs runs, in minutes (#1349): read by main's queueChecks. */
-export const QUEUE_CHECK_MINUTES = 'hive.queue.checkMinutes'
+export const QUEUE_CHECK_MINUTES = 'cw.queue.checkMinutes'
 /** The network error codes that make a failed merge check temporary (#1362): read by queueChecksApp.ts. */
-export const QUEUE_NETWORK_CODES = 'hive.queue.networkCodes'
+export const QUEUE_NETWORK_CODES = 'cw.queue.networkCodes'
 
 /** The longest the merge queue's signed merge commit takes before its signer is ended (#1350): read by main's queueHost. */
-export const QUEUE_SIGN_SECONDS = 'hive.queue.signSeconds'
+export const QUEUE_SIGN_SECONDS = 'cw.queue.signSeconds'
 /** G20 (HI-1367): the parallel jobs the merge queue gives a project's focused-tests runner (HIVE_FOCUSED_JOBS). */
-export const QUEUE_FOCUSED_JOBS = 'hive.queue.focusedJobs'
+export const QUEUE_FOCUSED_JOBS = 'cw.queue.focusedJobs'
 /** G20 (HI-1367): the longest a project's focused-tests picker runs, at a submit or at the merge. */
-export const FOCUSED_PICK_SECONDS = 'hive.focused.pickSeconds'
+export const FOCUSED_PICK_SECONDS = 'cw.focused.pickSeconds'
 
 /** Whether the merge queue asks before updating a target checked out in a folder (#1351, OP-40): read by main's queueHost. */
-export const QUEUE_CHECKED_OUT_TARGET = 'hive.queue.checkedOutTarget'
+export const QUEUE_CHECKED_OUT_TARGET = 'cw.queue.checkedOutTarget'
 
 /** Whether Hive removes a project's idle slots beyond its pool after a day (#1429, SPEC §16.10.2): read by main's slotsApp. */
-export const SLOTS_REMOVE_IDLE = 'hive.slots.removeIdle'
+export const SLOTS_REMOVE_IDLE = 'cw.slots.removeIdle'
 
 /** Whether an agent's worktree adopted as a slot at the 1.0 upgrade is renamed to a slot's name once free (#1441). */
-export const SLOTS_RENAME_ADOPTED = 'hive.slots.renameAdopted'
+export const SLOTS_RENAME_ADOPTED = 'cw.slots.renameAdopted'
 
 /** Whether a Done card's line is deleted once its target contains it (#1438): read by main's slotCards. */
-export const SLOTS_DELETE_MERGED = 'hive.slots.deleteMergedLines'
+export const SLOTS_DELETE_MERGED = 'cw.slots.deleteMergedLines'
 
 /** How many days after a session ends the usage history keeps its timeline's full detail (HI-1648): read by the usage worker. */
-export const USAGE_TIMELINE_DETAIL_DAYS = 'hive.usage.timelineDetailDays'
+export const USAGE_TIMELINE_DETAIL_DAYS = 'cw.usage.timelineDetailDays'
 
 /** The longest a slot's setup, install or archive command runs, in minutes (#1429): read by main's slotsApp. */
-export const SLOTS_SETUP_MINUTES = 'hive.slots.setupMinutes'
+export const SLOTS_SETUP_MINUTES = 'cw.slots.setupMinutes'
 
 /**
  * Whether a lane's end lets its builder finish its turn, tells it, and ends its CLI with the CLI's own exit (HI-1706):
  * read by main's slotsApp. Off, its session is stopped at its first idle moment, as before.
  */
-export const LANES_GENTLE_END = 'hive.lanes.gentleEnd'
+export const LANES_GENTLE_END = 'cw.lanes.gentleEnd'
 
 /** The longest a lane's end waits for its builder's turn to end, in minutes (HI-1706): read by main's slotsApp. */
-export const LANES_END_WAIT_MINUTES = 'hive.lanes.endWaitMinutes'
+export const LANES_END_WAIT_MINUTES = 'cw.lanes.endWaitMinutes'
 /** The longest Hive keeps trying to start a lane's busy agent in its new conversation, in minutes (HI-2034): read by main's laneStarts. */
-export const LANES_FRESH_START_WAIT_MINUTES = 'hive.lanes.freshStartWaitMinutes'
+export const LANES_FRESH_START_WAIT_MINUTES = 'cw.lanes.freshStartWaitMinutes'
 /**
  * Whether the Assistant, ending a turn while lanes run with no watch covering them, is told so before it finishes
  * (HI-2069): read by main's inboxNotices, with the drain.
  */
-export const LANES_UNWATCHED_NOTICE = 'hive.lanes.unwatchedNotice'
+export const LANES_UNWATCHED_NOTICE = 'cw.lanes.unwatchedNotice'
 /**
  * Whether a process an agent's command left running (HI-2111: its parent gone, past ten minutes) is told in a notice and
  * to the agent: read by main's orphanProcesses. Activity lists it either way.
  */
-export const ORPHAN_NOTICE = 'hive.processes.orphanNotice'
+export const ORPHAN_NOTICE = 'cw.processes.orphanNotice'
 
 /**
  * Settings Hive no longer has, dropped quietly from advanced.json as it is read (and so at its next write), never listed
@@ -301,52 +301,52 @@ export const RETIRED_ADVANCED: ReadonlySet<string> = new Set(['hive.accounts.pre
 export const LEGACY_ADVANCED: ReadonlySet<string> = new Set(['hive.assistant.otherMcpServers', 'hive.agents.perProject'])
 
 /** Whether sessions are started with TERM=xterm-256color and no WT_SESSION (HI-2004): read by main's ptyHost. */
-export const TERMINAL_TYPE = 'hive.sessions.terminalType'
+export const TERMINAL_TYPE = 'cw.sessions.terminalType'
 
 /** Whether reviewers review in review copies (#1435, SPEC §16.10.5): read by main's copiesApp. */
-export const COPIES_REVIEW = 'hive.copies.review'
+export const COPIES_REVIEW = 'cw.copies.review'
 
 /** Whether accounts' usage moves run (HI-2195): main's usageMoves.ts. Off, no rule fires; the rules are kept. */
-export const USAGE_MOVES = 'hive.accounts.usageMoves'
+export const USAGE_MOVES = 'cw.accounts.usageMoves'
 
 /** Whether workflow rules are enforced (#1265): the switch every gate answers to (workflow/service.ts's ENFORCE). */
-export const WORKFLOW_ENFORCE = 'hive.workflow.enforce'
+export const WORKFLOW_ENFORCE = 'cw.workflow.enforce'
 
 /** How long a returned copy waits to be quiet before it shows as still in use, in minutes (#1435): read by main's copiesApp. */
-export const COPIES_QUIET_WAIT = 'hive.copies.quietWaitMinutes'
+export const COPIES_QUIET_WAIT = 'cw.copies.quietWaitMinutes'
 
 /** HI-2340: how long a None project's whole-project read (its worker's scan) may take before it is stopped. */
-export const NONE_BASELINE_SECONDS = 'hive.none.baselineSeconds'
+export const NONE_BASELINE_SECONDS = 'cw.none.baselineSeconds'
 
 /** Ctrl+C and Ctrl+V in an agent's pane go to its CLI rather than Hive's copy and paste (#1286, #966 row 24): read by TerminalView. */
-export const CTRL_CV_TO_CLI = 'hive.terminal.ctrlCVToCli'
+export const CTRL_CV_TO_CLI = 'cw.terminal.ctrlCVToCli'
 
 /** Successful builds of Hive itself (npm run dist, npm run release) go into the journal as Hive's facts (#1534): read by main's buildFacts. */
-export const JOURNAL_BUILDS = 'hive.journal.builds'
+export const JOURNAL_BUILDS = 'cw.journal.builds'
 
 /** Past this many characters, an agent's card title gets a nudge to shorten it (HI-1872; 0: none): read by main's titleNudge. */
-export const CARD_TITLE_NUDGE = 'hive.cards.titleNudgeChars'
+export const CARD_TITLE_NUDGE = 'cw.cards.titleNudgeChars'
 
 /** The Assistant gets Hive's start view at each start and compaction (#1286, #966 row 28): read by main's startContext. */
-export const ASSISTANT_START_VIEW = 'hive.assistant.startView'
+export const ASSISTANT_START_VIEW = 'cw.assistant.startView'
 
 /** Hive types a prompt as it was written, line breaks and spacing kept (#1286, #966 row 29): read by sendPrompt. */
-export const PROMPT_AS_TYPED = 'hive.prompt.asTyped'
+export const PROMPT_AS_TYPED = 'cw.prompt.asTyped'
 
 /** Hive clears the CLI's input with Ctrl+U before it types there (#1286, #966 row 29): every Ctrl+U of sessions.ts. */
-export const PROMPT_CLEAR_DRAFT = 'hive.prompt.clearDraft'
+export const PROMPT_CLEAR_DRAFT = 'cw.prompt.clearDraft'
 
 /**
  * Every key in an agent's pane goes to its CLI, but the command palette's shortcut, so every command stays reachable
  * (#1292, #966 row 26): read by TerminalView, through isAppShortcut.
  */
-export const ALL_KEYS_TO_CLI = 'hive.terminal.allKeysToCli'
+export const ALL_KEYS_TO_CLI = 'cw.terminal.allKeysToCli'
 
 /** What Hive does with a CLI's OSC 52 clipboard writes: allow (as before), ask each time, or block (#1292, #966 row 27). */
-export const OSC52_POLICY = 'hive.terminal.osc52'
+export const OSC52_POLICY = 'cw.terminal.osc52'
 
 /** A card started on an agent is typed as its own words, without Hive's wrapper (#1292, #966 row 30): taskStart's prompt. */
-export const RAW_CARD_START = 'hive.prompt.rawCardStart'
+export const RAW_CARD_START = 'cw.prompt.rawCardStart'
 
 /**
  * The Hive Assistant got every server on in the workspace (#1284, #966 row 7), until HI-1472 gave it a choice of its own
@@ -356,26 +356,26 @@ export const RAW_CARD_START = 'hive.prompt.rawCardStart'
 export const ASSISTANT_OTHER_MCP = 'hive.assistant.otherMcpServers'
 
 /** Project agents get Hive's guidance with Hive's tools (#1285, #966 row 13): index.ts's hiveGuidance and the hive MCP server. */
-export const HIVE_GUIDANCE = 'hive.guidance'
+export const HIVE_GUIDANCE = 'cw.guidance'
 
 /** Hive delivers the Workspace notes note at each launch (#1433, #873): main's workspaceNotes.ts. */
-export const DELIVER_WORKSPACE_NOTES = 'hive.notes.deliverWorkspaceNotes'
+export const DELIVER_WORKSPACE_NOTES = 'cw.notes.deliverWorkspaceNotes'
 
 /** How much of the Workspace notes note a launch delivers at most, in bytes (#1433): main's workspaceNotes.ts and the note's editor. */
-export const WORKSPACE_NOTES_MAX_ID = 'hive.notes.workspaceNotesMax'
+export const WORKSPACE_NOTES_MAX_ID = 'cw.notes.workspaceNotesMax'
 /** The largest file kept with a card (HI-1700), in bytes. */
-export const CARD_ATTACHMENT_MAX_ID = 'hive.cards.attachmentMax'
+export const CARD_ATTACHMENT_MAX_ID = 'cw.cards.attachmentMax'
 export const CARD_ATTACHMENT_MAX = 25 * 1024 * 1024
 /** More folders agents, the Assistant and scripts may attach files to a card from (HI-2480), beside their own and Temp. */
-export const CARD_ATTACHMENT_FOLDERS_ID = 'hive.cards.attachmentFolders'
+export const CARD_ATTACHMENT_FOLDERS_ID = 'cw.cards.attachmentFolders'
 /** Where agents' own temp files go (HI-2496): a folder whose <project>\<agent> folder becomes each launch's TEMP; none, the system Temp. */
-export const AGENT_TEMP_FOLDER_ID = 'hive.agents.tempFolder'
+export const AGENT_TEMP_FOLDER_ID = 'cw.agents.tempFolder'
 
 /**
  * Where Hive removes its skill copies (.agents/skills/hive-*) once no agent of Hive's works in the folder (#1431, #966 row
  * 15): `slots` in every folder but the project folder, `everywhere`, or `never`. Read by main's skillCopies.ts.
  */
-export const SKILLS_REMOVE_IDLE_COPIES = 'hive.skills.removeIdleCopies'
+export const SKILLS_REMOVE_IDLE_COPIES = 'cw.skills.removeIdleCopies'
 
 /**
  * Whether right-click goes to a provider's CLI rather than Hive's copy/paste (#737): `<provider>.mouse.rightClickToCli`,
@@ -419,7 +419,7 @@ export const foldersText = (folders: readonly string[]): string => folders.join(
 const FIX = 'tests/fixtures'
 
 /** A CLI's value (not Hive's own): it needs recorded samples, and an override records the CLI version it was made for. */
-export const cliFacing = (d: AdvancedDef): boolean => d.group !== 'hive'
+export const cliFacing = (d: AdvancedDef): boolean => d.group !== 'cw'
 
 /** Recordings of each CLI taking Hive's hooks (configured with the default timeouts) and sending them. */
 const HOOKS_TAKEN: Record<string, AdvancedSample> = {
@@ -447,9 +447,9 @@ const FOOTER_SAMPLES: Record<string, AdvancedSample> = {
 const SOURCES: readonly AdvancedSource[] = [
   // Hive's own
   {
-    id: 'hive.showDeveloperFeatures',
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.showDeveloperFeatures.title', defaultMessage: 'Show developer features', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    id: 'cw.showDeveloperFeatures',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.showDeveloperFeatures.title', defaultMessage: 'Show developer features', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.hive.showDeveloperFeatures.desc', defaultMessage: 'Show Help → Developer Console (Ctrl+Alt+J): what each CLI sends Combwork, next to what Combwork made of it.', description: 'What the advanced setting "Show developer features" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'boolean',
     default: false,
@@ -460,7 +460,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // CLIs no TERM or WT_SESSION, Windows Terminal its WT_SESSION, so Claude Code drew ">" or "❯" by the launch path).
   {
     id: TERMINAL_TYPE,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.sessions.terminalType.title', defaultMessage: 'Sessions say their terminal is xterm-256color', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. xterm-256color is a terminal type's name and TERM an environment variable's: keep them." }),
     desc: msg({ id: 'settings.advanced.hive.sessions.terminalType.desc', defaultMessage: "Combwork starts each session with TERM=xterm-256color, as its terminal is, and without Windows Terminal's WT_SESSION, so the CLIs draw the same whether Combwork was opened from the Start menu or a terminal (Claude Code draws ❯ rather than >). A TERM in your own environment or the session's is kept. Turned off, sessions get the environment Combwork was opened with.", description: 'What the advanced setting "Sessions say their terminal is xterm-256color" does (Settings → Advanced). TERM, WT_SESSION and xterm-256color are names: keep them; ❯ and > are the characters Claude Code draws as its prompt mark.' }),
     kind: 'boolean',
@@ -468,54 +468,54 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'sessions'
   },
   {
-    id: 'hive.console.showText',
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.console.showText.title', defaultMessage: 'Developer console: show prompt, reply and command text', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    id: 'cw.console.showText',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.console.showText.title', defaultMessage: 'Developer console: show prompt, reply and command text', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.hive.console.showText.desc', defaultMessage: "Show the text in the developer console: prompts, replies, commands and tools' arguments, under a banner saying it is unredacted, and start each recording with its text box ticked. Tokens, API keys and sign-in details stay masked whatever this says; agents' cw_console stays redacted, and a recording with text is never attached to Copy Diagnostics.", description: 'What the advanced setting "Developer console: show prompt, reply and command text" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'boolean',
     default: false,
     applies: 'now'
   },
   {
-    id: 'hive.recorder.safeguard',
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.recorder.safeguard.title', defaultMessage: 'Flight recorder: capture safeguard stops', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. The flight recorder saves the developer console's recent events when something rare happens." }),
+    id: 'cw.recorder.safeguard',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.recorder.safeguard.title', defaultMessage: 'Flight recorder: capture safeguard stops', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The flight recorder saves the developer console's recent events when something rare happens." }),
     desc: msg({ id: 'settings.advanced.hive.recorder.safeguard.desc', defaultMessage: "Save a capture when a model's safeguards stop a response or switch the model: the agent's newest developer console events, redacted, in Combwork's console-recordings folder, with a notice. With any flight recorder trigger on, Combwork keeps each agent's newest developer console events in memory (redacted), whether a console is open or not.", description: 'What the advanced setting "Flight recorder: capture safeguard stops" does (Settings → Advanced). console-recordings is a folder name: keep it.' }),
     kind: 'boolean',
     default: false,
     applies: 'now'
   },
   {
-    id: 'hive.recorder.unknown',
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.recorder.unknown.title', defaultMessage: 'Flight recorder: capture something unknown from a CLI', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. The flight recorder saves the developer console's recent events when something rare happens." }),
+    id: 'cw.recorder.unknown',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.recorder.unknown.title', defaultMessage: 'Flight recorder: capture something unknown from a CLI', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The flight recorder saves the developer console's recent events when something rare happens." }),
     desc: msg({ id: 'settings.advanced.hive.recorder.unknown.desc', defaultMessage: "Save a capture when a CLI sends a hook or a status line with a field Combwork doesn't know: often the first sign that a CLI update changed something.", description: 'What the advanced setting "Flight recorder: capture something unknown from a CLI" does (Settings → Advanced). A hook and a status line are what a CLI sends Hive as it works.' }),
     kind: 'boolean',
     default: false,
     applies: 'now'
   },
   {
-    id: 'hive.recorder.version',
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.recorder.version.title', defaultMessage: 'Flight recorder: capture a CLI version change', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. The flight recorder saves the developer console's recent events when something rare happens." }),
+    id: 'cw.recorder.version',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.recorder.version.title', defaultMessage: 'Flight recorder: capture a CLI version change', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The flight recorder saves the developer console's recent events when something rare happens." }),
     desc: msg({ id: 'settings.advanced.hive.recorder.version.desc', defaultMessage: "Save a capture when an agent starts on a version of its CLI other than the one the last agent of that CLI started on.", description: 'What the advanced setting "Flight recorder: capture a CLI version change" does (Settings → Advanced).' }),
     kind: 'boolean',
     default: false,
     applies: 'now'
   },
   {
-    id: 'hive.recorder.stalled',
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.recorder.stalled.title', defaultMessage: 'Flight recorder: capture an agent gone silent', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. The flight recorder saves the developer console's recent events when something rare happens." }),
+    id: 'cw.recorder.stalled',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.recorder.stalled.title', defaultMessage: 'Flight recorder: capture an agent gone silent', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The flight recorder saves the developer console's recent events when something rare happens." }),
     desc: msg({ id: 'settings.advanced.hive.recorder.stalled.desc', defaultMessage: "Save a capture when an agent working on a turn goes silent past its limit, so Combwork can't tell what it is doing.", description: 'What the advanced setting "Flight recorder: capture an agent gone silent" does (Settings → Advanced).' }),
     kind: 'boolean',
     default: false,
     applies: 'now'
   },
   {
-    id: 'hive.recorder.pattern',
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.recorder.pattern.title', defaultMessage: 'Flight recorder: capture events matching', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. The flight recorder saves the developer console's recent events when something rare happens." }),
+    id: 'cw.recorder.pattern',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.recorder.pattern.title', defaultMessage: 'Flight recorder: capture events matching', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The flight recorder saves the developer console's recent events when something rare happens." }),
     desc: msg({ id: 'settings.advanced.hive.recorder.pattern.desc', defaultMessage: "Save a capture when an agent's developer console event has a name or summary this regular expression finds (case-insensitive). The default, (?!), never finds anything: it is off.", description: 'What the advanced setting "Flight recorder: capture events matching" does (Settings → Advanced). (?!) is a regular expression: keep it.' }),
     kind: 'pattern',
     default: '(?!)',
@@ -523,8 +523,8 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
-    id: 'hive.recorder.minutes',
-    group: 'hive',
+    id: 'cw.recorder.minutes',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.recorder.minutes.title', defaultMessage: 'Flight recorder: one capture per trigger and agent every', description: "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"10 min\")." }),
     desc: msg({ id: 'settings.advanced.hive.recorder.minutes.desc', defaultMessage: 'How long after a capture the same trigger waits before it captures the same agent again, so something that keeps happening saves one capture, not many.', description: 'What the advanced setting "Flight recorder: one capture per trigger and agent every" does (Settings → Advanced).' }),
     kind: 'number',
@@ -535,8 +535,8 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
-    id: 'hive.recorder.keep',
-    group: 'hive',
+    id: 'cw.recorder.keep',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.recorder.keep.title', defaultMessage: 'Flight recorder: captures kept', description: "An advanced setting's title (Settings → Advanced)." }),
     desc: msg({ id: 'settings.advanced.hive.recorder.keep.desc', defaultMessage: "How many captures Combwork keeps in its console-recordings folder: past it, the oldest go. Recordings you made in the developer console are never removed.", description: 'What the advanced setting "Flight recorder: captures kept" does (Settings → Advanced). console-recordings is a folder name: keep it.' }),
     kind: 'number',
@@ -547,8 +547,8 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
-    id: 'hive.recorder.afterSeconds',
-    group: 'hive',
+    id: 'cw.recorder.afterSeconds',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.recorder.afterSeconds.title', defaultMessage: 'Flight recorder: wait after a trigger', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"10 s\")." }),
     desc: msg({ id: 'settings.advanced.hive.recorder.afterSeconds.desc', defaultMessage: 'How long a capture waits after its trigger before it is saved, so it holds what followed too: what the CLI did next.', description: 'What the advanced setting "Flight recorder: wait after a trigger" does (Settings → Advanced).' }),
     kind: 'number',
@@ -560,8 +560,8 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: HARDWARE_ACCELERATION_OFF,
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.disableHardwareAcceleration.title', defaultMessage: 'Disable hardware acceleration', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.disableHardwareAcceleration.title', defaultMessage: 'Disable hardware acceleration', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.hive.disableHardwareAcceleration.desc', defaultMessage: "Draw Combwork without the graphics card, for a graphics driver that leaves Combwork's window blank, flickering or crashing. Terminals then draw without WebGL. Takes effect when Combwork restarts; to start once without it, run Combwork with --disable-gpu.", description: 'What the advanced setting "Disable hardware acceleration" is for, and what goes wrong when it is wrong (Settings → Advanced). --disable-gpu is a command-line option: keep it.' }),
     kind: 'boolean',
     default: false,
@@ -569,17 +569,17 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: HEAP_SNAPSHOT_NEAR_LIMIT,
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.heapSnapshotNearLimit.title', defaultMessage: 'Save a memory snapshot if Combwork is about to run out of memory', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.heapSnapshotNearLimit.title', defaultMessage: 'Save a memory snapshot if Combwork is about to run out of memory', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.hive.heapSnapshotNearLimit.desc', defaultMessage: "When Combwork's main process nears its memory limit, it writes a snapshot of its memory to the heap folder in Combwork's profile before it closes, to find out what filled it. A snapshot can be several gigabytes, holds whatever Combwork had in memory (card text, transcripts, possibly tokens) and stays on this PC; Combwork keeps the newest two. Takes effect when Combwork restarts.", description: 'What the advanced setting "Save a memory snapshot if Hive is about to run out of memory" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'boolean',
     default: false,
     applies: 'restart'
   },
   {
-    id: 'hive.mcp.replySeconds',
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.mcp.replySeconds.title', defaultMessage: 'hive tools: reply timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    id: 'cw.mcp.replySeconds',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.mcp.replySeconds.title', defaultMessage: 'hive tools: reply timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.hive.mcp.replySeconds.desc', defaultMessage: 'How long the hive MCP server waits for Combwork to answer one of its tools (a wait\'s own time comes on top). Raise it when a slow or very busy machine makes hive tools fail with "Combwork didn\'t reply within 300 s" (#371).', description: 'What the advanced setting "hive tools: reply timeout" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 300,
@@ -589,9 +589,9 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'sessions'
   },
   {
-    id: 'hive.progress.replySeconds',
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.progress.replySeconds.title', defaultMessage: "cw-progress: Combwork's reply time", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. cw-progress is the command agents run long commands and checks through: keep it as it is." }),
+    id: 'cw.progress.replySeconds',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.progress.replySeconds.title', defaultMessage: "cw-progress: Combwork's reply time", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. cw-progress is the command agents run long commands and checks through: keep it as it is." }),
     desc: msg({ id: 'settings.advanced.hive.progress.replySeconds.desc', defaultMessage: "How long cw-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 2 minutes at most.", description: "What the advanced setting \"cw-progress: Hive's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced)." }),
     kind: 'number',
     default: 15,
@@ -601,9 +601,9 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'sessions'
   },
   {
-    id: 'hive.mcp.connectSeconds',
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.mcp.connectSeconds.title', defaultMessage: 'hive tools: wait to connect', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    id: 'cw.mcp.connectSeconds',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.mcp.connectSeconds.title', defaultMessage: 'hive tools: wait to connect', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.hive.mcp.connectSeconds.desc', defaultMessage: "How long Combwork waits, once an agent is ready, for its CLI to connect Combwork's tools before it tells the agent of new work anyway. A resumed session can be ready before its tools are, and a message then is a turn spent without them (#865). Lower it if messages reach agents late when their CLI doesn't connect Combwork's tools.", description: 'What the advanced setting "hive tools: wait to connect" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 30,
@@ -613,8 +613,8 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
-    id: 'hive.mcpCatalog.fetchSeconds',
-    group: 'hive',
+    id: 'cw.mcpCatalog.fetchSeconds',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.mcpCatalog.fetchSeconds.title', defaultMessage: 'MCP catalogues: reading one', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds. An MCP catalogue is a list of servers to install (HI-545)." }),
     desc: msg({ id: 'settings.advanced.hive.mcpCatalog.fetchSeconds.desc', defaultMessage: "How long the MCP view waits for a catalogue's list, redirects included, before it shows that catalogue couldn't be read. Raise it on a slow connection.", description: 'What the advanced setting "MCP catalogues: reading one" is for (Settings → Advanced, HI-545).' }),
     kind: 'number',
@@ -625,8 +625,8 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
-    id: 'hive.mcpCatalog.downloadSeconds',
-    group: 'hive',
+    id: 'cw.mcpCatalog.downloadSeconds',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.mcpCatalog.downloadSeconds.title', defaultMessage: 'MCP catalogues: downloading a server', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (HI-545)." }),
     desc: msg({ id: 'settings.advanced.hive.mcpCatalog.downloadSeconds.desc', defaultMessage: "How long Install and Update wait for a catalogue server's zip, redirects included, before they stop with nothing installed. Raise it on a slow connection.", description: 'What the advanced setting "MCP catalogues: downloading a server" is for (Settings → Advanced, HI-545).' }),
     kind: 'number',
@@ -637,8 +637,8 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
-    id: 'hive.mcpCatalog.probeSeconds',
-    group: 'hive',
+    id: 'cw.mcpCatalog.probeSeconds',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.mcpCatalog.probeSeconds.title', defaultMessage: "MCP catalogues: checking this PC's requirements", description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (HI-545)." }),
     desc: msg({ id: 'settings.advanced.hive.mcpCatalog.probeSeconds.desc', defaultMessage: "How long each check of this PC for a catalogue server's requirements (its Windows edition and build, Node.js, Docker) may take before it shows as not checked.", description: 'What the advanced setting "MCP catalogues: checking this PC’s requirements" is for (Settings → Advanced, HI-545).' }),
     kind: 'number',
@@ -649,8 +649,8 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
-    id: 'hive.retry.tellAssistantAfterSeconds',
-    group: 'hive',
+    id: 'cw.retry.tellAssistantAfterSeconds',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.retry.tellAssistantAfterSeconds.title', defaultMessage: 'Retry wait: tell the Assistant after', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"300 s\"). A retry wait: an agent's coding agent waiting to try its model request again." }),
     desc: msg({ id: 'settings.advanced.hive.retry.tellAssistantAfterSeconds.desc', defaultMessage: "How long an agent's coding agent may keep waiting to retry its model request (rate-limited, or its service unreachable) in one turn before Combwork tells the Assistant, once a turn. 0: never.", description: 'What the advanced setting "Retry wait: tell the Assistant after" does (Settings → Advanced).' }),
     kind: 'number',
@@ -661,9 +661,9 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
-    id: 'hive.hooks.missingSeconds',
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.hooks.missingSeconds.title', defaultMessage: 'Hooks missing: wait', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Hooks: the calls an agent's coding agent makes to Hive as it works." }),
+    id: 'cw.hooks.missingSeconds',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.hooks.missingSeconds.title', defaultMessage: 'Hooks missing: wait', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Hooks: the calls an agent's coding agent makes to Hive as it works." }),
     desc: msg({ id: 'settings.advanced.hive.hooks.missingSeconds.desc', defaultMessage: "How long an agent's CLI may go without a hook, from its start (a CLI that sends one then) or from a prompt it went to work on, before Combwork says its hooks aren't arriving and shows its status as unknown (#1336). A long think after a prompt's hook never counts. Raise it if a slow machine shows that notice for agents that are fine.", description: 'What the advanced setting "Hooks missing: wait" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 60,
@@ -673,9 +673,9 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
-    id: 'hive.lostLine.steadySeconds',
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.lostLine.steadySeconds.title', defaultMessage: 'Lost line: wait', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A line: a message Hive typed into an agent's terminal." }),
+    id: 'cw.lostLine.steadySeconds',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.lostLine.steadySeconds.title', defaultMessage: 'Lost line: wait', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A line: a message Hive typed into an agent's terminal." }),
     desc: msg({ id: 'settings.advanced.hive.lostLine.steadySeconds.desc', defaultMessage: "A line Combwork typed into an agent that its CLI didn't take, gone from its input since (a screen of the CLI's took it): how long its input must stay empty, at its prompt, with nothing taken, before Combwork types it again or, with nothing to type again, tells you. Raise it if a slow machine has a line typed twice.", description: 'What the advanced setting "Lost line: wait" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959).' }),
     kind: 'number',
     default: 2,
@@ -685,9 +685,9 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
-    id: 'hive.wait.cardMaxSeconds',
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.wait.cardMaxSeconds.title', defaultMessage: 'Card waits: longest', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    id: 'cw.wait.cardMaxSeconds',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.wait.cardMaxSeconds.title', defaultMessage: 'Card waits: longest', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.hive.wait.cardMaxSeconds.desc', defaultMessage: "The longest an agent's cw_wait_for_tasks call (without wake) waits before it answers. It has to stay under the CLIs' own tool timeouts, so Combwork keeps it a minute below Codex's hive tool timeout whatever is set here.", description: 'What the advanced setting "Card waits: longest" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 840,
@@ -697,9 +697,9 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'sessions'
   },
   {
-    id: 'hive.wait.agentsMaxSeconds',
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.wait.agentsMaxSeconds.title', defaultMessage: 'Agent waits: longest', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    id: 'cw.wait.agentsMaxSeconds',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.wait.agentsMaxSeconds.title', defaultMessage: 'Agent waits: longest', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.hive.wait.agentsMaxSeconds.desc', defaultMessage: "The longest cw_wait_for_agents waits for agents to finish before it answers. Kept a minute below Codex's hive tool timeout, as card waits are.", description: 'What the advanced setting "Agent waits: longest" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 600,
@@ -710,8 +710,8 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: RESUME_AFTER_UPDATE,
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.restart.resumeAfterUpdate.title', defaultMessage: 'Resume agents after an update', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.restart.resumeAfterUpdate.title', defaultMessage: 'Resume agents after an update', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.hive.restart.resumeAfterUpdate.desc', defaultMessage: 'When Combwork restarts for an update (Restart to Update, or an installer closing it), the agents that were working, watching their cards or in a card loop start again in their conversations, one at a time, each told where it was. Off: Combwork offers to resume them instead, as it does after you quit.', description: 'What the advanced setting "Resume agents after an update" does (Settings → Advanced).' }),
     kind: 'boolean',
     default: true,
@@ -720,7 +720,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: RESTART_READY_SECONDS,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.restart.resumeReadySeconds.title', defaultMessage: 'Resuming after a restart: ready within', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"90 s\")." }),
     desc: msg({ id: 'settings.advanced.hive.restart.resumeReadySeconds.desc', defaultMessage: "How long an agent Combwork resumes after a restart has to be ready. One that isn't is stopped and listed as not resumed, and the next one starts.", description: 'What the advanced setting "Resuming after a restart: ready within" does (Settings → Advanced).' }),
     kind: 'number',
@@ -734,8 +734,8 @@ const SOURCES: readonly AdvancedSource[] = [
   // Resuming agents after a connection drops (HI-1612, Darren's decision: off by default, for everyone).
   {
     id: OUTAGE_RESUME,
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.outage.resume.title', defaultMessage: 'Resume agents after a connection drops', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.outage.resume.title', defaultMessage: 'Resume agents after a connection drops', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.hive.outage.resume.desc', defaultMessage: "When an agent's turn ends because its CLI couldn't reach its API (a router restarting, Wi-Fi dropping), Combwork shows it waiting for the connection, checks the CLI's API host now and then, and once it answers tells the agent to rerun what was cut off and carry on. Never for a usage limit, an expired sign-in or an overloaded server. After three resumes in an hour that end the same way, or once the wait's limit passes, Combwork stops and says what to try.", description: 'What the advanced setting "Resume agents after a connection drops" does (Settings → Advanced).' }),
     kind: 'boolean',
     default: false,
@@ -743,7 +743,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: OUTAGE_WAIT_MINUTES,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.outage.waitMinutes.title', defaultMessage: 'Resuming after a connection drops: wait at most', description: "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"120 min\")." }),
     desc: msg({ id: 'settings.advanced.hive.outage.waitMinutes.desc', defaultMessage: 'How long Combwork waits for the connection to come back before it stops waiting and tells you.', description: 'What the advanced setting "Resuming after a connection drops: wait at most" does (Settings → Advanced).' }),
     kind: 'number',
@@ -755,7 +755,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: OUTAGE_RESUMES_PER_HOUR,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.outage.resumesPerHour.title', defaultMessage: 'Resuming after a connection drops: resumes in an hour', description: "An advanced setting's title (Settings → Advanced), followed by a number." }),
     desc: msg({ id: 'settings.advanced.hive.outage.resumesPerHour.desc', defaultMessage: "How many times in an hour Combwork resumes the same agent. Once its turn ends on a connection error again after that many, Combwork stops: the PC's own network may not have recovered.", description: 'What the advanced setting "Resuming after a connection drops: resumes in an hour" does (Settings → Advanced).' }),
     kind: 'number',
@@ -766,7 +766,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: OUTAGE_CHECK_FIRST_SECONDS,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.outage.checkFirstSeconds.title', defaultMessage: 'Resuming after a connection drops: first check after', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"30 s\")." }),
     desc: msg({ id: 'settings.advanced.hive.outage.checkFirstSeconds.desc', defaultMessage: 'How long after the turn ends Combwork first checks the connection. Each check that finds it still down doubles the wait before the next, up to the longest wait below.', description: 'What the advanced setting "Resuming after a connection drops: first check after" does (Settings → Advanced).' }),
     kind: 'number',
@@ -778,7 +778,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: OUTAGE_CHECK_MOST_SECONDS,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.outage.checkMostSeconds.title', defaultMessage: 'Resuming after a connection drops: longest wait between checks', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"300 s\")." }),
     desc: msg({ id: 'settings.advanced.hive.outage.checkMostSeconds.desc', defaultMessage: 'The longest Combwork waits between two checks of the connection.', description: 'What the advanced setting "Resuming after a connection drops: longest wait between checks" does (Settings → Advanced).' }),
     kind: 'number',
@@ -790,7 +790,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: OUTAGE_NOT_CONNECTION,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.outage.notConnection.title', defaultMessage: 'Resuming after a connection drops: errors that are never a dropped connection', description: "An advanced setting's title (Settings → Advanced), listed under Combwork." }),
     desc: msg({ id: 'settings.advanced.hive.outage.notConnection.desc', defaultMessage: "A failed turn whose error this regular expression finds is never resumed, whatever a CLI's connection error pattern finds: a usage or rate limit, a sign-in, an overloaded server. Resuming wouldn't help those, and could repeat.", description: 'What the advanced setting "Resuming after a connection drops: errors that are never a dropped connection" does (Settings → Advanced).' }),
     kind: 'pattern',
@@ -800,7 +800,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: outageCheckUrlId('claude-code'),
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.outage.checkUrl.claude-code.title', defaultMessage: 'Resuming after a connection drops: address checked for Claude Code', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. Claude Code is a product name." }),
     desc: msg({ id: 'settings.advanced.hive.outage.checkUrl.claude-code.desc', defaultMessage: "The address Combwork asks to see whether Claude Code's connection is back: its API host. Any reply counts, an error page too. An agent on a server connection is checked at its server's address instead.", description: 'What the advanced setting "Resuming after a connection drops: address checked for Claude Code" does (Settings → Advanced).' }),
     kind: 'text',
@@ -809,7 +809,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: outageCheckUrlId('codex'),
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.outage.checkUrl.codex.title', defaultMessage: 'Resuming after a connection drops: address checked for Codex', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. Codex is a product name." }),
     desc: msg({ id: 'settings.advanced.hive.outage.checkUrl.codex.desc', defaultMessage: "The address Combwork asks to see whether Codex's connection is back: its API host. Any reply counts, an error page too.", description: 'What the advanced setting "Resuming after a connection drops: address checked for Codex" does (Settings → Advanced).' }),
     kind: 'text',
@@ -818,7 +818,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: outageCheckUrlId('copilot'),
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.outage.checkUrl.copilot.title', defaultMessage: 'Resuming after a connection drops: address checked for GitHub Copilot', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. GitHub Copilot is a product name." }),
     desc: msg({ id: 'settings.advanced.hive.outage.checkUrl.copilot.desc', defaultMessage: "The address Combwork asks to see whether GitHub Copilot's connection is back: its API host. Any reply counts, an error page too.", description: 'What the advanced setting "Resuming after a connection drops: address checked for GitHub Copilot" does (Settings → Advanced).' }),
     kind: 'text',
@@ -826,9 +826,9 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
-    id: 'hive.progress.lanesShown',
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.progress.lanesShown.title', defaultMessage: 'Progress panel: lanes shown', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    id: 'cw.progress.lanesShown',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.progress.lanesShown.title', defaultMessage: 'Progress panel: lanes shown', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.hive.progress.lanesShown.desc', defaultMessage: "How many card-loop lanes the Progress panel shows before its lanes scroll, until you drag the section's top edge (the drag is kept per workspace). A workspace that runs many lanes at once can set its own.", description: 'What the advanced setting "Progress panel: lanes shown" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     // About six before they scroll (HI-1673, Darren: as on main, the lanes at the bottom growing upwards).
@@ -840,9 +840,9 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
-    id: 'hive.lanes.waitYouMinutes',
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.lanes.waitYouMinutes.title', defaultMessage: 'Lanes: a long wait for you', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    id: 'cw.lanes.waitYouMinutes',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.lanes.waitYouMinutes.title', defaultMessage: 'Lanes: a long wait for you', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.hive.lanes.waitYouMinutes.desc', defaultMessage: "After how long a lane waiting for you (a request in For you, or a card at its round limit) has its wait marked in the Progress panel's Lanes. Too short marks every wait; too long, a lane can sit unnoticed.", description: 'What the advanced setting "Lanes: a long wait for you" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     // HI-1926 (Darren's card): For you over an hour.
@@ -854,9 +854,9 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
-    id: 'hive.lanes.waitReviewerMinutes',
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.lanes.waitReviewerMinutes.title', defaultMessage: 'Lanes: a long wait for a reviewer', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    id: 'cw.lanes.waitReviewerMinutes',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.hive.lanes.waitReviewerMinutes.title', defaultMessage: 'Lanes: a long wait for a reviewer', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.hive.lanes.waitReviewerMinutes.desc', defaultMessage: "After how long a lane whose card waits in Review with nobody reviewing it has its wait marked in the Progress panel's Lanes. Too short marks every review; too long, a card can sit unreviewed.", description: 'What the advanced setting "Lanes: a long wait for a reviewer" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     // HI-1926 (Darren's card): a reviewer over 15 minutes.
@@ -869,8 +869,8 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   // The one switch for every workflow rule at once (#1263, #1120's table); each rule has its own option too.
   {
-    id: 'hive.workflow.enforce',
-    group: 'hive',
+    id: 'cw.workflow.enforce',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.workflow.enforce.title', defaultMessage: 'Workflow rules are enforced', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. The workflow rules are the checks a card passes as it moves across the board (review, checks, merging), set per project in its Version Control options." }),
     desc: msg({
       id: 'settings.advanced.hive.workflow.enforce.desc',
@@ -883,8 +883,8 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   // An agent's branch after a squash merge (#1271, SPEC §16.19.2): Hive moves it between a lane's cards, or asks first.
   {
-    id: 'hive.workflow.updateAgentBranch',
-    group: 'hive',
+    id: 'cw.workflow.updateAgentBranch',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.workflow.updateAgentBranch.title', defaultMessage: "Bring an agent's branch up to date after a squash merge", description: "An advanced setting's title (Settings → Advanced), listed under Combwork. A squash merge puts a card's commits into the target as one new commit, so the agent's own branch (in its worktree) still has the old ones; Hive can move the branch to the target before the agent's next card." }),
     desc: msg({
       id: 'settings.advanced.hive.workflow.updateAgentBranch.desc',
@@ -897,8 +897,8 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   // The repository lock (#1347, SPEC §16.9.3): how long a merge waits for another Hive's. A live holder is never taken over.
   {
-    id: 'hive.merge.lockWaitSeconds',
-    group: 'hive',
+    id: 'cw.merge.lockWaitSeconds',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.merge.lockWaitSeconds.title', defaultMessage: 'Merges: wait for another Combwork', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. Another Hive: the installed Hive and a dev or test Hive on the same machine." }),
     desc: msg({ id: 'settings.advanced.hive.merge.lockWaitSeconds.desc', defaultMessage: "How long a merge, or another change to a repository's branches (a pull, switching branch, moving an agent's branch), waits while another Combwork on this computer is merging into the same repository. After it, nothing is changed and Combwork says which Combwork holds the repository: try again once it has finished. Combwork never takes the repository from a Combwork that is still running.", description: 'What the advanced setting "Merges: wait for another Hive" is for, and what happens when the wait ends (Settings → Advanced).' }),
     kind: 'number',
@@ -911,7 +911,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // How long one of the merge queue's checks may run (#1349, SPEC §16.9.1 step 8): past it, Hive ends it and counts it as transient.
   {
     id: QUEUE_CHECK_MINUTES,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.queue.checkMinutes.title', defaultMessage: 'Merge queue: longest a merge check runs', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (\"90 min\"). A merge check is a command (tests, a build) Hive runs on a card's merged result before it moves the target." }),
     desc: msg({
       id: 'settings.advanced.hive.queue.checkMinutes.desc',
@@ -928,7 +928,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // G20 (HI-1367): how many tests at once a card's focused tests run with at the merge (CPU-friendly: the machine is shared).
   {
     id: QUEUE_FOCUSED_JOBS,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.queue.focusedJobs.title', defaultMessage: 'Merge queue: focused tests run at once', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by a number: how many of a card's focused tests (the tests its change needs) the merge queue runs in parallel." }),
     desc: msg({ id: 'settings.advanced.hive.queue.focusedJobs.desc', defaultMessage: 'How many tests at once the merge queue’s run of a card’s focused tests may use, passed to the project’s command that runs them. More finishes sooner but loads the computer, which agents and your own work share.', description: 'What the advanced setting "Merge queue: focused tests run at once" does, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
@@ -940,7 +940,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // G20 (HI-1367): a picker past this is ended with its whole tree, and its pick is unknown (never "nothing needed").
   {
     id: FOCUSED_PICK_SECONDS,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.focused.pickSeconds.title', defaultMessage: 'Focused tests: longest the choice of tests runs', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds: how long the project's command that chooses a card's focused tests may run, when the card is submitted and at its merge." }),
     desc: msg({ id: 'settings.advanced.hive.focused.pickSeconds.desc', defaultMessage: 'How long the project’s command that chooses a card’s focused tests may run, when it is submitted and at its merge. Past it, the command is ended and no tests count as chosen: the builder then names them itself.', description: 'What the advanced setting "Focused tests: longest the choice of tests runs" does (Settings → Advanced).' }),
     kind: 'number',
@@ -954,7 +954,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // codes in a failed check's last 40 lines. A check exiting 75 says so itself, whatever this is.
   {
     id: QUEUE_NETWORK_CODES,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.queue.networkCodes.title', defaultMessage: 'Merge queue: network errors that count as temporary', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. The merge queue tests a card's work before merging it; a check that fails for the network, not the work, lets the card's builder submit the same revision again." }),
     desc: msg({
       id: 'settings.advanced.hive.queue.networkCodes.desc',
@@ -975,7 +975,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // past it, the signer is taken to be waiting for a passphrase, ended, and the queue pauses.
   {
     id: QUEUE_SIGN_SECONDS,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.queue.signSeconds.title', defaultMessage: 'Merge queue: longest a signed merge commit takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"60 s\"). The merge commit is the commit Hive's merge queue makes when it merges a card; signed means the repository is set to sign commits (GPG or SSH)." }),
     desc: msg({
       id: 'settings.advanced.hive.queue.signSeconds.desc',
@@ -994,7 +994,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // agreed; Ask each time stays the switch.
   {
     id: QUEUE_CHECKED_OUT_TARGET,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.queue.checkedOutTarget.title', defaultMessage: 'Merge queue: merge into a checked-out branch', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: what the merge queue does when the branch it merges into (main, say) is checked out in a folder, usually the project folder, whose files then change." }),
     desc: msg({
       id: 'settings.advanced.hive.queue.checkedOutTarget.desc',
@@ -1013,7 +1013,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // A project's slots (#1429, SPEC §16.10.2): the pool keeps as many as the project has builders; idle ones beyond it go.
   {
     id: SLOTS_REMOVE_IDLE,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.slots.removeIdle.title', defaultMessage: 'Remove idle slots after a day', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. A slot is a worktree Hive lends to a card or a lane and gets back when it ends; free ones are kept ready." }),
     desc: msg({
       id: 'settings.advanced.hive.slots.removeIdle.desc',
@@ -1026,7 +1026,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: SLOTS_RENAME_ADOPTED,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.slots.renameAdopted.title', defaultMessage: 'Rename adopted worktrees to slot names', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. At the upgrade to 1.0, agents' own worktrees became slots (worktrees Hive lends to a card or a lane), keeping their folder names." }),
     desc: msg({
       id: 'settings.advanced.hive.slots.renameAdopted.desc',
@@ -1039,7 +1039,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: SLOTS_DELETE_MERGED,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.slots.deleteMergedLines.title', defaultMessage: "Delete a card's branch once it's merged", description: "An advanced setting's title (Settings → Advanced), listed under Combwork. Each card built in a slot (a worktree Hive lends) gets a branch of its own." }),
     desc: msg({
       id: 'settings.advanced.hive.slots.deleteMergedLines.desc',
@@ -1052,7 +1052,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: SLOTS_SETUP_MINUTES,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.slots.setupMinutes.title', defaultMessage: 'Slots: longest a setup command runs', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (\"60 min\"). A slot is a worktree Hive lends to a card or a lane." }),
     desc: msg({
       id: 'settings.advanced.hive.slots.setupMinutes.desc',
@@ -1069,7 +1069,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // Lanes nothing will wake the Assistant about (HI-2069): told so as its turn ends.
   {
     id: LANES_UNWATCHED_NOTICE,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.lanes.unwatchedNotice.title', defaultMessage: 'Lanes: remind the Assistant to watch them', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. A lane is a card loop: a builder and a reviewer taking cards in turn; the Assistant is the Hive Assistant." }),
     desc: msg({
       id: 'settings.advanced.hive.lanes.unwatchedNotice.desc',
@@ -1083,7 +1083,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // A process an agent's command left running (HI-2111): a notice and a line to the agent, once each.
   {
     id: ORPHAN_NOTICE,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.processes.orphanNotice.title', defaultMessage: 'Processes left running: tell me and the agent', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: a process an agent's command left running, its shell gone, is told in a notice and to the agent." }),
     desc: msg({
       id: 'settings.advanced.hive.processes.orphanNotice.desc',
@@ -1097,7 +1097,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // A lane's end (HI-1706, SPEC §16.10.2): its builder finishes its turn, is told, and its CLI exits by itself.
   {
     id: LANES_GENTLE_END,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.lanes.gentleEnd.title', defaultMessage: "Lanes: let the builder finish when its lane ends", description: "An advanced setting's title (Settings → Advanced), listed under Combwork. A lane is a card loop: a builder and a reviewer taking cards in turn." }),
     desc: msg({
       id: 'settings.advanced.hive.lanes.gentleEnd.desc',
@@ -1110,7 +1110,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: LANES_END_WAIT_MINUTES,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.lanes.endWaitMinutes.title', defaultMessage: "Lanes: longest a lane's end waits for its builder", description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (\"10 min\"). A lane is a card loop: a builder and a reviewer taking cards in turn." }),
     desc: msg({
       id: 'settings.advanced.hive.lanes.endWaitMinutes.desc',
@@ -1126,7 +1126,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: LANES_FRESH_START_WAIT_MINUTES,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.lanes.freshStartWaitMinutes.title', defaultMessage: "Lanes: longest Combwork waits to start a busy agent afresh", description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (\"10 min\"). A lane is a card loop: a builder and a reviewer taking cards in turn." }),
     desc: msg({
       id: 'settings.advanced.hive.lanes.freshStartWaitMinutes.desc',
@@ -1143,7 +1143,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // Review and check copies (#1435, SPEC §16.10.5, §16.13): reviewers read and run commands in a copy at the exact revision.
   {
     id: USAGE_MOVES,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.accounts.usageMoves.title', defaultMessage: 'Move agents at a usage threshold', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. An account in Settings → Accounts & Connections can move its agents to another account when it has used a share of its plan's limit." }),
     desc: msg({ id: 'settings.advanced.hive.accounts.usageMoves.desc', defaultMessage: "Move an account's agents to another account when it reaches the share of its limit set on it in Settings → Accounts & Connections. Turned off, no account moves its agents and moves waiting for an agent's turn to end are dropped; the rules are kept.", description: 'What the advanced setting "Move agents at a usage threshold" does (Settings → Advanced, under Combwork). Settings → Accounts & Connections names a section.' }),
     kind: 'boolean',
@@ -1152,7 +1152,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: COPIES_REVIEW,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.copies.review.title', defaultMessage: 'Reviewers review in review copies', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. A review copy is a folder Hive keeps at the exact revision a reviewer reviews, which nothing else writes." }),
     desc: msg({
       id: 'settings.advanced.hive.copies.review.desc',
@@ -1165,7 +1165,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: COPIES_QUIET_WAIT,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.copies.quietWaitMinutes.title', defaultMessage: 'Copies: wait for one to be free', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (\"10 min\"). A copy is a folder Hive keeps at one revision for a review or an isolated check." }),
     desc: msg({
       id: 'settings.advanced.hive.copies.quietWaitMinutes.desc',
@@ -1181,7 +1181,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: NONE_BASELINE_SECONDS,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.none.baselineSeconds.title', defaultMessage: 'No version control: longest read of the project', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"120 s\"). In a project without version control, Hive reads every file of the project in the background when a card starts." }),
     desc: msg({
       id: 'settings.advanced.hive.none.baselineSeconds.desc',
@@ -1199,7 +1199,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // handling, the same for every CLI, so one row each. Each defaults to what Hive did before.
   {
     id: CTRL_CV_TO_CLI,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.terminal.ctrlCVToCli.title', defaultMessage: 'Ctrl+C and Ctrl+V go to the CLI', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. Ctrl+C and Ctrl+V name keys: use the key names your language uses." }),
     desc: msg({
       id: 'settings.advanced.hive.terminal.ctrlCVToCli.desc',
@@ -1212,7 +1212,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: ASSISTANT_START_VIEW,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.assistant.startView.title', defaultMessage: "The Assistant starts with Combwork's start view", description: "An advanced setting's title (Settings → Advanced), listed under Combwork. The start view is what Hive tells the Hive Assistant of the workspace's state as it starts." }),
     desc: msg({
       id: 'settings.advanced.hive.assistant.startView.desc',
@@ -1226,7 +1226,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: JOURNAL_BUILDS,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.journal.builds.title', defaultMessage: 'Record builds in the journal', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. The journal is the Hive Assistant's record of decisions and events; builds are installers made from Hive's own source code." }),
     desc: msg({
       id: 'settings.advanced.hive.journal.builds.desc',
@@ -1239,7 +1239,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: CARD_TITLE_NUDGE,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.cards.titleNudgeChars.title', defaultMessage: "Suggest a shorter title past", description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in characters (\"80 characters\"): the length of a card title an agent writes past which Hive suggests a shorter one." }),
     desc: msg({
       id: 'settings.advanced.hive.cards.titleNudgeChars.desc',
@@ -1255,7 +1255,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: PROMPT_AS_TYPED,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.prompt.asTyped.title', defaultMessage: 'Send prompts as typed', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: the prompts Hive itself types into agents' CLIs." }),
     desc: msg({
       id: 'settings.advanced.hive.prompt.asTyped.desc',
@@ -1268,7 +1268,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: PROMPT_CLEAR_DRAFT,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.prompt.clearDraft.title', defaultMessage: "Clear the CLI's draft before Combwork types", description: "An advanced setting's title (Settings → Advanced), listed under Combwork. The draft is text left in the input of an agent's CLI, not sent yet." }),
     desc: msg({
       id: 'settings.advanced.hive.prompt.clearDraft.desc',
@@ -1282,7 +1282,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // The three terminal switches Darren chose (#1292, #966 rows 26, 27, 30; #1120 point 5): each as Hive did by default.
   {
     id: ALL_KEYS_TO_CLI,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.terminal.allKeysToCli.title', defaultMessage: 'All keys go to the CLI', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: every key pressed in an agent's pane goes to its CLI." }),
     desc: msg({
       id: 'settings.advanced.hive.terminal.allKeysToCli.desc',
@@ -1295,7 +1295,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: OSC52_POLICY,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.terminal.osc52.title', defaultMessage: 'A CLI putting text on the clipboard', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: what Hive does when an agent's CLI asks to set the clipboard (OSC 52)." }),
     desc: msg({
       id: 'settings.advanced.hive.terminal.osc52.desc',
@@ -1313,7 +1313,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: RAW_CARD_START,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.prompt.rawCardStart.title', defaultMessage: "A card's start in its own words", description: "An advanced setting's title (Settings → Advanced), listed under Combwork: what Hive types into an agent when a card is started on it." }),
     desc: msg({
       id: 'settings.advanced.hive.prompt.rawCardStart.desc',
@@ -1328,7 +1328,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // and its own guidance have no switch (row 14): without them it is no Assistant, only an agent.
   {
     id: HIVE_GUIDANCE,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.guidance.title', defaultMessage: "Combwork's guidance for agents", description: "An advanced setting's title (Settings → Advanced), listed under Combwork: the instructions Hive gives project agents on how to work with it." }),
     desc: msg({
       id: 'settings.advanced.hive.guidance.desc',
@@ -1342,7 +1342,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // Workspace notes (#1433, #873): machine-specific notes reach every agent at launch, in any folder and on every CLI.
   {
     id: DELIVER_WORKSPACE_NOTES,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.notes.deliverWorkspaceNotes.title', defaultMessage: 'Deliver workspace notes to agents', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: Hive gives every agent the shared note Workspace notes when it starts." }),
     desc: msg({
       id: 'settings.advanced.hive.notes.deliverWorkspaceNotes.desc',
@@ -1355,7 +1355,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: WORKSPACE_NOTES_MAX_ID,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.notes.workspaceNotesMax.title', defaultMessage: 'Workspace notes: most an agent gets', description: "An advanced setting's title (Settings → Advanced), followed by its value in bytes: how much of the shared note Workspace notes an agent's instructions get at most." }),
     desc: msg({
       id: 'settings.advanced.hive.notes.workspaceNotesMax.desc',
@@ -1371,7 +1371,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: CARD_ATTACHMENT_MAX_ID,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.cards.attachmentMax.title', defaultMessage: 'Card attachments: largest file', description: "An advanced setting's title (Settings → Advanced), followed by its value in bytes: the largest file Hive keeps with a card (pasted, dropped or attached to it)." }),
     desc: msg({
       id: 'settings.advanced.hive.cards.attachmentMax.desc',
@@ -1388,7 +1388,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // HI-2480: a folder of the user's own for test evidence (excluded from Defender, say) instead of copying into Temp.
   {
     id: CARD_ATTACHMENT_FOLDERS_ID,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.cards.attachmentFolders.title', defaultMessage: 'Card attachments: more folders', description: "An advanced setting's title (Settings → Advanced), followed by a list of folders: where else agents may attach files to a card from." }),
     desc: msg({
       id: 'settings.advanced.hive.cards.attachmentFolders.desc',
@@ -1405,7 +1405,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // HI-2496: agents' scratchpads and temp files in a folder of the user's own (excluded from Defender, say), not the system Temp.
   {
     id: AGENT_TEMP_FOLDER_ID,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.agents.tempFolder.title', defaultMessage: "Agents' temp folder", description: "An advanced setting's title (Settings → Advanced), followed by a folder: where agents' own temporary files go instead of Windows' Temp folder." }),
     desc: msg({
       id: 'settings.advanced.hive.agents.tempFolder.desc',
@@ -1423,7 +1423,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // folder would still see them. Removed by default where Hive's own folders are (slots), kept in the project folder.
   {
     id: SKILLS_REMOVE_IDLE_COPIES,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.skills.removeIdleCopies.title', defaultMessage: "Remove Combwork's skill copies when no agent works in the folder", description: "An advanced setting's title (Settings → Advanced), listed under Combwork: the copies of Hive's skills it puts in a folder for Codex and Copilot." }),
     desc: msg({
       id: 'settings.advanced.hive.skills.removeIdleCopies.desc',
@@ -1444,7 +1444,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // apart from whether it can read one (its hive tools). None drops an item: off, it stays in the inbox.
   {
     id: INBOX_SWITCH_ID.checkpoints,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.inbox.checkpoints.title', defaultMessage: 'Tell a working agent at the end of a tool', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: Hive tells a busy agent what has arrived in its inbox each time one of its tool calls ends." }),
     desc: msg({
       id: 'settings.advanced.hive.inbox.checkpoints.desc',
@@ -1457,7 +1457,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: INBOX_SWITCH_ID.stopContinuation,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.inbox.stopContinuation.title', defaultMessage: 'Keep an agent going when it stops with unread items', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: when an agent is about to end its turn with items in its inbox it hasn't read, Hive makes it carry on and read them." }),
     desc: msg({
       id: 'settings.advanced.hive.inbox.stopContinuation.desc',
@@ -1470,7 +1470,7 @@ const SOURCES: readonly AdvancedSource[] = [
   },
   {
     id: INBOX_SWITCH_ID.idleWakes,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.inbox.idleWakes.title', defaultMessage: 'Wake an idle agent', description: "An advanced setting's title (Settings → Advanced), listed under Combwork: Hive types a short line into an idle agent's terminal to tell it something has arrived in its inbox." }),
     desc: msg({
       id: 'settings.advanced.hive.inbox.idleWakes.desc',
@@ -1484,7 +1484,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // The usage history's timeline detail (HI-1648, Darren 27 Oct): sessions that ended longer ago are kept in 1-hour steps.
   {
     id: USAGE_TIMELINE_DETAIL_DAYS,
-    group: 'hive',
+    group: 'cw',
     title: msg({ id: 'settings.advanced.hive.usage.timelineDetailDays.title', defaultMessage: 'Usage history: keep full detail for', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in days (\"14 days\"). The usage history is the record Hive keeps of what each session used." }),
     desc: msg({
       id: 'settings.advanced.hive.usage.timelineDetailDays.desc',
@@ -1502,7 +1502,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.trust.prompt',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.trust.prompt.title', defaultMessage: 'Trust question', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.trust.prompt.title', defaultMessage: 'Trust question', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.trust.prompt.desc', defaultMessage: "Claude Code's question before a folder's first session. Combwork shows the agent as waiting for you while it is on screen.", description: 'What the advanced setting "Trust question" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
     default: 'trust this folder', // i18n-ignore: a CLI's recorded text (#367)
@@ -1518,7 +1518,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.signIn.stopError',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.signIn.stopError.title', defaultMessage: 'Sign-in refused: StopFailure error', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.signIn.stopError.title', defaultMessage: 'Sign-in refused: StopFailure error', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.signIn.stopError.desc', defaultMessage: "The error a StopFailure hook names when Claude Code's sign-in was refused (expired, revoked, an invalid key): Combwork shows the agent signed out and offers to carry on once it's renewed (#309). Any other error ends the turn as failed.", description: 'What the advanced setting "Sign-in refused: StopFailure error" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'text',
     default: 'authentication_failed',
@@ -1533,7 +1533,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: outagePatternId('claude-code'),
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.outage.connectionError.title', defaultMessage: 'Connection dropped: StopFailure message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.outage.connectionError.title', defaultMessage: 'Connection dropped: StopFailure message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.outage.connectionError.desc', defaultMessage: "What a StopFailure hook's message says when Claude Code couldn't reach its API after its retries: with Resume agents after a connection drops on, Combwork waits for the connection and resumes the agent. Wrong, such agents stay stopped.", description: 'What the advanced setting "Connection dropped: StopFailure message" is for, and what goes wrong when it is wrong (Settings → Advanced). Resume agents after a connection drops is the title of another advanced setting.' }),
     kind: 'pattern',
     default: String.raw`\b(?:ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ECONNRESET|ETIMEDOUT|ENETUNREACH|EHOSTUNREACH|ENETDOWN)\b|Connection refused|Can't reach the API server|Connection error|Request timed out`,
@@ -1548,7 +1548,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.exit.command',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.exit.command.title', defaultMessage: "Lane's end: exit command", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.exit.command.title', defaultMessage: "Lane's end: exit command", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.exit.command.desc', defaultMessage: "What Combwork types into Claude Code, then Enter, to end it once its lane has ended and its turn is over, so it exits by itself rather than being killed. Wrong, Claude Code isn't ended by it and is killed after the exit grace.", description: 'What the advanced setting "Lane\'s end: exit command" is for, and what goes wrong when it is wrong (Settings → Advanced). A lane is a card loop.' }),
     kind: 'text',
     default: '/exit',
@@ -1558,7 +1558,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.exit.graceSeconds',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.exit.graceSeconds.title', defaultMessage: "Lane's end: exit grace", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.exit.graceSeconds.title', defaultMessage: "Lane's end: exit grace", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: withValues(msg({ id: 'settings.advanced.claude-code.exit.graceSeconds.desc', defaultMessage: "How long Combwork gives Claude Code to exit by itself after typing its exit command at a lane's end, before killing it. It took {took, plural, one {# second} other {# seconds}} when recorded.", description: 'What the advanced setting "Lane\'s end: exit grace" is for (Settings → Advanced). {took} is how long Claude Code took to exit when recorded, in seconds (1.9).' }), { took: 1.9 }),
     kind: 'number',
     default: 10,
@@ -1572,7 +1572,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.accounts.statusSeconds',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.accounts.statusSeconds.title', defaultMessage: 'Connections: sign-in check timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.accounts.statusSeconds.title', defaultMessage: 'Connections: sign-in check timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.accounts.statusSeconds.desc', defaultMessage: "How long Combwork gives `claude auth status` to say who a connection's folder is signed in as. Past it, the connection shows \"Couldn't check\", never signed out.", description: 'What the advanced setting "Connections: sign-in check timeout" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status` as it is (a command).' }),
     kind: 'number',
     default: 10,
@@ -1585,7 +1585,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.accounts.loggedInField',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.accounts.loggedInField.title', defaultMessage: 'Connections: signed-in field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.accounts.loggedInField.title', defaultMessage: 'Connections: signed-in field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.accounts.loggedInField.desc', defaultMessage: "The field of `claude auth status --json` that says whether a connection's folder is signed in. Wrong, Combwork can't tell, and its sign-in connections show \"Couldn't check\".", description: 'What the advanced setting "Connections: signed-in field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is (a command).' }),
     kind: 'field',
     default: 'loggedIn',
@@ -1598,7 +1598,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.accounts.emailField',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.accounts.emailField.title', defaultMessage: 'Connections: email field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.accounts.emailField.title', defaultMessage: 'Connections: email field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.accounts.emailField.desc', defaultMessage: "The field of `claude auth status --json` with the email a connection's folder is signed in as. Wrong, Combwork can't tell who a connection is signed in as, and can't warn when its login changes.", description: 'What the advanced setting "Connections: email field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is (a command).' }),
     kind: 'field',
     default: 'email',
@@ -1608,7 +1608,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.accounts.orgField',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.accounts.orgField.title', defaultMessage: 'Connections: organisation field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.accounts.orgField.title', defaultMessage: 'Connections: organisation field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.accounts.orgField.desc', defaultMessage: "The field of `claude auth status --json` with the organisation's id a connection's folder is signed in to. With the email, it tells two logins apart. Wrong, Combwork can't tell who a connection is signed in as.", description: 'What the advanced setting "Connections: organisation field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is (a command).' }),
     kind: 'field',
     default: 'orgId',
@@ -1618,7 +1618,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.accounts.planField',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.accounts.planField.title', defaultMessage: 'Connections: plan field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.accounts.planField.title', defaultMessage: 'Connections: plan field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.accounts.planField.desc', defaultMessage: "The field of `claude auth status --json` with a connection's plan (\"max\"), shown beside its email in Settings → Accounts & Connections. Wrong, no plan is shown.", description: 'What the advanced setting "Connections: plan field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` and "max" as they are.' }),
     kind: 'field',
     default: 'subscriptionType',
@@ -1628,7 +1628,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.accounts.onboardedField',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.accounts.onboardedField.title', defaultMessage: 'Connections: set-up field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.accounts.onboardedField.title', defaultMessage: 'Connections: set-up field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.accounts.onboardedField.desc', defaultMessage: "The field of a connection folder's `.claude.json` that says Claude Code's first-run screens were answered there (read only). Wrong, every Claude Code connection shows \"Needs set up\" in Settings → Accounts & Connections.", description: 'What the advanced setting "Connections: set-up field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `.claude.json` as it is (a file name); "Needs set up" is a state Hive shows: use its name as Hive shows it.' }),
     kind: 'field',
     default: 'hasCompletedOnboarding',
@@ -1638,7 +1638,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.accounts.trustField',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.accounts.trustField.title', defaultMessage: 'Connections: trusted folder field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.accounts.trustField.title', defaultMessage: 'Connections: trusted folder field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.accounts.trustField.desc', defaultMessage: "The field of a folder's entry under `projects` in a connection folder's `.claude.json` that says Claude Code was told to trust that folder (read only). Wrong, every Claude Code connection on in a workspace shows \"Needs set up\" in Settings → Accounts & Connections.", description: 'What the advanced setting "Connections: trusted folder field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `projects` and `.claude.json` as they are; "Needs set up" is a state Hive shows: use its name as Hive shows it.' }),
     kind: 'field',
     default: 'hasTrustDialogAccepted',
@@ -1648,7 +1648,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.accounts.loginFiles',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.accounts.loginFiles.title', defaultMessage: 'Connections: login files', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.accounts.loginFiles.title', defaultMessage: 'Connections: login files', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.accounts.loginFiles.desc', defaultMessage: "The names of the files in a connection's folder that change when Claude Code signs in or out there, as a regular expression. Combwork watches them (it never reads them) and checks the connection again when one changes. Wrong, a /login or /logout typed in an agent's pane is only found at the connection's next check.", description: 'What the advanced setting "Connections: login files" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep /login and /logout as they are (commands).' }),
     kind: 'pattern',
     default: String.raw`^\.(claude|credentials)\.json(\.tmp\.|$)`,
@@ -1662,7 +1662,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.accounts.dropEnv',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.accounts.dropEnv.title', defaultMessage: 'Connections: sign-in variables left out', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.accounts.dropEnv.title', defaultMessage: 'Connections: sign-in variables left out', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.accounts.dropEnv.desc', defaultMessage: "The environment variables Combwork leaves out when it runs Claude Code on a connection (its sign-in, its checks, Set Up and its agents), by name: a key, token, request header, server, provider switch or model set on this PC can't stand in for the connection's own. A server connection's own (its server, key and models) are set after. Wrong, a variable Claude Code reads as a login, a header or a server could make a connection run as someone else, or send a key elsewhere.", description: 'What the advanced setting "Connections: sign-in variables left out" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
     // Every ANTHROPIC_* (keys, tokens, ANTHROPIC_CUSTOM_HEADERS, base URLs, models and their names), the provider
@@ -1679,7 +1679,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.connections.remoteModels',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.connections.remoteModels.title', defaultMessage: 'Connections: Ollama cloud models', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Ollama is a product's name; its cloud models run on ollama.com." }),
+    title: msg({ id: 'settings.advanced.claude-code.connections.remoteModels.title', defaultMessage: 'Connections: Ollama cloud models', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Ollama is a product's name; its cloud models run on ollama.com." }),
     desc: msg({ id: 'settings.advanced.claude-code.connections.remoteModels.desc', defaultMessage: "The model names Ollama runs on ollama.com rather than on this PC (its cloud models, such as gpt-oss:120b-cloud), as a regular expression, for an Ollama connection's models typed in rather than read from Ollama (Read Models asks Ollama, which says). Such a connection's sessions aren't free (local). Wrong, a cloud model typed in is counted as free, or a local one as not free.", description: 'What the advanced setting "Connections: Ollama cloud models" is for, and what goes wrong when it is wrong (Settings → Advanced). Ollama, ollama.com and Read Models (a button) are names; "free (local)" is how Hive shows the cost of sessions run only on this PC.' }),
     kind: 'pattern',
     // A tag of `cloud`, or one ending in `-cloud` (Ollama's earlier cloud models), never a name's own `-cloud`.
@@ -1695,7 +1695,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.statusLine.rateLimits',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.statusLine.rateLimits.title', defaultMessage: 'Status line: plan limits field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.statusLine.rateLimits.title', defaultMessage: 'Status line: plan limits field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.statusLine.rateLimits.desc', defaultMessage: "The status line's field with a subscription's limits (the 5-hour and weekly use the status bar shows). Wrong, Combwork shows no plan limits for Claude Code.", description: 'What the advanced setting "Status line: plan limits field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'rate_limits',
@@ -1705,7 +1705,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.statusLine.fiveHour',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.statusLine.fiveHour.title', defaultMessage: 'Status line: 5-hour limit field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.statusLine.fiveHour.title', defaultMessage: 'Status line: 5-hour limit field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.statusLine.fiveHour.desc', defaultMessage: "The plan limits' field for the 5-hour window.", description: 'What the advanced setting "Status line: 5-hour limit field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'five_hour',
@@ -1715,7 +1715,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.statusLine.weekly',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.statusLine.weekly.title', defaultMessage: 'Status line: weekly limit field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.statusLine.weekly.title', defaultMessage: 'Status line: weekly limit field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.statusLine.weekly.desc', defaultMessage: "The plan limits' field for the weekly window.", description: 'What the advanced setting "Status line: weekly limit field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'seven_day',
@@ -1725,7 +1725,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.statusLine.usedPercent',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.statusLine.usedPercent.title', defaultMessage: 'Status line: percentage used field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.statusLine.usedPercent.title', defaultMessage: 'Status line: percentage used field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.statusLine.usedPercent.desc', defaultMessage: "A limit's field with the percentage used.", description: 'What the advanced setting "Status line: percentage used field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'used_percentage',
@@ -1735,7 +1735,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.subagent.launched',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.subagent.launched.title', defaultMessage: 'Transcript: background subagent launched', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.subagent.launched.title', defaultMessage: 'Transcript: background subagent launched', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.subagent.launched.desc', defaultMessage: "The status of the Agent tool's result when it runs a subagent (or a workflow) in the background (#1584). Wrong, Combwork doesn't count those subagents, and shows the agent finished while they work.", description: 'What the advanced setting "Transcript: background subagent launched" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'text',
     default: 'async_launched',
@@ -1745,7 +1745,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.subagent.idField',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.subagent.idField.title', defaultMessage: "Transcript: background subagent's id field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.subagent.idField.title', defaultMessage: "Transcript: background subagent's id field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.subagent.idField.desc', defaultMessage: "The field of that result with the subagent's id, which its notification names when it ends. Wrong, Combwork doesn't count background subagents.", description: 'What the advanced setting "Transcript: background subagent\'s id field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'agentId',
@@ -1755,7 +1755,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.subagent.descriptionField',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.subagent.descriptionField.title', defaultMessage: "Transcript: background subagent's description field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.subagent.descriptionField.title', defaultMessage: "Transcript: background subagent's description field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.subagent.descriptionField.desc', defaultMessage: 'The field of that result with what the subagent was asked to do, in a few words. Wrong, Combwork still counts it but has no description of it.', description: 'What the advanced setting "Transcript: background subagent\'s description field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'description',
@@ -1765,7 +1765,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.subagent.resumedField',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.subagent.resumedField.title', defaultMessage: 'Transcript: resumed subagent field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.subagent.resumedField.title', defaultMessage: 'Transcript: resumed subagent field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.subagent.resumedField.desc', defaultMessage: "The field of a message's result with the id of a finished subagent the message started again. Wrong, Combwork doesn't count a resumed subagent while it works.", description: 'What the advanced setting "Transcript: resumed subagent field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'resumedAgentId',
@@ -1776,7 +1776,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.retry.subtype',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.retry.subtype.title', defaultMessage: 'Transcript: retry entry', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A retry: the coding agent trying its model request again after it failed." }),
+    title: msg({ id: 'settings.advanced.claude-code.retry.subtype.title', defaultMessage: 'Transcript: retry entry', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A retry: the coding agent trying its model request again after it failed." }),
     desc: msg({ id: 'settings.advanced.claude-code.retry.subtype.desc', defaultMessage: "The kind of transcript entry Claude Code writes each time its model request fails and it tries again (rate-limited, or the service unreachable). Combwork reads the latest and shows the wait as the agent's status. Wrong, a waiting agent just shows Working.", description: 'What the advanced setting "Transcript: retry entry" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'text',
     default: 'api_error',
@@ -1786,7 +1786,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.retry.attemptField',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.retry.attemptField.title', defaultMessage: "Transcript: retry entry's try field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.retry.attemptField.title', defaultMessage: "Transcript: retry entry's try field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.retry.attemptField.desc', defaultMessage: "The field of that entry with which try it is (1, 2…). Wrong, a waiting agent just shows Working.", description: 'What the advanced setting "Transcript: retry entry\'s try field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'retryAttempt',
@@ -1796,7 +1796,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.retry.maxField',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.retry.maxField.title', defaultMessage: "Transcript: retry entry's tries field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.retry.maxField.title', defaultMessage: "Transcript: retry entry's tries field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.retry.maxField.desc', defaultMessage: 'The field of that entry with how many tries it makes in all. Wrong, a waiting agent just shows Working.', description: 'What the advanced setting "Transcript: retry entry\'s tries field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'maxRetries',
@@ -1806,7 +1806,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.retry.waitField',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.retry.waitField.title', defaultMessage: "Transcript: retry entry's wait field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.retry.waitField.title', defaultMessage: "Transcript: retry entry's wait field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.retry.waitField.desc', defaultMessage: 'The field of that entry with how long Claude Code waits before the next try, in milliseconds. Wrong, a waiting agent just shows Working.', description: 'What the advanced setting "Transcript: retry entry\'s wait field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'retryInMs',
@@ -1816,7 +1816,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.retry.statusField',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.retry.statusField.title', defaultMessage: "Transcript: retry error's status field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.retry.statusField.title', defaultMessage: "Transcript: retry error's status field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.retry.statusField.desc', defaultMessage: "The field of that entry's error with the HTTP status that refused the request (429: rate-limited). With none, the service couldn't be reached. Wrong, every wait shows as the service unreachable.", description: 'What the advanced setting "Transcript: retry error\'s status field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'status',
@@ -1839,7 +1839,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.hooks.timeoutSeconds',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.hooks.timeoutSeconds.title', defaultMessage: 'Hooks: timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.hooks.timeoutSeconds.title', defaultMessage: 'Hooks: timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.hooks.timeoutSeconds.desc', defaultMessage: "How long Claude Code waits for Combwork to take one of its hooks (a turn starting or ending, a notification). Combwork answers at once; raise it only if Combwork's log shows hooks timing out on a slow machine.", description: 'What the advanced setting "Hooks: timeout" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 5,
@@ -1852,7 +1852,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.hooks.preToolUseTimeoutSeconds',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.hooks.preToolUseTimeoutSeconds.title', defaultMessage: 'Hooks: before a tool, timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.hooks.preToolUseTimeoutSeconds.title', defaultMessage: 'Hooks: before a tool, timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.hooks.preToolUseTimeoutSeconds.desc', defaultMessage: "How long Claude Code waits for Combwork's answer before a tool runs (an edit waits for a file lock). If Combwork doesn't answer in time, the tool goes ahead.", description: 'What the advanced setting "Hooks: before a tool, timeout" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 10,
@@ -1865,7 +1865,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.turnScreen.done',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.turnScreen.done.title', defaultMessage: 'Screen: turn done', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.turnScreen.done.title', defaultMessage: 'Screen: turn done', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.turnScreen.done.desc', defaultMessage: 'Claude Code\'s line above its input when the last turn is done ("✻ Worked for 12s · done 16:52"). When Combwork missed a turn\'s end, it takes this on screen to mean the agent is idle; wrong, it leaves such an agent\'s status unknown, with Mark idle.', description: 'What the advanced setting "Screen: turn done" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
     default: String.raw`\bfor (?:\d+[hms]\s*)+· done \d{1,2}:\d{2}\b`,
@@ -1876,7 +1876,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.prompt.cliTurn',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.prompt.cliTurn.title', defaultMessage: "Prompt hook: Claude Code's own turn", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.prompt.cliTurn.title', defaultMessage: "Prompt hook: Claude Code's own turn", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.prompt.cliTurn.desc', defaultMessage: "What a prompt hook's text starts with when Claude Code starts a turn by itself, such as when a background task ends. Combwork never reports such a turn to the Assistant as your reply. Wrong, a background task's end soon after you pressed Enter in the agent's pane can be reported as your reply.", description: 'What the advanced setting "Prompt hook: Claude Code\'s own turn" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
     default: String.raw`^\s*<task-notification>`,
@@ -1886,7 +1886,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.safeguard.note',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.safeguard.note.title', defaultMessage: 'Safeguard stop: transcript note', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.safeguard.note.title', defaultMessage: 'Safeguard stop: transcript note', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.safeguard.note.desc', defaultMessage: "Claude Code's note in its transcript when its safety classifier stops a response, and the notice it adds for the model (#606). Wrong, Combwork misses such stops: no shield on the agent's pane, and Performance doesn't count them.", description: 'What the advanced setting "Safeguard stop: transcript note" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
     default: SAFEGUARD_DEFAULTS.claudeNote,
@@ -1900,7 +1900,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.safeguard.prompt',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.safeguard.prompt.title', defaultMessage: 'Safeguard stop: question', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.safeguard.prompt.title', defaultMessage: 'Safeguard stop: question', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.safeguard.prompt.desc', defaultMessage: 'Claude Code\'s question after a safeguard stop, whether to switch models, told by its open dialog\'s choices in the lines it wrote last. Combwork shows the agent waiting for you, and why, while it is open; wrong, the agent shows only "Claude needs your permission".', description: 'What the advanced setting "Safeguard stop: question" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
     default: SAFEGUARD_DEFAULTS.claudePrompt,
@@ -1911,7 +1911,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.screen.idleQuestion',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.screen.idleQuestion.title', defaultMessage: 'Screen: question while idle', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.screen.idleQuestion.title', defaultMessage: 'Screen: question while idle', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.screen.idleQuestion.desc', defaultMessage: "A question Claude Code puts on its screen by itself after a turn, sending Combwork nothing (\"Teach auto mode about your environment?\"), as a line of its own in a dialog that replaces its input box or is drawn under it (the same words above the input box, in a prompt or a reply, aren't it). While it shows, Combwork shows the agent waiting for you with the question, and types nothing into it: Enter would answer it. Wrong, Combwork types its wakes into the question.", description: 'What the advanced setting "Screen: question while idle" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959). The quoted question is Claude Code\'s own, in English: keep it as it is.' }),
     kind: 'pattern',
     default: String.raw`^[ \t]*Teach auto mode about your environment\?[ \t]*$`,
@@ -1926,7 +1926,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.screen.input',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.screen.input.title', defaultMessage: 'Screen: input box', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.screen.input.title', defaultMessage: 'Screen: input box', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.screen.input.desc', defaultMessage: "Claude Code's input box, between two rules, its first group what it holds after its prompt mark. Combwork reads it to tell that a line it typed is gone from the input (a screen of the CLI's took it), and then types it again. Wrong, such a line stays held, and nothing more is typed into the agent until you press Enter there.", description: 'What the advanced setting "Screen: input box" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959). A rule: a horizontal line drawn across the terminal.' }),
     kind: 'pattern',
     // Its prompt mark is ">" where the terminal doesn't say it shows Unicode (no TERM or WT_SESSION: a Hive started from the Start menu).
@@ -1940,7 +1940,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.prompt.clearKeySeconds',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.prompt.clearKeySeconds.title', defaultMessage: 'Clearing the input: wait for each key', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.prompt.clearKeySeconds.title', defaultMessage: 'Clearing the input: wait for each key', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.prompt.clearKeySeconds.desc', defaultMessage: "Claude Code's Ctrl+U deletes one row of a draft that wraps onto several, so before Combwork types into it, it presses Ctrl+U a key at a time until the input box (Screen: input box) shows empty. This is how long Combwork waits for Claude Code to show each key's effect. Not shown in time, Combwork types nothing and tries again later: too short, and a busy Claude Code makes Combwork put its messages off more often.", description: 'What the advanced setting "Clearing the input: wait for each key" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1979). Ctrl+U names keys: use the key names your language uses. "Screen: input box" is another advanced setting\'s title: use its translation.' }),
     kind: 'number',
     default: 2,
@@ -1953,7 +1953,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.autoModeSetup.offer',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.autoModeSetup.offer.title', defaultMessage: "Offer auto mode's environment setup", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Auto mode is one of Claude Code's permission modes." }),
+    title: msg({ id: 'settings.advanced.claude-code.autoModeSetup.offer.title', defaultMessage: "Offer auto mode's environment setup", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Auto mode is one of Claude Code's permission modes." }),
     desc: msg({ id: 'settings.advanced.claude-code.autoModeSetup.offer.desc', defaultMessage: "Claude Code offers, now and then in auto mode, to read the project, your recent sessions and optionally your shell history and other repositories, to teach auto mode about your environment. Combwork never answers it: the agent waits for you. Off, Combwork's Claude Code agents are started with the offer turned off for that launch (nothing is written to Claude Code's files, and auto mode decides as before); /auto-mode-setup still runs it when you want.", description: "What the advanced setting \"Offer auto mode's environment setup\" is for, and what happens when it is off (Settings → Advanced, HI-1959). /auto-mode-setup is Claude Code's command: keep it as it is." }),
     kind: 'boolean',
     default: true,
@@ -1983,7 +1983,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.memory.realPath',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.memory.realPath.title', defaultMessage: 'Auto memory by its real path on connections', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Auto memory is Claude Code's own notes it keeps per project; a connection is an account Hive signs a CLI in with." }),
+    title: msg({ id: 'settings.advanced.claude-code.memory.realPath.title', defaultMessage: 'Auto memory by its real path on connections', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Auto memory is Claude Code's own notes it keeps per project; a connection is an account Hive signs a CLI in with." }),
     desc: msg({ id: 'settings.advanced.claude-code.memory.realPath.desc', defaultMessage: "A connection's projects folder is a link to Claude Code's own, so Claude Code asked you before each memory it saved there. Each Claude Code agent on a connection is given its project's auto memory folder by its real path: the same folder, so it saves memories without asking, as it does without a connection. Nothing more is allowed, and nothing is written to Claude Code's files. Off, Claude Code asks before each memory on a connection.", description: "What the advanced setting \"Auto memory by its real path on connections\" is for, and what happens when it is off (Settings → Advanced, HI-1899). Auto memory is Claude Code's own notes it keeps per project; a connection is an account Hive signs a CLI in with; \"projects\" is a folder's name: keep it." }),
     kind: 'boolean',
     default: true,
@@ -1993,7 +1993,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.memory.setting',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.memory.setting.title', defaultMessage: 'Auto memory folder setting', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Auto memory is Claude Code's own notes it keeps per project." }),
+    title: msg({ id: 'settings.advanced.claude-code.memory.setting.title', defaultMessage: 'Auto memory folder setting', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Auto memory is Claude Code's own notes it keeps per project." }),
     desc: msg({ id: 'settings.advanced.claude-code.memory.setting.desc', defaultMessage: "The Claude Code setting that names its auto memory folder, which Combwork sets on a connection (Auto memory by its real path on connections) and leaves alone where you set it yourself. Wrong, Claude Code ignores it and asks before each memory on a connection.", description: "What the advanced setting \"Auto memory folder setting\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1899). \"Auto memory by its real path on connections\" is another advanced setting's title: keep it as translated there." }),
     kind: 'field',
     default: 'autoMemoryDirectory',
@@ -2004,7 +2004,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.trust.perLaunch',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.trust.perLaunch.title', defaultMessage: "Trust Combwork's folders on each launch", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.trust.perLaunch.title', defaultMessage: "Trust Combwork's folders on each launch", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.trust.perLaunch.desc', defaultMessage: "Each Codex agent is started with its own folder (its project, slot or review copy) trusted for that launch, so Codex doesn't ask whether to trust it. Nothing is written to Codex's files. Off, Codex asks once per project on each connection, and Set Up walks you through them.", description: 'What the advanced setting "Trust Hive\'s folders on each launch" is for, and what happens when it is off (Settings → Advanced, HI-1871). A slot and a review copy are folders Hive lends to agents.' }),
     kind: 'boolean',
     default: true,
@@ -2014,7 +2014,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.trust.prompt',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.trust.prompt.title', defaultMessage: 'Trust question', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.trust.prompt.title', defaultMessage: 'Trust question', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.trust.prompt.desc', defaultMessage: "Codex's question before a folder's first session (in a Git repository). Combwork shows the agent as waiting for you while it is on screen.", description: 'What the advanced setting "Trust question" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
     default: 'trust this folder', // i18n-ignore: a CLI's recorded text (#367)
@@ -2025,7 +2025,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.fullAccess.warning',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.fullAccess.warning.title', defaultMessage: 'Full Access warning', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Full Access is Codex's mode: keep it." }),
+    title: msg({ id: 'settings.advanced.codex.fullAccess.warning.title', defaultMessage: 'Full Access warning', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Full Access is Codex's mode: keep it." }),
     desc: msg({ id: 'settings.advanced.codex.fullAccess.warning.desc', defaultMessage: "Codex's own warning after Full Access is picked in its /permissions menu, which you answer in its terminal. While it is on screen, Combwork's switch to Full Access waits for your answer; if it doesn't match, Combwork may say Codex didn't confirm the switch while the warning is still waiting.", description: 'What the advanced setting "Full Access warning" is for, and what goes wrong when it is wrong (Settings → Advanced). Full Access and /permissions are Codex\'s: keep them.' }),
     kind: 'pattern',
     default: 'Enable full access\\?', // i18n-ignore: a CLI's recorded text (#367)
@@ -2036,7 +2036,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.fullAccess.warningAfterSeconds',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.fullAccess.warningAfterSeconds.title', defaultMessage: 'Full Access warning: time to appear', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Full Access is Codex's mode: keep it." }),
+    title: msg({ id: 'settings.advanced.codex.fullAccess.warningAfterSeconds.title', defaultMessage: 'Full Access warning: time to appear', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Full Access is Codex's mode: keep it." }),
     desc: msg({ id: 'settings.advanced.codex.fullAccess.warningAfterSeconds.desc', defaultMessage: "How long Codex has, after Combwork picks a preset in its /permissions menu before its first message, to show its own warning (Full Access). With no session file to read the switch back from, Combwork takes the preset as switched once this passes with no warning; raise it if a slow machine draws the warning later.", description: 'What the advanced setting "Full Access warning: time to appear" is for, and what goes wrong when it is wrong (Settings → Advanced). Full Access and /permissions are Codex\'s: keep them.' }),
     kind: 'number',
     default: 2,
@@ -2049,7 +2049,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.fullAccess.answerSeconds',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.fullAccess.answerSeconds.title', defaultMessage: 'Full Access warning: wait for your answer', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Full Access is Codex's mode: keep it." }),
+    title: msg({ id: 'settings.advanced.codex.fullAccess.answerSeconds.title', defaultMessage: 'Full Access warning: wait for your answer', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Full Access is Codex's mode: keep it." }),
     desc: msg({ id: 'settings.advanced.codex.fullAccess.answerSeconds.desc', defaultMessage: "How long Combwork's switch to Full Access waits for you to answer Codex's own warning in its terminal. Meanwhile Combwork types nothing into the agent; once it passes, Combwork says Codex didn't confirm the switch, and still notices it later if you answer Yes.", description: 'What the advanced setting "Full Access warning: wait for your answer" is for, and what goes wrong when it is wrong (Settings → Advanced). Full Access is Codex\'s: keep it.' }),
     kind: 'number',
     default: 600,
@@ -2062,7 +2062,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.ready.placeholder',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.ready.placeholder.title', defaultMessage: 'Composer placeholder', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.ready.placeholder.title', defaultMessage: 'Composer placeholder', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.ready.placeholder.desc', defaultMessage: "The text Codex's empty input shows. Codex only says it has started with the first prompt, so Combwork takes this text on screen to mean it is ready, and an input line showing only this to mean it is idle.", description: 'What the advanced setting "Composer placeholder" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'text',
     default: 'Ask Codex to do anything', // i18n-ignore: a CLI's recorded text (#367)
@@ -2072,7 +2072,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.signIn.expired',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.signIn.expired.title', defaultMessage: 'Sign-in refused: error message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.signIn.expired.title', defaultMessage: 'Sign-in refused: error message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.signIn.expired.desc', defaultMessage: "A turn's error, in Codex's session file, that means its sign-in was refused or has expired, when Codex doesn't mark the error itself (#309).", description: 'What the advanced setting "Sign-in refused: error message" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
     default: String.raw`^unexpected status 401 Unauthorized\b|access token could not be refreshed|refresh token (?:has expired|was already used|was revoked)`,
@@ -2085,7 +2085,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: outagePatternId('codex'),
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.outage.connectionError.title', defaultMessage: 'Connection dropped: error message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.outage.connectionError.title', defaultMessage: 'Connection dropped: error message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.outage.connectionError.desc', defaultMessage: "A turn's error, in Codex's session file, that means it lost its connection to its API: with Resume agents after a connection drops on, Combwork waits for the connection and resumes the agent. Wrong, such agents stay stopped.", description: 'What the advanced setting "Connection dropped: error message" is for, and what goes wrong when it is wrong (Settings → Advanced). Resume agents after a connection drops is the title of another advanced setting.' }),
     kind: 'pattern',
     default: String.raw`\b(?:ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ECONNRESET|ETIMEDOUT|ENETUNREACH|EHOSTUNREACH|ENETDOWN)\b|stream disconnected|Transport error|network error|error sending request|connection (?:refused|reset|closed)`,
@@ -2096,7 +2096,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.subagent.item',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.subagent.item.title', defaultMessage: "Session file: subagent's activity", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.subagent.item.title', defaultMessage: "Session file: subagent's activity", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.subagent.item.desc', defaultMessage: "The kind of item Codex records when a subagent it spawned starts or ends (#1584). Wrong, Combwork doesn't count Codex's subagents among an agent's background tasks.", description: 'What the advanced setting "Session file: subagent\'s activity" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'text',
     default: 'SubAgentActivity',
@@ -2106,7 +2106,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.subagent.started',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.subagent.started.title', defaultMessage: 'Session file: subagent started', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.subagent.started.title', defaultMessage: 'Session file: subagent started', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.subagent.started.desc', defaultMessage: "The kind of that activity when the subagent starts; any other kind ends it. Wrong, Combwork doesn't count Codex's subagents.", description: 'What the advanced setting "Session file: subagent started" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'text',
     default: 'started',
@@ -2116,7 +2116,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.subagent.threadField',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.subagent.threadField.title', defaultMessage: "Session file: subagent's thread field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.subagent.threadField.title', defaultMessage: "Session file: subagent's thread field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.subagent.threadField.desc', defaultMessage: "The field of that activity with the subagent's thread, which tells its start and its end apart from another's. Wrong, Combwork doesn't count Codex's subagents.", description: 'What the advanced setting "Session file: subagent\'s thread field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'agent_thread_id',
@@ -2126,7 +2126,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.subagent.taskField',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.subagent.taskField.title', defaultMessage: "Session file: subagent's task field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.subagent.taskField.title', defaultMessage: "Session file: subagent's task field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.subagent.taskField.desc', defaultMessage: "The field of that activity with the subagent's task name. Wrong, Combwork still counts it but has no description of it.", description: 'What the advanced setting "Session file: subagent\'s task field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'agent_path',
@@ -2136,7 +2136,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.rateLimits.field',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.rateLimits.field.title', defaultMessage: 'Session file: plan limits field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.rateLimits.field.title', defaultMessage: 'Session file: plan limits field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.rateLimits.field.desc', defaultMessage: "The field of Codex's token counts with a subscription's limits. Wrong, Combwork shows no plan limits for Codex.", description: 'What the advanced setting "Session file: plan limits field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'rate_limits',
@@ -2146,7 +2146,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.rateLimits.usedPercent',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.rateLimits.usedPercent.title', defaultMessage: 'Session file: percentage used field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.rateLimits.usedPercent.title', defaultMessage: 'Session file: percentage used field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.rateLimits.usedPercent.desc', defaultMessage: "A limit's field with the percentage used.", description: 'What the advanced setting "Session file: percentage used field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'used_percent',
@@ -2156,7 +2156,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.rateLimits.windowMinutes',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.rateLimits.windowMinutes.title', defaultMessage: "Session file: limit's window field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.rateLimits.windowMinutes.title', defaultMessage: "Session file: limit's window field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.rateLimits.windowMinutes.desc', defaultMessage: "A limit's field with its window in minutes (300 is the 5-hour limit, 10080 the weekly one).", description: 'What the advanced setting "Session file: limit\'s window field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'window_minutes',
@@ -2167,7 +2167,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.accounts.statusSeconds',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.accounts.statusSeconds.title', defaultMessage: 'Connections: sign-in check timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.accounts.statusSeconds.title', defaultMessage: 'Connections: sign-in check timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.accounts.statusSeconds.desc', defaultMessage: "How long Combwork gives Codex's app server to say who a connection's folder is signed in as (`account/read`). Past it, the connection shows \"Couldn't check\", never signed out.", description: 'What the advanced setting "Connections: sign-in check timeout" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `account/read` as it is (a request\'s name).' }),
     kind: 'number',
     default: 20,
@@ -2180,7 +2180,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.accounts.readMethod',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.accounts.readMethod.title', defaultMessage: 'Connections: sign-in request', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.accounts.readMethod.title', defaultMessage: 'Connections: sign-in request', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.accounts.readMethod.desc', defaultMessage: "The request Combwork sends Codex's app server to ask who a connection's folder is signed in as. Wrong, Combwork can't tell, and its Codex connections show \"Couldn't check\".", description: 'What the advanced setting "Connections: sign-in request" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'text',
     default: 'account/read',
@@ -2190,7 +2190,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.accounts.accountField',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.accounts.accountField.title', defaultMessage: 'Connections: account field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.accounts.accountField.title', defaultMessage: 'Connections: account field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.accounts.accountField.desc', defaultMessage: "The field of Codex's sign-in answer with the account a connection's folder is signed in as (empty when it is signed out). Wrong, Combwork can't tell, and its Codex connections show \"Couldn't check\".", description: 'What the advanced setting "Connections: account field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'account',
@@ -2200,7 +2200,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.accounts.emailField',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.accounts.emailField.title', defaultMessage: 'Connections: email field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.accounts.emailField.title', defaultMessage: 'Connections: email field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.accounts.emailField.desc', defaultMessage: "The field of Codex's account with the email a connection's folder is signed in as. Wrong, Combwork can't tell who a connection is signed in as, and can't warn when its login changes.", description: 'What the advanced setting "Connections: email field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'email',
@@ -2210,7 +2210,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.accounts.planField',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.accounts.planField.title', defaultMessage: 'Connections: plan field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.accounts.planField.title', defaultMessage: 'Connections: plan field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.accounts.planField.desc', defaultMessage: "The field of Codex's account with a connection's plan (\"plus\", \"pro\"), shown beside its email in Settings → Accounts & Connections. Wrong, no plan is shown.", description: 'What the advanced setting "Connections: plan field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep "plus" and "pro" as they are (plan names).' }),
     kind: 'field',
     default: 'planType',
@@ -2220,7 +2220,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.accounts.loginFiles',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.accounts.loginFiles.title', defaultMessage: 'Connections: login files', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.accounts.loginFiles.title', defaultMessage: 'Connections: login files', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.accounts.loginFiles.desc', defaultMessage: "The names of the files in a connection's folder that change when Codex signs in or out there, as a regular expression. Combwork watches them (it never reads them) and checks the connection again when one changes. Wrong, a sign-in or sign-out in an agent's pane is only found at the connection's next check.", description: 'What the advanced setting "Connections: login files" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
     default: '^auth\\.json$',
@@ -2231,7 +2231,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.accounts.dropEnv',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.accounts.dropEnv.title', defaultMessage: 'Connections: sign-in variables left out', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.accounts.dropEnv.title', defaultMessage: 'Connections: sign-in variables left out', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.accounts.dropEnv.desc', defaultMessage: "The environment variables Combwork leaves out when it runs Codex on a connection (its sign-in, its checks and its agents), so a key or token set on this PC can't stand in for the connection's own login. Wrong, a variable Codex reads as a login could make a connection run as someone else.", description: 'What the advanced setting "Connections: sign-in variables left out" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'list',
     default: ['CODEX_ACCESS_TOKEN', 'CODEX_API_KEY', 'OPENAI_API_KEY'],
@@ -2242,7 +2242,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.accounts.unelevatedSandbox',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.accounts.unelevatedSandbox.title', defaultMessage: "Connections: use Codex's non-admin sandbox", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Codex's non-admin sandbox is its Windows sandbox that needs no Administrator permission." }),
+    title: msg({ id: 'settings.advanced.codex.accounts.unelevatedSandbox.title', defaultMessage: "Connections: use Codex's non-admin sandbox", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Codex's non-admin sandbox is its Windows sandbox that needs no Administrator permission." }),
     desc: msg({
       id: 'settings.advanced.codex.accounts.unelevatedSandbox.desc',
       defaultMessage:
@@ -2257,7 +2257,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.appServer.closeSeconds',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.appServer.closeSeconds.title', defaultMessage: 'App server: time to close', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.appServer.closeSeconds.title', defaultMessage: 'App server: time to close', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.appServer.closeSeconds.desc', defaultMessage: "How long Codex's app server gets to end by itself once Combwork has its answer (a connection's sign-in check, its hooks' check). Past it, Combwork ends it with everything it started. Too short, Codex is cut off as it ends; too long, its processes stay a little longer.", description: 'What the advanced setting "App server: time to close" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 3,
@@ -2270,7 +2270,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.title.items',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.title.items.title', defaultMessage: 'Terminal title items', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.title.items.title', defaultMessage: 'Terminal title items', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.title.items.desc', defaultMessage: 'What Combwork asks Codex to put in its terminal title (tui.terminal_title): its activity, which shows the busy spinner and "Action Required", and the project\'s name. Without activity, Combwork can\'t tell from the title that Codex is working or needs you.', description: 'What the advanced setting "Terminal title items" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'list',
     default: ['activity', 'project-name'],
@@ -2280,7 +2280,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.hooks.timeoutSeconds',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.hooks.timeoutSeconds.title', defaultMessage: 'Hooks: timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.hooks.timeoutSeconds.title', defaultMessage: 'Hooks: timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: withValues(msg({ id: 'settings.advanced.codex.hooks.timeoutSeconds.desc', defaultMessage: 'How long Codex waits for Combwork to take one of its hooks. Codex itself holds the interrupt and session-end hooks to {most, plural, one {# second} other {# seconds}} at most. Combwork approves its hooks for Codex itself, so a change needs no review in Codex.', description: 'What the advanced setting "Hooks: timeout" is for, and what goes wrong when it is wrong (Settings → Advanced). {most} is the longest Codex allows those two hooks, in seconds.' }), { most: 3 }),
     kind: 'number',
     default: 5,
@@ -2293,7 +2293,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.hooks.preToolUseTimeoutSeconds',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.hooks.preToolUseTimeoutSeconds.title', defaultMessage: 'Hooks: before a tool, timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.hooks.preToolUseTimeoutSeconds.title', defaultMessage: 'Hooks: before a tool, timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.hooks.preToolUseTimeoutSeconds.desc', defaultMessage: "How long Codex waits for Combwork's answer before a tool runs (an edit waits for a file lock). If Combwork doesn't answer in time, the tool goes ahead.", description: 'What the advanced setting "Hooks: before a tool, timeout" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 10,
@@ -2307,7 +2307,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.hooks.listMethod',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.hooks.listMethod.title', defaultMessage: 'Hooks: listing request', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.hooks.listMethod.title', defaultMessage: 'Hooks: listing request', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.hooks.listMethod.desc', defaultMessage: "The request Combwork sends Codex's app server for the hooks a session has. Wrong, an agent's Hooks dialog lists only Combwork's own and says Codex couldn't list the rest, and Combwork trusts its hooks by its own hashes.", description: 'What the advanced setting "Hooks: listing request" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'text',
     default: 'hooks/list',
@@ -2317,7 +2317,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.hooks.listSeconds',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.hooks.listSeconds.title', defaultMessage: 'Hooks: listing timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.hooks.listSeconds.title', defaultMessage: 'Hooks: listing timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.hooks.listSeconds.desc', defaultMessage: "How long Combwork gives Codex's app server to list a session's hooks (`hooks/list`). Past it, an agent's Hooks dialog lists only Combwork's own and says Codex couldn't list the rest.", description: 'What the advanced setting "Hooks: listing timeout" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `hooks/list` as it is (a request\'s name).' }),
     kind: 'number',
     default: 20,
@@ -2331,7 +2331,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.retry.logTarget',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.retry.logTarget.title', defaultMessage: 'Retry wait: log entries', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A retry wait: the coding agent waiting to try its model request again (after being rate-limited)." }),
+    title: msg({ id: 'settings.advanced.codex.retry.logTarget.title', defaultMessage: 'Retry wait: log entries', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A retry wait: the coding agent waiting to try its model request again (after being rate-limited)." }),
     desc: msg({ id: 'settings.advanced.codex.retry.logTarget.desc', defaultMessage: "Where in its own log (logs_2.sqlite in its home folder) Codex says it is waiting to retry its model request, after being rate-limited for example. Combwork reads the latest such entry of a session's turn and shows the wait as its status. Wrong, a waiting agent just shows Working.", description: 'What the advanced setting "Retry wait: log entries" is for, and what goes wrong when it is wrong (Settings → Advanced). logs_2.sqlite is a file name: keep it.' }),
     kind: 'text',
     default: 'codex_core::responses_retry',
@@ -2341,7 +2341,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.retry.pattern',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.retry.pattern.title', defaultMessage: 'Retry wait: message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A retry wait: the coding agent waiting to try its model request again." }),
+    title: msg({ id: 'settings.advanced.codex.retry.pattern.title', defaultMessage: 'Retry wait: message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A retry wait: the coding agent waiting to try its model request again." }),
     desc: msg({ id: 'settings.advanced.codex.retry.pattern.desc', defaultMessage: 'How Codex words that log entry: a regular expression whose named groups give the try (attempt), the tries allowed (max), the wait (seconds, or millis) and the HTTP status that refused the request (status: 429 is a rate limit). Wrong, a waiting agent just shows Working.', description: 'What the advanced setting "Retry wait: message" is for (Settings → Advanced). attempt, max, seconds, millis and status are the names of the regular expression\'s groups: keep them.' }),
     kind: 'pattern',
     default: String.raw`retrying sampling request \((?<attempt>\d+)/(?<max>\d+) in (?:(?<seconds>\d+(?:\.\d+)?)s|(?<millis>\d+(?:\.\d+)?)ms)\)(?:.*?last status: (?<status>\d{3})\b)?`,
@@ -2366,7 +2366,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.promptInput.timeoutSeconds',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.promptInput.timeoutSeconds.title', defaultMessage: "Reading a session's instructions: timeout", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.promptInput.timeoutSeconds.title', defaultMessage: "Reading a session's instructions: timeout", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.promptInput.timeoutSeconds.desc', defaultMessage: "How long Combwork waits, as a Codex agent starts, for Codex to show the session's prompt (codex debug prompt-input, offline), from which it reads the developer_instructions it puts its guidance after. Too short on a slow machine, the agent starts with yours as they are and without Combwork's guidance, and Combwork says so.", description: 'What the advanced setting "Reading a session\'s instructions: timeout" is for, and what goes wrong when it is wrong (Settings → Advanced). codex debug prompt-input is a command and developer_instructions a Codex setting: keep them.' }),
     kind: 'number',
     default: 15,
@@ -2379,7 +2379,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.mcp.toolTimeoutSeconds',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.mcp.toolTimeoutSeconds.title', defaultMessage: 'hive tools: timeout in Codex', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.mcp.toolTimeoutSeconds.title', defaultMessage: 'hive tools: timeout in Codex', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.mcp.toolTimeoutSeconds.desc', defaultMessage: "How long Codex lets one of Combwork's tools run (its tool_timeout_sec for the hive server). Combwork's waits stay a minute under it.", description: 'What the advanced setting "hive tools: timeout in Codex" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 900,
@@ -2392,7 +2392,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.mcp.startupTimeoutSeconds',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.mcp.startupTimeoutSeconds.title', defaultMessage: 'hive tools: startup timeout in Codex', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.mcp.startupTimeoutSeconds.title', defaultMessage: 'hive tools: startup timeout in Codex', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.mcp.startupTimeoutSeconds.desc', defaultMessage: "How long Codex waits for Combwork's hive server to start, when your own Codex config has a server named hive with a startup timeout of its own: Combwork gives Codex this one instead (otherwise Codex's own, 10 s, applies). Too short, and Codex agents start without Combwork's tools.", description: 'What the advanced setting "hive tools: startup timeout in Codex" is for, and what goes wrong when it is wrong (Settings → Advanced). hive is the name of Hive\'s MCP server.' }),
     kind: 'number',
     default: 10,
@@ -2405,7 +2405,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: drawnWaitId('codex'),
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.prompt.drawnSeconds.title', defaultMessage: 'Typed line: wait to be drawn', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.prompt.drawnSeconds.title', defaultMessage: 'Typed line: wait to be drawn', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.prompt.drawnSeconds.desc', defaultMessage: "How long Combwork waits for Codex to show a line Combwork typed (a message's notice, a wake) in its prompt before pressing Enter. Codex drops an Enter that it reads together with the line while it is busy, so Combwork presses Enter once the line shows; if it doesn't show in time, Combwork presses Enter anyway, and presses it again 10 seconds later if the line wasn't sent.", description: 'What the advanced setting "Typed line: wait to be drawn" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 5,
@@ -2440,7 +2440,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.turnScreen.working',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.turnScreen.working.title', defaultMessage: 'Screen: working', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.turnScreen.working.title', defaultMessage: 'Screen: working', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.turnScreen.working.desc', defaultMessage: "Codex's Working line, drawn only while a turn runs. When Combwork missed a turn's start or end, it takes this on screen to mean the agent is working; wrong, it can take a working agent for idle.", description: 'What the advanced setting "Screen: working" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
     default: String.raw`esc to interrupt|\bWorking \(`,
@@ -2451,7 +2451,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.queue.hint',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.queue.hint.title', defaultMessage: 'Screen: holding what was typed', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.queue.hint.title', defaultMessage: 'Screen: holding what was typed', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.queue.hint.desc', defaultMessage: "Codex's hint on the last line it draws while it is busy and queues what is typed. Combwork waits for it to go before typing into Codex (a message, its /permissions menu at setup); wrong, what Combwork types can be queued rather than run.", description: 'What the advanced setting "Screen: holding what was typed" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
     default: String.raw`^tab to queue message\b`,
@@ -2463,7 +2463,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.exit.command',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.exit.command.title', defaultMessage: "Lane's end: exit command", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.exit.command.title', defaultMessage: "Lane's end: exit command", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.exit.command.desc', defaultMessage: "What Combwork types into Codex, then Enter, to end it once its lane has ended and its turn is over, so it exits by itself rather than being killed. Wrong, Codex isn't ended by it and is killed after the exit grace.", description: 'What the advanced setting "Lane\'s end: exit command" is for, and what goes wrong when it is wrong (Settings → Advanced). A lane is a card loop.' }),
     kind: 'text',
     default: '/quit',
@@ -2473,7 +2473,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.exit.graceSeconds',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.exit.graceSeconds.title', defaultMessage: "Lane's end: exit grace", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.exit.graceSeconds.title', defaultMessage: "Lane's end: exit grace", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: withValues(msg({ id: 'settings.advanced.codex.exit.graceSeconds.desc', defaultMessage: "How long Combwork gives Codex to exit by itself after typing its exit command at a lane's end, before killing it. It took {took, plural, one {# second} other {# seconds}} when recorded.", description: 'What the advanced setting "Lane\'s end: exit grace" is for (Settings → Advanced). {took} is how long Codex took to exit when recorded, in seconds (1.4).' }), { took: 1.4 }),
     kind: 'number',
     default: 10,
@@ -2513,7 +2513,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'copilot.trust.prompt',
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.trust.prompt.title', defaultMessage: 'Trust question', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.trust.prompt.title', defaultMessage: 'Trust question', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.copilot.trust.prompt.desc', defaultMessage: "Copilot's question before a folder's first session. Combwork shows the agent as waiting for you while it is on screen.", description: 'What the advanced setting "Trust question" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
     default: String.raw`Do you trust the files in this folder\?`,
@@ -2523,7 +2523,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'copilot.ready.footer',
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.ready.footer.title', defaultMessage: 'Ready footer', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.ready.footer.title', defaultMessage: 'Ready footer', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.copilot.ready.footer.desc', defaultMessage: 'Copilot only says it has started with the first prompt, so Combwork takes its footer on screen to mean it is ready.', description: 'What the advanced setting "Ready footer" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
     default: String.raw`· \/ commands ·`,
@@ -2553,7 +2553,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'copilot.signIn.errorType',
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.signIn.errorType.title', defaultMessage: 'Sign-in refused: error type', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.signIn.errorType.title', defaultMessage: 'Sign-in refused: error type', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.copilot.signIn.errorType.desc', defaultMessage: "A session error's type, in Copilot's session file, that means its sign-in was refused or is missing (#309): Combwork shows the agent signed out.", description: 'What the advanced setting "Sign-in refused: error type" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
     default: '^auth',
@@ -2566,7 +2566,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'copilot.turnFailed.errorType',
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.turnFailed.errorType.title', defaultMessage: 'Turn failed: error type', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.turnFailed.errorType.title', defaultMessage: 'Turn failed: error type', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.copilot.turnFailed.errorType.desc', defaultMessage: "A session error's type, in Copilot's session file, that means its turn ended because a model call failed after Copilot's retries (it sends no Stop then): Combwork ends the turn as failed, with Copilot's message. Wrong, such an agent shows working until you look.", description: 'What the advanced setting "Turn failed: error type" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
     // rate_limit (HI-1973): a turn refused as too many requests (429) after its retries ends with that type.
@@ -2582,7 +2582,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'copilot.retry.context',
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.retry.context.title', defaultMessage: 'Retry: error context', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. A retry: the coding agent trying its model request again after it failed." }),
+    title: msg({ id: 'settings.advanced.copilot.retry.context.title', defaultMessage: 'Retry: error context', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A retry: the coding agent trying its model request again after it failed." }),
     desc: msg({ id: 'settings.advanced.copilot.retry.context.desc', defaultMessage: "Where Copilot's error hook says a recoverable error happened when it is a model call it tries again (rate-limited, or the service unreachable). Combwork shows the agent's status as waiting to retry until Copilot goes on. Wrong, a waiting agent just shows Working.", description: 'What the advanced setting "Retry: error context" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
     default: '^model_call$',
@@ -2592,7 +2592,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'copilot.retry.message',
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.retry.message.title', defaultMessage: 'Retry: error message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.retry.message.title', defaultMessage: 'Retry: error message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.copilot.retry.message.desc', defaultMessage: "How that hook words why the call failed: a regular expression whose named group status is the HTTP status that refused it, whose group limited matches the words of a rate limit (429), or whose group network matches when the service couldn't be reached. Copilot's hook gives the service's own error, often with no status. Wrong, the wait shows without its reason.", description: 'What the advanced setting "Retry: error message" is for, and what goes wrong when it is wrong (Settings → Advanced). status, limited and network are the names of the regular expression\'s groups: keep them.' }),
     kind: 'pattern',
     default: String.raw`(?<network>ECONNREFUSED|ENOTFOUND|ETIMEDOUT|ECONNRESET|EAI_AGAIN|tcp connect error|dns error)|(?<limited>rate[ _-]?limit|too many requests)|(?:^|[^\d.])(?<status>[1-5]\d\d)(?=\s)`,
@@ -2606,7 +2606,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'copilot.signIn.errorMessage',
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.signIn.errorMessage.title', defaultMessage: 'Sign-in refused: error message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.signIn.errorMessage.title', defaultMessage: 'Sign-in refused: error message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.copilot.signIn.errorMessage.desc', defaultMessage: "A session error's message, in Copilot's session file, that means its sign-in was refused, when its type doesn't say so.", description: 'What the advanced setting "Sign-in refused: error message" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
     default: String.raw`please use \/login|sign in to use copilot|not (?:signed|logged) in|\b401\b|bad credentials`,
@@ -2617,7 +2617,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'copilot.signIn.hookMessage',
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.signIn.hookMessage.title', defaultMessage: 'Sign-in refused: ErrorOccurred hook', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.signIn.hookMessage.title', defaultMessage: 'Sign-in refused: ErrorOccurred hook', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.copilot.signIn.hookMessage.desc', defaultMessage: "The message of Copilot's ErrorOccurred hook that means a model call was refused for the sign-in: the turn ends signed out. Another error that ends the turn ends it as failed.", description: 'What the advanced setting "Sign-in refused: ErrorOccurred hook" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
     default: String.raw`\b401\b|unauthori[sz]ed|bad credentials|not (logged|signed) in|\/login|token (has )?expired`,
@@ -2630,7 +2630,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'copilot.question.tool',
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.question.tool.title', defaultMessage: 'Question: tool name', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.question.tool.title', defaultMessage: 'Question: tool name', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.copilot.question.tool.desc', defaultMessage: "The name Copilot's hooks give its tool that asks you a question. Combwork shows that tool's question while the agent waits for your answer; when it doesn't match, the agent shows only Copilot's own notice.", description: 'What the advanced setting "Question: tool name" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
     default: '^(ask_user|AskUserQuestion)$',
@@ -2641,7 +2641,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'copilot.question.field',
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.question.field.title', defaultMessage: 'Question: text field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.question.field.title', defaultMessage: 'Question: text field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.copilot.question.field.desc', defaultMessage: "The field of the question tool's input, in Copilot's hooks, with the question's text. When it is wrong, the agent shows only Copilot's own notice while it waits for your answer.", description: 'What the advanced setting "Question: text field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'message',
@@ -2652,7 +2652,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: outagePatternId('copilot'),
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.outage.connectionError.title', defaultMessage: 'Connection dropped: error message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.outage.connectionError.title', defaultMessage: 'Connection dropped: error message', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.copilot.outage.connectionError.desc', defaultMessage: "What Copilot's error says when it couldn't reach its model's API after its retries: with Resume agents after a connection drops on, Combwork waits for the connection and resumes the agent. Wrong, such agents stay stopped.", description: 'What the advanced setting "Connection dropped: error message" is for, and what goes wrong when it is wrong (Settings → Advanced). Resume agents after a connection drops is the title of another advanced setting.' }),
     kind: 'pattern',
     default: String.raw`\b(?:ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ECONNRESET|ETIMEDOUT|ENETUNREACH|EHOSTUNREACH|ENETDOWN)\b|error sending request|Could not connect to|dns error`,
@@ -2668,7 +2668,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'copilot.compaction.systemTokens',
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.compaction.systemTokens.title', defaultMessage: 'Compaction: system prompt tokens field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.compaction.systemTokens.title', defaultMessage: 'Compaction: system prompt tokens field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.copilot.compaction.systemTokens.desc', defaultMessage: "The field of a compaction's start and end, in Copilot's session file, with the system prompt's tokens: one of the three parts of the context before and after it, in usage and the Sessions tab.", description: 'What the advanced setting "Compaction: system prompt tokens field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'systemTokens',
@@ -2678,7 +2678,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'copilot.compaction.conversationTokens',
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.compaction.conversationTokens.title', defaultMessage: 'Compaction: conversation tokens field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.compaction.conversationTokens.title', defaultMessage: 'Compaction: conversation tokens field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.copilot.compaction.conversationTokens.desc', defaultMessage: "The field of a compaction's start and end, in Copilot's session file, with the conversation's tokens: one of the three parts of the context before and after it, in usage and the Sessions tab.", description: 'What the advanced setting "Compaction: conversation tokens field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'conversationTokens',
@@ -2688,7 +2688,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'copilot.compaction.toolTokens',
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.compaction.toolTokens.title', defaultMessage: 'Compaction: tool definition tokens field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.compaction.toolTokens.title', defaultMessage: 'Compaction: tool definition tokens field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.copilot.compaction.toolTokens.desc', defaultMessage: "The field of a compaction's start and end, in Copilot's session file, with the tool definitions' tokens: one of the three parts of the context before and after it, in usage and the Sessions tab.", description: 'What the advanced setting "Compaction: tool definition tokens field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'toolDefinitionsTokens',
@@ -2698,7 +2698,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'copilot.compaction.summary',
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.compaction.summary.title', defaultMessage: 'Compaction: summary field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.compaction.summary.title', defaultMessage: 'Compaction: summary field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.copilot.compaction.summary.desc', defaultMessage: "The field of a compaction's end, in Copilot's session file, with the summary it carries on from: the Sessions tab shows it with the compaction.", description: 'What the advanced setting "Compaction: summary field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'field',
     default: 'summaryContent',
@@ -2708,7 +2708,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'copilot.hooks.timeoutSeconds',
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.hooks.timeoutSeconds.title', defaultMessage: 'Hooks: timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.hooks.timeoutSeconds.title', defaultMessage: 'Hooks: timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.copilot.hooks.timeoutSeconds.desc', defaultMessage: 'How long Copilot waits for Combwork to take one of its hooks.', description: 'What the advanced setting "Hooks: timeout" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 5,
@@ -2721,7 +2721,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'copilot.hooks.preToolUseTimeoutSeconds',
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.hooks.preToolUseTimeoutSeconds.title', defaultMessage: 'Hooks: before a tool, timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.hooks.preToolUseTimeoutSeconds.title', defaultMessage: 'Hooks: before a tool, timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.copilot.hooks.preToolUseTimeoutSeconds.desc', defaultMessage: "How long Copilot waits for Combwork's answer before a tool runs (an edit waits for a file lock). If Combwork doesn't answer in time, the tool goes ahead.", description: 'What the advanced setting "Hooks: before a tool, timeout" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
     default: 10,
@@ -2734,7 +2734,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'copilot.exit.graceSeconds',
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.exit.graceSeconds.title', defaultMessage: 'Stop: exit grace', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.exit.graceSeconds.title', defaultMessage: 'Stop: exit grace', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: withValues(msg({ id: 'settings.advanced.copilot.exit.graceSeconds.desc', defaultMessage: "When Combwork stops Copilot (Stop, Restart, closing a project or quitting), how long it gives Copilot to exit by itself after its Ctrl+C before killing it. Copilot writes the session's token totals only as it exits by itself: one killed first loses them. It took up to {took, plural, one {# second} other {# seconds}} on a busy machine (#716); quitting Combwork or closing a workspace waits up to this long, and a second more, for a Copilot that hangs.", description: 'What the advanced setting "Stop: exit grace" is for, and what goes wrong when it is wrong (Settings → Advanced). {took} is the longest Copilot was seen to take, in seconds (2.4).' }), { took: 2.4 }),
     kind: 'number',
     default: 10,
@@ -2747,7 +2747,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'copilot.exit.armed',
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.exit.armed.title', defaultMessage: 'Stop: exit hint', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.exit.armed.title', defaultMessage: 'Stop: exit hint', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.copilot.exit.armed.desc', defaultMessage: 'What Copilot shows after one Ctrl+C at its prompt, meaning the next one exits. When Combwork stops Copilot, it presses Ctrl+C again once this shows. If it no longer matches, Combwork keeps pressing Ctrl+C until Copilot exits, which takes longer.', description: 'What the advanced setting "Stop: exit hint" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'pattern',
     default: String.raw`ctrl\+c again to exit`,
@@ -2758,7 +2758,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: rightClickToCliId('copilot'),
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.mouse.rightClickToCli.title', defaultMessage: 'Pass right-click to Copilot', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.mouse.rightClickToCli.title', defaultMessage: 'Pass right-click to Copilot', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({
       id: 'settings.advanced.copilot.mouse.rightClickToCli.desc',
       defaultMessage: "Right-click in a Copilot pane is Combwork's, as in every pane: it copies the terminal's selection (Shift+drag), or pastes. Turned on, Combwork passes right-clicks to Copilot instead, which copies its own selection (a drag) with them, as its footer says.",
@@ -2774,7 +2774,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: rightClickToCliId('claude-code'),
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.mouse.rightClickToCli.title', defaultMessage: 'Pass right-click to Claude Code', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.mouse.rightClickToCli.title', defaultMessage: 'Pass right-click to Claude Code', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({
       id: 'settings.advanced.claude-code.mouse.rightClickToCli.desc',
       defaultMessage: "Right-click in a Claude Code pane is Combwork's, as in every pane: it copies the terminal's selection, or pastes. Turned on, Combwork passes right-clicks to Claude Code instead. Claude Code doesn't use the mouse at its prompt, so there a right-click then does nothing: copy and paste with Ctrl+C and Ctrl+V.",
@@ -2788,7 +2788,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: rightClickToCliId('codex'),
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.mouse.rightClickToCli.title', defaultMessage: 'Pass right-click to Codex', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.mouse.rightClickToCli.title', defaultMessage: 'Pass right-click to Codex', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({
       id: 'settings.advanced.codex.mouse.rightClickToCli.desc',
       defaultMessage: "Right-click in a Codex pane is Combwork's, as in every pane: it copies the terminal's selection (Shift+drag), or pastes. Turned on, Combwork passes right-clicks to Codex instead, which tracks the mouse itself.",
@@ -2995,7 +2995,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.hooks.knownEvents',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.hooks.knownEvents.title', defaultMessage: 'Hooks: known events', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.hooks.knownEvents.title', defaultMessage: 'Hooks: known events', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.hooks.knownEvents.desc', defaultMessage: "The hook events Combwork knows Claude Code sends. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook named outside this list saves a capture of the agent's recent events.", description: 'What the advanced setting "Hooks: known events" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting\'s title: use it as Settings shows it.' }),
     kind: 'list',
     default: ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Notification', 'Stop', 'StopFailure', 'PreCompact', 'PostCompact', 'SessionEnd'], // i18n-ignore: a CLI's hook event names (#698)
@@ -3006,7 +3006,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.hooks.knownFields',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.hooks.knownFields.title', defaultMessage: 'Hooks: known fields', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.hooks.knownFields.title', defaultMessage: 'Hooks: known fields', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.hooks.knownFields.desc', defaultMessage: "The top-level fields Combwork knows Claude Code sends in its hooks. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook with a field outside this list saves a capture of the agent's recent events: often the first sign that a Claude Code update changed something. Add a field here once you know it is harmless.", description: 'What the advanced setting "Hooks: known fields" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting\'s title: use it as Settings shows it.' }),
     kind: 'list',
     default: ['hook_event_name', 'hookEventName', 'session_id', 'sessionId', 'transcript_path', 'transcriptPath', 'cwd', 'permission_mode', 'permissionMode', 'tool_name', 'toolName', 'tool_use_id', 'toolUseId', 'source', 'trigger', 'matcher', 'notification_type', 'model', 'agent_type', 'turn_id', 'timestamp', 'tool_input', 'prompt_id', 'prompt', 'tool_response', 'stop_hook_active', 'last_assistant_message', 'message', 'title', 'custom_instructions', 'compact_summary', 'agent_id', 'reason', 'error', 'is_interrupt', 'effort'],
@@ -3017,7 +3017,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.statusLine.knownFields',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.statusLine.knownFields.title', defaultMessage: 'Status line: known fields', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.claude-code.statusLine.knownFields.title', defaultMessage: 'Status line: known fields', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.statusLine.knownFields.desc', defaultMessage: "The top-level fields Combwork knows Claude Code sends in its status line. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a status line with a field outside this list saves a capture of the agent's recent events. Add a field here once you know it is harmless.", description: 'What the advanced setting "Status line: known fields" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting\'s title: use it as Settings shows it.' }),
     kind: 'list',
     default: ['session_id', 'transcript_path', 'cwd', 'scratchpad_dir', 'prompt_id', 'effort', 'model', 'workspace', 'version', 'output_style', 'cost', 'context_window', 'exceeds_200k_tokens', 'prompt_cache', 'fast_mode', 'thinking', 'rate_limits'],
@@ -3028,7 +3028,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.hooks.knownEvents',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.hooks.knownEvents.title', defaultMessage: 'Hooks: known events', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.hooks.knownEvents.title', defaultMessage: 'Hooks: known events', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.hooks.knownEvents.desc', defaultMessage: "The hook events Combwork knows Codex sends. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook named outside this list saves a capture of the agent's recent events.", description: 'What the advanced setting "Hooks: known events" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting\'s title: use it as Settings shows it.' }),
     kind: 'list',
     default: ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PermissionRequest', 'Interrupt', 'Stop', 'PreCompact', 'PostCompact', 'SessionEnd'], // i18n-ignore: a CLI's hook event names (#698)
@@ -3039,7 +3039,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'codex.hooks.knownFields',
     group: 'codex',
-    title: msg({ id: 'settings.advanced.codex.hooks.knownFields.title', defaultMessage: 'Hooks: known fields', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.codex.hooks.knownFields.title', defaultMessage: 'Hooks: known fields', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.codex.hooks.knownFields.desc', defaultMessage: "The top-level fields Combwork knows Codex sends in its hooks. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook with a field outside this list saves a capture of the agent's recent events: often the first sign that a Codex update changed something. Add a field here once you know it is harmless.", description: 'What the advanced setting "Hooks: known fields" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting\'s title: use it as Settings shows it.' }),
     kind: 'list',
     default: ['hook_event_name', 'hookEventName', 'session_id', 'sessionId', 'transcript_path', 'transcriptPath', 'cwd', 'permission_mode', 'permissionMode', 'tool_name', 'toolName', 'tool_use_id', 'toolUseId', 'source', 'trigger', 'matcher', 'notification_type', 'model', 'agent_type', 'turn_id', 'timestamp', 'tool_input', 'prompt', 'tool_response', 'stop_hook_active', 'last_assistant_message', 'message', 'reason', 'error'],
@@ -3050,7 +3050,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'copilot.hooks.knownEvents',
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.hooks.knownEvents.title', defaultMessage: 'Hooks: known events', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.hooks.knownEvents.title', defaultMessage: 'Hooks: known events', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.copilot.hooks.knownEvents.desc', defaultMessage: "The hook events Combwork knows GitHub Copilot sends. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook named outside this list saves a capture of the agent's recent events.", description: 'What the advanced setting "Hooks: known events" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting\'s title: use it as Settings shows it.' }),
     kind: 'list',
     default: ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'Notification', 'Stop', 'ErrorOccurred', 'PreCompact', 'SessionEnd'], // i18n-ignore: a CLI's hook event names (#698)
@@ -3061,7 +3061,7 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'copilot.hooks.knownFields',
     group: 'copilot',
-    title: msg({ id: 'settings.advanced.copilot.hooks.knownFields.title', defaultMessage: 'Hooks: known fields', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    title: msg({ id: 'settings.advanced.copilot.hooks.knownFields.title', defaultMessage: 'Hooks: known fields', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.copilot.hooks.knownFields.desc', defaultMessage: "The top-level fields Combwork knows GitHub Copilot sends in its hooks. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook with a field outside this list saves a capture of the agent's recent events: often the first sign that a GitHub Copilot update changed something. Add a field here once you know it is harmless.", description: 'What the advanced setting "Hooks: known fields" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting\'s title: use it as Settings shows it.' }),
     kind: 'list',
     default: ['hook_event_name', 'hookEventName', 'session_id', 'sessionId', 'transcript_path', 'transcriptPath', 'cwd', 'permission_mode', 'permissionMode', 'tool_name', 'toolName', 'tool_use_id', 'toolUseId', 'source', 'trigger', 'matcher', 'notification_type', 'model', 'agent_type', 'turn_id', 'timestamp', 'tool_input', 'prompt', 'initial_prompt', 'initialPrompt', 'toolInput', 'toolArgs', 'tool_result', 'toolResult', 'stop_hook_active', 'stop_reason', 'stopReason', 'reason', 'error', 'message', 'title', 'is_recoverable', 'recoverable'],
@@ -3076,6 +3076,31 @@ const SOURCES: readonly AdvancedSource[] = [
 export const ADVANCED_DEFS: readonly AdvancedDef[] = SOURCES.map((d) => ({ ...d, title: englishText(d.title), desc: englishText(d.desc), text: { title: d.title, desc: d.desc } }))
 
 const BY_ID = new Map(ADVANCED_DEFS.map((d) => [d.id, d]))
+
+/**
+ * Combwork's own settings' ids before HI-2518 (`hive.<area>.<name>`), each with the `cw.` id it has now. Saved values move
+ * to the new id as they are read (advanced.json, a workspace's own in workspace.json), one way: nothing is kept under
+ * the old id, and an agent's call naming one is refused with the new id (the settings tools). LEGACY_ADVANCED and
+ * RETIRED_ADVANCED keys keep their hive.* names: they are no settings now, only what older migrations read.
+ */
+export const RENAMED_ADVANCED: ReadonlyMap<string, string> = new Map(ADVANCED_DEFS.filter((d) => d.group === 'cw').map((d) => [`hive.${d.id.slice('cw.'.length)}`, d.id]))
+
+/**
+ * A record keyed by advanced ids with each hive.* id renamed to its cw.* one (HI-2518): `renamed` lists the old ids
+ * moved or dropped. Where both are there, the cw.* one is kept (by presence: false, 0 and [] are values) and the old one
+ * dropped. Other keys (unknown, LEGACY_ADVANCED) stay as they are, in their order. Pure.
+ */
+export function migrateAdvancedIds<T>(record: Record<string, T>): { record: Record<string, T>; renamed: string[] } {
+  const renamed = Object.keys(record).filter((k) => RENAMED_ADVANCED.has(k))
+  if (!renamed.length) return { record, renamed }
+  const out: Record<string, T> = {}
+  for (const [k, v] of Object.entries(record)) {
+    const to = RENAMED_ADVANCED.get(k)
+    if (!to) out[k] = v
+    else if (!Object.hasOwn(record, to)) out[to] = v
+  }
+  return { record: out, renamed }
+}
 
 export function advancedDef(id: string): AdvancedDef | undefined {
   return BY_ID.get(id)
@@ -3218,7 +3243,7 @@ export function sampleMissText(def: AdvancedDef, value: unknown): Text | null {
   )
 }
 
-const GROUP_NAMES: Record<string, string> = { hive: APP_NAME, 'claude-code': 'Claude Code', codex: 'Codex', copilot: 'GitHub Copilot' } // i18n-ignore: product names
+const GROUP_NAMES: Record<string, string> = { cw: APP_NAME, 'claude-code': 'Claude Code', codex: 'Codex', copilot: 'GitHub Copilot' } // i18n-ignore: product names
 export const groupName = (g: AdvancedGroup): string => GROUP_NAMES[g] ?? g
 
 /** The CLI version an override was made for: the installed one when it was set, and the value it was set to. */
@@ -3360,7 +3385,7 @@ const FILE_PROBLEM = {
 const fileProblem = (t: Text): { error: string; errorText: Text } => ({ error: englishText(t), errorText: t })
 
 /** advanced.json read: its overrides and versions, or why it can't be used (then Hive keeps what it had). */
-export function parseAdvancedFile(text: string): { values: Record<string, unknown>; madeFor: Record<string, MadeFor>; unknown: string[] } | { error: string; errorText: Text } {
+export function parseAdvancedFile(text: string): { values: Record<string, unknown>; madeFor: Record<string, MadeFor>; unknown: string[]; renamed: string[] } | { error: string; errorText: Text } {
   let raw: unknown
   try {
     raw = JSON.parse(text)
@@ -3371,12 +3396,13 @@ export function parseAdvancedFile(text: string): { values: Record<string, unknow
   if (typeof raw.format === 'number' && raw.format > ADVANCED_FORMAT) return fileProblem(withValues(FILE_PROBLEM.newer, { format: raw.format, supported: ADVANCED_FORMAT }))
   const given = raw.values === undefined ? {} : raw.values
   if (!isPlainObject(given)) return fileProblem(FILE_PROBLEM.notValues)
-  // A retired setting is dropped as read: neither listed as unknown nor kept at the next write.
-  const values = Object.fromEntries(Object.entries(given).filter(([k]) => !RETIRED_ADVANCED.has(k)))
+  // A retired setting is dropped as read: neither listed as unknown nor kept at the next write. A hive.* id is read as its
+  // cw.* one (HI-2518), here, so that every reader, the early ones before the store loads too, sees the new ids.
+  const { record: values, renamed } = migrateAdvancedIds(Object.fromEntries(Object.entries(given).filter(([k]) => !RETIRED_ADVANCED.has(k))))
   const madeFor: Record<string, MadeFor> = {}
   if (isPlainObject(raw.madeFor))
-    for (const [k, m] of Object.entries(raw.madeFor)) if (isPlainObject(m) && k in values) madeFor[k] = { version: typeof m.version === 'string' ? m.version : null, value: m.value }
-  return { values, madeFor, unknown: Object.keys(values).filter((k) => !BY_ID.has(k) && !LEGACY_ADVANCED.has(k)) }
+    for (const [k, m] of Object.entries(migrateAdvancedIds(raw.madeFor).record)) if (isPlainObject(m) && k in values) madeFor[k] = { version: typeof m.version === 'string' ? m.version : null, value: m.value }
+  return { values, madeFor, unknown: Object.keys(values).filter((k) => !BY_ID.has(k) && !LEGACY_ADVANCED.has(k)), renamed }
 }
 
 /** What a value takes, in words, as an agent reads it (the Assistant's tools; said in its chain, HI-2441). */

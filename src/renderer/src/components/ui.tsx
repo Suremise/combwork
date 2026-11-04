@@ -215,6 +215,22 @@ export function OneLineDesc({ text, className }: { text: string | null | undefin
   )
 }
 
+/**
+ * A section of Settings' or Project Settings' list (HI-2531): its icon and name on one compact row, the name cut with
+ * "…" where the list is narrow, and then given in full on hover, and on keyboard focus once the row takes it (the
+ * tooltip wraps the whole row).
+ */
+export function SectionNavRow({ id, icon, label, sub, selected, onSelect }: { id: string; icon: ReactNode; label: string; sub?: boolean; selected: boolean; onSelect: () => void }) {
+  const [ref, clipped] = useClipped<HTMLSpanElement>()
+  return (
+    <Tooltip content={clipped ? label : null} block focus>
+      <div className={cx('row', selected && 'selected')} data-section={id} onClick={onSelect}>
+        {icon} <span ref={ref} className={cx('label', sub && 'settings-sub')}>{label}</span>
+      </div>
+    </Tooltip>
+  )
+}
+
 /** A tooltip's way to tell the one around it that it is showing, so only the innermost one shows (#287). */
 const TipParent = createContext<((inner: boolean) => void) | null>(null)
 

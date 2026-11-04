@@ -46,7 +46,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   // HI-1973: the developer console with its text, so the error hooks of a rate-limited turn can be kept as Copilot sent them.
-  fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'hive.showDeveloperFeatures': true, 'hive.console.showText': true } }))
+  fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'cw.showDeveloperFeatures': true, 'cw.console.showText': true } }))
 
   const api = await startFakeCopilotApi({ log: apiLog })
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47823), ...copilotTestEnv(api, copilotDir, { above: lib.WORK }) })

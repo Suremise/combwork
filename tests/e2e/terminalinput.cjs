@@ -22,10 +22,10 @@ const ws = path.join(lib.WORK, 'terminalinput-ws')
 const claudeHome = path.join(lib.WORK, 'terminalinput-claude-home')
 const alpha = path.join(ws, 'alpha')
 const PORT = Number(lib.port(47840))
-const AS_TYPED = 'hive.prompt.asTyped'
-const CTRL_CV = 'hive.terminal.ctrlCVToCli'
-const ALL_KEYS = 'hive.terminal.allKeysToCli'
-const RAW_START = 'hive.prompt.rawCardStart'
+const AS_TYPED = 'cw.prompt.asTyped'
+const CTRL_CV = 'cw.terminal.ctrlCVToCli'
+const ALL_KEYS = 'cw.terminal.allKeysToCli'
+const RAW_START = 'cw.prompt.rawCardStart'
 /** The start of the wrapper Hive types around a card's start (prompt.card.start, src/shared/tasks.ts): it survives a rename. */
 const WRAPPER = 'Work on task '
 let failed = 0

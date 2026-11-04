@@ -293,7 +293,7 @@ const f = q.folderHelpers(fx)
     try {
       h = await q.startHive(fx, { port: PORT, keepOptions: true, env: { HIVE_TEST_QUEUE_CRASH: 'afterFiles' } })
       await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: f.options() })
-      await h.inv('advanced:set', 'hive.queue.checkedOutTarget', 'auto')
+      await h.inv('advanced:set', 'cw.queue.checkedOutTarget', 'auto')
       crew = { builder: await q.rejoin(fx, h, crew.builder), reviewer: await q.rejoin(fx, h, crew.reviewer) }
       let ended = false
       h.app.process().once('exit', () => (ended = true))

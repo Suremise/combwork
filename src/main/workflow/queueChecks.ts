@@ -5,7 +5,7 @@
 //
 // - The environment is a session command's (the app passes `childEnv()`), never Hive's own: no ELECTRON_RUN_AS_NODE and
 //   none of a session's HIVE_* variables (`checkEnv`). Hidden; ended with its whole tree at its time limit (Settings →
-//   Advanced, `hive.queue.checkMinutes`).
+//   Advanced, `cw.queue.checkMinutes`).
 // - Green means proved: the queue brackets each check (`bracketStart`/`bracketEnd`) and writes `CheckRan` at the test
 //   merge's revision, counted only if the folder was at exactly that revision and clean at the start and the end, and
 //   nothing was written to a tracked file and no HEAD reflog entry was made in between. Exit 0 but uncounted isn't green.

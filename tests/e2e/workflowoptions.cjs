@@ -403,13 +403,13 @@ async function theForm(page, app, inv) {
     check('saved: every rule off, no preset; the stage name kept', !!(await lib.until(async () => projectJson().workflow?.preset === null && saved().review === 'none' && saved().finish === 'notChecked' && saved().folder === 'project' && saved().stageNames?.review === 'Checking', HUNG_MS)), JSON.stringify(projectJson().workflow))
 
     // --- With the rules not enforced, the section says so and still saves.
-    await inv('advanced:set', 'hive.workflow.enforce', false)
+    await inv('advanced:set', 'cw.workflow.enforce', false)
     await reopen()
     check('with Workflow rules are enforced off, the section says so', !!(await lib.until(async () => (await section.locator('.workflow-note').count()) > 0 && (await section.innerText()).includes('aren’t enforced'), HUNG_MS)))
     await row('style').locator('select').selectOption('squash')
     await saveAll()
     check('…and still saves', !!(await lib.until(async () => saved().style === 'squash', HUNG_MS)))
-    await inv('advanced:set', 'hive.workflow.enforce', null)
+    await inv('advanced:set', 'cw.workflow.enforce', null)
 
     // --- A reviewer agent chosen from All off (#1508): "Nobody reviews their own work", held on while one reviews, is
     // turned on in the draft too, so it saves, the warning listing both.

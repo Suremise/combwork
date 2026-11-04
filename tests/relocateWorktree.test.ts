@@ -24,7 +24,7 @@ vi.mock('../src/main/workflow/service', async (orig) => ({ ...(await orig<object
 vi.mock('../src/main/advanced', async (orig) => {
   const actual = await orig<typeof import('../src/main/advanced')>()
   const advanced = Object.create(actual.advanced) as typeof actual.advanced
-  advanced.get = ((id: string, ...rest: unknown[]) => (id === 'hive.slots.renameAdopted' ? state.renameOn : (actual.advanced.get as (...a: unknown[]) => unknown)(id, ...rest))) as typeof advanced.get
+  advanced.get = ((id: string, ...rest: unknown[]) => (id === 'cw.slots.renameAdopted' ? state.renameOn : (actual.advanced.get as (...a: unknown[]) => unknown)(id, ...rest))) as typeof advanced.get
   return { ...actual, advanced }
 })
 // Its cards' work following the folder: failing once, for a step failing after git's move.

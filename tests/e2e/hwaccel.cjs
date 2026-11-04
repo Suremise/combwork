@@ -18,7 +18,7 @@ const ws = path.join(lib.WORK, 'hwaccel-ws')
 const proj = path.join(ws, 'demo')
 const file = path.join(userData, 'advanced.json')
 const relaunchLog = path.join(lib.WORK, 'hwaccel-relaunch.jsonl')
-const ID = 'hive.disableHardwareAcceleration'
+const ID = 'cw.disableHardwareAcceleration'
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++

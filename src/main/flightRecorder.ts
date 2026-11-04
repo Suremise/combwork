@@ -17,17 +17,17 @@ import { maskText } from '../shared/redact'
 /**
  * The developer console's flight recorder (#698): when something rare happens to an agent, its newest console events
  * (before it, and for a short while after) are saved as a capture, a recording like the user's (consoleRecorder.ts),
- * redacted, with a notice. Each trigger is opt-in (Settings → Advanced, `hive.recorder.<trigger>`, off by default); while
+ * redacted, with a notice. Each trigger is opt-in (Settings → Advanced, `cw.recorder.<trigger>`, off by default); while
  * one is on, the console keeps every agent's events in a small ring whether a console is open or not
  * (`DevConsole.setFlight`), and with all off it keeps nothing. One capture per trigger per agent every
- * `hive.recorder.minutes`; the newest `hive.recorder.keep` captures are kept. What a capture says of its trigger is
+ * `cw.recorder.minutes`; the newest `cw.recorder.keep` captures are kept. What a capture says of its trigger is
  * recorded data, in English (#1104); the notice is in Hive's language.
  */
 
 const log = createLogger('console')
 
 /** How long after a trigger its capture waits, for what follows it (an advanced value). Unpackaged test builds can shorten it (HIVE_TEST_FLIGHT_AFTER_MS). */
-const afterMs = (): number => (!app.isPackaged && Number(process.env.HIVE_TEST_FLIGHT_AFTER_MS) > 0 ? Number(process.env.HIVE_TEST_FLIGHT_AFTER_MS) : advanced.number('hive.recorder.afterSeconds') * 1000)
+const afterMs = (): number => (!app.isPackaged && Number(process.env.HIVE_TEST_FLIGHT_AFTER_MS) > 0 ? Number(process.env.HIVE_TEST_FLIGHT_AFTER_MS) : advanced.number('cw.recorder.afterSeconds') * 1000)
 
 /** Bounds on what the recorder holds besides the console's rings: cooldowns, and captures waiting or being written. */
 export const FLIGHT_MAX_COOLDOWNS = 1000
@@ -37,11 +37,11 @@ export const FLIGHT_MAX_PENDING = 20
 const clean = (what: string): string => maskText(what).slice(0, 300)
 
 const SETTING: Record<FlightTrigger, string> = {
-  safeguard: 'hive.recorder.safeguard',
-  unknown: 'hive.recorder.unknown',
-  version: 'hive.recorder.version',
-  stalled: 'hive.recorder.stalled',
-  pattern: 'hive.recorder.pattern'
+  safeguard: 'cw.recorder.safeguard',
+  unknown: 'cw.recorder.unknown',
+  version: 'cw.recorder.version',
+  stalled: 'cw.recorder.stalled',
+  pattern: 'cw.recorder.pattern'
 }
 
 const M = {
@@ -193,7 +193,7 @@ class FlightRecorder {
   }
 
   /**
-   * A trigger fired on an agent: unless it is off, fired on that agent within the last `hive.recorder.minutes`, or as many
+   * A trigger fired on an agent: unless it is off, fired on that agent within the last `cw.recorder.minutes`, or as many
    * captures as the recorder holds are waiting, it is noted as an event of the agent's own (kind `trigger`), and its
    * capture is written a short while later. What it saw is masked as an event's summary is: each value, and its English.
    */
@@ -205,7 +205,7 @@ class FlightRecorder {
     const source = sessionSourceId(who.projectPath, who.agentId)
     const key = `${trigger}|${source}`
     const now = Date.now()
-    const every = Math.max(1, advanced.number('hive.recorder.minutes')) * 60_000
+    const every = Math.max(1, advanced.number('cw.recorder.minutes')) * 60_000
     if (this.jobs.has(key) || now - (this.last.get(key) ?? -Infinity) < every) return
     if (this.jobs.size >= FLIGHT_MAX_PENDING) return log.warn(`flight recorder: ${trigger} on ${userText(who.label())} not captured: ${FLIGHT_MAX_PENDING} captures are waiting or being written`)
     // Cooldowns that have run out are forgotten; past the bound, the oldest go.
@@ -235,7 +235,7 @@ class FlightRecorder {
     try {
       const events = devConsole.flightEvents(source)
       const kind = workspace.isAssistantHome(who.projectPath) ? 'assistant' : 'session'
-      const info = await saveCapture({ source: { kind, label, provider: who.provider as never }, events, trigger, what, whatText: shown, keep: advanced.number('hive.recorder.keep') })
+      const info = await saveCapture({ source: { kind, label, provider: who.provider as never }, events, trigger, what, whatText: shown, keep: advanced.number('cw.recorder.keep') })
       log.info(`flight recorder: saved ${info.name} (${trigger}, ${events.length} events)`)
       toast('info', tr(M.captured, { trigger: tr(FLIGHT_TRIGGER_NAME[trigger]), agent: label }), tr(M.capturedDetail, { events: events.length, what: tr(FLIGHT_WHAT[shown.id] as Msg, shown.values as never) }), [{ label: tr(M.show), command: 'console.showCapture', args: [info.name] }], who.projectPath)
     } catch (e) {

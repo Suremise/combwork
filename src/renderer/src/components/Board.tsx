@@ -804,7 +804,7 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
   const shownProjects = known ?? NO_BOARD_PROJECTS
   const live = useMemo(() => all.filter((c) => !c.archived && (project === null || c.project.toLowerCase() === project.toLowerCase())), [all, project])
   const stageOf = (c: TaskCard) => cardStage(c.column, workBadges.get(c.number)?.stage)
-  const enforced = useAdvancedValue<boolean>('hive.workflow.enforce')
+  const enforced = useAdvancedValue<boolean>('cw.workflow.enforce')
   const layout = boardLayout(shownProjects, live.map((c) => ({ project: c.project, stage: stageOf(c) })), tr, enforced)
   const columnOf = (c: TaskCard): BoardColumnId => cardColumn(c.column, stageOf(c), layout)
   const [drag, showDrag] = useState<DragState | null>(null)

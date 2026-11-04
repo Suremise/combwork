@@ -131,14 +131,14 @@ describe("the i18nshots route's text report (#899)", () => {
       pl: {
         'board/board': { image: 'pl/board-board-dark.png', issues: [{ kind: 'wraps', text: 'DO ZROBIENIA', where: 'div.col-head > h3', detail: '2 lines' }, { kind: 'english', text: 'Not running', where: 'span' }] },
         'core/window': { image: 'pl/core-window-dark.png', issues: [] },
-        'settings/advanced': { image: 'pl/settings-advanced-dark.png', issues: [{ kind: 'clipped', text: 'hive.showDeveloperFeatures', where: 'div.s-label', px: 14 }] }
+        'settings/advanced': { image: 'pl/settings-advanced-dark.png', issues: [{ kind: 'clipped', text: 'cw.showDeveloperFeatures', where: 'div.s-label', px: 14 }] }
       }
     })
     expect(text.split('\n')).toEqual([
       'pl: 3 screens checked, 2 flagged (1 wraps, 1 english, 1 clipped)',
       '  board/board (pl): wraps "DO ZROBIENIA" [div.col-head > h3, 2 lines] → pl/board-board-dark.png',
       '  board/board (pl): english "Not running" [span] → pl/board-board-dark.png',
-      '  settings/advanced (pl): clipped by 14 px "hive.showDeveloperFeatures" [div.s-label] → pl/settings-advanced-dark.png',
+      '  settings/advanced (pl): clipped by 14 px "cw.showDeveloperFeatures" [div.s-label] → pl/settings-advanced-dark.png',
       ''
     ])
   })

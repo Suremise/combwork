@@ -243,7 +243,7 @@ export interface HooksEvidence {
 
 /**
  * Whether its hooks are missing now: 'start', 'transcript' or 'prompt' (what showed it), else null. `boundMs`: Settings → Advanced
- * (hive.hooks.missingSeconds). It notes what it saw on the way (work begun, a question at the start, an Enter dropped).
+ * (cw.hooks.missingSeconds). It notes what it saw on the way (work begun, a question at the start, an Enter dropped).
  */
 export function hooksMissing(w: HooksWatch, ev: HooksEvidence, now: number, boundMs: number): 'start' | 'prompt' | 'transcript' | null {
   if (ev.startWaits) w.startFrom = now

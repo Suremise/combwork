@@ -38,7 +38,7 @@ const TABS_KEY = 'settings.advanced'
  */
 const GROUPS: AdvancedGroup[] = (() => {
   const used = new Set(ADVANCED_DEFS.map((d) => d.group))
-  const ordered: AdvancedGroup[] = ['hive', ...PROVIDERS.map((p) => p.id).filter((id) => used.has(id))]
+  const ordered: AdvancedGroup[] = ['cw', ...PROVIDERS.map((p) => p.id).filter((id) => used.has(id))]
   return [...ordered, ...[...used].filter((g) => !ordered.includes(g))].filter((g) => used.has(g))
 })()
 
@@ -69,7 +69,7 @@ export function AdvancedSettings({ query, modifiedOnly: outerModified }: { query
   useEffect(() => {
     setClicked((c) => (c && c.key !== filterKey ? null : c))
   }, [filterKey])
-  const remembered = useRememberedTab<AdvancedGroup>(TABS_KEY, GROUPS, 'hive')
+  const remembered = useRememberedTab<AdvancedGroup>(TABS_KEY, GROUPS, 'cw')
   const count = (g: AdvancedGroup): number => shown.filter((r) => r.def.group === g).length
   // A value's own id searched for opens its group's tab, whatever is remembered.
   const exact = ADVANCED_DEFS.find((d) => words.length === 1 && d.id.toLowerCase() === words[0])?.group
