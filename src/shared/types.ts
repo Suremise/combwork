@@ -415,8 +415,6 @@ export interface AssistantAction extends Partial<ActivityTarget> {
   reason?: string
   /** A setting it changed (#186): old → new, which the list's Revert puts back. */
   setting?: AssistantSettingChange
-  /** The user reverted that change (this action's id): the list marks the change as reverted. */
-  revertOf?: string
   /** The line without what it quotes (a prompt, a message): what the Agent API's event stream gives (#620). */
   brief?: string
   /** The user's message it came from, and when it was sent (#1283: the panel lists it with that message's changes). */

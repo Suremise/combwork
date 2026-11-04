@@ -113,11 +113,10 @@ export function allows(need: AssistantControl): boolean {
 
 /**
  * Records something the Assistant did (or was refused), in its panel's list and hive.log: `act`, its kind and targets
- * (#763; a refusal, the kind it tried); with `more`, the setting it changed (for Revert), the change the user reverted,
- * the line without what it quotes (`brief`), or a refusal's `reason` as the event stream says it (Hive's own words,
+ * (#763; a refusal, the kind it tried); with `more`, the setting it changed, the line without what it quotes (`brief`), or a refusal's `reason` as the event stream says it (Hive's own words,
  * never the error's text: "Failed" when not given).
  */
-export function record(workspacePath: string, act: ActivityTarget, text: string, error?: string, more: { setting?: AssistantSettingChange; revertOf?: string; brief?: string; reason?: string } = {}): AssistantAction {
+export function record(workspacePath: string, act: ActivityTarget, text: string, error?: string, more: { setting?: AssistantSettingChange; brief?: string; reason?: string } = {}): AssistantAction {
   const s = stateOf(workspacePath)
   const reason = error ? (more.reason ?? publicReason(undefined)) : undefined
   // The user's message it came from (#1283): the panel lists it with that message's changes.
