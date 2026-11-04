@@ -432,7 +432,7 @@
   "assistant.skills.shipped.boardHygiene": "Tidy the board as the Assistant: duplicates, unrecorded answers, stale blocked reasons. Use when asked to tidy the board.",
   "assistant.skills.shipped.cardLoop": "Work through cards in turn as their builder or reviewer, waiting at no cost. Use when told to work through or review cards (one or several) as a builder or reviewer, or given rounds.",
   "assistant.skills.shipped.coordinateAgents": "Run work across the workspace's agents as the Assistant: cards, briefs, starting agents, waiting, handing over, stalled cards. Use when asked to get agents working, start or continue a card, or check progress.",
-  "assistant.skills.shipped.generalist": "General work: understand first, change carefully, prove it works, report honestly. Use when no other skill fits, not for a Combwork inbox line.",
+  "assistant.skills.shipped.generalist": "General work: understand, change carefully, prove it, report honestly. Use when no other skill fits, not for inbox lines.",
   "assistant.skills.shipped.handover": "Write a handover so a later session or another agent can carry on cold. Use when asked to wrap up for later, hand over or stop for the day. Readying a branch to merge is merge-ready.",
   "assistant.skills.shipped.journal": "Keep your journal as the Assistant while it is on - what to write, recalling, superseding, the weekly digest and the scope. Use when something worth remembering happens, before deciding from memory, or when asked for a handover.",
   "assistant.skills.shipped.licenceAudit": "Audit the licences of what ships: dependencies, vendored files, installer parts. Use when releasing or adding assets.",
