@@ -1,6 +1,6 @@
 // Windows Sandbox's broker and a connection switch's held slot (HI-2304, SPEC §16.10.3): MB1 switched connection, its
 // run left Windows Sandbox's WindowsSandboxServer.exe running, Hive held the slot for it, and MB1 never resumed.
-// B1 is lent slot-a (`slots:test`, as a card's start does) and started there, on the fake Claude Code. A test copy takes
+// B1 starts a real card in slot-a on the fake Claude Code, keeping its active lease across the restarts. A test copy takes
 // the processes whose ids are in the file HIVE_TEST_SYSTEM_BROKER as the Sandbox's broker (no test can put one in
 // WindowsApps; their paths are still asked of the helper by id and start time), and the names in the file
 // HIVE_TEST_SYSTEM_BROKER_ACTIVE as running on the machine.
@@ -24,7 +24,7 @@
 //    Slot… (from the notice's button) says so with "End these processes first" off. Screenshots of the notice and the
 //    question, light and dark. Released, the broker still runs.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
-// Dev build only: slot-a is lent through slots:test, and the broker is a test seam's, both of which a packaged build refuses.
+// Dev build only: the broker is a test seam's, which a packaged build refuses.
 const lib = require('./lib.cjs')
 const { processes, descendantsIn, endAsCrash } = require('./folderProcesses.cjs')
 const { DatabaseSync } = require('node:sqlite')
@@ -99,6 +99,7 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
   fs.writeFileSync(brokers, '')
   fs.mkdirSync(shots, { recursive: true })
   lib.gitProject(alpha)
+  lib.git(alpha, ['branch', '-M', 'main'])
   const env = lib.fakeClaude(userData, home, [alpha, ws, path.join(root, 'slot-a')])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -127,11 +128,17 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
 
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1', workflowRole: 'builder' })
     const key = lib.ptyKey(alpha, b1.id)
-    const lent = await inv('slots:test', alpha, { op: 'lend', agent: b1.id, card: 12 })
-    check('#12 is lent slot-a for B1', lent?.ok && lent.slot.name === 'slot-a', JSON.stringify(lent))
-    await inv('session:start', alpha, { agentId: b1.id })
+    // HI-2479: a fabricated card's lease expires once the restart pass sees no matching active cycle. Start a real
+    // card instead, so the broker/keeper tests never depend on that orphan lease's two-minute grace period.
+    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main', style: 'merge', preChecks: [], mergeChecks: [], okBefore: { mode: 'never', labels: [] } } })
+    const card = await inv('tasks:create', { title: 'Keep the broker slot across restarts', project: 'alpha' })
+    await inv('tasks:start', card.number, { kind: 'agent', agentId: b1.id })
     const s1 = await until(async () => ((await idle(b1.id)) ? live(b1.id) : null), HUNG_MS)
     check('B1 runs in slot-a', s1?.slot === 'slot-a', JSON.stringify(s1))
+    const lent = await slotA()
+    check(`${card.key} is lent slot-a for B1`, !!lent?.lease?.id && lent.lease.card === card.number && lent.lease.agent === b1.id, JSON.stringify(lent))
+    const lease = lent?.lease?.id
+    if (!lease) throw new Error('the card did not retain a slot lease')
 
     // --- 1. The fake broker left running while a "Sandbox" runs: held, and the switch waits.
     fs.writeFileSync(active, 'windowssandboxclient.exe\n')
@@ -199,9 +206,9 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
     await h.app.close()
     h = null
     await start()
-    check('the next Hive finds slot-a free: no writer, still lent to #12', !!(await until(async () => {
+    check(`the next Hive finds slot-a free: no writer, still lent to ${card.key} under the same lease`, !!(await until(async () => {
       const s = await slotA()
-      return s && !s.writer && s.lease?.card === 12
+      return s && !s.writer && s.lease?.card === card.number && s.lease.id === lease
     }, HUNG_MS)), JSON.stringify(await slotA()))
     check("…the broker isn't listed as B1's", !(await inv('session:leftovers')).some((l) => l.agentId === b1.id && l.processes.some((p) => p.pid === pid4)))
     check('…and still runs: nothing ended it', lib.identify([pid4]).length === 1)
@@ -263,7 +270,10 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
     // now, is told only the broker, and frees slot-a by itself. No notice; the broker and its keeper still run.
     const crash5 = await crashLeavingBroker(s4.runId, '5')
     await start()
-    check('5: the next Hive asks its keeper, told only the idle broker, and frees slot-a by itself', !!(await until(async () => !(await slotA())?.writer, HUNG_MS)), JSON.stringify(await slotA()))
+    check('5: the next Hive asks its keeper, told only the idle broker, and frees the writer while keeping the active card lease', !!(await until(async () => {
+      const s = await slotA()
+      return s && !s.writer && s.lease?.id === lease && s.lease.card === card.number
+    }, HUNG_MS)), JSON.stringify(await slotA()))
     check('5: …with no notice that it is held', (await h.page.locator('.toast', { hasText: 'slot-a is held by' }).count()) === 0)
     check('5: …the broker and its keeper still running: nothing ended', lib.identify([crash5.pid]).length === 1 && lib.stillSame(crash5.keeper).length === 1)
 
