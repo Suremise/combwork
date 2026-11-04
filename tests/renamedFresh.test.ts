@@ -56,6 +56,21 @@ beforeAll(async () => {
   internals.conversationEnds = async (_p: string, agentId: string) => void seen.ended.push(agentId)
 })
 
+/**
+ * HI-2462's fixture, which a case sets up itself (it runs alone too; doing it again changes nothing): alpha's .hive moved
+ * to .combwork, b3's current conversation (6) ran in a slot inside it, b4's (7) in the project folder. Returns the slot.
+ */
+async function movedFixture(): Promise<string> {
+  // alpha's .hive moved to .combwork: its folder holds the move's marker (combworkMove.ts writes it before the rename).
+  writeFileSync(join(project, '.combwork', 'combwork-move-id'), JSON.stringify({ kind: 'combwork-move', version: 1, id: 'test', from: '.hive' }))
+  // Folders move only at the move's boundaries, which publish the map readers use: this one stands in for the move.
+  await (await import('../src/main/combworkMove')).moveFolders(wsPath)
+  const slot = join(project, '.hive', 'slots', 'HI-1')
+  await run(() => ws.upsertSession(project, { id: '00000000-0000-4000-8000-000000000006', agent: 'claude-code', agentId: 'b3', cwd: slot, names: 2, name: 'x', lastActiveAt: '2026-11-02T00:00:00.000Z' }))
+  await run(() => ws.upsertSession(project, { id: '00000000-0000-4000-8000-000000000007', agent: 'claude-code', agentId: 'b4', cwd: project, names: 2, name: 'y', lastActiveAt: '2026-11-02T00:00:00.000Z' }))
+  return slot
+}
+
 afterAll(async () => {
   await disposeWorkspaceService(ws)
 })
@@ -94,13 +109,7 @@ describe('a conversation from before the rename (HI-2463)', () => {
     told.toasts.length = 0
     seen.launches.length = 0
     seen.carried.length = 0
-    // alpha's .hive moved to .combwork: its folder holds the move's marker (combworkMove.ts writes it before the rename).
-    writeFileSync(join(project, '.combwork', 'combwork-move-id'), JSON.stringify({ kind: 'combwork-move', version: 1, id: 'test', from: '.hive' }))
-    // Folders move only at the move's boundaries, which publish the map readers use: this one stands in for the move.
-    await (await import('../src/main/combworkMove')).moveFolders(wsPath)
-    const slot = join(project, '.hive', 'slots', 'HI-1')
-    await run(() => ws.upsertSession(project, { id: '00000000-0000-4000-8000-000000000006', agent: 'claude-code', agentId: 'b3', cwd: slot, names: 2, name: 'x', lastActiveAt: '2026-11-02T00:00:00.000Z' }))
-    await run(() => ws.upsertSession(project, { id: '00000000-0000-4000-8000-000000000007', agent: 'claude-code', agentId: 'b4', cwd: project, names: 2, name: 'y', lastActiveAt: '2026-11-02T00:00:00.000Z' }))
+    const slot = await movedFixture()
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     try {
       await run(() => sessions.start(project, { agentId: 'b3', resumeId: '00000000-0000-4000-8000-000000000006' }))
@@ -138,7 +147,11 @@ describe('a conversation from before the rename (HI-2463)', () => {
   })
 
   it('HI-2540: the window knows beforehand, by the rule the start reads; a start the user was asked about says so, with no notice', async () => {
-    // The list and the agents' resume targets: renamed (before HI-2463), moved (HI-2462, the test above), or neither.
+    // Its own fixture beside beforeAll's (1–4), so it runs alone too: b1's second conversation from before the rename (5),
+    // and HI-2462's move with b3's moved (6) and b4's current (7) conversations.
+    await run(() => ws.upsertSession(project, { id: '00000000-0000-4000-8000-000000000005', agent: 'claude-code', agentId: 'b1', cwd: project, name: 'x', lastActiveAt: '2026-11-01T00:00:00.000Z' }))
+    await movedFixture()
+    // The list and the agents' resume targets: renamed (before HI-2463), moved (HI-2462), or neither.
     const list = await run(() => sessions.list(project))
     const fresh = (n: number) => list.find((x) => x.id === `00000000-0000-4000-8000-00000000000${n}`)?.fresh
     expect([1, 2, 3, 4, 5, 6, 7].map(fresh)).toEqual(['renamed', 'renamed', undefined, undefined, 'renamed', 'moved', undefined])
