@@ -4811,7 +4811,8 @@ h2.section#unused-worktrees {
 }
 .account-main {
   flex: 1 1 360px;
-  min-width: 220px;
+  /* Never wider than a narrow card (HI-2528: Settings beside both panels in a small window is ~260px). */
+  min-width: min(220px, 100%);
 }
 .account-name {
   font-weight: 600;
@@ -5026,8 +5027,8 @@ h2.section#unused-worktrees {
 /* Each row is the same grid, so the columns line up: order, name, tag, five values, who uses it, its buttons. */
 .connection-row {
   display: grid;
-  grid-template-columns: 50px minmax(110px, 1.4fr) minmax(64px, 0.8fr) minmax(70px, 1fr) minmax(56px, 0.7fr) minmax(56px, 0.7fr) minmax(76px, 1fr) minmax(56px, 0.8fr) minmax(70px, 0.8fr) auto;
-  gap: 8px;
+  grid-template-columns: 44px minmax(90px, 1.4fr) minmax(56px, 0.8fr) minmax(60px, 1fr) minmax(48px, 0.7fr) minmax(48px, 0.7fr) minmax(60px, 1fr) minmax(48px, 0.8fr) minmax(64px, 0.9fr) 76px;
+  gap: 6px;
   align-items: center;
   min-height: 28px;
   border-bottom: 1px solid var(--border-subtle);
@@ -5071,18 +5072,21 @@ h2.section#unused-worktrees {
 .connection-actions {
   justify-content: flex-end;
 }
+.connection-order .icon-btn {
+  width: 20px;
+}
 .connection-summary {
   display: none;
 }
 /* A card narrower than the table (Settings beside the sidebar, a small window): each connection on two lines, its name,
    tag, who uses it and its buttons, then its values in a line. */
-@container connection-list (max-width: 700px) {
+@container connection-list (max-width: 640px) {
   .connection-head {
     display: none;
   }
   .connection-row {
-    grid-template-columns: 50px minmax(0, 1fr) auto auto;
-    grid-template-areas: 'order name users actions' 'order summary summary summary';
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-areas: 'order name actions' 'order tag tag' 'order summary summary' 'order users users';
     row-gap: 0;
     padding: 3px 0;
   }
@@ -5094,6 +5098,7 @@ h2.section#unused-worktrees {
   }
   .connection-row > .connection-users {
     grid-area: users;
+    text-align: left;
   }
   .connection-row > .connection-actions {
     grid-area: actions;
@@ -5104,6 +5109,11 @@ h2.section#unused-worktrees {
   }
   .connection-row > .connection-cell {
     display: none;
+  }
+  /* Its tag, when it has one, under its name. */
+  .connection-row > .connection-tag-cell:not(.faint) {
+    display: block;
+    grid-area: tag;
   }
 }
 .connection-name {

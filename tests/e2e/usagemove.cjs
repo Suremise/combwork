@@ -160,7 +160,7 @@ const check = (name, ok, extra = '') => {
     for (const [width, label] of [[1400, 'wide'], [820, 'narrow']]) {
       await page.setViewportSize({ width, height: 900 })
       // Narrow: each connection on two lines, no heading row, nothing wider than the pane.
-      if (label === 'narrow') check('narrow: the connections table goes to two lines, nothing scrolls sideways', !!(await lib.until(async () => ((await page.locator('.connection-head').first().isVisible()) === false && (await pane.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)) ? true : null), HUNG_MS)))
+      if (label === 'narrow') check('narrow: the connections table goes to two lines, nothing scrolls sideways', !!(await lib.until(async () => ((await page.locator('.connection-head').first().isVisible()) === false && (await page.locator('.settings-content').evaluate((el) => el.scrollWidth <= el.clientWidth + 1)) ? true : null), HUNG_MS)))
       else check('wide: the connections table has its heading row', await page.locator('.connection-head').first().isVisible())
       for (const theme of ['dark', 'light']) {
         await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
