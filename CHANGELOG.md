@@ -25,6 +25,7 @@
 
 ### Fixed
 
+- **Folder lists in Settings keep what you type** (HI-2538). Card attachments: more folders and Agents' temp folder take folders separated by semicolons, but the box and the Assistant showed a space after each semicolon that you hadn't typed. The box now shows the folders `;` apart, as you typed them, and `a; b` and `a;b` are the same list. Only a semicolon separates folders: a comma is kept as part of a folder's name.
 - **Settings section names cut short show in full on hover** (HI-2531). In a narrow window, Settings and Project Settings cut long section names ("Accounts & C…", "Keyboard Sho…"); hovering one now shows its whole name in a tooltip, and the list keeps its compact rows.
 - **Cut-off descriptions in side-panel lists show in full on hover** (HI-2527). Modes, MCP servers, Skills, Dialects, Templates and the MCP catalogue keep each row's description on one line, cut with "…"; hovering a cut one, or reaching it with Tab, now shows the whole text in a tooltip.
 - **Clicking the side panel leaves Settings** (HI-2525). With Settings open, the side panel kept showing the last view (Dialects, say), and clicking a row in it changed nothing in the main area, so Settings felt like a modal. A click anywhere in the side panel now takes you to that view, as its activity bar button does, and the gear brings Settings back on the section you were on. Text half typed in a box that only saves on its button (a viewer token's name, a model to price, a catalogue's address) is still there when you come back.

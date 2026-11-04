@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react'
-import { ADVANCED_DEFS, advancedRow, type AdvancedGroup, advancedShown, advancedTakesText, advancedUnit, checkAdvanced, cliFacing, groupName, shownText, type AdvancedDef, type AdvancedRow } from '@shared/advanced'
+import { ADVANCED_DEFS, advancedRow, type AdvancedGroup, advancedShown, advancedTakesText, advancedUnit, checkAdvanced, cliFacing, folderList, foldersText, groupName, shownText, type AdvancedDef, type AdvancedRow } from '@shared/advanced'
 import { msg, tr, tRich } from '@shared/i18n'
 import { INBOX_SWITCH_ID } from '@shared/inboxSwitches'
 import type { ProviderId } from '@shared/types'
@@ -271,8 +271,8 @@ function InboxAvailableNote() {
   )
 }
 
-/** A value as its text box shows it: a list of folders semicolons apart, as it is read back (HI-2480: a comma can be in a folder's name). */
-const boxText = (def: AdvancedDef, v: unknown): string => (v === null || v === undefined ? '' : Array.isArray(v) ? v.join(def.paths ? '; ' : ', ') : String(v))
+/** A value as its text box shows it: a list of folders semicolons apart, as it is read back (HI-2480: a comma can be in a folder's name; HI-2538: `;` alone, as typed). */
+const boxText = (def: AdvancedDef, v: unknown): string => (v === null || v === undefined ? '' : Array.isArray(v) ? (def.paths ? foldersText(v) : v.join(', ')) : String(v))
 
 /** The value's box: a switch, a number field, or text saved on Enter or leaving it (empty: back to the default, or Settings'). */
 function ValueBox({ def, value, label, placeholder, onCommit }: { def: AdvancedDef; value: unknown; label: string; placeholder?: string; onCommit: (v: unknown) => Promise<void> }) {
@@ -310,7 +310,11 @@ function ValueBox({ def, value, label, placeholder, onCommit }: { def: AdvancedD
     return <NumberField value={typeof value === 'number' ? value : null} min={def.min} max={def.max} step={1} inherit={placeholder} label={label} unit={advancedUnit(def) ?? undefined} onCommit={(v) => onCommit(v)} />
   const commit = (): void => {
     const v = draft.trim()
-    if (v === shown(value)) return
+    // The same folders typed with other spaces (`a; b` for `a;b`) are no change: shown as kept (HI-2538).
+    if (v === shown(value) || (def.paths && Array.isArray(value) && foldersText(folderList(v)) === shown(value))) {
+      setDraft(shown(value))
+      return
+    }
     void onCommit(v === '' ? null : def.kind === 'list' ? v : draft).catch(() => setDraft(shown(value)))
   }
   return (
