@@ -1,11 +1,11 @@
 name: Translation
-description: A word or sentence in one of Hive's languages reads badly, or is wrong.
+description: A word or sentence in one of Combwork's languages reads badly, or is wrong.
 labels: [i18n]
 body:
   - type: markdown
     attributes:
       value: |
-        Hive's languages besides English are drafted by AI, so corrections from people who speak them are very welcome.
+        Combwork's languages besides English are drafted by AI, so corrections from people who speak them are very welcome.
         You can also fix it yourself with a pull request, in GitHub's web editor and without installing anything: Help → Improve This Translation opens the guide, [Fix a translation](https://github.com/Suremise/combwork/blob/main/CONTRIBUTING.md#fix-a-translation). Each language's style page is in [docs/translating](https://github.com/Suremise/combwork/tree/main/docs/translating).
         Wrong English? Use the bug report instead.
   - type: dropdown
@@ -20,26 +20,26 @@ body:
         - Português (Brasil)
         - 日本語
         - 简体中文
-        - A language Hive doesn't have yet
+        - A language Combwork doesn't have yet
     validations:
       required: true
   - type: textarea
     id: where
     attributes:
       label: Where it is
-      description: Where in Hive you saw it (a setting, a button, a menu), and a screenshot if you have one.
+      description: Where in Combwork you saw it (a setting, a button, a menu), and a screenshot if you have one.
     validations:
       required: true
   - type: textarea
     id: text
     attributes:
       label: What it says, and what it should say
-      description: The text as Hive shows it, your better wording, and why if it isn't obvious.
+      description: The text as Combwork shows it, your better wording, and why if it isn't obvious.
     validations:
       required: true
   - type: input
     id: hive-version
     attributes:
-      label: Hive version
+      label: Combwork version
       description: Help → About Combwork shows it.
       placeholder: "0.9.0"

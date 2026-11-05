@@ -1,5 +1,5 @@
 name: Bug report
-description: Something in Hive doesn't work as it should.
+description: Something in Combwork doesn't work as it should.
 labels: [bug]
 body:
   - type: markdown
@@ -28,7 +28,7 @@ body:
   - type: input
     id: hive-version
     attributes:
-      label: Hive version
+      label: Combwork version
       description: Help → About Combwork shows it.
       placeholder: "0.9.0"
     validations:
@@ -52,7 +52,7 @@ body:
   - type: dropdown
     id: language
     attributes:
-      label: Hive's language
+      label: Combwork's language
       description: Settings → General → Language.
       options:
         - English
@@ -71,7 +71,7 @@ body:
     attributes:
       label: Diagnostics
       description: |
-        In Hive, click **Help → Copy Diagnostics…**, look at what it shows, click **Copy** and paste it here. It has Hive's and Windows' versions, your coding agents, the settings that change how Hive behaves and the last lines of its log. Your own text is left out: folders, workspace, project and agent names, card titles, what you asked agents to do, and anything that looks like a key or token.
+        In Combwork, click **Help → Copy Diagnostics…**, look at what it shows, click **Copy** and paste it here. It has Combwork's and Windows' versions, your coding agents, the settings that change how Combwork behaves and the last lines of its log. Your own text is left out: folders, workspace, project and agent names, card titles, what you asked agents to do, and anything that looks like a key or token.
       render: text
   - type: textarea
     id: screenshots

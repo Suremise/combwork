@@ -2,7 +2,7 @@ blank_issues_enabled: false
 contact_links:
   - name: User guide
     url: https://surmise.it/docs/user-guide/
-    about: How to use Hive, and what to do when something goes wrong (Troubleshooting).
+    about: How to use Combwork, and what to do when something goes wrong (Troubleshooting).
   - name: Report a security problem
     url: https://github.com/Suremise/combwork/security/advisories/new
     about: Report it privately, never in an issue. SECURITY.md says how.
