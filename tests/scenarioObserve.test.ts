@@ -2233,6 +2233,14 @@ describe("watcher-stopped: what a stopped Monitor's pipeline left is the CLI's, 
     const otherTail = { ...tail, pid: 2, label: 'tail -f checks.log' }
     const renamed = { ...tail, pid: 3, name: 'node.exe' }
     expect(h.leftoversByOwner(run([monitor(), taskStop()], [otherGrep, otherTail, renamed])).cli).toEqual([])
+    // HR2's round 1: stopped, then the same command started again and left running. Its tail may be either's: the agent's.
+    const again = h.leftoversByOwner(run([monitor('old'), taskStop('old'), monitor('new')], [tail]))
+    expect(again).toMatchObject({ cli: [], more: 0 })
+    expect(again.agent.map((p) => p.pid)).toEqual([126080])
+    // Both stopped: the CLI's again.
+    expect(h.leftoversByOwner(run([monitor('old'), taskStop('old'), monitor('new'), taskStop('new')], [tail, grep])).agent).toEqual([])
+    // An unstopped Monitor on another command takes nothing from the stopped one's stages.
+    expect(h.leftoversByOwner(run([monitor(), taskStop(), monitor('other', 'tail -f other.log')], [tail, grep])).cli.length).toBe(2)
     // The Monitor's tool call failed: no task was started.
     expect(h.leftoversByOwner(run([{ ...monitor(), isError: true }, taskStop()], [grep, tail])).cli).toEqual([])
   })
@@ -2249,6 +2257,8 @@ describe("watcher-stopped: what a stopped Monitor's pipeline left is the CLI's, 
     expect(checks(stoppedIt)).toMatchObject({ [OWN]: true, [ENDED]: true })
     expect(checks(run([monitor()], [grep, tail], 0, ended))[OWN]).toBe(false)
     expect(checks(run([monitor(), taskStop()], [grep, tail, loop], 1, ended))[OWN]).toBe(false)
+    // Stopped, then started again with the same command and never stopped (HR2's round 1): fails.
+    expect(checks(run([monitor('old'), taskStop('old'), monitor('new')], [grep, tail], 0, ended))[OWN]).toBe(false)
     // Cleanup still verified: what Combwork listed and didn't end fails, the CLI's included.
     expect(checks(run([monitor(), taskStop()], [grep, tail], 0, { leftoversEnded: 2, leftoversStillRunning: [{ pid: 40376, started: 1 }] }))[ENDED]).toBe(false)
     expect(checks(run([monitor(), taskStop()], [grep, tail], 0, { leftoversEnded: 'failed: no such run', leftoversStillRunning: [] }))[ENDED]).toBe(false)

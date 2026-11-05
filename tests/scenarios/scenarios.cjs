@@ -126,17 +126,17 @@ const leftoversByOwner = (o) => {
       .filter(([id, result]) => id && result.includes(`Successfully stopped task: ${id}`))
       .map(([id]) => id)
   )
-  const stages = (o.tools ?? [])
-    .filter((t) => t.name === 'Monitor' && !t.isError)
-    .filter((t) => stopped.has(/\(task (\w+)/.exec(String(t.result))?.[1]))
-    .flatMap((t) => pipelineStages(toolArg(t.input, 'command')))
+  const monitors = (o.tools ?? []).filter((t) => t.name === 'Monitor' && !t.isError).map((t) => ({ stopped: stopped.has(/\(task (\w+)/.exec(String(t.result))?.[1]), stages: pipelineStages(toolArg(t.input, 'command')) }))
   const program = (s) => String(s).split(' ')[0].split(/[\\/]/).pop().replace(/\.exe$/i, '').toLowerCase()
-  const isStage = (p) => {
+  const matches = (p, stages) => {
     const label = commandWords(p.label)
     const cut = label.endsWith('…')
     const shown = cut ? label.slice(0, -1).trim() : label
     return !!shown && stages.some((s) => (cut ? s.startsWith(shown) : s === shown) && program(s) === String(p.name ?? '').replace(/\.exe$/i, '').toLowerCase())
   }
+  // Unambiguous only (HR2, HI-2571 round 1): a process that is also a stage of a Monitor never stopped (the same
+  // command started again, say) may be that one's, so it stays the agent's.
+  const isStage = (p) => monitors.some((m) => m.stopped && matches(p, m.stages)) && !monitors.some((m) => !m.stopped && matches(p, m.stages))
   const all = (o.leftovers ?? []).flatMap((l) => l.processes ?? [])
   return { cli: all.filter(isStage), agent: all.filter((p) => !isStage(p)), more: (o.leftovers ?? []).reduce((n, l) => n + (l.more ?? 0), 0) }
 }
