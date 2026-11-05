@@ -31,8 +31,10 @@ const key = (project: string): string => `${PREFIX}${project.toLowerCase()}`
  * under the new key wins; the old key goes either way. Storage that can't be read or written: nothing is moved, and the
  * view starts afresh.
  */
-export function upgradeActivityViews(storage: Pick<Storage, 'length' | 'key' | 'getItem' | 'setItem' | 'removeItem'> = localStorage): void {
+export function upgradeActivityViews(given?: Pick<Storage, 'length' | 'key' | 'getItem' | 'setItem' | 'removeItem'>): void {
   try {
+    // Inside the try: reading localStorage itself can throw (a SecurityError where storage is blocked).
+    const storage = given ?? localStorage
     const old: string[] = []
     for (let i = 0; i < storage.length; i++) {
       const k = storage.key(i)

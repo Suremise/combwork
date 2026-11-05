@@ -55,4 +55,20 @@ describe('the Activity tabs\' kept views (HI-2610)', () => {
     const blocked = { get length(): number { throw new Error('blocked') }, key: () => null, getItem: () => null, setItem: () => undefined, removeItem: () => undefined }
     expect(() => upgradeActivityViews(blocked)).not.toThrow()
   })
+
+  it('never throws when reading localStorage itself throws, as the window calls it (no argument)', () => {
+    const had = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      get() {
+        throw new DOMException('storage blocked', 'SecurityError')
+      }
+    })
+    try {
+      expect(() => upgradeActivityViews()).not.toThrow()
+    } finally {
+      if (had) Object.defineProperty(globalThis, 'localStorage', had)
+      else delete (globalThis as { localStorage?: unknown }).localStorage
+    }
+  })
 })
