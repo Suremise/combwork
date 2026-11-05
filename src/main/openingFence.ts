@@ -1,5 +1,5 @@
 import { basename, dirname } from 'path'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { placeKey } from './fsutil'
 
 /**
@@ -65,7 +65,7 @@ export const isAdmitted = (place: string): boolean => admitted.has(place)
  * already its real location (`realPath`), not resolved again (HI-1887: each usage history request's).
  */
 export function ownerOf(file: string, real = false): string | null {
-  const hive = HIVE_DIR.toLowerCase()
+  const hive = CW_DIR.toLowerCase()
   for (let d = dirname(real ? file.toLowerCase() : placeKey(file)); ; ) {
     if (basename(d) === hive) return dirname(d)
     const up = dirname(d)

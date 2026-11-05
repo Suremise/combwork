@@ -5,18 +5,18 @@
 ; install folder, inherited by what it holds, on every install and update (electron-updater runs this installer too).
 ; Hive checks again at start (src/main/installDir.ts), for a folder changed after installing.
 ;
-; A local build's installer (#1647: npm run dist sets HIVE_LOCAL_BUILD=1, the release workflow 0; scripts/appIdentity.mjs)
+; A local build's installer (#1647: npm run dist sets CW_LOCAL_BUILD=1, the release workflow 0; scripts/appIdentity.mjs)
 ; also drops a downloaded update Hive was keeping (hive-updater\pending), so it isn't installed over this build later.
 !macro customInstall
   nsExec::Exec '"$SYSDIR\icacls.exe" "$INSTDIR" /grant *S-1-15-2-1:(OI)(CI)(RX)'
   Pop $0
-  !ifdef HIVE_LOCAL_BUILD
+  !ifdef CW_LOCAL_BUILD
     RMDir /r "$LOCALAPPDATA\hive-updater\pending"
   !endif
 !macroend
 
-!if "$%HIVE_LOCAL_BUILD%" == "1"
-  !define HIVE_LOCAL_BUILD
+!if "$%CW_LOCAL_BUILD%" == "1"
+  !define CW_LOCAL_BUILD
 !endif
 
 ; A local build's installer waits for another installer of Hive to finish, then installs, so it is the last (#1647).
@@ -27,10 +27,10 @@
 ; waits for one held (at most 10 minutes), then lets it go for the template to take; a release installer finding it
 ; held then quits, as before. Only the outer installer waits (never the uninstaller's build, nor the elevated inner
 ; instance the outer one started). A timeout or a failing call installs nothing and says so (exit code 3).
-!ifdef HIVE_LOCAL_BUILD
+!ifdef CW_LOCAL_BUILD
 !ifndef BUILD_UNINSTALLER
 ; How long it waits (ms): a test harness shortens it (tests/installer, #1647).
-!define /ifndef HIVE_INSTALLER_WAIT_MS 600000
+!define /ifndef CW_INSTALLER_WAIT_MS 600000
 LangString hiveInstallerBusy 1033 "Another Combwork installer is still running, or Combwork couldn't tell whether one is. Nothing was installed: run this installer again once the other one has finished."
 LangString hiveInstallerBusy 1031 "Ein anderes Combwork-Installationsprogramm läuft noch, oder Combwork konnte nicht feststellen, ob eines läuft. Es wurde nichts installiert: Starten Sie dieses Installationsprogramm erneut, sobald das andere fertig ist."
 LangString hiveInstallerBusy 3082 "Todavía se está ejecutando otro instalador de Combwork, o Combwork no ha podido saber si lo hay. No se ha instalado nada: vuelve a ejecutar este instalador cuando el otro haya terminado."
@@ -54,7 +54,7 @@ LangString hiveInstallerBusy 2052 "另一个 Combwork 安装程序仍在运行�
     ${Else}
       ; WAIT_OBJECT_0 (0), or WAIT_ABANDONED (0x80: its installer ended without letting it go): ours now, let go so the
       ; template takes it. WAIT_TIMEOUT (0x102) or WAIT_FAILED: nothing installed.
-      System::Call 'kernel32::WaitForSingleObject(i r1, i ${HIVE_INSTALLER_WAIT_MS}) i.r2'
+      System::Call 'kernel32::WaitForSingleObject(i r1, i ${CW_INSTALLER_WAIT_MS}) i.r2'
       ${If} $2 = 0
       ${OrIf} $2 = 0x80
         System::Call 'kernel32::ReleaseMutex(i r1) i.r3'
@@ -101,7 +101,7 @@ LangString hiveInstallerBusy 2052 "另一个 Combwork 安装程序仍在运行�
 ; whose profile and Hive Desktop's per-user install these are), never the uninstaller.
 ; 1. Hive Desktop's installer identity is held too: its mutex (1.0's APP_GUID, from appId com.hive.desktop) taken and
 ;    kept until this installer exits, so a 1.0 installer or updater started meanwhile finds it held and quits; one
-;    running now is waited for (at most HIVE_LEGACY_WAIT_MS). WAIT_ABANDONED counts as taken. electron-builder's
+;    running now is waited for (at most CW_LEGACY_WAIT_MS). WAIT_ABANDONED counts as taken. electron-builder's
 ;    uninstaller never takes its installer's mutex (ALLOW_ONLY_ONE_INSTALLER_INSTANCE is the installer's), so Hive
 ;    Desktop's uninstaller, run below, isn't held up by it. Any failing call: nothing changed (exit 4).
 ; 2. hiveUpgrade.ps1: the apps of both installations asked to close (hiveAskToClose.ps1, HI-1707: they record their
@@ -111,14 +111,14 @@ LangString hiveInstallerBusy 2052 "另一个 Combwork 安装程序仍在运行�
 ;    then too, saying so, and nothing is installed. Its lines go to the installer's log.
 !ifndef BUILD_UNINSTALLER
 ; This file's folder (build), as it is included: inside the macro, __FILEDIR__ would be where the macro is inserted.
-!define HIVE_BUILD_DIR "${__FILEDIR__}"
-!define HIVE_LEGACY_GUID "35960567-b95c-520c-a9f1-e8bb85764724"
+!define CW_BUILD_DIR "${__FILEDIR__}"
+!define LEGACY_GUID "35960567-b95c-520c-a9f1-e8bb85764724"
 ; How long a held Hive Desktop installer mutex is waited for (ms): 10 minutes, or 20 s in an installer built for the
-; Sandbox's refusal check (HIVE_TEST_SHORT_LEGACY_WAIT=1 in npm run dist's environment; a release never sets it).
-!if "$%HIVE_TEST_SHORT_LEGACY_WAIT%" == "1"
-  !define HIVE_LEGACY_WAIT_MS 20000
+; Sandbox's refusal check (CW_TEST_SHORT_LEGACY_WAIT=1 in npm run dist's environment; a release never sets it).
+!if "$%CW_TEST_SHORT_LEGACY_WAIT%" == "1"
+  !define CW_LEGACY_WAIT_MS 20000
 !else
-  !define HIVE_LEGACY_WAIT_MS 600000
+  !define CW_LEGACY_WAIT_MS 600000
 !endif
 
 LangString hiveLegacyBusy 1033 "A Hive Desktop installer is still running, or Combwork couldn't tell whether one is. Nothing was installed: run this installer again once the other one has finished."
@@ -152,13 +152,13 @@ LangString hiveOldNotRemoved 2052 "无法卸载 Hive Desktop，因此未安装 C
   ${IfNot} ${UAC_IsInnerInstance}
     ; 1. Hive Desktop's installer mutex, kept open (and owned) until this installer exits.
     StrCpy $4 "go"
-    System::Call 'kernel32::CreateMutexW(i 0, i 1, w "${HIVE_LEGACY_GUID}") i.r1 ?e'
+    System::Call 'kernel32::CreateMutexW(i 0, i 1, w "${LEGACY_GUID}") i.r1 ?e'
     Pop $0
     ${If} $1 = 0
       StrCpy $4 "fail"
     ${ElseIf} $0 = 183
       ; ERROR_ALREADY_EXISTS: another holds it (not ours yet). WAIT_OBJECT_0 (0) or WAIT_ABANDONED (0x80): ours now.
-      System::Call 'kernel32::WaitForSingleObject(i r1, i ${HIVE_LEGACY_WAIT_MS}) i.r2'
+      System::Call 'kernel32::WaitForSingleObject(i r1, i ${CW_LEGACY_WAIT_MS}) i.r2'
       ${If} $2 <> 0
       ${AndIf} $2 <> 0x80
         StrCpy $4 "fail"
@@ -172,8 +172,8 @@ LangString hiveOldNotRemoved 2052 "无法卸载 Hive Desktop，因此未安装 C
     ${EndIf}
     ; 2. The upgrade.
     InitPluginsDir
-    File "/oname=$PLUGINSDIR\hiveAskToClose.ps1" "${HIVE_BUILD_DIR}\hiveAskToClose.ps1"
-    File "/oname=$PLUGINSDIR\hiveUpgrade.ps1" "${HIVE_BUILD_DIR}\hiveUpgrade.ps1"
+    File "/oname=$PLUGINSDIR\hiveAskToClose.ps1" "${CW_BUILD_DIR}\hiveAskToClose.ps1"
+    File "/oname=$PLUGINSDIR\hiveUpgrade.ps1" "${CW_BUILD_DIR}\hiveUpgrade.ps1"
     nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\hiveUpgrade.ps1" -InstallDir "$INSTDIR" -WorkDir "$PLUGINSDIR"'
     Pop $0
     DetailPrint "The upgrade from Hive Desktop: $0"

@@ -4,22 +4,22 @@ import { app, screen, type BrowserWindow } from 'electron'
 /**
  * Test copies of Hive don't interrupt the person at the desk: their windows open off screen and never take focus, and
  * Windows notifications, taskbar flashes and the chime don't happen. What would have happened is appended to
- * HIVE_TEST_NOTIFY_LOG (one JSON line each), so suites can check it. A test copy is an unpackaged build with a test
- * profile (HIVE_USER_DATA, which every suite, scenario and verification script sets, however it is started), or one
- * started with HIVE_TEST_QUIET=1; HIVE_TEST_QUIET=0 turns it off, for a test that needs a real window. A packaged build
- * is quiet only with HIVE_TEST_QUIET=1 (#1253: the packaged suites start dist\win-unpacked with it, hiveEnv); its test
- * profile alone doesn't make it so. Never on in normal use: `npm run dev` has no HIVE_USER_DATA, and the installed app
- * is started without HIVE_TEST_QUIET.
+ * CW_TEST_NOTIFY_LOG (one JSON line each), so suites can check it. A test copy is an unpackaged build with a test
+ * profile (CW_USER_DATA, which every suite, scenario and verification script sets, however it is started), or one
+ * started with CW_TEST_QUIET=1; CW_TEST_QUIET=0 turns it off, for a test that needs a real window. A packaged build
+ * is quiet only with CW_TEST_QUIET=1 (#1253: the packaged suites start dist\win-unpacked with it, hiveEnv); its test
+ * profile alone doesn't make it so. Never on in normal use: `npm run dev` has no CW_USER_DATA, and the installed app
+ * is started without CW_TEST_QUIET.
  */
 export function testQuiet(env: NodeJS.ProcessEnv = process.env, packaged = app.isPackaged): boolean {
-  const quiet = env.HIVE_TEST_QUIET
+  const quiet = env.CW_TEST_QUIET
   if (packaged) return quiet === '1'
-  return quiet === '1' || (quiet !== '0' && !!env.HIVE_USER_DATA)
+  return quiet === '1' || (quiet !== '0' && !!env.CW_USER_DATA)
 }
 
 /**
- * Whether this copy honours the test seams every test copy is given (HIVE_TEST_NOTIFY_LOG, HIVE_TEST_TRASH_DIR,
- * HIVE_TEST_TIPS): any unpackaged build, and a packaged one only when quiet (HIVE_TEST_QUIET=1: a copy a test started,
+ * Whether this copy honours the test seams every test copy is given (CW_TEST_NOTIFY_LOG, CW_TEST_TRASH_DIR,
+ * CW_TEST_TIPS): any unpackaged build, and a packaged one only when quiet (CW_TEST_QUIET=1: a copy a test started,
  * #1253, #1599). The installed app is never started quiet, so it takes none of them.
  */
 export function takesTestSeams(env: NodeJS.ProcessEnv = process.env, packaged = app.isPackaged): boolean {
@@ -57,9 +57,9 @@ export function keepOffScreen(win: BrowserWindow): void {
   win.on('resize', check)
 }
 
-/** One line to HIVE_TEST_NOTIFY_LOG, if set (unpackaged builds and quiet packaged ones only). */
+/** One line to CW_TEST_NOTIFY_LOG, if set (unpackaged builds and quiet packaged ones only). */
 export function testNotifyLog(entry: { kind: 'notification' | 'flash' | 'chime' | 'dialog' | 'entry'; title?: string; body?: string; projectPath?: string; on?: boolean; id?: string; notifyKind?: string; route?: string; owner?: number | null }): void {
-  const file = takesTestSeams() ? process.env.HIVE_TEST_NOTIFY_LOG : undefined
+  const file = takesTestSeams() ? process.env.CW_TEST_NOTIFY_LOG : undefined
   if (!file) return
   try {
     appendFileSync(file, `${JSON.stringify({ at: Date.now(), ...entry })}\n`)
@@ -70,20 +70,20 @@ export function testNotifyLog(entry: { kind: 'notification' | 'flash' | 'chime' 
 
 /**
  * A token this test copy issues (a launch's hook token, an agent's or the Assistant's Agent API token), appended to
- * HIVE_TEST_TOKEN_LOG as `{ kind, token }` when that is set (unpackaged builds and quiet packaged ones only, as the
+ * CW_TEST_TOKEN_LOG as `{ kind, token }` when that is set (unpackaged builds and quiet packaged ones only, as the
  * other seams): the scenario harness's leak check knows from it every token a session could have printed, however soon
  * its launch ended and its files went (HI-2262, HR1's rounds 1 and 2). Called where the token is made, before it is kept,
  * written or returned. A record asked for that can't be written throws (naming no token), so nothing is issued that
  * the record lacks; without the variable it does nothing.
  */
 export function recordTestToken(kind: 'hook' | 'agent' | 'assistant', token: string): void {
-  const file = takesTestSeams() ? process.env.HIVE_TEST_TOKEN_LOG : undefined
+  const file = takesTestSeams() ? process.env.CW_TEST_TOKEN_LOG : undefined
   if (!file) return
   try {
     appendFileSync(file, `${JSON.stringify({ kind, token })}\n`)
   } catch (e) {
-    // i18n-ignore: a test seam's diagnostic for the test that set HIVE_TEST_TOKEN_LOG, never shown in normal use
-    throw new Error(`HIVE_TEST_TOKEN_LOG couldn't be written (${(e as NodeJS.ErrnoException)?.code ?? 'error'}): no ${kind} token issued`, { cause: e })
+    // i18n-ignore: a test seam's diagnostic for the test that set CW_TEST_TOKEN_LOG, never shown in normal use
+    throw new Error(`CW_TEST_TOKEN_LOG couldn't be written (${(e as NodeJS.ErrnoException)?.code ?? 'error'}): no ${kind} token issued`, { cause: e })
   }
 }
 

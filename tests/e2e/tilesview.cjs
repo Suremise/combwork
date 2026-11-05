@@ -37,7 +37,7 @@ const check = (name, ok, extra = '') => {
   fs.mkdirSync(claudeHome, { recursive: true })
   lib.gitProject(alpha)
   lib.fakeClaude(userData, claudeHome, [alpha])
-  let { app, page, inv } = await lib.launch({ userData, env: { CLAUDE_CONFIG_DIR: claudeHome, HIVE_API_PORT: lib.port(47825) }, viewport: { width: 1500, height: 900 } })
+  let { app, page, inv } = await lib.launch({ userData, env: { CLAUDE_CONFIG_DIR: claudeHome, CW_API_PORT: lib.port(47825) }, viewport: { width: 1500, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
@@ -360,7 +360,7 @@ const check = (name, ok, extra = '') => {
     check('…the drag has ended: no drop targets left', !!(await lib.until(async () => (await page.locator('.tile-drop, .tile-pages button.drop-target').count()) === 0, HUNG_MS)))
     // A move shown while its save is held (#1229): a refresh meanwhile reads the order from before it, and its report
     // reaches the window (seen by a listener after the window's own, then drawn); the tiles keep the move.
-    await app.evaluate(() => void (process.env.HIVE_TEST_SLOW_IPC = 'agents:move=20000*1'))
+    await app.evaluate(() => void (process.env.CW_TEST_SLOW_IPC = 'agents:move=20000*1'))
     await tile('C').focus()
     await page.keyboard.press('Control+Alt+Shift+ArrowRight')
     const held = ['B', 'C', 'A', ...NAMES.slice(3)]
@@ -377,7 +377,7 @@ const check = (name, ok, extra = '') => {
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
     check('…a refresh meanwhile reports the order from before the move', older === order(swapped), String(older))
     check('…and the tiles keep the move', (await tileNames()).join() === order(held.slice(0, 12)), (await tileNames()).join())
-    await app.evaluate(() => void (process.env.HIVE_TEST_SLOW_IPC = ''))
+    await app.evaluate(() => void (process.env.CW_TEST_SLOW_IPC = ''))
     // Bound: the save's hold left over, plus a hung run's.
     check('…saved once its save goes on, still shown', !!(await lib.until(async () => saved() === order(held) && (await tileNames()).join() === order(held.slice(0, 12)), 20000 + HUNG_MS)), `${saved()} / ${(await tileNames()).join()}`)
     await tile('C').focus()
@@ -528,7 +528,7 @@ const check = (name, ok, extra = '') => {
     await inv('session:stop', alpha).catch(() => undefined)
     await lib.until(async () => (await inv('session:live').catch(() => [])).length === 0, HUNG_MS)
     await app.close()
-    ;({ app, page, inv } = await lib.launch({ userData, env: { CLAUDE_CONFIG_DIR: claudeHome, HIVE_API_PORT: lib.port(47825) }, viewport: { width: 1500, height: 900 } }))
+    ;({ app, page, inv } = await lib.launch({ userData, env: { CLAUDE_CONFIG_DIR: claudeHome, CW_API_PORT: lib.port(47825) }, viewport: { width: 1500, height: 900 } }))
     page.on('pageerror', (e) => check('no page errors (restarted)', false, e.message))
     for (const w of app.windows().slice(1)) await w.close().catch(() => undefined)
     await lib.openWorkspace(inv, page, ws)

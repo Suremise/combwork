@@ -395,7 +395,7 @@ m.moveFolders(ws).then((r) => appendFileSync(out, 'moved ' + r.moved + '\\n'), (
     writeFileSync(barrier, '')
     const out = join(tmp, `k${n}.txt`)
     writeFileSync(out, '')
-    const child = spawn(process.execPath, [bundle, ws, out, barrier, 'renamed:workspace'], { env: { ...ctx.baseEnv(), HIVE_USER_DATA: join(tmp, `ud${n}`) }, stdio: 'ignore', windowsHide: true })
+    const child = spawn(process.execPath, [bundle, ws, out, barrier, 'renamed:workspace'], { env: { ...ctx.baseEnv(), CW_USER_DATA: join(tmp, `ud${n}`) }, stdio: 'ignore', windowsHide: true })
     children.push(child)
     await vi.waitFor(() => expect(readFileSync(out, 'utf8')).toContain('stopped'), WAIT)
     // While it lives, its row holds: this open is refused, nothing changed.
@@ -417,7 +417,7 @@ m.moveFolders(ws).then((r) => appendFileSync(out, 'moved ' + r.moved + '\\n'), (
     const outs = [join(tmp, `a${n}.txt`), join(tmp, `b${n}.txt`)]
     for (const o of outs) {
       writeFileSync(o, '')
-      children.push(spawn(process.execPath, [bundle, ws, o, barrier], { env: { ...ctx.baseEnv(), HIVE_USER_DATA: join(tmp, `ud${n}`) }, stdio: 'ignore', windowsHide: true }))
+      children.push(spawn(process.execPath, [bundle, ws, o, barrier], { env: { ...ctx.baseEnv(), CW_USER_DATA: join(tmp, `ud${n}`) }, stdio: 'ignore', windowsHide: true }))
     }
     const lines = (o: string): string[] => readFileSync(o, 'utf8').split('\n').filter(Boolean)
     await vi.waitFor(() => expect(outs.every((o) => lines(o).includes('looked'))).toBe(true), WAIT)

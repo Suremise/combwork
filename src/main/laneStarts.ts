@@ -17,7 +17,7 @@ import { offerNow, waitingForRun } from './deliveries'
 import { whyNoLine } from './lineWriter'
 import { sessions } from './sessions'
 import { startTask } from './taskStart'
-import { HIVE_LANE_START, WorkflowRefusedError } from './tasks'
+import { CW_LANE_START, WorkflowRefusedError } from './tasks'
 import { teamPauseOf } from './teamPause'
 import { inWorkspace, openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
 
@@ -220,7 +220,7 @@ async function lookAt(ws: WorkspaceService, path: string): Promise<void> {
       await laneStartsTestHooks.beforeStart?.(lane.id, next.number)
       if (!stillDue(ws, path, lane, next.number)) throw new LaneChanged('its lane changed meanwhile') // i18n-ignore: for the log
       log.info(`Lane ${lane.id}: starting #${next.number} on ${userText(lane.builder.name)} in ${userText(lane.project)}${prev ? ` (#${prev.number} is Done)` : ''}`)
-      await inWorkspace(ws, () => startTask(next.number, { kind: 'agent', agentId: lane.builder.id }, HIVE_LANE_START, note, undefined, (now) => {
+      await inWorkspace(ws, () => startTask(next.number, { kind: 'agent', agentId: lane.builder.id }, CW_LANE_START, note, undefined, (now) => {
         if (!stillDue(ws, path, lane, next.number, now)) throw new LaneChanged('its lane changed meanwhile') // i18n-ignore: for the log
       }))
       tried.delete(key)

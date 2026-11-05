@@ -18,8 +18,8 @@ interface TestSpecification {
   moduleId: string
 }
 
-// Where the runners' timings are kept (HIVE_TEST_PROGRESS_TIMINGS: another file, for this module's own tests).
-const timings = (): string => process.env.HIVE_TEST_PROGRESS_TIMINGS || join(process.env.LOCALAPPDATA || tmpdir(), 'hive-test', 'progress-timings.json')
+// Where the runners' timings are kept (CW_TEST_PROGRESS_TIMINGS: another file, for this module's own tests).
+const timings = (): string => process.env.CW_TEST_PROGRESS_TIMINGS || join(process.env.LOCALAPPDATA || tmpdir(), 'hive-test', 'progress-timings.json')
 
 /** Whether to report: the Combwork variables are set (or it runs under hive-progress), and it isn't turned off. */
 export function progressWanted(argv: string[] = process.argv): boolean {

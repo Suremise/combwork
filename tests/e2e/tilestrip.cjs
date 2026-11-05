@@ -29,7 +29,7 @@ const check = (name, ok, extra = '') => {
   fs.mkdirSync(claudeHome, { recursive: true })
   lib.gitProject(alpha)
   lib.fakeClaude(userData, claudeHome, [alpha])
-  const { app, page, inv } = await lib.launch({ userData, env: { CLAUDE_CONFIG_DIR: claudeHome, HIVE_API_PORT: lib.port(47799) }, viewport: { width: 1300, height: 800 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CLAUDE_CONFIG_DIR: claudeHome, CW_API_PORT: lib.port(47799) }, viewport: { width: 1300, height: 800 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)

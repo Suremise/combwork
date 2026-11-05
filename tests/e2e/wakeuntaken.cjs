@@ -39,7 +39,7 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   // How long a wake has to be taken (10 s in Combwork): set in Combwork's main process for each part (takeWindow, below).
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off', HIVE_TEST_NOTIFY_LOG: notifyLog })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off', CW_TEST_NOTIFY_LOG: notifyLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -70,8 +70,8 @@ const check = (name, ok, extra = '') => {
     await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
   }
   const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
-  /** Combwork's window for a typed wake to be taken, from now on (HIVE_TEST_WAKE_TAKE_MS, read at each wake). */
-  const takeWindow = (ms) => app.evaluate((_, v) => void (process.env.HIVE_TEST_WAKE_TAKE_MS = v), String(ms))
+  /** Combwork's window for a typed wake to be taken, from now on (CW_TEST_WAKE_TAKE_MS, read at each wake). */
+  const takeWindow = (ms) => app.evaluate((_, v) => void (process.env.CW_TEST_WAKE_TAKE_MS = v), String(ms))
 
   await page.getByText('alpha', { exact: true }).first().click()
   const agent = await lib.addAgent(inv, alpha, { name: 'Watcher' })

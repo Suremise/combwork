@@ -1,6 +1,6 @@
-// Antivirus scanning of the workspace (#316), on fixtures only: HIVE_TEST_ANTIVIRUS stands in for every PowerShell call
+// Antivirus scanning of the workspace (#316), on fixtures only: CW_TEST_ANTIVIRUS stands in for every PowerShell call
 // (the read-only probe and the elevated add, remove and check, on a simulated exclusion list), and
-// HIVE_TEST_ANTIVIRUS_LOG records them, so this suite never reads or changes the machine's Defender settings. The
+// CW_TEST_ANTIVIRUS_LOG records them, so this suite never reads or changes the machine's Defender settings. The
 // workspace's folders (resolved absolute paths, the worktrees folder only once it exists, the test area for a dev
 // build); Settings → Workspace's status; Add and Remove asking for exactly the folders shown, Add skipping one the
 // user had already excluded and Remove leaving it, a change refused when the folders changed after the user was asked;
@@ -9,7 +9,7 @@
 // when several agents run, again when a worktree agent adds its folder, a reminder after its spacing (a fixture's),
 // never after "Don't ask again"; and a test copy
 // without a fixture refusing to touch Defender. Screenshots in both themes.
-// Dev build only (#1580): HIVE_TEST_ANTIVIRUS (a seam a packaged build ignores) stands in for every scan, and Tree is a
+// Dev build only (#1580): CW_TEST_ANTIVIRUS (a seam a packaged build ignores) stands in for every scan, and Tree is a
 // 0.9 worktree agent (agents:testLegacy, refused by a packaged build), making the worktrees folder.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -50,7 +50,7 @@ const check = (name, ok, extra = '') => {
   const tests = fs.realpathSync.native(path.join(process.env.LOCALAPPDATA, 'hive-test'))
   // The user had already excluded the workspace itself (as administrator rights see Defender's list).
   setFixture({ probe: probe(), elevated: { exclusions: [root] } })
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_TEST_ANTIVIRUS: fixture, HIVE_TEST_ANTIVIRUS_LOG: callLog, ...claude }, viewport: { width: 1400, height: 950 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_TEST_ANTIVIRUS: fixture, CW_TEST_ANTIVIRUS_LOG: callLog, ...claude }, viewport: { width: 1400, height: 950 } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, ws)
   const shot = (name) => page.screenshot({ path: path.join(lib.WORK, `antivirus-${name}.png`) })
@@ -318,7 +318,7 @@ const check = (name, ok, extra = '') => {
   // A test copy without a fixture never asks Defender, and refuses to change it.
   const callsBefore = calls().length
   await app.evaluate(() => {
-    delete process.env.HIVE_TEST_ANTIVIRUS
+    delete process.env.CW_TEST_ANTIVIRUS
   })
   s = await inv('antivirus:status', true)
   const refused = await inv('antivirus:prepare', 'add').then(() => null, (e) => String(e.message ?? e))

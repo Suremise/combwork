@@ -113,7 +113,7 @@ function prepare() {
 }
 
 async function startHive(env = {}) {
-  const { app, page, inv } = await lib.launch({ userData: fx.userData, viewport: { width: 1500, height: 950 }, env: { HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: fx.claudeHome, CODEX_HOME: codexHome, HIVE_TEST_TIPS: 'off', ...env } })
+  const { app, page, inv } = await lib.launch({ userData: fx.userData, viewport: { width: 1500, height: 950 }, env: { CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: fx.claudeHome, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off', ...env } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.waitForProvider(inv)
   await lib.waitForProvider(inv, 'codex')

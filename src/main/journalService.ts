@@ -1,7 +1,7 @@
 import { existsSync } from 'original-fs'
 import { join } from 'path'
 import { ASSISTANT_AGENT_ID, ASSISTANT_DIR } from '../shared/assistant'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { readKeptJson } from './fsutil'
 import { JOURNAL_LIMITS, journalSettings, inScope, type JournalEdit, type JournalFilter, type JournalForgetPreview, type JournalForgetResult, type JournalSettings, type LinkType } from '../shared/journal'
 import { browseEntry, closeJournal, deleteEntry, deleteJournal, forgetJournal, forgetPreview, journalFile, journalFileBytes, journalSize, leaveEntry, onJournalChange, pruneJournal, updateEntry, writeEntry, writeEntryOnce } from './journal'
@@ -82,7 +82,7 @@ function pruneNow(ws: WorkspaceService, s: JournalSettings): void {
 /** Tells the workspace's Assistant something (an inbox notice), if the workspace has one. */
 async function tellAssistant(ws: WorkspaceService, body: string): Promise<void> {
   const home = ws.assistantHome
-  if (!existsSync(join(home, HIVE_DIR, 'project.json'))) return
+  if (!existsSync(join(home, CW_DIR, 'project.json'))) return
   // Loaded when used: sessions.ts reads the settings here, and deliveries.ts needs sessions loaded first.
   const { createDelivery } = await import('./deliveries')
   await createDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body }).catch((e) => log.warn('telling the Assistant its journal settings changed', e))
@@ -135,11 +135,11 @@ export interface Fact {
  * admitted for it.
  */
 export async function journalFactAt(workspacePath: string, fact: Fact): Promise<void> {
-  const saved = await readKeptJson<{ journal?: unknown }>(join(workspacePath, HIVE_DIR, 'workspace.json'), {})
+  const saved = await readKeptJson<{ journal?: unknown }>(join(workspacePath, CW_DIR, 'workspace.json'), {})
   const s = journalSettings(saved.journal)
   if (!s.enabled || !inScope(s, 'event')) return
   try {
-    leaveEntry(join(workspacePath, HIVE_DIR, ASSISTANT_DIR), s, { kind: 'event', ...fact, tags: ['hive', ...(fact.tags ?? [])] }, 'hive')
+    leaveEntry(join(workspacePath, CW_DIR, ASSISTANT_DIR), s, { kind: 'event', ...fact, tags: ['hive', ...(fact.tags ?? [])] }, 'hive')
   } catch (e) {
     log.warn('recording a fact in the journal', e)
   }

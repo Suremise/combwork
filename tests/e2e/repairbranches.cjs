@@ -39,7 +39,7 @@ const samePath = (a, b) => path.resolve(a).toLowerCase() === path.resolve(b).toL
   for (const d of [userData, root, home]) fs.rmSync(d, { recursive: true, force: true })
   const juniper = path.join(scratch, 'juniper')
   lib.gitProject(juniper)
-  const env = { ...lib.fakeClaude(userData, home, [juniper, path.join(`${scratch}.worktrees`, 'juniper', 'jb1')]), HIVE_API_PORT: lib.port(47842) }
+  const env = { ...lib.fakeClaude(userData, home, [juniper, path.join(`${scratch}.worktrees`, 'juniper', 'jb1')]), CW_API_PORT: lib.port(47842) }
   let card = 0
   {
     const { app, page, inv } = await lib.launch({ userData, env })

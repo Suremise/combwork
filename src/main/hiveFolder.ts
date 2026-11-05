@@ -1,6 +1,6 @@
 import { existsSync } from 'original-fs'
 import { join } from 'path'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { LEGACY_HIVE_DIR } from '../shared/hiveFolderMove'
 import { ASSISTANT_DIR } from '../shared/assistant'
 
@@ -24,7 +24,7 @@ export function ours(dir: string, kind: HostKind): boolean {
  * either, so there is only ever one tree.
  */
 export function dataFolder(host: string, kind: HostKind = 'project'): string {
-  const now = join(host, HIVE_DIR)
+  const now = join(host, CW_DIR)
   if (existsSync(now)) return now
   const old = join(host, LEGACY_HIVE_DIR)
   if (existsSync(old) && ours(old, kind)) return old

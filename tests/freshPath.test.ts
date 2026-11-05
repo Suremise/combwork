@@ -1,5 +1,5 @@
 // A CLI installed while Combwork runs (#472): Combwork adds the registry PATH's new folders to its own before it looks for the
-// CLIs, so the install is found without a restart. The registry is stubbed (HIVE_TEST_REGISTRY_PATH): this test
+// CLIs, so the install is found without a restart. The registry is stubbed (CW_TEST_REGISTRY_PATH): this test
 // never reads the machine's.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { expandVars, noteCliFolder, withCliFolders, mergePath, parseRegQuery, pathFolders, refreshPath, refreshPathBeforeStart, testRegistryPath } from '../src/main/freshPath'
@@ -65,10 +65,10 @@ describe('reading the registry', () => {
 
 describe('test copies', () => {
   it("never read the machine's registry: the suite's stand-in, else none with a test profile", () => {
-    expect(testRegistryPath({ HIVE_TEST_REGISTRY_PATH: 'C:\\X' }, false)).toBe('C:\\X')
-    expect(testRegistryPath({ HIVE_USER_DATA: 'C:\\p' }, false)).toBe('')
+    expect(testRegistryPath({ CW_TEST_REGISTRY_PATH: 'C:\\X' }, false)).toBe('C:\\X')
+    expect(testRegistryPath({ CW_USER_DATA: 'C:\\p' }, false)).toBe('')
     expect(testRegistryPath({}, false)).toBeUndefined()
-    expect(testRegistryPath({ HIVE_TEST_REGISTRY_PATH: 'C:\\X', HIVE_USER_DATA: 'C:\\p' }, true)).toBeUndefined()
+    expect(testRegistryPath({ CW_TEST_REGISTRY_PATH: 'C:\\X', CW_USER_DATA: 'C:\\p' }, true)).toBeUndefined()
   })
 })
 
@@ -77,7 +77,7 @@ describe.runIf(process.platform === 'win32')('refreshPath', () => {
     const key = Object.keys(process.env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH'
     process.env[key] = 'C:\\Windows'
     process.env.LOCALAPPDATA = 'C:\\Users\\u\\AppData\\Local'
-    process.env.HIVE_TEST_REGISTRY_PATH = 'C:\\Windows;%LOCALAPPDATA%\\Microsoft\\WinGet\\Links'
+    process.env.CW_TEST_REGISTRY_PATH = 'C:\\Windows;%LOCALAPPDATA%\\Microsoft\\WinGet\\Links'
     expect(await refreshPath()).toEqual(['C:\\Users\\u\\AppData\\Local\\Microsoft\\WinGet\\Links'])
     expect(process.env[key]).toBe('C:\\Windows;C:\\Users\\u\\AppData\\Local\\Microsoft\\WinGet\\Links')
     // Nothing new the next time.
@@ -88,7 +88,7 @@ describe.runIf(process.platform === 'win32')('refreshPath', () => {
   it('shares one read between calls at the same time', async () => {
     const key = Object.keys(process.env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH'
     process.env[key] = 'C:\\Windows'
-    process.env.HIVE_TEST_REGISTRY_PATH = 'C:\\New'
+    process.env.CW_TEST_REGISTRY_PATH = 'C:\\New'
     const [a, b] = await Promise.all([refreshPath(), refreshPath()])
     expect(a).toEqual(['C:\\New'])
     expect(b).toEqual(['C:\\New'])
@@ -102,11 +102,11 @@ describe.runIf(process.platform === 'win32')('refreshPathBeforeStart', () => {
   it('gives the next process the folders added to the registry since Combwork started', async () => {
     const key = Object.keys(process.env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH'
     process.env[key] = 'C:\\Windows'
-    process.env.HIVE_TEST_REGISTRY_PATH = 'C:\\Windows'
+    process.env.CW_TEST_REGISTRY_PATH = 'C:\\Windows'
     await refreshPathBeforeStart()
     expect(process.env[key]).toBe('C:\\Windows')
     // An installer adds a folder while Combwork runs.
-    process.env.HIVE_TEST_REGISTRY_PATH = 'C:\\Windows;C:\\Installed'
+    process.env.CW_TEST_REGISTRY_PATH = 'C:\\Windows;C:\\Installed'
     await refreshPathBeforeStart()
     expect(process.env[key]).toBe('C:\\Windows;C:\\Installed')
   })
@@ -114,8 +114,8 @@ describe.runIf(process.platform === 'win32')('refreshPathBeforeStart', () => {
   it("goes on with Combwork's PATH when the registry is slow, and the read still counts once it ends", async () => {
     const key = Object.keys(process.env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH'
     process.env[key] = 'C:\\Windows'
-    delete process.env.HIVE_TEST_REGISTRY_PATH
-    delete process.env.HIVE_USER_DATA
+    delete process.env.CW_TEST_REGISTRY_PATH
+    delete process.env.CW_USER_DATA
     held.length = 0
     // The registry isn't answering: the start goes on after its wait, with the PATH as it was.
     await refreshPathBeforeStart(20)

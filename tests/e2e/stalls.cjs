@@ -1,6 +1,6 @@
 // "The main process was busy" (#1109): a gap spanning the PC's sleep (a suspend and resume told by powerMonitor, faked
 // here around a block of the main process) logs an info line, not a warning; an IPC call that holds the main process
-// (HIVE_TEST_BLOCK_IPC) is named in the warning. Main's thread pool has 16 threads, not Node's 4 (HI-1702): with eight held
+// (CW_TEST_BLOCK_IPC) is named in the warning. Main's thread pool has 16 threads, not Node's 4 (HI-1702): with eight held
 // a file call still ends, and with all of them held the slow file call is noted in hive.log, timed off main's thread (main
 // held with the pool free gives no such line). The blocked call's stall is kept for the Performance view, which lists
 // it with its cause in a throwaway workspace (HI-1135). Dev build, throwaway profile.
@@ -23,7 +23,7 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
 ;(async () => {
   fs.rmSync(userData, { recursive: true, force: true })
   // A warning a second at most, so one from Combwork's own start doesn't hide the suite's.
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_TEST_STALL_QUIET_MS: '1000' } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_TEST_STALL_QUIET_MS: '1000' } })
   try {
     // The PC sleeps: suspend, the main process held, resume.
     const before = busyLines().length
@@ -42,7 +42,7 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
     // An IPC call holds the main process: the warning names it.
     const mark = busyLines().length
     await app.evaluate(() => {
-      process.env.HIVE_TEST_BLOCK_IPC = 'app:info=1500*1'
+      process.env.CW_TEST_BLOCK_IPC = 'app:info=1500*1'
     })
     await inv('app:info')
     const warned = await lib.until(() => busyLines().slice(mark).find((l) => /\[WARN\] \[main\] The main process was busy for \d+ ms/.test(l) && l.includes('ipc app:info')), HUNG_MS)
@@ -119,7 +119,7 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
       // Main's thread held 700 ms with the pool free (HR2's round 1): a busy warning, and no slow file call. The pool
       // held again after it marks the end: any line for main's 700 ms would come before that one's, or be counted in it.
       await app.evaluate(() => {
-        process.env.HIVE_TEST_BLOCK_IPC = 'app:info=700*1'
+        process.env.CW_TEST_BLOCK_IPC = 'app:info=700*1'
       })
       const called = Date.now()
       await inv('app:info')

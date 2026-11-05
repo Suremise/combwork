@@ -2,7 +2,7 @@
 // TMP and TMPDIR in a folder of its own, <folder>\<project>-<hash>\<agent id> (the Assistant's apart), made at launch;
 // Claude Code also CLAUDE_CODE_TMPDIR, over one it inherited. Empty, a launch's variables are as before (an inherited
 // CLAUDE_CODE_TMPDIR kept). A folder inside a project stops the launch, and a launch held at its folder while its
-// workspace closes never starts its CLI (HIVE_TEST_HOLD_AGENT_TEMP: NOT RUN on a packaged build). Runs the fake Claude
+// workspace closes never starts its CLI (CW_TEST_HOLD_AGENT_TEMP: NOT RUN on a packaged build). Runs the fake Claude
 // Code and the fake Codex, which record their temp variables; the Assistant on the fake Claude Code. Dev build,
 // throwaway profile and folders.
 const lib = require('./lib.cjs')
@@ -20,7 +20,7 @@ const codexHome = path.join(lib.WORK, 'agenttemp-codex-home')
 const tempRoot = path.join(lib.WORK, 'agenttemp-root')
 const inherited = path.join(lib.WORK, 'agenttemp-inherited')
 const wsOther = path.join(lib.WORK, 'agenttemp-ws-other')
-// Each launch holds once its temp folder is made, while this file is missing (HIVE_TEST_HOLD_AGENT_TEMP): there from the start.
+// Each launch holds once its temp folder is made, while this file is missing (CW_TEST_HOLD_AGENT_TEMP): there from the start.
 const holdGo = path.join(lib.WORK, 'agenttemp-hold-go')
 const proj = path.join(ws, 'alpha')
 const PORT = lib.port(47800)
@@ -52,7 +52,7 @@ const allAt = (temp, dir) => ['TEMP', 'TMP', 'TMPDIR'].every((n) => Object.keys(
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   // Combwork started with a CLAUDE_CODE_TMPDIR of the user's own: kept while the setting is empty, overridden when it is set.
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CLAUDE_CODE_TMPDIR: inherited, HIVE_TEST_HOLD_AGENT_TEMP: holdGo })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CLAUDE_CODE_TMPDIR: inherited, CW_TEST_HOLD_AGENT_TEMP: holdGo })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()

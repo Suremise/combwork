@@ -16,7 +16,7 @@
 //    (text, hover, screenshot); once the process ends, the card starts in slot-a with no other call;
 // 5. the Assistant's second sighting: B1 stopped, a process holding slot-a, a lane recorded through the API waits for a
 //    slot, its row in the Progress panel saying what holds it (screenshot), and is lent slot-a once the process ends.
-// HI-2467, Windows Sandbox's broker (a stand-in whose current folder is slot-a, HIVE_TEST_SYSTEM_BROKER):
+// HI-2467, Windows Sandbox's broker (a stand-in whose current folder is slot-a, CW_TEST_SYSTEM_BROKER):
 // 6. a broker working elsewhere while a process holds slot-a: only the process is said; the broker working in slot-a
 //    once the process has gone: a retry names it, idle (status and the Progress panel's row, screenshot); a Sandbox
 //    starting and stopping: later retries say so; the broker ending: the lane is lent slot-a with no other call.
@@ -82,14 +82,14 @@ const renamable = (dir) => {
   const beat4 = path.join(tools, 'hold4-beat.txt')
   fs.writeFileSync(turn, `const fs = require('fs'); const { spawn } = require('child_process'); const c = spawn(process.execPath, [${JSON.stringify(hold)}, require('path').join(process.cwd(), '.combwork', 'hold4.lock'), ${JSON.stringify(go4)}, ${JSON.stringify(beat4)}, '${HUNG_MS * 4}'], { detached: true, stdio: 'ignore', windowsHide: true }); c.unref(); const t = Date.now(); const tick = () => { if (fs.existsSync(${JSON.stringify(turnGo)}) || Date.now() - t > ${HUNG_MS * 3}) process.exit(0); setTimeout(tick, 100) }; tick()\n`)
   // Step 6's stand-in broker (HI-2467): only its current folder in the slot, no file open, until stand-go.txt (bounded),
-  // writing its own PID/current-folder heartbeat. brokers.txt lists the stand-ins' ids (HIVE_TEST_SYSTEM_BROKER), brokers-active.txt the
-  // Sandbox's own processes running now (HIVE_TEST_SYSTEM_BROKER_ACTIVE; while it is missing, none).
+  // writing its own PID/current-folder heartbeat. brokers.txt lists the stand-ins' ids (CW_TEST_SYSTEM_BROKER), brokers-active.txt the
+  // Sandbox's own processes running now (CW_TEST_SYSTEM_BROKER_ACTIVE; while it is missing, none).
   const stand = path.join(tools, 'stand.js')
   fs.writeFileSync(stand, `const fs = require('fs'); const [go, beat, ms] = process.argv.slice(2); const t = Date.now(); const tick = () => { if (fs.existsSync(go) || Date.now() - t > Number(ms)) process.exit(0); fs.writeFileSync(beat, JSON.stringify({ pid: process.pid, cwd: process.cwd(), at: Date.now() })); setTimeout(tick, 100) }; tick()\n`)
   const brokers = path.join(tools, 'brokers.txt')
   const brokersActive = path.join(tools, 'brokers-active.txt')
   fs.writeFileSync(brokers, '')
-  const env = { ...lib.fakeClaude(userData, home, [alpha, ws, slotA]), HIVE_TEST_SYSTEM_BROKER: brokers, HIVE_TEST_SYSTEM_BROKER_ACTIVE: brokersActive }
+  const env = { ...lib.fakeClaude(userData, home, [alpha, ws, slotA]), CW_TEST_SYSTEM_BROKER: brokers, CW_TEST_SYSTEM_BROKER_ACTIVE: brokersActive }
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
@@ -97,7 +97,7 @@ const renamable = (dir) => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' } })
+  const h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' } })
   const { app, page, inv } = h
   let holder = null
   let stopBrokerStatus = null
@@ -260,7 +260,7 @@ const renamable = (dir) => {
     console.log(`INFO step 5's lane, as it went: ${(await stop5()).join(' | ')}`)
 
     // --- 6. HI-2467: Windows Sandbox's broker working in slot-a (a stand-in: a process whose current folder is slot-a,
-    // its id in HIVE_TEST_SYSTEM_BROKER, so its path, read by the helper, is taken as the broker's). Named only while it
+    // its id in CW_TEST_SYSTEM_BROKER, so its path, read by the helper, is taken as the broker's). Named only while it
     // is seen working there, idle or not as the Sandbox's own processes run, looked at again on each retry.
     await inv('lanes:end', (await laneOf(c4)).id, true)
     check('the lane is ended, B1 stopped, slot-a free and held by nothing', !!(await until(settled, HUNG_MS)), JSON.stringify(await slotNow()))

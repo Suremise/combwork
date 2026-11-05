@@ -846,7 +846,7 @@ polite closing ("Please let me know if you need anything else", "Tell me if anyt
 ## Merging through the merge slot: fakes, Codex (its default model, `gpt-5.6-luna`), fixtures v51 (v52 once merged with main), 11 October 2026
 
 #374 checks that merge-ready's merge slot is used, from what ran rather than mentions. The evidence:
-- Hive's own record (`HIVE_TEST_MERGE_SLOT_LOG`, development builds only): each change to the slots (who holds one,
+- Hive's own record (`CW_TEST_MERGE_SLOT_LOG`, development builds only): each change to the slots (who holds one,
   told so or not, and who waits) and each claim or release as Hive resolved it (the branch, and what it did), timed.
 - The checks' own runs: check.js records each run's start (commit, base, any merge in progress, and the tree it
   checked: the tracked files as they are on disk, staged or not) and its end with the result. What went into a merge is

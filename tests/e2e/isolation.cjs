@@ -30,10 +30,10 @@ const LEAKS = {
   CW_PROGRESS_RUN_AS_NODE: '1',
   CW_PROGRESS_DATA: 'C:\\leaked\\progress',
   CW_API_URL: 'http://127.0.0.1:9',
-  HIVE_API_TOKEN: 'leaked-token',
+  CW_API_TOKEN: 'leaked-token',
   CW_PROJECT: 'leaked',
-  HIVE_TEST_SLOW_IPC: 'tasks:list=1',
-  HIVE_E2E_NATIVE: '1',
+  CW_TEST_SLOW_IPC: 'tasks:list=1',
+  CW_E2E_NATIVE: '1',
   CLAUDE_CONFIG_DIR: 'C:\\leaked\\claude',
   COPILOT_HOME: 'C:\\leaked\\copilot',
   GH_CONFIG_DIR: 'C:\\leaked\\gh',
@@ -49,7 +49,7 @@ const leaked = (env) => Object.entries(env).filter(([k, v]) => LEAKS[k.toUpperCa
 ;(async () => {
   // Under the runner: the suite's environment is the allowlist, the settings passed on by name and its run context.
   if (process.env.E2E_RUN_SUITE) {
-    const allowed = new Set(upper([...ctx.ALLOW, ...Object.keys(ctx.PASS_ENV), 'HIVE_E2E_DIR', 'HIVE_E2E_PORT', 'HIVE_API_PORT', ...ctx.CARRIED]))
+    const allowed = new Set(upper([...ctx.ALLOW, ...Object.keys(ctx.PASS_ENV), 'CW_E2E_DIR', 'CW_E2E_PORT', 'CW_API_PORT', ...ctx.CARRIED]))
     const extra = upper(Object.keys(process.env)).filter((k) => !allowed.has(k))
     check("the runner gave this suite nothing of its own environment but the allowlist", !extra.length, extra.join(', '))
   } else console.log('(run on its own: the runner check is skipped)')
@@ -59,18 +59,18 @@ const leaked = (env) => Object.entries(env).filter(([k, v]) => LEAKS[k.toUpperCa
   fs.rmSync(data, { recursive: true, force: true })
 
   // A test Combwork: its main process's environment is what its agents' shells and the CLIs start from.
-  const { app } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47929) } })
+  const { app } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47929) } })
   try {
     const env = await app.evaluate(() => Object.fromEntries(Object.entries(process.env)))
     check("a test Combwork gets none of the suite's environment", !leaked(env).length, leaked(env).join(', '))
     // CHROME_CRASHPAD_PIPE_NAME: Combwork's own crash handler, which Electron sets in main for its processes (#985); what Combwork
     // starts doesn't get it (ptyHost's childEnv).
-    const allowed = new Set(upper([...ctx.ALLOW, 'HIVE_USER_DATA', 'HIVE_TEST_QUIET', 'HIVE_TEST_TIPS', 'HIVE_TEST_CLI_HOME_CONNECTION', 'HIVE_LANG', 'HIVE_TEST_TRASH_DIR', ...Object.keys(ctx.cliHomes()), 'GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'HIVE_API_PORT', ...ctx.CARRIED, 'CHROME_CRASHPAD_PIPE_NAME']))
+    const allowed = new Set(upper([...ctx.ALLOW, 'CW_USER_DATA', 'CW_TEST_QUIET', 'CW_TEST_TIPS', 'CW_TEST_CLI_HOME_CONNECTION', 'CW_LANG', 'CW_TEST_TRASH_DIR', ...Object.keys(ctx.cliHomes()), 'GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'CW_API_PORT', ...ctx.CARRIED, 'CHROME_CRASHPAD_PIPE_NAME']))
     // PROMPT: cmd.exe's default ($P$G), which Playwright's start of Electron on Windows sets; not the suite's.
     const extra = upper(Object.keys(env)).filter((k) => !allowed.has(k) && !(k === 'PROMPT' && env[Object.keys(env).find((x) => x.toUpperCase() === 'PROMPT')] === '$P$G'))
     check('…only the allowlist and its run context', !extra.length, extra.join(', '))
-    check('…with its profile, quiet, tips off and its port', env.HIVE_USER_DATA === userData && env.HIVE_TEST_QUIET === '1' && env.HIVE_TEST_TIPS === 'off' && env.HIVE_API_PORT === lib.port(47929), JSON.stringify({ HIVE_USER_DATA: env.HIVE_USER_DATA, HIVE_TEST_QUIET: env.HIVE_TEST_QUIET, HIVE_TEST_TIPS: env.HIVE_TEST_TIPS, HIVE_API_PORT: env.HIVE_API_PORT }))
-    check("…and its suite's trash folder, not the user's Recycle Bin (#414)", env.HIVE_TEST_TRASH_DIR === lib.TRASH, String(env.HIVE_TEST_TRASH_DIR))
+    check('…with its profile, quiet, tips off and its port', env.CW_USER_DATA === userData && env.CW_TEST_QUIET === '1' && env.CW_TEST_TIPS === 'off' && env.CW_API_PORT === lib.port(47929), JSON.stringify({ CW_USER_DATA: env.CW_USER_DATA, CW_TEST_QUIET: env.CW_TEST_QUIET, CW_TEST_TIPS: env.CW_TEST_TIPS, CW_API_PORT: env.CW_API_PORT }))
+    check("…and its suite's trash folder, not the user's Recycle Bin (#414)", env.CW_TEST_TRASH_DIR === lib.TRASH, String(env.CW_TEST_TRASH_DIR))
     const homes = ctx.cliHomes()
     const given = Object.fromEntries(Object.keys(homes).map((k) => [k, env[k]]))
     check("…and the CLI homes (Claude Code's, Codex's, Copilot's, the GitHub CLI's config), empty folders of the suite's, not the user's (#382, #452)", Object.entries(homes).every(([k, v]) => env[k] === v && !ctx.isUserCliHome(env[k])), JSON.stringify(given))
@@ -79,7 +79,7 @@ const leaked = (env) => Object.entries(env).filter(([k, v]) => LEAKS[k.toUpperCa
     const globalGit = await app.evaluate(() => {
       const { execFileSync } = process.mainModule.require('child_process')
       // In its profile, outside any repository, so no repository's config is listed.
-      const read = (...a) => execFileSync('git', ['config', ...a], { cwd: process.env.HIVE_USER_DATA, encoding: 'utf8' }).trim()
+      const read = (...a) => execFileSync('git', ['config', ...a], { cwd: process.env.CW_USER_DATA, encoding: 'utf8' }).trim()
       return { name: read('--global', 'user.name'), email: read('--global', 'user.email'), autocrlf: read('core.autocrlf'), scopes: [...new Set(read('--list', '--show-scope').split(/\r?\n/).map((l) => l.split('\t')[0]))] }
     })
     check("…and its git's config, the suite's with the test identity and autocrlf false, no system or user config (#1466)", env.GIT_CONFIG_GLOBAL === ctx.gitConfig() && env.GIT_CONFIG_NOSYSTEM === '1' && globalGit.autocrlf === 'false' && globalGit.scopes.join() === 'global' && globalGit.email === ctx.TEST_GIT_IDENTITY.email && globalGit.name === ctx.TEST_GIT_IDENTITY.name, JSON.stringify({ GIT_CONFIG_GLOBAL: env.GIT_CONFIG_GLOBAL, ...globalGit }))
@@ -98,7 +98,7 @@ const leaked = (env) => Object.entries(env).filter(([k, v]) => LEAKS[k.toUpperCa
     }
   }
   check("a test Combwork started with the suite's own environment is refused", await refused(null))
-  check('…or with a copy of a run-context environment', await refused({ ...lib.hiveEnv({ HIVE_USER_DATA: userData }) }))
+  check('…or with a copy of a run-context environment', await refused({ ...lib.hiveEnv({ CW_USER_DATA: userData }) }))
 
   // A child that is part of Combwork (the hive MCP server, a bridge): the allowlist and what it is given.
   const child = await new Promise((resolve) => {

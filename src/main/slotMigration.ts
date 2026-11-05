@@ -119,11 +119,11 @@ function adoptedName(store: SlotStore, folder: string): string {
 /**
  * A workspace's migration (#1441), one at a time per workspace: in each project of a 1.0 board, the agents not migrated
  * yet have their worktrees adopted. A failure leaves those agents as they were, for the next opening. Test copies (unpackaged) with
- * `HIVE_TEST_SLOT_MIGRATION=off` skip it, so a suite can run a workspace as 0.9 left it before its upgrade (slotupgrade).
+ * `CW_TEST_SLOT_MIGRATION=off` skip it, so a suite can run a workspace as 0.9 left it before its upgrade (slotupgrade).
  */
 export function migrateSlots(ws: WorkspaceService): Promise<void> {
   const path = ws.path
-  if (!path || (!app.isPackaged && process.env.HIVE_TEST_SLOT_MIGRATION === 'off')) return Promise.resolve()
+  if (!path || (!app.isPackaged && process.env.CW_TEST_SLOT_MIGRATION === 'off')) return Promise.resolve()
   return coalesced(`slot-migration:${path.toLowerCase()}`, async () => {
     try {
       if (upgradeWaiting(path) || boardValue(ws, ADOPTION_UPTO) === null) return

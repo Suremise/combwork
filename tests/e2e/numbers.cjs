@@ -26,7 +26,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   lib.gitProject(proj)
   lib.enableProviders(userData)
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47898) })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47898) })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -90,19 +90,19 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 
   // A failed save leaves the setting, and the box, as they were.
   await app.evaluate(() => {
-    process.env.HIVE_TEST_FAIL_IPC = 'settings:update*1'
+    process.env.CW_TEST_FAIL_IPC = 'settings:update*1'
   })
   await enter('120000')
   // The box shows 120000 until the save has failed, then the saved value again.
   check('failed save: box shows the saved value', await becomes(async () => (await box.inputValue()) === '150000'), await box.inputValue())
   check('failed save: setting kept', (await sessions()).compactSuggestTokens === 150000)
   await app.evaluate(() => {
-    delete process.env.HIVE_TEST_FAIL_IPC
+    delete process.env.CW_TEST_FAIL_IPC
   })
 
   // Saves don't overlap: a number left by clicking Never (its slow save first, then Never's) ends as Never.
   await app.evaluate(() => {
-    process.env.HIVE_TEST_SLOW_IPC = 'settings:update=2000*1'
+    process.env.CW_TEST_SLOW_IPC = 'settings:update=2000*1'
   })
   await box.click()
   await box.press('Control+A')
@@ -113,7 +113,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('overlapping saves: the last choice wins', (await sessions()).compactSuggestTokens === 0, String((await sessions()).compactSuggestTokens))
   check('overlapping saves: Never stays ticked', await never.isChecked())
   await app.evaluate(() => {
-    delete process.env.HIVE_TEST_SLOW_IPC
+    delete process.env.CW_TEST_SLOW_IPC
   })
   await never.uncheck()
   check('…unticking brings back the number', await becomes(async () => (await sessions()).compactSuggestTokens === 120000), String((await sessions()).compactSuggestTokens))
@@ -170,7 +170,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 
   // The same for the project, whose saves could finish in either order.
   await app.evaluate(() => {
-    process.env.HIVE_TEST_SLOW_IPC = 'project:updateConfig=2000*1'
+    process.env.CW_TEST_SLOW_IPC = 'project:updateConfig=2000*1'
   })
   await pbox.click()
   await pbox.press('Control+A')
@@ -180,7 +180,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('project: overlapping saves end as Never', (await projectCfg()).compactSuggestTokens === 0, String((await projectCfg()).compactSuggestTokens))
   check('project: Never stays ticked', await pnever.isChecked())
   await app.evaluate(() => {
-    delete process.env.HIVE_TEST_SLOW_IPC
+    delete process.env.CW_TEST_SLOW_IPC
   })
 
   await app.close()

@@ -1,6 +1,6 @@
 // The fake CLIs' way to call Combwork's tools: through the launch's real Combwork MCP server, started as the launch configured it (its
 // command, arguments and environment), so a scripted call is what a model's call would be. The server runs the call
-// against the Agent API, logs it (HIVE_TEST_MCP_LOG) and reports its reply's size to Combwork's performance metrics, as
+// against the Agent API, logs it (CW_TEST_MCP_LOG) and reports its reply's size to Combwork's performance metrics, as
 // it does for a real CLI. Used by fake-claude and fake-codex for their "cw", "boardmove", "boardreview" and
 // "boardcomment" steps.
 const { spawn } = require('child_process')

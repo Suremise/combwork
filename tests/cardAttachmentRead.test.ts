@@ -26,10 +26,10 @@ advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
 beforeAll(() => {
-  process.env.HIVE_TEST_TRASH_DIR = join(base, 'trash')
+  process.env.CW_TEST_TRASH_DIR = join(base, 'trash')
 })
 afterAll(async () => {
-  delete process.env.HIVE_TEST_TRASH_DIR
+  delete process.env.CW_TEST_TRASH_DIR
   att.attachmentReadSeams.afterOpen = null
   att.attachmentReadSeams.beforeOpen = null
   advanced.stop()

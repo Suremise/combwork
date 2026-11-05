@@ -4,7 +4,7 @@ import type { HiveVcs } from './types'
 
 /** The id of the user guide's heading on what .combwork holds and how it is kept out of version control. */
 // i18n-ignore: a user guide heading's id (#1535)
-export const HIVE_FOLDER_GUIDE = 'what-hive-keeps-in-a-project'
+export const CW_FOLDER_GUIDE = 'what-hive-keeps-in-a-project'
 
 const M = {
   trackedTitle: msg({ id: 'git.hiveVcs.trackedTitle', defaultMessage: '{count, plural, one {# file in .combwork is committed to git} other {# files in .combwork are committed to git}}', description: "Title of the notice in a project's Overview and Project Settings: files in the project's .combwork folder were committed to git. Keep .combwork. No full stop: the notice adds it." }),

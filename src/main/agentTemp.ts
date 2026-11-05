@@ -12,7 +12,7 @@ import { createHash } from 'crypto'
 import { lstat, mkdir, realpath, stat } from 'original-fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'path'
 import { AGENT_TEMP_FOLDER_ID } from '../shared/advanced'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { msg } from '../shared/i18n'
 import { advanced } from './advanced'
 import { hiveError } from './hiveError'
@@ -104,7 +104,7 @@ export async function protectedFolders(workspaces: readonly WorkspaceService[]):
       const projects = (await Promise.all([w.listProjectPaths().catch(() => [] as string[]), w.listProjectPaths({ hidden: true }).catch(() => [] as string[])])).flat()
       // The workspace's own folder too: its projects are listed from it, and the Assistant works in it.
       // Agents' folders it knows elsewhere too (HR1, round 1): slots, retired homes and 0.9 worktrees outside its pool.
-      return [w.path, ...projects, w.worktreesRoot, ...w.knownRoots(), w.assistantHome, join(w.path, HIVE_DIR)]
+      return [w.path, ...projects, w.worktreesRoot, ...w.knownRoots(), w.assistantHome, join(w.path, CW_DIR)]
     })
   )
   return all.flat()
@@ -144,11 +144,11 @@ export async function prepareAgentTemp(o: AgentTempLaunch): Promise<string | nul
 }
 
 /**
- * Tests only (unpackaged or quiet test builds): HIVE_TEST_HOLD_AGENT_TEMP=<file> holds each launch here, its folder made,
+ * Tests only (unpackaged or quiet test builds): CW_TEST_HOLD_AGENT_TEMP=<file> holds each launch here, its folder made,
  * until that file exists, so a suite can close the workspace or stop the agent while a launch waits on it (HR1, round 1).
  */
 async function testHold(): Promise<void> {
-  const file = takesTestSeams() ? process.env.HIVE_TEST_HOLD_AGENT_TEMP : undefined
+  const file = takesTestSeams() ? process.env.CW_TEST_HOLD_AGENT_TEMP : undefined
   if (!file) return
   while (!(await lstat(file).then(() => true, () => false))) await new Promise((r) => setTimeout(r, 100))
 }

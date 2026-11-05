@@ -6,9 +6,9 @@
 // keeping the 0.9 copy. A 0.9 Hive opened afterwards finds no .hive and starts a fresh one beside .combwork, never
 // reaching the moved board (Darren on HI-2506, 4 Nov: "no going back"). Help → Restore the 0.9 Board Backup… puts the
 // copy back in .combwork. Last, a 0.9 Hive started *during* the upgrade (the dev build holding its lock,
-// HIVE_TEST_UPGRADE_HOLD): what it shows is recorded for the RC notes. Banner and dialog in both themes.
+// CW_TEST_UPGRADE_HOLD): what it shows is recorded for the RC notes. Banner and dialog in both themes.
 //
-// The 0.9 Hive is a packaged 0.9.x build: HIVE_E2E_HIVE09 (its win-unpacked folder), else the main checkout's
+// The 0.9 Hive is a packaged 0.9.x build: CW_E2E_V09 (its win-unpacked folder), else the main checkout's
 // dist/win-unpacked when that is 0.9.x; with neither, the suite is skipped. No agents. Throwaway profiles and workspace.
 // lib.cjs keeps the 0.9 Hive's windows off screen and unfocused (#1253): a released build isn't quiet by itself.
 const lib = require('./lib.cjs')
@@ -95,21 +95,21 @@ const screenshot = (page, file) => bounded(`screenshot ${file}`, page.screenshot
 
 /** The 0.9 build to run, or why there is none. */
 function hive09() {
-  let dir = process.env.HIVE_E2E_HIVE09
+  let dir = process.env.CW_E2E_V09
   if (!dir) {
     const main = /^worktree (.+)$/m.exec(lib.git(lib.ROOT, 'worktree list --porcelain'))?.[1]
     if (!main) return { why: "no main checkout found (git worktree list)" }
     dir = path.join(main, 'dist', 'win-unpacked')
   }
   const exe = path.join(dir, 'Hive.exe')
-  if (!fs.existsSync(exe)) return { why: `no Hive 0.9 build at ${dir} (set HIVE_E2E_HIVE09 to a 0.9.x win-unpacked folder)` }
+  if (!fs.existsSync(exe)) return { why: `no Hive 0.9 build at ${dir} (set CW_E2E_V09 to a 0.9.x win-unpacked folder)` }
   let version = '?'
   try {
     version = JSON.parse(require('@electron/asar').extractFile(path.join(dir, 'resources', 'app.asar'), 'package.json').toString('utf8')).version
   } catch (e) {
     return { why: `couldn't read the version of ${dir}: ${e.message}` }
   }
-  if (!version.startsWith('0.9.')) return { why: `${dir} is Hive ${version}, not 0.9.x (set HIVE_E2E_HIVE09 to a 0.9.x win-unpacked folder)` }
+  if (!version.startsWith('0.9.')) return { why: `${dir} is Hive ${version}, not 0.9.x (set CW_E2E_V09 to a 0.9.x win-unpacked folder)` }
   return { exe, version }
 }
 
@@ -130,7 +130,7 @@ const copiesOf = (prefix) => (fs.existsSync(backupsNow()) ? fs.readdirSync(backu
  * `ms`: its calls' bound (longer while the dev build holds the upgrade's lock, which they may wait on).
  */
 async function startOld(old, mayFail = false, ms = HUNG_MS) {
-  const app = await _electron.launch({ executablePath: old.exe, args: [], env: lib.hiveEnv({ HIVE_USER_DATA: oldProfile }) })
+  const app = await _electron.launch({ executablePath: old.exe, args: [], env: lib.hiveEnv({ CW_USER_DATA: oldProfile }) })
   try {
     const page = await app.firstWindow()
     await lib.appReady(page)
@@ -320,9 +320,9 @@ async function themes(dev, name) {
     // The restored board stays in .combwork: a 0.9 Hive reads its own .hive (HI-2506, "no going back").
 
     // 8. A 0.9 Hive started during the upgrade: the dev build holds the lock (its main thread waits) while it starts.
-    // The hold is for unpackaged builds only: a packaged one (HIVE_EXE, the Sandbox checks) ends here.
-    if (process.env.HIVE_EXE) throw new StopHere('step 8 (a 0.9 Hive started during the upgrade) needs an unpackaged build: not run with HIVE_EXE')
-    const dev2 = await lib.launch({ userData: devProfile, viewport: { width: 1400, height: 900 }, env: { ...claude, HIVE_TEST_UPGRADE_HOLD: `${HOLD_MS};${held}` } })
+    // The hold is for unpackaged builds only: a packaged one (CW_EXE, the Sandbox checks) ends here.
+    if (process.env.CW_EXE) throw new StopHere('step 8 (a 0.9 Hive started during the upgrade) needs an unpackaged build: not run with CW_EXE')
+    const dev2 = await lib.launch({ userData: devProfile, viewport: { width: 1400, height: 900 }, env: { ...claude, CW_TEST_UPGRADE_HOLD: `${HOLD_MS};${held}` } })
     dev2.inv = boundedInv('dev build', dev2.inv)
     running.push({ name: 'dev', app: dev2.app, page: dev2.page })
     open.add(dev2)

@@ -20,7 +20,7 @@ const check = (name, ok, extra = '') => {
   fs.mkdirSync(proj, { recursive: true })
   lib.enableProviders(userData, ['claude-code'])
   const claudeHome = lib.ownClaudeHome('agentview')
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47894), ...claudeHome.env })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47894), ...claudeHome.env })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   await lib.fitWindow(app, page, { width: 1200, height: 750 })

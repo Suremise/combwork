@@ -90,7 +90,7 @@ Say a German button reads badly.
      needed: the first is npm's, the second electron-vite's).
    - **Screenshots of the main screens** in both themes, without clicking around:
      `npm run e2e -- --lang de --build` (after `npx install-electron --no`; outside a Hive workspace, set
-     `HIVE_TEST_NO_BOARD=1` first, in PowerShell `$env:HIVE_TEST_NO_BOARD='1'`). It needs no sign-in: the agents in it
+     `CW_TEST_NO_BOARD=1` first, in PowerShell `$env:CW_TEST_NO_BOARD='1'`). It needs no sign-in: the agents in it
      are a stand-in. The runner prints where it kept the screenshots. Look for text that is cut off or wraps
      badly. See [tests/e2e/README.md](tests/e2e/README.md), *The i18n screenshot route*.
 

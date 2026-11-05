@@ -1,11 +1,11 @@
 // The Changes tab's picker and pages (#476). A project with no worktrees opens on its folder, with no picker. A project
 // with worktrees opens on Unused worktrees: first the picker says Combwork is looking and the page shows a spinner and a
-// message (listing is slowed, HIVE_TEST_SLOW_IPC), then the list, each labelled with who made it ("was B4": the Combwork
+// message (listing is slowed, CW_TEST_SLOW_IPC), then the list, each labelled with who made it ("was B4": the Combwork
 // agent whose session last ran there; "not made by Combwork": a `git worktree add` of its own). The picker lists the unused
 // worktrees, then the folders agents work in (#1569: Coder's 0.9 worktree, the slot kept for it once the project has
 // opened), then the project folder, last. Coming back shows the last list at once while it is
 // checked again, and Refresh looks again; a Refresh that fails keeps the list, says so, and Retry recovers
-// (HIVE_TEST_FAIL_IPC). A project with no agent whose only worktree is unused shows the spinner while it is first looked
+// (CW_TEST_FAIL_IPC). A project with no agent whose only worktree is unused shows the spinner while it is first looked
 // at, never its folder as if it had none; if that first look fails, it says so with Retry (still not its folder), and
 // Retry settles it: the list, or, for a project with no worktrees, its folder. A project whose worktrees are all in use
 // shows Unused worktrees empty. Each
@@ -91,10 +91,10 @@ function inUse(project, name) {
     await page.locator('.tab', { hasText: 'Version Control' }).click()
   }
   const slow = (v) => app.evaluate((_, x) => {
-    process.env.HIVE_TEST_SLOW_IPC = x
+    process.env.CW_TEST_SLOW_IPC = x
   }, v)
   const failing = (v) => app.evaluate((_, x) => {
-    process.env.HIVE_TEST_FAIL_IPC = x
+    process.env.CW_TEST_FAIL_IPC = x
   }, v)
 
   // --- No worktrees: the project folder, no picker, and what it shows.

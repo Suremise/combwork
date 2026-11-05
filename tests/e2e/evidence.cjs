@@ -216,11 +216,11 @@ function evidence({ tasksDir, cards, testRoot = runContext.TEST_ROOT, label = 'h
 }
 
 /**
- * The evidence rules for the repository at root (its workspace's board). HIVE_TEST_NO_BOARD=1 says there is no board
+ * The evidence rules for the repository at root (its workspace's board). CW_TEST_NO_BOARD=1 says there is no board
  * whose cards could cite test output (a checkout outside a Combwork workspace): then nothing is evidence. Without it, no
  * board found means nothing may be deleted, and the runners won't start (#285: copies would pile up run after run).
  */
-const evidenceFor = (root, opts = {}, env = process.env) => (env.HIVE_TEST_NO_BOARD === '1' ? evidence({ cards: [], ...opts }) : evidence({ tasksDir: findBoard(root), ...opts }))
+const evidenceFor = (root, opts = {}, env = process.env) => (env.CW_TEST_NO_BOARD === '1' ? evidence({ cards: [], ...opts }) : evidence({ tasksDir: findBoard(root), ...opts }))
 
 /**
  * The first folder between root and p (root and p themselves not counted) that is a link (a junction or a symlink), or

@@ -13,7 +13,7 @@ describe('loop agents with no watch, and the loop wakes that reach them (HI-1693
   const base = tempDir('hive-loopcheck-wakes-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   // No grace in tests (loopCheck's test seam): a check runs as soon as the agent is idle.
-  process.env.HIVE_TEST_LOOP_GRACE_MS = '0'
+  process.env.CW_TEST_LOOP_GRACE_MS = '0'
   afterAll(async () => {
     ;(await import('../src/main/boardStore')).closeAllBoards()
     rmSync(base, { recursive: true, force: true })

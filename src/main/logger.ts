@@ -68,14 +68,14 @@ function writerThread(): Worker | null {
     here = true
     return null
   }
-  // Tests (unpackaged builds): HIVE_TEST_LOG_DIRECT=1 writes here, as before; HIVE_TEST_SLOW_LOG_MS holds each write.
-  if ((unpackaged() && process.env.HIVE_TEST_LOG_DIRECT === '1' && !forTests) || !bundledScriptExists(script)) {
-    workerHere('log writer', bundledScriptExists(script) ? 'HIVE_TEST_LOG_DIRECT' : "its script isn't there") // i18n-ignore: Copy Diagnostics' report, in English
+  // Tests (unpackaged builds): CW_TEST_LOG_DIRECT=1 writes here, as before; CW_TEST_SLOW_LOG_MS holds each write.
+  if ((unpackaged() && process.env.CW_TEST_LOG_DIRECT === '1' && !forTests) || !bundledScriptExists(script)) {
+    workerHere('log writer', bundledScriptExists(script) ? 'CW_TEST_LOG_DIRECT' : "its script isn't there") // i18n-ignore: Copy Diagnostics' report, in English
     here = true
     return null
   }
   try {
-    const slowMs = forTests?.slowMs ?? ((unpackaged() && Number(process.env.HIVE_TEST_SLOW_LOG_MS)) || 0)
+    const slowMs = forTests?.slowMs ?? ((unpackaged() && Number(process.env.CW_TEST_SLOW_LOG_MS)) || 0)
     const w = new Worker(script, { workerData: { state: shared.buffer, slowMs } })
     workerStarted('log writer', w) // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)
     w.on('message', (n: number) => {
@@ -125,7 +125,7 @@ function append(name: string, line: string): void {
 function appendHere(f: string, line: string): void {
   const start = stallClock.mono()
   // Tests (unpackaged builds): the same held disk as the writer's, to compare the two.
-  const slowMs = unpackaged() && !forTests ? Number(process.env.HIVE_TEST_SLOW_LOG_MS) || 0 : 0
+  const slowMs = unpackaged() && !forTests ? Number(process.env.CW_TEST_SLOW_LOG_MS) || 0 : 0
   if (slowMs > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, slowMs)
   appendLog(f, line, MAX_BYTES)
   if (stallClock.mono() - start >= SLOW_WRITE_MS) noteStep(`log write ${basename(f)}`, start)

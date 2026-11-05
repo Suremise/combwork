@@ -5,7 +5,7 @@ import { join, basename } from 'path'
 import { mkdir, open, readdir, readFile, stat, writeFile } from 'original-fs/promises'
 import { existsSync, readFileSync, realpathSync } from 'original-fs'
 import type { AgentInstallInfo, AutoCompactSetting, McpServerDef, MemorySource, PathDataCopy, PlanLimit, PlanUsage, ReadinessIssue, RetryWait, SubSession } from '../../../shared/types'
-import { HIVE_DIR, assertSessionId, isSessionId } from '../../../shared/defaults'
+import { CW_DIR, assertSessionId, isSessionId } from '../../../shared/defaults'
 import { isCliOwnMode } from '../../../shared/cliOwnMode'
 import { CLAUDE_CODE, CLAUDE_DESCRIPTOR, CLAUDE_FOOTER_MODES, baseModel, canSwitchLive, footerMode, hookMode } from '../../../shared/claude'
 import { providerSettings } from '../../../shared/providers'
@@ -437,7 +437,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
    * replaces the folder while the project's other agents may still be reading theirs.
    */
   launchDir(projectPath: string, agentId: string): string {
-    return join(projectPath, HIVE_DIR, `launch-${agentId}`)
+    return join(projectPath, CW_DIR, `launch-${agentId}`)
   }
 
   /** Rebuilds the agent's launch folder with exactly the session's Hive skills, MCP servers and Hive's hooks. */

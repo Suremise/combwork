@@ -42,7 +42,7 @@ const check = (name, ok, extra = '') => {
   // Trust reads go ahead while this file is there; taken away, they wait (HI-1870: Checking… shown, for its screenshot).
   const trustGo = path.join(userData, 'trust-go')
   fs.writeFileSync(trustGo, '')
-  env.HIVE_TEST_HOLD_TRUST = trustGo
+  env.CW_TEST_HOLD_TRUST = trustGo
   fs.mkdirSync(path.dirname(conversation), { recursive: true })
   fs.writeFileSync(conversation, '{"kept":true}\n')
   // Each project with a Claude Code agent: "Needs set up" counts only projects a connection would be used in (HI-1871).

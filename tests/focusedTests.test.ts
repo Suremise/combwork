@@ -35,7 +35,7 @@ describe('the ids the runner takes', () => {
     expect(sortIds([], { cwd: root, suiteNames })).toMatchObject({ unit: [], suites: [], problem: null })
   })
 
-  it('HIVE_FOCUSED_JOBS: a whole number of 1 or more, 2 when unset', () => {
+  it('CW_FOCUSED_JOBS: a whole number of 1 or more, 2 when unset', () => {
     expect(parseJobs(undefined)).toBe(2)
     expect(parseJobs('')).toBe(2)
     expect(parseJobs('3')).toBe(3)
@@ -85,7 +85,7 @@ describe("each test's result", () => {
         { name: 'board', ok: true, skipped: null, environment: false },
         { name: 'files', ok: false, skipped: null, environment: false, windows: ['exit 0xC0000142'] },
         { name: 'claude-real', ok: false, skipped: 'environment: usage limit reached', environment: true },
-        { name: 'packaged', ok: false, skipped: null, environment: false, notRun: 'it needs HIVE_TEST_SLOW_IPC' },
+        { name: 'packaged', ok: false, skipped: null, environment: false, notRun: 'it needs CW_TEST_SLOW_IPC' },
         { name: 'queuecard', ok: true, skipped: null, environment: false, partsNotRun: ['S7 crash'] }
       ]
     }
@@ -94,7 +94,7 @@ describe("each test's result", () => {
       board: { result: 'passed' },
       files: { result: 'failed', why: 'failed (exit 0xC0000142)' },
       'claude-real': { result: 'skipped', why: 'environment: usage limit reached' },
-      packaged: { result: 'skipped', why: 'not run: it needs HIVE_TEST_SLOW_IPC' },
+      packaged: { result: 'skipped', why: 'not run: it needs CW_TEST_SLOW_IPC' },
       queuecard: { result: 'passed', why: 'parts not run: S7 crash' },
       about: { result: 'failed', why: 'not in the run record: it did not run' }
     })
@@ -134,7 +134,7 @@ describe('the runner on the command line (focused.run)', () => {
     const tests = join(dir, 'tests.json')
     const results = join(dir, 'out', 'results.json')
     writeFileSync(tests, typeof ids === 'string' ? ids : JSON.stringify(ids))
-    const r = spawnSync(process.execPath, [join(root, 'scripts', 'focusedTests.mjs')], { cwd: root, encoding: 'utf8', env: { ...runContext.baseEnv(), HIVE_FOCUSED_TESTS: tests, HIVE_FOCUSED_RESULTS: results, ...(jobs ? { HIVE_FOCUSED_JOBS: jobs } : {}) } })
+    const r = spawnSync(process.execPath, [join(root, 'scripts', 'focusedTests.mjs')], { cwd: root, encoding: 'utf8', env: { ...runContext.baseEnv(), CW_FOCUSED_TESTS: tests, CW_FOCUSED_RESULTS: results, ...(jobs ? { CW_FOCUSED_JOBS: jobs } : {}) } })
     return { status: r.status, stderr: r.stderr, records: JSON.parse(readFileSync(results, 'utf8')) as { test: string; result: string; why?: string }[] }
   }
 
@@ -147,13 +147,13 @@ describe('the runner on the command line (focused.run)', () => {
     ])
   })
 
-  it('a list it cannot use, or a bad HIVE_FOCUSED_JOBS, runs nothing and exits 2', () => {
+  it('a list it cannot use, or a bad CW_FOCUSED_JOBS, runs nothing and exits 2', () => {
     const twice = run(['board', 'board'])
     expect(twice.status).toBe(2)
     expect(twice.records).toEqual([{ test: 'board', result: 'failed', why: expect.stringMatching(/^nothing run: the test list names board more than once/) }])
     const jobs = run(['board'], '0')
     expect(jobs.status).toBe(2)
-    expect(jobs.records).toEqual([{ test: 'board', result: 'failed', why: expect.stringMatching(/HIVE_FOCUSED_JOBS/) }])
+    expect(jobs.records).toEqual([{ test: 'board', result: 'failed', why: expect.stringMatching(/CW_FOCUSED_JOBS/) }])
     const broken = run('{')
     expect(broken.status).toBe(2)
     expect(broken.records).toEqual([])

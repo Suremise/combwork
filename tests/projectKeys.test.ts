@@ -2,7 +2,7 @@
 // case-insensitive), the 1.0 step (an existing card keeps its number in its project, HI-1061; every old #N still resolves),
 // new cards numbered per project, a key changed (the old one an alias), a card moved to another project (its old key an
 // alias, its number there again when it comes back), a counter after a change undone part way, and references for the
-// Agent API (`HI-12`, `hi-12`, `#12`, 12). HIVE_KEYS_LIVE_DB=<a hive.db> runs the step on a copy of that board.
+// Agent API (`HI-12`, `hi-12`, `#12`, 12). CW_KEYS_LIVE_DB=<a hive.db> runs the step on a copy of that board.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
@@ -510,8 +510,8 @@ describe('the 1.0 step: keys for a 0.9 board', () => {
   })
 })
 
-const live = process.env.HIVE_KEYS_LIVE_DB
-describe.skipIf(!live)("the keys step on a copy of a live board's hive.db (HIVE_KEYS_LIVE_DB)", () => {
+const live = process.env.CW_KEYS_LIVE_DB
+describe.skipIf(!live)("the keys step on a copy of a live board's hive.db (CW_KEYS_LIVE_DB)", () => {
   it('gives each project with cards a key, and every card that has a project its own number there: every old #N resolves', () => {
     const copy = join(base, `live-${++n}.db`)
     copyFileSync(live!, copy)

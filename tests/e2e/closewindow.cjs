@@ -47,7 +47,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'always', closeToTray: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const { app, page: p1, inv: inv1 } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47915), CLAUDE_CONFIG_DIR: claudeHome } })
+  const { app, page: p1, inv: inv1 } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47915), CLAUDE_CONFIG_DIR: claudeHome } })
   app.on('window', (p) => p.on('pageerror', (e) => check('no page errors', false, e.message)))
   p1.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv1, p1, wsA)

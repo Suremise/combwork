@@ -35,7 +35,7 @@ const check = (name, ok, extra = '') => {
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const { app, page, inv } = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT) } })
+  const { app, page, inv } = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT) } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
@@ -98,7 +98,7 @@ const check = (name, ok, extra = '') => {
       for (const l of lines.map((x) => JSON.parse(x))) {
         const f = l.opts?.['--mcp-config']
         const servers = f && fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')).mcpServers : null
-        if (servers?.combwork?.env?.HIVE_AGENT_ID === agentId) return servers
+        if (servers?.combwork?.env?.CW_AGENT_ID === agentId) return servers
       }
       return null
     }

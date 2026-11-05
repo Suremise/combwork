@@ -92,13 +92,13 @@ async function registryPath(): Promise<string[] | null> {
 
 /**
  * The registry PATH a test copy gets instead of the machine's, or undefined for the machine's: an unpackaged build
- * with HIVE_TEST_REGISTRY_PATH (`;`-separated folders; a suite may change it while Hive runs, standing in for an
- * installer) or with a test profile (HIVE_USER_DATA: none), so a suite's PATH without a CLI stays without it.
+ * with CW_TEST_REGISTRY_PATH (`;`-separated folders; a suite may change it while Hive runs, standing in for an
+ * installer) or with a test profile (CW_USER_DATA: none), so a suite's PATH without a CLI stays without it.
  * `npm run dev` (no test profile) and the installed app read the registry.
  */
 export function testRegistryPath(env: NodeJS.ProcessEnv = process.env, packaged = app.isPackaged): string | undefined {
   if (packaged) return undefined
-  return env.HIVE_TEST_REGISTRY_PATH ?? (env.HIVE_USER_DATA ? '' : undefined)
+  return env.CW_TEST_REGISTRY_PATH ?? (env.CW_USER_DATA ? '' : undefined)
 }
 
 /** What a new process's PATH would hold, the folders in order (null when it can't be read, or not on Windows). */

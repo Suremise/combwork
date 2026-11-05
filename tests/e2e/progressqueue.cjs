@@ -12,8 +12,8 @@
 // - once nothing keeps it (its outcomes seen, no card in flight under the old rules), the queue's card goes.
 // Screenshots of the Merges tab (wide and narrow) and Pulse, both themes. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
-// Builders on slots (#1578). Many returns makes the list of returns small with a test seam (HIVE_TEST_QUEUE_RETURNS):
-// NOT RUN on a packaged build (HIVE_EXE), where the rest runs.
+// Builders on slots (#1578). Many returns makes the list of returns small with a test seam (CW_TEST_QUEUE_RETURNS):
+// NOT RUN on a packaged build (CW_EXE), where the rest runs.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -300,12 +300,12 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     for (const c of [zero, two, three]) await inv('tasks:archive', c.n, true)
     check('once none is, and its outcomes are seen, the queue\'s card goes', !!(await until(async () => (await card.count()) === 0, HUNG_MS)), await panel.locator('.progress-tab-merges').innerText().catch(() => ''))
 
-    if (q.devSeam('many returns (the list of returns made small, HIVE_TEST_QUEUE_RETURNS)')) {
+    if (q.devSeam('many returns (the list of returns made small, CW_TEST_QUEUE_RETURNS)')) {
       // --- Many returns (#1356's returns policy, HR3's rounds 1 to 4): the window's list of returns made small (the seam: a
       // bound of 2), so four cards pass it. A card queued again takes no place; the rest are counted; a row shown and seen
       // stays usable for its 10 s, and only then does the next come, with nothing else happening (the queue paused).
       await h.app.evaluate(() => {
-        process.env.HIVE_TEST_QUEUE_RETURNS = '2'
+        process.env.CW_TEST_QUEUE_RETURNS = '2'
       })
       await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
       // Not seen meanwhile: the window counts as not focused.
@@ -354,7 +354,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
       const last = await view()
       check('…still paused, P2 still queued, never shown as returned', last?.paused?.reason === 'user' && last.queued.some((e) => e.card === p2.n) && !(await cardText()).includes(`${p2.key} returned`), JSON.stringify({ paused: last?.paused, queued: last?.queued.map((e) => e.key) }))
       await h.app.evaluate(() => {
-        delete process.env.HIVE_TEST_QUEUE_RETURNS
+        delete process.env.CW_TEST_QUEUE_RETURNS
       })
     }
   } catch (e) {

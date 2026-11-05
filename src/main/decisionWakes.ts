@@ -42,7 +42,7 @@ const SETTLE_MS = 15_000
 const SETTLE_MAX_MS = 60_000
 export const testHooks: { settleMs?: number } = {}
 const settleMs = (): number => {
-  const v = !app.isPackaged ? Number(process.env.HIVE_TEST_DECISION_SETTLE_MS) : NaN
+  const v = !app.isPackaged ? Number(process.env.CW_TEST_DECISION_SETTLE_MS) : NaN
   return testHooks.settleMs ?? (Number.isFinite(v) && v >= 0 ? v : SETTLE_MS)
 }
 

@@ -18,7 +18,7 @@ const check = (name, ok, extra = '') => {
 }
 
 async function start() {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: PORT })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: PORT })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   app.on('window', (p) => p.on('pageerror', (e) => check('no page errors', false, e.message)))
   return app

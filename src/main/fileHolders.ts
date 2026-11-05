@@ -45,13 +45,13 @@ public static class HiveFileHolders {
 }
 "@
 Add-Type -TypeDefinition $src
-[HiveFileHolders]::Of($env:HIVE_HOLDER_PATH)
+[HiveFileHolders]::Of($env:CW_HOLDER_PATH)
 `
 
 export function fileHolders(path: string): Promise<string[]> {
   if (process.platform !== 'win32') return Promise.resolve([])
   return new Promise((res) => {
-    execFile(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', SCRIPT], { windowsHide: true, encoding: 'utf8', timeout: 20_000, env: { ...process.env, HIVE_HOLDER_PATH: path } }, (err, out) =>
+    execFile(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', SCRIPT], { windowsHide: true, encoding: 'utf8', timeout: 20_000, env: { ...process.env, CW_HOLDER_PATH: path } }, (err, out) =>
       res(err ? [] : String(out).split(/\r?\n/).map((l) => l.trim()).filter(Boolean))
     )
   })

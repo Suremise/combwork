@@ -40,7 +40,7 @@ const toolReplies = await import('../src/shared/toolReplies')
 const { checksView, intentText } = toolReplies
 const { armIntentWatch } = await import('../src/main/intentWatch')
 const watches = await import('../src/main/watches')
-const { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, HIVE_TOOLS, INTENT_TOOLS, assistantTools } = await import('../src/shared/assistantTools')
+const { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, CW_TOOLS, INTENT_TOOLS, assistantTools } = await import('../src/shared/assistantTools')
 
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
@@ -967,9 +967,9 @@ describe("the intents' routes and tools (#1267)", () => {
     expect(checksView(names, 'AL-1', true)).toEqual({ checks: names, checksHint: hint(true) })
   })
 
-  it('every agent has the intent tools, Codex too (#913: enabled_tools is HIVE_TOOLS); the Assistant at Control agents, never start_card', () => {
+  it('every agent has the intent tools, Codex too (#913: enabled_tools is CW_TOOLS); the Assistant at Control agents, never start_card', () => {
     for (const t of [...INTENT_TOOLS, 'cw_start_card']) {
-      expect(HIVE_TOOLS).toContain(t)
+      expect(CW_TOOLS).toContain(t)
       expect(ASSISTANT_ONLY_TOOLS).not.toContain(t)
     }
     expect(AGENT_ONLY_TOOLS).toContain('cw_start_card')

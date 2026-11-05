@@ -31,7 +31,7 @@ const check = (name, ok, extra = '') => {
   // Switching stops the agents without asking, as after the user says so.
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const { app, page, inv } = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: lib.port(47922) } })
+  const { app, page, inv } = await lib.launch({ userData, env: { ...env, CW_API_PORT: lib.port(47922) } })
   let gone = null
   page.on('close', () => (gone ??= new Date().toISOString()))
   const mainPid = await app.evaluate(() => process.pid)

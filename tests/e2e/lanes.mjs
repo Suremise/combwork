@@ -31,7 +31,7 @@ const LOCK = '.claiming'
 const LOCK_MAX_MS = 10_000
 
 /**
- * Where the lanes of a pool of its own (HIVE_TEST_LANES_DIR, runContext's OWN_LANES: concurrency.mjs's check of a run
+ * Where the lanes of a pool of its own (CW_TEST_LANES_DIR, runContext's OWN_LANES: concurrency.mjs's check of a run
  * that waits for a lane, #735) have their ports: above the machine pool's. Runs in other worktrees claim the machine
  * pool's lanes without seeing this pool's claims, so sharing ports let one of them start its test Combwork on the port a
  * scenario here had just claimed, and the scenario's Agent API calls reached that Combwork, which refused its token (#1127).

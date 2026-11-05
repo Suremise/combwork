@@ -26,8 +26,8 @@ import { maskText } from '../shared/redact'
 
 const log = createLogger('console')
 
-/** How long after a trigger its capture waits, for what follows it (an advanced value). Unpackaged test builds can shorten it (HIVE_TEST_FLIGHT_AFTER_MS). */
-const afterMs = (): number => (!app.isPackaged && Number(process.env.HIVE_TEST_FLIGHT_AFTER_MS) > 0 ? Number(process.env.HIVE_TEST_FLIGHT_AFTER_MS) : advanced.number('cw.recorder.afterSeconds') * 1000)
+/** How long after a trigger its capture waits, for what follows it (an advanced value). Unpackaged test builds can shorten it (CW_TEST_FLIGHT_AFTER_MS). */
+const afterMs = (): number => (!app.isPackaged && Number(process.env.CW_TEST_FLIGHT_AFTER_MS) > 0 ? Number(process.env.CW_TEST_FLIGHT_AFTER_MS) : advanced.number('cw.recorder.afterSeconds') * 1000)
 
 /** Bounds on what the recorder holds besides the console's rings: cooldowns, and captures waiting or being written. */
 export const FLIGHT_MAX_COOLDOWNS = 1000

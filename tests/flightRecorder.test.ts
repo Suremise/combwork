@@ -147,7 +147,7 @@ describe("the console's flight mode", async () => {
 })
 
 describe('captures and triggers', async () => {
-  process.env.HIVE_TEST_FLIGHT_AFTER_MS = '1'
+  process.env.CW_TEST_FLIGHT_AFTER_MS = '1'
   const { devConsole } = await import('../src/main/devConsole')
   const { saveCapture, listCaptures, recordingsDir, latestRecording } = await import('../src/main/consoleRecorder')
   const { flightRecorder, FLIGHT_MAX_PENDING } = await import('../src/main/flightRecorder')
@@ -318,7 +318,7 @@ describe('captures and triggers', async () => {
   })
 
   it('a trigger turned off stops at once: its capture waiting is dropped, another trigger still on saves its own', async () => {
-    process.env.HIVE_TEST_FLIGHT_AFTER_MS = '300'
+    process.env.CW_TEST_FLIGHT_AFTER_MS = '300'
     try {
       // Many kept, so this test's capture isn't pruned by the earlier ones.
       set({ 'cw.recorder.safeguard': true, 'cw.recorder.stalled': true, 'cw.recorder.keep': 200 })
@@ -337,7 +337,7 @@ describe('captures and triggers', async () => {
       expect(captures().length).toBe(before + 1)
       expect(toasts.list.length).toBe(1)
     } finally {
-      process.env.HIVE_TEST_FLIGHT_AFTER_MS = '1'
+      process.env.CW_TEST_FLIGHT_AFTER_MS = '1'
     }
   })
 

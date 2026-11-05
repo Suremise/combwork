@@ -1,4 +1,4 @@
-// A session's environment (#567, #589): Combwork's own HIVE_ variables are dropped from it. SESSION_SETTINGS names the ones a
+// A session's environment (#567, #589): Combwork's own CW_ variables are dropped from it. SESSION_SETTINGS names the ones a
 // session keeps on purpose, none today: the test-slot count is the test folder's config.json, which needs no passing on.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -16,35 +16,34 @@ afterEach(() => {
 })
 
 describe("a session's environment", () => {
-  it("drops every HIVE_ variable while the list is empty: Combwork's own, the test copies' settings and the slot count, and a session's identity", () => {
+  it("drops every CW_ variable while the list is empty: Combwork's own, the test copies' settings and the slot count, and a session's identity", () => {
     expect([...SESSION_SETTINGS]).toEqual([])
-    set({ HIVE_TEST_HEAVY_SLOTS: '4', HIVE_API_TOKEN: 'secret', HIVE_AGENT_ID: 'a-1', HIVE_TEST_QUIET: '1', HIVE_TEST_HEAVY_DIR: 'C:/pool', HIVE_USER_DATA: 'C:/profile', CLAUDECODE: '1', ELECTRON_RUN_AS_NODE: '1', CHROME_CRASHPAD_PIPE_NAME: '\\\\.\\pipe\\crashpad_1_X', HIVE_TEST_SOMETHING_ELSE: 'x' })
+    set({ CW_TEST_HEAVY_SLOTS: '4', CW_API_TOKEN: 'secret', CW_AGENT_ID: 'a-1', CW_TEST_QUIET: '1', CW_TEST_HEAVY_DIR: 'C:/pool', CW_USER_DATA: 'C:/profile', CLAUDECODE: '1', ELECTRON_RUN_AS_NODE: '1', CHROME_CRASHPAD_PIPE_NAME: '\\\\.\\pipe\\crashpad_1_X', CW_TEST_SOMETHING_ELSE: 'x' })
     const env = childEnv()
-    expect(Object.keys(env).filter((k) => k.startsWith('HIVE_'))).toEqual([])
+    expect(Object.keys(env).filter((k) => k.startsWith('CW_'))).toEqual([])
     // Combwork's crash handler (#985) too: an app the agent starts keeps its crashes to itself.
     for (const k of ['CLAUDECODE', 'ELECTRON_RUN_AS_NODE', 'CHROME_CRASHPAD_PIPE_NAME']) expect(env[k], k).toBeUndefined()
   })
 
-  it('drops inherited CW_ variables too (HI-2463: the public names), so a session gets only those Combwork gives it now', () => {
-    // A session started from a shell inside another Combwork or Combwork session inherits that one's identity under both names.
-    set({ CW_API_TOKEN_FILE: 'C:/other/token.json', CW_AGENT: 'HB9', CW_SLOT: 'slot-z', HIVE_API_URL: 'http://127.0.0.1:1', HIVE_AGENT: 'HB8', CWD_LIKE: 'kept', CWX: 'kept' })
+  it("drops inherited CW_ variables, so a session gets only those Combwork gives it now", () => {
+    // A session started from a shell inside another Combwork session inherits that one's identity.
+    set({ CW_API_TOKEN_FILE: 'C:/other/token.json', CW_AGENT: 'HB9', CW_SLOT: 'slot-z', CW_API_URL: 'http://127.0.0.1:1', CWD_LIKE: 'kept', CWX: 'kept' })
     const env = childEnv({ CW_AGENT: 'HB2', CW_API_URL: 'http://127.0.0.1:47822' })
     expect(Object.keys(env).filter((k) => k.startsWith('CW_')).sort()).toEqual(['CW_AGENT', 'CW_API_URL'])
     expect([env.CW_AGENT, env.CW_API_URL]).toEqual(['HB2', 'http://127.0.0.1:47822'])
-    expect(Object.keys(env).filter((k) => k.startsWith('HIVE_'))).toEqual([])
     expect([env.CWD_LIKE, env.CWX]).toEqual(['kept', 'kept'])
   })
 
   it('keeps a name added to the list, and only that one; what the session is given wins', () => {
-    set({ HIVE_KEPT_FOR_TEST: 'yes', HIVE_API_TOKEN: 'secret' })
-    SESSION_SETTINGS.add('HIVE_KEPT_FOR_TEST')
+    set({ CW_KEPT_FOR_TEST: 'yes', CW_API_TOKEN: 'secret' })
+    SESSION_SETTINGS.add('CW_KEPT_FOR_TEST')
     try {
       const env = childEnv()
-      expect(Object.keys(env).filter((k) => k.startsWith('HIVE_'))).toEqual(['HIVE_KEPT_FOR_TEST'])
-      expect(childEnv({ HIVE_KEPT_FOR_TEST: 'given' }).HIVE_KEPT_FOR_TEST).toBe('given')
+      expect(Object.keys(env).filter((k) => k.startsWith('CW_'))).toEqual(['CW_KEPT_FOR_TEST'])
+      expect(childEnv({ CW_KEPT_FOR_TEST: 'given' }).CW_KEPT_FOR_TEST).toBe('given')
     } finally {
-      SESSION_SETTINGS.delete('HIVE_KEPT_FOR_TEST')
+      SESSION_SETTINGS.delete('CW_KEPT_FOR_TEST')
     }
-    expect(childEnv().HIVE_KEPT_FOR_TEST).toBeUndefined()
+    expect(childEnv().CW_KEPT_FOR_TEST).toBeUndefined()
   })
 })

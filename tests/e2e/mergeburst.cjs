@@ -39,7 +39,7 @@ function fixture() {
 
 ;(async () => {
   fixture()
-  const h = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47709) } })
+  const h = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47709) } })
   const { app, page, inv } = h
   try {
     await lib.openWorkspace(inv, page, ws)

@@ -448,10 +448,10 @@ describe('reviewing the set-aside cards (#1044, Darren\'s decision on #1017: the
   // Added and discarded files go to the Recycle Bin: a test trash folder here.
   const trashDir = join(base, 'set-aside-trash')
   beforeAll(() => {
-    process.env.HIVE_TEST_TRASH_DIR = trashDir
+    process.env.CW_TEST_TRASH_DIR = trashDir
   })
   afterAll(() => {
-    delete process.env.HIVE_TEST_TRASH_DIR
+    delete process.env.CW_TEST_TRASH_DIR
   })
   const trashedFrom = (ws: string): string[] => {
     try {

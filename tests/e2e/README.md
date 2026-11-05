@@ -48,8 +48,8 @@ another run started in the same second. The last ten finished runs are kept, and
 up to 2 GB of logs (Where they work, below): a run still going (`.active` in its folder,
 with its runner's process id) is never pruned, so runners started side by side don't remove each other's logs. A runner started inside a suite (`progressreport`
 runs one) keeps its runs under `logs/nested`, so they never push real runs out (`logs.mjs`). It knows it is inside a
-suite from `E2E_RUN_SUITE`, which the runner sets for each suite: Combwork drops `HIVE_` variables from its sessions, so
-`HIVE_E2E_PORT` doesn't reach an agent's shell.
+suite from `E2E_RUN_SUITE`, which the runner sets for each suite: Combwork drops `CW_` variables from its sessions, so
+`CW_E2E_PORT` doesn't reach an agent's shell.
 
 **The build.** The suites run the dev build in `out/`. `--build` builds it first, only when it isn't from the source
 as it is now: a build made with `--build` is stamped with a hash of everything it was made from (the paths and contents
@@ -61,7 +61,7 @@ stamp: the runner warns that it may hold other code, and a run record made with 
 needs no `--build` (#274).
 
 **The installer's suites** (`packaged*`) test `dist\win-unpacked`, not `out/`: a run of only those doesn't look at
-`out/` (unless `HIVE_PROGRESS_CHECK_DEV=1`). Instead the runner checks what `dist\win-unpacked` itself was built from:
+`out/` (unless `CW_PROGRESS_CHECK_DEV=1`). Instead the runner checks what `dist\win-unpacked` itself was built from:
 `npm run dist` records that inside it (`win-unpacked\.hive-build-info.json`) once it is sure, and removes it when it
 starts. Not `dist\build-info.json`: that describes the installer set, which a worktree's `npm run dist` copies into the
 main checkout's `dist` without `win-unpacked`, so there it can describe another build than the one the suites would
@@ -72,9 +72,9 @@ another commit, or from before an edit, is reported.
 
 **Windows** (#1253): no suite puts a window on the screen or takes the focus. A dev test copy is quiet itself
 (`testQuiet`: off screen, unfocusable, no notifications). A packaged Combwork isn't, unless it is 1.0 with
-`HIVE_TEST_QUIET=1` (which `hiveEnv` sets); a released 0.9 can't be changed at all. So `lib.cjs`'s `_electron.launch`
+`CW_TEST_QUIET=1` (which `hiveEnv` sets); a released 0.9 can't be changed at all. So `lib.cjs`'s `_electron.launch`
 does it from outside for every packaged Combwork a suite starts (`packaged`, `packaged-transcript`, `packaged-workers`, `boardupgrade` and
-`upgradelane`'s 0.9 from `HIVE_E2E_HIVE09` or the main checkout's `dist\win-unpacked`, `plan` with `HIVE_EXE`). It
+`upgradelane`'s 0.9 from `CW_E2E_V09` or the main checkout's `dist\win-unpacked`, `plan` with `CW_EXE`). It
 starts with `--hidden` (Combwork makes its windows but shows none, as when started at sign-in). As soon as Playwright
 reaches its main process, `keepPackagedQuiet` moves its windows off screen, makes them unfocusable and keeps them off
 the taskbar, then shows them inactive so they draw for screenshots. From then on, showing, focusing, maximising,
@@ -85,20 +85,20 @@ watcher of on-screen windows and the foreground: none from Hive, as the app was 
 
 **No update checks** (#1332): a packaged Combwork checks GitHub 30 s after it starts and every 6 hours, and each check
 fetches the release's `latest.yml`, which GitHub counts as a download. A packaged test Combwork never does: 1.0 with
-`HIVE_TEST_QUIET=1` checks nothing, automatic or manual (Settings → Updates says it's a test copy, and its log says so
-at start), and `lib.cjs`'s `_electron.launch` also gives every packaged Combwork `HIVE_UPDATE_DELAY` at its maximum (about
+`CW_TEST_QUIET=1` checks nothing, automatic or manual (Settings → Updates says it's a test copy, and its log says so
+at start), and `lib.cjs`'s `_electron.launch` also gives every packaged Combwork `CW_UPDATE_DELAY` at its maximum (about
 24.8 days: a 0.9's first check never comes) and, in a profile it has saved, automatic checks off (no 6-hourly one).
 The guard: when a suite ends, each packaged Combwork's `hive.log` must show no `[updates] Checking for update` since it
 was started, or the suite fails, naming the lines. The Sandbox checks run with their network off.
 
 Nor does a test ever start the installed app (`%LOCALAPPDATA%\Programs\Combwork`, or 1.0's `Programs\Hive`): `lib.cjs` refuses it and any exe
-outside this checkout, the test folders, the main checkout's `dist\win-unpacked`, `HIVE_E2E_HIVE09` and `HIVE_EXE`. And
+outside this checkout, the test folders, the main checkout's `dist\win-unpacked`, `CW_E2E_V09` and `CW_EXE`. And
 children of the run context get no `%APPDATA%\Combwork\bin` or `Combwork-Dev\bin` (nor 1.0's `Hive\bin`, `Hive-Dev\bin`) on their PATH (an agent session has them):
 those `cw-progress` shims run the installed exe. A `cw-progress` run seen in a process list is itself
 `Programs\Combwork\Combwork.exe` (1.0's `Programs\Hive\Hive.exe`; as Node, no window), not the app.
 
 **Several at once.** Suites run four at a time (`--jobs N` for another number; `--jobs 1` runs them one after
-another). Each gets its own profile, folders and Agent API port: the runner sets `HIVE_E2E_PORT` and `HIVE_API_PORT`,
+another). Each gets its own profile, folders and Agent API port: the runner sets `CW_E2E_PORT` and `CW_API_PORT`,
 and suites read the port with `lib.port(<default>)` (the default is used when a suite runs on its own). Suites that
 start the real Claude Code or use the Codex test home share those with each other, so they run one at a time in a lane
 of their own, beside the rest. Those marked `serial` in `suites.mjs` (with the reason: window focus, a shared test
@@ -121,7 +121,7 @@ A runner started inside a suite claims no lane: it takes ports 1000 above its pa
 lane (`logs/` below), so `.active` there shows every run still going. Suites keep their test projects outside the
 repository, so its `CLAUDE.md` (which imports `AGENTS.md`) never applies to their Claude Code sessions: Claude Code
 would ask each session whether to allow the import. `update` keeps its download cache per lane too (`%LOCALAPPDATA%\hive-test-updater-<k>`, through
-`HIVE_UPDATE_CACHE`). The Codex test home stays shared: it holds the one sign-in, and copies of it would share a
+`CW_UPDATE_CACHE`). The Codex test home stays shared: it holds the one sign-in, and copies of it would share a
 refresh token. Real Codex suites take a machine-wide lock on that home's real path for their whole suite (#478):
 two runners starting sandbox commands through the PowerShell alias together could leave one launch refused with
 `CreateProcessAsUserW failed: 5`. The second runner prints who holds the home and waits in the Progress panel;
@@ -140,18 +140,18 @@ a run uses of its own comes from one place, `runContext.cjs` (with `lanes.mjs` f
 for the build), and the e2e runner, `lib.cjs` and the scenario harness all take it from there.
 
 - **Environments are built from an allowlist.** A suite (from the runner), a test copy of Combwork (`lib.hiveEnv({
-  HIVE_USER_DATA, … })`, which `lib.launch()` uses) and a child that is part of Combwork, such as the combwork MCP server or the
+  CW_USER_DATA, … })`, which `lib.launch()` uses) and a child that is part of Combwork, such as the combwork MCP server or the
   `cw-progress` wrapper (`lib.childEnv({ … })`), get Windows' own variables, the user's folders and the network's
   proxy and certificates (`ALLOW`), plus what the context sets: the profile, quiet and tips off, the suite's folder
-  (`HIVE_E2E_DIR`) and port (`HIVE_E2E_PORT`, which a test Combwork gets as `HIVE_API_PORT`), the CLI test homes a suite
+  (`CW_E2E_DIR`) and port (`CW_E2E_PORT`, which a test Combwork gets as `CW_API_PORT`), the CLI test homes a suite
   names. Nothing else of the parent's: not an agent session's `CW_*` variables or an outer `cw-progress`'s
   `CW_PROGRESS_*`, not `NO_COLOR`/`FORCE_COLOR`, `ELECTRON_RUN_AS_NODE`, `NODE_OPTIONS`, `CLAUDE_*` or `ANTHROPIC_*`
   (the real tier uses the CLIs' own sign-in) or `GIT_*`. So a run started from an agent's shell inside `cw-progress`
   behaves as one started from a plain one, and there is no strip list to keep growing.
-- **Test settings are passed on by name** (`PASS_ENV`, each with what it is for): `HIVE_TEST_CODEX_HOME`,
-  `HIVE_TEST_CLAUDE_HOME`, `HIVE_TEST_QUIET` (`0` shows the copies), `HIVE_TEST_PROGRESS_TIMINGS`,
-  `HIVE_PROGRESS_CHECK_DEV`, `HIVE_EXE`, `REPLYSIZE_OUT`. A new setting a suite must get from the person running it is
-  added there. `HIVE_E2E_NATIVE` never is: it only works with a suite run on its own.
+- **Test settings are passed on by name** (`PASS_ENV`, each with what it is for): `CW_TEST_CODEX_HOME`,
+  `CW_TEST_CLAUDE_HOME`, `CW_TEST_QUIET` (`0` shows the copies), `CW_TEST_PROGRESS_TIMINGS`,
+  `CW_PROGRESS_CHECK_DEV`, `CW_EXE`, `REPLYSIZE_OUT`. A new setting a suite must get from the person running it is
+  added there. `CW_E2E_NATIVE` never is: it only works with a suite run on its own.
 - **No child environment from `process.env`.** `lib.cjs` refuses to start a test Combwork whose environment `lib.hiveEnv`
   didn't build, and `tests/e2esuites.test.ts` fails for a suite, the runner or the scenario harness that spreads or
   passes `process.env`. The fake CLIs are the exception: they stand for Claude Code and Codex, which start their MCP
@@ -197,7 +197,7 @@ second worktree it makes for the check (a git worktree of `HEAD` with the uncomm
 through a junction, removed afterwards), one in each worktree with an agent shell's environment (`NO_COLOR`,
 `CW_PROGRESS_WRAPPED`, a token…) and one with a plain one. It checks that every run passes in a lane, folders, ports
 and logs folder of its own, and that each worktree is built once and stamped. After that (alone with `--lane-wait`),
-an e2e run and a scenario run wait for a lane of a pool of their own (`HIVE_TEST_LANES_DIR`) while a source file is
+an e2e run and a scenario run wait for a lane of a pool of their own (`CW_TEST_LANES_DIR`) while a source file is
 added: both must build and test the changed source, and the record name it (#735); meanwhile it holds machine lanes 0 and 1 with a suite folder in each, which their housekeeping as they end must leave (#1133). Run it after changing the runner,
 `lib.cjs`, `runContext.cjs`, `lanes.mjs`, `build.mjs` or the scenario harness. Two checkers can run at once, from two
 worktrees (#207): each keeps what it makes (its worktrees, decoy, heavy-run pool) in a folder of its own,
@@ -263,7 +263,7 @@ over from a session that ended: …`), so a resumed agent knows its earlier run 
 its results may still be wanted. Stop it by its process id (never by name), or with **Stop Them** in Combwork's notice after
 an unexpected close, which ends the whole run.
 `npm run e2e:concurrency -- --heavy` checks it: three heavy runs from three worktrees with two slots (in a pool of their
-own, `HIVE_TEST_HEAVY_DIR`, with no side slot), one waiting visibly, `--no-wait`, with both heavy slots held a small run
+own, `CW_TEST_HEAVY_DIR`, with no side slot), one waiting visibly, `--no-wait`, with both heavy slots held a small run
 taking the side slot while a heavy one is refused, a killed run's slot, a pre-merge run taking the slot
 before two that asked earlier (the stand-in Agent API says its agent holds the merge slot), and a killed pre-merge run's
 place.
@@ -274,16 +274,16 @@ the shared test folder's settings file, `%LOCALAPPDATA%\hive-test\config.json`: 
 1 or more. It is machine-wide, as the slots are: every worktree's runs, an agent's or a terminal's, read the same file,
 so they all count the same slots. It is read each time a run asks for a slot, so an edit counts from the next run, with
 no restart of Combwork or a terminal. A missing or unreadable file, or a value that isn't a whole number from 1, means two,
-and the run says so in one line (`Test slots: …`). `HIVE_TEST_HEAVY_SLOTS`, a whole number, overrides the file for one
-run (the concurrency checker uses it); Combwork doesn't pass it on to its sessions (it drops its `HIVE_` variables), and a
+and the run says so in one line (`Test slots: …`). `CW_TEST_HEAVY_SLOTS`, a whole number, overrides the file for one
+run (the concurrency checker uses it); Combwork doesn't pass it on to its sessions (it drops its `CW_` variables), and a
 run started with a higher number than the others can take a slot they are waiting for, so use the file for the
-machine's setting. If runs start failing after raising it, go back down. A pool of its own (`HIVE_TEST_HEAVY_DIR`) with
+machine's setting. If runs start failing after raising it, go back down. A pool of its own (`CW_TEST_HEAVY_DIR`) with
 a count of its own is for checking the queue itself (`npm run e2e:concurrency -- --heavy`), never for getting round
 it. The side slot and model trials are set beside it (HI-2070), read the same way:
 `{ "heavySlots": 2, "sideSlots": 1, "modelTrials": 2, "smallRun": { "e2eSuites": 3, "e2eRepeat": 3, "scenarioRuns": 5 } }`.
 `sideSlots` is a whole number from 0 (0: no side slot, small runs queue for the heavy slots); `modelTrials` and each of
 `smallRun`'s from 1; one left out, or one that isn't valid (said in a `Test slots: …` line), is its default.
-`HIVE_TEST_SIDE_SLOTS` and `HIVE_TEST_MODEL_TRIALS` override the first two for one run, as `HIVE_TEST_HEAVY_SLOTS` does.
+`CW_TEST_SIDE_SLOTS` and `CW_TEST_MODEL_TRIALS` override the first two for one run, as `CW_TEST_HEAVY_SLOTS` does.
 
 **Unit tests under load.** `npm test` uses half the cores (`maxWorkers: '50%'` in `vitest.config.ts`) and allows 20 s
 a test and 30 s a hook, so a full run beside an e2e set doesn't hit Vitest's 5 s default. A test that needs longer says
@@ -299,7 +299,7 @@ same code while every required check still runs:
   commits first, so it is the commit the round names), each suite's result and time,
   and the logs folder. Paste the printed block into the card comment. When real suites ran, the record also names the
   real CLIs' versions as the suites' test copies of Combwork selected them ("Real CLIs (as Combwork selected them): Claude Code
-  2.1.292, Codex 0.160.1"; each Combwork notes its choice in the suite's `hive-clis.jsonl`, `HIVE_TEST_CLI_LOG`), and
+  2.1.292, Codex 0.160.1"; each Combwork notes its choice in the suite's `hive-clis.jsonl`, `CW_TEST_CLI_LOG`), and
   `run-record.json` beside it holds them per suite: `npm run tested-clis` makes the release's "Tested with" manifest
   from it (#365, RELEASING.md). The runner itself never starts a CLI.
 - **The reviewer** checks the record instead of repeating it (#533): its fingerprint is the code it's reviewing
@@ -367,7 +367,7 @@ passed to them), and it never changes the output or the results. Turn it off wit
 `CW_PROGRESS=0` (both). The reporting is all in `tests/progressReport.mts`.
 
 `packaged-progress` checks the `cw-progress` wrapper as installed (`dist/win-unpacked`), against a stand-in for the
-Agent API; `HIVE_PROGRESS_CHECK_DEV=1 node tests/e2e/packaged-progress.cjs` checks the dev build's copy.
+Agent API; `CW_PROGRESS_CHECK_DEV=1 node tests/e2e/packaged-progress.cjs` checks the dev build's copy.
 
 ### Contract tests: what a CLI sends Combwork
 
@@ -383,7 +383,7 @@ scripted stand-in model.
 
 ### The i18n screenshot route: every screen in another language
 
-Every suite runs Combwork in English (`lib.hiveEnv` sets `HIVE_LANG=en`, #767): they find what they click by its English
+Every suite runs Combwork in English (`lib.hiveEnv` sets `CW_LANG=en`, #767): they find what they click by its English
 text, and numbers and dates come out the same on any Windows. Whether the window works in **another language** is
 the **i18nshots** route's (#769; #756's design, section 4): it opens each screen and photographs it in both themes, for
 a person or an agent to look at. Under the pseudo-locale (`en-XA`: English accented, longer and in brackets) any text
@@ -477,25 +477,25 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
   release-testing project that holds just the release-testing agent (the hive-mcp repo's
   `servers/windows-sandbox/RELEASE-TESTING.md`).
 - **The 1.0 upgrade from installed 0.9** (S53, S60 and restore, #1227): `upgradelane` and `boardupgrade` run inside the
-  Sandbox against two installs, with `HIVE_E2E_HIVE09` a copy of the installed 0.9 and `HIVE_EXE` a copy of the new
-  build installed over it (copies, as `lib.cjs` never starts an installed copy: `Programs\Combwork`, or before 1.1 `Programs\Hive`). With `HIVE_EXE` set,
+  Sandbox against two installs, with `CW_E2E_V09` a copy of the installed 0.9 and `CW_EXE` a copy of the new
+  build installed over it (copies, as `lib.cjs` never starts an installed copy: `Programs\Combwork`, or before 1.1 `Programs\Hive`). With `CW_EXE` set,
   `lib.launch` starts that packaged exe instead of the dev build, saying so in the suite's log; `boardupgrade`'s
   step 8 needs an unpackaged build's upgrade hold, so it says NOT RUN there. The Sandbox maps Node, Git and the checkout
   read-only as tool folders; #1227's card has the script.
 - **The queue suites on a packaged build** (#1578; S54 and S55 among them, for #1449 and #1539): `queueFixture.cjs`
-  starts Combwork through `lib.launch`, so `HIVE_EXE` runs them on the build named. A packaged build refuses the test
+  starts Combwork through `lib.launch`, so `CW_EXE` runs them on the build named. A packaged build refuses the test
   copies' channels (`agents:testLegacy`, which makes 0.9 worktree agents, and `slots:test`) and ignores the
-  `HIVE_TEST_…` seams, so builders are added in the project folder and work on the slot each card's start lends
+  `CW_TEST_…` seams, so builders are added in the project folder and work on the slot each card's start lends
   (`q.approve`, `q.approveBy`, `q.startCard`). A part that needs a seam runs only when `q.devSeam(what)` says so, and
   prints NOT RUN on a packaged build. A suite that tests 0.9 worktrees on purpose (a lane carried over the upgrade, the
   Merge dialog on an agent's branch) or that needs the test channels says "Dev build only" and why in its header.
   `tests/e2esuites.test.ts` fails on a queue suite that needs one of these without saying so, and on any suite that
   uses the test channels without saying so (#1580: the suites making 0.9 worktree agents or lending slots through
   `slots:test` are all dev-build tests, each header saying why).
-- **What can't run on a packaged build is NOT RUN, never a pass** (#1591). With `HIVE_EXE` set, the runner doesn't
+- **What can't run on a packaged build is NOT RUN, never a pass** (#1591). With `CW_EXE` set, the runner doesn't
   start a suite that would test the dev build all the same: one whose header says "Dev build only", one that starts
-  this checkout's Electron itself (`executablePath: lib.ELECTRON`, not `lib.launch`), and, unless it reads `HIVE_EXE`
-  or uses `q.devSeam` (it then handles the packaged build itself), one that needs a `HIVE_TEST_…` seam a packaged
+  this checkout's Electron itself (`executablePath: lib.ELECTRON`, not `lib.launch`), and, unless it reads `CW_EXE`
+  or uses `q.devSeam` (it then handles the packaged build itself), one that needs a `CW_TEST_…` seam a packaged
   build ignores or a test channel it refuses. Each is listed `NOT RUN` with why, in the output and the run record,
   which names the packaged build; a `NOT RUN <what>` line a suite prints for a part it leaves out is in the record
   too. A suite is judged with the files it uses: a folder of its name and the helpers it requires (`wakepaste-codex`
@@ -515,7 +515,7 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
   run, with onboarding done and a made-up API key approved, so it starts at its prompt with no sign-in and no tokens.
   The one that sends prompts (`assistantresume`) uses the signed-in Claude Code test home (`claudeHome: 'test'`,
   below). The runner asks Claude Code about the test home's sign-in only, and refuses a Claude suite with no home. Each
-  test copy of Combwork notes the home its CLIs run in (`HIVE_TEST_CLI_LOG`), and the run record names each real suite's
+  test copy of Combwork notes the home its CLIs run in (`CW_TEST_CLI_LOG`), and the run record names each real suite's
   ("Real CLIs' homes"); a real suite that ran in your own `~/.claude` or `~/.codex` makes the record not valid. The
   first run in a test folder answers Claude Code's "trust this folder" question (never a sign-in screen). Suites about Combwork's own behaviour that only need some
   session running (`quit`, `windows`, `launchrace`, `resume`) use the fake (#194), and so do `agents`, `image`,
@@ -544,7 +544,7 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
   ```powershell
   New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\hive-test\claude" | Out-Null; $env:CLAUDE_CONFIG_DIR="$env:LOCALAPPDATA\hive-test\claude"; claude
   ```
-  `HIVE_TEST_CLAUDE_HOME` points it at another test home. Without that sign-in the suite is skipped for the
+  `CW_TEST_CLAUDE_HOME` points it at another test home. Without that sign-in the suite is skipped for the
   environment, and never falls back to your own home. It checks that a resumed Assistant answers from its current mode's instructions (a
   codeword only those give), not the system prompt Claude Code recorded: after Restart in This Mode… and after a switch
   while it was stopped. `node tests/e2e/assistantresume.cjs --snapshot-on` is its negative control (the recorded
@@ -589,10 +589,10 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
 
 ## Where they work
 
-Everything goes in `%LOCALAPPDATA%\hive-test\e2e` (override with `HIVE_E2E_DIR`). In it:
+Everything goes in `%LOCALAPPDATA%\hive-test\e2e` (override with `CW_E2E_DIR`). In it:
 
-- `lanes\<k>\<suite>`: the profiles (`HIVE_USER_DATA`), workspaces and screenshots of each suite a runner in lane *k*
-  runs (above). The runner gives each suite a folder of its own in its lane's as `HIVE_E2E_DIR`, which `lib.WORK`
+- `lanes\<k>\<suite>`: the profiles (`CW_USER_DATA`), workspaces and screenshots of each suite a runner in lane *k*
+  runs (above). The runner gives each suite a folder of its own in its lane's as `CW_E2E_DIR`, which `lib.WORK`
   reads, made fresh when the suite starts (`<suite>-2`… while an earlier run keeps it: Housekeeping, below). When the
   suite passes (or skips), the whole folder is removed; when it fails, it stays for a look (the runner prints where,
   and copies its screenshots and reports into the run's log folder) and goes with that run's logs.
@@ -601,7 +601,7 @@ Everything goes in `%LOCALAPPDATA%\hive-test\e2e` (override with `HIVE_E2E_DIR`)
   every run that started in the last 24 hours (#1595: with several lanes testing, ten newer runs came within the hour,
   before a reviewer opened the run a builder cited), as long as the logs' run folders come to no more than 2 GB: past
   that, the oldest of those runs go first, passing ones before failed ones, and the runner says how many went early.
-  The newest ten are never pruned for size. `HIVE_E2E_KEEP_HOURS` (0: only the newest ten, and failed runs) and `HIVE_E2E_KEEP_MB`
+  The newest ten are never pruned for size. `CW_E2E_KEEP_HOURS` (0: only the newest ten, and failed runs) and `CW_E2E_KEEP_MB`
   change the window and the cap for a runner (a value that isn't a number of 0 or more is ignored, and said so). A run that **failed**
   (a suite failed, or its record isn't valid) is kept a day beyond that (the newest twenty such; #223), and its failed
   suites' own files are copied into it, in `<run folder>\<suite>`: the files at the top of the suite's folder
@@ -619,16 +619,16 @@ Everything goes in `%LOCALAPPDATA%\hive-test\e2e` (override with `HIVE_E2E_DIR`)
 Nothing touches your Combwork profile, your clipboard, your real Claude Code and Codex homes (#368, #382: above) or your
 **Recycle Bin**. What Combwork moves to the
 Recycle Bin (Delete in Files, notes, skills, templates, cards, session copies, Clean Up, Delete Project) a test copy
-moves into its suite's trash folder instead, `<suite folder>\trash` (`HIVE_TEST_TRASH_DIR`, set by `lib.hiveEnv`;
-without it, a test profile's `test-trash`; a packaged Combwork too, `HIVE_EXE` or `dist\win-unpacked`, when quiet:
-`HIVE_TEST_QUIET=1`, which `hiveEnv` sets, #1599), which goes with the suite's folder (#414). A move is one rename, whole or not at all (an item on another drive than
+moves into its suite's trash folder instead, `<suite folder>\trash` (`CW_TEST_TRASH_DIR`, set by `lib.hiveEnv`;
+without it, a test profile's `test-trash`; a packaged Combwork too, `CW_EXE` or `dist\win-unpacked`, when quiet:
+`CW_TEST_QUIET=1`, which `hiveEnv` sets, #1599), which goes with the suite's folder (#414). A move is one rename, whole or not at all (an item on another drive than
 that folder is refused, changing nothing), and then a line in its `trash.jsonl` (`{ at, from, to }`; best effort: a
 line that can't be written is a warning in the test copy's log, and the deletion still counts): a suite checks what it deleted arrived with `lib.trashed(path)` (`board`, `files`,
 `storage`, `sessiontree`). Combwork's one way there is `trash()` in `src/main/trash.ts` (`tests/trash.test.ts` fails for a
 direct `shell.trashItem` anywhere else); the installed app and `npm run dev` use the real Recycle Bin. The runner counts
 the Recycle Bin, read only, before and after a run, and says so under the summary and in the run record ("Recycle Bin:
 266 items before and after the run").
-`HIVE_TEST_CODEX_HOME` points the Codex suites at another test home.
+`CW_TEST_CODEX_HOME` points the Codex suites at another test home.
 
 **A process that fails to start** (#599): under heavy load Windows can fail one as it starts (0xc0000142: its desktop
 heap runs short with many processes at once). Node sets the error mode that keeps Windows' error dialogs away
@@ -699,7 +699,7 @@ kept and why, without removing anything; `--days N` sets the age, default 3).
   kept every folder every later run made there, 2,078 of them, 23 GB in six hours). The cards are read from the
   workspace's board, found up from this repository's main checkout, afresh for every deletion (a card that cites
   something a moment before it would go keeps it). **Without the board** (none found, or a card that can't be read)
-  the runners don't start: nothing they made could be removed. Set `HIVE_TEST_NO_BOARD=1` on a machine where no Combwork
+  the runners don't start: nothing they made could be removed. Set `CW_TEST_NO_BOARD=1` on a machine where no Combwork
   board cites test output. Should the board become unreadable during a run, nothing is deleted meanwhile and what
   stays is tied to the run.
 - **A suite's folder** in its lane (`lanes\<k>\<suite>`): when the suite passes, the whole folder goes; when it fails
@@ -728,7 +728,7 @@ card is Done.
 ## Writing one
 
 Start from an existing suite and use `lib.cjs`:
-- `hiveEnv({ HIVE_USER_DATA, … })` as the environment of every test Combwork it starts (or `launch()`), `childEnv({ … })`
+- `hiveEnv({ CW_USER_DATA, … })` as the environment of every test Combwork it starts (or `launch()`), `childEnv({ … })`
   for a child that is part of Combwork (the combwork MCP server, `cw-progress`); never `process.env` (Run context, above);
 - `port(<default>)` for its Agent API port (never a fixed number, so it can run beside others); add it to an area in
   `affected.mjs` and to `suites.mjs` (sorted), with `serial: '<why>'` if it can't run beside others;
@@ -743,13 +743,13 @@ Start from an existing suite and use `lib.cjs`:
 - in a real-CLI suite, `cliStep(name, { session }, fn)` around each step that waits on the CLI answering, with
   `checked(ok)` in the suite's `check` (above: how an environment failure there becomes a SKIP).
 
-**Slow or failing calls** (unpackaged builds only): `HIVE_TEST_SLOW_IPC="tasks:start=2000,git:diff=3000*1"` delays those IPC calls (`*n`: only the first n) and `HIVE_TEST_FAIL_IPC="git:status*1"` makes them fail; `HIVE_TEST_BLOCK_IPC="app:info=1500*1"` holds the main process that long in them, a stall the log's busy warning names (`stalls`, #1109, with `HIVE_TEST_STALL_QUIET_MS` shortening the minute between warnings). Combwork reads them again when they change, so a suite can set them in the main process while it runs (`app.evaluate(() => { process.env.HIVE_TEST_SLOW_IPC = '…' })`). `busy`, `changes` and `loadfail` use them. `HIVE_TEST_SLOW_DETECT="claude-code=12000"` holds that provider's detection at start, so another answers first, and `HIVE_TEST_DETECT_WAIT_MS` shortens how long a launch waits for detection before it is refused (`providerdetect`, #506); a test launch that holds one can't use `lib.launch`, whose `appReady` waits for every provider. `HIVE_TEST_SILENT_MS` shortens how long a running turn may be silent before Combwork looks for its end on screen or says its state is unknown (five minutes; `turnledger`, #648). `HIVE_TEST_FLIGHT_AFTER_MS` shortens how long the flight recorder waits after a trigger before it writes its capture (ten seconds; `flightrecorder`, #698). `HIVE_TEST_QUEUE_RETURNS` makes the window's merge queue model list fewer returns (50; the rest are counted), so a suite passes that bound with a few cards; read at each listing, so a suite can set them in main as it goes (`progressqueue`, #1356). `HIVE_TEST_PROFILE_CHOOSE=<folder>` (with `HIVE_USER_DATA` set, which it then overrides) chooses the profile folders (HI-2461, SPEC §4.3) in `<folder>\appdata` and `<folder>\localappdata` instead of the real ones: `Combwork-Dev` there, else `Hive-Dev` with the fallback notice, and the accounts in the local choice.
+**Slow or failing calls** (unpackaged builds only): `CW_TEST_SLOW_IPC="tasks:start=2000,git:diff=3000*1"` delays those IPC calls (`*n`: only the first n) and `CW_TEST_FAIL_IPC="git:status*1"` makes them fail; `CW_TEST_BLOCK_IPC="app:info=1500*1"` holds the main process that long in them, a stall the log's busy warning names (`stalls`, #1109, with `CW_TEST_STALL_QUIET_MS` shortening the minute between warnings). Combwork reads them again when they change, so a suite can set them in the main process while it runs (`app.evaluate(() => { process.env.CW_TEST_SLOW_IPC = '…' })`). `busy`, `changes` and `loadfail` use them. `CW_TEST_SLOW_DETECT="claude-code=12000"` holds that provider's detection at start, so another answers first, and `CW_TEST_DETECT_WAIT_MS` shortens how long a launch waits for detection before it is refused (`providerdetect`, #506); a test launch that holds one can't use `lib.launch`, whose `appReady` waits for every provider. `CW_TEST_SILENT_MS` shortens how long a running turn may be silent before Combwork looks for its end on screen or says its state is unknown (five minutes; `turnledger`, #648). `CW_TEST_FLIGHT_AFTER_MS` shortens how long the flight recorder waits after a trigger before it writes its capture (ten seconds; `flightrecorder`, #698). `CW_TEST_QUEUE_RETURNS` makes the window's merge queue model list fewer returns (50; the rest are counted), so a suite passes that bound with a few cards; read at each listing, so a suite can set them in main as it goes (`progressqueue`, #1356). `CW_TEST_PROFILE_CHOOSE=<folder>` (with `CW_USER_DATA` set, which it then overrides) chooses the profile folders (HI-2461, SPEC §4.3) in `<folder>\appdata` and `<folder>\localappdata` instead of the real ones: `Combwork-Dev` there, else `Hive-Dev` with the fallback notice, and the accounts in the local choice.
 
-**Restarting Combwork** (unpackaged builds only, #676): Settings → Advanced's **Restart Combwork** quits and starts Combwork again. With `HIVE_TEST_RELAUNCH_LOG=<file>`, a test copy writes the relaunch it would make to that file as a JSON line (`{ args }`) instead of making it, so no copy of Combwork outlives its suite (`hwaccel`).
+**Restarting Combwork** (unpackaged builds only, #676): Settings → Advanced's **Restart Combwork** quits and starts Combwork again. With `CW_TEST_RELAUNCH_LOG=<file>`, a test copy writes the relaunch it would make to that file as a JSON line (`{ args }`) instead of making it, so no copy of Combwork outlives its suite (`hwaccel`).
 
-**The registry's PATH** (unpackaged builds only, #472): Combwork adds the folders of the PATH Windows gives new programs to its own before it looks for the CLIs. A test copy (a test profile) never reads the machine's: `HIVE_TEST_REGISTRY_PATH` (`;`-separated folders, none when unset) stands in for it, and a suite can change it while Combwork runs, as an installer would (`freshpath`). So a suite's PATH without a CLI (or git, `gitmissing`) stays without it.
+**The registry's PATH** (unpackaged builds only, #472): Combwork adds the folders of the PATH Windows gives new programs to its own before it looks for the CLIs. A test copy (a test profile) never reads the machine's: `CW_TEST_REGISTRY_PATH` (`;`-separated folders, none when unset) stands in for it, and a suite can change it while Combwork runs, as an installer would (`freshpath`). So a suite's PATH without a CLI (or git, `gitmissing`) stays without it.
 
-**Quiet test copies** (unpackaged builds only): a copy of Combwork started with a test profile (`HIVE_USER_DATA`, which every suite sets) is quiet, however it was started (the runner, `node tests/e2e/<suite>.cjs`, a scenario or a Playwright script), and so is one started with `HIVE_TEST_QUIET=1`. `HIVE_TEST_QUIET=0` turns it off, for a suite that needs a real window (listed in `LOUD` in `tests/testQuiet.test.ts`, which fails for a suite that starts Combwork without a test profile or turns quiet off unlisted). So the copies of Combwork the suites start never interrupt you: their windows open off screen, to the left of your screens, and never take focus (`showInactive`; Chromium's occlusion tracking is off for them, so they still draw), and they raise no Windows notification, taskbar flash or chime (`src/main/testQuiet.ts`; the window still counts a chime, for `window.__hiveChimes`). Set `HIVE_TEST_NOTIFY_LOG=<file>` to have each notification, flash and chime they would have made written there as a JSON line (`{ kind, title, body }`); `bursts` checks its notifications that way. The message Combwork shows when it can't start from its install folder (`src/main/installDir.ts`) is recorded there too (`kind: 'dialog'`), and `HIVE_TEST_DIALOG_SNAPSHOT=<png>` draws it off screen to that picture without showing it; `HIVE_TEST_INSTALL_DIR` makes Combwork check a test folder's permissions instead of its own folder's (`installdir`). Quitting with processes agents left running asks in a native dialog (#507), which a quiet copy skips (leaving them running, and listed again at its next start: `leftovers-restart`, #614) unless started with `HIVE_TEST_ASK_LEFTOVERS=1`: `leftovers` sets it and stubs the dialog, and sets `HIVE_TEST_JOB_KILL_FAILS=1` in Combwork's main process while it runs to make ending them fail, as Windows refusing would, and starts a second copy with `HIVE_TEST_PROCESS_TRACKER=silent` and `HIVE_TEST_TRACKER_WAIT_MS=3000` (a tracker that never gets going: agents start untracked, with one notice; `=fail` acts out one that can't start at all). Suites that need a focused window stub it (`inbox`, `progress`, `taskbar`) rather than taking OS focus. Maximising is simulated the same way: `carddialog` gives its off-screen window a screen's work-area size, makes `isMaximized()` say so and emits `maximize`/`unmaximize`, which checks Combwork's handling of them (the card kept in the window, the title-bar buttons dimmed) but not Electron's and Windows' own maximise. For that, run it on its own with **`HIVE_E2E_NATIVE=1 node tests/e2e/carddialog.cjs`** (PowerShell: `$env:HIVE_E2E_NATIVE='1'; node tests/e2e/carddialog.cjs`): the same checks with the real `maximize()`/`unmaximize()` in a normal window, which **comes on screen, takes the focus and fills the screen** while it runs, so only when asked. The runner drops `HIVE_E2E_NATIVE`, so full and `--affected` runs stay quiet.
+**Quiet test copies** (unpackaged builds only): a copy of Combwork started with a test profile (`CW_USER_DATA`, which every suite sets) is quiet, however it was started (the runner, `node tests/e2e/<suite>.cjs`, a scenario or a Playwright script), and so is one started with `CW_TEST_QUIET=1`. `CW_TEST_QUIET=0` turns it off, for a suite that needs a real window (listed in `LOUD` in `tests/testQuiet.test.ts`, which fails for a suite that starts Combwork without a test profile or turns quiet off unlisted). So the copies of Combwork the suites start never interrupt you: their windows open off screen, to the left of your screens, and never take focus (`showInactive`; Chromium's occlusion tracking is off for them, so they still draw), and they raise no Windows notification, taskbar flash or chime (`src/main/testQuiet.ts`; the window still counts a chime, for `window.__hiveChimes`). Set `CW_TEST_NOTIFY_LOG=<file>` to have each notification, flash and chime they would have made written there as a JSON line (`{ kind, title, body }`); `bursts` checks its notifications that way. The message Combwork shows when it can't start from its install folder (`src/main/installDir.ts`) is recorded there too (`kind: 'dialog'`), and `CW_TEST_DIALOG_SNAPSHOT=<png>` draws it off screen to that picture without showing it; `CW_TEST_INSTALL_DIR` makes Combwork check a test folder's permissions instead of its own folder's (`installdir`). Quitting with processes agents left running asks in a native dialog (#507), which a quiet copy skips (leaving them running, and listed again at its next start: `leftovers-restart`, #614) unless started with `CW_TEST_ASK_LEFTOVERS=1`: `leftovers` sets it and stubs the dialog, and sets `CW_TEST_JOB_KILL_FAILS=1` in Combwork's main process while it runs to make ending them fail, as Windows refusing would, and starts a second copy with `CW_TEST_PROCESS_TRACKER=silent` and `CW_TEST_TRACKER_WAIT_MS=3000` (a tracker that never gets going: agents start untracked, with one notice; `=fail` acts out one that can't start at all). Suites that need a focused window stub it (`inbox`, `progress`, `taskbar`) rather than taking OS focus. Maximising is simulated the same way: `carddialog` gives its off-screen window a screen's work-area size, makes `isMaximized()` say so and emits `maximize`/`unmaximize`, which checks Combwork's handling of them (the card kept in the window, the title-bar buttons dimmed) but not Electron's and Windows' own maximise. For that, run it on its own with **`CW_E2E_NATIVE=1 node tests/e2e/carddialog.cjs`** (PowerShell: `$env:CW_E2E_NATIVE='1'; node tests/e2e/carddialog.cjs`): the same checks with the real `maximize()`/`unmaximize()` in a normal window, which **comes on screen, takes the focus and fills the screen** while it runs, so only when asked. The runner drops `CW_E2E_NATIVE`, so full and `--affected` runs stay quiet.
 
 **React's commit bursts and chains** (HI-1387, HI-1865): a render loop (a setState per event in a useEffect, #1366)
 only throws once React's nested-update limit (50) is passed, and a production build says nothing before then. So a quiet
@@ -767,7 +767,7 @@ are recorded only: fast typing makes one as large as a loop's (HI-1864), but eac
 `commitburst` checks a deliberate loop is caught (its burst and chain both reach 50) and typing's chain stays short,
 shows a child run failing at a chain of 60 and passing once it accepts it, and accepts its own loop.
 
-**Tips** are off in every test copy of Combwork (`lib.hiveEnv` sets `HIVE_TEST_TIPS=off`, which unpackaged builds and quiet packaged ones take, #1599: a profile that doesn't set *Show a tip when Combwork starts* gets it off), so no tip card covers what a suite clicks. A suite about tips (`tips`) turns them on in its profile.
+**Tips** are off in every test copy of Combwork (`lib.hiveEnv` sets `CW_TEST_TIPS=off`, which unpackaged builds and quiet packaged ones take, #1599: a profile that doesn't set *Show a tip when Combwork starts* gets it off), so no tip card covers what a suite clicks. A suite about tips (`tips`) turns them on in its profile.
 
 **A fake Claude Code** (`fake-claude/fake-claude.cmd`) runs agents without signing in or spending tokens: set it as
 the profile's Claude Code path (`settings.providers['claude-code'].executablePath`) and start Combwork with

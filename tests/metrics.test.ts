@@ -707,9 +707,9 @@ describe('cost', () => {
     for (let i = 0; i < N; i++) metrics.recordApi(metrics.metricsHandle(w), `p${i % 20}`, api(i % 2 ? '/v1/tasks' : '/v1/tasks/:n', { ms: i % 300 }))
     const perCallUs = ((performance.now() - t) * 1000) / N
     // Every series the caps allow, in one hour: Combwork's tools x roles x modes x outcomes, over projects.
-    const { HIVE_TOOLS } = await import('../src/shared/assistantTools')
+    const { CW_TOOLS } = await import('../src/shared/assistantTools')
     const h = metrics.metricsHandle(w)
-    for (let p = 0; p < 12; p++) for (const tool of HIVE_TOOLS) for (const role of ['agent', 'assistant'] as const) for (const mode of ['compact', 'detail']) for (const ok of [true, false]) metrics.recordMcp(h, `project-${p}`, role, { tool, mode, ok, chars: 1000, bytes: 1200, ms: 3 })
+    for (let p = 0; p < 12; p++) for (const tool of CW_TOOLS) for (const role of ['agent', 'assistant'] as const) for (const mode of ['compact', 'detail']) for (const ok of [true, false]) metrics.recordMcp(h, `project-${p}`, role, { tool, mode, ok, chars: 1000, bytes: 1200, ms: 3 })
     const full = metrics.queryMetrics(w, { scope: { kind: 'workspace' } })
     const kept = Object.values(full.projects).reduce((total, pt) => total + pt.mcp.length + pt.api.length, 0) + full.workspace!.api.length
     expect(kept).toBe(metrics.METRICS_LIMITS.series)
@@ -726,11 +726,11 @@ describe('cost', () => {
 
 describe('approved labels', () => {
   it("the tool names metrics take are exactly the Combwork MCP server's tools", async () => {
-    const { HIVE_TOOLS } = await import('../src/shared/assistantTools')
+    const { CW_TOOLS } = await import('../src/shared/assistantTools')
     const source = readFileSync(join(__dirname, '..', 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
     // A tool's name, or an intent tool's (#1267: intent('cw_submit', …)).
     const offered = [...source.matchAll(/(?:^ {4}name: |\bintent\(\s*)'(cw_[a-z_]+)'/gm)].map((m) => m[1])
-    expect([...offered].sort()).toEqual([...HIVE_TOOLS].sort())
+    expect([...offered].sort()).toEqual([...CW_TOOLS].sort())
   })
 })
 

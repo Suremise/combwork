@@ -160,13 +160,13 @@ describe('what runs', () => {
   it("a test copy never runs them, shown or quiet; only an unpackaged build's seam does", () => {
     expect(runsCloseCommands({}, true)).toBe(true)
     expect(runsCloseCommands({}, false)).toBe(true)
-    // A test profile, quiet or shown (HIVE_TEST_QUIET=0 is still a test copy).
-    expect(runsCloseCommands({ HIVE_USER_DATA: 'x' }, false)).toBe(false)
-    expect(runsCloseCommands({ HIVE_USER_DATA: 'x', HIVE_TEST_QUIET: '0' }, false)).toBe(false)
-    expect(runsCloseCommands({ HIVE_TEST_QUIET: '1' }, true)).toBe(false)
+    // A test profile, quiet or shown (CW_TEST_QUIET=0 is still a test copy).
+    expect(runsCloseCommands({ CW_USER_DATA: 'x' }, false)).toBe(false)
+    expect(runsCloseCommands({ CW_USER_DATA: 'x', CW_TEST_QUIET: '0' }, false)).toBe(false)
+    expect(runsCloseCommands({ CW_TEST_QUIET: '1' }, true)).toBe(false)
     // The seam: an unpackaged build only.
-    expect(runsCloseCommands({ HIVE_USER_DATA: 'x', HIVE_TEST_RUN_ON_CLOSE: '1' }, false)).toBe(true)
-    expect(runsCloseCommands({ HIVE_TEST_QUIET: '1', HIVE_TEST_RUN_ON_CLOSE: '1' }, true)).toBe(false)
+    expect(runsCloseCommands({ CW_USER_DATA: 'x', CW_TEST_RUN_ON_CLOSE: '1' }, false)).toBe(true)
+    expect(runsCloseCommands({ CW_TEST_QUIET: '1', CW_TEST_RUN_ON_CLOSE: '1' }, true)).toBe(false)
   })
 })
 

@@ -17,7 +17,7 @@ import { tmpdir } from 'os'
 import { ATTACHMENTS_DIR, CARD_ATTACHMENTS_DIR, attachmentKind } from '../shared/attachments'
 import { CARD_ATTACHMENT_FOLDERS_ID, CARD_ATTACHMENT_MAX_ID } from '../shared/advanced'
 import { ATTACH_MAX_FILES, ATTACH_MAX_TOTAL, type CardAttachment, type CardAttachmentGroup, type CardDrafts } from '../shared/cardAttachments'
-import { HIVE_DIR, projectAgents } from '../shared/defaults'
+import { CW_DIR, projectAgents } from '../shared/defaults'
 import { msg } from '../shared/i18n'
 import { formatBytes } from '../shared/units'
 import { legacyWorktree } from '../shared/agentFolders'
@@ -69,7 +69,7 @@ export function cardHost(ws: WorkspaceService, project: string | null | undefine
   return join(ws.path!, project)
 }
 /** A host's cards folder, `<host>\.combwork\attachments\cards`. */
-export const cardsRoot = (host: string): string => join(host, HIVE_DIR, ATTACHMENTS_DIR, CARD_ATTACHMENTS_DIR)
+export const cardsRoot = (host: string): string => join(host, CW_DIR, ATTACHMENTS_DIR, CARD_ATTACHMENTS_DIR)
 /** A card's folder, made or not. */
 export const cardFolder = (host: string, card: number): string => join(cardsRoot(host), String(card))
 
@@ -179,7 +179,7 @@ const allProjects = async (ws: WorkspaceService): Promise<string[]> => [...(awai
  */
 function throughHive(real: string): { hive: string; next: string | undefined } | null {
   const parts = real.split(sep)
-  const i = parts.map((x) => x.toLowerCase()).lastIndexOf(HIVE_DIR)
+  const i = parts.map((x) => x.toLowerCase()).lastIndexOf(CW_DIR)
   return i < 0 ? null : { hive: parts.slice(0, i + 1).join(sep), next: parts[i + 1]?.toLowerCase() }
 }
 
@@ -221,7 +221,7 @@ export async function attachableSource(ws: WorkspaceService, caller: AttachCalle
   const real = realPath(resolve(path))
   if (caller.kind === 'user') return real
   if (caller.kind === 'pane') {
-    const root = join(caller.host, HIVE_DIR, ATTACHMENTS_DIR)
+    const root = join(caller.host, CW_DIR, ATTACHMENTS_DIR)
     if (!within(real, [root]) || within(real, [join(root, CARD_ATTACHMENTS_DIR)])) refuse()
     return real
   }
@@ -234,9 +234,9 @@ export async function attachableSource(ws: WorkspaceService, caller: AttachCalle
     // Protected first: another project's folders, the Assistant's home, the workspace's own .combwork (wherever they are,
     // inside the caller's own folders or the temp folder included).
     const others = (await Promise.all(projects.filter((p) => p !== own).map((p) => workFolders(ws, p)))).flat()
-    if (within(real, [...others, ws.assistantHome, join(ws.path!, HIVE_DIR)])) refuse()
+    if (within(real, [...others, ws.assistantHome, join(ws.path!, CW_DIR)])) refuse()
     // A .combwork only through its own project's attachments.
-    if (hive && !(hive.hive.toLowerCase() === realPath(join(own!, HIVE_DIR)).toLowerCase() && hive.next === ATTACHMENTS_DIR)) refuse()
+    if (hive && !(hive.hive.toLowerCase() === realPath(join(own!, CW_DIR)).toLowerCase() && hive.next === ATTACHMENTS_DIR)) refuse()
     if (!within(real, [...ownFolders, temp, ...more])) refuse()
     return real
   }
@@ -697,7 +697,7 @@ function trashRecord(v: unknown): { kind: 'remove'; card: number; files: { id: s
  * names.
  */
 async function recoverHost(ws: WorkspaceService, host: string, root: string, out: CardAttachmentRecovery): Promise<void> {
-  for (const p of [join(host, HIVE_DIR), join(host, HIVE_DIR, ATTACHMENTS_DIR), root]) {
+  for (const p of [join(host, CW_DIR), join(host, CW_DIR, ATTACHMENTS_DIR), root]) {
     if (!(await ownFolderNow(host, p))) {
       out.left++
       return log.warn(`${userText(p)} is a link or not a folder: its card attachments are left as they are`)
@@ -879,7 +879,7 @@ export async function readCardAttachment(ws: WorkspaceService, card: { number: n
   const folder = cardFolder(host, n)
   const path = join(folder, row.file)
   // Each folder from the host's .combwork down to the card's, and the file: there, and none of them a link.
-  const chain = [join(host, HIVE_DIR), join(host, HIVE_DIR, ATTACHMENTS_DIR), cardsRoot(host), folder]
+  const chain = [join(host, CW_DIR), join(host, CW_DIR, ATTACHMENTS_DIR), cardsRoot(host), folder]
   const plain = async (): Promise<'ok' | 'missing' | 'outside'> => {
     for (const d of chain) {
       const st = await lstat(d).catch(() => null)

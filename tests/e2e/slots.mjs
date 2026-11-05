@@ -32,7 +32,7 @@ import { processAlive } from './logs.mjs'
 import { claimHeld, describeHolder, withLock } from './lanes.mjs'
 import { parentSuite } from './runner.mjs'
 
-/** Heavy runs at once, unless the machine's config.json or HIVE_TEST_HEAVY_SLOTS says otherwise. */
+/** Heavy runs at once, unless the machine's config.json or CW_TEST_HEAVY_SLOTS says otherwise. */
 export const DEFAULT_SLOTS = 2
 /**
  * The machine's test settings (#589): `{ "heavySlots": 3 }` in the shared test folder, read each time a run asks, so an
@@ -51,16 +51,16 @@ const sayOnce = (say, line) => {
 }
 
 /**
- * How many heavy runs may go at once (#589): HIVE_TEST_HEAVY_SLOTS, a one-off override; else `heavySlots` in the machine's
+ * How many heavy runs may go at once (#589): CW_TEST_HEAVY_SLOTS, a one-off override; else `heavySlots` in the machine's
  * config.json (CONFIG_FILE); else DEFAULT_SLOTS. Each a whole number, 1 or more. A missing or unreadable file, or a value
  * that isn't one, falls back to the default, and the run says so in one line (once).
  */
 export function heavySlots(env = process.env, file = CONFIG_FILE, say = (line) => console.error(line)) {
   const whole = (v) => Number.isInteger(v) && v >= 1
-  const set = env.HIVE_TEST_HEAVY_SLOTS
+  const set = env.CW_TEST_HEAVY_SLOTS
   if (set !== undefined && set !== '') {
     if (whole(Number(set))) return Number(set)
-    sayOnce(say, `Test slots: HIVE_TEST_HEAVY_SLOTS=${JSON.stringify(set)} isn't a whole number from 1; it is left out.`)
+    sayOnce(say, `Test slots: CW_TEST_HEAVY_SLOTS=${JSON.stringify(set)} isn't a whole number from 1; it is left out.`)
   }
   let text
   try {
@@ -98,7 +98,7 @@ export const MODEL_PROVIDERS = ['claude-code', 'codex']
 /**
  * The side slots, model trials and small-run bound (HI-2070), from the machine's config.json beside heavySlots
  * (`sideSlots`, a whole number from 0; `modelTrials`, from 1; `smallRun: { e2eSuites, e2eRepeat, scenarioRuns }`, each
- * from 1), read each time a run asks; HIVE_TEST_SIDE_SLOTS and HIVE_TEST_MODEL_TRIALS override the first two for one run.
+ * from 1), read each time a run asks; CW_TEST_SIDE_SLOTS and CW_TEST_MODEL_TRIALS override the first two for one run.
  * A value that isn't one falls back to its default, said in one line (once).
  */
 export function slotSettings(env = process.env, file = CONFIG_FILE, say = (line) => console.error(line)) {
@@ -121,8 +121,8 @@ export function slotSettings(env = process.env, file = CONFIG_FILE, say = (line)
     sayOnce(say, `Test slots: ${name} ${JSON.stringify(v)} in ${file} isn't a whole number from ${from}; ${def}, the default.`)
     return def
   }
-  const side = pick('sideSlots', 'HIVE_TEST_SIDE_SLOTS', DEFAULT_SIDE_SLOTS, 0)
-  const models = pick('modelTrials', 'HIVE_TEST_MODEL_TRIALS', DEFAULT_MODEL_TRIALS, 1)
+  const side = pick('sideSlots', 'CW_TEST_SIDE_SLOTS', DEFAULT_SIDE_SLOTS, 0)
+  const models = pick('modelTrials', 'CW_TEST_MODEL_TRIALS', DEFAULT_MODEL_TRIALS, 1)
   const small = { ...DEFAULT_SMALL_RUN }
   if (cfg.smallRun !== undefined) {
     for (const k of Object.keys(DEFAULT_SMALL_RUN)) {
@@ -215,7 +215,7 @@ export function needsSlot({ count, repeat = 1 }, env = process.env) {
 async function apiGet(path, env, { fetch = globalThis.fetch, timeoutMs = 3000, workspace = env.CW_WORKSPACE } = {}) {
   const url = env.CW_API_URL?.replace(/\/+$/, '')
   if (!url) return null
-  // The session's token file, never HIVE_API_TOKEN (HI-2262: sessions no longer get it).
+  // The session's token file, never CW_API_TOKEN (HI-2262: sessions no longer get it).
   let token = ''
   if (env.CW_API_TOKEN_FILE) {
     try {
@@ -382,7 +382,7 @@ export function describeClaim(c, now = Date.now()) {
 function capacity(pool, slots, settings) {
   if (pool === 'model') return `${settings.models} real-model trials at once on this machine, modelTrials`
   if (pool === 'small' && settings.side) return `a small run: ${settings.side} side and ${slots} heavy slots on this machine, sideSlots and heavySlots`
-  return `${slots} heavy runs at once on this machine, HIVE_TEST_HEAVY_SLOTS`
+  return `${slots} heavy runs at once on this machine, CW_TEST_HEAVY_SLOTS`
 }
 
 /** What a waiting run prints at a look that finds no slot (both runners): how many go at once, its place, the holders. */

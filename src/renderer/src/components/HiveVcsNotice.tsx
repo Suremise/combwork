@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { HIVE_FOLDER_GUIDE, hiveVcsKey, hiveVcsText } from '@shared/hiveVcsText'
+import { CW_FOLDER_GUIDE, hiveVcsKey, hiveVcsText } from '@shared/hiveVcsText'
 import { msg, tr } from '@shared/i18n'
 import type { ProjectInfo } from '@shared/types'
 import { call, errorMessage } from '../api'
@@ -94,7 +94,7 @@ export function HiveVcsNotice({ project, dismissible = false }: { project: Proje
           {tr(M.exclude)}
         </BusyButton>
       )}
-      <button className="btn small subtle" onClick={() => openGuideAt(HIVE_FOLDER_GUIDE)}>
+      <button className="btn small subtle" onClick={() => openGuideAt(CW_FOLDER_GUIDE)}>
         {tr(M.learnMore)}
       </button>
       {dismissible && <IconButton icon="close" title={tr(M.dismiss)} onClick={() => rememberProjectPref('hiveVcsNotice', key, hiveVcsKey(v))} />}

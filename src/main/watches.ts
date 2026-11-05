@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto'
 import { rename, writeFile } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
-import { HIVE_DIR, projectAgents } from '../shared/defaults'
+import { CW_DIR, projectAgents } from '../shared/defaults'
 import { agentWorkflowRole } from '../shared/workflow/roles'
 import { cardChange, carriedOver, ownCut, changesBetween, handoffsSince, hearsHandoffs, decisionLine, historyVerdict, reviewStep, changesSince, entryWithin, ENTRY_KEY, limitLine, markOf, movedIntoSince, seenOf, readMark, readSavedCondition, WAKE_MAX_BYTES, wakeAbout, watchLabel, cardWakeLine, userNameOf, releasedLine, withLanesTail, RELEASE_REASONS, type Released, type ReplyNote, alreadyThere, cardOver, encodeSince, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_CARDS, WATCH_MAX_LIMIT_MINUTES, type Baseline, type CardChange, type CardMark, type ReviewWhere, type Seen, type WatchChange, type WatchCondition } from '../shared/watch'
 import { loopReviewerOf, poolCard } from './loopReviewer'
@@ -330,7 +330,7 @@ const loading = new Map<string, Promise<Store>>()
  * A workspace's watches file before #1018, by the folder it was loaded from (a window's service can open another
  * workspace later): moved into the workspace database the first time (storeTables.ts), then kept as a backup.
  */
-const fileOf = (path: string): string => join(path, HIVE_DIR, 'watches.json')
+const fileOf = (path: string): string => join(path, CW_DIR, 'watches.json')
 const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
 // agent-protocol: servers.ts gives this reply its status by its words (/workspace was closed/)
 const closedError = (): Error => new Error('The workspace was closed')

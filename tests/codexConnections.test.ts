@@ -17,7 +17,7 @@ import { tempDir } from './tempDir'
 const base = tempDir('hive-codex-connections-')
 const home = join(base, 'codex-home')
 const userHome = join(base, 'user-profile')
-process.env.HIVE_USER_DATA = join(base, 'profile')
+process.env.CW_USER_DATA = join(base, 'profile')
 process.env.CODEX_HOME = home
 ;(electron.app as unknown as { getPath: (n: string) => string }).getPath = (n: string) => (n === 'home' ? userHome : join(base, 'profile'))
 
@@ -145,7 +145,7 @@ describe("a Codex connection's folder", () => {
 })
 
 describe('the test seam for Codex', () => {
-  const env = (o: Record<string, string | undefined>) => ({ HIVE_USER_DATA: 'x', HIVE_TEST_CLI_HOME_CONNECTION: '1', ...o })
+  const env = (o: Record<string, string | undefined>) => ({ CW_USER_DATA: 'x', CW_TEST_CLI_HOME_CONNECTION: '1', ...o })
   it("is never on the user's own ~/.codex (the CLI's home the variable is), on a test home it is", () => {
     expect(seam.testHomeSeam('CODEX_HOME', env({ CODEX_HOME: join(userHome, '.codex') }), false)).toBe(false)
     expect(seam.testHomeSeam('CODEX_HOME', env({ CODEX_HOME: home }), false)).toBe(true)

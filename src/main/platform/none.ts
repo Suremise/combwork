@@ -11,7 +11,7 @@ import { isAbsolute, join, relative, sep } from 'path'
 import type { FileChange, Manifest } from '../../shared/workflow/facts'
 import { UNREADABLE } from '../../shared/workflow/texts'
 import { isUnknown, unknown, type Maybe } from './types'
-import { HIVE_DIR } from '../../shared/defaults'
+import { CW_DIR } from '../../shared/defaults'
 
 /** At most this many files or bytes per card; beyond, the revision is unknown and the option row says to narrow it. */
 export const NONE_MAX_FILES = 20_000
@@ -80,7 +80,7 @@ export class NoneAdapter {
   private skip(name: string): boolean {
     const fold = (s: string): string => (this.anyCase ? s.toLowerCase() : s)
     const n = fold(name)
-    return n === HIVE_DIR || n === '.git' || this.excluded.some((x) => fold(x) === n)
+    return n === CW_DIR || n === '.git' || this.excluded.some((x) => fold(x) === n)
   }
 
   /**
@@ -155,7 +155,7 @@ export class NoneAdapter {
   /** A declared path stays inside the project: no `..` out of it, no absolute path, no `.combwork`. */
   static inside(p: string): boolean {
     const posix = toPosix(p)
-    return !!posix && !isAbsolute(p) && !posix.split('/').some((part) => part === '..' || part === HIVE_DIR)
+    return !!posix && !isAbsolute(p) && !posix.split('/').some((part) => part === '..' || part === CW_DIR)
   }
 
   /**

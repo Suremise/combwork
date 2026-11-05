@@ -6,7 +6,7 @@
 // Claude Code with a note on their rows, its workflow unticked; Pair loaded from + Add ▾ → Templates with "Also apply its
 // workflow" (HI-1910: Combwork's own carry their preset's) ticked lands in Version Control → Workflow with Pair chosen and not
 // saved. Screenshots of the Combwork templates, and of
-// the load dialog's suggestion and connections (HI-2109), in both themes. Dev build (or HIVE_EXE), throwaway profile, workspace and
+// the load dialog's suggestion and connections (HI-2109), in both themes. Dev build (or CW_EXE), throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR; a quiet test copy. (0.9's templates copied at the board's real upgrade, and the upgrade waiting:
 // tests/upgradeTemplates.test.ts, on boards made 0.9's.)
 const lib = require('./lib.cjs')
@@ -51,8 +51,8 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  // Through lib.launch, so HIVE_EXE runs it on a packaged build (#1578).
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47800), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' }, viewport: { width: 1500, height: 900 } })
+  // Through lib.launch, so CW_EXE runs it on a packaged build (#1578).
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47800), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' }, viewport: { width: 1500, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)

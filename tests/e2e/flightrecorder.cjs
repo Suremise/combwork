@@ -7,9 +7,9 @@
 // - unknown on: an ordinary turn (every field of the fake's known) saves nothing; a hook with a field Combwork doesn't know
 //   (the fake's "newfield") saves a capture naming it;
 // - version on: the agent started again on another version of its CLI saves a capture saying old → new;
-// - stalled on: the fake Codex silent in a turn past its limit (HIVE_TEST_SILENT_MS) saves a capture;
+// - stalled on: the fake Codex silent in a turn past its limit (CW_TEST_SILENT_MS) saves a capture;
 // - console:captures lists them newest first, and the developer console's Captures list shows them.
-// The capture is written HIVE_TEST_FLIGHT_AFTER_MS after its trigger (ten seconds in the app). A capture saved after
+// The capture is written CW_TEST_FLIGHT_AFTER_MS after its trigger (ten seconds in the app). A capture saved after
 // another trigger's is written after it: a later capture on disk shows an earlier one would be there too.
 // Dev build, throwaway profile, workspace and CLI homes.
 const lib = require('./lib.cjs')
@@ -69,7 +69,7 @@ const captured = (trigger) => lib.until(() => capturesOf(trigger).find((c) => c.
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47837), ...claudeEnv, CODEX_HOME: codexHome, HIVE_TEST_SILENT_MS: String(SILENT_MS), HIVE_TEST_FLIGHT_AFTER_MS: '500' })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47837), ...claudeEnv, CODEX_HOME: codexHome, CW_TEST_SILENT_MS: String(SILENT_MS), CW_TEST_FLIGHT_AFTER_MS: '500' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()

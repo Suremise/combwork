@@ -2,7 +2,7 @@ import { app } from 'electron'
 import { randomUUID } from 'crypto'
 import { join } from 'path'
 import { rm } from 'original-fs/promises'
-import { HIVE_DIR, projectAgents } from '../shared/defaults'
+import { CW_DIR, projectAgents } from '../shared/defaults'
 import { agentMsg, inDialectOf, say } from '../shared/agentText'
 import { teamPauseLine, type TeamPause } from '../shared/teamPause'
 import { emit } from './events'
@@ -50,7 +50,7 @@ const resumed = new Map<string, number>()
 const locks = new Map<string, Promise<unknown>>()
 
 /** A workspace's .combwork folder, from its path (the same as its hiveDir, which a stand-in for one may not have). */
-const hiveOf = (ws: Pick<WorkspaceService, 'path'>): string => join(ws.path ?? '', HIVE_DIR)
+const hiveOf = (ws: Pick<WorkspaceService, 'path'>): string => join(ws.path ?? '', CW_DIR)
 const keyOf = (ws: Pick<WorkspaceService, 'path'>): string => hiveOf(ws).toLowerCase()
 
 /** The user's pause of every open workspace, while it lasts. */

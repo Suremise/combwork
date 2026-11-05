@@ -6,11 +6,11 @@
 // as they go, nothing runs against the board meanwhile ("no such table", "readonly"), and the log times each step.
 // The first merge waits for the merge style and commit message, which the upgrade left to the user (HI-1697): asked under
 // For you, answered there (Squash, the branch's own message); then by a Workflow save; then through a crash after the
-// board records the choice and one inside its change, each started again (HIVE_TEST_MERGE_CHOICE_CRASH); then a card with
+// board records the choice and one inside its change, each started again (CW_TEST_MERGE_CHOICE_CRASH); then a card with
 // Combwork's message.
 // The 0.9 board is written here as 0.9.3's schema steps made it (v1 `cards`, v2 `store_rows`: 0.9 is released, so they
 // are fixed), so no packaged 0.9 is needed. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
-// Dev build only (HI-1697): its crash cases end Combwork at a merge choice's seam (HIVE_TEST_MERGE_CHOICE_CRASH), which a
+// Dev build only (HI-1697): its crash cases end Combwork at a merge choice's seam (CW_TEST_MERGE_CHOICE_CRASH), which a
 // packaged build ignores.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -93,7 +93,7 @@ const log = () => {
   // upgrade gives it its options, and leaves its merge style and commit message to be asked (HI-1697).
   fs.mkdirSync(path.join(fx.alpha, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(fx.alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
-  // Opened as the user opens it: the ask shows, nothing is pre-answered (no HIVE_TEST_BOARD_UPGRADE), options kept for after.
+  // Opened as the user opens it: the ask shows, nothing is pre-answered (no CW_TEST_BOARD_UPGRADE), options kept for after.
   let h = await q.startHive(fx, { port: PORT, keepOptions: true })
   try {
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -189,7 +189,7 @@ const log = () => {
       } finally {
         db.close()
       }
-      await startAgain(crash ? { HIVE_TEST_MERGE_CHOICE_CRASH: crash } : {})
+      await startAgain(crash ? { CW_TEST_MERGE_CHOICE_CRASH: crash } : {})
     }
     const startAgain = async (env = {}) => {
       h = await q.startHive(fx, { port: PORT, keepOptions: true, env })
@@ -245,7 +245,7 @@ const log = () => {
     check('crash inside the board: Combwork ended at the seam', !!(await until(() => ended, HUNG_MS)))
     await h.app.close().catch(() => {})
     // Started again in German (HI-1733): the answer kept on the card as the user's comment is in their language.
-    await startAgain({ HIVE_LANG: 'de' })
+    await startAgain({ CW_LANG: 'de' })
     // The crash is told in the corner ("Combwork closed unexpectedly", for two minutes), beside other notices of the restart
     // (resume the agent that was working…), any of which can lie over the card clicked below (HI-1989): the crash's seen,
     // then the corner's notices hidden.

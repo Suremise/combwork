@@ -52,9 +52,9 @@ const require = createRequire(import.meta.url)
 const evidence = require('../e2e/evidence.cjs').evidenceFor(join(import.meta.dirname, '..', '..'))
 const spare = (p) => evidence.protects(p)
 // Without the board nothing a run made could be removed, so copies would pile up (#285): as the e2e runner, it doesn't
-// start (HIVE_TEST_NO_BOARD=1: no board cites test output on this machine).
+// start (CW_TEST_NO_BOARD=1: no board cites test output on this machine).
 if (!evidence.ok) {
-  console.error(`Can't tell what the tests may delete: ${evidence.why}. Fix the board, or set HIVE_TEST_NO_BOARD=1 if no Combwork board cites test output on this machine.`)
+  console.error(`Can't tell what the tests may delete: ${evidence.why}. Fix the board, or set CW_TEST_NO_BOARD=1 if no Combwork board cites test output on this machine.`)
   process.exit(2)
 }
 // The run's own temp folder in hive-test\tmp (HI-2102): the test copies of Combwork and the CLIs its scenarios start get it

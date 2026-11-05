@@ -1,7 +1,7 @@
 import { dirname, join } from 'path'
 import { readdir, writeFile } from 'original-fs/promises'
 import { existsSync } from 'original-fs'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { msg } from '../shared/i18n'
 import { capitalised, englishText, listOf, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
 import { FIRST_COMMIT_MESSAGE, gitignoreNameText, gitignoreText, isGitignoreChoice, type GitInitCheck, type GitInitOptions } from '../shared/gitInit'
@@ -55,7 +55,7 @@ async function repoIdentity(projectPath: string): Promise<GitIdentityPart> {
 /** Whether the folder holds nothing but .combwork (an empty first commit). */
 async function isEmpty(projectPath: string): Promise<boolean> {
   const names = await readdir(projectPath).catch(() => [] as string[])
-  return names.every((n) => n === HIVE_DIR || n === '.git')
+  return names.every((n) => n === CW_DIR || n === '.git')
 }
 
 /** What the Initialise dialog needs: whether it can be done here, the repository around the folder, the identity, the folder's .gitignore. */
@@ -170,7 +170,7 @@ export async function initRepo(projectPath: string, opts: GitInitOptions): Promi
     const add = await git(projectPath, ['add', '-A', '--', '.'])
     if (!add.ok) throw stop(msg({ id: 'main.gitInit.failed.stage', defaultMessage: "couldn't stage the folder's files", description: 'What failed in making a git repository, a clause (main.gitInit.stoppedAfter).' }), gitSaid(add))
     // A last check that git's ignore did its job: nothing of .combwork staged.
-    const staged = await git(projectPath, ['diff', '--cached', '--name-only', '-z', '--', HIVE_DIR])
+    const staged = await git(projectPath, ['diff', '--cached', '--name-only', '-z', '--', CW_DIR])
     if (!staged.ok || staged.out.replace(/\0/g, '')) {
       await git(projectPath, ['reset', '-q'])
       throw stop(

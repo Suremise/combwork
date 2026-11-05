@@ -12,7 +12,7 @@ import { copilotCheckEnv, copilotSignIn, ignoredTokens } from '../src/main/provi
 import { catalogArgs } from '../src/main/providers/copilot/models'
 import type { LaunchContext } from '../src/main/providers/types'
 import { ADVANCED_DEFS, advancedDef, overrideId, rightClickToCliId } from '../src/shared/advanced'
-import { HIVE_TOOLS } from '../src/shared/assistantTools'
+import { CW_TOOLS } from '../src/shared/assistantTools'
 import { tempDir } from './tempDir'
 
 // The off switches for Combwork's overrides of the CLIs' own behaviour (#966, #1167): each one's effect on the launch, on and off.
@@ -318,7 +318,7 @@ describe("Codex: Combwork's hive server over a native one of that name", () => {
       for (const place of places) {
         await advanced.set(overrideId('codex', 'mcpIsolation'), isolation ? null : false)
         const t = table(where(place, 'command = "node"\nargs = ["native.js"]\nenabled = false\nenabled_tools = ["only_this"]\ndisabled_tools = ["cw_notify"]\n'))
-        expect(t, `${place}, isolation ${isolation}`).toMatchObject({ command: 'node', args: ['cw-mcp.js'], enabled: true, enabled_tools: [...HIVE_TOOLS], disabled_tools: [] })
+        expect(t, `${place}, isolation ${isolation}`).toMatchObject({ command: 'node', args: ['cw-mcp.js'], enabled: true, enabled_tools: [...CW_TOOLS], disabled_tools: [] })
       }
   })
 
@@ -617,8 +617,8 @@ describe("Combwork's guidance for agents (#1285, row 13)", () => {
   })
 
   it('is a switch of its own under Combwork, on by default, taken by sessions started afterwards (e2e agentguidance checks the hive server it gives)', async () => {
-    const { HIVE_GUIDANCE } = await import('../src/shared/advanced')
-    expect(advancedDef(HIVE_GUIDANCE)).toMatchObject({ group: 'cw', kind: 'boolean', default: true, applies: 'sessions' })
+    const { CW_GUIDANCE } = await import('../src/shared/advanced')
+    expect(advancedDef(CW_GUIDANCE)).toMatchObject({ group: 'cw', kind: 'boolean', default: true, applies: 'sessions' })
   })
 })
 

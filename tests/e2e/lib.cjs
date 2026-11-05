@@ -99,7 +99,7 @@ function probeDir(name = 'probe', root = TEST_ROOT) {
   return fs.mkdtempSync(path.join(base, `${label}-${stamp}-`))
 }
 /**
- * A token in a file of its own, as Combwork gives a session its token (HI-2262: CW_API_TOKEN_FILE, never HIVE_API_TOKEN):
+ * A token in a file of its own, as Combwork gives a session its token (HI-2262: CW_API_TOKEN_FILE, never CW_API_TOKEN):
  * its path, for a child's CW_API_TOKEN_FILE. `dir`: where (a new probe folder by default).
  */
 function tokenFile(token, dir = probeDir('token')) {
@@ -108,10 +108,10 @@ function tokenFile(token, dir = probeDir('token')) {
   return file
 }
 /**
- * A suite's Agent API port, as a string: the runner's (HIVE_E2E_PORT, one per suite running at the same time, so suites
+ * A suite's Agent API port, as a string: the runner's (CW_E2E_PORT, one per suite running at the same time, so suites
  * can run side by side), else the suite's own default when it runs alone (node tests/e2e/<suite>.cjs).
  */
-const port = (fallback) => process.env.HIVE_E2E_PORT || String(fallback)
+const port = (fallback) => process.env.CW_E2E_PORT || String(fallback)
 
 /** Waits until fn() returns something truthy (checking every interval ms), up to ms; returns its last value. */
 async function until(fn, ms = 10000, interval = 100) {
@@ -292,16 +292,16 @@ async function openWorkspace(inv, page, ws, ms = 20000) {
 }
 
 /**
- * Starts the dev build with a test profile, or the packaged Combwork.exe HIVE_EXE names (the Sandbox upgrade checks run
+ * Starts the dev build with a test profile, or the packaged Combwork.exe CW_EXE names (the Sandbox upgrade checks run
  * boardupgrade and upgradelane against an installed build that way, #1227). Returns { app, page, inv } (inv calls an
  * IPC channel). readyMs bounds the wait for its window to be ready; one that isn't is closed and the failure thrown.
  */
 async function launch({ userData, env = {}, viewport = { width: 1400, height: 850 }, readyMs = 90000 }) {
-  const exe = process.env.HIVE_EXE
-  if (exe && !launch.said) console.log(`Combwork: ${exe} (HIVE_EXE), not the dev build`)
+  const exe = process.env.CW_EXE
+  if (exe && !launch.said) console.log(`Combwork: ${exe} (CW_EXE), not the dev build`)
   launch.said = !!exe
   // The run context's environment (quiet, tips off, the suite's port) with the profile and the suite's own variables.
-  const app = await _electron.launch({ executablePath: exe || ELECTRON, args: exe ? [] : [ROOT], cwd: ROOT, env: hiveEnv({ HIVE_USER_DATA: userData, ...env }) }).catch((e) => {
+  const app = await _electron.launch({ executablePath: exe || ELECTRON, args: exe ? [] : [ROOT], cwd: ROOT, env: hiveEnv({ CW_USER_DATA: userData, ...env }) }).catch((e) => {
     // Electron that failed to start (0xc0000142 under heavy load, #599): its exit code said with what it means.
     const said = windowsCodesIn(e?.message)
     if (said.length && e instanceof Error) e.message = `${e.message}\nWindows: ${said.join('; ')}`
@@ -637,7 +637,7 @@ const apps = new Set()
 const launchElectron = _electron.launch.bind(_electron)
 _electron.launch = async (...args) => {
   const env = args[0]?.env
-  if (!isHiveEnv(env)) throw new Error("Start a test Combwork with lib.hiveEnv({ HIVE_USER_DATA, … }) as its env (tests/e2e/runContext.cjs), never the suite's own environment")
+  if (!isHiveEnv(env)) throw new Error("Start a test Combwork with lib.hiveEnv({ CW_USER_DATA, … }) as its env (tests/e2e/runContext.cjs), never the suite's own environment")
   // The CLI homes, test folders (#382, #452): Combwork looks for the CLIs when it starts, and their sign-in checks read these.
   for (const k of ['CLAUDE_CONFIG_DIR', 'CODEX_HOME', 'COPILOT_HOME', 'GH_CONFIG_DIR']) {
     if (!env[k]) throw new Error(`A test Combwork needs ${k} (hiveEnv gives an empty one of the suite's; a suite may give a test home, never none): without it the CLI reads the user's own home (#382)`)
@@ -654,12 +654,12 @@ _electron.launch = async (...args) => {
   // Its profile on its command line (#614), which Combwork ignores: the runner stops what names a suite's folder once the
   // suite ends, and a test Combwork's own line names only the checkout, so a suite killed before closing its Combwork (HB1's,
   // 10 Oct) left it running for a day. Chromium's own processes already name it (--user-data-dir).
-  if (env.HIVE_USER_DATA) args[0] = { ...args[0], args: [...(args[0].args ?? []), `--hive-test-profile=${env.HIVE_USER_DATA}`] }
+  if (env.CW_USER_DATA) args[0] = { ...args[0], args: [...(args[0].args ?? []), `--hive-test-profile=${env.CW_USER_DATA}`] }
   if (packaged) {
     args[0] = { ...args[0], args: [...args[0].args, ...PACKAGED_ARGS], env: { ...env, ...NO_UPDATE_CHECK } }
-    unmaximized(env.HIVE_USER_DATA)
-    noUpdateChecks(env.HIVE_USER_DATA)
-    if (env.HIVE_USER_DATA) packagedLaunches.push({ profile: env.HIVE_USER_DATA, since: new Date().toISOString() })
+    unmaximized(env.CW_USER_DATA)
+    noUpdateChecks(env.CW_USER_DATA)
+    if (env.CW_USER_DATA) packagedLaunches.push({ profile: env.CW_USER_DATA, since: new Date().toISOString() })
   }
   const from = Date.now()
   const app = await launchElectron(...args)
@@ -696,7 +696,7 @@ _electron.launch = async (...args) => {
   // child, by the process tree alone, trusted only while this process holds the shell's handle (it hasn't exited). Looked
   // up in the background, so the launch returns as it did: only a record, which never fails or holds up the suite. A
   // copy whose record isn't made (in time, or at all) is never ended by the runner, only listed.
-  if (process.env.HIVE_E2E_DIR) recordMainProcess(WORK, app.process(), from, env.HIVE_USER_DATA ?? null).catch(() => undefined)
+  if (process.env.CW_E2E_DIR) recordMainProcess(WORK, app.process(), from, env.CW_USER_DATA ?? null).catch(() => undefined)
   return app
 }
 
@@ -836,13 +836,13 @@ const inside = (file, dir) => {
 /**
  * Which Combwork a suite starts: 'dev' (this checkout's Electron, the dev build) or 'packaged' (a Combwork.exe: this checkout's
  * dist\win-unpacked, the main checkout's 0.9 one boardupgrade and upgradelane use, one in the test folders, or what
- * HIVE_E2E_HIVE09 or HIVE_EXE name). Never the installed Combwork, nor one from anywhere else (#1253): it would open the user's
+ * CW_E2E_V09 or CW_EXE name). Never the installed Combwork, nor one from anywhere else (#1253): it would open the user's
  * app on their screen. Throws for those.
  */
 function testExecutable(exe) {
   if (comparable(exe) === comparable(ELECTRON)) return 'dev'
-  if (INSTALLED.some((d) => d && inside(exe, d))) throw new Error(`A test may never start the installed Combwork (${exe}): use this checkout's build, or a 0.9 build's win-unpacked folder (HIVE_E2E_HIVE09) (#1253)`)
-  const named = [ROOT, TEST_ROOT, process.env.HIVE_E2E_HIVE09, process.env.HIVE_EXE && path.dirname(process.env.HIVE_EXE)].filter(Boolean)
+  if (INSTALLED.some((d) => d && inside(exe, d))) throw new Error(`A test may never start the installed Combwork (${exe}): use this checkout's build, or a 0.9 build's win-unpacked folder (CW_E2E_V09) (#1253)`)
+  const named = [ROOT, TEST_ROOT, process.env.CW_E2E_V09, process.env.CW_EXE && path.dirname(process.env.CW_EXE)].filter(Boolean)
   if (named.some((d) => inside(exe, d))) return 'packaged'
   // Asked of git only now: in Windows Sandbox the checkout is a mapped copy, not a repository (#1227).
   const main = /^worktree (.+)$/m.exec(git(ROOT, 'worktree list --porcelain'))?.[1]
@@ -876,11 +876,11 @@ function unmaximized(profile) {
 
 /**
  * A packaged test Combwork never checks GitHub for updates (#1332): each check fetches the release's latest.yml, which
- * GitHub counts as a download. 1.0 doesn't for HIVE_TEST_QUIET=1 (hiveEnv); a released build (0.9) can't be changed, so
- * its first check, 30 s after it starts, is put off as far as a timer goes (about 24.8 days: HIVE_UPDATE_DELAY, which
+ * GitHub counts as a download. 1.0 doesn't for CW_TEST_QUIET=1 (hiveEnv); a released build (0.9) can't be changed, so
+ * its first check, 30 s after it starts, is put off as far as a timer goes (about 24.8 days: CW_UPDATE_DELAY, which
  * every build reads), and a profile it has saved has automatic checks off, so it schedules no 6-hourly check either.
  */
-const NO_UPDATE_CHECK = { HIVE_UPDATE_DELAY: String(2 ** 31 - 1) }
+const NO_UPDATE_CHECK = { CW_UPDATE_DELAY: String(2 ** 31 - 1) }
 function noUpdateChecks(profile) {
   const file = profile && path.join(profile, 'config.json')
   // A new profile is left alone: a config.json of settings alone would read as one from before every migration.
@@ -891,7 +891,7 @@ function noUpdateChecks(profile) {
     cfg.settings = { ...cfg.settings, updates: { ...cfg.settings?.updates, checkAutomatically: false } }
     fs.writeFileSync(file, JSON.stringify(cfg, null, 2))
   } catch {
-    // Unreadable: Combwork starts with its defaults, and HIVE_UPDATE_DELAY still puts its check off.
+    // Unreadable: Combwork starts with its defaults, and CW_UPDATE_DELAY still puts its check off.
   }
 }
 
@@ -1133,7 +1133,7 @@ async function sendPrompt(inv, key, text, { submitted, ready = null, tries = 3, 
 }
 
 /**
- * Whether Combwork's log in a test profile (HIVE_USER_DATA) says an agent's Combwork tools connected (#865), at or after
+ * Whether Combwork's log in a test profile (CW_USER_DATA) says an agent's Combwork tools connected (#865), at or after
  * `since` (a line count from hiveLogLines, so a relaunch's own connect is waited for): a ready() for sendPrompt into a
  * just-started Claude Code, as Combwork itself types nothing before it (sessions.hiveToolsSettled). A build from before
  * HI-2584 (a packaged suite's older build) logged it as "hive tools": both are read.

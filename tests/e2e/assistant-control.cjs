@@ -39,7 +39,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.assistant = { ...cfg.settings.assistant, typingPause: 600, enterEndsPause: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -71,7 +71,7 @@ const check = (name, ok, extra = '') => {
   const token = JSON.parse(fs.readFileSync(tokenFile, 'utf8')).token
   // In its launch's private folder in Combwork's user data, not the project (#345).
   const mcp = JSON.parse(fs.readFileSync(path.join(lib.launchDir(userData, (await live(home, 'assistant')).runId), 'mcp.json'), 'utf8')).mcpServers.combwork
-  check("the Assistant's hive tools use its token and role", mcp?.env.CW_API_TOKEN_FILE === tokenFile && mcp.env.HIVE_ROLE === 'assistant' && mcp.env.HIVE_ASSISTANT_CONTROL === 'projects', JSON.stringify(mcp?.env))
+  check("the Assistant's hive tools use its token and role", mcp?.env.CW_API_TOKEN_FILE === tokenFile && mcp.env.CW_ROLE === 'assistant' && mcp.env.CW_ASSISTANT_CONTROL === 'projects', JSON.stringify(mcp?.env))
   // Its skills: the workspace's skills for the Assistant (coordinate-agents and the shared ones), none for agents only.
   const assistantSkills = fs.readdirSync(path.join(home, '.combwork', 'launch-assistant', 'plugin', 'skills')).sort()
   // use-cw-api is for both (HI-2012): its tools.md, the hive tools' detail, is copied with it.
@@ -255,10 +255,10 @@ const check = (name, ok, extra = '') => {
   check('the hand-over is listed', (await inv('assistant:actions')).some((x) => x.ok && x.text.startsWith("Handing Fixer's work over to Checker")))
 
   // Through its real hive tools, with the Agent API on: the CLI hands its own environment to MCP servers, and
-  // that may carry the Agent API's token (HIVE_API_TOKEN); the Assistant's tools must still use its own.
+  // that may carry the Agent API's token (CW_API_TOKEN); the Assistant's tools must still use its own.
   const viaTool = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
     input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_activate_project', arguments: { project: 'alpha', active: true } } }) + '\n',
-    env: lib.childEnv({ HIVE_API_TOKEN: apiToken, ...mcp.env, CW_API_URL: API }),
+    env: lib.childEnv({ CW_API_TOKEN: apiToken, ...mcp.env, CW_API_URL: API }),
     timeout: 15000
   }).toString()
   const toolReply = JSON.parse(viaTool.split('\n')[0]).result
@@ -356,15 +356,15 @@ const check = (name, ok, extra = '') => {
     return JSON.parse(outText.split('\n')[0]).result.tools.map((t) => t.name)
   }
   const asAgent = tools({ CW_PROJECT: 'alpha' })
-  const asAgents = tools({ HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'agents' })
-  const asLook = tools({ HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'look' })
+  const asAgents = tools({ CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'agents' })
+  const asLook = tools({ CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'look' })
   check('project agents get no control tools', !asAgent.includes('cw_add_agent') && !asAgent.includes('cw_agent_activity') && !asAgent.includes('cw_start_task'), asAgent.join(','))
   check('project agents get the board tools', ['cw_list_tasks', 'cw_read_task', 'cw_create_task', 'cw_update_task', 'cw_reorder_tasks'].every((t) => asAgent.includes(t)), asAgent.join(','))
   check('Control agents: agent tools, no project creation', asAgents.includes('cw_prompt_agent') && asAgents.includes('cw_stop_agent') && asAgents.includes('cw_hand_over') && asAgents.includes('cw_start_task') && !asAgents.includes('cw_create_project'))
   check('Look and advise: reading tools only', asLook.includes('cw_agent_activity') && asLook.includes('cw_wait_for_agents') && asLook.includes('cw_list_tasks') && !asLook.includes('cw_add_agent') && !asLook.includes('cw_start_task'))
   // Its lane tool says only list works there (#500); trusted at every level (sessions' trustedHiveTools, unit-tested).
   const laneTool = (envExtra) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) + '\n', env: lib.childEnv({ CW_API_URL: API, ...envExtra }), timeout: 10000 }).toString().split('\n')[0]).result.tools.find((t) => t.name === 'cw_lane')
-  check('Look and advise: cw_lane says only list works', /only list works/.test(laneTool({ HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'look' })?.description ?? '') && !/only list works/.test(laneTool({ HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'agents' })?.description ?? ''))
+  check('Look and advise: cw_lane says only list works', /only list works/.test(laneTool({ CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'look' })?.description ?? '') && !/only list works/.test(laneTool({ CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'agents' })?.description ?? ''))
 
   // --- HI-2328: an agent change waiting behind project.json's lock is checked again with its write. The user's own write is
   // held just before its file is replaced (as in assistantsettings), the Assistant's change queues behind it, Control is

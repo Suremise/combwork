@@ -87,13 +87,13 @@ const START_GRACE_MS = 2 * 60 * 1000
 const KEEPS: ReadonlySet<StageId> = new Set<StageId>(['active', 'review', 'approved', 'merging', 'hold'])
 
 /**
- * Test copies (unpackaged) only: `HIVE_TEST_SLOT_CRASH=<point>` ends Hive at once there, no quit handler run, so a suite
+ * Test copies (unpackaged) only: `CW_TEST_SLOT_CRASH=<point>` ends Hive at once there, no quit handler run, so a suite
  * shows what the next start recovers (HR1's #1438 rounds 1 and 2): `afterAction` (a slot action marked done, nothing of
  * it done), `inPrepare` (the line checked out, `SlotPrepared` not written), `inPlacement` (claimed, nothing delivered),
  * `inDeletion` (a merged line's ref removed, nothing checked or recorded after it).
  */
 function crashAt(point: 'afterAction' | 'inPrepare' | 'inPlacement' | 'inDeletion'): Promise<never> | null {
-  if (app.isPackaged || process.env.HIVE_TEST_SLOT_CRASH !== point) return null
+  if (app.isPackaged || process.env.CW_TEST_SLOT_CRASH !== point) return null
   exitBy('app.exit', `a test crash at a slot's ${point}`, () => app.exit(1)) // i18n-ignore: the exit log's reason
   return new Promise<never>(() => undefined)
 }

@@ -2,7 +2,7 @@
 // group's transaction, and every reader of the board giving the same bytes after as before (cards in full and in short,
 // holds, places, Export Board). A step that throws part way leaves the 0.9 file as it was; opening it again runs nothing.
 //
-// HIVE_BOARD_GOLDEN_DB=<a hive.db> runs the same comparison over a copy of that board, made in tempDir() (the file itself
+// CW_BOARD_GOLDEN_DB=<a hive.db> runs the same comparison over a copy of that board, made in tempDir() (the file itself
 // is never opened; its -wal is copied with it). Timings are tests/boardBench.test.ts's.
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -263,7 +263,7 @@ describe('the cards step (#1209)', () => {
     await close(w)
   })
 
-  const golden = process.env.HIVE_BOARD_GOLDEN_DB
+  const golden = process.env.CW_BOARD_GOLDEN_DB
   it.skipIf(!golden)("a live board's copy: every reader gives the same bytes after the upgrade", { timeout: 600_000 }, async () => {
     const ws = workspace()
     const file = store.boardFile(ws)

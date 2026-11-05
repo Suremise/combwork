@@ -103,7 +103,7 @@ const check = (name, ok, extra = '') => {
   cfg2.settings.providers.codex.executablePath = path.join(__dirname, 'fake-codex', 'fake-codex.cmd')
   cfg2.settings.general = { ...cfg2.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(path.join(userData2, 'config.json'), JSON.stringify(cfg2, null, 2))
-  const base = lib.hiveEnv({ HIVE_USER_DATA: userData2 })
+  const base = lib.hiveEnv({ CW_USER_DATA: userData2 })
   const pathKey = Object.keys(base).find((k) => k.toUpperCase() === 'PATH')
   const noClaude = (base[pathKey] ?? '')
     .split(path.delimiter)

@@ -49,7 +49,7 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
   // A token in Combwork's own environment, as one set on the PC would be: a connection's Codex must never get it.
   // Each app server the fake runs (Combwork's sign-in checks, its hook checks) notes its pid there.
   const appServers = path.join(userData, 'fake-appservers.txt')
-  const env = { CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CODEX_ACCESS_TOKEN: 'made-up-not-a-token', HIVE_TEST_CLI_HOME_CONNECTION: '0', FAKE_CODEX_APPSERVER_LOG: appServers }
+  const env = { CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CODEX_ACCESS_TOKEN: 'made-up-not-a-token', CW_TEST_CLI_HOME_CONNECTION: '0', FAKE_CODEX_APPSERVER_LOG: appServers }
   const { app, page } = await lib.launch({ userData, env, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))

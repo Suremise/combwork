@@ -18,7 +18,7 @@
 // Screenshots in both themes, in English and German: the step, the board, Branches & remotes, the Pulse hovers, the
 // legend, the old rules mark, the save's warning, the offer, and each Version Control section of a Git and a None
 // project. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
-// The Merge queue section read slowly (HIVE_TEST_SLOW_IPC) is NOT RUN on a packaged build (HIVE_EXE), where the rest
+// The Merge queue section read slowly (CW_TEST_SLOW_IPC) is NOT RUN on a packaged build (CW_EXE), where the rest
 // runs (#1578).
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -621,15 +621,15 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const queueTab = page.locator('.git-sections [data-section="queue"]')
     check('None, a Git card still in flight: the Merge queue section stays', (await queueTab.count()) === 1, JSON.stringify(await page.locator('.git-sections [data-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-section')))))
     if ((await queueTab.count()) === 1) {
-      if (q.devSeam('the Merge queue section read slowly (HIVE_TEST_SLOW_IPC)')) {
+      if (q.devSeam('the Merge queue section read slowly (CW_TEST_SLOW_IPC)')) {
         // Read slowly (as under load): the section says it's reading, never nothing.
-        await app.evaluate(() => { process.env.HIVE_TEST_SLOW_IPC = 'queue:list=3000' })
+        await app.evaluate(() => { process.env.CW_TEST_SLOW_IPC = 'queue:list=3000' })
         await section('workflow')
         await section('queue')
         const reading = page.locator('.git-body [data-queue-reading]')
         check('the Merge queue section, while its queues are read, says so', !!(await waitHung(async () => (await reading.count()) === 1 && (await text(reading)) === 'Reading the merge queues…')), (await page.locator('.git-body').innerHTML().catch(() => '')).slice(0, 600))
         await page.locator('.vc-view').screenshot({ path: path.join(fx.shots, 'p6lane-vc-none-queue-reading-en-dark.png') })
-        await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
+        await app.evaluate(() => { delete process.env.CW_TEST_SLOW_IPC })
       }
       // Then the old queue as the board has it, with its history: the repository gone takes none of it away.
       const body = page.locator('.git-body')

@@ -68,7 +68,7 @@ function transcript(sid, startMin) {
   const transcripts = path.join(claudeHome, 'projects', alpha.replace(/[^a-zA-Z0-9]/g, '-'))
   fs.mkdirSync(transcripts, { recursive: true })
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47931), ...claude })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47931), ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const shots = path.join(lib.WORK, 'activitytab-shots')
   fs.mkdirSync(shots, { recursive: true })

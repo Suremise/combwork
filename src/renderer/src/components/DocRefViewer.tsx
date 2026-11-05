@@ -7,7 +7,7 @@ import { call, errorMessage } from '../api'
 import { openFileLink } from '../fileLinks'
 import { get, set, showView, useLanguage } from '../store'
 import { Markdown, Modal } from './ui'
-import { HIVE_DIR } from '@shared/defaults'
+import { CW_DIR } from '@shared/defaults'
 
 type Section = Awaited<ReturnType<HiveRequests['docs:section']>>
 
@@ -58,7 +58,7 @@ export function DocRefViewer({ projectPath, docRef, onClose, onOpen }: { project
       const ws = get().workspace?.path
       if (!ws) return
       showView('notes')
-      set({ selectedNote: [ws, HIVE_DIR, 'shared', ...parsed.path.slice('shared:'.length).split('/')].join('\\') })
+      set({ selectedNote: [ws, CW_DIR, 'shared', ...parsed.path.slice('shared:'.length).split('/')].join('\\') })
     } else if (projectPath) openFileLink({ project: projectPath, agentId: null, root: projectPath, rel: parsed.path }, line)
   }
   // The viewer closes, then whatever it opens over (the card dialog) closes the way it does, asking about unsaved edits:

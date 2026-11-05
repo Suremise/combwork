@@ -14,7 +14,7 @@ import { checkEnv, classifyCheckFailure, installPlan, MAX_LOG_BYTES, networkCode
 import { advancedDef, QUEUE_NETWORK_CODES } from '../../src/shared/advanced'
 import { runDetails } from '../../src/shared/progress'
 import { tr } from '../../src/shared/i18n'
-import { HIVE_RUNS, keptRuns, ProgressStore } from '../../src/main/progress'
+import { CW_RUNS, keptRuns, ProgressStore } from '../../src/main/progress'
 import { publicRun } from '../../src/main/apiEvents'
 import type { RunCheck } from '../../src/shared/types'
 
@@ -55,8 +55,8 @@ const base = (): Record<string, string> => ({
   PATH: process.env.PATH ?? '',
   SystemRoot: process.env.SystemRoot ?? '',
   ComSpec: process.env.ComSpec ?? 'cmd.exe',
-  HIVE_TOKEN: 'secret',
-  Hive_Agent_Id: 'B1',
+  CW_TOKEN: 'secret',
+  Cw_Agent_Id: 'B1',
   ELECTRON_RUN_AS_NODE: '1'
 })
 
@@ -251,9 +251,9 @@ describe("finding a check's program before it starts (Windows: cmd exits 1 for o
 })
 
 describe("a check's environment", () => {
-  it('has no HIVE_* variable (in any case) and none of Electron\'s switches, and keeps the rest', () => {
-    const e = checkEnv({ ...base(), hive_port: '47821', electron_run_as_node: '1', CHROME_CRASHPAD_PIPE_NAME: 'x', FOO: 'bar' })
-    expect(Object.keys(e).filter((k) => /^hive_|^electron_|crashpad/i.test(k))).toEqual([])
+  it('has no CW_* variable (in any case) and none of Electron\'s switches, and keeps the rest', () => {
+    const e = checkEnv({ ...base(), cw_port: '47821', electron_run_as_node: '1', CHROME_CRASHPAD_PIPE_NAME: 'x', FOO: 'bar' })
+    expect(Object.keys(e).filter((k) => /^cw_|^electron_|crashpad/i.test(k))).toEqual([])
     expect(e.FOO).toBe('bar')
     expect(e.PATH).toBe(process.env.PATH ?? '')
   })
@@ -313,7 +313,7 @@ describe("Combwork's runs in the Progress panel", () => {
   it('are "Combwork (merge queue)" in the project, no agent; only Combwork changes them; they never go stale; kept as they were', () => {
     const p = store()
     const r = p.start({ ...caller, noInstall: true }, { title: 'AM-1 · check · a3f2c1d', command: 'npm test' }, { card: 1, revision: 'a'.repeat(40), testedCheckout: 'a'.repeat(40) })
-    expect(r).toMatchObject({ source: 'hive', agentName: HIVE_RUNS, defaultName: 'mergeQueue', projectPath: caller.projectPath, agentId: null, provider: null, noInstall: true, card: 1 })
+    expect(r).toMatchObject({ source: 'hive', agentName: CW_RUNS, defaultName: 'mergeQueue', projectPath: caller.projectPath, agentId: null, provider: null, noInstall: true, card: 1 })
     // A script (the workspace's token) can't end it, and neither can another project's queue.
     expect(() => p.finish({ source: 'api', workspacePath: caller.workspacePath }, r.id, { ok: true })).toThrow('Unknown progress run')
     expect(() => p.finish({ ...caller, projectPath: 'C:\\ws\\other' }, r.id, { ok: true })).toThrow('Unknown progress run')
@@ -323,7 +323,7 @@ describe("Combwork's runs in the Progress panel", () => {
     p.finish(caller, r.id, { ok: false, exitCode: 1, logPath: 'C:\\logs\\x.log' })
     p.noteCheck(caller.workspacePath, r.id, { name: 'check', counted: false, whyNot: 'changed' })
     const [kept] = keptRuns(JSON.parse(JSON.stringify({ runs: p.list(caller.workspacePath) })), caller.workspacePath)
-    expect(kept).toMatchObject({ source: 'hive', agentName: HIVE_RUNS, defaultName: 'mergeQueue', projectPath: caller.projectPath, noInstall: true, logPath: 'C:\\logs\\x.log', counts: { name: 'check', counted: false, whyNot: 'changed' } })
+    expect(kept).toMatchObject({ source: 'hive', agentName: CW_RUNS, defaultName: 'mergeQueue', projectPath: caller.projectPath, noInstall: true, logPath: 'C:\\logs\\x.log', counts: { name: 'check', counted: false, whyNot: 'changed' } })
   })
 })
 
@@ -455,17 +455,17 @@ describe('merge checks as Combwork\'s runs (temporary repositories)', () => {
     const [o] = await q.drain('main')
     expect(o).toMatchObject({ outcome: 'integrated' })
     const result = mainHead(e)
-    // What the check saw: the queue's folder, and no HIVE_* or ELECTRON_RUN_AS_NODE.
+    // What the check saw: the queue's folder, and no CW_* or ELECTRON_RUN_AS_NODE.
     const seen = JSON.parse(readFileSync(out, 'utf8')) as { env: Record<string, string>; cwd: string }
     expect(seen.cwd.toLowerCase()).toBe(join(e.home, 'queue').toLowerCase())
-    expect(Object.keys(seen.env).filter((k) => /^hive_|^electron_run_as_node$/i.test(k))).toEqual([])
+    expect(Object.keys(seen.env).filter((k) => /^cw_|^electron_run_as_node$/i.test(k))).toEqual([])
     // Its run, and its CheckRan at the result revision, counted.
     expect(r.started[0]).toMatchObject({ title: `${card.key} · check · ${result.slice(0, 7)}`, card: card.id, revision: result })
     expect(r.finished[0]).toMatchObject({ ok: true, exitCode: 0 })
     expect(readFileSync(r.finished[0].logPath!, 'utf8')).toBe('')
     expect(r.counted[0].c).toEqual({ name: 'check', counted: true })
     const ran = e.wf.state(card).checks.at(-1)!
-    expect(ran).toMatchObject({ name: 'check', revision: result, tested: result, result: 'passed', by: HIVE_RUNS, counted: true, run: 'run1' })
+    expect(ran).toMatchObject({ name: 'check', revision: result, tested: result, result: 'passed', by: CW_RUNS, counted: true, run: 'run1' })
     // Nothing installed (no setup command, no lock file): said once, on that check's run.
     expect(r.started[0].noInstall).toBe(true)
   })

@@ -8,7 +8,7 @@
 // now in every project; a status change alone never finds a card's agents again or reads the session lists beyond their
 // cadence. A card whose builder went on to its next card (its session's record keeping this one) has nobody on it. A
 // card's Activity whose agents come back after the window went elsewhere (another view, another workspace) doesn't open
-// (HR5's round 1: activity:cardAgents made slow, HIVE_TEST_SLOW_IPC). Both themes. Fake Claude Code only (no sign-in, no tokens). Dev build, throwaway profile,
+// (HR5's round 1: activity:cardAgents made slow, CW_TEST_SLOW_IPC). Both themes. Fake Claude Code only (no sign-in, no tokens). Dev build, throwaway profile,
 // workspace and CLI homes; quiet.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -57,7 +57,7 @@ const AGENTS = [
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', HIVE_TEST_SLOW_IPC: 'activity:cardAgents=2500', ...claude })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', CW_TEST_SLOW_IPC: 'activity:cardAgents=2500', ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const shots = path.join(lib.WORK, 'activityworkspace-shots')
   fs.rmSync(shots, { recursive: true, force: true })

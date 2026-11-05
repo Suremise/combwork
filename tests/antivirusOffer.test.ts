@@ -1,5 +1,5 @@
 // The antivirus suggestion's reminders (#348): folders not offered before at once, the same ones again at most once a
-// day and with no limit, until Don't Ask Again or they stop being slowed. On a fixture only (HIVE_TEST_ANTIVIRUS) and
+// day and with no limit, until Don't Ask Again or they stop being slowed. On a fixture only (CW_TEST_ANTIVIRUS) and
 // a fake clock: nothing here reads or changes the machine's Defender settings.
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -25,7 +25,7 @@ const probe = (exclusions: string[] = ['N/A: Must be an administrator to view ex
   volumes: []
 })
 const setFixture = (f: object): void => writeFileSync(fixture, JSON.stringify(f))
-const env = process.env.HIVE_TEST_ANTIVIRUS
+const env = process.env.CW_TEST_ANTIVIRUS
 
 let n = 0
 /** A workspace as the suggestion needs it: a folder, its lifetime and no projects. */
@@ -35,11 +35,11 @@ function open(path = join(base, `ws${++n}`)) {
 }
 
 beforeAll(() => {
-  process.env.HIVE_TEST_ANTIVIRUS = fixture
+  process.env.CW_TEST_ANTIVIRUS = fixture
 })
 afterAll(async () => {
-  if (env === undefined) delete process.env.HIVE_TEST_ANTIVIRUS
-  else process.env.HIVE_TEST_ANTIVIRUS = env
+  if (env === undefined) delete process.env.CW_TEST_ANTIVIRUS
+  else process.env.CW_TEST_ANTIVIRUS = env
   await config.flush()
   rmSync(base, { recursive: true, force: true })
 })

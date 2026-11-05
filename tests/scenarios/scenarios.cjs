@@ -2015,7 +2015,7 @@ module.exports.SCENARIOS = [
       const out = runs(o, 'cards.ps1').map((t) => t.result).join('\n')
       return [
         ['read the use-cw-api skill', read(o, 'use-cw-api'), o.skillsRead.join(',')],
-        // HI-2262: sessions get the token only in its file; a script reading HIVE_API_TOKEN gets nothing.
+        // HI-2262: sessions get the token only in its file; a script reading CW_API_TOKEN gets nothing.
         ['the script takes the agent\'s own token from CW_API_TOKEN_FILE', /CW_API_TOKEN_FILE/.test(script), script.slice(0, 200)],
         ['never the workspace token (agent-api.json)', !/agent-api\.json/i.test(script) && !o.tools.some((t) => /agent-api\.json/i.test(t.input))],
         ['it ran, and listed its own card', /Scoped card for alpha/.test(out), out.slice(0, 200)],

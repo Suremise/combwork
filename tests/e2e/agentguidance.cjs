@@ -114,7 +114,7 @@ function packagesRequired(entry) {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), ...claudeEnv })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -162,9 +162,9 @@ function packagesRequired(entry) {
     // description and error word the catalogue's. Nothing here needs Combwork: the lists and these errors come before any call.
     const ids = new Set(Object.keys(catalogue))
     const canaryEnv = { ...on.env, CW_DIALECT_FILE: dialectFile, CW_DIALECT: 'canary' }
-    const assistant = (control) => ({ HIVE_ROLE: 'assistant', CW_PROJECT: '', HIVE_ASSISTANT_CONTROL: control, HIVE_ASSISTANT_SETTINGS: '1', HIVE_JOURNAL: '1', HIVE_DEV_CONSOLE: '1' })
+    const assistant = (control) => ({ CW_ROLE: 'assistant', CW_PROJECT: '', CW_ASSISTANT_CONTROL: control, CW_ASSISTANT_SETTINGS: '1', CW_JOURNAL: '1', CW_DEV_CONSOLE: '1' })
     const roles = [
-      ['agent', { HIVE_DEV_CONSOLE: '1' }, [['cw_lane', { action: 'nope' }], ['cw_merge_slot', { action: 'nope' }], ['cw_queue', { action: 'pause' }], ['cw_nope', {}]]],
+      ['agent', { CW_DEV_CONSOLE: '1' }, [['cw_lane', { action: 'nope' }], ['cw_merge_slot', { action: 'nope' }], ['cw_queue', { action: 'pause' }], ['cw_nope', {}]]],
       ['assistant at Look and advise', assistant('look'), []],
       ['assistant at Agents', assistant('agents'), []],
       ['assistant at Projects', assistant('projects'), [['cw_team', { action: 'nope' }], ['cw_connection', { action: 'nope' }], ['cw_release_slot', { action: 'nope', project: 'alpha' }], ['cw_template', { action: 'nope', project: 'alpha' }]]]
@@ -182,7 +182,7 @@ function packagesRequired(entry) {
     // ---- Off: the same server, its tools still there, no instructions.
     await inv('advanced:set', GUIDANCE, false)
     const off = await hiveServer()
-    check('off: the launch still has the hive server (Combwork\'s tools)', !!off?.command && off.env?.HIVE_GUIDANCE === '0', JSON.stringify(off?.env ?? {}).slice(0, 300))
+    check('off: the launch still has the hive server (Combwork\'s tools)', !!off?.command && off.env?.CW_GUIDANCE === '0', JSON.stringify(off?.env ?? {}).slice(0, 300))
     const without = await initialize(off)
     check('…which answers with no instructions', !!without && !('instructions' in without), JSON.stringify(without).slice(0, 300))
     await inv('advanced:set', GUIDANCE, true)

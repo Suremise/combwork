@@ -1,7 +1,7 @@
 // Sessions and deliveries in their 1.0 tables (#1211, schema/sessionDeliveryTables.ts and sessionDeliveryCodec.ts): every record reads back
 // equal as JSON (odd ones too: a field Combwork doesn't know, a null, a lone surrogate, one missing), a change writes only
 // the rows it changed, the 1.0 step moves store_rows' rows into the tables and keeps aside what isn't of Combwork's form, and
-// the queries use their indexes. HIVE_STORE_ROUNDTRIP_DB=<a hive.db> runs the step over a copy of that board made in
+// the queries use their indexes. CW_STORE_ROUNDTRIP_DB=<a hive.db> runs the step over a copy of that board made in
 // tempDir() (the file itself is never opened): counts equal, every session and delivery equal as JSON.
 import { copyFileSync, existsSync } from 'fs'
 import { join } from 'path'
@@ -420,7 +420,7 @@ describe('the 1.0 step: store_rows into the tables', () => {
     }
   })
 
-  const live = process.env.HIVE_STORE_ROUNDTRIP_DB
+  const live = process.env.CW_STORE_ROUNDTRIP_DB
   it.skipIf(!live)("moves every session and delivery of a live board's copy: counts equal, each equal as JSON", () => {
     const copy = join(tempDir('hive-store-roundtrip-'), 'hive.db')
     copyFileSync(live!, copy)

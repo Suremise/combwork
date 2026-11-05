@@ -3705,7 +3705,7 @@ export interface LanguageInfo {
   available: string[]
   /** Windows' regional format, for dates shown as Windows shows them (Date format: System). */
   regionalFormat: string
-  /** The --lang start option or HIVE_LANG, which wins over the setting for this run; null without one. */
+  /** The --lang start option or CW_LANG, which wins over the setting for this run; null without one. */
   forced: string | null
   /** Its translations (id → ICU message), loaded once by main. */
   messages: Record<string, string>

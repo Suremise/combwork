@@ -57,7 +57,7 @@ const check = (name, ok, extra = '') => {
   const api = copilot ? await startFakeCopilotApi({ log: apiLog, systems: true }) : null
   const copilotEnv = api ? copilotTestEnv(api, copilotDir, { above: lib.WORK }) : {}
   const PORT = lib.port(47816)
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, ...copilotEnv })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, ...copilotEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

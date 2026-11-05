@@ -47,7 +47,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 
   let h = null
   try {
-    h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT) }, viewport: { width: 1500, height: 900 } })
+    h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT) }, viewport: { width: 1500, height: 900 } })
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     const { inv, page } = h
     await lib.waitForProvider(inv)
@@ -156,7 +156,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     // A pane whose session ended here keeps its terminal (the ended bar); after an upgrade Combwork opens with none: open
     // it again, as then, and read R1's pane.
     await h.app.close()
-    h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT) }, viewport: { width: 1500, height: 900 } })
+    h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT) }, viewport: { width: 1500, height: 900 } })
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     const again = { inv: h.inv, page: h.page }
     await lib.openWorkspace(again.inv, again.page, ws)

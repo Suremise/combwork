@@ -61,9 +61,9 @@ async function agentWithWork(inv, project, name) {
 
   const hives = []
   try {
-    const a = await lib.launch({ userData: profileA, env: { HIVE_API_PORT: lib.port(47844) } })
+    const a = await lib.launch({ userData: profileA, env: { CW_API_PORT: lib.port(47844) } })
     hives.push(a.app)
-    const b = await lib.launch({ userData: profileB, env: { HIVE_API_PORT: await freePort() } })
+    const b = await lib.launch({ userData: profileB, env: { CW_API_PORT: await freePort() } })
     hives.push(b.app)
     for (const [h, ws] of [[a, wsA], [b, wsB]]) {
       h.page.on('pageerror', (e) => check('no page errors', false, e.message))

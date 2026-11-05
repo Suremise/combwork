@@ -2,7 +2,7 @@
 // the Assistant never started: Combwork notifies the user of a lane's failed review (one notice naming the lane and the
 // card), a card of it blocked (with why), and every card passed so its merge is due; nothing for a plain move into
 // Review, and nothing when Settings → Notifications has notifications off. A quiet test copy records each notice in
-// HIVE_TEST_NOTIFY_LOG, which this reads. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// CW_TEST_NOTIFY_LOG, which this reads. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 // Dev build only (#1578): it starts this checkout's Electron itself.
 const lib = require('./lib.cjs')
 const { showBoard, openByTitle } = require('./queueFixture.cjs')
@@ -39,7 +39,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_NOTIFY_LOG: notifyLog, HIVE_TEST_TIPS: 'off' })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_NOTIFY_LOG: notifyLog, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()

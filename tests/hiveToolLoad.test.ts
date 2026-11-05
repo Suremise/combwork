@@ -1,12 +1,12 @@
 // Combwork's tools where a CLI defers MCP tools (HI-2229): each role's most used tools are marked to be sent in full, only
 // tools that role is offered at every control level; and a refused call that guessed its arguments is told the tool's.
 import { describe, expect, it } from 'vitest'
-import { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, HIVE_TOOLS, assistantTools } from '../src/shared/assistantTools'
+import { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, CW_TOOLS, assistantTools } from '../src/shared/assistantTools'
 import { AGENT_ALWAYS_LOAD, ASSISTANT_ALWAYS_LOAD, alwaysLoaded, argumentHint } from '../src/shared/hiveToolLoad'
 
 describe('the tools sent in full (HI-2229)', () => {
   it('are Combwork tools, a few per role', () => {
-    for (const t of ASSISTANT_ALWAYS_LOAD) expect(HIVE_TOOLS).toContain(t)
+    for (const t of ASSISTANT_ALWAYS_LOAD) expect(CW_TOOLS).toContain(t)
     expect(alwaysLoaded(false)).toEqual(AGENT_ALWAYS_LOAD)
     expect(alwaysLoaded(true)).toEqual(ASSISTANT_ALWAYS_LOAD)
     expect(ASSISTANT_ALWAYS_LOAD.length).toBeLessThanOrEqual(6)

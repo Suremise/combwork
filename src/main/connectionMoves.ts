@@ -3,7 +3,7 @@ import { existsSync } from 'original-fs'
 import type { AgentDef, Connection, LaunchValues, MovedField, ProjectConfig, ProviderId } from '../shared/types'
 import { type LegacyInputs, type MovedNotice, type AccountStore, migrateAssistant, migrateProject, migrateWorkspaceFile, placeUnplaced, waitsForConnection } from '../shared/connectionDefaults'
 import { autoProviderPending, providerDescriptor } from '../shared/providers'
-import { HIVE_DIR, projectAgents } from '../shared/defaults'
+import { CW_DIR, projectAgents } from '../shared/defaults'
 import { msg, tr } from '../shared/i18n'
 import { config } from './config'
 import { onHiveEvent, toast } from './events'
@@ -76,7 +76,7 @@ async function withConnections(write: (plan: (fn: (store: AccountStore) => void)
 async function migrateOne(ws: WorkspaceService, projectPath: string): Promise<void> {
   const assistant = ws.isAssistantHome(projectPath)
   // A project without its project.json yet has nothing to migrate (its first write is a new one's).
-  if (!assistant && !existsSync(join(projectPath, HIVE_DIR, 'project.json'))) return
+  if (!assistant && !existsSync(join(projectPath, CW_DIR, 'project.json'))) return
   const read = await ws.projectConfig(projectPath)
   if (!read.migrations?.accounts1) {
     // Automatic's pick (an agent from before 0.2, the Assistant following Settings) is only known once detection answered.

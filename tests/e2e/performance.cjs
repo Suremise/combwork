@@ -230,7 +230,7 @@ const check = (name, ok, extra = '') => {
 
   // A scope switched while the last query is slow: the late answer for the old scope is never shown.
   await app.evaluate(() => {
-    process.env.HIVE_TEST_SLOW_IPC = 'metrics:query=2500*1'
+    process.env.CW_TEST_SLOW_IPC = 'metrics:query=2500*1'
   })
   await page.locator('.sidebar .row', { hasText: 'alpha' }).click()
   await lib.sleep(300)
@@ -239,7 +239,7 @@ const check = (name, ok, extra = '') => {
   await lib.sleep(3000) // A fixed wait on purpose: the slowed answer for the old choice arrives later, and this checks it doesn't replace the new one.
   check("…and the old scope's late reply doesn't replace it", (await requests()) === '12', await requests())
   await app.evaluate(() => {
-    process.env.HIVE_TEST_SLOW_IPC = ''
+    process.env.CW_TEST_SLOW_IPC = ''
   })
 
   await page.locator('.sidebar .row', { hasText: 'gamma' }).click()

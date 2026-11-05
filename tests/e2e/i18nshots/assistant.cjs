@@ -4,7 +4,7 @@
 // Projects sidebar (a project's menu, the compact rail), and templates: the Templates view (its failed load, a
 // template, its editor, Load into Project's plan, the delete confirmation) and a project's Templates tab. Reached for
 // the i18nshots route (#756's design, section 4) with locale-independent means only: IPC calls and failures
-// (HIVE_TEST_FAIL_IPC), command ids and structural hooks (classes, icons, data-path), never English text. See
+// (CW_TEST_FAIL_IPC), command ids and structural hooks (classes, icons, data-path), never English text. See
 // tests/e2e/i18nshots.cjs for ctx.
 const fs = require('fs')
 const path = require('path')
@@ -37,7 +37,7 @@ const menuShown = (ctx) => shown(ctx, ctx.page.locator('.menu[role="menu"]'), 't
 
 /** Makes calls on an IPC channel fail: the next one (`*1`), or all until failing(ctx, ''): tests/e2e/README.md. */
 const failing = (ctx, calls) => ctx.app.evaluate((_, c) => {
-  process.env.HIVE_TEST_FAIL_IPC = c
+  process.env.CW_TEST_FAIL_IPC = c
 }, calls)
 
 /** An icon button by its icon (its name is translated), within `scope`. */

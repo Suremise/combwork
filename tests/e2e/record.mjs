@@ -40,12 +40,12 @@ export function fingerprint(root = process.cwd()) {
 /** The real CLIs a run can use (suites.mjs `needs`): the provider each one is, by its id and name. */
 export const REAL_CLIS = { claude: { id: 'claude-code', name: 'Claude Code' }, codex: { id: 'codex', name: 'Codex' }, copilot: { id: 'copilot', name: 'GitHub Copilot' } }
 
-/** The file in a suite's folder where its test copies of Combwork note the CLIs they selected (HIVE_TEST_CLI_LOG). */
+/** The file in a suite's folder where its test copies of Combwork note the CLIs they selected (CW_TEST_CLI_LOG). */
 export const CLI_LOG = 'hive-clis.jsonl'
 
 /**
  * The CLIs a suite's test copies of Combwork selected (#365): each provider's executable and version as Combwork's own
- * detection chose them (main's noteSelectedCli writes a line per check to HIVE_TEST_CLI_LOG), once each. Not a probe of
+ * detection chose them (main's noteSelectedCli writes a line per check to CW_TEST_CLI_LOG), once each. Not a probe of
  * the runner's: what the suite ran is what Combwork picked (a standalone CLI, never an editor extension's copy).
  */
 export function readCliLog(text) {
@@ -175,7 +175,7 @@ export function recordMarkdown({ code, when, jobs, results, logDir, summary, pro
   const cell = (r) => (!r ? '–' : r.notRun || r.skipped ? result(r) : `${result(r)} ${r.seconds ?? '–'}s`)
   // A record that can't be trusted says so first, so nobody matches its fingerprint by mistake.
   const warning = problems.length ? [`**Not valid — don't trust this record:** ${problems.join('; ')}.`, ''] : []
-  const head = `**e2e run record** · code \`${code}\` · ${when} · ${jobs > 1 ? `${jobs} at a time` : 'one at a time'}${packaged ? ` · packaged build \`${packaged}\` (HIVE_EXE)` : ''}`
+  const head = `**e2e run record** · code \`${code}\` · ${when} · ${jobs > 1 ? `${jobs} at a time` : 'one at a time'}${packaged ? ` · packaged build \`${packaged}\` (CW_EXE)` : ''}`
   const envSkipped = [...new Set((runs ?? [{ results }]).flatMap((r) => r.results.filter((x) => x.environment).map((x) => x.name)))]
   const windows = results.filter((r) => windowsOf(r).length).map((r) => `${r.name}: ${windowsOf(r).join('; ')}`)
   const devOnly = results.filter((r) => r.notRun).map((r) => r.name)

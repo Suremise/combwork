@@ -66,7 +66,7 @@ module.exports = async function run(provider) {
     cliEnv = copilotTestEnv(api, cliDir, { above: lib.WORK })
   }
   fs.rmSync(hold, { force: true })
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', HIVE_TEST_HOLD_TYPED: hold, CLAUDE_CONFIG_DIR: claudeHome, ...cliEnv })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', CW_TEST_HOLD_TYPED: hold, CLAUDE_CONFIG_DIR: claudeHome, ...cliEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -172,7 +172,7 @@ module.exports = async function run(provider) {
     }
 
     // A doorbell put off part-way (HI-1974): typed into a narrow pane, so it wraps, held before its Enter
-    // (HIVE_TEST_HOLD_TYPED), and no longer wanted meanwhile (idle wakes turned off). What Combwork typed is taken back whole
+    // (CW_TEST_HOLD_TYPED), and no longer wanted meanwhile (idle wakes turned off). What Combwork typed is taken back whole
     // (one Ctrl+U clears the whole line in Codex and Copilot), and the next doorbell goes alone.
     await lib.cliStep('a doorbell put off part-way', { session: lib.ptyKey(proj, id) }, async () => {
       const key = lib.ptyKey(proj, id)

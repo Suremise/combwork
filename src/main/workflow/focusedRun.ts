@@ -3,7 +3,7 @@
 // merge queue (in its own folder, at the test merge's result). The shared, pure part is shared/workflow/focused.ts.
 //
 // - The picker is the project's `focused.pick`, run as a check is (cmd's command line, hidden, its environment a check's
-//   with Hive's own variables taken out) with HIVE_FOCUSED_BASE, the change's paths on stdin, its stdout read as the
+//   with Hive's own variables taken out) with CW_FOCUSED_BASE, the change's paths on stdin, its stdout read as the
 //   selection and its stderr kept apart as diagnostics, both bounded. At its time limit its whole tree is ended.
 // - Its outcome is never "pass by default": a failure, a time-out or output Hive can't read is `unknown`.
 
@@ -123,7 +123,7 @@ export function runPick(deps: PickDeps, command: string, folder: string, base: s
     if (deps.signal?.aborted) return cancel()
     deps.signal?.addEventListener('abort', cancel, { once: true })
     try {
-      const env = { ...checkEnv(deps.env()), HIVE_FOCUSED_BASE: base }
+      const env = { ...checkEnv(deps.env()), CW_FOCUSED_BASE: base }
       if (!programFound(command, env, folder, platform)) return done({ state: 'unknown', tests: [], why: 'failed', diagnostics: say(FOCUSED_TEXT.programMissing, { command }) }) // i18n-ignore: the picker's state (a code) and its diagnostics, agent text
       const sh = shellSpec(command, env, platform)
       child = spawn(sh.file, sh.args, { cwd: folder, env, windowsHide: true, windowsVerbatimArguments: sh.verbatim, stdio: ['pipe', 'pipe', 'pipe'] })

@@ -52,7 +52,7 @@ export const LANGUAGES: readonly Language[] = [
 
 /**
  * The pseudo-locale: English with accents and about 30% longer, in brackets, to find text that was missed and layouts
- * that break. Only from the start option or HIVE_LANG (tests, screenshots), never in the picker.
+ * that break. Only from the start option or CW_LANG (tests, screenshots), never in the picker.
  */
 export const PSEUDO_LANGUAGE = 'en-XA'
 
@@ -89,7 +89,7 @@ export interface ChosenLanguage {
 }
 
 /**
- * The language Hive shows: a forced one (the --lang start option or HIVE_LANG, for tests, screenshots and translators,
+ * The language Hive shows: a forced one (the --lang start option or CW_LANG, for tests, screenshots and translators,
  * which may be the pseudo-locale or a language with no translations yet), else the setting, else the first of
  * Windows' preferred display languages Hive has translations for (`available`), else English. The setting may name
  * any of Hive's languages: it was chosen.

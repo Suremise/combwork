@@ -59,7 +59,7 @@ let finishReply: Record<string, unknown> = {}
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 10000
 const seenFile = join(dir, 'seen.json')
-/** The agent's token in its file, as a session has it (HI-2262: never HIVE_API_TOKEN). */
+/** The agent's token in its file, as a session has it (HI-2262: never CW_API_TOKEN). */
 const agentTokenFile = join(dir, 'agent-token.json')
 writeFileSync(agentTokenFile, JSON.stringify({ token: 'agent-token' }))
 let refuse = false
@@ -113,7 +113,7 @@ beforeEach(() => {
 })
 
 const node = process.execPath
-const env = (extra: Record<string, string | undefined> = {}) => ({ ...process.env, CW_API_URL: url, HIVE_API_TOKEN: undefined, CW_PROGRESS_DATA: join(dir, 'data'), CW_PROGRESS: undefined, CW_API_TOKEN_FILE: agentTokenFile,CW_WORKSPACE: undefined, CW_PROGRESS_WRAPPED: undefined, HIVE_TEST_SEEN: seenFile, ...extra })
+const env = (extra: Record<string, string | undefined> = {}) => ({ ...process.env, CW_API_URL: url, CW_API_TOKEN: undefined, CW_PROGRESS_DATA: join(dir, 'data'), CW_PROGRESS: undefined, CW_API_TOKEN_FILE: agentTokenFile,CW_WORKSPACE: undefined, CW_PROGRESS_WRAPPED: undefined, CW_TEST_SEEN: seenFile, ...extra })
 /**
  * Runs the wrapper, collecting what it writes. By default the run is reported only at a step line with the total, or at
  * the end, however long the command takes to start; `startWaitMs` 0 reports it at once, before the command's output.
@@ -130,7 +130,7 @@ async function wrap(argv: string[], e: Record<string, string | undefined>, start
  * then fail, rather than the test hanging).
  */
 const seenJs = join(dir, 'seen.js')
-writeFileSync(seenJs, "globalThis.seen = (p) => new Promise((r) => { const end = Date.now() + 10000; const t = setInterval(() => { let c = []; try { c = JSON.parse(require('fs').readFileSync(process.env.HIVE_TEST_SEEN, 'utf8')) } catch {} if (p(c) || Date.now() > end) { clearInterval(t); r() } }, 10) })")
+writeFileSync(seenJs, "globalThis.seen = (p) => new Promise((r) => { const end = Date.now() + 10000; const t = setInterval(() => { let c = []; try { c = JSON.parse(require('fs').readFileSync(process.env.CW_TEST_SEEN, 'utf8')) } catch {} if (p(c) || Date.now() > end) { clearInterval(t); r() } }, 10) })")
 const seenNode = [node, '-r', seenJs]
 
 describe('the hive-progress command line', () => {
@@ -608,8 +608,8 @@ describe('reporting a run', () => {
     const quiet = ['--', node, '-e', 'process.exit(5)']
     expect((await wrap(quiet, env({ CW_API_URL: undefined }))).code).toBe(5)
     expect((await wrap(quiet, env({ CW_API_TOKEN_FILE: undefined }))).code).toBe(5)
-    // HI-2262: a token in HIVE_API_TOKEN alone is no target (sessions get only the file).
-    expect((await wrap(quiet, env({ CW_API_TOKEN_FILE: undefined, HIVE_API_TOKEN: 'agent-token' }))).code).toBe(5)
+    // HI-2262: a token in CW_API_TOKEN alone is no target (sessions get only the file).
+    expect((await wrap(quiet, env({ CW_API_TOKEN_FILE: undefined, CW_API_TOKEN: 'agent-token' }))).code).toBe(5)
     expect((await wrap(quiet, env({ CW_PROGRESS: '0' }))).code).toBe(5)
     expect(calls).toEqual([])
   })
@@ -678,13 +678,13 @@ describe('reporting a run', () => {
 })
 
 describe('the shared reporter and timings', () => {
-  it('finds its target: the agent token from the file Combwork keeps it in, never HIVE_API_TOKEN (HI-2262); CW_PROGRESS=0 turns it off', () => {
+  it('finds its target: the agent token from the file Combwork keeps it in, never CW_API_TOKEN (HI-2262); CW_PROGRESS=0 turns it off', () => {
     const file = join(dir, 'token.json')
     writeFileSync(file, JSON.stringify({ token: 'from-file' }))
     expect(progressTarget({ CW_API_URL: 'http://h/', CW_API_TOKEN_FILE: file, CW_WORKSPACE: 'W' })).toEqual({ url: 'http://h', token: 'from-file', workspace: 'W' })
-    // The file's, whatever HIVE_API_TOKEN says; with it alone, no target.
-    expect(progressTarget({ CW_API_URL: 'http://h', HIVE_API_TOKEN: 't', CW_API_TOKEN_FILE: file })?.token).toBe('from-file')
-    expect(progressTarget({ CW_API_URL: 'http://h', HIVE_API_TOKEN: 't' })).toBeNull()
+    // The file's, whatever CW_API_TOKEN says; with it alone, no target.
+    expect(progressTarget({ CW_API_URL: 'http://h', CW_API_TOKEN: 't', CW_API_TOKEN_FILE: file })?.token).toBe('from-file')
+    expect(progressTarget({ CW_API_URL: 'http://h', CW_API_TOKEN: 't' })).toBeNull()
     expect(progressTarget({ CW_API_URL: 'http://h', CW_API_TOKEN_FILE: join(dir, 'no-such-token.json') })).toBeNull()
     expect(progressTarget({ CW_API_URL: 'http://h' })).toBeNull()
     expect(progressTarget({ CW_API_TOKEN_FILE: file })).toBeNull()
@@ -946,8 +946,8 @@ describe("agents told to run long commands through hive-progress (Settings → G
 describe("Combwork's own test runners (tests/progressReport.mts)", () => {
   const saved = { ...process.env }
   beforeEach(() => {
-    Object.assign(process.env, { CW_API_URL: url, CW_API_TOKEN_FILE: agentTokenFile, HIVE_TEST_PROGRESS_TIMINGS: join(dir, 'runner-timings.json') })
-    for (const k of ['HIVE_API_TOKEN', 'CW_WORKSPACE', 'CW_PROGRESS', 'CW_PROGRESS_WRAPPED']) delete process.env[k]
+    Object.assign(process.env, { CW_API_URL: url, CW_API_TOKEN_FILE: agentTokenFile, CW_TEST_PROGRESS_TIMINGS: join(dir, 'runner-timings.json') })
+    for (const k of ['CW_API_TOKEN', 'CW_WORKSPACE', 'CW_PROGRESS', 'CW_PROGRESS_WRAPPED']) delete process.env[k]
   })
   afterAll(() => {
     for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k]

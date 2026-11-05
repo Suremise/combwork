@@ -30,7 +30,7 @@ const check = (name, ok, extra = '') => {
   const env = lib.fakeClaude(userData, claudeHome, [proj])
   // Settings → Advanced → hardware acceleration off: terminals skip xterm's WebGL renderer.
   fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'cw.disableHardwareAcceleration': true } }))
-  const { app, page, inv } = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: lib.port(47924) }, viewport: { width: 1200, height: 800 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { ...env, CW_API_PORT: lib.port(47924) }, viewport: { width: 1200, height: 800 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     check('hardware acceleration is off (the setting)', (await inv('app:info')).gpu?.off === true, JSON.stringify((await inv('app:info')).gpu))

@@ -1,6 +1,6 @@
 // A CLI installed while Combwork runs is found without a restart (#472). The test copy starts with a PATH holding no Codex
 // (the run context's, without the folders that have one) and a stand-in for the registry's PATH
-// (HIVE_TEST_REGISTRY_PATH: test copies never read the machine's). Then the suite "installs" the fake Codex as an
+// (CW_TEST_REGISTRY_PATH: test copies never read the machine's). Then the suite "installs" the fake Codex as an
 // installer does: a folder of its own with codex.cmd, added to the registry's PATH (the stand-in, changed in Combwork's main
 // process while it runs). Provider Setup's Check again finds it there (via PATH), Combwork's own PATH has the folder, and a new
 // Codex agent starts with it, its session's PATH holding the folder too. Then a tool is "installed" the same way with no
@@ -30,7 +30,7 @@ const check = (name, ok, extra = '') => {
 
 /** The run context's PATH for a test copy without the folders that hold a Codex (node stays, for the launcher). */
 function pathWithoutCodex() {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData })
   const key = Object.keys(env).find((k) => k.toUpperCase() === 'PATH')
   return (env[key] ?? '')
     .split(path.delimiter)
@@ -61,7 +61,7 @@ function pathWithoutCodex() {
   const hidden = pathWithoutCodex()
   check('the test copy gets a PATH without Codex, with node', !hidden.toLowerCase().includes(bin.toLowerCase()) && hidden.split(path.delimiter).some((d) => fs.existsSync(path.join(d, 'node.exe'))))
 
-  const { app, page, inv } = await lib.launch({ userData, env: { PATH: hidden, HIVE_TEST_REGISTRY_PATH: '', CODEX_HOME: codexHome, FAKE_CODEX_VERSION: VERSION }, viewport: { width: 1300, height: 820 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { PATH: hidden, CW_TEST_REGISTRY_PATH: '', CODEX_HOME: codexHome, FAKE_CODEX_VERSION: VERSION }, viewport: { width: 1300, height: 820 } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   const codexInfo = async () => (await inv('provider:info')).codex
   const before = await codexInfo()
@@ -71,7 +71,7 @@ function pathWithoutCodex() {
 
   // --- The install: the folder goes on the registry's PATH, not on Combwork's.
   await app.evaluate((_, dir) => {
-    process.env.HIVE_TEST_REGISTRY_PATH = dir
+    process.env.CW_TEST_REGISTRY_PATH = dir
   }, bin)
 
   await page.keyboard.press('Control+Shift+P')
@@ -111,7 +111,7 @@ function pathWithoutCodex() {
   // --- A tool installed later, outside Combwork (#821): its folder goes on the registry's PATH, and nothing makes Combwork
   // look for the CLIs again. What Combwork starts from now on has it.
   await app.evaluate((_, dirs) => {
-    process.env.HIVE_TEST_REGISTRY_PATH = dirs
+    process.env.CW_TEST_REGISTRY_PATH = dirs
   }, [bin, tool].join(';'))
   const m = runs().length
   await inv('provider:task', 'codex', 'login')
