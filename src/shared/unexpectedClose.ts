@@ -32,7 +32,8 @@ export interface RunMarker {
   /** When that Hive started, and when it last wrote the marker (ISO). */
   startedAt: string
   lastSeen: string
-  hive: string
+  /** The version of Combwork that wrote it (HI-2587: `hive` before 1.1, renamed by the names upgrade at start). */
+  app: string
   /** The workspaces it had open. */
   workspaces: string[]
   agents: RunningAgent[]
@@ -84,7 +85,7 @@ export function parseRunMarker(text: string): RunMarker | null {
     agents.push({ workspace: r.workspace, projectPath: r.projectPath, project: r.project, agentId: r.agentId, agentName: r.agentName, provider: r.provider as ProviderId, sessionId: r.sessionId, ...(str(r.sessionName, 300) && r.sessionName ? { sessionName: r.sessionName } : {}) })
   }
   const workspaces = Array.isArray(d.workspaces) ? d.workspaces.filter((w): w is string => str(w) && !!w).slice(0, 50) : []
-  return { version: 1, pid: Number(d.pid) || 0, startedAt: d.startedAt, lastSeen: d.lastSeen, hive: str(d.hive, 40) ? d.hive : '', workspaces, agents, processes: parseLaunches(d.processes) }
+  return { version: 1, pid: Number(d.pid) || 0, startedAt: d.startedAt, lastSeen: d.lastSeen, app: str(d.app, 40) ? d.app : '', workspaces, agents, processes: parseLaunches(d.processes) }
 }
 
 /** The marker's launches read back: only processes known by id and start time, within the bounds; bad rows left out. */

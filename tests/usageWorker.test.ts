@@ -50,7 +50,7 @@ async function setup() {
   const dir = tempDir('hive-usage-worker-')
   const file = join(dir, '.combwork', 'usage.db')
   const transcript = join(dir, 'abc.jsonl')
-  await call({ type: 'config', advanced: {}, providers: DEFAULT_SETTINGS.providers, hiveVersion: '9.9.9-test' })
+  await call({ type: 'config', advanced: {}, providers: DEFAULT_SETTINGS.providers, appVersion: '9.9.9-test' })
   const job = (o: Partial<IngestJob> = {}): IngestJob => ({ scope: 'p1', session: 'abc', provider: 'claude-code', agentId: 'a1', path: transcript, holds: [], holdsKey: null, keepState: 'now', ...o })
   const ingest = (o?: Partial<IngestJob>) => call({ type: 'ingest', file, job: job(o) }) as Promise<IngestResult>
   const stored = async (): Promise<StoredSession | undefined> => ((await call({ type: 'sessions', file, scopes: ['p1'] })) as StoredSession[]).find((s) => s.session === 'abc')
@@ -122,7 +122,7 @@ describe('the usage worker', () => {
     const t = await setup()
     writeFileSync(t.transcript, prompt(0) + line(1) + line(2))
     await t.ingest()
-    await call({ type: 'config', advanced: {}, providers: DEFAULT_SETTINGS.providers, hiveVersion: '9.9.10-test' })
+    await call({ type: 'config', advanced: {}, providers: DEFAULT_SETTINGS.providers, appVersion: '9.9.10-test' })
     appendFileSync(t.transcript, line(3))
     expect((await t.ingest()).status).toBe('written')
     expect(await t.output()).toBe(300)

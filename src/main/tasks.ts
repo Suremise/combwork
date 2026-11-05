@@ -2587,7 +2587,7 @@ export async function noteOnCard(n: number, what: string | StoredText, ws: Works
  * A comment from Hive itself on a card (#606: its agent's model changed after a safeguard stop), for whoever reads the
  * card. `still`: whether the card, as it is in the change, is still the one meant (its column, project and agent may
  * have changed since it was chosen). True when it was written. `said`: English text, or a message of the card history's
- * (shared/taskHistory.ts), kept as its English (`text`) and as data (`hiveText`, #846) for the window to show in its language.
+ * (shared/taskHistory.ts), kept as its English (`text`) and as data (`appText`, #846) for the window to show in its language.
  * `key`: the comment's id, at most once on the card. Or both (HI-2087): its English as agents read it (`text`, longer
  * than the window's), and the message the window shows (`shown`).
  */
@@ -2755,9 +2755,9 @@ function commentText(comment: string): string {
   return t
 }
 
-/** Adds a comment, at `at` (its change's one time) or as a change of its own; one Hive writes itself can carry its text as data (`hiveText`) beside its English. */
-function addComment(c: TaskCard, by: string, t: string, hiveText?: StoredText, id?: string, at = changeTime(c)): void {
-  c.comments = [...c.comments, { at, by, text: t, ...(hiveText ? { hiveText } : {}), id: id ?? entryId() }].slice(-MAX_COMMENTS)
+/** Adds a comment, at `at` (its change's one time) or as a change of its own; one Hive writes itself can carry its text as data (`appText`) beside its English. */
+function addComment(c: TaskCard, by: string, t: string, appText?: StoredText, id?: string, at = changeTime(c)): void {
+  c.comments = [...c.comments, { at, by, text: t, ...(appText ? { appText } : {}), id: id ?? entryId() }].slice(-MAX_COMMENTS)
   c.updatedAt = at
 }
 

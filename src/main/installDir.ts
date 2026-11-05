@@ -76,7 +76,7 @@ function system32(...parts: string[]): string {
 
 /** A file's or folder's DACL as SDDL, or null if it can't be read. */
 function readSddl(target: string): string | null {
-  const out = join(tmpdir(), `hive-acl-${process.pid}-${Date.now()}.txt`)
+  const out = join(tmpdir(), `combwork-acl-${process.pid}-${Date.now()}.txt`)
   try {
     const r = spawnSync(system32('icacls.exe'), [target, '/save', out], { windowsHide: true, timeout: 10_000 })
     if (r.status !== 0) return null

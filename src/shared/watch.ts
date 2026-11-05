@@ -679,7 +679,7 @@ const firstLine = (text: string, max = 160): string => {
 export function cardChange(n: number, card: TaskCard | null, changes: WatchChange[] | 'gone'): CardChange {
   const last = card?.comments.at(-1)
   const by = card ? ([...card.history].sort((a, b) => a.at.localeCompare(b.at)).at(-1)?.by ?? null) : null
-  return { number: n, column: card ? card.column : 'gone', changes, by, comment: last ? { by: last.by, firstLine: firstLine(storedForAgents(last.text, last.hiveText)) } : null, ...(changes === 'gone' && card?.archived ? { archived: true } : {}), ...(changes !== 'gone' && changes.includes('blocked') && card?.blocked ? { blocked: card.blocked } : {}) }
+  return { number: n, column: card ? card.column : 'gone', changes, by, comment: last ? { by: last.by, firstLine: firstLine(storedForAgents(last.text, last.appText)) } : null, ...(changes === 'gone' && card?.archived ? { archived: true } : {}), ...(changes !== 'gone' && changes.includes('blocked') && card?.blocked ? { blocked: card.blocked } : {}) }
 }
 
 const columnWord = (c: TaskColumn | 'gone'): string => (c === 'gone' ? 'gone' : columnLabel(c))

@@ -744,7 +744,7 @@ Start from an existing suite and use `lib.cjs`:
 **React's commit bursts and chains** (HI-1387, HI-1865): a render loop (a setState per event in a useEffect, #1366)
 only throws once React's nested-update limit (50) is passed, and a production build says nothing before then. So a quiet
 test copy's window counts React's commits through a DevTools hook installed before React DOM loads
-(`src/renderer/src/commitWatch.ts`; main passes `--hive-commit-watch` to a test copy's window only), and says on its
+(`src/renderer/src/commitWatch.ts`; main passes `--cw-commit-watch` to a test copy's window only), and says on its
 console each new largest burst (the most commits within 250 ms) and each new longest chain (commits with nothing from
 outside between them: no input or other DOM event, no message or reply from main, which the preload marks, and no
 timer's or frame's callback; React's own scheduling, through a MessageChannel and microtasks, keeps a chain going).

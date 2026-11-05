@@ -395,7 +395,7 @@ export async function deleteTemplate(ref: TemplateRef): Promise<void> {
   })
 }
 
-/** The file name an export of a template suggests ("Build and review.hive-template.json"); refused if it can't be used. */
+/** The file name an export of a template suggests ("Build and review.combwork-template.json"); refused if it can't be used. */
 export async function exportName(ref: TemplateRef): Promise<string> {
   return exportFileName((await usable(ref)).name)
 }

@@ -517,7 +517,7 @@ describe.skipIf(!live)("the keys step on a copy of a live board's combwork.db (H
     copyFileSync(live!, copy)
     if (existsSync(`${live}-wal`)) copyFileSync(`${live}-wal`, `${copy}-wal`)
     // The board's 1.0 group as the upgrade runs it (the cards step before the keys step), on the copy.
-    const opened2 = openDb(copy, { migrations: store.BOARD_MIGRATIONS, hiveVersion: '1.0.0-test', approve: () => true })
+    const opened2 = openDb(copy, { migrations: store.BOARD_MIGRATIONS, appVersion: '1.0.0-test', approve: () => true })
     try {
       const r = opened2.reader
       const cards = r.prepare('SELECT number, project_id, project_number FROM cards').all() as { number: number; project_id: string | null; project_number: number | null }[]

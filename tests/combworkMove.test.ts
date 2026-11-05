@@ -204,7 +204,7 @@ describe('refused, nothing lost', () => {
     const ws = workspace10()
     const other = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore', windowsHide: true })
     try {
-      json(join(ws, '.hive', 'open', 'Combwork-1234.json'), { pid: other.pid, profile: 'Combwork', hiveVersion: '1.0.0', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() })
+      json(join(ws, '.hive', 'open', 'Combwork-1234.json'), { pid: other.pid, profile: 'Combwork', appVersion: '1.0.0', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() })
       await expect(moveFolders(ws)).rejects.toThrow(/open in another Combwork or Hive \(Combwork\)/)
       expect(existsSync(join(ws, '.hive', 'hive.db'))).toBe(true)
       expect(existsSync(join(ws, 'alpha', '.hive'))).toBe(true)

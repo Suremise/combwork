@@ -15,7 +15,7 @@ import type { CatalogRead } from '../types'
 
 /** The arguments: print mode reading and writing stream-json, nothing saved, no MCP servers started. */
 export const INITIALIZE_ARGS = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--no-session-persistence', '--strict-mcp-config']
-const REQUEST_ID = 'hive-models'
+const REQUEST_ID = 'combwork-models'
 export const INITIALIZE_REQUEST = JSON.stringify({ type: 'control_request', request_id: REQUEST_ID, request: { subtype: 'initialize' } })
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
@@ -97,7 +97,7 @@ export function parseClaudeInitialize(reply: unknown): CatalogRead | null {
  * (ptyHost childEnv), without Hive's own variables.
  */
 export function readClaudeModels(executable: string, env: Record<string, string>, timeoutMs = 20_000): Promise<CatalogRead | null> {
-  const cwd = join(tmpdir(), 'hive-claude-models')
+  const cwd = join(tmpdir(), 'combwork-claude-models')
   mkdirSync(cwd, { recursive: true })
   const s = toSpawnable(executable, INITIALIZE_ARGS)
   return new Promise((resolve) => {

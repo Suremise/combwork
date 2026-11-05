@@ -197,7 +197,7 @@ describe('scenario benchmarks', () => {
   it('reads a file as untrusted input: bounds, junk, escapes; a kept file is re-read into a fresh, bounded object', () => {
     expect(parseArtifact('{', WS)).toMatchObject({ error: expect.stringMatching(/JSON/) })
     expect(parseArtifact('{"schema":"other"}', WS)).toMatchObject({ error: expect.stringMatching(/isn’t a Combwork benchmark/) })
-    const big = JSON.stringify({ schema: 'hive-benchmark/1', pad: '日'.repeat(BENCHMARK_LIMITS.fileBytes / 3 + 10) })
+    const big = JSON.stringify({ schema: 'combwork-benchmark/1', pad: '日'.repeat(BENCHMARK_LIMITS.fileBytes / 3 + 10) })
     expect(big.length).toBeLessThan(BENCHMARK_LIMITS.fileBytes)
     expect(parseArtifact(big, WS)).toMatchObject({ error: expect.stringMatching(/over 2 MB/) })
     const b = JSON.parse(fixture('baseline'))
@@ -227,7 +227,7 @@ describe('scenario benchmarks', () => {
   })
 })
 
-/** A Performance export (hive-metrics/1) of a scope, as metrics:export writes it. */
+/** A Performance export (combwork-metrics/1) of a scope, as metrics:export writes it. */
 function exportFile(opts: { scope?: any; sanitized?: boolean; own?: boolean; observedMs?: number; hours?: number; requests?: Record<string, number>; role?: string; dropped?: number; unattributed?: boolean; workspace?: number; brokenApi?: boolean } = {}): string {
   const hours = opts.hours ?? 24
   const to = Date.parse('2026-10-03T12:00:00Z')
@@ -251,7 +251,7 @@ function exportFile(opts: { scope?: any; sanitized?: boolean; own?: boolean; obs
     dropped: opts.dropped ?? 0,
     ...(opts.unattributed ? { lossesUnattributed: true } : {})
   }
-  return JSON.stringify({ schema: 'hive-metrics/1', app: { name: 'Hive', version: '0.3.1' }, exportedAt: new Date(to).toISOString(), sanitized: !!opts.sanitized, report })
+  return JSON.stringify({ schema: 'combwork-metrics/1', app: { name: 'Hive', version: '0.3.1' }, exportedAt: new Date(to).toISOString(), sanitized: !!opts.sanitized, report })
 }
 
 describe('what Compare says about its measures', () => {
@@ -262,6 +262,12 @@ describe('what Compare says about its measures', () => {
 })
 
 describe('Performance exports', () => {
+  it("1.0's id (hive-metrics/1) still imports, as a 1.0 user's exports would otherwise be lost; a benchmark's old id doesn't (HI-2587)", () => {
+    const old = art(parseArtifact(exportFile({ requests: { alpha: 24 } }).replace('combwork-metrics/1', 'hive-metrics/1'), WS))
+    expect(old.schema).toBe('combwork-metrics/1')
+    expect(parseArtifact(fixture('baseline').replace('combwork-benchmark/1', 'hive-benchmark/1'), WS)).toMatchObject({ error: expect.stringMatching(/isn’t a Combwork benchmark/) })
+  })
+
   it('compared per hour recorded, with the filters and coverage that make them comparable', () => {
     const a = art(parseArtifact(exportFile({ requests: { alpha: 24 } }), WS))
     const b = art(parseArtifact(exportFile({ requests: { alpha: 48 }, hours: 48 }), WS))
@@ -841,7 +847,7 @@ describe('kept comparisons (main/benchmarks.ts)', async () => {
     await expect(kept.readBenchmark(ctx(), alpha, own.id)).rejects.toThrow(/missing or damaged/)
     writeFileSync(join(dir, `${own.id}.json`), JSON.stringify({ ...stored, pad: 'x'.repeat(5 * 1024 * 1024) }))
     await expect(kept.readBenchmark(ctx(), alpha, own.id)).rejects.toThrow(/missing or damaged/)
-    const big = file('big', JSON.stringify({ schema: 'hive-benchmark/1', pad: 'x'.repeat(BENCHMARK_LIMITS.fileBytes + 10) }))
+    const big = file('big', JSON.stringify({ schema: 'combwork-benchmark/1', pad: 'x'.repeat(BENCHMARK_LIMITS.fileBytes + 10) }))
     expect(await kept.importBenchmark(ctx(), WS, { path: big })).toMatchObject({ error: expect.stringMatching(/over 2 MB/) })
     await disposeWorkspaceService(w)
   })

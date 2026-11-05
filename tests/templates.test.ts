@@ -264,8 +264,8 @@ describe('the template format', () => {
   })
 
   it('names files safely and makes taken names unique', () => {
-    expect(exportFileName('Build: review?')).toBe('Build review.hive-template.json')
-    expect(exportFileName('...')).toBe('template.hive-template.json')
+    expect(exportFileName('Build: review?')).toBe('Build review.combwork-template.json')
+    expect(exportFileName('...')).toBe('template.combwork-template.json')
     expect(uniqueTemplateName('Pair', ['pair', 'Pair (2)'])).toBe('Pair (3)')
     expect(uniqueTemplateName('x'.repeat(60), ['x'.repeat(60)])).toBe(`${'x'.repeat(56)} (2)`)
     expect(templateFile('Build & Review!')).toBe('build-review.json')
@@ -715,7 +715,7 @@ describe('saving and loading templates', () => {
     const out = join(base, 'exports')
     mkdirSync(out, { recursive: true })
     const file = join(out, exportFileName('Solo act'))
-    expect(basename(file)).toBe('Solo act.hive-template.json')
+    expect(basename(file)).toBe('Solo act.combwork-template.json')
     await run(() => templates.exportTemplate({ scope: 'workspace', file: 'solo-act.json' }, file))
     const text = readFileSync(file, 'utf8')
     expect(text).not.toMatch(/[A-Za-z]:\\\\|hive-templates-|"id"|lastSessionId|worktree"\s*:\s*\{|needsSetup/)
@@ -1081,7 +1081,7 @@ describe("a template's workflow (HI-1910)", () => {
     // HR5's two cases: a section with a value Combwork can't use, and a workflow that isn't one.
     const cases: [string, unknown][] = [['Bad none', { none: { preset: null, options: { review: 'bogus' } } }], ['Bogus', 'bogus']]
     for (const [name, workflow] of cases) {
-      const file = join(dir, `${name}.hive-template.json`)
+      const file = join(dir, `${name}.combwork-template.json`)
       writeFileSync(file, JSON.stringify({ version: TEMPLATE_VERSION, name, savedAt: '', layout: 'auto', suggestedPreset: 'pair', agents, workflow }))
       const r = await run(() => templates.importTemplate(file, { scope: 'workspace' }))
       expect('imported' in r).toBe(true)

@@ -19,7 +19,7 @@ export interface PresenceMarker {
   pid: number
   /** The profile folder's name (Hive, Hive-Dev, a test profile's). */
   profile: string
-  hiveVersion: string
+  appVersion: string
   startedAt: string
   heartbeat: string
 }

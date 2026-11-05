@@ -206,7 +206,7 @@ async function askThroughLauncher(c: Check, o: Request): Promise<CheckAnswer> {
     })
     // Told to run Codex only now (the launcher's go-ahead), then its first request.
     child.stdin!.write('go\n') // i18n-ignore: the launcher's go-ahead (queueJobs.ts), not text
-    send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'hive', version: '1' } } })
+    send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'combwork', version: '1' } } })
   })
 }
 

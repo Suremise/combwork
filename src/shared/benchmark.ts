@@ -1,7 +1,7 @@
 /**
  * Comparing two measurements of Hive's own costs (#117): scenario benchmarks (tests/scenarios writes them,
- * "hive-benchmark/1": controlled runs, each sample with its correctness checks) and Performance exports
- * ("hive-metrics/1": real use over a range, kept as a summary). Pure, so the app and tests share it. Every file, imported
+ * "combwork-benchmark/1": controlled runs, each sample with its correctness checks) and Performance exports
+ * ("combwork-metrics/1": real use over a range, kept as a summary). Pure, so the app and tests share it. Every file, imported
  * or kept, is read through the same normalisers as untrusted input (nothing is cast and returned as it was). A
  * comparison says whether the two can be compared at all (and why not), compares like with like (the same scenarios,
  * scope, filters), keeps what wasn't measured unknown (never zero), and never calls a smaller result better when the work
@@ -18,8 +18,13 @@ import { utf8Bytes, type MetricsRole, type MetricsScope } from './metrics'
 import { formatDate, formatDateTime } from './dates'
 import { moneyLabel } from './usageTotals'
 
-export const BENCHMARK_SCHEMA = 'hive-benchmark/1'
-export const METRICS_EXPORT_SCHEMA = 'hive-metrics/1'
+export const BENCHMARK_SCHEMA = 'combwork-benchmark/1'
+export const METRICS_EXPORT_SCHEMA = 'combwork-metrics/1'
+/**
+ * A Performance export's id as 1.0 wrote it (HI-2587): still imported, as a 1.0 user's kept exports would otherwise be
+ * lost. A benchmark's old id isn't: those files are development runs', made again with the new one.
+ */
+const OLD_METRICS_EXPORT_SCHEMA = 'hive-metrics/1'
 
 /** Bounds on what is read and kept: an artifact is checked as untrusted input. */
 // scenarios: 200 since #1444 took the set past 100 (the last ones were dropped from benchmarks).
@@ -109,7 +114,7 @@ const M = {
   sanitizedPart: msg({ id: 'performance.compare.error.sanitizedPart', defaultMessage: 'It is sanitized (project names replaced), so this project’s part can’t be found.', description: "Why a workspace's Performance export is not imported on a project's Performance page." }),
   ownNoPart: msg({ id: 'performance.compare.error.ownNoPart', defaultMessage: 'It is the workspace’s own work: it has no project’s part.', description: "Why a Performance export is not imported on a project's Performance page." }),
   noPart: msg({ id: 'performance.compare.error.noPart', defaultMessage: 'It is a workspace export with no part for {project}.', description: "Why a workspace's Performance export is not imported on a project's Performance page. {project} is the project's name." }),
-  unknownSchema: msg({ id: 'performance.compare.error.unknownSchema', defaultMessage: 'It isn’t a Combwork benchmark (hive-benchmark/1) or Performance export (hive-metrics/1).', description: 'Why a file is not imported to Performance → Compare. Keep hive-benchmark/1 and hive-metrics/1 (file formats).' }),
+  unknownSchema: msg({ id: 'performance.compare.error.unknownSchema', defaultMessage: 'It isn’t a Combwork benchmark (combwork-benchmark/1) or Performance export (combwork-metrics/1).', description: 'Why a file is not imported to Performance → Compare. Keep combwork-benchmark/1 and combwork-metrics/1 (file formats).' }),
   // A kept comparison's name and description when Hive made them (#1104): the window says them from its facts.
   aboutScenarios: msg({ id: 'performance.compare.about.scenarios', defaultMessage: '{real, select, yes {Model trial {provider} {model} ({effort}, {mode})} other {Fake {provider}}}, fixtures v{fixtures}, {scenarios, plural, one {# scenario} other {# scenarios}} × {repeats, number}, source {head}{real, select, yes {, spent {spent}{unpriced, plural, =0 {} other { + {unpriced, number} unpriced (total unknown)}}} other {}}', description: "What a kept scenario benchmark is, in a line under its name in Performance → Compare. A model trial ran a real model ({provider} the CLI, {model}, its {effort} and permission {mode}); Fake ran Hive's fake CLI. fixtures v{fixtures} is the version of the test fixtures (keep v); {head} is the git commit the run was made from; {spent} what the trial cost; unpriced trials are ones with no known cost." }),
   aboutExport: msg({ id: 'performance.compare.about.export', defaultMessage: '{from} to {to}: {filters}', description: 'What a kept Performance export is, in a line under its name in Performance → Compare: its range ({from} and {to} are dates and times) and its filters (such as "project agents, all providers").' }),
@@ -765,7 +770,7 @@ export function parseArtifact(textValue: string, scope: CompareScope, opts: { us
     // i18n-ignore: a kept comparison's default name, stored in its file and renamed by the user (#1104: stays as written)
     return { artifact: { schema: BENCHMARK_SCHEMA, kind: 'scenarios', label: text(data.label) || `${run.provider} benchmark`, ...(text(data.label) ? {} : { labelKind: 'benchmark' as const }), createdAt: iso(data.createdAt), appVersion: text(app?.version, 40), scope: { kind: 'workspace' }, run, scenarios } }
   }
-  if (data.schema === METRICS_EXPORT_SCHEMA) {
+  if (data.schema === METRICS_EXPORT_SCHEMA || data.schema === OLD_METRICS_EXPORT_SCHEMA) {
     const report = obj(data.report)
     const fileScope = readScope(report?.scope)
     const projects = obj(report?.projects)

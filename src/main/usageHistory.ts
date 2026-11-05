@@ -315,7 +315,7 @@ class UsageHistory {
     body = admitted(body)
     const send = await this.transport()
     body = admitted(body)
-    const cfg = JSON.stringify({ advanced: resolvedValues(advanced), providers: config.settings.providers, hiveVersion: appVersion(), cacheSize: usageCacheSize() })
+    const cfg = JSON.stringify({ advanced: resolvedValues(advanced), providers: config.settings.providers, appVersion: appVersion(), cacheSize: usageCacheSize() })
     if (cfg !== this.sentConfig) {
       this.sentConfig = cfg
       this.post(send, { type: 'config', ...(JSON.parse(cfg) as Omit<Extract<Body, { type: 'config' }>, 'type'>) }).catch((e) => log.warn('sending the usage worker its settings', e))
@@ -875,7 +875,7 @@ class UsageHistory {
       this.setProgress(path, { importing: true, done: n - failed, total })
       return
     }
-    await this.call({ type: 'meta', file, scope: '', key: 'backfill', value: JSON.stringify({ at: new Date().toISOString(), sessions: total, hiveVersion: appVersion() }) })
+    await this.call({ type: 'meta', file, scope: '', key: 'backfill', value: JSON.stringify({ at: new Date().toISOString(), sessions: total, appVersion: appVersion() }) })
     log.info(`imported the usage history of ${userText(path)}: ${total} session(s) in ${Date.now() - t0} ms`)
     this.setProgress(path, { importing: false, done: total, total })
     await sessions.retireUsageCacheFile().catch((e) => log.warn('removing usage-cache.json', e))

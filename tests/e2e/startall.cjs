@@ -399,10 +399,10 @@ const check = (name, ok, extra = '') => {
   const archiveDialog = page.locator('.dialog', { hasText: 'Archive and start new for all agents?' })
   await lib.agentsMenuRun(page, 'Archive and Start New (3)')
   await archiveDialog.waitFor({ timeout: 5000 })
-  const archiveText = await archiveDialog.innerText()
+  const arcappText = await archiveDialog.innerText()
   const archiveTable = await tableOf(archiveDialog)
   check('Archive lists them as a table too, saying each session is archived', archiveTable.rows.Worker?.[3]?.text === 'Stopped (will be interrupted), then its session archived, then a new one' && Object.keys(archiveTable.rows).length === 3, JSON.stringify(archiveTable.rows))
-  check('Archive asks once, listing the agents with sessions, the working one flagged', /Worker — Working.*\(will be interrupted\)/.test(archiveText) && /Idle — /.test(archiveText) && /Stopped — /.test(archiveText) && /\.combwork\/archive/.test(archiveText), archiveText)
+  check('Archive asks once, listing the agents with sessions, the working one flagged', /Worker — Working.*\(will be interrupted\)/.test(arcappText) && /Idle — /.test(arcappText) && /Stopped — /.test(arcappText) && /\.combwork\/archive/.test(arcappText), arcappText)
   await archiveDialog.getByRole('button', { name: 'Archive and start new' }).click()
   const renewed = await until(async () => {
     const l = await Promise.all([w, i, s].map((a) => live(a.id)))

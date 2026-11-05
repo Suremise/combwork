@@ -216,7 +216,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     await select('gitb')
     // gitb last showed Version Control: its Session tab, for + Add ▾.
     await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
-    const bad =path.join(lib.WORK, 'templateworkflow-bad.hive-template.json')
+    const bad =path.join(lib.WORK, 'templateworkflow-bad.combwork-template.json')
     fs.writeFileSync(bad, JSON.stringify({ version: 2, name: 'Bad none', savedAt: '', layout: 'auto', suggestedPreset: 'pair', agents: [{ name: 'BD-B1', role: 'builder', provider: 'claude-code' }], workflow: { none: { preset: null, options: { review: 'bogus' } } } }))
     const imported = await inv('templates:import', bad, { scope: 'workspace' })
     check('imported, its rejected section kept as rejected (never what it held)', !!imported?.imported && JSON.stringify(imported.imported.workflowDropped) === '["none"]' && !/bogus/.test(fs.readFileSync(path.join(ws, '.combwork', 'templates', imported.imported.file), 'utf8')), JSON.stringify(imported))

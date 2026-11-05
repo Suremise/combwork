@@ -107,7 +107,7 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     await sidebar.locator('[aria-label="Refresh"]').click()
     await until(async () => (await sidebar.locator('.template-row[data-scope="workspace"][aria-label="Mine"]').count()) === 1, HUNG_MS)
     await sidebar.locator('.template-row[data-scope="hive"][aria-label="Team 3×3"]').click()
-    const exported = path.join(files, 'Team 3x3.hive-template.json')
+    const exported = path.join(files, 'Team 3x3.combwork-template.json')
     await app.evaluate(({ dialog }, f) => {
       dialog.showSaveDialog = async () => ({ canceled: false, filePath: f })
     }, exported)

@@ -449,7 +449,7 @@ export function DockEdge({ paneKey: key, chosen, shown, min, max, pitch, snap = 
   )
 }
 
-const LANE_DRAG = 'application/x-hive-lane'
+const LANE_DRAG = 'application/x-combwork-lane'
 
 const START_LANE = msg({ id: 'board.lanes.start', defaultMessage: 'Start Lane…', description: "A button in the Progress panel's Lanes tab and an item of a lane's menu: opens Start Lane (a builder and a reviewer agent work through cards in turn). Glossary: lane." })
 

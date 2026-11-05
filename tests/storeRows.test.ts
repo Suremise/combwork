@@ -28,15 +28,15 @@ describe('the workspace database from before (#1017: schema 1)', () => {
   it('gets the stores tables (schema 2), its cards kept, after a backup', () => {
     const ws = workspace()
     const file = join(ws, '.combwork', 'combwork.db')
-    const v1 = openDb(file, { migrations: board.BOARD_MIGRATIONS.slice(0, 1), hiveVersion: '0.9.0' })
+    const v1 = openDb(file, { migrations: board.BOARD_MIGRATIONS.slice(0, 1), appVersion: '0.9.0' })
     v1.writer.prepare('INSERT INTO cards (number, doc) VALUES (1, ?)').run(JSON.stringify({ number: 1, title: 'Kept', column: 'todo' }))
     v1.close()
     // 0.9's steps (the 1.0 group's have their own tests: boardUpgrade.test.ts).
-    const db = openDb(file, { migrations: board.BOARD_MIGRATIONS.filter((m) => !m.group), hiveVersion: '0.9.0', backupDir: join(ws, '.combwork', 'backups') })
+    const db = openDb(file, { migrations: board.BOARD_MIGRATIONS.filter((m) => !m.group && m.version < 25), appVersion: '0.9.0', backupDir: join(ws, '.combwork', 'backups') })
     try {
       expect(schemaVersion(db.writer)).toBe(2)
       expect((db.reader.prepare('SELECT count(*) AS n FROM cards').get() as { n: number }).n).toBe(1)
-      expect(readdirSync(join(ws, '.combwork', 'backups')).some((f) => f.startsWith('hive-v1-'))).toBe(true)
+      expect(readdirSync(join(ws, '.combwork', 'backups')).some((f) => f.startsWith('combwork-v1-'))).toBe(true)
       expect(db.reader.prepare("SELECT name FROM sqlite_master WHERE name IN ('store_rows', 'store_meta') ORDER BY name").all().map((r) => (r as { name: string }).name)).toEqual(['store_meta', 'store_rows'])
     } finally {
       db.close()

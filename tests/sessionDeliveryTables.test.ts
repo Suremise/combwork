@@ -335,7 +335,7 @@ describe('the 1.0 step: store_rows into the tables', () => {
   function board09(rows: { store: string; scope: string; key: string; ord: number; doc: string }[], metas: [string, string, string, string][] = []): string {
     const file = join(base, `b-${++n}`, 'combwork.db')
     const step = BOARD_MIGRATIONS.find((m) => m.name === 'sessions and deliveries in tables')!
-    const db = openDb(file, { migrations: BOARD_MIGRATIONS.filter((m) => m.version < step.version), hiveVersion: '0.9.3' })
+    const db = openDb(file, { migrations: BOARD_MIGRATIONS.filter((m) => m.version < step.version), appVersion: '0.9.3' })
     try {
       const put = db.writer.prepare('INSERT INTO store_rows (store, scope, key, ord, doc) VALUES (?, ?, ?, ?, ?)')
       for (const r of rows) put.run(r.store, r.scope, r.key, r.ord, r.doc)
@@ -375,7 +375,7 @@ describe('the 1.0 step: store_rows into the tables', () => {
         ['deliveries', 'p1', 'invalid', '[{"kept":"before"}]']
       ]
     )
-    const db = openDb(file, { migrations: BOARD_MIGRATIONS, hiveVersion: '1.0.0', approve: () => true })
+    const db = openDb(file, { migrations: BOARD_MIGRATIONS, appVersion: '1.0.0', approve: () => true })
     try {
       const w = db.writer
       expect(readSessionRecords(w, 'p1')).toEqual([json(fullSession('a')), json(fullSession('b', { cards: undefined }))])
@@ -399,7 +399,7 @@ describe('the 1.0 step: store_rows into the tables', () => {
 
   it("refuses while store_rows still has another store's rows (they would be lost): the whole group, the file left as it was", () => {
     const file = board09([{ store: 'lanes', scope: '', key: 'l1', ord: 0, doc: '{"id":"l1"}' }])
-    expect(() => openDb(file, { migrations: BOARD_MIGRATIONS, hiveVersion: '1.0.0', approve: () => true })).toThrow('store_rows still has rows of lanes (1)')
+    expect(() => openDb(file, { migrations: BOARD_MIGRATIONS, appVersion: '1.0.0', approve: () => true })).toThrow('store_rows still has rows of lanes (1)')
     const raw = new DatabaseSync(file, { readOnly: true })
     try {
       // As it was: every step before this one (board09 makes it so), none after.
@@ -411,7 +411,7 @@ describe('the 1.0 step: store_rows into the tables', () => {
 
   it('a new file takes the step with nothing to move', () => {
     const file = join(base, `b-${++n}`, 'combwork.db')
-    const db = openDb(file, { migrations: BOARD_MIGRATIONS, hiveVersion: '1.0.0' })
+    const db = openDb(file, { migrations: BOARD_MIGRATIONS, appVersion: '1.0.0' })
     try {
       expect(schemaVersion(db.writer)).toBe(Math.max(...BOARD_MIGRATIONS.map((m) => m.version)))
       expect(readSessionRecords(db.writer, 'p1')).toEqual([])

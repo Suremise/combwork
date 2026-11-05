@@ -228,7 +228,7 @@ describe("the merge queue's comment on a card it returned (HI-2087)", () => {
     expect(stateOf(ws, id)).toBe('done')
     const said = await hiveComments(w, c)
     expect(said).toHaveLength(1)
-    expect(said[0]).toMatchObject({ id: `action-${id}`, text: expect.stringMatching(/^alpha-\d+ came back from the merge queue: a conflict with main in a\.txt\./), hiveText: { id: 'tasks.history.queueReturned' } })
+    expect(said[0]).toMatchObject({ id: `action-${id}`, text: expect.stringMatching(/^alpha-\d+ came back from the merge queue: a conflict with main in a\.txt\./), appText: { id: 'tasks.history.queueReturned' } })
     // As a restart would find it: pending again, run again. Its comment is there already (its id): none more.
     store.workspaceDb(ws).writer.prepare("UPDATE card_actions SET state = 'pending' WHERE id = ?").run(id)
     await worker.runActions(w)

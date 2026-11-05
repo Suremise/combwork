@@ -475,7 +475,7 @@ async function elevated(action: AvAction, paths: string[], drives: string[], rem
   if (fixture) return fixtureChange(fixture, action, paths, remove)
   if (isTestCopy()) throw new Error('Test copies of Hive never change Defender’s settings.') // i18n-ignore: test copies only
   if (process.platform !== 'win32') throw new Error(tr(msg({ id: 'main.antivirus.windowsOnly', defaultMessage: 'Only Windows has Defender exclusions.', description: 'An error in Settings → Workspace → Antivirus scanning on another system.' })))
-  const dir = join(tmpdir(), `hive-antivirus-${randomUUID()}`)
+  const dir = join(tmpdir(), `combwork-antivirus-${randomUUID()}`)
   await mkdir(dir, { recursive: true })
   try {
     const output = join(dir, 'result.json')

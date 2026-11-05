@@ -146,7 +146,7 @@ describe('the Agent API (#845)', () => {
 
   it("leaves the window's text as data out where a whole object goes to agents, and only that", () => {
     const history = { at: 'x', by: 'You', what: 'Moved to Review', whatText: { id: 'tasks.history.moved', values: { column: 'review' } }, id: 'h1' }
-    const comment = { at: 'x', by: 'Combwork', text: 'Session started', hiveText: { id: 'tasks.comment.started' }, id: 'c1' }
+    const comment = { at: 'x', by: 'Combwork', text: 'Session started', appText: { id: 'tasks.comment.started' }, id: 'c1' }
     expect(entryForAgents(history)).toEqual({ at: 'x', by: 'You', what: 'Moved to Review' })
     expect(entryForAgents(comment)).toEqual({ at: 'x', by: 'Combwork', text: 'Session started' })
     const metrics = { notMeasured: ['Provider network traffic'], notMeasuredText: [M.gone], filters: { scope: 'workspace', notFiltered: ['Trend'], notFilteredText: [M.gone] }, totals: { errorText: { n: 1 } } }

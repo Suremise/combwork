@@ -149,7 +149,7 @@ describe('entries as rows, and back (#1212)', () => {
 /** A 0.9 board's file (every step before the 1.0 group) with these store_rows rows and store_meta values. */
 function board09(rows: [string, string, string, number, string][], meta: [string, string, string][] = []): DatabaseSync {
   const file = join(base, `board-09-${++n}.db`)
-  openDb(file, { migrations: board.BOARD_MIGRATIONS.filter((m) => !m.group), hiveVersion: '0.9.3' }).close()
+  openDb(file, { migrations: board.BOARD_MIGRATIONS.filter((m) => !m.group && m.version < 25), appVersion: '0.9.3' }).close()
   const db = new DatabaseSync(file)
   db.exec('PRAGMA foreign_keys = ON')
   for (const r of rows) db.prepare('INSERT INTO store_rows (store, scope, key, ord, doc) VALUES (?, ?, ?, ?, ?)').run(...r)

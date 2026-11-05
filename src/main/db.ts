@@ -43,7 +43,7 @@ export interface OpenOptions {
   /** The schema's steps, in order. */
   migrations: Migration[]
   /** This Hive's version, recorded with each step it runs. */
-  hiveVersion: string
+  appVersion: string
   /** Where a copy of the file is kept before a step runs on one that has data (the last 3 are kept). */
   backupDir?: string
   /** The name its copies start with there (default: the file's name without `.db`), so databases sharing a folder keep their own three. */
@@ -296,8 +296,8 @@ function migrate(db: DatabaseSync, file: string, opts: OpenOptions): PendingGrou
   const existing = from > 0 && hasData(db)
   const family = opts.backupFamily ?? basename(file).replace(/\.db$/i, '')
   let copied = false
-  transaction(db, () => db.exec('CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL, hive_version TEXT NOT NULL) STRICT'))
-  const record = db.prepare('INSERT INTO schema_version (version, name, applied_at, hive_version) VALUES (?, ?, ?, ?)')
+  transaction(db, () => db.exec('CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL, app_version TEXT NOT NULL) STRICT'))
+  const record = db.prepare('INSERT INTO schema_version (version, name, applied_at, app_version) VALUES (?, ?, ?, ?)')
   const timed: { version: number; name: string; ms: number }[] = []
   let copyMs: number | null = null
   const copy = (make: () => void): void => {
@@ -308,7 +308,7 @@ function migrate(db: DatabaseSync, file: string, opts: OpenOptions): PendingGrou
   const run = (m: Migration): void => {
     const t = performance.now()
     m.up(db)
-    record.run(m.version, m.name, new Date().toISOString(), opts.hiveVersion)
+    record.run(m.version, m.name, new Date().toISOString(), opts.appVersion)
     timed.push({ version: m.version, name: m.name, ms: performance.now() - t })
   }
   const told = (): void => {
@@ -450,6 +450,15 @@ export function openDb(file: string, opts: OpenOptions): Db {
   })
 }
 
+/**
+ * `schema_version`'s column of the version that ran each step, `hive_version` before 1.1, renamed `app_version` (HI-2587):
+ * in its own transaction, once (a file that has it already, or no table yet, needs nothing).
+ */
+export function renameVersionColumn(db: DatabaseSync): void {
+  const cols = (db.prepare("SELECT name FROM pragma_table_info('schema_version')").all() as { name: string }[]).map((c) => c.name) // i18n-ignore: SQL
+  if (cols.includes('hive_version') && !cols.includes('app_version')) transaction(db, () => db.exec('ALTER TABLE schema_version RENAME COLUMN hive_version TO app_version'))
+}
+
 function openDbNow(file: string, opts: OpenOptions): Db {
   mkdirSync(dirname(file), { recursive: true })
   const writer = new DatabaseSync(file, { timeout: 5000 })
@@ -460,6 +469,8 @@ function openDbNow(file: string, opts: OpenOptions): Db {
     const known = Math.max(0, ...opts.migrations.map((m) => m.version))
     const found = schemaVersion(writer)
     const newer = found > known ? found : null
+    // The version column's old name (HI-2587, the names upgrade): renamed before anything reads or records a step.
+    if (newer === null) renameVersionColumn(writer)
     const pending = newer === null ? migrate(writer, file, opts) : null
     if (newer !== null || pending) writer.exec('PRAGMA query_only = ON')
     reader = new DatabaseSync(file, { timeout: 5000 })

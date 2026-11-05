@@ -267,7 +267,7 @@ export class CopilotAdapter implements ProviderAdapter {
     if (custom) {
       const dir = join(this.instructionsDir(ctx), '.github', 'instructions')
       await mkdir(dir, { recursive: true })
-      await writeFile(join(dir, 'hive.instructions.md'), `---\napplyTo: '**'\n---\n${custom}\n`)
+      await writeFile(join(dir, 'combwork.instructions.md'), `---\napplyTo: '**'\n---\n${custom}\n`)
     }
     return delivered
   }

@@ -61,12 +61,12 @@ describe('the database layer (db.ts)', () => {
   it('opens with WAL and its settings, runs each step once, recorded with the version that ran it', () => {
     const file = join(base, `layer-${++n}`, 'x.db')
     const steps = [{ version: 1, name: 'one', up: (d: DatabaseSync) => d.exec('CREATE TABLE a (x)') }]
-    const db = openDb(file, { migrations: steps, hiveVersion: '9.9.9' })
+    const db = openDb(file, { migrations: steps, appVersion: '9.9.9' })
     try {
       expect((db.writer.prepare('PRAGMA journal_mode').get() as { journal_mode: string }).journal_mode).toBe('wal')
       expect((db.writer.prepare('PRAGMA synchronous').get() as { synchronous: number }).synchronous).toBe(1)
       expect((db.writer.prepare('PRAGMA busy_timeout').get() as { timeout: number }).timeout).toBe(5000)
-      expect(db.writer.prepare('SELECT version, name, hive_version FROM schema_version').all()).toEqual([{ version: 1, name: 'one', hive_version: '9.9.9' }])
+      expect(db.writer.prepare('SELECT version, name, app_version FROM schema_version').all()).toEqual([{ version: 1, name: 'one', app_version: '9.9.9' }])
       // The reader only reads.
       expect(() => db.reader.exec('INSERT INTO a VALUES (1)')).toThrow()
     } finally {
@@ -74,7 +74,7 @@ describe('the database layer (db.ts)', () => {
     }
     // A second step later: only it runs, after a copy of the file kept in the backup folder.
     const backups = join(base, `layer-${n}`, 'backups')
-    const two = openDb(file, { migrations: [...steps, { version: 2, name: 'two', up: (d) => d.exec('CREATE TABLE b (y)') }], hiveVersion: '9.9.10', backupDir: backups })
+    const two = openDb(file, { migrations: [...steps, { version: 2, name: 'two', up: (d) => d.exec('CREATE TABLE b (y)') }], appVersion: '9.9.10', backupDir: backups })
     try {
       expect(schemaVersion(two.writer)).toBe(2)
       expect(readdirSync(backups).filter((f) => f.startsWith('x-v1-'))).toHaveLength(1)
@@ -113,11 +113,11 @@ describe('the database layer (db.ts)', () => {
   it('a file from a newer Combwork opens read-only, migrated not at all', () => {
     const file = join(base, `layer-${++n}`, 'x.db')
     const steps = [{ version: 1, name: 'one', up: (d: DatabaseSync) => d.exec('CREATE TABLE a (x)') }]
-    openDb(file, { migrations: steps, hiveVersion: '1' }).close()
+    openDb(file, { migrations: steps, appVersion: '1' }).close()
     const raw = new DatabaseSync(file)
     raw.exec("INSERT INTO schema_version VALUES (7, 'from the future', '', '2.0.0')")
     raw.close()
-    const db = openDb(file, { migrations: steps, hiveVersion: '1' })
+    const db = openDb(file, { migrations: steps, appVersion: '1' })
     try {
       expect(db.newer).toBe(7)
       expect(() => db.writer.exec('INSERT INTO a VALUES (1)')).toThrow()
@@ -137,7 +137,7 @@ describe('the database layer (db.ts)', () => {
     const retries: number[] = []
     const db = openDb(file, {
       migrations: steps,
-      hiveVersion: '1',
+      appVersion: '1',
       setup: () => {
         if (failing-- > 0) throw sqliteError(4618, 'disk I/O error')
       },
@@ -158,18 +158,18 @@ describe('the database layer (db.ts)', () => {
     const file = join(base, `layer-${++n}`, 'x.db')
     const steps = [{ version: 1, name: 'one', up: (d: DatabaseSync) => d.exec('CREATE TABLE a (x)') }]
     const retries: number[] = []
-    expect(() => openDb(file, { migrations: steps, hiveVersion: '1', setup: () => { throw sqliteError(10, 'disk I/O error') }, onIoRetry: (_e, ms) => retries.push(ms) })).toThrow('disk I/O error')
+    expect(() => openDb(file, { migrations: steps, appVersion: '1', setup: () => { throw sqliteError(10, 'disk I/O error') }, onIoRetry: (_e, ms) => retries.push(ms) })).toThrow('disk I/O error')
     expect(retries).toEqual(OPEN_IO_RETRY_MS)
     retries.length = 0
-    expect(() => openDb(file, { migrations: steps, hiveVersion: '1', setup: () => { throw sqliteError(11, 'database disk image is malformed') }, onIoRetry: (_e, ms) => retries.push(ms) })).toThrow('malformed')
+    expect(() => openDb(file, { migrations: steps, appVersion: '1', setup: () => { throw sqliteError(11, 'database disk image is malformed') }, onIoRetry: (_e, ms) => retries.push(ms) })).toThrow('malformed')
     expect(retries).toEqual([])
     // Closed each time it failed: the file opens now.
-    openDb(file, { migrations: steps, hiveVersion: '1' }).close()
+    openDb(file, { migrations: steps, appVersion: '1' }).close()
   })
 
   it('a file closed cleanly is openable at once, its files unchanged (HI-2199)', async () => {
     const file = join(base, `layer-${++n}`, 'x.db')
-    openDb(file, { migrations: [{ version: 1, name: 'one', up: (d: DatabaseSync) => d.exec('CREATE TABLE a (x)') }], hiveVersion: '1' }).close()
+    openDb(file, { migrations: [{ version: 1, name: 'one', up: (d: DatabaseSync) => d.exec('CREATE TABLE a (x)') }], appVersion: '1' }).close()
     const before = readdirSync(join(file, '..')).sort()
     const told: Error[] = []
     expect(await untilOpenable(file, { onWait: (e) => told.push(e) })).toBe(0)
@@ -295,7 +295,7 @@ describe.runIf(process.platform === 'win32')('a board whose -shm another process
     })
     // Let go: at once, and the file opens.
     expect(await untilOpenable(file)).toBeLessThan(HUNG_MS)
-    openDb(file, { migrations: [], hiveVersion: '1' }).close()
+    openDb(file, { migrations: [], appVersion: '1' }).close()
   })
 })
 

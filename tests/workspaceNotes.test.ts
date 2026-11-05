@@ -179,7 +179,7 @@ describe('delivered at launch, on every CLI, after Combwork\'s guidance', () => 
   })
 
   it('Copilot: in its instruction file, after the guidance and the role', async () => {
-    const file = (ctx: LaunchContext): string => readFileSync(join(ctx.privateDir, 'instructions', '.github', 'instructions', 'hive.instructions.md'), 'utf8')
+    const file = (ctx: LaunchContext): string => readFileSync(join(ctx.privateDir, 'instructions', '.github', 'instructions', 'combwork.instructions.md'), 'utf8')
     const agent = context({ notes: NOTES })
     await copilot.prepareLaunch(agent)
     // The guidance comes as the hive server's instructions (the switch on): the file has the tools' names and the notes.

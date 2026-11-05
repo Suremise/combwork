@@ -109,7 +109,7 @@ app.on('window-all-closed', () => undefined)
       const f = join(keepDir, 'keeper-killed-run.json')
       return existsSync(f) ? (JSON.parse(readFileSync(f, 'utf8')) as Record<string, unknown>) : null
     }
-    await waitFor(() => expect(receipt()).toMatchObject({ v: 1, run: 'killed-run', helper: ready.self, hive: '100:5', state: 'live', members: expect.arrayContaining([expect.objectContaining({ pid: member.pid, name: 'node' })]) }))
+    await waitFor(() => expect(receipt()).toMatchObject({ v: 1, run: 'killed-run', helper: ready.self, app: '100:5', state: 'live', members: expect.arrayContaining([expect.objectContaining({ pid: member.pid, name: 'node' })]) }))
     expect(stillSame(helper)).toEqual([ready.pid])
 
     // Its launch's last process ends: "ended", and the keeper exits.

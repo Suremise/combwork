@@ -135,7 +135,7 @@ describe("cleaning up archived cards' attachments (HI-1842)", () => {
     const said = after.comments.at(-1)!
     expect(said.by).toBe('Combwork')
     expect(said.text).toMatch(/^Removed 2 attachments \(.*shot\.png.*\): this project removes archived cards' attachments 30 days after archiving \(Project Settings → Storage\)\. They are in the Recycle Bin\.$/)
-    expect(said.hiveText).toBeTruthy()
+    expect(said.appText).toBeTruthy()
     expect([rows(w, open.n), rows(w, done.n)]).toEqual([2, 2])
     expect([...open.paths, ...done.paths].every((f) => existsSync(f))).toBe(true)
     // Used once: its Move again is refused, and the automatic run finds nothing more.

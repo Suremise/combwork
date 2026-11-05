@@ -67,7 +67,7 @@ export const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp)$/i
 export const quotePath = (p: string): string => (/\s/.test(p) ? `"${p}"` : p)
 
 /** Drag payload for files dragged out of the Files and Attachments tabs. */
-export const HIVE_FILES_MIME = 'application/x-hive-files'
+export const HIVE_FILES_MIME = 'application/x-combwork-files'
 
 export function carriesFiles(dt: DataTransfer | null): boolean {
   return !!dt && (dt.types.includes('Files') || dt.types.includes(HIVE_FILES_MIME))

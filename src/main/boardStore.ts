@@ -13,6 +13,7 @@ import { moveCardsIntoTables } from './schema/cardsStep'
 import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, currentKeys, keysHeld, KEYS_STEP, moveKeys, movedCardNames, numberCard } from './schema/keysStep'
 import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
 import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_ATTACHMENTS_STEP, CARD_REVS_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SESSION_LEASES_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
+import { NAMES_STEP } from './schema/namesStep'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, isIoError, openDb, OPENABLE_WAIT_MS, schemaVersion, soleCopy, untilOpenable, type Db, type Migration, type PendingGroup } from './db'
 import { checkpointsReleased, checkpointWhenIdle, timedCommit } from './walCheckpoint'
 import { beginWrite, countedWrite } from './dbWrites'
@@ -309,6 +310,18 @@ export const BOARD_MIGRATIONS: Migration[] = [
     up: (db) => {
       for (const sql of CARD_REVS_STEP.ddl) db.exec(sql)
     }
+  },
+  {
+    // HI-2587, the names upgrade: what the board kept under Hive's names takes Combwork's (comments' `hive_text` column,
+    // the 0.9 import's record's `appVersion`). After the 1.0 group: a board waiting for it gets this after it.
+    version: 25,
+    name: NAMES_STEP.name,
+    up: (db) => {
+      // Only with 1.0's tables (a board made before them, its group not run, has no comments' column to rename).
+      const cols = (db.prepare("SELECT name FROM pragma_table_info('card_comments')").all() as { name: string }[]).map((c) => c.name) // i18n-ignore: SQL
+      if (cols.includes('hive_text')) for (const sql of NAMES_STEP.ddl) db.exec(sql)
+      db.exec("UPDATE board_meta SET value = json_remove(json_set(value, '$.appVersion', json_extract(value, '$.hiveVersion')), '$.hiveVersion') WHERE key = 'imported' AND json_valid(value) AND json_type(value, '$.hiveVersion') IS NOT NULL") // i18n-ignore: SQL
+    }
   }
 ]
 
@@ -317,7 +330,7 @@ interface Imported {
   at: string
   cards: number
   damaged: string[]
-  hiveVersion: string
+  appVersion: string
   /** The folder the files were moved to, as a backup. */
   folder: string
   /** The files' folder couldn't be renamed yet (held open): tried again at the next open. */
@@ -488,7 +501,7 @@ function renameNow(from: string, to: string): boolean {
  * is (in the backup folder after the move) and named. Then the folder becomes `tasks.imported-<time>`, kept as a backup,
  * and a stub takes its place for older versions.
  */
-function importFiles(b: Board, hive: string, hiveVersion: string): void {
+function importFiles(b: Board, hive: string, appVersion: string): void {
   const db = b.db.writer
   const dir = join(hive, TASKS)
   const names = cardFiles(dir)
@@ -503,7 +516,7 @@ function importFiles(b: Board, hive: string, hiveVersion: string): void {
   const batches = readJsonFile<{ batches?: unknown }>(join(dir, 'archive-batches.json'), {})
   const folder = `${TASKS}.imported-${stamp()}`
   const t0 = performance.now()
-  const record: Imported = { at: new Date().toISOString(), cards: cards.length, damaged, hiveVersion, folder, pendingRename: names.length > 0 || existsSync(join(dir, 'board.json')) || existsSync(join(dir, 'archive-batches.json')) }
+  const record: Imported = { at: new Date().toISOString(), cards: cards.length, damaged, appVersion, folder, pendingRename: names.length > 0 || existsSync(join(dir, 'board.json')) || existsSync(join(dir, 'archive-batches.json')) }
   timedStep(`db begin ${DB_FILE}`, () => db.exec('BEGIN IMMEDIATE'))
   try {
     for (const c of cards) writeCardRows(db, decomposeCard(c.n, c.doc))
@@ -671,7 +684,7 @@ function removeAdded(dir: string, file: string): void {
 }
 const removing = new Set<string>()
 
-const hiveVersion = (): string => {
+const appVersion = (): string => {
   try {
     return app.getVersion()
   } catch {
@@ -747,7 +760,7 @@ function openBoard(path: string, upgrade: boolean): Board {
   try {
     db = openDb(join(path, HIVE_DIR, DB_FILE), {
       migrations: BOARD_MIGRATIONS,
-      hiveVersion: hiveVersion(),
+      appVersion: appVersion(),
       backupDir: join(path, HIVE_DIR, BACKUPS),
       approve: (p) => upgrade || upgradeAnswer(p) === 'yes',
       beforeGroup: () => {
@@ -788,7 +801,7 @@ function openBoard(path: string, upgrade: boolean): Board {
     if (writable(db)) {
       const raw = meta(w, 'imported')
       const imported = raw ? (JSON.parse(raw) as Imported) : null
-      if (!imported) importFiles(b, hive, hiveVersion())
+      if (!imported) importFiles(b, hive, appVersion())
       else if (imported.pendingRename) finishMove(b, hive, imported)
       else setAsideStub(b, hive)
     }
@@ -859,7 +872,7 @@ const presenceId = (): string => (ownPresence ??= profileId(userDataOf()))
 /** Writes this Hive's presence marker in a workspace's .combwork (its heartbeat); a failure only means one heartbeat fewer. */
 function markPresent(hive: string): void {
   try {
-    writePresence(hive, presenceId(), { pid: process.pid, profile: basename(userDataOf()), hiveVersion: hiveVersion(), startedAt })
+    writePresence(hive, presenceId(), { pid: process.pid, profile: basename(userDataOf()), appVersion: appVersion(), startedAt })
   } catch (e) {
     log.warn('writing the workspace presence marker', e)
   }

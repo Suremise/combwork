@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto'
 import { mkdir, open, readdir, rename, rm, stat, unlink } from 'original-fs/promises'
 import { join } from 'path'
-import { BENCHMARK_LIMITS, aboutOf, compareScopeKey, factsOf, parseArtifact, readEntry, readKept, summaryOf, type Artifact, type CompareScope, type ImportResult, type KeptEntry, type ParseResult } from '../shared/benchmark'
+import { BENCHMARK_LIMITS, METRICS_EXPORT_SCHEMA, aboutOf, compareScopeKey, factsOf, parseArtifact, readEntry, readKept, summaryOf, type Artifact, type CompareScope, type ImportResult, type KeptEntry, type ParseResult } from '../shared/benchmark'
 import type { MetricsReport } from '../shared/metrics'
 import { renameRetrying, writeTextAtomic } from './fsutil'
 import { createLogger } from './logger'
@@ -490,7 +490,7 @@ export async function keepReport(ctx: BenchContext, report: MetricsReport, appVe
   if (report.workspacePath.toLowerCase() !== ctx.workspacePath.toLowerCase()) throw hiveError(msg({ id: 'service.benchmarks.switched', defaultMessage: 'The workspace was switched: nothing was kept.', description: "An error keeping the Performance page's report as a comparison: the window opened another workspace meanwhile." }), undefined, { kind: 'conflict' })
   const s = summaryOf(report, report.scope.kind === 'project' ? report.scope.project : undefined)
   const scope: CompareScope = report.scope.kind === 'project' ? { kind: 'project', project: report.scope.project } : report.filters?.own ? { kind: 'workspace', own: true } : { kind: 'workspace' }
-  const a: Artifact = { schema: 'hive-metrics/1', kind: 'export', label: (label?.trim() || `Kept ${s.from.slice(0, 10)} to ${s.to.slice(0, 10)}`).slice(0, 80), ...(label?.trim() ? {} : { labelKind: 'kept' as const }), createdAt: new Date().toISOString(), appVersion, scope, summary: s }
+  const a: Artifact = { schema: METRICS_EXPORT_SCHEMA, kind: 'export', label: (label?.trim() || `Kept ${s.from.slice(0, 10)} to ${s.to.slice(0, 10)}`).slice(0, 80), ...(label?.trim() ? {} : { labelKind: 'kept' as const }), createdAt: new Date().toISOString(), appVersion, scope, summary: s }
   return keep(ctx, a)
 }
 

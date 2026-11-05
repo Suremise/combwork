@@ -196,7 +196,7 @@ describe('Copilot launch', () => {
     expect(hooks).toEqual(copilotHooks(ctx.hookUrl, 'tok123'))
     expect(JSON.parse(readFileSync(join(ctx.privateDir, 'plugin', 'plugin.json'), 'utf8')).name).toBe('combwork-launch')
     expect(JSON.parse(readFileSync(join(ctx.privateDir, 'mcp.json'), 'utf8'))).toEqual({ mcpServers: { combwork: { type: 'local', command: 'node', args: ['cw-mcp.js'], env: { CW_PROJECT: 'proj' }, tools: ['*'] } } })
-    expect(readFileSync(join(ctx.privateDir, 'instructions', '.github', 'instructions', 'hive.instructions.md'), 'utf8')).toBe(`---\napplyTo: '**'\n---\n${toolNamesLine()}\n\nRole: assistant.\n`)
+    expect(readFileSync(join(ctx.privateDir, 'instructions', '.github', 'instructions', 'combwork.instructions.md'), 'utf8')).toBe(`---\napplyTo: '**'\n---\n${toolNamesLine()}\n\nRole: assistant.\n`)
   })
 
   it('is ended with Ctrl+C before it is killed, so it writes its token totals (#465)', async () => {

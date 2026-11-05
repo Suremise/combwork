@@ -807,7 +807,7 @@ export class CodexAdapter implements ProviderAdapter {
    * sandbox is on (it upgrades that to the admin one).
    */
   setupCommand(executable: string): CommandSpec {
-    const dir = join(tmpdir(), 'hive-codex-setup')
+    const dir = join(tmpdir(), 'combwork-codex-setup')
     mkdirSync(dir, { recursive: true })
     // The title items are pinned as for sessions: the busy wait below reads the spinner a user's own [tui].terminal_title could drop.
     const s = toSpawnable(executable, ['--no-daemon', '-C', dir, '-c', `projects=${toToml({ [dir]: { trust_level: 'trusted' } })}`, '-c', `tui.terminal_title=${toToml(titleItems())}`, ...CODEX_MODE_FLAGS['read-only']])

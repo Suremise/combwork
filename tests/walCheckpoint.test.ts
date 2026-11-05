@@ -17,7 +17,7 @@ const DEFAULTS = { ...wal.checkpointLimits }
 afterEach(() => Object.assign(wal.checkpointLimits, DEFAULTS))
 
 const MIGRATIONS = [{ version: 1, name: 'rows', up: (db: DatabaseSync) => db.exec('CREATE TABLE t (id INTEGER PRIMARY KEY, doc BLOB) STRICT') }]
-const open = (checkpointer?: typeof wal.checkpointWhenIdle) => openDb(join(base, `db-${++n}.db`), { migrations: MIGRATIONS, hiveVersion: 'test', checkpointer })
+const open = (checkpointer?: typeof wal.checkpointWhenIdle) => openDb(join(base, `db-${++n}.db`), { migrations: MIGRATIONS, appVersion: 'test', checkpointer })
 
 /** The WAL's checkpoint sequence (its header): it moves on each time a write starts the WAL from its beginning. */
 function walRestarts(file: string): number {

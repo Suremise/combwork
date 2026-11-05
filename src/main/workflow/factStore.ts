@@ -311,7 +311,7 @@ export class FactStore {
 
   /** A store on a connection of its own to a workspace database's file, opened as the board opens it (another Hive on it; a restart). */
   static open(file: string, scope: Scope): FactStore {
-    return new FactStore(new OwnConn(openDb(file, { migrations: BOARD_MIGRATIONS, hiveVersion: 'workflow' }), true), scope)
+    return new FactStore(new OwnConn(openDb(file, { migrations: BOARD_MIGRATIONS, appVersion: 'workflow' }), true), scope)
   }
 
   /** Closes the connection the store opened; once. */

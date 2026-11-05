@@ -2339,7 +2339,7 @@ export function TaskDialog() {
                 <div className="task-comment-by">
                   <strong>{byText(c.by)}</strong> <span className="faint">{timeAgo(c.at)}</span>
                 </div>
-                <Markdown source={withAttachmentUrls(storedLine(c.text, c.hiveText), lookup)} cards={MARKDOWN_CARDS} onLink={onAttachmentLink} images={attachmentImages} />
+                <Markdown source={withAttachmentUrls(storedLine(c.text, c.appText), lookup)} cards={MARKDOWN_CARDS} onLink={onAttachmentLink} images={attachmentImages} />
               </div>
             ))}
             {!card.archived && (

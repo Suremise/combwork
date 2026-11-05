@@ -101,7 +101,7 @@ describe("Codex: its terminal title (row 34)", () => {
 })
 
 describe("Copilot: every MCP server's instructions (row 21)", () => {
-  const instructions = (ctx: LaunchContext): string => readFileSync(join(ctx.privateDir, 'instructions', '.github', 'instructions', 'hive.instructions.md'), 'utf8')
+  const instructions = (ctx: LaunchContext): string => readFileSync(join(ctx.privateDir, 'instructions', '.github', 'instructions', 'combwork.instructions.md'), 'utf8')
 
   it("shows the hive server's instructions with the switch on; off, Combwork's guidance comes as custom instructions instead", async () => {
     const agent = context({ privateDir: join(base, 'private-on') })
@@ -141,7 +141,7 @@ describe('a launch reads its switches once (overridesNow), so its stages agree w
     const cmd = copilot.buildCommand('C:\\bin\\copilot.exe', ctx)
     // Still the launch it was prepared as: the flag, and the instructions folder holding only the tool names' line.
     expect(cmd.args).toContain('--allow-all-mcp-server-instructions')
-    expect(readFileSync(join(cmd.env!.COPILOT_CUSTOM_INSTRUCTIONS_DIRS!, '.github', 'instructions', 'hive.instructions.md'), 'utf8')).not.toContain('Combwork guidance')
+    expect(readFileSync(join(cmd.env!.COPILOT_CUSTOM_INSTRUCTIONS_DIRS!, '.github', 'instructions', 'combwork.instructions.md'), 'utf8')).not.toContain('Combwork guidance')
   })
 
   it('Copilot: prepared with it off, then turned on before the command is built', async () => {
@@ -153,7 +153,7 @@ describe('a launch reads its switches once (overridesNow), so its stages agree w
     expect(cmd.args).not.toContain('--allow-all-mcp-server-instructions')
     const dir = cmd.env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS
     expect(dir).toBe(join(ctx.privateDir, 'instructions'))
-    expect(readFileSync(join(dir!, '.github', 'instructions', 'hive.instructions.md'), 'utf8')).toContain('Combwork guidance')
+    expect(readFileSync(join(dir!, '.github', 'instructions', 'combwork.instructions.md'), 'utf8')).toContain('Combwork guidance')
   })
 
   it("Codex: the title and whether Combwork reads it come from the same launch's switch", async () => {

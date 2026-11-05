@@ -94,7 +94,7 @@ export const CARDS_STEP: SchemaStep = {
       at        TEXT,
       by        TEXT,
       text      TEXT,
-      hive_text TEXT,
+      app_text  TEXT,
       id        TEXT,
       raw       TEXT,
       PRIMARY KEY (card, ord)

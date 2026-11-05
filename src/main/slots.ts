@@ -328,7 +328,7 @@ export interface SlotConn {
 
 /** A connection of its own to a workspace database's file (another process; tests): each write BEGIN IMMEDIATE. */
 export function fileSlotConn(file: string): SlotConn {
-  const db = openDb(file, { migrations: BOARD_MIGRATIONS, hiveVersion: 'slots' })
+  const db = openDb(file, { migrations: BOARD_MIGRATIONS, appVersion: 'slots' })
   const tx = <T>(begin: string, fn: (d: DatabaseSync) => T): T => {
     db.writer.exec(begin)
     try {

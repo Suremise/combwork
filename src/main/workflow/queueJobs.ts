@@ -3,7 +3,7 @@
 // of its tree (a shell's detached server too), and a launcher that is in the job, and recorded, before the command it
 // runs exists.
 //
-// The job is named after the lease (`Local\HiveQueue-<lease>`) and kill on close: the supervisor is a child of Hive,
+// The job is named after the lease (`Local\CombworkQueue-<lease>`) and kill on close: the supervisor is a child of Hive,
 // which Windows ends with Hive, and once its handle goes every process in the job ends too, by the operating system's
 // guarantee; nothing in it may break away. What escapes it anyway (a packaged app's process, such as the Store's
 // PowerShell, starts its children outside every job) is adopted into it, or followed by the supervisor (#543, #659,
