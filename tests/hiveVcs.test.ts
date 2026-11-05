@@ -63,8 +63,17 @@ describe('.combwork kept out of version control (#345)', () => {
     // Not a repository git can read (a bare .git folder): the line is written, but git couldn't confirm it (#346).
     expect(await ensureHiveExcluded(p)).toEqual({ excluded: true, root: p, added: true, unconfirmed: true })
     expect(await ensureHiveExcluded(p)).toEqual({ excluded: true, root: p, added: false, unconfirmed: true })
-    expect(readFileSync(join(p, '.git', 'info', 'exclude'), 'utf8')).toBe('# mine\n*.log\n# Hive project metadata (added by Hive)\n/.combwork/\n')
+    expect(readFileSync(join(p, '.git', 'info', 'exclude'), 'utf8')).toBe('# mine\n*.log\n# Combwork project metadata (added by Combwork)\n/.combwork/\n')
     expect(await hiveVcs(p)).toEqual({ state: 'excluded' })
+  })
+
+  it('takes an entry Hive wrote before 1.1 as its own, adding nothing (HI-2575)', async () => {
+    const p = folder('project')
+    mkdirSync(join(p, '.git', 'info'), { recursive: true })
+    const old = '# Hive project metadata (added by Hive)\n/.combwork/\n'
+    writeFileSync(join(p, '.git', 'info', 'exclude'), old)
+    expect((await ensureHiveExcluded(p))?.added).toBe(false)
+    expect(readFileSync(join(p, '.git', 'info', 'exclude'), 'utf8')).toBe(old)
   })
 
   it('takes the unanchored line someone wrote, and makes info/ when git has none', async () => {

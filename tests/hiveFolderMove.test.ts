@@ -72,7 +72,12 @@ describe('movedExcludeText', () => {
   const ours = '# Hive project metadata (added by Hive)\n/.hive/\n'
 
   it("replaces Hive's own line, under its comment, keeping every other line", () => {
-    expect(movedExcludeText(`build/\n${ours}*.log\n`, '/.hive/', '/.combwork/', true)).toBe('build/\n# Hive project metadata (added by Hive)\n/.combwork/\n*.log\n')
+    expect(movedExcludeText(`build/\n${ours}*.log\n`, '/.hive/', '/.combwork/', true)).toBe('build/\n# Combwork project metadata (added by Combwork)\n/.combwork/\n*.log\n')
+  })
+
+  it("takes a line under Combwork's comment as its own too, and leaves another comment's wording (HI-2575)", () => {
+    expect(movedExcludeText('# Combwork project metadata (added by Combwork)\n.hive/\n', '/.hive/', '/.combwork/', true)).toBe('# Combwork project metadata (added by Combwork)\n/.combwork/\n')
+    expect(movedExcludeText('# old project folder (added by Hive, by hand)\n/.hive/\n', '/.hive/', '/.combwork/', true)).toBe('# old project folder (added by Hive, by hand)\n/.combwork/\n')
   })
 
   it("keeps a user's own .hive line, and Hive's while a .hive is still there", () => {

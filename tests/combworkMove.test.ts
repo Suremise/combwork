@@ -345,7 +345,7 @@ describe('git', () => {
     write(join(alpha, '.hive', 'slots', 'HI-1', 'src.txt'), 'changed')
     write(join(alpha, '.hive', 'slots', 'HI-1', 'new.txt'), 'untracked')
     await openMove(ws)
-    expect(readFileSync(join(alpha, '.git', 'info', 'exclude'), 'utf8')).toBe('# a user line\nbuild/\n# Hive project metadata (added by Hive)\n/.combwork/\n')
+    expect(readFileSync(join(alpha, '.git', 'info', 'exclude'), 'utf8')).toBe('# a user line\nbuild/\n# Combwork project metadata (added by Combwork)\n/.combwork/\n')
     const slot = join(alpha, '.combwork', 'slots', 'HI-1')
     expect(git(alpha, 'worktree', 'list', '--porcelain').replace(/\//g, '\\').toLowerCase()).toContain(slot.toLowerCase())
     expect(git(slot, 'status', '--porcelain').split('\n').filter(Boolean).sort()).toEqual([' M src.txt', '?? new.txt'])

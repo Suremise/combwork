@@ -2,6 +2,7 @@ import { dirname, join, relative, resolve } from 'path'
 import { appendFile, mkdir, readFile } from 'original-fs/promises'
 import { existsSync, readFileSync, statSync } from 'original-fs'
 import { HIVE_DIR } from '../shared/defaults'
+import { EXCLUDE_COMMENT } from '../shared/hiveFolderMove'
 import { git, gitReading } from './git'
 import { gitTool } from './gitTool'
 import type { HiveVcs } from '../shared/types'
@@ -152,7 +153,7 @@ export async function ensureHiveExcluded(projectPath: string, opts: { readOnly?:
   const added = !has
   if (added) {
     const prefix = text && !text.endsWith('\n') ? '\n' : ''
-    await appendFile(f, `${prefix}# Hive project metadata (added by Hive)\n${line}\n`)
+    await appendFile(f, `${prefix}${EXCLUDE_COMMENT}\n${line}\n`)
   }
   // Git's own answer; only when git can't be asked, the line Hive found or wrote.
   const ignored = await gitIgnores(projectPath, f)
