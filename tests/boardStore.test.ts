@@ -1,7 +1,7 @@
 // The board in SQLite (#1017): the database layer (settings, migrations, a file from a newer Combwork), the move of the cards'
 // files into it (once, checked, the folder kept as a backup and a stub left for older versions), cards an older Hive saved
 // meanwhile, Export Board to JSON (an export read back is the same board), and the window's board with archived cards in short.
-import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'fs'
 import { join, resolve, sep } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
@@ -356,21 +356,28 @@ describe("moving the cards' files in (#1017)", () => {
     const ws = workspaceWith()
     const w = await open(ws)
     expect(await inWorkspace(w, () => tasks.allTasks(w))).toEqual([])
-    // The empty folder it was given is left as it was, nothing written in it; the next open removes it.
+    // The empty folder it was given (0.8's, with no cards) is left as it was, nothing written in it, at this open and the
+    // next: no version reads it now, and nothing makes one (HI-2594).
     expect(hiveFolders(ws).filter((f) => f.startsWith('tasks'))).toEqual(['tasks'])
     expect(readdirSync(join(ws, '.combwork', 'tasks'))).toEqual([])
     await disposeWorkspaceService(w)
-    const again = await open(ws)
-    await inWorkspace(again, () => tasks.allTasks(again))
-    expect(hiveFolders(ws).filter((f) => f.startsWith('tasks'))).toEqual([])
+    const fresh = join(base, `ws-${++n}`)
+    mkdirSync(join(fresh, 'p', '.combwork'), { recursive: true })
+    writeFileSync(join(fresh, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    const again = await open(fresh)
+    expect(await inWorkspace(again, () => tasks.allTasks(again))).toEqual([])
+    expect(hiveFolders(fresh).filter((f) => f.startsWith('tasks'))).toEqual([])
   })
 })
 
 /**
  * The stub 0.9 to 1.0 left in a workspace's old cards' folder for older versions (no version writes one since 1.1,
  * HI-2594), with the board's next number: what an older Hive saved cards in before the workspace moved to `.combwork`.
+ * The workspace is as before its names upgrade (no record), whose files step sets the stub's cards aside at the next
+ * open, under the move's lock, and removes it (nameUpgradeFiles.ts moveOldStub, HR1's round 1).
  */
 function leaveStub(ws: string, next: number): string {
+  rmSync(join(ws, '.combwork', 'combwork-names.json'), { force: true })
   const stub = join(ws, '.combwork', 'tasks')
   mkdirSync(stub, { recursive: true })
   writeFileSync(join(stub, 'board.json'), JSON.stringify({ version: 1, next }, null, 2) + '\n')

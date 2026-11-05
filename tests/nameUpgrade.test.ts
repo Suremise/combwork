@@ -29,6 +29,9 @@ const write = (p: string, text: string): void => {
 }
 const git = (cwd: string, ...args: string[]): string => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, encoding: 'utf8' })
 
+/** A card an older Hive saved in the board's stub. */
+const STUB_CARD = '{"number":7,"title":"Made in an older Hive"}'
+
 const OLD_GITIGNORE = "# The task board's database and what moving it from files left (added by Hive, #1017)\nhive.db\nhive.db-*\nbackups/\n"
 const OLD_EXCLUDE = "# Hive project metadata (added by Hive)\n/.combwork/\n# Hive's copies of workspace skills for Codex and Copilot (added by Hive)\n/.agents/skills/cw-*/\n/.agents/skills/.cw-*/\n/.agents/skills/hive-*/\n/.agents/skills/.hive-*/\n"
 
@@ -86,6 +89,10 @@ function workspace(kind: '1.0' | 'rc2'): { ws: string; alpha: string; slot: stri
   db.exec('CREATE TABLE card_context (card INTEGER NOT NULL, ord INTEGER NOT NULL, ref TEXT NOT NULL, PRIMARY KEY (card, ord)) STRICT')
   db.exec('CREATE TABLE skill_copies (folder TEXT NOT NULL, skill TEXT NOT NULL, project TEXT NOT NULL, revision TEXT NOT NULL, made_at TEXT NOT NULL, PRIMARY KEY (folder, skill)) STRICT')
   db.prepare('INSERT INTO cards (number, title) VALUES (1, ?)').run('One')
+  // The stub 0.9 to 1.0 left for older versions (#1017), with a card an older Hive saved in it (HI-2594).
+  write(join(ws, tree, 'tasks', 'board.json'), '{"version":1,"next":2}')
+  write(join(ws, tree, 'tasks', 'README.txt'), 'The task board moved to .hive/hive.db in Hive 0.9 (#1017).\r\n')
+  write(join(ws, tree, 'tasks', '7.json'), STUB_CARD)
   db.prepare('INSERT INTO skill_copies VALUES (?, ?, ?, ?, ?)').run(slot, 'handover', 'alpha', 'h2', 'now')
   db.close()
   return { ws, alpha, slot }
@@ -97,6 +104,9 @@ function expectUpgraded(w: { ws: string; alpha: string; slot: string }): void {
   expect((db.prepare('SELECT title FROM cards').all() as { title: string }[]).map((r) => r.title)).toEqual(['One'])
   db.close()
   expect(readdirSync(dir).filter((f) => f.startsWith('hive'))).toEqual([])
+  // The stub's card set aside, intact, and the stub gone (HI-2594).
+  expect(readdirSync(dir).filter((f) => f.startsWith('tasks'))).toEqual(['tasks.set-aside'])
+  expect(readFileSync(join(dir, 'tasks.set-aside', '7.json'), 'utf8')).toBe(STUB_CARD)
   expect(readFileSync(join(dir, '.gitignore'), 'utf8')).toMatch(/^# The task board's database .*\(added by Combwork, #1017\)\ncombwork\.db\ncombwork\.db-\*\n/)
   expect(readFileSync(join(dir, 'README.md'), 'utf8')).toBe(WORKSPACE_README)
   expect(readFileSync(join(dir, 'mcp', 'srv.json'), 'utf8')).toBe('{"command":"${CW_MCP_DIR}/srv/run.cmd"}')

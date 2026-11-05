@@ -704,7 +704,7 @@ export class WorkspaceService {
     const h = this.hiveDir
     // The folders, then the files, each all at once (HI-1705: one after another, each waited its turn behind other
     // windows' file work). Each folder is made with those above it.
-    await whenAll([join(h, 'shared', 'handovers'), join(h, 'skills'), join(h, 'mcp'), join(h, 'tasks')].map((d) => mkdir(d, { recursive: true })))
+    await whenAll([join(h, 'shared', 'handovers'), join(h, 'skills'), join(h, 'mcp')].map((d) => mkdir(d, { recursive: true })))
     const hr = join(h, 'shared', 'handovers', 'README.md')
     await whenAll([
       // A new workspace has nothing of Hive's: its names upgrade recorded done, under the move's lock (HI-2587).
@@ -893,10 +893,6 @@ export class WorkspaceService {
     if (retried) changed()
   }
 
-  /** The cards' folder before 0.9 (#1017): now the stub an older Hive looks at, and the import's source. */
-  get tasksDir(): string {
-    return join(this.hiveDir, 'tasks')
-  }
 
   /**
    * MCP settings from before #1093 moved to its model, once, so what ran still runs and nothing new starts: a server on

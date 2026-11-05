@@ -86,6 +86,8 @@ export interface UpgradeOptions {
   projects: readonly string[]
   /** A single project that came into the open workspace later: its own steps only. */
   only?: string
+  /** Cards an older version saved in the board's stub were set aside (HI-2594): the board's notice says so. */
+  setAside?: (cards: number) => Promise<void> | void
 }
 
 /** The steps (under the move's lock, nothing of the workspace open): each throws a HiveError naming it when it can't. */
@@ -100,7 +102,10 @@ export async function upgradeWorkspace(ws: string, o: UpgradeOptions): Promise<v
   }
   if (!existsSync(dir)) return
   await step('board', o.stop, () => moveBoardFile(dir, o.checkpoint))
-  await step('files', o.stop, async () => upgradeWorkspaceFiles(dir, (await import('./workspace')).WORKSPACE_README))
+  await step('files', o.stop, async () => {
+    const cards = await upgradeWorkspaceFiles(dir, (await import('./workspace')).WORKSPACE_README)
+    if (cards) await o.setAside?.(cards)
+  })
   await step('projects', o.stop, async () => {
     // Each project, then each folder its agents worked in that the board's records name (slots, worktrees, copies: the
     // same repository's exclude file, already done, and their own skill copies).

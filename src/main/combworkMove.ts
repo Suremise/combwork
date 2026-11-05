@@ -463,7 +463,8 @@ async function movedUnderLock(ws: string, o: MoveOptions & { only?: string }, st
   // Then what is kept inside under Hive's names (HI-2587, nameUpgrade.ts), still under the lock and before anything of
   // the workspace is admitted.
   const projects = (await hostsOf(ws)).filter((h) => h.kind === 'project').map((h) => h.host)
-  await upgradeWorkspace(ws, { stop, checkpoint: checkpointOffMain, copyFolders: copyFoldersOffMain, projects, only: o.only })
+  const setAside = async (cards: number): Promise<void> => (await import('./boardStore')).tellSetAside(ws, cards)
+  await upgradeWorkspace(ws, { stop, checkpoint: checkpointOffMain, copyFolders: copyFoldersOffMain, projects, only: o.only, setAside })
   const moves = await deriveMoves(ws)
   publish(ws, moves)
   if (!moves.length || (await doneHash(ws)) === mapHash(moves)) return { late: false, moved }
