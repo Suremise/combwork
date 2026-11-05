@@ -199,6 +199,9 @@ interface HiveMessageValues {
   'service.metrics.notTokens': undefined
   'service.metrics.notTransport': undefined
   'service.metrics.sharedNumbers': undefined
+  'service.nameUpgrade.boardNotFolded': { file: string | number; log: string | number }
+  'service.nameUpgrade.boardOrphan': { file: string | number }
+  'service.nameUpgrade.failed': { what: string | number; error: string | number }
   'service.providers.keysStopped': { task: string | number; why: string | number }
   'service.providers.noSetup': { cli: string | number }
   'service.providers.notInstalled': { cli: string | number }

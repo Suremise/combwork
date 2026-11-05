@@ -336,8 +336,8 @@
     "description": "Why a file is not imported to Performance → Compare: it is larger than {mb} MB."
   },
   "performance.compare.error.unknownSchema": {
-    "defaultMessage": "It isn’t a Combwork benchmark (hive-benchmark/1) or Performance export (hive-metrics/1).",
-    "description": "Why a file is not imported to Performance → Compare. Keep hive-benchmark/1 and hive-metrics/1 (file formats)."
+    "defaultMessage": "It isn’t a Combwork benchmark (combwork-benchmark/1) or Performance export (combwork-metrics/1).",
+    "description": "Why a file is not imported to Performance → Compare. Keep combwork-benchmark/1 and combwork-metrics/1 (file formats)."
   },
   "performance.compare.failedInRun": {
     "defaultMessage": "Failed in the run: <warn>{checks}</warn>",
@@ -1584,8 +1584,8 @@
     "description": "Column header of the Performance page's Main process stalls table: the database or file step that held the main process."
   },
   "performance.stalls.tip": {
-    "defaultMessage": "Times Combwork's main process was busy for more than 250 ms. Every pane's typing goes through it, so a stall is felt as lag. Step is the work that held it, where Combwork knows it (a database or file step); During it is what else was under way, which may only have waited behind it. Little CPU means it was waiting (on the disk, a lock, another program); it is measured from half a second before, so it can be a little more than the length. The last {kept, number} since Combwork started, kept in memory only; hive.log notes them too, at most one line a minute.",
-    "description": "Info tip beside the Main process stalls heading of the Performance page. Step and During it are its columns: keep them as named there. hive.log is a file name."
+    "defaultMessage": "Times Combwork's main process was busy for more than 250 ms. Every pane's typing goes through it, so a stall is felt as lag. Step is the work that held it, where Combwork knows it (a database or file step); During it is what else was under way, which may only have waited behind it. Little CPU means it was waiting (on the disk, a lock, another program); it is measured from half a second before, so it can be a little more than the length. The last {kept, number} since Combwork started, kept in memory only; combwork.log notes them too, at most one line a minute.",
+    "description": "Info tip beside the Main process stalls heading of the Performance page. Step and During it are its columns: keep them as named there. combwork.log is a file name."
   },
   "performance.stalls.waiting": {
     "defaultMessage": "mostly waiting",
