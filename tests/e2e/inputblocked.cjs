@@ -90,7 +90,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
      */
     const probes = (from) => [...b1Reads(from).filter((r) => !r.data.includes('\x1b[200~')).map((r) => r.data).join('')].filter((k) => k === 'x').length
     const hiveLog = () => {
-      const f = path.join(userData, 'logs', 'hive.log')
+      const f = path.join(userData, 'logs', 'combwork.log')
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''
     }
     let tb1 = null

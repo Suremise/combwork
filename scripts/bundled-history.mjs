@@ -10,7 +10,7 @@ import { join, resolve } from 'path'
 
 const root = resolve(import.meta.dirname, '..')
 const out = join(root, 'src', 'main', 'bundledHistory.json')
-const SKIP = new Set(['.hive-copy', '.DS_Store', 'Thumbs.db', 'desktop.ini'])
+const SKIP = new Set(['.combwork-copy', '.DS_Store', 'Thumbs.db', 'desktop.ini'])
 
 /** The same hash as contentHash() in src/main/fsutil.ts, over [relative path, bytes] pairs. */
 function hash(files) {

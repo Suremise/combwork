@@ -29,7 +29,7 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 const until = (fn, ms) => lib.until(fn, ms, 200)
-const dbFile = path.join(fx.ws, '.combwork', 'hive.db')
+const dbFile = path.join(fx.ws, '.combwork', 'combwork.db')
 
 /** The workspace's board as Hive 0.9.3 left it: its two schema steps, no cards. */
 function board09() {
@@ -80,7 +80,7 @@ function rows(sql, ...args) {
 /** The test profile's log as it is now. */
 const log = () => {
   try {
-    return fs.readFileSync(path.join(fx.userData, 'logs', 'hive.log'), 'utf8')
+    return fs.readFileSync(path.join(fx.userData, 'logs', 'combwork.log'), 'utf8')
   } catch {
     return ''
   }

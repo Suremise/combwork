@@ -10,7 +10,7 @@ import { useScopedLoad } from '../scopedLoad'
 import { timeAgo } from '../util'
 
 /**
- * Performance's Main process stalls (HI-1135): the main process's recent stalls since Hive started, as hive.log's "The
+ * Performance's Main process stalls (HI-1135): the main process's recent stalls since Hive started, as combwork.log's "The
  * main process was busy" lines note them (main/mainStalls.ts), with the step that held the thread and the work that
  * overlapped it. Hive's, not a workspace's: no range or filter applies. Read with the page, and again as it refreshes.
  */
@@ -21,8 +21,8 @@ const M = {
   tip: msg({
     id: 'performance.stalls.tip',
     defaultMessage:
-      "Times Combwork's main process was busy for more than 250 ms. Every pane's typing goes through it, so a stall is felt as lag. Step is the work that held it, where Combwork knows it (a database or file step); During it is what else was under way, which may only have waited behind it. Little CPU means it was waiting (on the disk, a lock, another program); it is measured from half a second before, so it can be a little more than the length. The last {kept, number} since Combwork started, kept in memory only; hive.log notes them too, at most one line a minute.",
-    description: 'Info tip beside the Main process stalls heading of the Performance page. Step and During it are its columns: keep them as named there. hive.log is a file name.'
+      "Times Combwork's main process was busy for more than 250 ms. Every pane's typing goes through it, so a stall is felt as lag. Step is the work that held it, where Combwork knows it (a database or file step); During it is what else was under way, which may only have waited behind it. Little CPU means it was waiting (on the disk, a lock, another program); it is measured from half a second before, so it can be a little more than the length. The last {kept, number} since Combwork started, kept in memory only; combwork.log notes them too, at most one line a minute.",
+    description: 'Info tip beside the Main process stalls heading of the Performance page. Step and During it are its columns: keep them as named there. combwork.log is a file name.'
   }),
   when: msg({ id: 'performance.stalls.when', defaultMessage: 'When', description: "Column header of the Performance page's Main process stalls table: when the stall ended (a time)." }),
   length: msg({ id: 'performance.stalls.length', defaultMessage: 'Length', description: "Column header of the Performance page's Main process stalls table: how long the main process was busy." }),

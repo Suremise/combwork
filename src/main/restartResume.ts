@@ -253,7 +253,7 @@ export async function recordClosing(reason: RestartReason, o: { snapshotMs?: num
     snapshot = enriched
     await save()
   } else log.warn(`Reading the cards and lanes of the agents took over ${o.snapshotMs ?? 2000} ms as Combwork closed: every running conversation is kept to resume`)
-  if (snapshot.length) log.info(`Recorded ${snapshot.length} agent(s) as Combwork closes (${reason}): ${snapshot.map((e) => `${userText(e.agentName)} in ${userText(e.project)}`).join(', ')}`) // i18n-ignore: a line of hive.log
+  if (snapshot.length) log.info(`Recorded ${snapshot.length} agent(s) as Combwork closes (${reason}): ${snapshot.map((e) => `${userText(e.agentName)} in ${userText(e.project)}`).join(', ')}`) // i18n-ignore: a line of combwork.log
   if (reason !== 'quit' && snapshot.length) {
     const tell = Promise.allSettled(snapshot.map((e) => inWorkspace(workspaceOf(e.projectPath), () => createDelivery(e.projectPath, { agentId: e.agentId, agentName: e.agentName, kind: 'control', from: HIVE, body: inDialectOf({ projectPath: e.projectPath, agentId: e.agentId }, restartingLine) }))))
     await bounded(tell, o.tellMs ?? 1500, [])

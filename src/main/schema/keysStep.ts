@@ -3,7 +3,7 @@ import { V1_0_STEPS } from './v1_0'
 import { cardKey, normalKey, suggestKey, type KeyHeld } from '../../shared/projectKeys'
 
 /**
- * Project keys and per-project numbers in hive.db (#1219, #704; SPEC §16.12). The tables are #1208's (v1_0.ts, the
+ * Project keys and per-project numbers in combwork.db (#1219, #704; SPEC §16.12). The tables are #1208's (v1_0.ts, the
  * "project keys" step); this module is every query on them, for the 1.0 step and for the board (boardStore.ts), all on a
  * connection the caller holds (inside its transaction).
  *

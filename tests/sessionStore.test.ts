@@ -327,7 +327,7 @@ describe('following the project', () => {
     fileHooks.afterWrite = (path) => {
       if (!path.endsWith('sessions.json')) return
       fileHooks.afterWrite = null
-      const db = new DatabaseSync(join(wsPath, '.combwork', 'hive.db'), { timeout: 0 })
+      const db = new DatabaseSync(join(wsPath, '.combwork', 'combwork.db'), { timeout: 0 })
       try {
         db.prepare("UPDATE sessions SET name = 'committed elsewhere' WHERE host = ? AND id = 'one'").run(idOf(p))
         wrote = 'committed'

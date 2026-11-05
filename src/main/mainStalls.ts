@@ -12,7 +12,7 @@ import { MAIN_STALLS_KEPT, type MainStall, type MainStalls, type MainStallWork }
 export { beginWork, stallClock, timedStep } from './stallWork'
 
 /**
- * Notes in hive.log when the main process was busy long enough to be felt (every terminal's typing goes through it), at
+ * Notes in combwork.log when the main process was busy long enough to be felt (every terminal's typing goes through it), at
  * most once a minute, so pauses can be matched with what Hive was doing (#1109). The delay is Node's event loop delay
  * (`monitorEventLoopDelay`: its timer, every 20 ms, catches a block wherever it falls), read every half second. A gap
  * that spans the PC's sleep isn't a stall: the warning waits a few seconds, and a suspend or resume during it drops it
@@ -229,7 +229,7 @@ export interface FileWaitDeps {
 export const FILE_WAIT_TIMING = { every: 1000, settleMs: 3000, quietMs: 60_000 }
 
 /**
- * Notes in hive.log when a file call took long enough to be felt (HI-1702), at most once a minute. Every asynchronous
+ * Notes in combwork.log when a file call took long enough to be felt (HI-1702), at most once a minute. Every asynchronous
  * file call of main's and its worker threads takes one of the pool's threads (threadPool.ts): with them all held by
  * slow calls, the next waits, and a step awaiting many in turn (a window's open, a session listing) takes seconds
  * although no task holds main's thread, so the busy warning above never sees it. The call is the watchdog thread's

@@ -941,7 +941,7 @@ export function Modal({
 }) {
   const busyNow = useRef(busy)
   busyNow.current = busy
-  // Open: where the window is, for hive.log's long-task and hang lines (HI-1775).
+  // Open: where the window is, for combwork.log's long-task and hang lines (HI-1775).
   useEffect(() => dialogOpened(title), [title])
   // Escape runs this render's onClose, never an earlier one's: a dialog whose fields fill in after it opens would
   // otherwise answer an Escape with its first render's view of them (#288).

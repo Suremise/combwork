@@ -63,7 +63,7 @@ async function read(): Promise<Store> {
   }
   try {
     const parsed = JSON.parse(text) as unknown
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('not an object') // i18n-ignore: hive.log, in English
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('not an object') // i18n-ignore: combwork.log, in English
     const out: Store = {}
     for (const [id, e] of Object.entries(parsed as Record<string, Partial<Entry>>)) {
       if (e && typeof e.blob === 'string' && typeof e.origin === 'string' && typeof e.v === 'string' && typeof e.last4 === 'string') out[id] = { v: e.v, origin: e.origin, last4: e.last4, at: String(e.at ?? ''), blob: e.blob }

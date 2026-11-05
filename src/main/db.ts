@@ -4,7 +4,7 @@ import { basename, dirname, join } from 'path'
 import { timedStep } from './stallWork'
 
 /**
- * Hive's SQLite layer (#990, #1017): every database Hive keeps (the workspace's board in `.combwork/hive.db`; later its metrics,
+ * Hive's SQLite layer (#990, #1017): every database Hive keeps (the workspace's board in `.combwork/combwork.db`; later its metrics,
  * and the Assistant's journal in a file of its own, #989) is opened, set up and migrated here, with Node's built-in
  * `node:sqlite` (no native module to rebuild for each Electron). Nothing else imports `node:sqlite`, so another library
  * would be a change to this file only. Its calls are synchronous: at these sizes a query or a commit takes well under a

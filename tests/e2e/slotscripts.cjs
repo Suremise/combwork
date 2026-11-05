@@ -33,7 +33,7 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(path.join(fx.alpha, '.env'), 'A=1\n')
   // The archive script: records the slot it ran for and whether its folder was still there, and exits with the code in
   // archive-exit.txt. It writes outside the slot (a slot it left files in would be kept for those).
-  const archiveLog = path.join(fx.tools, 'archive.log')
+  const archiveLog = path.join(fx.tools, 'arccombwork.log')
   const exitFile = path.join(fx.tools, 'archive-exit.txt')
   const archive = path.join(fx.tools, 'archive.js')
   fs.writeFileSync(archive, ["const fs = require('fs')", `fs.appendFileSync(${JSON.stringify(archiveLog)}, process.env.CW_SLOT + ' ' + fs.existsSync('.git') + '\\n')`, `process.exit(Number(fs.readFileSync(${JSON.stringify(exitFile)}, 'utf8')))`, ''].join('\n'))

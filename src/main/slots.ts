@@ -1,5 +1,5 @@
 // A project's slot pool (#1429, SPEC §16.10.1–16.10.2): the worktrees Hive lends to a card or a lane (a dispatch lease)
-// and gets back when it ends, kept ready between loans. Slots and leases are typed rows of hive.db (schema/v1_0.ts,
+// and gets back when it ends, kept ready between loans. Slots and leases are typed rows of combwork.db (schema/v1_0.ts,
 // SLOTS_STEP): at most one open lease per slot, and one open dispatch lease and one carried lease per agent, by partial
 // unique indexes, so two Hives (or processes) lending at once can't both get one slot, however their code races; the
 // second is refused ("slot-b is in use by HI-B1 for AM-12").

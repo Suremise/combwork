@@ -4,7 +4,7 @@ import { getHeapStatistics, setHeapSnapshotNearHeapLimit } from 'v8'
 import { createLogger } from './logger'
 
 /**
- * The main process's memory (#1005, after #988's out-of-memory crash): a line in hive.log at start, every 5 minutes and
+ * The main process's memory (#1005, after #988's out-of-memory crash): a line in combwork.log at start, every 5 minutes and
  * as the process exits, a warning when the used heap passes 70% and 85% of its limit, and, when Settings → Advanced
  * says so, a heap snapshot written as the heap nears its limit, so the next such crash shows what filled it.
  */
@@ -39,7 +39,7 @@ const mb = (n: number): number => Math.round(n / MB)
 
 /** The memory line: "heap 512 of 600 MB used (limit 4096 MB, 13%); external 20 MB, array buffers 5 MB, rss 900 MB". */
 export function memoryLine(m: MemoryNow = memoryNow()): string {
-  return `heap ${mb(m.used)} of ${mb(m.total)} MB used (limit ${mb(m.limit)} MB, ${Math.round((m.used / m.limit) * 100)}%); external ${mb(m.external)} MB, array buffers ${mb(m.arrayBuffers)} MB, rss ${mb(m.rss)} MB` // i18n-ignore: hive.log's memory line, for the maintainer, in English
+  return `heap ${mb(m.used)} of ${mb(m.total)} MB used (limit ${mb(m.limit)} MB, ${Math.round((m.used / m.limit) * 100)}%); external ${mb(m.external)} MB, array buffers ${mb(m.arrayBuffers)} MB, rss ${mb(m.rss)} MB` // i18n-ignore: combwork.log's memory line, for the maintainer, in English
 }
 
 /** How many of HEAP_WARN_AT the used heap is past. */
@@ -53,7 +53,7 @@ export function logMemory(why: string, m: MemoryNow = memoryNow()): void {
   const now = heapLevel(m)
   const rose = now > level
   level = now
-  const line = rose ? `Memory, ${why}: past ${HEAP_WARN_AT[now - 1] * 100}% of the heap limit: ${memoryLine(m)}` : `Memory, ${why}: ${memoryLine(m)}` // i18n-ignore: hive.log's memory line, for the maintainer, in English
+  const line = rose ? `Memory, ${why}: past ${HEAP_WARN_AT[now - 1] * 100}% of the heap limit: ${memoryLine(m)}` : `Memory, ${why}: ${memoryLine(m)}` // i18n-ignore: combwork.log's memory line, for the maintainer, in English
   if (rose) log.warn(line)
   else log.info(line)
   recent.push(`${new Date().toISOString()} ${rose ? 'WARN ' : ''}${line}`)
@@ -62,7 +62,7 @@ export function logMemory(why: string, m: MemoryNow = memoryNow()): void {
 
 /** Logs the memory line now (Hive is starting) and every 5 minutes. */
 export function startMemoryLog(): void {
-  logMemory('at start') // i18n-ignore: hive.log's memory line, for the maintainer, in English
+  logMemory('at start') // i18n-ignore: combwork.log's memory line, for the maintainer, in English
   setInterval(() => logMemory('every 5 min'), MEMORY_EVERY_MS).unref()
 }
 

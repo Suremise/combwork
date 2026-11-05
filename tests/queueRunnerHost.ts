@@ -1,5 +1,5 @@
 // A Combwork's merge queue runner in a process of its own, for tests/queueRunner.test.ts (#1360): two or three of these on
-// one hive.db copy are Hives on one workspace. Bundled by the test (esbuild, Electron stubbed) and run by Node; it reads
+// one combwork.db copy are Hives on one workspace. Bundled by the test (esbuild, Electron stubbed) and run by Node; it reads
 // one JSON command a line on stdin and answers each with one line on stdout: REPLY and JSON (Combwork's log lines go there
 // too). Its seams come from its environment: QR_LINGER (its job's supervisor outlives it), QR_STALL_SETTLE (a takeover
 // that never gets past its first step); and from commands: `block` (its board writes wait for ever, as behind a busy

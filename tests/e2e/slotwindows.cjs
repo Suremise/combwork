@@ -35,7 +35,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
 const logText = () => {
   try {
-    return fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
+    return fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
   } catch {
     return ''
   }

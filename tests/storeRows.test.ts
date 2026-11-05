@@ -27,7 +27,7 @@ afterAll(() => board.closeAllBoards())
 describe('the workspace database from before (#1017: schema 1)', () => {
   it('gets the stores tables (schema 2), its cards kept, after a backup', () => {
     const ws = workspace()
-    const file = join(ws, '.combwork', 'hive.db')
+    const file = join(ws, '.combwork', 'combwork.db')
     const v1 = openDb(file, { migrations: board.BOARD_MIGRATIONS.slice(0, 1), hiveVersion: '0.9.0' })
     v1.writer.prepare('INSERT INTO cards (number, doc) VALUES (1, ?)').run(JSON.stringify({ number: 1, title: 'Kept', column: 'todo' }))
     v1.close()

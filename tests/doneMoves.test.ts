@@ -1,4 +1,4 @@
-// A move to Done always goes through the card's workflow (HI-1674), on the real board (a temp hive.db) and a temp Git
+// A move to Done always goes through the card's workflow (HI-1674), on the real board (a temp combwork.db) and a temp Git
 // repository. On rc.1 the Assistant moved two code cards with no change from Doing to Done: the column moved, the
 // stage stayed Active and their agents' questions stayed For you. The cause: cards from before 1.0 started by an
 // intent kept their 1.0 mark (`pre_workflow`), so the board's moves of them took P3's path, around their rules. Now a

@@ -140,7 +140,7 @@ describe('what cards cite (they keep it)', () => {
 
   it("reads a board in its database (#1017) as it reads card files; one it can't open means nothing may go", () => {
     const dir = temp('hive-clean-db-')
-    const file = join(dir, 'hive.db')
+    const file = join(dir, 'combwork.db')
     const db = new DatabaseSync(file)
     db.exec('CREATE TABLE cards (number INTEGER PRIMARY KEY, doc TEXT NOT NULL)')
     const put = db.prepare('INSERT INTO cards (number, doc) VALUES (?, ?)')
@@ -161,7 +161,7 @@ describe('what cards cite (they keep it)', () => {
 
   it("reads a 1.0 board's cards from its tables (#1209) as it reads a 0.9 board's documents", () => {
     const dir = temp('hive-clean-db10-')
-    const file = join(dir, 'hive.db')
+    const file = join(dir, 'combwork.db')
     const db = new DatabaseSync(file)
     for (const sql of CARDS_STEP.ddl) db.exec(sql)
     const add = (n: number, c: object): void => writeCardRows(db, decomposeCard(n, { number: n, title: 't', description: '', comments: [], column: 'todo', ...c }))
@@ -185,8 +185,8 @@ describe('what cards cite (they keep it)', () => {
     mkdirSync(join(ws, '.combwork', 'tasks'), { recursive: true })
     writeFileSync(join(ws, '.combwork', 'tasks', 'board.json'), '{"next":9}')
     expect(findBoard(ws)).toBe(join(ws, '.combwork', 'tasks'))
-    writeFileSync(join(ws, '.combwork', 'hive.db'), '')
-    expect(findBoard(ws)).toBe(join(ws, '.combwork', 'hive.db'))
+    writeFileSync(join(ws, '.combwork', 'combwork.db'), '')
+    expect(findBoard(ws)).toBe(join(ws, '.combwork', 'combwork.db'))
   })
 })
 

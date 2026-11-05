@@ -26,7 +26,7 @@ const claudeHome = path.join(lib.WORK, 'upgradelane-claude')
 const spareHome = path.join(lib.WORK, 'upgradelane-claude-spare')
 const alpha = path.join(ws, 'alpha')
 // The board as the dev build keeps it, once it has moved the workspace's .hive to .combwork (HI-2462).
-const dbFile = path.join(ws, '.combwork', 'hive.db')
+const dbFile = path.join(ws, '.combwork', 'combwork.db')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++

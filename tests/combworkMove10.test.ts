@@ -106,6 +106,8 @@ describe("a 1.0.0 workspace opened in this build (HR1's finding 6)", () => {
       [join(alpha, '.combwork'), join(alpha, '.hive')]
     ])
       if (existsSync(from)) renameSync(from, to)
+    // And its board's file under 1.0's name (HI-2587).
+    for (const s of ['', '-wal', '-shm']) if (existsSync(join(ws, '.hive', `combwork.db${s}`))) renameSync(join(ws, '.hive', `combwork.db${s}`), join(ws, '.hive', `hive.db${s}`))
     // 1.0 stored the attachment's link by its path, the comment's text and the context reference as written then.
     const db = new DatabaseSync(join(ws, '.hive', 'hive.db'))
     db.prepare('UPDATE cards SET description = ? WHERE number = ?').run(`![shot](${old(shot)})`, card.number)

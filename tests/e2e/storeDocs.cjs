@@ -1,4 +1,4 @@
-// The workspace's small stores as its database keeps them (#1018: deliveries and sessions in .combwork/hive.db's store_rows;
+// The workspace's small stores as its database keeps them (#1018: deliveries and sessions in .combwork/combwork.db's store_rows;
 // #1212: lanes and watches in typed tables), read by the suites that checked their files before: a read-only connection,
 // opened and closed for each read.
 const fs = require('fs')
@@ -35,7 +35,7 @@ function watchOf(w) {
 
 /** A store's entries, in order (what its file's array held); [] while the workspace has no database yet. */
 function storeDocs(ws, store, scope = '') {
-  const file = path.join(ws, '.combwork', 'hive.db')
+  const file = path.join(ws, '.combwork', 'combwork.db')
   if (!fs.existsSync(file)) return []
   const db = new DatabaseSync(file, { readOnly: true, timeout: 5000 })
   try {
@@ -73,7 +73,7 @@ function deliveriesOf(host) {
 
 /** A value kept beside a store's entries (deliveries' `next`), parsed; undefined when there is none. */
 function storeMeta(ws, store, key, scope = '') {
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { readOnly: true, timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { readOnly: true, timeout: 5000 })
   try {
     const r = db.prepare('SELECT value FROM store_meta WHERE store = ? AND scope = ? AND key = ?').get(store, scope, key)
     return r ? JSON.parse(r.value) : undefined
@@ -87,7 +87,7 @@ function storeMeta(ws, store, key, scope = '') {
  * there, else last; `meta` values set beside it (JSON-encoded here). In one transaction.
  */
 function putStoreDoc(ws, store, key, doc, { scope = '', meta = {} } = {}) {
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
   try {
     db.exec('BEGIN IMMEDIATE')
     if (store === 'deliveries' && hasTable(db, 'deliveries')) {
@@ -120,7 +120,7 @@ function putStoreDoc(ws, store, key, doc, { scope = '', meta = {} } = {}) {
 function sessionsOf(host) {
   const p = deliveriesPlace(host)
   const out = { version: 1, sessions: [] }
-  const file = path.join(p.ws, '.combwork', 'hive.db')
+  const file = path.join(p.ws, '.combwork', 'combwork.db')
   if (!fs.existsSync(file)) return out
   const db = new DatabaseSync(file, { readOnly: true, timeout: 5000 })
   try {
@@ -158,7 +158,7 @@ function sessionsOf(host) {
  */
 function putSessions(host, f) {
   const p = deliveriesPlace(host)
-  const db = new DatabaseSync(path.join(p.ws, '.combwork', 'hive.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(p.ws, '.combwork', 'combwork.db'), { timeout: 5000 })
   try {
     db.exec('BEGIN IMMEDIATE')
     if (hasTable(db, 'sessions')) {
@@ -194,7 +194,7 @@ function putSessions(host, f) {
 
 /** Takes out what an ended lane kept of its cards (a lane ended before #512 kept it, or its record damaged). */
 function forgetLaneCards(ws, laneId) {
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
   try {
     db.prepare('DELETE FROM lane_frozen WHERE lane = ?').run(laneId)
   } finally {

@@ -639,7 +639,7 @@ async function asRefused<T>(fn: () => Promise<T>): Promise<T> {
 
 /**
  * A change the Hive Assistant asks for: admitted by the Assistant's change boundary (control level, limit), run, and
- * recorded (its panel's list and hive.log) with `act`, its kind and targets (#763), and what `fn` adds to them once
+ * recorded (its panel's list and combwork.log) with `act`, its kind and targets (#763), and what `fn` adds to them once
  * known (`act`: a new card's number, a new agent). `fn` gets the boundary's guard, to run again as each write is made.
  * Other callers can't make these changes through the API.
  */

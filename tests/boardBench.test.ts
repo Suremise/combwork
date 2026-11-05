@@ -1,5 +1,5 @@
 // How long the board's reads and writes take on a copy of a real board (#1209's timings, for the cards' storage cards to
-// compare before and after a change): HIVE_BOARD_BENCH_DB=<a hive.db> copies it (with its -wal) into tempDir() (the file
+// compare before and after a change): HIVE_BOARD_BENCH_DB=<a combwork.db> copies it (with its -wal) into tempDir() (the file
 // itself is never opened), upgrades the copy and prints the median of each. Skipped without it. It uses only the board's
 // public calls, so the same file runs on an older commit for the "before".
 import { copyFileSync, existsSync, mkdirSync } from 'fs'
@@ -31,7 +31,7 @@ describe('the board on a real board’s copy', () => {
   it.skipIf(!source)('reads and writes, timed', { timeout: 600_000 }, async () => {
     const ws = join(base, 'ws')
     mkdirSync(join(ws, '.combwork'), { recursive: true })
-    const file = join(ws, '.combwork', 'hive.db')
+    const file = join(ws, '.combwork', 'combwork.db')
     copyFileSync(source!, file)
     if (existsSync(`${source}-wal`)) copyFileSync(`${source}-wal`, `${file}-wal`)
     const raw = new DatabaseSync(file)

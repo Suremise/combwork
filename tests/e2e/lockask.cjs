@@ -89,7 +89,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
 
     // --- Allow, after the blocked turn's end: the go-ahead is typed, Asker reads it and edits the file.
     await allow.first().click()
-    const hiveLog = () => (fs.existsSync(path.join(userData, 'logs', 'hive.log')) ? fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8') : '')
+    const hiveLog = () => (fs.existsSync(path.join(userData, 'logs', 'combwork.log')) ? fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8') : '')
     check('Allow is answered: Asker is allowed to edit x.txt', !!(await until(() => /Lock: .*Asker.* allowed to edit .*x\.txt/.test(hiveLog()))), JSON.stringify({ log: hiveLog().match(/.*Lock: .*/g), toasts: await page.locator('.toast').allInnerTexts() }))
     const wakes = () => lines(path.join(codexHome, 'fake-wakes.jsonl')).filter((w) => w.agent === 'Asker')
     check('the go-ahead is typed into Asker, which reads it in its inbox', !!(await until(() => wakes().some((w) => /allowed you to edit x\.txt/.test(w.text)))), JSON.stringify(wakes()))

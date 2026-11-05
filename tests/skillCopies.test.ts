@@ -20,7 +20,7 @@ const { SKILLS_REMOVE_IDLE_COPIES } = await import('../src/shared/advanced')
 const { offNames, skillOff, withSkillDelivered } = await import('../src/shared/skillDelivery')
 const { boardSkillsLine, hiveInstructions } = await import('../src/shared/hiveGuidance')
 
-/** A book kept in memory, as hive.db's table keeps it (by folder and skill, case-insensitively). */
+/** A book kept in memory, as combwork.db's table keeps it (by folder and skill, case-insensitively). */
 function memBook(): SkillCopyBook & { rows: Map<string, SkillCopyRecord & { folder: string }> } {
   const rows = new Map<string, SkillCopyRecord & { folder: string }>()
   const key = (folder: string, skill: string): string => `${folder.toLowerCase()}\n${skill.toLowerCase()}`
@@ -114,7 +114,7 @@ describe('safe clean-up (#1431)', () => {
     // Made without a book (before records): marked, unrecorded.
     await sync(w.slot, w.project, w.sources)
     // A marker from before hashes: whether it changed can't be told.
-    writeFileSync(join(w.copy(w.slot, 'legacy'), '.hive-copy'), JSON.stringify({ source: 'x' }) + '\n')
+    writeFileSync(join(w.copy(w.slot, 'legacy'), '.combwork-copy'), JSON.stringify({ source: 'x' }) + '\n')
     const book = memBook()
     expect(await removeHiveCopies(w.slot, w.project, book, () => false)).toEqual(['deploy'])
     expect(existsSync(w.copy(w.slot, 'legacy'))).toBe(true)
@@ -240,7 +240,7 @@ describe('the switch: Slots only, Everywhere, Never (#1431)', () => {
     expect([removesIn(slot, project, 'never'), removesIn(project, project, 'never')]).toEqual([false, false])
   })
 
-  it("in a workspace: the record is hive.db's, and each value removes the copies where it says, at a session's end and at start", async () => {
+  it("in a workspace: the record is combwork.db's, and each value removes the copies where it says, at a session's end and at start", async () => {
     const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
     const { advanced } = await import('../src/main/advanced')
     const { closeAllBoards } = await import('../src/main/boardStore')

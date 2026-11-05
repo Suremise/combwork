@@ -1,5 +1,5 @@
 // A closed workspace's deliveries (#1391): once a window closes it (switches away), its hosts' stores go from memory, so
-// the tick no longer rechecks them, each change of which leased its closed hive.db again, and nothing reads them again
+// the tick no longer rechecks them, each change of which leased its closed combwork.db again, and nothing reads them again
 // until a window opens it; a read the close caught isn't kept. They stay in its database and come back as it opens.
 import { mkdirSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -56,7 +56,7 @@ describe("a closed workspace's deliveries", () => {
     return id
   }
 
-  it('go from memory as the window switches away: a tick, an offer or a load opens its hive.db no more, and they come back as it opens', async () => {
+  it('go from memory as the window switches away: a tick, an offer or a load opens its combwork.db no more, and they come back as it opens', async () => {
     const id = await queued()
 
     await w.open(wsB)

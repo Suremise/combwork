@@ -14,7 +14,7 @@ import { setKeyMasker } from '../shared/redact'
  * whitespace in any of its forms, so none of it can pass. `none` (no key was ever saved): nothing to mask.
  *
  * maskKeys is plugged into shared/redact.ts's maskSecrets (the developer console, its recordings and flight captures,
- * Copy Diagnostics, transcript views) and hive.log's line (logger.ts logLine); the exports mask what they write with it.
+ * Copy Diagnostics, transcript views) and combwork.log's line (logger.ts logLine); the exports mask what they write with it.
  */
 
 export const FRAGMENT = 8

@@ -5,7 +5,7 @@ import { createLogger } from './logger'
 import { memoryLine } from './memory'
 
 /**
- * Why Hive stopped (#985): crash dumps kept in the profile, never sent anywhere, and a line in hive.log for every way
+ * Why Hive stopped (#985): crash dumps kept in the profile, never sent anywhere, and a line in combwork.log for every way
  * the app can end, so a run that stops without a word (17 Oct 2026) leaves something to go on. The logger's writer thread
  * (HI-1730) writes lines within moments; at the process's exit what it hasn't written is written at once (flushLogs), so
  * a line logged just before the end is on disk when the process goes. A crash of the whole process can lose the last few

@@ -342,7 +342,7 @@ export interface AssistantSettings {
  */
 export type AssistantControl = 'look' | 'agents' | 'projects'
 
-/** Something the Hive Assistant did (or tried), for the list in its panel and hive.log. */
+/** Something the Hive Assistant did (or tried), for the list in its panel and combwork.log. */
 /** Also its kind and targets (#763, assistantActivity.ts): what the event stream gives viewers instead of the line. */
 /**
  * What kind of change of the Assistant's undo works on (#1282, SPEC §16.14): a card's fields (or a card it made), a lane

@@ -200,7 +200,7 @@ describe('whether a conversation may resume now (automatic) or by the user', () 
     expect(canResumeNow(f, builder, { cwd: slotFolder('slot-b'), lease: 'l1' })).toBe(false)
   })
 
-  it('after a restart with both leases open, the same answers (the contract reads only what hive.db keeps)', () => {
+  it('after a restart with both leases open, the same answers (the contract reads only what combwork.db keeps)', () => {
     const before = facts([slot('hb2', { open: lease('lc', 'hb2', 'b1', 'carried') }), slot('slot-a', { open: lease('ld', 'slot-a', 'b1') })])
     const after: FolderFacts = JSON.parse(JSON.stringify(before))
     for (const s of [{ cwd: slotFolder('hb2'), lease: 'lc' }, { cwd: slotFolder('slot-a'), lease: 'ld' }]) expect(resumeHold(after, builder, s)).toEqual(resumeHold(before, builder, s))
@@ -244,7 +244,7 @@ describe('Resume All and the Sessions tab with holds', () => {
 })
 
 
-describe("a slot's writer: claimed in one write with the resume authority, held until its run has exited (hive.db)", () => {
+describe("a slot's writer: claimed in one write with the resume authority, held until its run has exited (combwork.db)", () => {
   const opened: (() => void)[] = []
   afterEach(() => {
     for (const close of opened.splice(0)) close()
@@ -253,7 +253,7 @@ describe("a slot's writer: claimed in one write with the resume authority, held 
   const ME = { pid: process.pid, started: 1 }
 
   /**
-   * A workspace's hive.db with a project's slot-b lent to b1 for #12 (lease l1), slot-c free and ready, and b1's
+   * A workspace's combwork.db with a project's slot-b lent to b1 for #12 (lease l1), slot-c free and ready, and b1's
    * session s1 in slot-b, bound to l1. `other()` is another Combwork's connection to the same file.
    */
   function board(): { store: SlotStore; db: DatabaseSync; other: () => SlotStore } {
@@ -342,7 +342,7 @@ describe("a slot's writer: claimed in one write with the resume authority, held 
     expect(await b.store.finalizeEndRev('l1', 'head-3')).toBe(false)
   })
 
-  it('a lease that changed before the write: the claim decides from hive.db as it is then (two Hives at once: one writer)', async () => {
+  it('a lease that changed before the write: the claim decides from combwork.db as it is then (two Hives at once: one writer)', async () => {
     const b = board()
     // The lease ended between the facts read and the write: a new conversation has no slot of its own any more.
     await b.store.end('l1', 'done')

@@ -40,7 +40,7 @@ import { HIVE_DIR } from '../shared/defaults'
 /**
  * Hive's performance metrics, one store per open workspace (shared/metrics.ts has the contract). Recording is a few
  * map updates into the current hour's bucket; nothing is read from disk on the request path. Buckets are hourly for 7
- * days, then folded into days, kept 30 days, and saved (debounced) in the workspace's database (#1019: `.combwork/hive.db`,
+ * days, then folded into days, kept 30 days, and saved (debounced) in the workspace's database (#1019: `.combwork/combwork.db`,
  * a bucket and its series in their typed tables since #1212, storeTables.ts, so a save writes the buckets that changed, the hour under way, and appends a new
  * one; `.combwork/metrics/metrics.json` before, moved in by the first save), which is git-ignored and machine-local. Every dimension comes from a fixed set (route templates, Hive's tool names, provider ids), each
  * bucket has caps on projects and series, the store has a cap on buckets whichever way the clock moves, and the file

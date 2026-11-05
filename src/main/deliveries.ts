@@ -2074,7 +2074,7 @@ onDbReplaced((_path, place) => {
 })
 
 // A window closes its workspace (#1391): its hosts' deliveries go from memory, so the tick no longer rechecks them, which
-// leased its closed hive.db at each change. They stay in the database and are restored when a window opens it again. A
+// leased its closed combwork.db at each change. They stay in the database and are restored when a window opens it again. A
 // save already under way holds its store and lease, and finishes. By real location (`placeKey`), as the fence tells
 // workspaces apart: a host loaded through a junction or an 8.3 name to the folder is the same workspace's. Followed from
 // initDeliveries (once).

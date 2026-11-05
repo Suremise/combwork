@@ -12,11 +12,11 @@ import { tempDir } from './tempDir'
 const { hiveToolsConnected } = createRequire(import.meta.url)('./e2e/lib.cjs') as { hiveToolsConnected: (userData: string, agentId: string, since?: number) => boolean }
 const ROOT = join(__dirname, '..')
 
-/** A test profile whose hive.log holds these lines. */
+/** A test profile whose combwork.log holds these lines. */
 function profile(lines: string[]): string {
   const userData = tempDir('toolsconnected-')
   mkdirSync(join(userData, 'logs'), { recursive: true })
-  writeFileSync(join(userData, 'logs', 'hive.log'), lines.join('\n') + '\n')
+  writeFileSync(join(userData, 'logs', 'combwork.log'), lines.join('\n') + '\n')
   return userData
 }
 const T = '2026-11-05T12:00:00.000Z [INFO] [sessions]'

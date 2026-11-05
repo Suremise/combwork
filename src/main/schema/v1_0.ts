@@ -1,5 +1,5 @@
 /**
- * hive.db's 1.0 schema (#1208, SPEC §16.12, §16.4, §16.17; #1025, #704, #1119): every table P3's migration makes, grouped
+ * combwork.db's 1.0 schema (#1208, SPEC §16.12, §16.4, §16.17; #1025, #704, #1119): every table P3's migration makes, grouped
  * into the steps the storage cards register in `BOARD_MIGRATIONS`, in this order (each takes the next version number when
  * it merges, never out of order: db.ts skips a version below the file's). #1207's 1.0 group runs them in one
  * transaction, after one ask, one backup and one exclusive lock. Registered so far: the cards step (#1209, cardsStep.ts).
@@ -362,7 +362,7 @@ const LANES_WATCHES_METRICS: SchemaStep = {
   ]
 }
 
-/** The fact log, durable actions and rulesets (SPEC §16.4), from the P2 spike's factStore.ts, in hive.db. */
+/** The fact log, durable actions and rulesets (SPEC §16.4), from the P2 spike's factStore.ts, in combwork.db. */
 export const FACTS_STEP: SchemaStep = {
   name: 'facts',
   ddl: [

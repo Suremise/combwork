@@ -3,7 +3,7 @@ import { join } from 'path'
 
 /**
  * The processes that have a file open (HI-1749), as Windows' Restart Manager lists them (RmGetList): what held project.json
- * when its save failed with EPERM, which hive.log couldn't say. Through PowerShell (a C# helper compiled for the call, a
+ * when its save failed with EPERM, which combwork.log couldn't say. Through PowerShell (a C# helper compiled for the call, a
  * second or two), so only after a write has failed; read-only (it registers the file and lists, never ends anything).
  * Each as "<pid> <application name>"; empty when none or it couldn't tell (another OS, PowerShell refused, a timeout).
  */

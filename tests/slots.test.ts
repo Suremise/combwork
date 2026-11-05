@@ -1,8 +1,8 @@
 // A project's slot pool (#1429, SPEC §16.10.1–16.10.2; src/main/slots.ts): lending and releasing, one open lease per
-// slot and per agent kept by SQLite's own indexes (two processes on one hive.db lending one slot at once), carried slots
+// slot and per agent kept by SQLite's own indexes (two processes on one combwork.db lending one slot at once), carried slots
 // protected, dirty slots not lent, the pool's size and idle removal, every guard of a removal, setup and installs as
 // runs, a failed setup, names, a slot gone from disk, and the options read from today's worktree settings. And the
-// operations that own a slot while it changes (HR1's round 1): two pools on one hive.db as two Hives (each its own
+// operations that own a slot while it changes (HR1's round 1): two pools on one combwork.db as two Hives (each its own
 // connection and holder process), commands held at a gate, a holder that dies, jobs that can't be emptied.
 import { spawn, spawn as nodeSpawn, type ChildProcess } from 'child_process'
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs'
@@ -82,7 +82,7 @@ interface World {
   clock: { now: number }
   /** Pids of holder processes that have ended. */
   dead: Set<number>
-  /** Another Combwork on the same hive.db: its own connection and holder process. */
+  /** Another Combwork on the same combwork.db: its own connection and holder process. */
   another: (pid: number) => { pool: SlotPool; store: SlotStore }
   /** Holds the next `what` run of a slot at a gate: resolves once it has started; `open()` lets it go. */
   hold: (slot: string, what: SlotRun['what']) => { started: Promise<void>; open: () => void }
@@ -102,7 +102,7 @@ afterEach(async () => {
   setBuilderCount(null)
 })
 
-/** A workspace with a hive.db and a project repository on main (git-ignoring warm/ and node_modules/), and its pool. */
+/** A workspace with a combwork.db and a project repository on main (git-ignoring warm/ and node_modules/), and its pool. */
 function world(o: { setup?: string; builders?: number } = {}): World {
   const ws = join(tempDir('slots-'), 'ws')
   const project = gitRepo(join(ws, 'project'))

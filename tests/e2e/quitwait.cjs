@@ -157,7 +157,7 @@ async function keepBusy(inv, alpha, agent, live, secs) {
   // it (save or discard) rather than quit and lose it; Cancel there keeps Combwork running.
   {
     const { app, page, inv, alpha, agent, live, ready, userData } = await launch('reopen')
-    const reentries = () => (fs.existsSync(path.join(userData, 'logs', 'hive.log')) ? fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').split('\n').filter((l) => l.includes('final look at unsaved files is already asking')).length : 0)
+    const reentries = () => (fs.existsSync(path.join(userData, 'logs', 'combwork.log')) ? fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8').split('\n').filter((l) => l.includes('final look at unsaved files is already asking')).length : 0)
     check('reopen: the agent starts', !!ready)
     const dialog = page.locator('.dialog', { hasText: 'Quit Combwork?' })
     const waitToQuit = async (secs) => {

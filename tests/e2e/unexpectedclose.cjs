@@ -19,7 +19,7 @@ const claudeHome = path.join(lib.WORK, 'unexpectedclose-claude-home')
 const ws = path.join(lib.WORK, 'unexpectedclose-ws')
 const proj = path.join(ws, 'alpha')
 const markerFile = path.join(userData, 'running.json')
-const logFile = path.join(userData, 'logs', 'hive.log')
+const logFile = path.join(userData, 'logs', 'combwork.log')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -158,7 +158,7 @@ const liveAgent = async (inv, agentId) => (await inv('session:live')).find((l) =
       const line = home ? await lib.until(told, HUNG_MS) : null
       check("the Assistant finds it in its inbox for its next start, with the agents and that nothing was resumed", !!line && /Steady \(alpha\)/.test(line.body) && /Nothing was resumed/.test(line.body), JSON.stringify(line ?? home))
       check('nothing resumed on its own', !(await liveAgent(inv, agent.id)))
-      check('hive.log says so, with the time', thisRun().includes(`ended without quitting: last seen ${left.lastSeen}`), thisRun().split('\n').slice(0, 8).join(' | '))
+      check('combwork.log says so, with the time', thisRun().includes(`ended without quitting: last seen ${left.lastSeen}`), thisRun().split('\n').slice(0, 8).join(' | '))
       check('Copy Diagnostics says the last run ended without quitting', /The last run ended without quitting: last seen [^;]+; 1 agent\(s\) were running/.test(await inv('app:diagnostics')))
       check('this run has its own marker', !!(await lib.until(() => marker()?.startedAt && marker().startedAt !== left.startedAt, HUNG_MS)))
       await page.locator('.toast', { hasText: 'Combwork closed unexpectedly' }).getByRole('button', { name: 'Resume All' }).click()
@@ -173,7 +173,7 @@ const liveAgent = async (inv, agentId) => (await inv('session:live')).find((l) =
       await inv('app:quit').catch(() => undefined)
       check('a normal quit ends the copy', await quitting.gone(HUNG_MS))
       check('…and removes the marker', !fs.existsSync(markerFile))
-      check('…saying why in hive.log', /Removed the running marker: Combwork is quitting/.test(thisRun()))
+      check('…saying why in combwork.log', /Removed the running marker: Combwork is quitting/.test(thisRun()))
       current = null
     }
     {

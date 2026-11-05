@@ -196,7 +196,7 @@ const notice = (page) => page.evaluate(() => [...document.querySelectorAll('.toa
       check("the ended copy's Agent API port is free again", !!(await lib.until(apiPortFree, HUNG_MS)), portHolders())
       // HI-2196: held as the next copy starts (as the copy just ended may still hold it), the port is tried again after
       // the unexpected close, and the API listens once it is freed.
-      const logFile = path.join(userData, 'logs', 'hive.log')
+      const logFile = path.join(userData, 'logs', 'combwork.log')
       const logFrom = fs.existsSync(logFile) ? fs.statSync(logFile).size : 0
       const newLog = () => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8').slice(logFrom) : '')
       held = net.createServer()

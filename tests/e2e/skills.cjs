@@ -46,7 +46,7 @@ const check = (name, ok, extra = '') => {
   const copy = path.join(proj, '.agents', 'skills', 'cw-handover')
   fs.mkdirSync(copy, { recursive: true })
   fs.writeFileSync(path.join(copy, 'SKILL.md'), '---\nname: handover\ndescription: copy\n---\n')
-  fs.writeFileSync(path.join(copy, '.hive-copy'), '{"hash":"x"}')
+  fs.writeFileSync(path.join(copy, '.combwork-copy'), '{"hash":"x"}')
 
   lib.enableProviders(userData, ['claude-code', 'codex'])
   const { app, page, inv } = await lib.launch({ userData, env: { CODEX_HOME: lib.CODEX_HOME }, viewport: { width: 1500, height: 950 } })

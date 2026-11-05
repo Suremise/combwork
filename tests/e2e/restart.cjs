@@ -59,10 +59,10 @@ const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.json
   check('after Restart session it is ready again, the offer gone', restarted)
   // What happened instead (#218): the fake's launches, the sessions and Combwork's log of them.
   if (!restarted) {
-    const log = fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').split('\n').filter((l) => /\[(pty|sessions)\]/.test(l))
+    const log = fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8').split('\n').filter((l) => /\[(pty|sessions)\]/.test(l))
     console.log(`(launches: ${launches().length}; live: ${JSON.stringify((await inv('session:live')).map((l) => ({ status: l.status, id: l.sessionId })))}; banner: ${await page.getByRole('button', { name: 'Restart session' }).count()}; dialogs: ${JSON.stringify(await page.locator('.dialog').allInnerTexts())})`)
     await page.screenshot({ path: path.join(shots, '3-restart-failed.png') })
-    for (const l of log.slice(-12)) console.log(`(hive.log) ${l.slice(0, 300)}`)
+    for (const l of log.slice(-12)) console.log(`(combwork.log) ${l.slice(0, 300)}`)
   }
   await page.screenshot({ path: path.join(shots, '3-after-restart.png') })
 
@@ -83,7 +83,7 @@ const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.json
   await lib.setLaunch(inv, proj, agent.id, { effort: 'high' })
   await inv('workspace:refresh')
   check('another changed effort offers Restart session', !!(await lib.until(async () => (await page.getByRole('button', { name: 'Restart session' }).count()) > 0, 10000)))
-  const dbFile = path.join(ws, '.combwork', 'hive.db')
+  const dbFile = path.join(ws, '.combwork', 'combwork.db')
   const hold = `const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync(${JSON.stringify(dbFile)}, { timeout: 5000 }); db.exec('BEGIN IMMEDIATE'); console.log('held'); setTimeout(() => { db.exec('COMMIT'); db.close() }, 3000)`
   const holder = require('child_process').spawn(process.execPath, ['-e', hold], { env: lib.baseEnv() })
   const released = new Promise((r) => holder.once('exit', r))

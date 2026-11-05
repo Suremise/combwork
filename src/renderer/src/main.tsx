@@ -19,7 +19,7 @@ const isConsole = location.hash === '#console'
 await initLanguage()
 initTeamPause()
 
-// The window's long tasks and where it is, for hive.log (HI-1775): not the developer console's.
+// The window's long tasks and where it is, for combwork.log (HI-1775): not the developer console's.
 if (!isConsole) startWindowHealth()
 
 createRoot(document.getElementById('root')!).render(

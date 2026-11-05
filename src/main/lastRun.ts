@@ -105,7 +105,7 @@ export function checkLastRun(file = markerFile()): UnexpectedClose | null {
   if (m && m.hive && m.hive !== app.getVersion() && found.agents.length) adoptInstalledRun(found.agents, m.hive, found.lastSeen)
   // The agents a restart's record has (restartResume.ts owns their resume): not resumed from here too.
   toResume = found.agents.filter((a) => !ownsResume(a.projectPath, a.agentId))
-  log.warn(`The last run of Combwork ended without quitting: last seen ${found.lastSeen}${m ? ` (Combwork ${m.hive}, started ${m.startedAt})` : ' (its marker could not be read)'}; ${found.agents.length} agent(s) were running${found.agents.length ? `: ${found.agents.map((a) => `${userText(a.agentName)} in ${userText(a.project)}`).join(', ')}` : ''}${dump ? `; a crash dump from ${new Date(dump.at).toISOString()}` : '; no crash dump'}`) // i18n-ignore: a line of hive.log
+  log.warn(`The last run of Combwork ended without quitting: last seen ${found.lastSeen}${m ? ` (Combwork ${m.hive}, started ${m.startedAt})` : ' (its marker could not be read)'}; ${found.agents.length} agent(s) were running${found.agents.length ? `: ${found.agents.map((a) => `${userText(a.agentName)} in ${userText(a.project)}`).join(', ')}` : ''}${dump ? `; a crash dump from ${new Date(dump.at).toISOString()}` : '; no crash dump'}`) // i18n-ignore: a line of combwork.log
   return found
 }
 
@@ -222,10 +222,10 @@ export function startRunMarker(): void {
   })
   onLaunchProcessJoined(writeSoon)
   // Windows ending the session is a clean end too: Hive may be ended without quitting after it.
-  const watch = (w: BrowserWindow): void => void w.on('session-end', () => endRunMarker('Windows is ending the session')) // i18n-ignore: why, for hive.log
+  const watch = (w: BrowserWindow): void => void w.on('session-end', () => endRunMarker('Windows is ending the session')) // i18n-ignore: why, for combwork.log
   for (const w of BrowserWindow.getAllWindows()) watch(w)
   app.on('browser-window-created', (_e, w) => watch(w))
-  app.on('will-quit', () => endRunMarker('Combwork is quitting')) // i18n-ignore: why, for hive.log
+  app.on('will-quit', () => endRunMarker('Combwork is quitting')) // i18n-ignore: why, for combwork.log
 }
 
 /** A normal end (quitting, an update, a restart, Windows ending the session): the marker goes, and isn't written again. */
@@ -377,7 +377,7 @@ export async function tellUnexpectedClose(): Promise<void> {
   const kept = c.processes.flatMap((l) => l.processes)
   const leftRunning = (await stillRunningOf(kept).catch(() => null)) ?? []
   leftovers.set(leftRunning, kept)
-  if (kept.length) log.info(`Of ${kept.length} process(es) the agents had started, ${leftRunning.length} still run${leftRunning.length ? `: ${userText(leftRunning.map((p) => p.label).join('; '))}` : ''}`) // i18n-ignore: a line of hive.log
+  if (kept.length) log.info(`Of ${kept.length} process(es) the agents had started, ${leftRunning.length} still run${leftRunning.length ? `: ${userText(leftRunning.map((p) => p.label).join('; '))}` : ''}`) // i18n-ignore: a line of combwork.log
   told = true
   const actions: ToastAction[] = []
   if (!r && mine.length) actions.push({ label: tr(msg({ id: 'main.unexpectedClose.resumeAll', defaultMessage: 'Resume All', description: 'A button in the notice that Hive closed unexpectedly: resumes the agents that were running.' })), command: 'session.resumeAfterClose' })

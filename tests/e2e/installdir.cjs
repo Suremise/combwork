@@ -97,7 +97,7 @@ function pasted(message) {
   check('and to the file Electron checks, read', /\(A;;0x1200a9;;;AC\)/.test(sddl(icu)), sddl(icu))
   await app.close()
   // Its lines, written by the log's own thread (HI-1730), in words: a profile that never saved a key masks nothing (HI-1855).
-  const logFile = path.join(userData, 'logs', 'hive.log')
+  const logFile = path.join(userData, 'logs', 'combwork.log')
   const readLog = () => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8') : '')
   const said = await lib.until(() => readLog().includes("icudtl.dat doesn't inherit") && readLog().includes('Added ALL APPLICATION PACKAGES to the install folder'), HUNG_MS)
   check('its log says so', !!said, readLog().split('\n').filter((l) => l.includes('[installDir]')).join(' | '))

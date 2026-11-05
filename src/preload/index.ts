@@ -24,16 +24,16 @@ const noteArrived = (what: string): void => {
   arrived.push({ at, what, n: 1 })
   if (arrived.length > 300) arrived.shift()
 }
-ipcRenderer.on('hive:event', (_: IpcRendererEvent, event: HiveEvent) => noteArrived(`event ${event.type}`)) // i18n-ignore: hive.log, in English
-ipcRenderer.on('pty:data', () => noteArrived('terminal output')) // i18n-ignore: hive.log, in English
-ipcRenderer.on('pty:exit', () => noteArrived('terminal exit')) // i18n-ignore: hive.log, in English
+ipcRenderer.on('hive:event', (_: IpcRendererEvent, event: HiveEvent) => noteArrived(`event ${event.type}`)) // i18n-ignore: combwork.log, in English
+ipcRenderer.on('pty:data', () => noteArrived('terminal output')) // i18n-ignore: combwork.log, in English
+ipcRenderer.on('pty:exit', () => noteArrived('terminal exit')) // i18n-ignore: combwork.log, in English
 
 const bridge: HiveBridge = {
   invoke: (channel, ...args) =>
     ipcRenderer.invoke(channel, ...args).then(
-      (r) => (noteArrived(`reply ${channel}`), r), // i18n-ignore: hive.log, in English
+      (r) => (noteArrived(`reply ${channel}`), r), // i18n-ignore: combwork.log, in English
       (e: unknown) => {
-        noteArrived(`reply ${channel} (failed)`) // i18n-ignore: hive.log, in English
+        noteArrived(`reply ${channel} (failed)`) // i18n-ignore: combwork.log, in English
         throw e
       }
     ),

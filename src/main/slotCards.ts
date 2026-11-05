@@ -1936,7 +1936,7 @@ function laneSlot(ws: WorkspaceService, lane: LaneRecord): LaneSlotInfo | null {
 }
 
 /**
- * A running lane's slot in hive.db (#1446): of `project`'s leases only (its slots' project id), the lane's own, else its
+ * A running lane's slot in combwork.db (#1446): of `project`'s leases only (its slots' project id), the lane's own, else its
  * builder's carried one (#1441: a 0.9 worktree adopted at the upgrade); none of the project's: null.
  */
 export function laneSlotIn(db: DatabaseSync, project: string, lane: Pick<LaneRecord, 'id' | 'builder'>): LaneSlotInfo | null {

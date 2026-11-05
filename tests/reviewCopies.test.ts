@@ -3,7 +3,7 @@
 // with --add-dir; Codex's -c override would replace the user's own writable roots: the recorded fixture); start review
 // leasing a copy at the submission's revision, the verdict returning it to returning, a stale pass's confirming review
 // leasing one again, a resubmission's new revision, and a review waiting while every copy is in use, then told once it
-// has one. A real CopyPool on a real hive.db and git repository; conditions, never time.
+// has one. A real CopyPool on a real combwork.db and git repository; conditions, never time.
 import { spawn as nodeSpawn } from 'child_process'
 import { mkdirSync, readFileSync } from 'fs'
 import { createRequire } from 'module'

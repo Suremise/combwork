@@ -276,7 +276,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
 
     // --- An upgraded workspace: no step, no notice, only the old presets notice.
     await lib.openWorkspace(inv, page, upgradedWs)
-    const db = new DatabaseSync(path.join(upgradedWs, '.combwork', 'hive.db'), { timeout: 5000 })
+    const db = new DatabaseSync(path.join(upgradedWs, '.combwork', 'combwork.db'), { timeout: 5000 })
     try {
       db.prepare("INSERT INTO board_meta (key, value) VALUES ('adoption_upto', '3') ON CONFLICT (key) DO UPDATE SET value = excluded.value").run()
     } finally {

@@ -314,7 +314,7 @@ const check = (name, ok, extra = '') => {
     check('…the shortcut and Help open the same window, not another', consoles().length === 1)
 
     // --- Closing it while a recording's start is still on its way (#638 round 2): nothing records, nothing captures.
-    const hiveLog = path.join(userData, 'logs', 'hive.log')
+    const hiveLog = path.join(userData, 'logs', 'combwork.log')
     const notStarted = () => (fs.readFileSync(hiveLog, 'utf8').match(/recording not started/g) ?? []).length
     const refusedBefore = notStarted()
     const filesBefore = new Set(fs.readdirSync(recordingsDir))

@@ -87,10 +87,53 @@ export function rewriteCards(job: CardsRewrite): CardsAnswer {
   }
 }
 
+/** The board file's move (HI-2587): its old file folded whole, its log checkpointed into it and removed by its close. */
+export interface Checkpoint {
+  kind: 'checkpoint'
+  file: string
+}
+
+export type CheckpointAnswer = { ok: true } | { ok: false; error: string }
+
+/**
+ * Opens the board's old file as its only connection, reads it (a rollback journal left by a crash is rolled back here,
+ * as SQLite does on a first read), checkpoints its write-ahead log into it and truncates it, then closes it: closing its
+ * last connection removes the log and its index. The move checks what is left afterwards, never this answer alone.
+ */
+export function checkpointFile(job: Checkpoint): CheckpointAnswer {
+  const db = new DatabaseSync(job.file, { timeout: 10_000 })
+  try {
+    db.prepare('SELECT count(*) FROM sqlite_master').get() // i18n-ignore: SQL
+    db.exec('PRAGMA wal_checkpoint(TRUNCATE)')
+    return { ok: true }
+  } finally {
+    db.close()
+  }
+}
+
+/** The folders the board's `skill_copies` records name (HI-2587's marker step): none on a board without the table. */
+export interface CopyFolders {
+  kind: 'copyFolders'
+  file: string
+}
+
+export type CopyFoldersAnswer = { ok: true; folders: string[] } | { ok: false; error: string }
+
+export function copyFolders(job: CopyFolders): CopyFoldersAnswer {
+  const db = new DatabaseSync(job.file, { readOnly: true, timeout: 10_000 })
+  try {
+    if (!has(db, 'skill_copies', 'folder')) return { ok: true, folders: [] }
+    return { ok: true, folders: (db.prepare('SELECT DISTINCT folder FROM skill_copies').all() as { folder: string }[]).map((r) => r.folder) } // i18n-ignore: SQL
+  } finally {
+    db.close()
+  }
+}
+
 const port = parentPort
 if (port && workerData) {
   try {
-    port.postMessage(rewriteCards(workerData as CardsRewrite))
+    const kind = (workerData as { kind?: string }).kind
+    port.postMessage(kind === 'checkpoint' ? checkpointFile(workerData as Checkpoint) : kind === 'copyFolders' ? copyFolders(workerData as CopyFolders) : rewriteCards(workerData as CardsRewrite))
   } catch (e) {
     port.postMessage({ ok: false, error: e instanceof Error ? e.message : String(e) } satisfies CardsAnswer)
   }

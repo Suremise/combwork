@@ -9,7 +9,7 @@ import { providerName } from '../shared/providers'
 import { testedComparison } from '../shared/testedClis'
 import type { AgentInstallInfo, ProviderId } from '../shared/types'
 import { config } from './config'
-import { logsDir } from './logger'
+import { LOG_FILE, logsDir } from './logger'
 import { provider } from './providers'
 import { providerService } from './providerService'
 import { gitTool } from './gitTool'
@@ -34,7 +34,7 @@ const LOG_LINES = 50
 
 /** The end of Hive's log (64 KB, whole lines). */
 async function logTail(): Promise<string[]> {
-  const file = join(logsDir(), 'hive.log')
+  const file = join(logsDir(), LOG_FILE)
   if (!existsSync(file)) return []
   const f = await open(file, 'r')
   try {

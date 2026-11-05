@@ -2,7 +2,7 @@
 
 The acceptance scenarios of SPEC §16.18 (and §16.19's release candidates), each against the test that covers it. Here
 `tests/workflow` is P2's core suite, run with the app's runtime settings (`reconcileActs` on, `harness.ts`). App-level
-unit tests run Combwork's main process on a real board (a temporary `hive.db`), and e2e suites (`tests/e2e/*.cjs`) run the
+unit tests run Combwork's main process on a real board (a temporary `combwork.db`), and e2e suites (`tests/e2e/*.cjs`) run the
 built app. Written for #1287, P4's acceptance check, and extended for #1358, P5's, and #1425, P6's (with every option
 against its tests: [Options and their tests](#options-and-their-tests)). A part that a later phase builds is marked
 with that phase rather than left out.
@@ -201,7 +201,7 @@ an e2e where the window sets it and one where it acts. **inv** as above (`projec
 | Adopted worktrees renamed | `cw.slots.renameAdopted` | on | `relocateWorktree.test.ts` "free, but with the switch off, the rules off or a session running in it: kept as it is", "free and nothing in it: renamed …" | `p7settings` | `slotupgrade` (on: hb1 renamed slot-a once free); `slotswitches` (off: a free adopted hb2 keeps its name through a lane; on, renamed at the next pass) |
 | Reviewers review in review copies | `cw.copies.review` | on | `copies.test.ts` "refuses when none is free (noCopy), and a review while review copies are off"; `reviewCopies.test.ts` "goes to a reviewer and to an either agent …" | shown in `slotoptions` (Open Advanced) | `reviewcopies` (on, then off: no --add-dir, no lease; inv); `p7lane` (on) |
 | Wait for a copy to go quiet | `cw.copies.quietWaitMinutes` | 10 | `copies.test.ts` "a copy held back past the bound says what still uses it" | `p7settings` | `copyquiet` (1 min: a reviewer's returned copy, held back while it works, is "still in use by R1 (working)" past the minute, then leased on) |
-| Idle skill copies removed | `cw.skills.removeIdleCopies` | Slots only | `skillCopies.test.ts` "in a workspace: the record is hive.db's, and each value removes the copies where it says, …" | `p7settings` (Never, Everywhere) | `skilldelivery` (Slots only, Everywhere; inv); never: unit only |
+| Idle skill copies removed | `cw.skills.removeIdleCopies` | Slots only | `skillCopies.test.ts` "in a workspace: the record is combwork.db's, and each value removes the copies where it says, …" | `p7settings` (Never, Everywhere) | `skilldelivery` (Slots only, Everywhere; inv); never: unit only |
 | Inbox: checkpoints | `cw.inbox.checkpoints` (the project's `inboxCheckpoints`) | on | `carryingOn.test.ts` "the table: each switch decides only its own way, and nothing is dropped", "a project's own value wins over Settings' …"; `inboxNotices.test.ts` "with their switches off (#1432), …" | `carryingon` (the project's own, Project Settings → Sessions) | `carryingon` (on, then off; inv) |
 | Inbox: carrying on at Stop | `cw.inbox.stopContinuation` (`inboxStopContinuation`) | on | the same `carryingOn.test.ts` table; `toolReplies.test.ts` "names only the ways the carrying-on switches on for the agent tell it …" | `carryingon` (the project's own) | `carryingon` (on, then off; inv) |
 | Inbox: idle wakes | `cw.inbox.idleWakes` (`inboxIdleWakes`) | on | `carryingOn.test.ts` "idle wakes off: no kind of item is typed, a card event (a loop wake) included …" | `carryingon` (the project's own) | `carryingon` (off: nothing typed, a loop's wake included) |

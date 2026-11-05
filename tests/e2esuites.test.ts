@@ -1648,12 +1648,12 @@ describe('packaged test Hives never check GitHub for updates (lib.cjs, #1332)', 
     expect(JSON.parse(readFileSync(join(profile, 'config.json'), 'utf8'))).toEqual({ version: 9, settings: { updates: { install: 'manual', checkAutomatically: false }, general: { showTips: true } } })
   })
 
-  it('the guard finds a check logged since the launch, in hive.log or its older copy, and only those', () => {
+  it('the guard finds a check logged since the launch, in combwork.log or its older copy, and only those', () => {
     const profile = tempDir('hive-noupdates-')
     mkdirSync(join(profile, 'logs'))
     const check = '2026-10-21T10:00:05.000Z [INFO] [updates] Checking for update'
-    writeFileSync(join(profile, 'logs', 'hive.1.log'), `2026-10-21T09:00:00.000Z [INFO] [updates] Checking for update\n${check}\n`)
-    writeFileSync(join(profile, 'logs', 'hive.log'), '2026-10-21T10:00:06.000Z [INFO] [updates] Update settings: check off\n')
+    writeFileSync(join(profile, 'logs', 'combwork.1.log'), `2026-10-21T09:00:00.000Z [INFO] [updates] Checking for update\n${check}\n`)
+    writeFileSync(join(profile, 'logs', 'combwork.log'), '2026-10-21T10:00:06.000Z [INFO] [updates] Update settings: check off\n')
     expect(lib.updateChecksLogged({ profile, since: '2026-10-21T10:00:00.000Z' })).toEqual([check])
     expect(lib.updateChecksLogged({ profile, since: '2026-10-21T11:00:00.000Z' })).toEqual([])
   })

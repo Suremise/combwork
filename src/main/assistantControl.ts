@@ -112,7 +112,7 @@ export function allows(need: AssistantControl): boolean {
 }
 
 /**
- * Records something the Assistant did (or was refused), in its panel's list and hive.log: `act`, its kind and targets
+ * Records something the Assistant did (or was refused), in its panel's list and combwork.log: `act`, its kind and targets
  * (#763; a refusal, the kind it tried); with `more`, the setting it changed (for Undo),
  * the line without what it quotes (`brief`), or a refusal's `reason` as the event stream says it (Hive's own words,
  * never the error's text: "Failed" when not given).

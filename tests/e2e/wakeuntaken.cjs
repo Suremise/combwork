@@ -60,7 +60,7 @@ const check = (name, ok, extra = '') => {
   }
   const wakes = () => wakeRecords().map((w) => w.text)
   const hiveLog = () => {
-    const f = path.join(userData, 'logs', 'hive.log')
+    const f = path.join(userData, 'logs', 'combwork.log')
     return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''
   }
   // The Windows notifications the user got: each tell() also logs an `entry` line (HI-2320), not a second notice (HI-2369).

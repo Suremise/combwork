@@ -12,7 +12,7 @@ const WS = 'D:\\ws'
 const MOVES = [{ from: `${WS}\\.hive`, to: `${WS}\\.combwork` }]
 
 function board(): string {
-  const file = join(tempDir('hivemoveworker-'), 'hive.db')
+  const file = join(tempDir('hivemoveworker-'), 'combwork.db')
   const db = new DatabaseSync(file)
   db.exec('PRAGMA journal_mode = WAL')
   db.exec('CREATE TABLE cards (number INTEGER PRIMARY KEY, description TEXT NOT NULL) STRICT')

@@ -70,7 +70,7 @@ describe('admission follows the window (#1395)', () => {
       const ws = workspace()
       await w.open(ws)
       expect(fence.admittedCount()).toBe(before + 1)
-      expect(fence.refusal(join(ws, '.combwork', 'hive.db'))).toBeNull()
+      expect(fence.refusal(join(ws, '.combwork', 'combwork.db'))).toBeNull()
     }
     await w.close()
     expect(fence.admittedCount()).toBe(before)

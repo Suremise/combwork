@@ -509,7 +509,7 @@ describe('Codex skill copies', () => {
     const sync = (list: { name: string; sourcePath: string }[]) => syncAgentsSkills({ cwd, skills: list } as never, 'Codex')
     await sync([{ name: 'deploy', sourcePath: src }])
     expect(readFileSync(join(skills, 'cw-deploy', 'SKILL.md'), 'utf8')).toBe('# deploy v1')
-    expect(existsSync(join(skills, 'cw-deploy', '.hive-copy'))).toBe(true)
+    expect(existsSync(join(skills, 'cw-deploy', '.combwork-copy'))).toBe(true)
     writeFileSync(join(src, 'SKILL.md'), '# deploy v2')
     await sync([{ name: 'deploy', sourcePath: src }])
     expect(readFileSync(join(skills, 'cw-deploy', 'SKILL.md'), 'utf8')).toBe('# deploy v2')

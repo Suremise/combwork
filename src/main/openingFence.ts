@@ -3,7 +3,7 @@ import { HIVE_DIR } from '../shared/defaults'
 import { placeKey } from './fsutil'
 
 /**
- * Admission to a workspace's databases (#1395, replacing #1379's fence and #1381's list of closed workspaces): hive.db,
+ * Admission to a workspace's databases (#1395, replacing #1379's fence and #1381's list of closed workspaces): combwork.db,
  * the Assistant's journal and usage.db are kept open (a persistent open: the board, the journal, the usage worker's file)
  * only for a workspace a window holds now, admitted as the window opens it and dismissed first as it closes it. Anything
  * else is a transient open (a lease: open, use, close in `finally`, as a store's last save as its workspace closes) or

@@ -1,7 +1,7 @@
 // "The main process was busy" (#1109): a gap spanning the PC's sleep (a suspend and resume told by powerMonitor, faked
 // here around a block of the main process) logs an info line, not a warning; an IPC call that holds the main process
 // (HIVE_TEST_BLOCK_IPC) is named in the warning. Main's thread pool has 16 threads, not Node's 4 (HI-1702): with eight held
-// a file call still ends, and with all of them held the slow file call is noted in hive.log, timed off main's thread (main
+// a file call still ends, and with all of them held the slow file call is noted in combwork.log, timed off main's thread (main
 // held with the pool free gives no such line). The blocked call's stall is kept for the Performance view, which lists
 // it with its cause in a throwaway workspace (HI-1135). Dev build, throwaway profile.
 const lib = require('./lib.cjs')
@@ -11,7 +11,7 @@ const path = require('path')
 const HUNG_MS = 20000
 
 const userData = path.join(lib.WORK, 'stalls-profile')
-const logFile = path.join(userData, 'logs', 'hive.log')
+const logFile = path.join(userData, 'logs', 'combwork.log')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++

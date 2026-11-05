@@ -3,7 +3,7 @@
 // once the builder is idle with no run going and its worktree clean, and only when everything on it is in the target;
 // recorded as LineMoved on the card just Done, before the next card's Started (whose base is its `to`). Work that isn't
 // in the target, and git's refusal, are asked of the user (For you); with the switch off the user is asked every time;
-// with workflow rules off nothing moves. A merge commit needs nothing. On a real board (a temp hive.db) and temp repos.
+// with workflow rules off nothing moves. A merge commit needs nothing. On a real board (a temp combwork.db) and temp repos.
 import { execFileSync } from 'child_process'
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'

@@ -3,7 +3,7 @@
 // rolled back. Observed facts carry a dedupe key, unique per card and kind, so two Hives observing one workspace write
 // each transition once (§16.17).
 //
-// In the workspace's hive.db since #1215 (Darren, #1118: "the fact store replaced by hive.db tables written inside
+// In the workspace's combwork.db since #1215 (Darren, #1118: "the fact store replaced by combwork.db tables written inside
 // boardWrite"): the 1.0 group's facts step makes its tables (schema/v1_0.ts), and a card is the board's own row. A store
 // is one project's: its cards, its lanes, its queue's pauses and its values. It reaches the database one of two ways
 // (HR4's #1215 round 1): on the board's (`forBoard`), its writes are part of the caller's boardWrite only, through the

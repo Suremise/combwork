@@ -1,5 +1,5 @@
 // A delivery's receipt and ack are logged (HI-2036): only "queued" was, so a message read through cw_inbox at once read
-// in hive.log as queued for hours (m637, Legible's lane). Once each, as saved, with how it was received, its agent's
+// in combwork.log as queued for hours (m637, Legible's lane). Once each, as saved, with how it was received, its agent's
 // name as the user's text (left out of Copy Diagnostics), never what it says. The session layer is a stand-in.
 import { rmSync } from 'fs'
 import { join } from 'path'

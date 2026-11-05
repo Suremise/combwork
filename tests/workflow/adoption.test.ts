@@ -288,7 +288,7 @@ describe.runIf(!!process.env.HIVE_STORE_ROUNDTRIP_DB && existsSync(process.env.H
   it('handles every card once and moves none', async () => {
     const ws = join(base, 'live')
     mkdirSync(join(ws, '.combwork'), { recursive: true })
-    copyFileSync(process.env.HIVE_STORE_ROUNDTRIP_DB!, join(ws, '.combwork', 'hive.db'))
+    copyFileSync(process.env.HIVE_STORE_ROUNDTRIP_DB!, join(ws, '.combwork', 'combwork.db'))
     const w = await open(ws)
     if (store.upgradeWaiting(ws)) await inWorkspace(w, () => store.upgradeBoard(w))
     const before = store.adoptionCards(w)

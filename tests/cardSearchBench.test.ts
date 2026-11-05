@@ -1,4 +1,4 @@
-// The board's full-text search on a copy of a real board (#1237): HIVE_BOARD_BENCH_DB=<a hive.db> copies it (with its -wal)
+// The board's full-text search on a copy of a real board (#1237): HIVE_BOARD_BENCH_DB=<a combwork.db> copies it (with its -wal)
 // into tempDir() (the file itself is never opened), upgrades the copy, and prints what the index costs and saves: its
 // size and build time, a search through it against reading every card and matching in memory (as `GET /v1/tasks` would
 // without it) and against the window's filter of cards it already holds, and a card's edit with and without its
@@ -37,7 +37,7 @@ describe('the full-text search on a real board’s copy', () => {
   it.skipIf(!source)('costs and saves, timed, and finds what the board finds', { timeout: 600_000 }, async () => {
     const ws = join(base, 'ws')
     mkdirSync(join(ws, '.combwork'), { recursive: true })
-    const file = join(ws, '.combwork', 'hive.db')
+    const file = join(ws, '.combwork', 'combwork.db')
     copyFileSync(source!, file)
     if (existsSync(`${source}-wal`)) copyFileSync(`${source}-wal`, `${file}-wal`)
     store.boardTestHooks.upgradeAnswer = 'yes'

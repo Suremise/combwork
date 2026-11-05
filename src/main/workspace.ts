@@ -41,6 +41,8 @@ import { duplicateAgentNames, suggestAgentName } from '../shared/agentNames'
 import { NO_PROJECT_IDS, isProjectId, settleProjectIds, type ProjectIdEntry, type ProjectIdIndex } from '../shared/projectIds'
 import { migrateProjectPreferences } from '../shared/workflow/preferences'
 import { classify, finishMove, moveFolders, type MoveOptions, type MoveOutcome } from './combworkMove'
+import { NAMES_DONE_FILE } from './nameUpgrade'
+import { NAMES_IGNORE } from './nameUpgradeFiles'
 import { movedPathOf } from '../shared/hiveFolderMove'
 
 const log = createLogger('workspace')
@@ -102,7 +104,7 @@ This folder is managed by [Combwork](https://github.com/Suremise/combwork) and i
 - \`skills/\` — Combwork skills (one folder per skill, each with a \`SKILL.md\`). Every agent in every project gets them.
 - \`mcp/\` — MCP server definitions (one \`<name>.json\` per server). Add them to projects in Combwork.
 - \`workspace.json\` — the workspace's settings, among them the MCP servers added for the Combwork Assistant (a project's are in its \`.combwork/project.json\`).
-- \`hive.db\` — the task board (Combwork's database). It is this machine's, like the Assistant's sessions: \`.gitignore\` keeps it out of git.
+- \`combwork.db\` — the task board (Combwork's database). It is this machine's, like the Assistant's sessions: \`.gitignore\` keeps it out of git.
 - \`usage.db\` — what each session used (the usage history the Overviews read). It is this machine's too, kept out of git.
 
 MCP definitions must not contain secrets. Reference environment variables instead, e.g. \`"\${GITHUB_TOKEN}"\`.
@@ -111,15 +113,13 @@ MCP definitions must not contain secrets. Reference environment variables instea
 /** The usage history's lines of BOARD_GITIGNORE (#1106), added to the .gitignore Hive wrote before them. */
 const USAGE_IGNORE = '# What each session used: the usage history (#1106)\nusage.db\nusage.db-*\n' // i18n-ignore: the .combwork folder's .gitignore, a file committed with the workspace
 
-/** BOARD_GITIGNORE's first line as Hive wrote it before 1.1 (HI-2580): a .gitignore starting with it is still Combwork's own. */
-const LEGACY_BOARD_GITIGNORE_HEAD = "# The task board's database and what moving it from files left (added by Hive, #1017)" // i18n-ignore: the .combwork folder's .gitignore, a file committed with the workspace
-
 /**
- * A .combwork/.gitignore's text with the usage history's lines added, or null to leave it as it is: one Combwork (or Hive,
- * before 1.1) didn't write is the user's, and one that has them already needs nothing.
+ * A .combwork/.gitignore's text with the usage history's lines added, or null to leave it as it is: one Combwork didn't
+ * write is the user's, and one that has them already needs nothing. Hive's, from before 1.1, has Combwork's head by then
+ * (the names upgrade at the open, HI-2587: nameUpgradeFiles.ts).
  */
 export function withUsageIgnore(text: string): string | null {
-  const ours = text.startsWith(BOARD_GITIGNORE.split('\n')[0]) || text.startsWith(LEGACY_BOARD_GITIGNORE_HEAD)
+  const ours = text.startsWith(BOARD_GITIGNORE.split('\n')[0])
   if (!ours || /^usage\.db\r?$/m.test(text)) return null
   const nl = text.includes('\r\n') ? '\r\n' : '\n'
   return `${text}${text.endsWith('\n') ? '' : nl}${USAGE_IGNORE.replace(/\n/g, nl)}`
@@ -134,8 +134,8 @@ async function addUsageIgnore(file: string): Promise<void> {
 
 // i18n-ignore: the .combwork folder's .gitignore, a file committed with the workspace
 export const BOARD_GITIGNORE = `# The task board's database and what moving it from files left (added by Combwork, #1017)
-hive.db
-hive.db-*
+combwork.db
+combwork.db-*
 backups/
 tasks.imported-*/
 tasks.set-aside/
@@ -143,7 +143,7 @@ deleted-cards/
 # What each session used: the usage history (#1106)
 usage.db
 usage.db-*
-`
+${NAMES_IGNORE}`
 
 /** The Assistant's home's .gitignore (HI-2580: before 1.1 it said Hive; nothing reads it back). */
 // agent-protocol: a .gitignore's fixed text for git and whoever opens the file, not words said to an agent
@@ -707,7 +707,8 @@ export class WorkspaceService {
     await whenAll([join(h, 'shared', 'handovers'), join(h, 'skills'), join(h, 'mcp'), join(h, 'tasks')].map((d) => mkdir(d, { recursive: true })))
     const hr = join(h, 'shared', 'handovers', 'README.md')
     await whenAll([
-      existsSync(join(h, 'workspace.json')) ? undefined : newWorkspaceConfig().then((c) => writeKeptJson(join(h, 'workspace.json'), c)),
+      // A new workspace has nothing under Hive's names: the names upgrade is done for it (HI-2587).
+      existsSync(join(h, 'workspace.json')) ? undefined : newWorkspaceConfig().then((c) => writeKeptJson(join(h, 'workspace.json'), c)).then(() => writeFile(join(h, NAMES_DONE_FILE), JSON.stringify({ version: 1, at: new Date().toISOString() }) + '\n')),
       existsSync(join(h, 'README.md')) ? undefined : writeFile(join(h, 'README.md'), WORKSPACE_README),
       // The board's database and what its move from files left (#1017) are this machine's: kept out of git if the workspace is a repository.
       existsSync(join(h, '.gitignore')) ? addUsageIgnore(join(h, '.gitignore')) : writeFile(join(h, '.gitignore'), BOARD_GITIGNORE),

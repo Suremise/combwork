@@ -95,7 +95,7 @@ function keysSaved(): boolean {
 const neverKeyed = (m: Marks): boolean => !m.ever && !m.gap && !existsSync(fingerprintsFile()) && !keysSaved()
 
 /**
- * As the main process starts, before ready (HI-1855): hive.log's first lines (the install folder's check) were masked
+ * As the main process starts, before ready (HI-1855): combwork.log's first lines (the install folder's check) were masked
  * strictly in every profile. A profile with no evidence of a key ever saved (config.json read as is: unreadable, it
  * stays strict) masks nothing from here; any other stays strict until startCoverage and loadCoverage, after ready.
  */
@@ -123,10 +123,10 @@ export function loadCoverage(): Promise<void> {
     if (m.ever || m.gap) await writeMarks(m).catch((e) => log.warn(`key masking: its markers couldn't be written: ${(e as Error).message}`))
     if (neverKeyed(m)) return setMasking({ state: 'none', gap: false })
     try {
-      if (!existsSync(fingerprintsFile())) throw new Error('missing') // i18n-ignore: hive.log, in English
-      if (!safeStorage.isEncryptionAvailable()) throw new Error('safeStorage unavailable') // i18n-ignore: hive.log, in English
+      if (!existsSync(fingerprintsFile())) throw new Error('missing') // i18n-ignore: combwork.log, in English
+      if (!safeStorage.isEncryptionAvailable()) throw new Error('safeStorage unavailable') // i18n-ignore: combwork.log, in English
       const file = JSON.parse(await readFile(fingerprintsFile(), 'utf8')) as { blob?: unknown }
-      if (typeof file.blob !== 'string') throw new Error('no blob') // i18n-ignore: hive.log, in English
+      if (typeof file.blob !== 'string') throw new Error('no blob') // i18n-ignore: combwork.log, in English
       const s = JSON.parse(safeStorage.decryptString(Buffer.from(file.blob, 'base64'))) as Stored
       const n = validWindows(s)
       stored = s
@@ -143,14 +143,14 @@ export function loadCoverage(): Promise<void> {
 
 /** The stored fingerprints' window count, checked whole (bounds included); throws when they aren't usable. */
 function validWindows(s: Stored): number {
-  if (!s || typeof s.salt !== 'string' || !Number.isInteger(s.base) || s.base < 2 || s.base >= MOD || !Array.isArray(s.keys)) throw new Error('shape') // i18n-ignore: hive.log, in English
+  if (!s || typeof s.salt !== 'string' || !Number.isInteger(s.base) || s.base < 2 || s.base >= MOD || !Array.isArray(s.keys)) throw new Error('shape') // i18n-ignore: combwork.log, in English
   let n = 0
   for (const k of s.keys) {
-    if (!Array.isArray(k.windows)) throw new Error('shape') // i18n-ignore: hive.log, in English
-    for (const w of k.windows) if (!Array.isArray(w) || typeof w[0] !== 'number' || typeof w[1] !== 'string') throw new Error('shape') // i18n-ignore: hive.log, in English
+    if (!Array.isArray(k.windows)) throw new Error('shape') // i18n-ignore: combwork.log, in English
+    for (const w of k.windows) if (!Array.isArray(w) || typeof w[0] !== 'number' || typeof w[1] !== 'string') throw new Error('shape') // i18n-ignore: combwork.log, in English
     n += k.windows.length
   }
-  if (n > maxWindows) throw new Error('over its bound') // i18n-ignore: hive.log, in English
+  if (n > maxWindows) throw new Error('over its bound') // i18n-ignore: combwork.log, in English
   return n
 }
 

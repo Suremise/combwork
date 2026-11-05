@@ -1,5 +1,5 @@
 // The Assistant's journal and the usage history (usage.db) opened under another name for their workspace's folder (#1456,
-// as #1402 for hive.db): a junction or an 8.3 short name is another connection to the same file, which the window's close
+// as #1402 for combwork.db): a junction or an 8.3 short name is another connection to the same file, which the window's close
 // closes too, by the place the window recorded as it opened, never by what a spelling resolves to at the close. So a
 // junction removed or pointed at another workspace before the close neither keeps this one's open nor closes another's.
 import { existsSync, mkdirSync, rmSync, unlinkSync, writeFileSync } from 'fs'

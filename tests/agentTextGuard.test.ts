@@ -67,7 +67,7 @@ describe('the agent-text guard', () => {
 
   it("checks only the lines marked agent text elsewhere: an i18n-ignore whose reason is agents'", () => {
     const t = tree({ [OTHER]: 'export const x = 1\n' })
-    t.write(OTHER, [`export const a = 'A sentence for the log' // i18n-ignore: hive.log's line, in English`, `export const b = 'A wake for the agent' // i18n-ignore: agent-facing, the wake's text`, `// i18n-ignore: SQL, no text`, `export const c = 'SELECT name FROM cards'`].join('\n'))
+    t.write(OTHER, [`export const a = 'A sentence for the log' // i18n-ignore: combwork.log's line, in English`, `export const b = 'A wake for the agent' // i18n-ignore: agent-facing, the wake's text`, `// i18n-ignore: SQL, no text`, `export const c = 'SELECT name FROM cards'`].join('\n'))
     expect(reported(t.run())).toEqual([expect.stringMatching(/^NEW AGENT TEXT src\/main\/somewhere\.ts:2 {2}prose\|var\|A wake for the agent$/)])
     expect(agentReason("agent-facing, the launch's instructions")).toBe(true)
     expect(agentReason("the Assistant's tool reply")).toBe(true)

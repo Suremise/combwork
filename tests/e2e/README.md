@@ -88,7 +88,7 @@ fetches the release's `latest.yml`, which GitHub counts as a download. A package
 `HIVE_TEST_QUIET=1` checks nothing, automatic or manual (Settings → Updates says it's a test copy, and its log says so
 at start), and `lib.cjs`'s `_electron.launch` also gives every packaged Combwork `HIVE_UPDATE_DELAY` at its maximum (about
 24.8 days: a 0.9's first check never comes) and, in a profile it has saved, automatic checks off (no 6-hourly one).
-The guard: when a suite ends, each packaged Combwork's `hive.log` must show no `[updates] Checking for update` since it
+The guard: when a suite ends, each packaged Combwork's `combwork.log` must show no `[updates] Checking for update` since it
 was started, or the suite fails, naming the lines. The Sandbox checks run with their network off.
 
 Nor does a test ever start the installed app (`%LOCALAPPDATA%\Programs\Combwork`, or 1.0's `Programs\Hive`): `lib.cjs` refuses it and any exe

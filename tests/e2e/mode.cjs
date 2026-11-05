@@ -25,7 +25,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
   const live = async () => (await inv('session:live')).find((l) => l.projectPath.toLowerCase() === proj.toLowerCase())
   /** How many times Combwork has launched a session's process (its log's spawn lines): to wait for a relaunch. */
-  const launches = () => (fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').match(/ spawn \W?session:/g) ?? []).length
+  const launches = () => (fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8').match(/ spawn \W?session:/g) ?? []).length
   const waitMode = async (m, ms = 30000) => { const t = Date.now(); while (Date.now() - t < ms) { if ((await live())?.permissionMode === m) return true; await sleep(200) } return false }
   await inv('workspace:open', ws); await sleep(600)
   await inv('project:updateConfig', proj, { providers: {}, layout: 'single', keybindings: {} })

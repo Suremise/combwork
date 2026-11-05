@@ -1,7 +1,7 @@
 // A project's review and check copies (#1435, SPEC §16.10.5, §16.13): a small warm pool of detached worktrees in one
 // fixed folder per project (`<Workspace>.worktrees/<Project>/copies/copy-N`, so a reviewer's launch grant never
 // changes), each leased to one reviewer for one submission (#1439) or to one isolated check run (`hive-progress --check
-// <name> --isolated`), reset to the exact revision first. Rows of hive.db (schema/v1_0.ts, COPIES_STEP): at most one
+// <name> --isolated`), reset to the exact revision first. Rows of combwork.db (schema/v1_0.ts, COPIES_STEP): at most one
 // lease per copy that isn't freed (a partial unique index).
 //
 // - Leasing (`leaseCopy`) reserves a free copy (the most recently used), or a new one while the pool is under its size

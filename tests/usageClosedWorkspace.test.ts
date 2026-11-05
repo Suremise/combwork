@@ -1,7 +1,7 @@
 // A workspace's databases aren't opened again once a window starts closing it (#1379): an import begun as it opened, a
 // session's ingest queued from no window's request, a host's first read waiting for the board's lock, a read resuming
 // while the close waits for its file watcher, housekeeping between compression and retention, a transcript read taking
-// its saved state from the closed workspace's usage.db. Each used to open its hive.db or usage.db again as the window
+// its saved state from the closed workspace's usage.db. Each used to open its combwork.db or usage.db again as the window
 // switched away, holding its folder until Combwork quit (the user couldn't move or delete it).
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join, resolve as resolvePath } from 'path'

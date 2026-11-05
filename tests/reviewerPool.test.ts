@@ -151,7 +151,7 @@ function lane(e: Env, id: string, cards: number[], builder: string, reviewer: st
   state.lanes.push({ id, project: 'project', name: null, builder: { id: builder, name: builder }, reviewer: reviewer ? { id: reviewer, name: reviewer } : null, cards, rounds: 10, waitMinutes: 360, state: 'active', startedBy: 'the user', startedAt: t, updatedAt: t, endedAt: null, mergeCommit: null, ...(reviewer ? {} : { pool: true as const }) })
 }
 
-/** Runs SQL on the workspace's hive.db on a connection of its own, as another Combwork (or the slots' own writes) would. */
+/** Runs SQL on the workspace's combwork.db on a connection of its own, as another Combwork (or the slots' own writes) would. */
 function onDb<T>(e: Env, fn: (db: DatabaseSync) => T): T {
   const db = new DatabaseSync(boardFile(e.home))
   try {
@@ -163,7 +163,7 @@ function onDb<T>(e: Env, fn: (db: DatabaseSync) => T): T {
 }
 
 let slotNo = 0
-/** An agent's dispatch lease of the project's slots (a lane's), taken or ended, in hive.db's slot tables as #1429 keeps them. */
+/** An agent's dispatch lease of the project's slots (a lane's), taken or ended, in combwork.db's slot tables as #1429 keeps them. */
 function lease(e: Env, agent: string, open: boolean): void {
   onDb(e, (db) => {
     const at = new Date().toISOString()

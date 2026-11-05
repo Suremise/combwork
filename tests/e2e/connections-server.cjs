@@ -192,7 +192,7 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
     const keyStore = read(path.join(userData, 'connection-keys.json'))
     check('the key store holds it encrypted, by its last 4 characters', keyStore.includes(ds.id) && !keyStore.includes(KEY) && !keyStore.includes(KEY2))
     check('…and no backup of it is kept', !fs.existsSync(path.join(userData, 'connection-keys.json.bak')))
-    for (const [where, text] of [['hive.log', lib.hiveLogLines(userData).join('\n')], ['config.json', read(path.join(userData, 'config.json'))], ['config.json.bak', read(path.join(userData, 'config.json.bak'))], ['Copy Diagnostics', String(diag)], ["the window's console", consoleText.join('\n')]]) check(`no key in ${where}`, !text.includes(KEY) && !text.includes(KEY2))
+    for (const [where, text] of [['combwork.log', lib.hiveLogLines(userData).join('\n')], ['config.json', read(path.join(userData, 'config.json'))], ['config.json.bak', read(path.join(userData, 'config.json.bak'))], ['Copy Diagnostics', String(diag)], ["the window's console", consoleText.join('\n')]]) check(`no key in ${where}`, !text.includes(KEY) && !text.includes(KEY2))
 
     // --- Removed: its key goes with it.
     await inv('connections:remove', ds.id)

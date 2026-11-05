@@ -473,7 +473,7 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
   })
 })
 
-describe('while the upgrade waits, nothing needing hive.db starts or writes (#1207 round 1)', () => {
+describe('while the upgrade waits, nothing needing combwork.db starts or writes (#1207 round 1)', () => {
   it('an agent is refused before anything starts, saying why; it starts once upgraded', async () => {
     const ws = await board09()
     const w = await open(ws)

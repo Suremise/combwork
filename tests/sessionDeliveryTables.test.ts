@@ -1,7 +1,7 @@
 // Sessions and deliveries in their 1.0 tables (#1211, schema/sessionDeliveryTables.ts and sessionDeliveryCodec.ts): every record reads back
 // equal as JSON (odd ones too: a field Combwork doesn't know, a null, a lone surrogate, one missing), a change writes only
 // the rows it changed, the 1.0 step moves store_rows' rows into the tables and keeps aside what isn't of Combwork's form, and
-// the queries use their indexes. HIVE_STORE_ROUNDTRIP_DB=<a hive.db> runs the step over a copy of that board made in
+// the queries use their indexes. HIVE_STORE_ROUNDTRIP_DB=<a combwork.db> runs the step over a copy of that board made in
 // tempDir() (the file itself is never opened): counts equal, every session and delivery equal as JSON.
 import { copyFileSync, existsSync } from 'fs'
 import { join } from 'path'
@@ -333,7 +333,7 @@ describe("a host's records in the tables (storeTables.ts)", () => {
 describe('the 1.0 step: store_rows into the tables', () => {
   /** A board file at 0.9's schema (and the group's steps before this one), with these store_rows rows. */
   function board09(rows: { store: string; scope: string; key: string; ord: number; doc: string }[], metas: [string, string, string, string][] = []): string {
-    const file = join(base, `b-${++n}`, 'hive.db')
+    const file = join(base, `b-${++n}`, 'combwork.db')
     const step = BOARD_MIGRATIONS.find((m) => m.name === 'sessions and deliveries in tables')!
     const db = openDb(file, { migrations: BOARD_MIGRATIONS.filter((m) => m.version < step.version), hiveVersion: '0.9.3' })
     try {
@@ -410,7 +410,7 @@ describe('the 1.0 step: store_rows into the tables', () => {
   })
 
   it('a new file takes the step with nothing to move', () => {
-    const file = join(base, `b-${++n}`, 'hive.db')
+    const file = join(base, `b-${++n}`, 'combwork.db')
     const db = openDb(file, { migrations: BOARD_MIGRATIONS, hiveVersion: '1.0.0' })
     try {
       expect(schemaVersion(db.writer)).toBe(Math.max(...BOARD_MIGRATIONS.map((m) => m.version)))
@@ -422,7 +422,7 @@ describe('the 1.0 step: store_rows into the tables', () => {
 
   const live = process.env.HIVE_STORE_ROUNDTRIP_DB
   it.skipIf(!live)("moves every session and delivery of a live board's copy: counts equal, each equal as JSON", () => {
-    const copy = join(tempDir('hive-store-roundtrip-'), 'hive.db')
+    const copy = join(tempDir('hive-store-roundtrip-'), 'combwork.db')
     copyFileSync(live!, copy)
     if (existsSync(`${live}-wal`)) copyFileSync(`${live}-wal`, `${copy}-wal`)
     const db = new DatabaseSync(copy)

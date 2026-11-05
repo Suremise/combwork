@@ -187,7 +187,7 @@ async function killedWorkspace(): Promise<{ ws: string; file: string }> {
   await inWorkspace(first, () => tasks.createTask({ title: 'Kept', project: 'p' }, user))
   await disposeWorkspaceService(first)
   store.closeBoard(ws)
-  const file = join(ws, '.combwork', 'hive.db')
+  const file = join(ws, '.combwork', 'combwork.db')
   await leftByAKill(file)
   return { ws, file }
 }
@@ -663,14 +663,14 @@ describe('a board opened under another name for its folder (#1402)', () => {
   }
   /** The window's board, opened as it is first used (by its window's spelling). */
   const useBoard = (w: WS) => inWorkspace(w, () => tasks.listTasks({}))
-  const fenced = (ws: string): boolean => refusal(join(ws, '.combwork', 'hive.db')) !== null
+  const fenced = (ws: string): boolean => refusal(join(ws, '.combwork', 'combwork.db')) !== null
   /** The next number in the stub older versions read, and the profiles' presence markers there. */
   const stubNext = (ws: string): number => JSON.parse(readFileSync(join(ws, '.combwork', 'tasks', 'board.json'), 'utf8')).next
   const markers = (ws: string): string[] => (existsSync(join(ws, '.combwork', 'open')) ? readdirSync(join(ws, '.combwork', 'open')) : [])
   /** Nothing holds the folder: it can be moved (Windows refuses while a connection has its database open). */
   async function moves(ws: string): Promise<void> {
     await renameRetrying(ws, `${ws}-moved`)
-    expect(existsSync(join(`${ws}-moved`, '.combwork', 'hive.db'))).toBe(true)
+    expect(existsSync(join(`${ws}-moved`, '.combwork', 'combwork.db'))).toBe(true)
   }
 
   for (const kind of ['junction', '8.3'] as const) {

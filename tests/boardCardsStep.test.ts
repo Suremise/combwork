@@ -2,7 +2,7 @@
 // group's transaction, and every reader of the board giving the same bytes after as before (cards in full and in short,
 // holds, places, Export Board). A step that throws part way leaves the 0.9 file as it was; opening it again runs nothing.
 //
-// HIVE_BOARD_GOLDEN_DB=<a hive.db> runs the same comparison over a copy of that board, made in tempDir() (the file itself
+// HIVE_BOARD_GOLDEN_DB=<a combwork.db> runs the same comparison over a copy of that board, made in tempDir() (the file itself
 // is never opened; its -wal is copied with it). Timings are tests/boardBench.test.ts's.
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'

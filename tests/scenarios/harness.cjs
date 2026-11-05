@@ -835,7 +835,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       const screen = plain(await inv('pty:buffer', key).catch(() => ''))
       if (screen) lastScreen = screen
       // Exited before its session started (an OAuth session it couldn't refresh, #577): no prompt can reach it.
-      const hiveLog = path.join(userData, 'logs', 'hive.log')
+      const hiveLog = path.join(userData, 'logs', 'combwork.log')
       if (s) seen = true
       else if (seen || ptyExitedIn(hiveLog, agentId)) {
         endedAtLaunch = launchEnded({ screen: lastScreen, reason: startFailureIn(hiveLog), auth: p.provider === 'claude-code' ? claudeAuthStatus(hiveLog, agentId, env) : null })
@@ -912,7 +912,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       if (!(await lib.sendPrompt(inv, key, text, { submitted, ready, waitMs: 20000 }))) {
         // Never taken: a sign-in or a limit the CLI shows only once something is typed is the environment (#1321).
         const drawn = String((await inv('pty:buffer', key).catch(() => '')) ?? '').slice(mark)
-        const refused = promptRefused({ prompt: text, screen: drawn, auth: p.provider === 'claude-code' ? claudeAuthStatus(path.join(userData, 'logs', 'hive.log'), agentId, env) : null })
+        const refused = promptRefused({ prompt: text, screen: drawn, auth: p.provider === 'claude-code' ? claudeAuthStatus(path.join(userData, 'logs', 'combwork.log'), agentId, env) : null })
         if (refused) return skipFor(refused)
         notTaken = promptNotTaken({ taken: await submitted(), screen: drawn })
       }

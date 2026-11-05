@@ -74,7 +74,7 @@ const check = (name, ok, extra = '') => {
       // The window is closing.
     }
   }, 60)
-  const logText = () => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
+  const logText = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
   const told = (name) => logText().split('\n').filter((l) => l.includes(`· ${name}`) && /waits for you|asks a question/.test(l)).length
   const turn = async (a, text) => {
     seen.set(a.id, [])

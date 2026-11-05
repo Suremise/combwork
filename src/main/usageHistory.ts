@@ -679,7 +679,7 @@ class UsageHistory {
   /**
    * Whether work begun for a workspace may go on: it is still the one open, in the same opening. `ws.lifetime` read later
    * is the next opening's (close starts a new one), so the run's own is checked (#1379: a backfill that went on after a
-   * switch read the closed workspace's sessions and opened its hive.db again, holding its folder).
+   * switch read the closed workspace's sessions and opened its combwork.db again, holding its folder).
    */
   private live(ws: WorkspaceService, run: WorkspaceRun): boolean {
     return !run.signal.aborted && ws.path === run.path && !this.stopped

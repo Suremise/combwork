@@ -760,7 +760,7 @@ let liveTimer: ReturnType<typeof setTimeout> | null = null
  */
 const LOADED = new Set<string>(['lanes', 'laneOrder', 'mergeSlots', 'assistantActions', 'assistantQuestions', 'assistantChanges', 'queues', 'queueKept', 'advanced', 'recent', 'openProgress', 'skillsVersion', 'modesVersion', 'dialectsVersion'] satisfies (keyof State)[])
 
-/** Sets the store, noting which of its parts changed (HI-1775): a long task's line in hive.log names the updates made in it. */
+/** Sets the store, noting which of its parts changed (HI-1775): a long task's line in combwork.log names the updates made in it. */
 export const set: typeof useStore.setState = ((partial: Parameters<typeof useStore.setState>[0], replace?: boolean) => {
   let before = useStore.getState()
   let update = typeof partial === 'function' ? partial(before) : partial

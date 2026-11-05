@@ -156,7 +156,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('the Assistant starts', live?.status === 'ready', live?.status)
   check('it works in the workspace folder', live?.cwd.toLowerCase() === ws.toLowerCase(), live?.cwd)
   check('its conversation is named for the mode', (live?.sessionName ?? '').startsWith('Assistant · Planner · '), live?.sessionName)
-  const log = fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
+  const log = fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
   // The key is marked as the user's own text in the log (userText), so the line is found by its parts.
   const launch = log.split('\n').filter((l) => / spawn \W?session:/.test(l) && l.toLowerCase().includes('assistant#assistant')).pop() ?? ''
   check('it launches in Auto', launch.includes('"--permission-mode","auto"'))

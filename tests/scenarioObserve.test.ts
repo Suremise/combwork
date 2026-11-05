@@ -1948,7 +1948,7 @@ describe('a trial the environment stops (trialEnvironment)', () => {
       const dir = tempDir('hive-auth-status-')
       const home = join(dir, 'home')
       mkdirSync(home)
-      const log = join(dir, 'hive.log')
+      const log = join(dir, 'combwork.log')
       writeFileSync(log, `2026-10-11T08:24:30.000Z [INFO] [pty] spawn \u2068session:c:\\x\\alpha#a-1\u2069: ${join(process.cwd(), 'tests', 'e2e', 'fake-claude', 'fake-claude.cmd')} ["--session-id","x"]\n`)
       expect(claudeAuthStatus(log, 'a-1', { CLAUDE_CONFIG_DIR: home })).toMatchObject({ loggedIn: true })
       writeFileSync(join(home, 'fake-signin.json'), JSON.stringify({ expired: true, atLaunch: true }))
@@ -1962,7 +1962,7 @@ describe('a trial the environment stops (trialEnvironment)', () => {
     })
 
     it("reads the reason from Combwork's log", () => {
-      const log = join(tempDir('hive-start-failure-'), 'hive.log')
+      const log = join(tempDir('hive-start-failure-'), 'combwork.log')
       writeFileSync(log, `2026-10-11T08:24:30.000Z [INFO] [pty] spawn x\n2026-10-11T08:24:33.000Z [WARN] [sessions] ⁨alpha · Coder⁩: exited with code 1 before it started: ⁨${OAUTH}⁩\n`)
       expect(startFailureIn(log)).toBe(OAUTH)
       expect(startFailureIn(join(dirname(log), 'none.log'))).toBe('')

@@ -1,4 +1,4 @@
-// Card attachments (HI-1700), on the real board (a temp hive.db) with two projects: kept in the card's folder with a row
+// Card attachments (HI-1700), on the real board (a temp combwork.db) with two projects: kept in the card's folder with a row
 // each; the same bytes once; the limits checked up front and while streaming (a file that grows); a batch all or nothing;
 // undone with the change; removed and deleted through the cards' trash, to the Recycle Bin once committed; a crash at any
 // step settled at the next open from the operations' records and the committed board; a move copying the files; never a

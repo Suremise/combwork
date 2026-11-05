@@ -1,7 +1,7 @@
-// Lanes, watches and metrics in hive.db's typed tables (#1212): each entry written in columns and read back equal as
+// Lanes, watches and metrics in combwork.db's typed tables (#1212): each entry written in columns and read back equal as
 // JSON, an odd one kept whole, the 1.0 step moving 0.9's store_rows in (order, values, entries no row can hold kept aside),
 // saves that write only what changed and are all or nothing, 0.8's lanes.json moved in once, and a copy of a live board
-// migrated with every lane, watch and metric equal (HIVE_STORE_MIGRATION_DB names its hive.db).
+// migrated with every lane, watch and metric equal (HIVE_STORE_MIGRATION_DB names its combwork.db).
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
@@ -451,7 +451,7 @@ describe("0.8's lanes.json moved in (from #1018's tests)", () => {
 })
 
 const live = process.env.HIVE_STORE_MIGRATION_DB
-describe.skipIf(!live)("a copy of a live board's hive.db (HIVE_STORE_MIGRATION_DB)", () => {
+describe.skipIf(!live)("a copy of a live board's combwork.db (HIVE_STORE_MIGRATION_DB)", () => {
   it('migrates with every lane, watch and metric equal as JSON, in order, and their values kept', () => {
     const copy = join(base, `live-${++n}.db`)
     copyFileSync(live!, copy)

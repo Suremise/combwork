@@ -95,8 +95,8 @@ const BOTH = ['handover', 'pick-up', 'split-work', 'workspace-note', 'use-cw-api
   const codexDir = path.join(proj, '.agents', 'skills')
   const codexSkills = copies(codexDir)
   check('Codex: the same skills as cw-<name> copies in its folder', [...AGENT_ONLY, ...BOTH.filter((n) => n !== 'handover')].every((n) => codexSkills.includes(n)) && !ASSISTANT_ONLY.some((n) => codexSkills.includes(n)), codexSkills.join(','))
-  check("…each marked as Combwork's", fs.existsSync(path.join(codexDir, 'cw-work-on-card', '.hive-copy')))
-  check("a folder of the user's with a copy's name is left as it is", fs.readFileSync(path.join(codexDir, 'cw-handover', 'SKILL.md'), 'utf8').includes('MY OWN') && !fs.existsSync(path.join(codexDir, 'cw-handover', '.hive-copy')))
+  check("…each marked as Combwork's", fs.existsSync(path.join(codexDir, 'cw-work-on-card', '.combwork-copy')))
+  check("a folder of the user's with a copy's name is left as it is", fs.readFileSync(path.join(codexDir, 'cw-handover', 'SKILL.md'), 'utf8').includes('MY OWN') && !fs.existsSync(path.join(codexDir, 'cw-handover', '.combwork-copy')))
   check("Combwork's copies are kept out of git", fs.readFileSync(path.join(proj, '.git', 'info', 'exclude'), 'utf8').includes('/.agents/skills/cw-*/'))
   const told = developer(codexLaunch(proj))
   check('Codex is told the session contract: the board skills and their boundaries', /work-on-card skill/.test(told) && /review-agent-work/.test(told) && /Board rules\b.*\bcw_report_merge\b.*Never take a card out of On Hold unasked/.test(told) && !/coordinate-agents/.test(told), told.slice(0, 300))
@@ -134,7 +134,7 @@ const BOTH = ['handover', 'pick-up', 'split-work', 'workspace-note', 'use-cw-api
   await inv('session:start', proj, { agentId: codex.id })
   await ready(proj, codex.id)
   const copy = path.join(codexDir, 'cw-work-on-card')
-  check('the next launch has the new version, with its references', fs.readFileSync(path.join(copy, 'SKILL.md'), 'utf8').includes('EDITED FOR THIS TEST') && fs.existsSync(path.join(copy, 'references', 'board.md')) && fs.existsSync(path.join(copy, '.hive-copy')))
+  check('the next launch has the new version, with its references', fs.readFileSync(path.join(copy, 'SKILL.md'), 'utf8').includes('EDITED FOR THIS TEST') && fs.existsSync(path.join(copy, 'references', 'board.md')) && fs.existsSync(path.join(copy, '.combwork-copy')))
   check('…and no half-made copies are left beside it', !fs.readdirSync(codexDir).some((f) => f.startsWith('.')), fs.readdirSync(codexDir).join(','))
 
   // --- The Assistant on Codex: its skills in the workspace folder, where it works, and its role in its instructions.

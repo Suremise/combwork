@@ -40,9 +40,9 @@ describe.skipIf(!SRC)('the slots migration on a copy of a 0.9 workspace (#1441)'
     // The workspace's own files, read-only.
     mkdirSync(join(dst, '.combwork'), { recursive: true })
     copyFileSync(join(SRC, '.combwork', 'workspace.json'), join(dst, '.combwork', 'workspace.json'))
-    const src = new DatabaseSync(join(SRC, '.combwork', 'hive.db'), { readOnly: true })
+    const src = new DatabaseSync(join(SRC, '.combwork', 'combwork.db'), { readOnly: true })
     try {
-      await backup(src, join(dst, '.combwork', 'hive.db'))
+      await backup(src, join(dst, '.combwork', 'combwork.db'))
     } finally {
       src.close()
     }

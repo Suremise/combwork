@@ -32,7 +32,7 @@ import { CATEGORY_STAGE, type Category, type StageId } from '../shared/workflow/
 const log = createLogger('board')
 
 /**
- * The workspace's task board in SQLite (#1017, design on the card): `.combwork/hive.db`. Since 1.0's cards step (#1209) a
+ * The workspace's task board in SQLite (#1017, design on the card): `.combwork/combwork.db`. Since 1.0's cards step (#1209) a
  * card is a row of typed columns in `cards` with its lists in child tables (labels, links, context, comments, history,
  * decisions, holds; schema/v1_0.ts), and every reader is given the card's JSON document composed from them, byte for
  * byte the document it was saved as (schema/cardRows.ts), so the Agent API's JSON is unchanged. Before the upgrade (a
@@ -40,7 +40,7 @@ const log = createLogger('board')
  * transaction, and one `tasks-changed` after it commits. Only this module reads or writes cards' rows.
  */
 
-export const DB_FILE = 'hive.db'
+export const DB_FILE = 'combwork.db'
 /** The folder the cards' files were in before (#1017), and what an older Hive still looks at. */
 const TASKS = 'tasks'
 
@@ -398,7 +398,7 @@ const stamp = (): string => new Date().toISOString().replace(/[:.]/g, '-')
 
 /** The README left in the cards' old folder for anyone (or any older Hive) looking there. */
 const README = [
-  'The task board moved to .combwork/hive.db in Hive 0.9 (#1017).', // i18n-ignore: a file left for people and older Hive versions, in English
+  'The task board moved to .combwork/combwork.db in Hive 0.9 (#1017).', // i18n-ignore: a file left for people and older Hive versions, in English
   'An older Hive opening this workspace shows an empty board; cards it adds here are set aside in .combwork/tasks.set-aside when Hive 0.9 or later opens again, for you to review.', // i18n-ignore: as above
   'To use the board in an older Hive, use Export Board to JSON in Hive 0.9 and copy the exported files into this folder, with Hive closed.', // i18n-ignore: as above
   ''
@@ -1977,7 +1977,7 @@ function replaced(path: string): void {
 }
 
 /**
- * Whether a workspace's data waits for its upgrade to 1.0 (the user said Not Now): hive.db then takes no writes, so
+ * Whether a workspace's data waits for its upgrade to 1.0 (the user said Not Now): combwork.db then takes no writes, so
  * nothing that must be recorded may start (an agent's session, #1207 round 1). False when the board can't be opened at
  * all: that is told where it is used. Throws the refusal for a workspace no window holds (#1395).
  */
@@ -2005,7 +2005,7 @@ export function boardWaits(ws: WorkspaceService): boolean {
   }
 }
 
-/** Throws the user's reason when the workspace's upgrade to 1.0 waits: for what can't run without hive.db (an agent's start). */
+/** Throws the user's reason when the workspace's upgrade to 1.0 waits: for what can't run without combwork.db (an agent's start). */
 export function assertUpgraded(workspacePath: string): void {
   if (upgradeWaiting(workspacePath)) throw hiveError(M.upgradeFirstStart, undefined, { kind: 'conflict' })
 }
