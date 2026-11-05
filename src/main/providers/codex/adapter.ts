@@ -145,34 +145,45 @@ export function codexHoldsInput(screen: string): boolean {
 const IDLE_QUESTION_LINES = 14
 /** A choice view's selected row (HI-2609): "›" in Codex's first column, then its number ("› 1. Switch to gpt-6-luna"). */
 const SELECTED_ROW = /^›\s*\d+\.\s/
-/** How far above its selected row a choice view's title may be: its title, its question line and a blank line. */
+/**
+ * A choice view's other lines above its selected row (HI-2609, HR2's round 2): a choice not selected ("  2. Keep current
+ * model", indented, numbered), or a choice's text wrapped onto a line of its own, indented further than a choice.
+ */
+const VIEW_ROW_ABOVE = /^\s+\d+\.\s|^\s{4,}\S/
+/** How many choices a view's rows above its selected row may take (a bound: Codex's views have a few). */
+const VIEW_ROWS_MOST = 12
+/** How far above its first choice a choice view's title may be: its title, its question line and a blank line. */
 const VIEW_TITLE_ABOVE = 4
 /**
  * The question Codex shows by itself between turns, sending no hook (HI-2609, 0.166.0: "Approaching rate limits", its
  * offer of a cheaper model with that choice selected, which Enter takes): its title (codex.screen.idleQuestion) and one
  * of its choices (codex.screen.idleQuestionChoice), read by the view's own layout. Such a view replaces the input while
  * it shows, so it is the last thing drawn: the last line Codex marks with "›" in its first column is the view's selected
- * row ("› 1. Switch to …"), and the title starts a paragraph of its own just above that row (its title, its question, a
- * blank line), its choices at and below the row. Anything else is no question (HR2's round 1): an input line last (the
- * view gone, or leftovers of one above it), the words in a reply or a prompt above the input, or typed into the input
- * however it wraps or is numbered (a first line "› 1. …" has nothing of the view above it, and a draft's other lines
- * follow its "›"). Null when none shows.
+ * row ("› 1. Switch to …", whichever choice is selected), the choices above it (not selected, or a choice's text
+ * wrapped) go up to the view's first choice, and the title starts a paragraph of its own just above that (its title, its
+ * question, a blank line); one of its choices is in the view. Anything else is no question (HR2's round 1): an input
+ * line last (the view gone, or leftovers of one above it), the words in a reply or a prompt above the input, or typed
+ * into the input however it wraps or is numbered (a first line "› 1. …" has nothing of the view above it, and a draft's
+ * other lines follow its "›"). Null when none shows.
  */
 export function codexIdleQuestion(screen: string): string | null {
   const lines = screen.split('\n').map((l) => l.trimEnd())
   while (lines.length && !lines.at(-1)) lines.pop()
   const row = lines.findLastIndex((l) => l.startsWith('›'))
   if (row < 0 || !SELECTED_ROW.test(lines[row])) return null
+  // Its first choice: up through the choices above the selected one (HR2's round 2: the third selected).
+  let first = row
+  while (first > 0 && row - first < VIEW_ROWS_MOST && VIEW_ROW_ABOVE.test(lines[first - 1])) first--
   const title = advanced.pattern('codex.screen.idleQuestion')
   const choice = advanced.pattern('codex.screen.idleQuestionChoice')
-  // Its title: a line just above the row (never the row itself), starting a paragraph, with only the view's own lines
-  // (indented text, blank lines) between it and the row: no conversation item ("•"), no prompt or input ("›").
-  for (let t = row - 1; t >= Math.max(0, row - VIEW_TITLE_ABOVE); t--) {
+  // Its title: a line just above its first choice, starting a paragraph, with only the view's own lines (indented text,
+  // blank lines) between: no conversation item ("•"), no prompt or input ("›").
+  for (let t = first - 1; t >= Math.max(0, first - VIEW_TITLE_ABOVE); t--) {
     if (!/^(\s|$)/.test(lines[t])) return null
     const asked = title.exec(lines[t])?.[0]
     if (!asked) continue
     if (t > 0 && lines[t - 1].trim()) return null
-    return lines.slice(row, row + IDLE_QUESTION_LINES).some((l) => choice.test(l)) ? asked.trim() : null
+    return lines.slice(first, row + IDLE_QUESTION_LINES).some((l) => choice.test(l)) ? asked.trim() : null
   }
   return null
 }

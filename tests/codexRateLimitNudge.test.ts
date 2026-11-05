@@ -25,6 +25,8 @@ const TITLE = 'Approaching rate limits'
 /** The offer's view as the fixture draws it, from its title down. */
 const VIEW = NUDGE.slice(NUDGE.indexOf(`  ${TITLE}`)).trimEnd()
 const INPUT = '› Ask Codex to do anything\n\n  GPT-6-Astra low · C:\\work\\alpha\n  ? for shortcuts'
+/** The fixture with choice n selected (HR2's round 2): "›" moved to its row. */
+const selecting = (n: number): string => NUDGE.replace('› 1. Switch', '  1. Switch').replace(new RegExp(`^  ${n}\\. `, 'm'), `› ${n}. `)
 
 describe("Codex's offer of a cheaper model, on its screen (0.166.0)", () => {
   it('reads it from the composed screen: its title, with its first choice selected ("› 1. …", not an input line)', () => {
@@ -32,6 +34,13 @@ describe("Codex's offer of a cheaper model, on its screen (0.166.0)", () => {
     // Another choice selected, and the view drawn alone (nothing above it).
     expect(codexIdleQuestion(NUDGE.replace('› 1. Switch', '  1. Switch').replace('  2. Keep current model', '› 2. Keep current model'))).toBe(TITLE)
     expect(codexIdleQuestion(VIEW)).toBe(TITLE)
+  })
+
+  it("reads it whichever choice is selected, and with a choice's text wrapped (HR2's round 2)", () => {
+    for (const n of [1, 2, 3]) expect(codexIdleQuestion(selecting(n)), `choice ${n}`).toBe(TITLE)
+    // A narrow pane: a choice's description wrapped onto lines of their own, above and below the selected row.
+    const wrapped = `  ${TITLE}\n  Switch to gpt-6-luna for lower credit usage?\n\n  1. Switch to gpt-6-luna   Uses fewer credits for\n                            upcoming turns.\n  2. Keep current model\n› 3. Keep current model (never show\n     again)`
+    expect(codexIdleQuestion(wrapped)).toBe(TITLE)
   })
 
   it('is none on an idle or a working screen, or with its title and no choice of it', () => {
@@ -119,6 +128,27 @@ describe('a Codex agent and its offer of a cheaper model (HI-2609)', () => {
     // Answered by the user (Keep current model): Codex's input again.
     await draw(e, IDLE)
     expect(sessions.cliAsks(project, id)).toBe(false)
+  })
+
+  it("whichever choice is selected, the agent waits and nothing is typed or pressed (HR2's round 2)", async () => {
+    vi.spyOn(internals, 'notify').mockImplementation(() => undefined)
+    const writes: string[] = []
+    vi.spyOn(pty, 'writePty').mockImplementation((_k, data) => void writes.push(data))
+    for (const n of [1, 2, 3]) {
+      const e = running('finished')
+      await draw(e, selecting(n))
+      // Before its status says so (the screen read first), every way of typing is refused for the question itself.
+      expect(sessions.cliAsks(project, id), `choice ${n}`).toBe(true)
+      await expect(sessions.sendPrompt(project, id, '[CW] New in your inbox: 1 card event (HI-12)'), `choice ${n}`).rejects.toThrow(/shows a question for you/)
+      expect(sessions.submitAgain(project, id, 'run1'), `choice ${n}`).toBe(false)
+      expect(writer.whyNoLine(project, id), `choice ${n}`).toMatch(/shows a question for the user/)
+      // Then the agent waits for the user with it.
+      internals.lookAtIdleScreen(liveKey(), e)
+      expect(e.state.status, `choice ${n}`).toBe('waiting')
+      e.screen.dispose()
+      live.delete(key)
+    }
+    expect(writes).toEqual([])
   })
 
   it("a draft with the offer's words in Codex's input is no question: the agent stays idle, and typing goes on (HR2's round 1)", async () => {
