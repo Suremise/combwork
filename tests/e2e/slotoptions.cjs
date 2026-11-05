@@ -6,7 +6,7 @@
 // - the setup script set in Slots and copies is the one the next warming run uses (a marker file in the slot), and the
 //   slots list shows the lent slot with its card; the copies' size saves; two fields saved while the first save is slow
 //   (HIVE_TEST_SLOW_IPC) both stay, with another window's change; the setup emptied is "none", and Inherit undoes it;
-// - the copied files inherit Hive's slot default, then the workspace's (set to none in its Workspace defaults, Settings → Version Control), then the
+// - the copied files inherit Combwork's slot default, then the workspace's (set to none in its Workspace defaults, Settings → Version Control), then the
 //   default, each saying where it comes from (HI-1765); Project Settings opens on General, with no slot rows;
 // - a project saved by a P6 build with Pair (G15 stored Off, the one-time step not run yet) reads as Pair, not Custom,
 //   after the next start, with G15 On.
@@ -31,7 +31,7 @@ const check = (name, ok, extra = '') => {
 }
 const until = (fn, ms) => lib.until(fn, ms, 200)
 const projectJson = (p = fx.alpha) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'project.json'), 'utf8'))
-/** Changes the workspace's board from outside Hive, as another process would. */
+/** Changes the workspace's board from outside Combwork, as another process would. */
 function board(sql, ...args) {
   const db = new DatabaseSync(path.join(fx.ws, '.combwork', 'hive.db'), { timeout: 5000 })
   try {
@@ -194,19 +194,19 @@ function board(sql, ...args) {
     check('a typed value is saved with Enter', !!(await until(() => projectJson().slots?.setup === 'npm ci --typed', HUNG_MS)), JSON.stringify(projectJson().slots))
     await slotsGroup.locator('[data-action="inherit-setup"]').click()
     await until(async () => !('setup' in (projectJson().slots ?? {})), HUNG_MS)
-    // The copied files (HI-1765): the project's own back to inherited, from Hive's slot default (Settings → Workflow
-    // defaults), then the workspace's set to none in its Workspace defaults (Settings → Version Control), over Hive's; the project's own none over both.
+    // The copied files (HI-1765): the project's own back to inherited, from Combwork's slot default (Settings → Workflow
+    // defaults), then the workspace's set to none in its Workspace defaults (Settings → Version Control), over Combwork's; the project's own none over both.
     await inv('slots:setLevelDefault', 'global', 'copy', '.env*\nconfig/hive.json')
     const copyOrigin = slotsGroup.locator('[data-slot-option="copy"] .workflow-origin')
     await slotsGroup.locator('[data-action="inherit-copy"]').click()
-    check('the copied files inherit Hive’s slot default, From Combwork defaults', !!(await until(async () => !('copy' in (projectJson().slots ?? {})) && (await copyOrigin.getAttribute('data-origin')) === 'global' && (await copyOrigin.innerText()).includes('config/hive.json'), HUNG_MS)), `${JSON.stringify(projectJson().slots)} ${await copyOrigin.innerText().catch(() => '')}`)
+    check('the copied files inherit Combwork’s slot default, From Combwork defaults', !!(await until(async () => !('copy' in (projectJson().slots ?? {})) && (await copyOrigin.getAttribute('data-origin')) === 'global' && (await copyOrigin.innerText()).includes('config/hive.json'), HUNG_MS)), `${JSON.stringify(projectJson().slots)} ${await copyOrigin.innerText().catch(() => '')}`)
     await shot('copy-global', slotsGroup.locator('[data-slot-option="copy"]'))
     await page.keyboard.press('Control+,')
     // The workspace's part of Settings → Version Control (HI-1768), its own tab since HI-1837.
     await page.locator('.settings-nav .row', { hasText: 'Version Control' }).first().click()
     await page.locator('[role="tab"][data-setting-tab="workflow.workspaceDefaults"]').click()
     const wsCopy = page.locator('[data-slot-default="copy"][data-level="workspace"]')
-    check('Settings → Version Control’s Workspace defaults have the copied files, inheriting Hive’s', !!(await until(async () => (await wsCopy.locator('.workflow-origin').getAttribute('data-origin').catch(() => '')) === 'global' && (await wsCopy.innerText()).includes('config/hive.json'), HUNG_MS)), await wsCopy.innerText().catch(() => ''))
+    check('Settings → Version Control’s Workspace defaults have the copied files, inheriting Combwork’s', !!(await until(async () => (await wsCopy.locator('.workflow-origin').getAttribute('data-origin').catch(() => '')) === 'global' && (await wsCopy.innerText()).includes('config/hive.json'), HUNG_MS)), await wsCopy.innerText().catch(() => ''))
     const wsJson = () => JSON.parse(fs.readFileSync(path.join(fx.ws, '.combwork', 'workspace.json'), 'utf8'))
     await wsCopy.locator('[data-action="none-copy"]').click()
     check('…set to none there, saved in workspace.json', !!(await until(async () => wsJson().slotDefaults?.copy === '' && (await wsCopy.locator('.workflow-origin').getAttribute('data-origin')) === 'none', HUNG_MS)), JSON.stringify(wsJson().slotDefaults))
@@ -215,7 +215,7 @@ function board(sql, ...args) {
     await openWorkflow(fx.alpha)
     check('the project then inherits the workspace’s none, From the workspace', !!(await until(async () => (await copyOrigin.getAttribute('data-origin').catch(() => '')) === 'workspace' && (await copyOrigin.innerText()).includes('None'), HUNG_MS)), await copyOrigin.innerText().catch(() => ''))
     await inv('slots:setLevelDefault', 'workspace', 'copy', null)
-    // Hive's level changing tells the window, which reads the project's copied files again (the workspace's now unset).
+    // Combwork's level changing tells the window, which reads the project's copied files again (the workspace's now unset).
     await inv('slots:setLevelDefault', 'global', 'copy', '.env*\nconfig/again.json')
     check('…and Combwork’s again once the workspace’s is unset', !!(await until(async () => (await copyOrigin.getAttribute('data-origin')) === 'global' && (await copyOrigin.innerText()).includes('config/again.json'), HUNG_MS)), await copyOrigin.innerText().catch(() => ''))
     await slotsGroup.locator('[data-action="none-copy"]').click()

@@ -1,7 +1,7 @@
 // Heavy test runs, machine-wide (#204). Several agents checking their cards at once on one machine (full e2e sets,
 // repeats, scenario runs) slowed each other until tests timed out: the flakes were the load, not the code. So at most
 // a few heavy runs go at once across every worktree (heavySlots in hive-test\config.json, default 2, #589); a heavy run started while
-// they are all taken waits for one, in the order the runs asked, saying who holds them (and in Hive's Progress panel).
+// they are all taken waits for one, in the order the runs asked, saying who holds them (and in Combwork's Progress panel).
 // A pre-merge run goes first (#558): one started by the agent holding its project's merge slot (holdsMergeSlot), or
 // with --pre-merge. It takes the next free slot before runs that asked earlier for other reasons (a merge shouldn't wait
 // behind flake-proof repeats while every other merge waits behind it), but never stops a run that holds one.
@@ -20,11 +20,11 @@
 // waiting (when it asked, which pool; `first` for a pre-merge run), each with its runner's process id, changed only
 // under the claims lock. A crashed run's claim expires: its process is gone (or it is a day old).
 //
-// A run left over (#1008): one started in an agent's session that has ended since (Hive closed under it, the agent
+// A run left over (#1008): one started in an agent's session that has ended since (Combwork closed under it, the agent
 // stopped or restarted) keeps running, and keeps its slot, while its process lives. Its claim records the agent's launch
-// (owner: runOwner), and a waiting run asks Hive whether that launch still runs (launchEnded): the wait line names a
+// (owner: runOwner), and a waiting run asks Combwork whether that launch still runs (launchEnded): the wait line names a
 // holder that was left over, and a run in the same worktree says so as it starts. Nothing is stopped on its own: its
-// results may still be wanted. Hive's notice after an unexpected close offers to stop it (#987).
+// results may still be wanted. Combwork's notice after an unexpected close offers to stop it (#987).
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
@@ -141,7 +141,7 @@ export const SIDE_E2E_JOBS = 2
 /**
  * The kinds of slot the run this one was started inside holds for it (HI-2070): 'cpu' (a heavy or side slot) and
  * 'model' (a model trial's), from E2E_RUN_SLOTS, comma-separated, which the runners set for what they start and which
- * is carried into a test Hive's sessions (runContext CARRIED). A run inside a suite marked without it (an older runner)
+ * is carried into a test Combwork's sessions (runContext CARRIED). A run inside a suite marked without it (an older runner)
  * has the CPU credit every nested run had before (#211); a run started outside any has none.
  */
 export function heldCredit(env = process.env) {
@@ -208,8 +208,8 @@ export function needsSlot({ count, repeat = 1 }, env = process.env) {
 }
 
 /**
- * A GET of Hive's Agent API with the session's own variables, which the runners read from the shell they were started
- * in, as their progress reporting does: the reply's JSON, or null when no Hive agent runs this, or the API doesn't answer
+ * A GET of Combwork's Agent API with the session's own variables, which the runners read from the shell they were started
+ * in, as their progress reporting does: the reply's JSON, or null when no Combwork agent runs this, or the API doesn't answer
  * in time or refuses. workspace: the X-Hive-Workspace to name (the session's own by default).
  */
 async function apiGet(path, env, { fetch = globalThis.fetch, timeoutMs = 3000, workspace = env.CW_WORKSPACE } = {}) {
@@ -238,7 +238,7 @@ async function apiGet(path, env, { fetch = globalThis.fetch, timeoutMs = 3000, w
 
 /**
  * Whether this run is the merge slot holder's (#558): started in the session of the agent that holds its project's
- * merge slot (the default branch's), asked through Hive's Agent API. False when no Hive agent runs it or the API doesn't
+ * merge slot (the default branch's), asked through Combwork's Agent API. False when no Combwork agent runs it or the API doesn't
  * answer in time: an ordinary run then.
  */
 export async function holdsMergeSlot(env = process.env, { fetch = globalThis.fetch, timeoutMs = 3000 } = {}) {
@@ -257,9 +257,9 @@ export function runOwner(env = process.env) {
 }
 
 /**
- * Whether the launch a claim's run was started in has ended (#1008): Hive closed under it, or its agent stopped or
+ * Whether the launch a claim's run was started in has ended (#1008): Combwork closed under it, or its agent stopped or
  * restarted, so the run was left over and nobody waits for its results in that session. Asked through the Agent API
- * with this run's own session: true or false, or null when it can't say (no owner, no Hive agent here, no answer).
+ * with this run's own session: true or false, or null when it can't say (no owner, no Combwork agent here, no answer).
  */
 export async function launchEnded(owner, env = process.env, opts = {}) {
   if (!owner?.project || !owner.agent || !owner.run) return null

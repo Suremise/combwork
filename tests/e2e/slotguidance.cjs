@@ -1,7 +1,7 @@
 // What agents are told about slots (#1444, SPEC §16.10): the guidance P7 changed, as each CLI is given it, with the
 // Assistant off. alpha builds cards in slots (Where cards are built: each card in its own folder):
 // 1. Claude Code (fake): B1, in the project folder, starts its card through its own hive server (tools/call, as its
-//    CLI would): the reply names the slot and says it continues there; Hive starts it again in the slot, where its launch's
+//    CLI would): the reply names the slot and says it continues there; Combwork starts it again in the slot, where its launch's
 //    skills have the slot lines (work-on-card: work and run checks in the slot; --isolated) and its hive server's
 //    instructions the contract's slot line.
 // 2. R1, a reviewer in the project folder: its skills have the review-copy line (review-agent-work), and its start review
@@ -118,7 +118,7 @@ const OWN = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown 
     const copy = (folder, name) => readOr(path.join(folder, '.agents', 'skills', `cw-${name}`, 'SKILL.md'))
     const delivered = []
 
-    // --- 1. Claude Code: B1 starts its card from the project folder; Hive gives it the card in the slot.
+    // --- 1. Claude Code: B1 starts its card from the project folder; Combwork gives it the card in the slot.
     const n1 = (await inv('tasks:create', { title: 'Greeting comma', project: 'alpha' })).number
     await inv('tasks:update', n1, { agent: b1.id })
     await inv('session:start', alpha, { agentId: b1.id })
@@ -131,7 +131,7 @@ const OWN = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown 
       const s = await live(b1.id)
       return s && same(s.cwd, slotA) && s.sessionId !== first.sessionId ? s : null
     }, HUNG_MS)
-    check('Hive starts B1 again in the slot, in a new conversation', !!inSlot, JSON.stringify(await live(b1.id)))
+    check('Combwork starts B1 again in the slot, in a new conversation', !!inSlot, JSON.stringify(await live(b1.id)))
     await ready(b1.id)
     const work1 = pluginSkill(b1.id, 'work-on-card')
     check("B1's work-on-card has the slot lines (work and check in the slot; --isolated)", SLOT_LINE.test(work1) && ISOLATED.test(work1), work1.slice(0, 200))
@@ -147,8 +147,8 @@ const OWN = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown 
     check("B1 submits its card from the slot", !submitted.isError && !!(await until(async () => (await inv('tasks:list')).find((c) => c.number === n1)?.column === 'review', HUNG_MS)), submitted.text)
 
     // --- 2. R1, a reviewer in the project folder: the review-copy lines, and a start review naming the copy's folder.
-    // The card is in Review outside a lane, so Hive starts R1, the stopped reviewer, for it (HI-2046): waited for, never
-    // started here too, which raced Hive's own start ("already running or starting", HI-2207).
+    // The card is in Review outside a lane, so Combwork starts R1, the stopped reviewer, for it (HI-2046): waited for, never
+    // started here too, which raced Combwork's own start ("already running or starting", HI-2207).
     const rs = await ready(r1.id)
     check('R1 runs in the project folder', same(rs?.cwd, alpha), JSON.stringify(rs))
     const review1 = pluginSkill(r1.id, 'review-agent-work')

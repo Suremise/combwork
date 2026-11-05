@@ -1,4 +1,4 @@
-// Hive closing unexpectedly (#984): while it runs, Hive keeps a marker in its profile listing its running agents. A
+// Combwork closing unexpectedly (#984): while it runs, Combwork keeps a marker in its profile listing its running agents. A
 // test copy ended from outside (by its own pid and start time, lib.identify, never by name) leaves it, and the next
 // start says so: when it was last seen, which agents were running where, Nothing was resumed, with Resume All (which
 // resumes the agent into its conversation) and Show Overview; nothing resumes on its own. The Assistant is told, and

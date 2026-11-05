@@ -1,6 +1,6 @@
-// Hooks health, part 2 (#1371): a quick turn with its hooks off, over before Hive's first look at its screen, is caught by
+// Hooks health, part 2 (#1371): a quick turn with its hooks off, over before Combwork's first look at its screen, is caught by
 // its transcript: the turn the CLI recorded (Claude Code's promptId, Codex's turn_id), which no hook named. With the
-// fake Claude Code and the fake Codex, and Hive's bound (Hooks missing: wait) at 3 s. Hive's checks are held while a file
+// fake Claude Code and the fake Codex, and Combwork's bound (Hooks missing: wait) at 3 s. Combwork's checks are held while a file
 // is there (HIVE_TEST_HOOKS_HOLD), so each turn is over, its screen idle and its transcript written before any check
 // looks: only the transcript can show it (a condition, not a race with the check's period).
 // - a healthy quick turn (its hooks came) is never flagged; then its hooks are turned off and a quick marked turn runs:
@@ -81,7 +81,7 @@ const rollouts = (dir = path.join(codexHome, 'sessions')) => {
     const raw = async (a) => (await inv('pty:buffer', lib.ptyKey(alpha, a.id)).catch(() => '')) ?? ''
 
     /**
-     * One quick turn, with Hive's checks held: typed, then over on its screen (this prompt's own end, after a mark) and
+     * One quick turn, with Combwork's checks held: typed, then over on its screen (this prompt's own end, after a mark) and
      * idle, its transcript holding its turn (`turnOf`: its id there, by its text); then the hold is let go. Its id.
      */
     const quickTurn = async (a, text, turnOf, ended) => {

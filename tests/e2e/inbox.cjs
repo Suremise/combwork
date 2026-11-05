@@ -22,7 +22,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-// Git in the test repositories, waiting out the Hive under test's own git (lib.git, #199).
+// Git in the test repositories, waiting out the Combwork under test's own git (lib.git, #199).
 const git = (cwd, ...a) => lib.git(cwd, a)
 const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-${name}.png`) })
 
@@ -59,7 +59,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
     return v
   }
   // Focus as the test says, not as Windows allows: Windows doesn't give a background app the focus while another window
-  // has it (focus-stealing protection), so the window's focus is stubbed (as taskbar.cjs does) and the event Hive
+  // has it (focus-stealing protection), so the window's focus is stubbed (as taskbar.cjs does) and the event Combwork
   // listens for is sent with it.
   const setFocus = (focused) =>
     app.evaluate(({ BrowserWindow }, f) => {

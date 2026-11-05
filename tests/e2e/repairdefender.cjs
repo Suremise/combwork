@@ -1,17 +1,17 @@
-// Repair a Moved Workspace moves Hive's Defender exclusions to the new folders (#1302), on fixtures only:
+// Repair a Moved Workspace moves Combwork's Defender exclusions to the new folders (#1302), on fixtures only:
 // HIVE_TEST_ANTIVIRUS stands in for every PowerShell call (the probe, and the elevated add and move on a simulated
 // exclusion list) and HIVE_TEST_ANTIVIRUS_LOG records them, so this suite never reads or changes the machine's Defender
 // settings nor raises an administrator prompt. Before: workspace Scratch, whose worktrees folder the user had excluded
-// themselves; Hive's Add excludes the workspace. Moved to Tools, Repair's table has a Microsoft Defender group: the
-// workspace's row moves Hive's exclusion (the box under the table, ticked), the worktrees' is the user's own (named, never
-// changed), each folder with its state and where the states come from (Hive's administrator read, dated); unticked, the
-// row leaves it; while Defender is still being read, Repair waits. Repair runs one elevated move, last: Hive's old entry
+// themselves; Combwork's Add excludes the workspace. Moved to Tools, Repair's table has a Microsoft Defender group: the
+// workspace's row moves Combwork's exclusion (the box under the table, ticked), the worktrees' is the user's own (named, never
+// changed), each folder with its state and where the states come from (Combwork's administrator read, dated); unticked, the
+// row leaves it; while Defender is still being read, Repair waits. Repair runs one elevated move, last: Combwork's old entry
 // removed, the new folder added, the report says so, and the Antivirus status follows. Moved again with the box unticked:
 // no elevated run. Moved again with Defender ignoring local changes (an organisation's policy): the report says so and
-// nothing is remembered as Hive's. Last, moved inside its old folder: with the list hidden the states are what Hive
-// knows and an unknown folder is never called scanned; with it shown the new workspace is Excluded only through Hive's
+// nothing is remembered as Combwork's. Last, moved inside its old folder: with the list hidden the states are what Combwork
+// knows and an unknown folder is never called scanned; with it shown the new workspace is Excluded only through Combwork's
 // old entry, and Repair still excludes it. Then (#1389) moved again with Repair's prompt declined: Repair finishes,
-// and the Antivirus panel lists Hive's exclusions of folders that are gone, which Remove Hive's Exclusions… takes away.
+// and the Antivirus panel lists Combwork's exclusions of folders that are gone, which Remove Combwork's Exclusions… takes away.
 // Screenshots in both themes, the plan in German and Polish, the gone exclusions in German.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -33,15 +33,15 @@ const tests = fs.realpathSync.native(path.join(process.env.LOCALAPPDATA, 'hive-t
 
 const drive = path.parse(root).root[0].toUpperCase()
 const DEFENDER_ON = 397568
-// Defender's list hidden without administrator rights: the states come from Hive's last administrator read (its Add).
+// Defender's list hidden without administrator rights: the states come from Combwork's last administrator read (its Add).
 const probe = { defender: { antivirus: true, realTime: true, mode: 'Normal' }, exclusions: ['N/A: Must be an administrator to view exclusions'], perfMode: 1, products: [{ name: 'Windows Defender', state: DEFENDER_ON }], volumes: [{ drive, fs: 'NTFS' }] }
 // `over` changes the probe's answer (a list Defender shows now); `elevated` is the machine's list as administrator rights
-// see it, simulated by each copy of Hive from its first elevated run.
+// see it, simulated by each copy of Combwork from its first elevated run.
 const setFixture = (elevated, over = {}) => fs.writeFileSync(fixture, JSON.stringify({ probe: { ...probe, ...over }, elevated }))
 const calls = () => (fs.existsSync(callLog) ? fs.readFileSync(callLog, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
 const changes = (kind) => calls().filter((c) => c.call !== 'probe' && (!kind || c.call === kind))
-// A dev build offers Hive's test area too, and it holds this suite's folders: excluded, it would cover every one of them.
-// So between runs of Hive the machine's list and Hive's memory of it never hold it (the profile's config.json).
+// A dev build offers Combwork's test area too, and it holds this suite's folders: excluded, it would cover every one of them.
+// So between runs of Combwork the machine's list and Combwork's memory of it never hold it (the profile's config.json).
 const forgetTests = () => {
   const file = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(file, 'utf8'))
@@ -50,7 +50,7 @@ const forgetTests = () => {
   cfg.antivirus = { ...a, ...(a.added ? { added: a.added.filter(other) } : {}), ...(a.adminCheck ? { adminCheck: { ...a.adminCheck, exclusions: a.adminCheck.exclusions.filter(other) } } : {}) }
   fs.writeFileSync(file, JSON.stringify(cfg, null, 2))
 }
-// Hive's administrator read forgotten: with Defender's list hidden, only Hive's record of its own exclusions is known.
+// Combwork's administrator read forgotten: with Defender's list hidden, only Combwork's record of its own exclusions is known.
 const forgetAdmin = () => {
   const file = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(file, 'utf8'))
@@ -88,7 +88,7 @@ const check = (name, ok, extra = '') => {
   }
   const textOf = async (dialog) => (await dialog.innerText().catch(() => '')).replace(/\s+/g, ' ')
 
-  // Scratch: the user excluded its worktrees folder themselves; Hive's Add excludes the workspace (and the test area).
+  // Scratch: the user excluded its worktrees folder themselves; Combwork's Add excludes the workspace (and the test area).
   setFixture({ exclusions: [scratch.trees] })
   {
     const { app, page, inv } = await launch()
@@ -104,7 +104,7 @@ const check = (name, ok, extra = '') => {
   }
   forgetTests()
   moveWorkspace(scratch, tools)
-  // The machine's list as administrator rights see it now (each copy of Hive simulates it from the fixture).
+  // The machine's list as administrator rights see it now (each copy of Combwork simulates it from the fixture).
   setFixture({ exclusions: [scratch.trees, scratch.ws] })
 
   // The plan in German and Polish: looked at, not repaired.
@@ -174,7 +174,7 @@ const check = (name, ok, extra = '') => {
     }
   }
 
-  // Moved again, the box unticked: no elevated run. Hive's Add then excludes Third's folders, for the last move.
+  // Moved again, the box unticked: no elevated run. Combwork's Add then excludes Third's folders, for the last move.
   moveWorkspace(tools, third)
   setFixture({ exclusions: [scratch.trees, tools.ws] })
   {
@@ -195,7 +195,7 @@ const check = (name, ok, extra = '') => {
     }
   }
 
-  // Moved again, Defender ignoring local changes (an organisation's policy): said, and nothing remembered as Hive's.
+  // Moved again, Defender ignoring local changes (an organisation's policy): said, and nothing remembered as Combwork's.
   forgetTests()
   moveWorkspace(third, fourth)
   // The user excluded Fourth's worktrees folder themselves (for the last move).
@@ -209,7 +209,7 @@ const check = (name, ok, extra = '') => {
       check('…one elevated run, for both kinds', JSON.stringify(changes('move').slice(-1).map((c) => [c.remove, c.paths])) === JSON.stringify([[[third.ws, third.trees], [fourth.ws, fourth.trees]]]), JSON.stringify(changes('move')))
       const s = await inv('antivirus:status', true)
       check('…and nothing of the new folders is remembered as Combwork’s', s.paths.every((p) => !p.path.startsWith(fourth.ws) || !p.addedByHive), JSON.stringify(s.paths))
-      // Hive's Add for Fourth: the workspace (its worktrees folder is the user's).
+      // Combwork's Add for Fourth: the workspace (its worktrees folder is the user's).
       setFixture({ exclusions: [scratch.trees, tools.ws, third.ws, third.trees, fourth.trees] })
       const prepared = await inv('antivirus:prepare', 'add')
       const { result } = await inv('antivirus:apply', prepared.id)
@@ -219,9 +219,9 @@ const check = (name, ok, extra = '') => {
     }
   }
 
-  // Moved inside its old folder (Fourth\Inner), its worktrees folder left where it was; Hive's administrator read
-  // forgotten. With Defender's list hidden: what Hive knows, said as such, and nothing claimed scanned. Then with the
-  // list shown: the new workspace shows Excluded only through Hive's old entry, and Repair still excludes it.
+  // Moved inside its old folder (Fourth\Inner), its worktrees folder left where it was; Combwork's administrator read
+  // forgotten. With Defender's list hidden: what Combwork knows, said as such, and nothing claimed scanned. Then with the
+  // list shown: the new workspace shows Excluded only through Combwork's old entry, and Repair still excludes it.
   forgetTests()
   forgetAdmin()
   const inner = { ws: path.join(fourth.ws, 'Inner'), trees: path.join(fourth.ws, 'Inner.worktrees') }
@@ -254,10 +254,10 @@ const check = (name, ok, extra = '') => {
   }
 
   // #1389: moved again (Inner → Fifth) with Repair's administrator prompt declined. Repair finishes and doesn't offer
-  // the move again; Hive's exclusion of Inner, a folder that is gone now, stays in Defender's list. The Antivirus panel
-  // lists Hive's exclusions of folders that are gone (Inner's, and Tools', left when its move was unticked), and
-  // Remove Hive's Exclusions… takes them away. Defender's list hidden, Hive's administrator read forgotten: every one
-  // Hive recorded is shown, unconfirmed, until its Remove reads the list.
+  // the move again; Combwork's exclusion of Inner, a folder that is gone now, stays in Defender's list. The Antivirus panel
+  // lists Combwork's exclusions of folders that are gone (Inner's, and Tools', left when its move was unticked), and
+  // Remove Combwork's Exclusions… takes them away. Defender's list hidden, Combwork's administrator read forgotten: every one
+  // Combwork recorded is shown, unconfirmed, until its Remove reads the list.
   forgetTests()
   forgetAdmin()
   const fifth = at('Fifth')
@@ -312,7 +312,7 @@ const check = (name, ok, extra = '') => {
       await page.screenshot({ path: path.join(lib.WORK, 'repairdefender-gone-light.png') })
       await inv('settings:update', { appearance: { theme: 'dark' } })
 
-      // Remove Hive's Exclusions… covers them (the workspace has none of Hive's: the button is there for them alone).
+      // Remove Combwork's Exclusions… covers them (the workspace has none of Combwork's: the button is there for them alone).
       await panel.getByRole('button', { name: 'Remove Combwork’s Exclusions…' }).click()
       const removeDialog = page.locator('.dialog', { hasText: 'Remove the exclusions Combwork added?' })
       await lib.until(async () => (await removeDialog.count()) === 1, HUNG_MS)

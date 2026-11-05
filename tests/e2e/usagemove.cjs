@@ -94,7 +94,7 @@ const check = (name, ok, extra = '') => {
     const rule = settingsDialog.locator('[data-usage-move]')
     await rule.waitFor({ timeout: HUNG_MS })
     check('the rule is off by default', (await rule.getAttribute('data-usage-move')) === 'off')
-    // Controlled by the saved rule: ticked once Hive has it (a click, then the wait below).
+    // Controlled by the saved rule: ticked once Combwork has it (a click, then the wait below).
     await rule.locator('input[type="checkbox"]').click()
     check('ticked, it is on: 98% of the weekly limit, to Max 2', !!(await lib.until(async () => (await rule.getAttribute('data-usage-move')) === 'on', HUNG_MS)) && JSON.stringify((await inv('connections:list')).connections.find((c) => c.id === max1.id)?.usageMove) === JSON.stringify({ percent: 98, limit: 'weekly', to: max2.id }))
     const percent = rule.locator('.usage-move-percent')

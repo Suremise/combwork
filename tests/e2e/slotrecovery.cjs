@@ -1,12 +1,12 @@
 // Cards on slots across a restart (#1438, HR1's round 1): what a card's start owes (its line made in its slot, its builder
-// placed there) is done from durable state by the next start's pass, once. Hive ends at once (HIVE_TEST_SLOT_CRASH, no
+// placed there) is done from durable state by the next start's pass, once. Combwork ends at once (HIVE_TEST_SLOT_CRASH, no
 // quit handler) at each point, and the next start recovers:
 // 1. `afterAction`: the start's slot action marked done, nothing of it done: the restart makes the line and places B1;
 // 2. `inPrepare`: the line checked out, its `SlotPrepared` not written: the restart records it (nothing switched twice);
 // 3. `inPlacement`: the placement claimed, nothing delivered: the restart takes the claim over and gives the card once;
 // 4. a lane started from the window with no slot free waits through a restart ("waiting for a slot", kept with the lane),
 //    starts nothing while the rules are off, and starts once a slot is free with them back on: its builder's brief once;
-// 5. a placement owed as Hive is quit, its builder's conversation bound to the card's lease (HI-1746: its slot taken
+// 5. a placement owed as Combwork is quit, its builder's conversation bound to the card's lease (HI-1746: its slot taken
 //    over by its next card): the next start resumes that conversation there with the card, never a new one.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -45,7 +45,7 @@ const git = (dir, ...a) => lib.git(dir, a).trim()
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   let h = null
-  /** Hive started on the workspace (`crash`: the point it ends at, once there). */
+  /** Combwork started on the workspace (`crash`: the point it ends at, once there). */
   const start = async (crash) => {
     h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', ...(crash ? { HIVE_TEST_SLOT_CRASH: crash } : {}) } })
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -79,13 +79,13 @@ const git = (dir, ...a) => lib.git(dir, a).trim()
   const kinds = async (n) => (await facts(n)).map((f) => f.kind)
   const count = async (n, kind) => (await kinds(n)).filter((k) => k === kind).length
   const lane = async (id) => (await inv('lanes:list')).find((l) => l.id === id)
-  /** Ends a run of Hive that should end at its crash point, then starts it again with no crash point: it recovers. */
+  /** Ends a run of Combwork that should end at its crash point, then starts it again with no crash point: it recovers. */
   const crashedThenRestart = async (label) => {
-    check(`${label}: Hive ended at the point`, !!(await until(() => h.ended, HUNG_MS)))
+    check(`${label}: Combwork ended at the point`, !!(await until(() => h.ended, HUNG_MS)))
     await h.app.close().catch(() => {})
     await start(null)
   }
-  /** Hive started again to end at `point` (nothing owed then, so only the next step reaches it). */
+  /** Combwork started again to end at `point` (nothing owed then, so only the next step reaches it). */
   const restartToCrashAt = async (point) => {
     await h.app.close().catch(() => {})
     await start(point)
@@ -101,19 +101,19 @@ const git = (dir, ...a) => lib.git(dir, a).trim()
     const [c1, c2, c3, c4] = [await create('Recover one'), await create('Recover two'), await create('Recover three'), await create('Lane four')]
     const slotOf = async (n) => (await facts(n)).findLast((f) => f.kind === 'Started')?.data
 
-    // --- 1. afterAction: the start written, its action marked done, then Hive ends: the restart does the rest.
+    // --- 1. afterAction: the start written, its action marked done, then Combwork ends: the restart does the rest.
     const s1 = await intent(await tokenOf(b1.id), c1, 'start')
-    // The crash point is the start's slot action, after its commit, and the start goes on to reply as Hive ends: app.exit
+    // The crash point is the start's slot action, after its commit, and the start goes on to reply as Combwork ends: app.exit
     // closes the windows first (their workspaces disposed), so a loaded machine's reply can be "No workspace is open"
-    // (HI-2549), or none comes. Any reply but the start's own is a Hive that reached the point (only an accepted start
-    // asks for the action), so it counts once Hive ends there; the restart's checks then find the start recorded.
+    // (HI-2549), or none comes. Any reply but the start's own is a Combwork that reached the point (only an accepted start
+    // asks for the action), so it counts once Combwork ends there; the restart's checks then find the start recorded.
     check('1. B1 starts card 1 in a slot', (s1.status === 200 && !!s1.body?.data?.folder) || !!(await until(() => h.ended, HUNG_MS)), JSON.stringify(s1.body))
     await crashedThenRestart('1. afterAction')
     const st1 = await until(() => slotOf(c1), HUNG_MS)
     check("1. …restarted: card 1's line made in its slot, recorded once", !!(await until(async () => (await count(c1, 'SlotPrepared')) === 1, HUNG_MS)) && git(st1.folder, 'branch', '--show-current') === st1.line, JSON.stringify(await kinds(c1)))
     check('1. …B1 placed there once: started in its slot', !!(await until(async () => (await count(c1, 'BuilderPlaced')) === 1 && same((await live(b1.id))?.cwd, st1.folder), HUNG_MS)), JSON.stringify(await live(b1.id)))
 
-    // --- 2. inPrepare: the line checked out, then Hive ends before it is recorded: the restart records it once.
+    // --- 2. inPrepare: the line checked out, then Combwork ends before it is recorded: the restart records it once.
     await restartToCrashAt('inPrepare')
     const s2 = await intent(await tokenOf(b2.id), c2, 'start')
     check('2. B2 starts card 2 in a slot', s2.status === 200, JSON.stringify(s2.body))
@@ -122,7 +122,7 @@ const git = (dir, ...a) => lib.git(dir, a).trim()
     check('2. …its line was checked out before the end', git(st2.folder, 'branch', '--show-current') === st2.line)
     check('2. …restarted: recorded once, placed once', !!(await until(async () => (await count(c2, 'SlotPrepared')) === 1 && (await count(c2, 'BuilderPlaced')) === 1, HUNG_MS)), JSON.stringify(await kinds(c2)))
 
-    // --- 3. inPlacement: claimed, nothing delivered, then Hive ends: the restart takes the claim over and places once.
+    // --- 3. inPlacement: claimed, nothing delivered, then Combwork ends: the restart takes the claim over and places once.
     await restartToCrashAt('inPlacement')
     const s3 = await intent(await tokenOf(b3.id), c3, 'start')
     check('3. B3 starts card 3 in a slot', s3.status === 200, JSON.stringify(s3.body))
@@ -135,12 +135,12 @@ const git = (dir, ...a) => lib.git(dir, a).trim()
     await lib.setMaxAgents(inv, 3)
     const lane4 = await inv('lanes:start', alpha, { builder: b4.id, reviewer: r1.id, cards: [c4], note: 'Keep it small.' })
     check('4. the lane waits for a slot, its agents not started', !!lane4.waitingForSlot && lane4.started.length === 0 && !(await live(b4.id)), JSON.stringify(lane4))
-    // An ordinary quit with B3 running in slot-c (card 3's): its run's writer released before Hive quit (HI-1801), so
+    // An ordinary quit with B3 running in slot-c (card 3's): its run's writer released before Combwork quit (HI-1801), so
     // the next start finds no slot held by the run that quit, and B3 can start there again.
     await h.app.close().catch(() => {})
     await start(null)
     const held = (await inv('slots:list', alpha)).filter((s) => s.writer)
-    check('4. …restarted after a quit: no slot still held by a run of the Hive that quit (HI-1801)', held.length === 0, JSON.stringify(held))
+    check('4. …restarted after a quit: no slot still held by a run of the Combwork that quit (HI-1801)', held.length === 0, JSON.stringify(held))
     const waiting = await until(async () => ((await lane(lane4.lane.id))?.status?.reason === 'slot' ? lane(lane4.lane.id) : null), HUNG_MS)
     check("4. …restarted: still 'waiting for a slot', paused", waiting?.state === 'paused', JSON.stringify(waiting?.status))
     // The rules off: card 3 put back frees a slot, but nothing is lent to the lane.
@@ -165,7 +165,7 @@ const git = (dir, ...a) => lib.git(dir, a).trim()
     // --- 5. A placement owed at a restart, the builder's conversation bound to the card's lease (HI-1746). B2 builds card 5
     // in a slot (its conversation there, under card 5's lease); in its turn, it puts card 5 back and starts card 6, which
     // takes its slot over (HI-1762: the conversation rebound to card 6's lease), so card 6's placement waits for the turn
-    // to end; Hive is quit then. The next start resumes that conversation there with card 6, once, never a new one.
+    // to end; Combwork is quit then. The next start resumes that conversation there with card 6, once, never a new one.
     const [c5, c6] = [await create('Recover five'), await create('Recover six')]
     const pb2 = await intent(await tokenOf(b2.id), c2, 'put-back', { why: 'making room' })
     check('5. card 2 put back', pb2.status === 200, JSON.stringify(pb2.body))
@@ -189,7 +189,7 @@ const git = (dir, ...a) => lib.git(dir, a).trim()
     check('5. …its conversation rebound to card 6', !!lease6 && !!(await until(async () => (await sessionsOf(b2.id)).find((s) => s.id === b2Conv.sessionId && s.lease === lease6), HUNG_MS)), JSON.stringify((await sessionsOf(b2.id)).map((s) => ({ id: s.id, lease: s.lease }))))
     // Its slot's preparation and its placement both wait for that turn to end.
     check("5. …card 6's placement owed (B2's turn not over)", (await count(c6, 'BuilderPlaced')) === 0 && (await live(b2.id))?.status === 'working', JSON.stringify(await kinds(c6)))
-    // Hive quit with the placement owed; the next start places it.
+    // Combwork quit with the placement owed; the next start places it.
     await h.app.close().catch(() => {})
     await start(null)
     const placed6 = await until(async () => (await facts(c6)).find((f) => f.kind === 'BuilderPlaced'), HUNG_MS)

@@ -1,7 +1,7 @@
 // "The CLI's own setting" (#1284, #966 row 1), and the Assistant's other MCP servers' switch (row 7) gone, on a fake Claude
 // Code session (fake-claude/), so nothing signs in or spends tokens.
 // 1. A project's agents on the CLI's own setting: the stopped agent's badge says "CLI's own" and its menu marks the
-//    choice; launched, the CLI gets no --permission-mode; its hooks report the mode it runs in, which Hive records as
+//    choice; launched, the CLI gets no --permission-mode; its hooks report the mode it runs in, which Combwork records as
 //    seen while the badge keeps saying "CLI's own"; a conversation of its own, stopped and resumed, resumes with no flag
 //    and the same state; the running agent's menu says why nothing switches live, and a switch restarts it in the mode
 //    chosen (then passed again).

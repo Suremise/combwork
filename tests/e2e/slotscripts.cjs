@@ -1,5 +1,5 @@
 // The slots' copy patterns, idle removal switch and archive script acting in the app (#1563, tests/workflow/README.md's
-// P7 table), through a test Hive's `slots:test` channel as slotpool does, the options set with the Version Control tab's
+// P7 table), through a test Combwork's `slots:test` channel as slotpool does, the options set with the Version Control tab's
 // channel (slots:setSetting):
 // - Files copied into new slots `*.key`: a git-ignored api.key is copied into each new slot; an ignored notes.local and
 //   .env (the default's) are not;

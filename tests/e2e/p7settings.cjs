@@ -1,6 +1,6 @@
 // P7's switches set in the window (#1563, tests/workflow/README.md's P7 table): Settings → Advanced's rows for the slots'
 // and copies' switches (Remove idle slots after a day, Delete a card's branch once it's merged, Rename adopted worktrees
-// to slot names, Copies: wait for one to be free, Remove Hive's skill copies when no agent works in the folder) each
+// to slot names, Copies: wait for one to be free, Remove Combwork's skill copies when no agent works in the folder) each
 // changed there, written to advanced.json and read by the main process; and the workflow option Wake reviewers and
 // builders (loopWakes, under Card loops in Version Control → Workflow since HI-1766) turned off and on with Save, in
 // project.json's options. What each does is other suites' (slotswitches,
@@ -61,7 +61,7 @@ const values = () => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'ut
     check('…set to 3 in the window: in advanced.json', !!(await until(() => values()['cw.copies.quietWaitMinutes'] === 3, HUNG_MS)), JSON.stringify(values()))
     check('…read by the main process', !!(await until(async () => (await inMain('cw.copies.quietWaitMinutes')) === 3, HUNG_MS)))
 
-    // Remove Hive's skill copies when no agent works in the folder: Slots only, Everywhere, Never.
+    // Remove Combwork's skill copies when no agent works in the folder: Slots only, Everywhere, Never.
     const copies = row('cw.skills.removeIdleCopies').locator('select').first()
     await copies.scrollIntoViewIfNeeded()
     check('cw.skills.removeIdleCopies: Slots only by default', (await copies.inputValue()) === 'slots')

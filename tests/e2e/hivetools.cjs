@@ -1,6 +1,6 @@
 // A doorbell only once the hive tools are there (#865): a resumed Claude Code is ready at its SessionStart before its
 // hive MCP server has connected, and a doorbell then is a turn that can't call cw_inbox. The launch's hive server
-// tells Hive when the CLI has connected it (POST /v1/launch/connected, with the launch's own token); until then Hive
+// tells Combwork when the CLI has connected it (POST /v1/launch/connected, with the launch's own token); until then Combwork
 // types no line into the session, at most Settings → Advanced → "hive tools: wait to connect" from when it became ready.
 // On fake Claude Code (fake-claude/), which connects the real hive server as it starts, or holds it back while
 // fake-mcp-hold-<agent> is in its home until the test makes fake-mcp-go-<agent>:
@@ -67,7 +67,7 @@ const check = (name, ok, extra = '') => {
     const assistantNow = async () => (await inv('session:live')).find((s) => s.agentId === 'assistant')?.status
     check('the Assistant starts', !!(await until(async () => ['ready', 'finished'].includes(await assistantNow()), HUNG_MS)), await assistantNow())
     const asAssistant = (method, route, body) => call(method, route, body, JSON.parse(fs.readFileSync(asTokenFile, 'utf8')).token)
-    // Hive's doorbells in the builder's conversation (#650: a prompt "[CW] New in your inbox: …", read with cw_inbox).
+    // Combwork's doorbells in the builder's conversation (#650: a prompt "[CW] New in your inbox: …", read with cw_inbox).
     let sessionId = ''
     const bells = () => {
       const dir = path.join(claudeHome, 'projects')

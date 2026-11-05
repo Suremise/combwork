@@ -1,5 +1,5 @@
 // A card's intents over the Agent API (#1267, SPEC §16.8.1), each caller with its own token: a builder and a reviewer
-// (fake Claude Code agents, their own tokens as their hive tools use them) and the Hive Assistant through Settings →
+// (fake Claude Code agents, their own tokens as their hive tools use them) and the Combwork Assistant through Settings →
 // Assistant → Control. An agent's plain number is refused naming the card's key alone (S48); start, submit, start
 // review, the reviewer's request (which ends the builder's wait for its verdict, #1272) and a failed verdict move the
 // card by its workflow (the card stays its builder's); the builder can't review its own card; a second reviewer can't
@@ -210,7 +210,7 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
 
     // An agent asks the Assistant on a card (HI-1866): its comment and a history line, and the Assistant's inbox, whose
     // doorbell its idle session takes. Refused, with nothing written: a plain number, no text, the Assistant itself, and
-    // at Look and advise (it can't act on it). What the Assistant's fake read: it follows Hive's doorbell with
+    // at Look and advise (it can't act on it). What the Assistant's fake read: it follows Combwork's doorbell with
     // cw_inbox and logs what it read.
     const asks = () => {
       const f = path.join(claudeHome, 'fake-wakes.jsonl')
@@ -234,7 +234,7 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     await inv('session:stop', home, 'assistant')
 
     // An agent's hive tool: cw_start_card runs the start intent. Called through hive-mcp.js with the builder's own
-    // hive server settings (from its launch), not typed into its pane, where Hive's own wakes may be typed meanwhile.
+    // hive server settings (from its launch), not typed into its pane, where Combwork's own wakes may be typed meanwhile.
     const builderHive = await hiveOf(builder.id)
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_start_card', arguments: { card: key } } }) + '\n',

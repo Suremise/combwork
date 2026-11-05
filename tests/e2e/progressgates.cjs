@@ -92,7 +92,7 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
       const f = path.join(claudeHome, 'fake-shell.jsonl')
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
     }
-    // Typed again when a wake of Hive's (the lane's) disturbed it (typeLine).
+    // Typed again when a wake of Combwork's (the lane's) disturbed it (typeLine).
     const shell = async (id, cmd) => {
       const before = shells().length
       const name = id === builder.id ? 'B1' : 'R1'
@@ -201,7 +201,7 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
     fs.writeFileSync(path.join(slot, 'b.ts'), 'export const b = 3\n')
     gitIn(slot, 'commit', '-qam', 'Another change')
     const second = gitIn(slot, 'rev-parse', 'HEAD')
-    // Its Work section read once (as the card dialog does): Hive looks at its folder soon, once events settle. Asked
+    // Its Work section read once (as the card dialog does): Combwork looks at its folder soon, once events settle. Asked
     // again on every poll, that "soon" would keep moving.
     await inv('tasks:work', a)
     check('a new revision after the pass marks the folded segment stale', !!(await until(async () => (await fin.getAttribute('class'))?.includes('stale'), HUNG_MS)), await fin.getAttribute('class'))
@@ -235,8 +235,8 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
     await app.close().catch(() => undefined)
   }
 
-  // --- In another language: Hive started again in German, the same lane.
-  // The lane's agents were working: Hive offers to resume them (its restart record), in a notice over the lane's
+  // --- In another language: Combwork started again in German, the same lane.
+  // The lane's agents were working: Combwork offers to resume them (its restart record), in a notice over the lane's
   // segments (HI-1809: the hover timed out under it). Answered Don't Resume, below, until the record is gone (nothing
   // left to offer) and no offer shows.
   const restartRecord = path.join(userData, 'restart.json')

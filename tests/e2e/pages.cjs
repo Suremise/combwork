@@ -127,7 +127,7 @@ const check = (name, ok, extra = '') => {
     await lib.agentMenu(page, name)
     await page.locator('.menu-item', { hasText: 'Remove Agent…' }).click()
     await page.locator('.dialog-footer button', { hasText: /^Remove$/ }).click()
-    // Gone from Hive and from the panes (the dialog closes before the removal has finished).
+    // Gone from Combwork and from the panes (the dialog closes before the removal has finished).
     await lib.until(async () => !(await inv('workspace:refresh')).projects[0].agents.some((a) => a.name === name) && !(await page.locator('.pane-header-bar .agent-name').allInnerTexts()).some((t) => t.trim() === name), 10000)
   }
   await remove('Agent 9')

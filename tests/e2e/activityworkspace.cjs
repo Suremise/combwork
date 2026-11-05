@@ -1,6 +1,6 @@
 // Activity's workspace level (HI-1664): the activity bar's Activity, the same "what's running now" as a project's tab
 // across every session host of the workspace with an agent running, its tabs grouped by project. Two projects whose
-// builders share the id hb1 (each its own tab, its own work), and the Hive Assistant as a group of its own. Its sidebar:
+// builders share the id hb1 (each its own tab, its own work), and the Combwork Assistant as a group of its own. Its sidebar:
 // Whole workspace, and each project's row opening that project's own tab, whose filters stay its own. Opened from a card
 // (its agents now: a project card's builder; a workspace card's agents in both projects, found again when one stops),
 // from a Progress panel run's details and from a lane's menu (Show in Activity). Frozen when opened; nothing read or

@@ -1,5 +1,5 @@
-// Hive's icon sizes don't change when an editor first loads Monaco's stylesheet (its Codicons base rule, the same as
-// the one Hive bundles, sets every icon to 16px). Each way Monaco first loads gets a fresh app: a Markdown preview
+// Combwork's icon sizes don't change when an editor first loads Monaco's stylesheet (its Codicons base rule, the same as
+// the one Combwork bundles, sets every icon to 16px). Each way Monaco first loads gets a fresh app: a Markdown preview
 // colouring a code block, the Changes tab's diff editor, and the Files tab's source editor. The activity bar's icons
 // stay 24px and other shell icons keep their sizes, before, while the editor shows and after leaving it, again and
 // again, in both themes, and they scale with the UI zoom; Monaco's own icons keep theirs. Dev build, throwaway

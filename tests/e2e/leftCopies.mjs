@@ -1,4 +1,4 @@
-// Test copies of Hive a run left running (HI-1453): a copy that outlived its suite (its runner killed, its shell ended)
+// Test copies of Combwork a run left running (HI-1453): a copy that outlived its suite (its runner killed, its shell ended)
 // ran on for 12 h, holding its lane's Agent API port, so no later runner took that lane and nothing ended it. A runner
 // ends a suite's copies when the suite ends (run.mjs); this ends, at a run's start, those an earlier run recorded
 // (lib.cjs) in the lanes no running runner holds, each only while it is still the process recorded (pid and start time).

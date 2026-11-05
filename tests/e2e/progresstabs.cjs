@@ -339,7 +339,7 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     check('…past its bound (a minute, Settings → Advanced), the time is marked', !!(await until(async () => ((await tabsWaited.getAttribute('class').catch(() => '')) ?? '').includes('long'), 120_000)), await tabsWaited.textContent().catch(() => ''))
     await shoot('lanes-wait-long')
     await inv('advanced:set', 'cw.lanes.waitYouMinutes', null)
-    // Six more lanes (solo, their builders started by Hive): seven in all, more than fit.
+    // Six more lanes (solo, their builders started by Combwork): seven in all, more than fit.
     for (let i = 2; i <= 7; i++) {
       const bx = await lib.addAgent(inv, alpha, { name: `B${i}` })
       const card = await inv('tasks:create', { title: `Lane card ${i}`, project: 'alpha' })

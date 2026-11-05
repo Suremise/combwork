@@ -1,4 +1,4 @@
-// The Hive Assistant's control (Settings → Assistant → Control), through the Agent API with the Assistant's own
+// The Combwork Assistant's control (Settings → Assistant → Control), through the Agent API with the Assistant's own
 // token, with the Agent API itself turned off. Agents run the fake Claude Code (fake-claude/), so nothing signs in
 // or spends tokens. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -69,7 +69,7 @@ const check = (name, ok, extra = '') => {
   // Its hive tools: its own token file, its role and control level.
   const tokenFile = path.join(userData, 'assistant-api', `${createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`)
   const token = JSON.parse(fs.readFileSync(tokenFile, 'utf8')).token
-  // In its launch's private folder in Hive's user data, not the project (#345).
+  // In its launch's private folder in Combwork's user data, not the project (#345).
   const mcp = JSON.parse(fs.readFileSync(path.join(lib.launchDir(userData, (await live(home, 'assistant')).runId), 'mcp.json'), 'utf8')).mcpServers.combwork
   check("the Assistant's hive tools use its token and role", mcp?.env.CW_API_TOKEN_FILE === tokenFile && mcp.env.HIVE_ROLE === 'assistant' && mcp.env.HIVE_ASSISTANT_CONTROL === 'projects', JSON.stringify(mcp?.env))
   // Its skills: the workspace's skills for the Assistant (coordinate-agents and the shared ones), none for agents only.
@@ -87,7 +87,7 @@ const check = (name, ok, extra = '') => {
   check('with the Agent API off, its own token is refused', (await api('GET', '/v1/projects', null, apiToken)).status === 403)
   check("the Assistant's token still works", (await api('GET', '/v1/projects')).status === 200)
   /**
-   * Waits for an agent of alpha to be done with a task Hive just gave it (#680): its activity has the task (`task`, a
+   * Waits for an agent of alpha to be done with a task Combwork just gave it (#680): its activity has the task (`task`, a
    * pattern) and the reply to it. agents/wait can answer before that task is taken (the last turn's "finished", or a new
    * launch still starting), so its answer is shown, never relied on; the activity is read until it has both, bounded for
    * a hung run; with `session`, in that conversation (a task in the same words as the one before it). Returns
@@ -110,7 +110,7 @@ const check = (name, ok, extra = '') => {
   const providers = (await api('GET', '/v1/providers')).body
   check('it lists the providers with their models, efforts and modes', providers?.some((p) => p.id === 'claude-code' && p.enabled && p.installed && p.models.length && p.efforts.length && p.modes.length), JSON.stringify(providers?.map((p) => p.id)))
 
-  // Project agents read what they are given from their inbox with Hive's tools (#650): on from here for their tasks, and
+  // Project agents read what they are given from their inbox with Combwork's tools (#650): on from here for their tasks, and
   // off again for the hand-over checks below.
   await inv('settings:update', { agentApi: { enabled: true } })
   await lib.until(async () => (await api('GET', '/v1/status').catch(() => ({}))).status === 200, 10000)
@@ -239,10 +239,10 @@ const check = (name, ok, extra = '') => {
   check('no hand-over from the latest handover when there is none', none.status === 409 && /no handover/i.test(none.body?.error), JSON.stringify(none.body))
   fs.mkdirSync(path.join(ws, '.combwork', 'shared', 'handovers'), { recursive: true })
   fs.writeFileSync(path.join(ws, '.combwork', 'shared', 'handovers', '2026-10-01-alpha-plan.md'), '# Plan\n\n- **Project:** alpha\n\nwork 1\n')
-  // Handing over: refused at once while project agents lack Hive's tools (the Agent API is off), then done.
+  // Handing over: refused at once while project agents lack Combwork's tools (the Agent API is off), then done.
   await inv('settings:update', { agentApi: { enabled: false } })
   const noTools = await api('POST', '/v1/projects/alpha/handover', { from: 'Builder', to: 'Fixer', handover: false })
-  check("no hand-over while agents can't use Hive's tools", noTools.status === 409 && /Combwork's tools/.test(noTools.body?.error), JSON.stringify(noTools.body))
+  check("no hand-over while agents can't use Combwork's tools", noTools.status === 409 && /Combwork's tools/.test(noTools.body?.error), JSON.stringify(noTools.body))
   await inv('settings:update', { agentApi: { enabled: true } })
   await lib.until(async () => (await api('GET', '/v1/status').catch(() => ({}))).status === 200, 10000)
   const typedIn = await api('POST', '/v1/projects/alpha/handover', { from: 'Builder', to: 'Fixer', handover: false })
@@ -303,8 +303,8 @@ const check = (name, ok, extra = '') => {
   check('a lane started with no watch following it: the reply says to watch the lanes', unwatched.status === 200 && /No watch of yours follows this lane/.test(unwatched.body?.note ?? ''), JSON.stringify(unwatched.body))
   // HI-2232 (Darren's decision (a)): Builder, idle outside slots, is given the lane in a new conversation, as Start Lane… gives it;
   // not free at its launch, it is owed one (HI-2034). Here it isn't free: the user pressed Enter in its terminal above, and the
-  // suite's typing pause (600 s, enterEndsPause off) still holds, so its run is left for now and the reply says Hive gives it the
-  // lane once it is free, not to prompt it (HI-2029, HR1: a prompt would race Hive's start). The reply comes once the lane's launch
+  // suite's typing pause (600 s, enterEndsPause off) still holds, so its run is left for now and the reply says Combwork gives it the
+  // lane once it is free, not to prompt it (HI-2029, HR1: a prompt would race Combwork's start). The reply comes once the lane's launch
   // is over, so a new conversation given now would show by now.
   const nowLive = await live(alpha, builderId)
   check("…its builder, idle but not free (the user typed there), is owed the lane's new conversation, and the reply says not to prompt it (HI-2232, HI-2034)", wasLive?.status === 'finished' && !!wasLive.sessionId && nowLive?.sessionId === wasLive.sessionId && nowLive?.runId === wasLive.runId && /Builder wasn't free: Combwork gives it the lane in a new conversation once it is, so don't prompt it\./.test(unwatched.body?.note ?? ''), JSON.stringify({ note: unwatched.body?.note, status: wasLive?.status, before: wasLive?.sessionId, after: nowLive?.sessionId }))

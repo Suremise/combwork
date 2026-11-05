@@ -1,4 +1,4 @@
-// The Sessions tab says where each session ran and whose it was: a badge on every Hive session ("Coder · Project
+// The Sessions tab says where each session ran and whose it was: a badge on every Combwork session ("Coder · Project
 // folder", "Reviewer · Worktree · hive/reviewer") and "Ran in …" over the selected transcript, as the session recorded.
 // A removed agent's sessions say so ("Coder (removed)", or "Removed agent" for records from before names were kept),
 // and never take the name of an agent added later with the same name or worktree. Resume still names the agent that
@@ -51,7 +51,7 @@ const check = (name, ok, extra = '') => {
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)
     return v
   }
-  /** Starts an agent and has it answer one prompt, so Hive keeps its session. */
+  /** Starts an agent and has it answer one prompt, so Combwork keeps its session. */
   const runOnce = async (id) => {
     await inv('session:start', alpha, { agentId: id })
     await until(async () => ['waiting', 'ready'].includes((await live(id))?.status), HUNG_MS)

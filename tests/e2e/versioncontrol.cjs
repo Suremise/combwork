@@ -27,7 +27,7 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 
-/** Writes to the workspace's board from outside Hive, as the upgrade would have (its marks). */
+/** Writes to the workspace's board from outside Combwork, as the upgrade would have (its marks). */
 function board(sql, ...args) {
   const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { timeout: 5000 })
   try {

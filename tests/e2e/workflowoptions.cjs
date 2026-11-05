@@ -3,7 +3,7 @@
 // Checks, Merging, Where cards are built, Card loops, Stages; None: Review, Checks, The work, Card loops, Stages; File
 // locks and Card loops options since HI-1766, File locks shown with slots too), each worded as an outcome with one sentence on what it does and where its value comes from. Each preset
 // (and All off) previews what it sets and why, marking what it would change, before Use fills the form: Pair (the agent
-// merges), Pair (Hive merges, G9's checks and install), Team (#1361's note). A contradiction shows its reason under both
+// merges), Pair (Combwork merges, G9's checks and install), Team (#1361's note). A contradiction shows its reason under both
 // rows as it is chosen and keeps Save off; those the form can't reach are refused when pasted, as a save is. Save… lists
 // what changes and the running lane keeping the old rules; a stage rename alone applies now; a save after another change
 // (the Assistant's tool, another window) is refused as changed meanwhile and the section reloads. Inherit, Copy as JSON
@@ -320,12 +320,12 @@ async function theForm(page, app, inv) {
     check('a good paste fills the form, to save', (await row('target').locator('input').inputValue()) === 'release')
     await discard()
 
-    // --- Pair (Hive merges, #1355): Hive merges, G9's checks suggested from the scripts with their commands, the install.
+    // --- Pair (Combwork merges, #1355): Combwork merges, G9's checks suggested from the scripts with their commands, the install.
     await applyChoice('pair')
     check('Pair: Combwork merges into the repository’s own default branch, by name (master here)', (await row('finish').locator('select').inputValue()) === 'hiveMerges' && (await row('target').locator('input').inputValue()) === 'master', await row('target').locator('input').inputValue())
     check('…G9 in Checks: the quick checks from its scripts, with their commands', JSON.stringify(await inGroup('checks')) === JSON.stringify(['preChecks', 'mergeChecks', 'focusedTests', 'mergeInstall']) && JSON.stringify(await values('mergeChecks')) === JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint']), JSON.stringify(await values('mergeChecks')))
     check('…G8 shown in Merging while Combwork merges', (await inGroup('merging')).includes('strict'))
-    // G18 (#1179): pushing the target after a merge, shown while Hive merges, off in the preset; switched on and saved.
+    // G18 (#1179): pushing the target after a merge, shown while Combwork merges, off in the preset; switched on and saved.
     const push = row('pushTarget').locator('[role="switch"]')
     check('…G18 shown in Merging while Combwork merges, off', (await inGroup('merging')).includes('pushTarget') && (await push.getAttribute('aria-checked')) === 'false')
     await push.click()
@@ -428,7 +428,7 @@ async function theForm(page, app, inv) {
     await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
     check('#1508: saved, a reviewer agent and nobody reviews their own work, one reviewer', !!(await lib.until(() => saved().review === 'agent' && saved().noSelfReview === true && (saved().reviewers ?? 1) === 1, HUNG_MS)), JSON.stringify(projectJson().workflow))
 
-    // --- Set in the window on their own and saved (#1483), each before only by a preset or at Hive's level: G1b two
+    // --- Set in the window on their own and saved (#1483), each before only by a preset or at Combwork's level: G1b two
     // reviewers, G12 the project's identity, G13 stop own runs, G14 on the project's own row. From the reviewer agent
     // just saved.
     const without = (o, key) => JSON.stringify(Object.fromEntries(Object.entries(o).filter(([k]) => k !== key).sort(([a], [b]) => a.localeCompare(b))))

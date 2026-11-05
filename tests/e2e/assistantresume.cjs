@@ -1,7 +1,7 @@
-// A resumed Hive Assistant conversation runs on its current mode's instructions, with the real Claude Code (#334).
+// A resumed Combwork Assistant conversation runs on its current mode's instructions, with the real Claude Code (#334).
 // Since 2.1.267 Claude Code records a conversation's system prompt on its first request and sends that record on every
-// resume, whatever a later launch appends; Hive resumes the Assistant with --system-prompt-snapshot off. Three modes of
-// the test's own each give a codeword only in their instructions (never in their summary, which Hive types when it
+// resume, whatever a later launch appends; Combwork resumes the Assistant with --system-prompt-snapshot off. Three modes of
+// the test's own each give a codeword only in their instructions (never in their summary, which Combwork types when it
 // tells the Assistant a mode). The Assistant starts in Alpha and gives its codeword; switched to Bravo while it runs,
 // then Restart in This Mode… (the menu and its question), the same conversation gives Bravo's; switched to Charlie
 // while it is stopped and resumed, it is told Charlie once and gives Charlie's; resumed again, it isn't told again.
@@ -77,7 +77,7 @@ const mode = ({ name, word: w }) =>
   // None until its first message is in.
   const items = async (id) => (await inv('transcript:read', home, id).catch(() => null))?.items ?? []
   /**
-   * Where it was told a mode (#650: Hive's doorbell, then its cw_inbox read, whose result has the notice): one per read
+   * Where it was told a mode (#650: Combwork's doorbell, then its cw_inbox read, whose result has the notice): one per read
    * that gave it, as the doorbell that began that read's turn. Counted by reads, not doorbells: a doorbell its turn
    * couldn't read (a resumed CLI whose hive tools hadn't connected yet, under load) is rung again (#650), and both
    * doorbells precede the one read that told it (#863).
@@ -136,7 +136,7 @@ const mode = ({ name, word: w }) =>
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Alt+I')
   await lib.until(async () => (await panel.locator('.assistant-header').count()) === 1, 5000)
-  // Hive's log as each launch starts: ask() types its question once that launch's hive tools connected, as Hive types
+  // Combwork's log as each launch starts: ask() types its question once that launch's hive tools connected, as Combwork types
   // nothing before (#1148: a question typed into a just-started Claude Code wasn't taken).
   let launchMark = lib.hiveLogLines(userData).length
   await inv('session:start', home, { agentId: 'assistant' })
@@ -175,7 +175,7 @@ const mode = ({ name, word: w }) =>
   await inv('session:start', home, { resumeId: session, agentId: 'assistant' })
   await lib.cliStep('resumed after a switch while stopped', { session: key }, async () => {
     check('Claude Code resumes the conversation', !!(await idle()) && (await live())?.sessionId === session, (await live())?.sessionId)
-    check('…and Hive tells it Charlie once it is idle', !!(await lib.until(async () => (await told(session, modes.charlie)) === 1, 60000, 500)))
+    check('…and Combwork tells it Charlie once it is idle', !!(await lib.until(async () => (await told(session, modes.charlie)) === 1, 60000, 500)))
     if (!(await noticeEnded(session, modes.charlie))) return
     const reply = await ask(session)
     if (control) check(`with the recorded prompt asked for, it doesn't know Charlie's codeword (${modes.charlie.word})`, !reply.includes(modes.charlie.word), reply)

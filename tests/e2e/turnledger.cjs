@@ -1,7 +1,7 @@
 // The turn ledger (#648): an agent's status follows its CLI's turns by their ids, so it can't freeze on "working". Acted
 // out with the fake Claude Code (prompt_id, 2.1.296's screen) and the fake Codex (turn_id, its rollout's task_complete):
 // - a final turn with no tool call ends finished;
-// - a tool's PostToolUse that reaches Hive after its turn's Stop leaves it finished (one way #642's agent stayed working);
+// - a tool's PostToolUse that reaches Combwork after its turn's Stop leaves it finished (one way #642's agent stayed working);
 // - a turn another Stop hook carries on works again at its next tool, and ends at its next Stop;
 // - a Stop that never comes: Codex's own record of the turn's end ends it; Claude Code idle at its prompt on screen
 //   (after a silence, HIVE_TEST_SILENT_MS here) ends it;
@@ -18,7 +18,7 @@ const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 20000
-// How long a running turn may be silent before Hive looks for its end on screen or says its state is unknown.
+// How long a running turn may be silent before Combwork looks for its end on screen or says its state is unknown.
 const SILENT_MS = 2000
 
 const userData = path.join(lib.WORK, 'turnledger-profile')
@@ -123,7 +123,7 @@ const check = (name, ok, extra = '') => {
       return from[0]?.startsWith('working') && from.includes('finished|over') && from
     }, HUNG_MS)
     const ended = since ? since.indexOf('finished|over') : -1
-    check(`${name}: a tool end that reaches Hive after the turn's Stop is old news: it stays finished`, !!after && !!stale && still?.status === 'finished' && ended > 0 && !since.slice(ended).some((s) => s.startsWith('working')), JSON.stringify(seen.get(a.id)))
+    check(`${name}: a tool end that reaches Combwork after the turn's Stop is old news: it stays finished`, !!after && !!stale && still?.status === 'finished' && ended > 0 && !since.slice(ended).some((s) => s.startsWith('working')), JSON.stringify(seen.get(a.id)))
   }
 
   // Claude Code: another Stop hook carries the turn on: working at its next tool, finished at its next Stop.
@@ -134,7 +134,7 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(path.join(claudeHome, 'fake-continue-done-Claude'), '')
   check('and its next Stop ends it', !!(await is(claude, 'finished', 'over')))
 
-  // Codex: its Stop never reaches Hive; its rollout records the turn's end (task_complete).
+  // Codex: its Stop never reaches Combwork; its rollout records the turn's end (task_complete).
   await turn(codex, 'loststop')
   check("Codex: a turn whose Stop is lost ends from Codex's own record of it", !!(await is(codex, 'finished', 'over')))
   check('the log says so', !!(await until(() => /Codex recorded the end of turn [\w-]+ at .*, and Hive saw no Stop: its turn is over/.test(hiveLog()), HUNG_MS)))

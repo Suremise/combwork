@@ -150,7 +150,7 @@ const check = (name, ok, extra = '') => {
     check(`${codexW.name} starts`, !!(await ready(codexW.id)))
     await lib.until(async () => lines(path.join(codexHome, 'fake-launches.jsonl')).length > launches, HUNG_MS, 200)
     check('switched off, the next launch gets none of it', !codexTold(codexW.cwd).includes('NOTE-ALL'), codexTold(codexW.cwd).slice(-300))
-    // Claude Code keeps a conversation's first system prompt on resume (since 2.1.267): one Hive gave the note to is
+    // Claude Code keeps a conversation's first system prompt on resume (since 2.1.267): one Combwork gave the note to is
     // resumed with it rendered fresh, so the note is gone from it too, by another agent in its folder as well (HR5's
     // rounds 1–2: the record is the conversation's, SessionRecord.promptAdded).
     const claudeSession = (await live(claudeP.id))?.sessionId

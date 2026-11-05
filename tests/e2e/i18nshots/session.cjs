@@ -1,5 +1,5 @@
 // Screenshot cases for the `session` area (#847): what sessions say in the window's language while agents and the
-// Agent API read English. An agent compacting by itself (its status, which is Hive's text beside the English
+// Agent API read English. An agent compacting by itself (its status, which is Combwork's text beside the English
 // statusMessage, and the notice), a refused Hand Over (a session HiveError, formatted for the window by IPC) and both in
 // the Notifications panel. Reached for the i18nshots route (tests/e2e/i18nshots.cjs has the case format) with
 // locale-independent means only: IPC, the fake Claude Code's files, command ids and structural hooks, never English text.
@@ -61,7 +61,7 @@ async function closeAutoCompact(ctx) {
 }
 
 /**
- * Hand Over to… from One (stopped) to Two with the latest handover, when the project has none: Hive refuses
+ * Hand Over to… from One (stopped) to Two with the latest handover, when the project has none: Combwork refuses
  * (session.handOver.none, a HiveError), and the window says so in a notice in its language.
  */
 async function handOverRefused(ctx) {

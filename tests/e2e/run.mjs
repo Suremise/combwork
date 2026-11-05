@@ -1,4 +1,4 @@
-// Runs Hive's end-to-end suites: npm run e2e [suite…] [options]. See tests/e2e/README.md.
+// Runs Combwork's end-to-end suites: npm run e2e [suite…] [options]. See tests/e2e/README.md.
 //   --jobs N        how many suites run at once (default 4; 1 runs them one after another). Suites that start a real
 //                   CLI run one at a time in a lane of their own beside the others; those marked serial in suites.mjs
 //                   (and the installer's) run last, alone.
@@ -24,7 +24,7 @@
 //   --lang L[,L…]   the i18n screenshot route (i18nshots, #769) in these languages (en-XA, the pseudo-locale, when not
 //                   given): run alone, its screenshots kept as with --keep-files. Every other suite runs in English.
 //   --build         build first (npx electron-vite build), only if the build isn't from this source (build.mjs).
-//   --packaged      include the installer's suites (need npm run dist); --no-progress: don't report to Hive.
+//   --packaged      include the installer's suites (need npm run dist); --no-progress: don't report to Combwork.
 //   --no-wait       a heavy run (more than 5 suites, or --repeat) fails at once when every test slot on this machine is
 //                   taken, instead of waiting for one (slots.mjs; heavySlots and sideSlots in hive-test\config.json); and
 //                   any run fails at once when every test lane (10) is taken, instead of waiting for one (lanes.mjs, #707).
@@ -33,7 +33,7 @@
 // Needs a dev build. A suite fails when it exits non-zero or prints a line starting with FAIL. Each suite gets its own
 // Agent API port (HIVE_E2E_PORT, read through lib.port()), so suites can run side by side; each runner claims a lane
 // (lanes.mjs: ports and suite folders of its own), so runners in different worktrees can run at the same time.
-// Run in a Hive agent's session, it shows in that Hive's Progress panel, one step per suite (../progressReport.mts).
+// Run in a Combwork agent's session, it shows in that Combwork's Progress panel, one step per suite (../progressReport.mts).
 // Each suite's environment comes from the run context (runContext.cjs): an allowlist and the suite's own folder and
 // port, never the environment the runner was started from.
 import { spawn, spawnSync } from 'child_process'
@@ -94,14 +94,14 @@ if (opts.clearDir) {
 
 // What may be deleted (#253, evidence.cjs): never what a card that isn't Done cites. That needs the board: without it
 // nothing a run made could be removed, and runs would pile up copies of their suites' folders (#285), so it doesn't
-// start. HIVE_TEST_NO_BOARD=1 says there is no board (a checkout outside a Hive workspace): nothing is evidence then.
+// start. HIVE_TEST_NO_BOARD=1 says there is no board (a checkout outside a Combwork workspace): nothing is evidence then.
 const evidence = evidenceFor(root)
 if (!evidence.ok) {
-  console.error(`Can't tell what the tests may delete: ${evidence.why}. Fix the board, or set HIVE_TEST_NO_BOARD=1 if no Hive board cites test output on this machine.`)
+  console.error(`Can't tell what the tests may delete: ${evidence.why}. Fix the board, or set HIVE_TEST_NO_BOARD=1 if no Combwork board cites test output on this machine.`)
   process.exit(2)
 }
 // The run's own temp folder in hive-test\tmp (HI-2102): its suites, Playwright's playwright-artifacts-* folders, the
-// test copies of Hive and the CLIs they start get it as TEMP (runContext.cjs ALLOW), not %TEMP%. It goes as the runner
+// test copies of Combwork and the CLIs they start get it as TEMP (runContext.cjs ALLOW), not %TEMP%. It goes as the runner
 // exits, unless the run is recorded for review (kept, as its logs are, until a run's start a day later removes it,
 // while no open card cites it). A run's start removes what stopped runs left, by the same evidence rules.
 const runTemp = startRunTemp((p) => evidence.protects(p))
@@ -186,15 +186,15 @@ if (pool) {
 // Before the code's fingerprint and the build (#735): a run that waited tests the source as it is once it has a lane.
 let lane = null
 if (!nested) {
-  // First, the test copies of Hive an earlier run left in lanes no runner holds (HI-1453): one holding a lane's port
+  // First, the test copies of Combwork an earlier run left in lanes no runner holds (HI-1453): one holding a lane's port
   // kept every later runner off that lane.
   try {
     const left = await endLeftCopies(runContext.LANES_DIR, lib.WORK)
-    if (left.ended) console.log(`Ended ${left.ended} process(es) of test copies of Hive an earlier run left running in its lanes (HI-1453).\n`)
+    if (left.ended) console.log(`Ended ${left.ended} process(es) of test copies of Combwork an earlier run left running in its lanes (HI-1453).\n`)
     // Never ended without a record: listed, for a person to look at.
     if (left.unrecorded.length) console.log(`Still running in lanes no runner holds, with no record of a run starting them (not ended; look at them, HI-1453):\n${left.unrecorded.map((p) => `  ${p.pid}: ${p.commandLine}`).join('\n')}\n`)
   } catch (e) {
-    console.warn(`Couldn't look for test copies of Hive an earlier run left running (HI-1453): ${e.message}\n`)
+    console.warn(`Couldn't look for test copies of Combwork an earlier run left running (HI-1453): ${e.message}\n`)
   }
   const queue = slotWaitProgress('e2e', `npm run e2e -- ${args.join(' ')}`.trim(), args, 'a test lane')
   let said = ''
@@ -262,7 +262,7 @@ if (packagedStale) console.warn(`Warning: ${packagedStale}: the installer's suit
 
 /**
  * Where the suites keep their profiles, workspaces and screenshots: the lane's folder (the logs stay in lib.WORK). A
- * runner inside a suite uses nested/ in its parent's (E2E_RUN_DIR: Hive drops HIVE_E2E_DIR from an agent's shell).
+ * runner inside a suite uses nested/ in its parent's (E2E_RUN_DIR: Combwork drops HIVE_E2E_DIR from an agent's shell).
  */
 const suiteWork = lane ? laneWork(lib.WORK, lane.lane) : process.env.E2E_RUN_DIR ? join(process.env.E2E_RUN_DIR, 'nested') : null
 // Each slot has its own port, from the lane's: the CLI lane takes the one below the first slot's.
@@ -272,9 +272,9 @@ if (lane) console.log(`Lane ${lane.lane}: ports ${lane.first}–${lane.last}\n  
 /**
  * A suite's environment (runContext.suiteEnv): the allowlist and the test settings passed on by name, nothing else of
  * the runner's (an agent session's HIVE_ variables, HIVE_PROGRESS_*, NO_COLOR…); its lane's folder, and side by side
- * its own Agent API port (suites read it with lib.port(); the test Hives they start get it through lib.hiveEnv). The
- * same said without the HIVE_ prefix (E2E_RUN_*), which Hive keeps in its sessions: a runner started in an agent's
- * shell inside the suite's Hive (progressreport does) knows it is inside a suite, and which port to keep clear of.
+ * its own Agent API port (suites read it with lib.port(); the test copies they start get it through lib.hiveEnv). The
+ * same said without the HIVE_ prefix (E2E_RUN_*), which Combwork keeps in its sessions: a runner started in an agent's
+ * shell inside the suite's Combwork (progressreport does) knows it is inside a suite, and which port to keep clear of.
  */
 const suiteEnv = (name, port, dir) => {
   const env = runContext.suiteEnv({ name, port, work: dir, runDir: dir ?? lib.WORK, cliLog: dir ? join(dir, CLI_LOG) : null, slots: creditFor(pool) })
@@ -282,7 +282,7 @@ const suiteEnv = (name, port, dir) => {
   if (name === LANG_SUITE && opts.lang.length) env.E2E_I18N_LANGS = opts.lang.join(',')
   return env
 }
-/** The CLIs the suite's test copies of Hive selected (record.mjs readCliLog), read before its folder goes. */
+/** The CLIs the suite's test copies of Combwork selected (record.mjs readCliLog), read before its folder goes. */
 const suiteClis = (dir) => {
   try {
     return dir ? readCliLog(readFileSync(join(dir, CLI_LOG), 'utf8')) : []
@@ -317,7 +317,7 @@ const run = (name, port) =>
     const add = (d) => (out += d)
     child.stdout.on('data', add)
     child.stderr.on('data', add)
-    // Out of time: the suite and everything it started. Killing only the suite's node leaves its test copy of Hive running,
+    // Out of time: the suite and everything it started. Killing only the suite's node leaves its test copy of Combwork running,
     // holding the lane's port, and the lane's next suites can't start their Agent API.
     const limitMs = suiteLimitMs(name, opts.lang)
     const timer = setTimeout(() => {
@@ -333,10 +333,10 @@ const run = (name, port) =>
       const outcome = { ...suiteOutcome({ code, out }), clis: suiteClis(dir), windows }
       // What a suite's agents left running from its folder (a command through hive-progress, a server: #542) would hold
       // the folder and outlive the run: stopped, by command line (its folder, started since the suite did), never by name.
-      // Its test copies of Hive first (HI-1453): those it recorded, as the processes recorded. One not recorded is the
+      // Its test copies of Combwork first (HI-1453): those it recorded, as the processes recorded. One not recorded is the
       // folder's sweep's below (#542), which takes what names the folder and started since the suite did.
       const copies = dir ? endCopies([dir]).ended : 0
-      if (copies) out += `\n(${copies} process(es) of its test copies of Hive still running after it ended were ended, HI-1453)\n`
+      if (copies) out += `\n(${copies} process(es) of its test copies of Combwork still running after it ended were ended, HI-1453)\n`
       const stopped = dir ? stopProcessesIn(dir, started) : 0
       if (stopped) out += `\n(${stopped} process(es) still running from its folder after it ended were stopped, #542)\n`
       // --keep-files: a passed suite's own files (screenshots, reports) go into the run's log folder before its folder
@@ -351,7 +351,7 @@ const run = (name, port) =>
     })
   })
 
-/** A CLI's path: on the PATH, or where its installer puts it (Hive looks there too); null when it isn't installed. */
+/** A CLI's path: on the PATH, or where its installer puts it (Combwork looks there too); null when it isn't installed. */
 const cliPath = (cmd, places) => {
   const r = spawnSync('where.exe', [cmd], { encoding: 'utf8', env: runContext.baseEnv() })
   return (r.status === 0 && r.stdout.split(/\r?\n/)[0].trim()) || places.find((p) => existsSync(p)) || null
@@ -563,7 +563,7 @@ if (opts.record) {
   // A record that isn't valid: its run is kept as a failed one's (#223).
   if (recordInvalid) markRunFailed(lastRun.logDir, `record not valid: ${problems.join('; ')}`)
   const when = new Date().toISOString().slice(0, 16).replace('T', ' ')
-  // The real CLIs the real suites ran, as their Hive selected them (#365: the release's tested-with manifest).
+  // The real CLIs the real suites ran, as their Combwork selected them (#365: the release's tested-with manifest).
   const clis = realCliVersions(lastRun.results, SUITES)
   const md = `${recordMarkdown({ code: codeBefore, when, jobs, results: lastRun.results, logDir: lastRun.logDir, summary, problems, notRun: notRun.map((s) => s.name), runs: repeat > 1 ? Object.assign(runs, { repeat }) : null, clis, homes, selection, packaged: packagedExe }).trimEnd()}\n\n${binLine}\n`
   const json = `${JSON.stringify(recordJson({ code: codeBefore, when, results: lastRun.results, problems, notRun: notRun.map((s) => s.name), clis, selection, packaged: packagedExe }), null, 2)}

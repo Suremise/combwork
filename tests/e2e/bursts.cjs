@@ -51,7 +51,7 @@ const until = async (fn, ms = 10000) => {
   await app.evaluate(({ Notification }) => {
     Notification.isSupported = () => true
   })
-  // The notifications Hive would have shown, since the last clearNotes().
+  // The notifications Combwork would have shown, since the last clearNotes().
   const logged = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((e) => e.kind === 'notification')
   let notesFrom = 0
   const notes = async () => logged().slice(notesFrom)
@@ -104,7 +104,7 @@ const until = async (fn, ms = 10000) => {
   fs.writeFileSync(path.join(claudeHome, 'bursts-one-go'), '')
   check('One finishes once released', !!(await until(async () => (await live(alpha, one))?.status === 'finished', 10000)))
 
-  // --- HI-2312: a finish whose agent starts its next turn before the group is told (as Hive's delivery typed at a turn's
+  // --- HI-2312: a finish whose agent starts its next turn before the group is told (as Combwork's delivery typed at a turn's
   // end starts one) isn't told: told then, it arrived as the agent worked again, with the last turn's message. Two
   // finishes and is given more at once; Three finishes a moment later, in the same group, which is told without Two's.
   await until(async () => (await notes()).some((n) => /One finished/.test(n.title)), HUNG_MS) // One's finish, told on its own

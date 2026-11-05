@@ -1,9 +1,9 @@
 // The run context (runContext.cjs, #203): nothing from the environment a test is started from reaches what it starts,
 // but the allowlist. With the variables an agent's shell or an outer hive-progress sets put into this suite's own
 // environment (NO_COLOR, CW_PROGRESS_WRAPPED, an Agent API token…), checked: under the runner, the suite itself got
-// nothing else; a test Hive's main process (whose environment its agents' shells get), a child that is part of Hive,
-// and the hive-progress wrapper (#202: it reports, not taking itself for nested) see none of them; a test Hive's git
-// reads the suite's global config, with the test identity (#1466); and a test Hive
+// nothing else; a test Combwork's main process (whose environment its agents' shells get), a child that is part of Combwork,
+// and the hive-progress wrapper (#202: it reports, not taking itself for nested) see none of them; a test Combwork's git
+// reads the suite's global config, with the test identity (#1466); and a test Combwork
 // started with any environment but lib.hiveEnv's is refused.
 const lib = require('./lib.cjs')
 const ctx = require('./runContext.cjs')
@@ -22,7 +22,7 @@ const check = (name, ok, extra = '') => {
 }
 const upper = (keys) => keys.filter((k) => !k.startsWith('=')).map((k) => k.toUpperCase())
 
-/** What an agent's shell in Hive, an outer hive-progress, or a person's own shell may have set. */
+/** What an agent's shell in Combwork, an outer hive-progress, or a person's own shell may have set. */
 const LEAKS = {
   NO_COLOR: '1',
   FORCE_COLOR: '1',
@@ -58,12 +58,12 @@ const leaked = (env) => Object.entries(env).filter(([k, v]) => LEAKS[k.toUpperCa
   fs.rmSync(userData, { recursive: true, force: true })
   fs.rmSync(data, { recursive: true, force: true })
 
-  // A test Hive: its main process's environment is what its agents' shells and the CLIs start from.
+  // A test Combwork: its main process's environment is what its agents' shells and the CLIs start from.
   const { app } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47929) } })
   try {
     const env = await app.evaluate(() => Object.fromEntries(Object.entries(process.env)))
-    check("a test Hive gets none of the suite's environment", !leaked(env).length, leaked(env).join(', '))
-    // CHROME_CRASHPAD_PIPE_NAME: Hive's own crash handler, which Electron sets in main for its processes (#985); what Hive
+    check("a test Combwork gets none of the suite's environment", !leaked(env).length, leaked(env).join(', '))
+    // CHROME_CRASHPAD_PIPE_NAME: Combwork's own crash handler, which Electron sets in main for its processes (#985); what Combwork
     // starts doesn't get it (ptyHost's childEnv).
     const allowed = new Set(upper([...ctx.ALLOW, 'HIVE_USER_DATA', 'HIVE_TEST_QUIET', 'HIVE_TEST_TIPS', 'HIVE_TEST_CLI_HOME_CONNECTION', 'HIVE_LANG', 'HIVE_TEST_TRASH_DIR', ...Object.keys(ctx.cliHomes()), 'GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'HIVE_API_PORT', ...ctx.CARRIED, 'CHROME_CRASHPAD_PIPE_NAME']))
     // PROMPT: cmd.exe's default ($P$G), which Playwright's start of Electron on Windows sets; not the suite's.
@@ -87,7 +87,7 @@ const leaked = (env) => Object.entries(env).filter(([k, v]) => LEAKS[k.toUpperCa
     await app.close().catch(() => undefined)
   }
 
-  // Started any other way, a test Hive is refused before it starts.
+  // Started any other way, a test Combwork is refused before it starts.
   const refused = async (env) => {
     try {
       const other = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, ...(env ? { env } : {}) })
@@ -97,10 +97,10 @@ const leaked = (env) => Object.entries(env).filter(([k, v]) => LEAKS[k.toUpperCa
       return /lib\.hiveEnv/.test(e.message)
     }
   }
-  check("a test Hive started with the suite's own environment is refused", await refused(null))
+  check("a test Combwork started with the suite's own environment is refused", await refused(null))
   check('…or with a copy of a run-context environment', await refused({ ...lib.hiveEnv({ HIVE_USER_DATA: userData }) }))
 
-  // A child that is part of Hive (the hive MCP server, a bridge): the allowlist and what it is given.
+  // A child that is part of Combwork (the hive MCP server, a bridge): the allowlist and what it is given.
   const child = await new Promise((resolve) => {
     const p = spawn(process.execPath, ['-e', 'process.stdout.write(JSON.stringify(process.env))'], { env: lib.childEnv({ CW_API_URL: 'http://127.0.0.1:1' }) })
     let out = ''

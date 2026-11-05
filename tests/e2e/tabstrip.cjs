@@ -3,7 +3,7 @@
 // active tab in view, when even that doesn't fit. No tab is ever cut off unless the strip scrolls, at the window's
 // minimum width too; icon-only tabs keep their name (tooltip and accessible label) and order, and dragging files over
 // the Session tab still switches to it. Light and dark screenshots. The agent runs the fake Claude Code (fake-claude/).
-// Opened in a narrow window, the tabs fit at once, with no resize (#812): on Hive's start with the project restored, on
+// Opened in a narrow window, the tabs fit at once, with no resize (#812): on Combwork's start with the project restored, on
 // switching to another project, and on showing the project again after another view.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -203,9 +203,9 @@ const check = (name, ok, extra = '') => {
 
   await inv('session:stop', alpha).catch(() => undefined)
 
-  // --- Opened narrow (#812): the fit is right on first show, with no resize to set it. Hive starts from saved bounds as
+  // --- Opened narrow (#812): the fit is right on first show, with no resize to set it. Combwork starts from saved bounds as
   // narrow as it allows (sidebar shown: room for the icons but not the labels, as above), and nothing sizes the window or
-  // the page after that (lib.launch would: fitWindow), so only Hive's own first layout can get the fit right.
+  // the page after that (lib.launch would: fitWindow), so only Combwork's own first layout can get the fit right.
   await app.close()
   const narrowBounds = { width: minW, height: HEIGHT, maximized: false }
   const saved = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -228,7 +228,7 @@ const check = (name, ok, extra = '') => {
       check(`${what}: ${fit}, no scrolling`, !!ok, JSON.stringify(await fitOf()))
     }
     const narrowShot = (file) => p.screenshot({ path: path.join(lib.WORK, file), clip: { x: 0, y: 0, width: sizes[0] ?? minW, height: 140 } })
-    await fitsAs('Hive started narrow with alpha restored', 'icons')
+    await fitsAs('Combwork started narrow with alpha restored', 'icons')
     await narrowShot('tabstrip-6-start-narrow-dark.png')
     await p.getByText('beta', { exact: true }).first().click()
     await lib.until(async () => (await p.locator('.project-header h1').textContent().catch(() => '')) === 'beta', HUNG_MS)

@@ -103,10 +103,10 @@ const check = (name, ok, extra = '') => {
   await lib.addAgent(inv, alpha, { name: 'Reviewer' })
   await inv('project:updateConfig', alpha, { layout: 'columns3' })
   await inv('workspace:refresh')
-  // With none of the user's yet, Add Agent from Template lists Hive's own (#1436), their agents named from the
+  // With none of the user's yet, Add Agent from Template lists Combwork's own (#1436), their agents named from the
   // project's key (alpha's: AL-B1).
   await lib.addMenuRun(page, 'Add Agent from Template')
-  check("Add Agent from Template with none saved yet lists Hive's own, named from the project's key", !!(await lib.until(async () => (await menuItems()).includes('AL-B1') && (await menuItems()).includes('AL-R6'), HUNG_MS)) && !(await menuItems()).some((n) => n.includes('{key}')), JSON.stringify(await menuItems()))
+  check("Add Agent from Template with none saved yet lists Combwork's own, named from the project's key", !!(await lib.until(async () => (await menuItems()).includes('AL-B1') && (await menuItems()).includes('AL-R6'), HUNG_MS)) && !(await menuItems()).some((n) => n.includes('{key}')), JSON.stringify(await menuItems()))
   // Escape closes the submenu, then + Add ▾'s own.
   await lib.until(async () => (await page.locator('.menu').count()) === 0 || void (await page.keyboard.press('Escape')), HUNG_MS)
   // …and following it works: + Add ▾ → Templates → Save Template…
@@ -144,10 +144,10 @@ const check = (name, ok, extra = '') => {
   await loadMenu()
   check('Templates ▸ lists the workspace template', (await menuItems()).includes('pair'), JSON.stringify(await menuItems()))
   const shape = await page.evaluate(() => [...document.querySelector('.menu').children].slice(0, 3).map((el) => el.className.split(' ')[0] + ':' + el.textContent.trim()))
-  check("…after Save Template…, a separator and Hive's own (#1436)", shape[0] === 'menu-item:Save Template…' && shape[1] === 'menu-sep:' && shape[2] === "menu-header:Combwork's templates", JSON.stringify(shape))
+  check("…after Save Template…, a separator and Combwork's own (#1436)", shape[0] === 'menu-item:Save Template…' && shape[1] === 'menu-sep:' && shape[2] === "menu-header:Combwork's templates", JSON.stringify(shape))
   // (Headers are upper-case by CSS.)
   const headers = (await page.locator('.menu .menu-header').allInnerTexts()).map((h) => h.toLowerCase())
-  check("…Hive's own, then the workspace's", JSON.stringify(headers) === JSON.stringify(["combwork's templates", 'workspace templates']), JSON.stringify(headers))
+  check("…Combwork's own, then the workspace's", JSON.stringify(headers) === JSON.stringify(["combwork's templates", 'workspace templates']), JSON.stringify(headers))
   await item('pair').click()
   const blocked = page.locator('.dialog', { hasText: "Can't load" })
   await shown(blocked, 'blocked')
@@ -355,7 +355,7 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => (await menuItems()).includes('Reviewer'), 5000)
   const first = (await page.locator('.menu .menu-item:not(.disabled)').first().innerText()).split('\n')[0].trim()
   check('→ opens the template agents on the first one', (await active()) === first, `${await active()} / ${first}`)
-  // (Past Hive's own templates' agents first, #1436.)
+  // (Past Combwork's own templates' agents first, #1436.)
   for (let i = 0; i < 80 && (await active()) !== 'Reviewer'; i++) await page.keyboard.press('ArrowDown')
   check('→ opens the template agents, ↓ reaches Reviewer', (await active()) === 'Reviewer', await active())
   await page.keyboard.press('Enter')

@@ -45,7 +45,7 @@ fs.mkdirSync(shots, { recursive: true })
   await lib.acceptClaudeTrust(inv, proj, agent.id)
   check('the session starts', !!(await lib.until(async () => (await inv('session:live')).some((l) => l.status === 'ready'), 30000)))
   const typed = async () => (await inv('pty:buffer', lib.ptyKey(proj, agent.id))).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
-  /** The attachments' paths on the CLI's input line: copies Hive keeps with the session (.combwork/attachments/<session>/…). */
+  /** The attachments' paths on the CLI's input line: copies Combwork keeps with the session (.combwork/attachments/<session>/…). */
   // A copy's name may have spaces (its own name after the time), when its path is quoted.
   const kept = async (ext = 'png') => [...new Set([...(await typed()).matchAll(new RegExp(`[\\\\/]\\.combwork[\\\\/]attachments[\\\\/][^"\\r\\n]+?\\.${ext}(?=["\\s]|$)`, 'gi'))].map((m) => m[0]))]
   const images = () => kept('png')

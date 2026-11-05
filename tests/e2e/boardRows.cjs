@@ -30,7 +30,7 @@ function readCitingDocs(db) {
   return readCardRows(db, { where: "archived = 0 AND col <> 'done'", parts: ['comments'] }).map((r) => ({ number: r.card.number, doc: composeCard(r) }))
 }
 
-/** Saves a card's document as another program would, in one transaction (a running Hive sees it within about a second). */
+/** Saves a card's document as another program would, in one transaction (a running Combwork sees it within about a second). */
 function writeDoc(db, n, doc) {
   if (legacy(db)) {
     db.prepare('INSERT INTO cards (number, doc) VALUES (?, ?) ON CONFLICT(number) DO UPDATE SET doc = excluded.doc').run(n, JSON.stringify(doc))

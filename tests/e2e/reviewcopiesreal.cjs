@@ -6,7 +6,7 @@
 // is named, with whose turn left it and its screen, #1546: a reviewer's shell starts in the project folder, and Haiku
 // once ran `node test.js` there before running it in its copy). An edit there
 // is never asked about (granted): a command may be (Claude Code's Accept edits and Copilot's ask before one), and is
-// answered Yes, counted in the output. What each CLI's own home has afterwards never names the copies folder (Hive
+// answered Yes, counted in the output. What each CLI's own home has afterwards never names the copies folder (Combwork
 // passes it on the command line only).
 // - Claude Code: Haiku, Accept edits, in the signed-in test home (CLAUDE_TEST_HOME: tokens).
 // - Codex: gpt-6-luna at low effort, Ask (workspace-write), in the Codex test home (tokens).
@@ -64,7 +64,7 @@ const parts = {
 if (parts.copilot) lib.skip(`${parts.copilot}: it builds the cards`)
 if (parts.claude && parts.codex) lib.skip(`${parts.claude}; ${parts.codex}`)
 
-/** An agent's Agent API token, from the file Hive keeps for it (agentTokens.ts). */
+/** An agent's Agent API token, from the file Combwork keeps for it (agentTokens.ts). */
 const tokenOf = (projectPath, agentId) => {
   const h = createHash('sha256').update(`${projectPath.toLowerCase()}#${agentId}`).digest('hex').slice(0, 16)
   const f = path.join(userData, 'agent-api', `${h}.json`)
@@ -114,7 +114,7 @@ const namingCopies = () => {
     await lib.openWorkspace(inv, page, ws)
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, folder: 'project' } })
     await inv('project:updateConfig', alpha, { copies: { size: 3 } })
-    // HI-2211: Hive's reviewer pool gives each card in Review outside a lane to a free reviewer and types it in (HI-2046),
+    // HI-2211: Combwork's reviewer pool gives each card in Review outside a lane to a free reviewer and types it in (HI-2046),
     // and a real CLI then reviews it on its own (RX approved its card before its start review here). The suite's steps are
     // each reviewer's, so the team is paused (HI-2081: nothing given out or told) before any agent starts: none is
     // running to be told of the pause, and the reviews and verdicts below are the agents' own calls, which it doesn't hold.

@@ -1,9 +1,9 @@
-// Which settings files the real Claude Code reads, and which --settings files it refuses (#333): what Hive's compaction
+// Which settings files the real Claude Code reads, and which --settings files it refuses (#333): what Combwork's compaction
 // reader (providers/claude/autoCompact.ts, settingSources and readSettings) and its launch read of a user's --settings
 // (launchSettings.ts) assume. Each settings file has a SessionStart hook leaving a marker; `claude -p --init-only` runs
 // the hooks and exits without a conversation, so it needs no sign-in, sends nothing and spends no tokens. In a Claude
 // Code home of the suite's own (claudeHome: 'own'), never the user's. The Claude Code it runs is the one a test copy of
-// Hive selects (standalone, never an editor extension's copy; the run record's version comes from that, #365), started
+// Combwork selects (standalone, never an editor extension's copy; the run record's version comes from that, #365), started
 // briefly with the same home. Run it after a Claude Code update: a failure means the reader no longer matches the CLI.
 const fs = require('fs')
 const path = require('path')
@@ -24,8 +24,8 @@ const check = (name, ok, extra = '') => {
 }
 
 /**
- * The Claude Code a test copy of Hive selects, as an agent of it would run: Hive's own detection (the standalone CLI,
- * never an editor extension's copy), in the suite's home, with an empty Codex home (Hive looks for Codex too).
+ * The Claude Code a test copy of Combwork selects, as an agent of it would run: Combwork's own detection (the standalone CLI,
+ * never an editor extension's copy), in the suite's home, with an empty Codex home (Combwork looks for Codex too).
  */
 async function claudeExe() {
   lib.enableProviders(userData)
@@ -61,7 +61,7 @@ const marking = (who, extra = {}) => ({ ...extra, hooks: { SessionStart: [{ hook
   const found = await claudeExe().catch((e) => lib.skip(`environment: ${e.message}`))
   const exe = found.path
   const env = lib.childEnv({ CLAUDE_CONFIG_DIR: home })
-  console.log(`Claude Code ${found.version} (${exe}), as Hive selected it`)
+  console.log(`Claude Code ${found.version} (${exe}), as Combwork selected it`)
   /** Runs Claude Code's SessionStart hooks with these arguments: its exit code, the markers left, its first error line. */
   const run = (args) => {
     for (const f of fs.readdirSync(marks)) fs.unlinkSync(path.join(marks, f))

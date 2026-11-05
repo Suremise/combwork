@@ -1,7 +1,7 @@
 // Purge… (#1138) from its three places, on fixtures: a project with a session the "CLI" still has, an archived one it
 // lost, a third for the session's own purge, a running session, a deleted session's attachments and a leftover spare of a
 // backup; and a second project. The Sessions tab's Purge Combwork's Files… lists and removes one session's files to the
-// Recycle Bin, the record staying; Project Settings → Storage's Purge… lists every file of Hive's with its size, the
+// Recycle Bin, the record staying; Project Settings → Storage's Purge… lists every file of Combwork's with its size, the
 // last copy tagged and the running session left alone, and with Delete permanently removes them for good (nothing in the
 // Recycle Bin), deleting the lost session as Delete does; Settings → Workspace's Purge… covers the other project too. The
 // CLI's transcripts, the running session's files and the totals never change. Dev build, throwaway profile, workspace
@@ -30,7 +30,7 @@ const check = (name, ok, extra = '') => {
 
 const id = (n) => `9b26e000-0000-4000-8000-00000000000${n}`
 const WITH_CLI = id(1) // the CLI still has it
-const LOST = id(2) // archived; the CLI lost it: Hive's backup is its last copy
+const LOST = id(2) // archived; the CLI lost it: Combwork's backup is its last copy
 const ONE = id(3) // purged on its own, from the Sessions tab
 const DELETED = id(4) // deleted: only its attachments are left
 const BETA = id(5) // the other project's
@@ -162,7 +162,7 @@ const write = (file, text) => {
       const r = rel(await rows(), alpha)
       return JSON.stringify(r) === JSON.stringify(want) && r
     }, HUNG_MS)
-    check("the project's preview lists every file of Hive's, not the running session's", !!listed, JSON.stringify(rel(await rows(), alpha)))
+    check("the project's preview lists every file of Combwork's, not the running session's", !!listed, JSON.stringify(rel(await rows(), alpha)))
     check('…says the running session is left alone', /1 running session is left alone/.test(await dialogText()), await dialogText())
     check('…tags the last copy and warns that its session is deleted', (await dialog.locator('.purge-last-copy').count()) === 1 && /1 session has no other copy/.test(await dialog.locator('.banner.danger').innerText().catch(() => '')))
     const kinds = await dialog.locator('.cleanup-kind').allInnerTexts()

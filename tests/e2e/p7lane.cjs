@@ -1,8 +1,8 @@
 // P7's acceptance in the app (#1448, SPEC §16.18, §16.19.1's P7 row: "a 6×6 setup runs a full lane on slots, Resume All
 // and resume after restart work"), the Assistant off, fake Claude Code builders and fake Codex reviewers acting by their
 // own tokens, temp Git projects:
-// A. alpha, Hive's Team 6×6 loaded (its agents named from the project's key), Team chosen in the Version Control tab (G15
-//    On, G17 One per lane), Hive merging into main, checked out in the project folder:
+// A. alpha, Combwork's Team 6×6 loaded (its agents named from the project's key), Team chosen in the Version Control tab (G15
+//    On, G17 One per lane), Combwork merging into main, checked out in the project folder:
 //    - two lanes started from the window at once: each is lent a slot (slot-a, slot-b), its builder started there in a new
 //      conversation, and each card gets a line of its own from main's head;
 //    - lane 1's first card: counted checks, submitted; its reviewer, whose session stays in the project folder, is
@@ -13,8 +13,8 @@
 //    - S42: the user's uncommitted edit in a file the next merge changes pauses the queue, the file named; put back, it
 //      merges;
 //    - the Progress panel: "AL-B1 / AL-R1 · slot-a", the review copy's run a check of the revision, the slots' warming
-//      runs as Hive's;
-//    - lane 1 ends; a third lane is lent slot-a again; Hive quits mid-lane and opens again: Resume All resumes the open
+//      runs as Combwork's;
+//    - lane 1 ends; a third lane is lent slot-a again; Combwork quits mid-lane and opens again: Resume All resumes the open
 //      leases' sessions in their slots and lists AL-B1's, whose slot was lent again, as reused (S35's window side).
 // Screenshots in both themes. Dev build, throwaway profile, workspace, CLAUDE_CONFIG_DIR and CODEX_HOME.
 const lib = require('./lib.cjs')
@@ -121,7 +121,7 @@ async function startHive(env = {}) {
   return { app, page, inv }
 }
 
-/** The page's helpers for one start of Hive: sessions, tokens, intents, shells, the board and the Progress panel. */
+/** The page's helpers for one start of Combwork: sessions, tokens, intents, shells, the board and the Progress panel. */
 function helpers(h) {
   const { page, inv } = h
   const live = async (p, id) => (await inv('session:live')).find((s) => same(s.projectPath, p) && s.agentId === id) ?? null
@@ -146,7 +146,7 @@ function helpers(h) {
   const intent = async (p, a, n, name, body = {}) => {
     const token = await tokenOf(p, a)
     let res = null
-    // "Try again: Hive reads it afresh" (what it read moved as it decided), as an agent does, a few times at most.
+    // "Try again: Combwork reads it afresh" (what it read moved as it decided), as an agent does, a few times at most.
     for (let tries = 0; tries < 5; tries++) {
       const r = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${encodeURIComponent(`#${n}`)}/${name}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       res = { status: r.status, body: await r.json().catch(() => null) }
@@ -270,7 +270,7 @@ function helpers(h) {
     const { page, inv } = h
     const x = helpers(h)
 
-    // --- A. alpha: Team 6×6 from Hive's template, its agents named from the project's key.
+    // --- A. alpha: Team 6×6 from Combwork's template, its agents named from the project's key.
     // Loaded from the Templates view: Team 6×6 → Load into Project… → alpha; its load dialog names each agent.
     await page.locator('.activitybar [aria-label="Templates"]').click()
     const tplRow = page.locator('.sidebar .template-row[data-scope="hive"][aria-label="Team 6×6"]')
@@ -296,7 +296,7 @@ function helpers(h) {
     check('…six Claude Code builders and six Codex reviewers, none in a worktree', agents.length === 12 && agents.filter((a) => a.workflowRole === 'builder' && a.provider === 'claude-code').length === 6 && agents.filter((a) => a.workflowRole === 'reviewer' && a.provider === 'codex').length === 6 && agents.every((a) => !a.worktree), JSON.stringify(agents.map((a) => [a.name, a.workflowRole, a.provider, !!a.worktree])))
     Object.assign(kept, { b1, b2, b3, r1, r2, r3 })
 
-    // Team chosen in the Version Control tab: G15 On, G17 One per lane, Hive merging into main (the default branch).
+    // Team chosen in the Version Control tab: G15 On, G17 One per lane, Combwork merging into main (the default branch).
     await x.toProject('alpha')
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
     await page.locator('.git-sections [data-section="workflow"]').click()
@@ -316,7 +316,7 @@ function helpers(h) {
       const f = await inv('workflow:form', alpha)
       return f?.preset === 'team' ? f.options : null
     }, HUNG_MS)
-    must('Team saved from the tab: Hive merges into main, slots, G15 On, G17 One per lane, quick and tests before review and merge', opts?.finish === 'hiveMerges' && opts.target === 'main' && !!opts.commands?.typecheck && !!opts.commands?.test && opts.folder === 'slots' && opts.slotsUpToDate === true && opts.reviewerMode === 'lane' && opts.preChecks?.length === 2 && opts.mergeChecks?.length === 2, JSON.stringify(opts))
+    must('Team saved from the tab: Combwork merges into main, slots, G15 On, G17 One per lane, quick and tests before review and merge', opts?.finish === 'hiveMerges' && opts.target === 'main' && !!opts.commands?.typecheck && !!opts.commands?.test && opts.folder === 'slots' && opts.slotsUpToDate === true && opts.reviewerMode === 'lane' && opts.preChecks?.length === 2 && opts.mergeChecks?.length === 2, JSON.stringify(opts))
     await inv('project:updateConfig', alpha, { slots: { setup: `node "${path.join(fx.tools, 'setup.js')}"` } })
 
     // --- Two lanes from the window at once, each lent a slot, its builder started there in a new conversation.
@@ -339,7 +339,7 @@ function helpers(h) {
       }, HUNG_MS)
       check(`${b.name} runs in ${s.name}`, !!there && there.slot === s.name, JSON.stringify(await x.live(alpha, b.id)))
     }
-    check("the slots' warming ran as Hive's, for each slot", !!(await until(async () => ['slot-a', 'slot-b'].every((n) => lines(setupLog).includes(n)), HUNG_MS)) && (await x.runs()).some((r) => r.source === 'hive' && r.slot === 'slot-a'), JSON.stringify({ log: lines(setupLog), runs: (await x.runs()).filter((r) => r.slot).map((r) => [r.slot, r.source, r.defaultName]) }))
+    check("the slots' warming ran as Combwork's, for each slot", !!(await until(async () => ['slot-a', 'slot-b'].every((n) => lines(setupLog).includes(n)), HUNG_MS)) && (await x.runs()).some((r) => r.source === 'hive' && r.slot === 'slot-a'), JSON.stringify({ log: lines(setupLog), runs: (await x.runs()).filter((r) => r.slot).map((r) => [r.slot, r.source, r.defaultName]) }))
 
     // Each card its own line from main's head.
     const startIn = async (b, n, slot) => {
@@ -404,13 +404,13 @@ function helpers(h) {
     }, HUNG_MS)), await tip())
     await h.page.mouse.move(5, 5)
     const agentChoices = () => x.panel.locator('select[aria-label="Agent"] option').allInnerTexts().catch(() => [])
-    // HI-1710: the copy's set-up run is its reviewer's (no "Hive (copy …)" entry), and no entry is listed twice.
+    // HI-1710: the copy's set-up run is its reviewer's (no "Combwork (copy …)" entry), and no entry is listed twice.
     const hives = ['Combwork (slot slot-a)', 'Combwork (slot slot-b)']
     const hivesNamed = async () => {
       const now = await agentChoices()
       return hives.every((c) => now.includes(c)) && !now.some((c) => c.startsWith('Combwork (copy')) && new Set(now).size === now.length
     }
-    check("the Runs tab's Agent filter names the slots' runs as Hive's, and the copy's as its reviewer's", !!(await until(hivesNamed, HUNG_MS)), JSON.stringify(await agentChoices()))
+    check("the Runs tab's Agent filter names the slots' runs as Combwork's, and the copy's as its reviewer's", !!(await until(hivesNamed, HUNG_MS)), JSON.stringify(await agentChoices()))
     await x.shoot('runs', x.panel)
 
     // --- Passed: the queue merges it into main, checked out in the project folder, while the reviewer is idle there (S42).
@@ -469,7 +469,7 @@ function helpers(h) {
     check('…put back and resumed: merged, Done', (await inv('queue:resume', alpha, 'main')).resumed === true && (await x.done(a2)), JSON.stringify(await x.kinds(a2)))
     check('lane 1 ends with its cards Done; its builder is stopped', !!(await until(async () => !!(await x.lane(l1.id))?.endedAt && !(await x.live(alpha, b1.id)), HUNG_MS)))
 
-    // --- A third lane is lent slot-a again (AL-B1's conversation there is now another's); Hive quits mid-lane.
+    // --- A third lane is lent slot-a again (AL-B1's conversation there is now another's); Combwork quits mid-lane.
     // slot-a free again: no lease, its writer (AL-B1's session) gone, ready.
     check('slot-a is free and ready once lane 1 has ended', !!(await until(async () => (await x.slots(alpha)).some((s) => s.name === 'slot-a' && !s.lease && !s.writer && s.state === 'ready'), HUNG_MS)), JSON.stringify(await x.slots(alpha)))
     const d1 = await x.create(alpha, 'Lane three: only')
@@ -543,8 +543,8 @@ function helpers(h) {
 const assignedOf = async (x, n) => (await x.facts(n)).filter((f) => f.kind === 'ReviewerAssigned').map((f) => f.data.reviewer)
 
 /**
- * B. beta, Hive's Team 6 + pool trimmed to two builders and its two pooled reviewers, an either agent E1 beside them, two
- * reviewers per card (G1b = 2), Hive merging: two lanes on the pool ("<KEY>-B1 / pool"); a card reviewed by both pooled
+ * B. beta, Combwork's Team 6 + pool trimmed to two builders and its two pooled reviewers, an either agent E1 beside them, two
+ * reviewers per card (G1b = 2), Combwork merging: two lanes on the pool ("<KEY>-B1 / pool"); a card reviewed by both pooled
  * reviewers, each in a review copy at its revision; E1 builds a card in a slot and isn't given a review meanwhile, then,
  * its card Done, reviews from the pool in the project folder (its launch granted the copies folder).
  */

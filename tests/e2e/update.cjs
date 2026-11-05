@@ -1,4 +1,4 @@
-// Hive's updater against a local fake release feed (generic provider): automatic check + download,
+// Combwork's updater against a local fake release feed (generic provider): automatic check + download,
 // status bar states, update dialog, manual download, skip, auto-check off, errors, dev-build
 // disabled state, Restart and Update through the quit flow (test mode never installs anything). #1647: what an install
 // would replace is a stand-in installed copy (HIVE_TEST_RESOURCES, fakeInstall.cjs): an older one is replaced, a local

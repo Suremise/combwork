@@ -59,7 +59,7 @@ const check = (name, ok, extra = '') => {
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
     return v
   }
-  // What each agent read when Hive's doorbell rang (#650: fake Claude Code reads its inbox then), and the doorbells.
+  // What each agent read when Combwork's doorbell rang (#650: fake Claude Code reads its inbox then), and the doorbells.
   const wakeLog = (agent) => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
     return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent)
@@ -68,7 +68,7 @@ const check = (name, ok, extra = '') => {
   const wakes = (agent) => wakeLog(agent).map((w) => lib.unkey(w.text))
   const bells = (agent) => wakeLog(agent).map((w) => lib.unkey(w.doorbell ?? ''))
   const say = async (id, text) => {
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(alpha, id) })
   }
   const idle = async (id) => ['ready', 'finished'].includes((await live(alpha, id))?.status)

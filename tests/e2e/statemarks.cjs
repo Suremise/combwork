@@ -2,7 +2,7 @@
 // (a diamond, a square, a dot, a ring) as well as its own colour, named for screen readers; the working dot pulses,
 // and holds still under reduced motion. Shown through StateMark's test hook (the session page doesn't show them yet),
 // with a screenshot of each theme. Their contrast on every background is the contrast suite's.
-// Throwaway profile and workspace, quiet; no agent is started. Empty Claude Code and Codex homes of its own: Hive looks
+// Throwaway profile and workspace, quiet; no agent is started. Empty Claude Code and Codex homes of its own: Combwork looks
 // for both CLIs when it starts, and their sign-in checks must never read the user's.
 const lib = require('./lib.cjs')
 const fs = require('fs')

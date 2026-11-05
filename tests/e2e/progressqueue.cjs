@@ -1,8 +1,8 @@
-// The merge queue in the Progress panel (#1356): a project set to "Hive merges" into `integration` (queueFixture.cjs),
+// The merge queue in the Progress panel (#1356): a project set to "Combwork merges" into `integration` (queueFixture.cjs),
 // fake Claude Code agents acting by their own tokens, one merge check the test steers.
-// - the queue's card shows, empty ("Nothing queued."), while the options have Hive merge;
+// - the queue's card shows, empty ("Nothing queued."), while the options have Combwork merge;
 // - a red check: returned with its check's name, Open card and Show log (its run's log) working;
-// - the check's run in Runs as "Hive (merge queue)", with Open log, and in the Agent filter;
+// - the check's run in Runs as "Combwork (merge queue)", with Open log, and in the Agent filter;
 // - testing (the card, the target's head, its step), queued (in order, its revision, Remove), Pulse's line, the badge;
 // - old rules: the options switch to "The agent merges" with one card testing and two queued; the queue's card stays,
 //   with Pause queue, Resume and Remove (with its confirmation) working, through paused (the testing card finishes its
@@ -32,7 +32,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
 
 ;(async () => {
   q.prepare(fx)
-  // A second project, also on Hive merges (its queue's card shows, empty): the project filter has both.
+  // A second project, also on Combwork merges (its queue's card shows, empty): the project filter has both.
   const beta = path.join(fx.ws, 'beta')
   lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.combwork/\n' })
   lib.git(beta, ['branch', '-M', 'main'])
@@ -49,7 +49,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     })
     const opened = () => h.app.evaluate(() => globalThis.__opened)
     // Looking at the Merges tab in a focused window sees a return: the window's focus is stubbed (as inbox.cjs does; a
-    // test copy never takes the OS focus) and the event Hive listens for is sent with it.
+    // test copy never takes the OS focus) and the event Combwork listens for is sent with it.
     await h.app.evaluate(({ BrowserWindow }) => {
       const w = BrowserWindow.getAllWindows()[0]
       w.isFocused = () => true
@@ -95,7 +95,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await projectFilter.selectOption({ label: 'All projects' })
     await until(async () => (await card.count()) === 0, HUNG_MS)
 
-    // --- Hive merges, nothing queued: the queue's card shows, empty, for the project being worked on (HI-2165: beta,
+    // --- Combwork merges, nothing queued: the queue's card shows, empty, for the project being worked on (HI-2165: beta,
     // not worked on, is left out under All projects while its queue is idle).
     const reviewer = await q.agent(fx, h, 'R1')
     check('the reviewer has its token', !!reviewer.token)
@@ -178,7 +178,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await setWidth(420)
     await shoot('merges-wide')
 
-    // The check's run, in Runs as Hive (merge queue), Open log; the Agent filter has it beside an agent's run.
+    // The check's run, in Runs as Combwork (merge queue), Open log; the Agent filter has it beside an agent's run.
     const runId = testing.testing.run
     const own = await fetch(`http://127.0.0.1:${PORT}/v1/progress`, { method: 'POST', headers: { Authorization: `Bearer ${one.builder.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'unit', command: 'npm test' }) })
     check("an agent's own run beside it", own.status === 200)

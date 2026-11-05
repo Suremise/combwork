@@ -1,9 +1,9 @@
-// Hooks health, part 2, for Copilot (#1371): its hooks carry no turn id, and Hive has no screen reading of its turns, so
+// Hooks health, part 2, for Copilot (#1371): its hooks carry no turn id, and Combwork has no screen reading of its turns, so
 // before this a Copilot agent whose hooks stopped arriving was never flagged. Now its events.jsonl names each turn (an
 // interactionId), and a worked turn no hook came after is flagged. The real Copilot CLI, offline against the scripted
-// stand-in model (fake-copilot-api.cjs), in a home of the suite's own; Hive loses its hooks while a file is there
+// stand-in model (fake-copilot-api.cjs), in a home of the suite's own; Combwork loses its hooks while a file is there
 // (HIVE_TEST_DROP_HOOKS: a Copilot hook can't be stopped at Copilot's end), and holds its checks while another is
-// (HIVE_TEST_HOOKS_HOLD), so each turn is over before any check looks. Hive's bound at 3 s.
+// (HIVE_TEST_HOOKS_HOLD), so each turn is over before any check looks. Combwork's bound at 3 s.
 // - a healthy quick turn is never flagged; with its hooks lost, a quick marked turn is: "transcript", naming that turn's
 //   interactionId, never the healthy one's;
 // - its hooks back, the next turn's hook clears it.
@@ -89,7 +89,7 @@ const jsonl = (file) => {
       const stopped = all.slice(i).some((e) => e.type === 'hook.end' && e.data?.hookType === 'agentStop')
       return worked && stopped ? id : null
     }
-    /** One quick turn with Hive's checks held until it is over in Copilot's own records. Its interactionId. */
+    /** One quick turn with Combwork's checks held until it is over in Copilot's own records. Its interactionId. */
     const quickTurn = async (text) => {
       fs.writeFileSync(hold, '')
       await inv('pty:write', key, text)

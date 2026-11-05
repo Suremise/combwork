@@ -1,6 +1,6 @@
 // A scenario whose agent leaves a command running through hive-progress (#542): on 10 Oct a Codex agent's command
 // (cmd → hive-progress → node) outlived its scenario, held the scenario's folder, and the next run in that lane crashed
-// removing it. The harness stops what its Hive started, and what still names the folder, by command line (never by
+// removing it. The harness stops what its Combwork started, and what still names the folder, by command line (never by
 // name), before it removes the folder; a folder still in use fails that one scenario, saying so, and nothing crashes.
 // Here the fake Claude Code's "progress-linger" leaves such a command (a lingering node under the session's own
 // hive-progress shim) and ends its turn; the same scenario then runs again in the same folder.
@@ -104,7 +104,7 @@ const scenario = {
     check(`run ${run}: the scenario's folder went`, !r.kept && !fs.existsSync(root), r.kept ?? root)
   }
   // HI-2217: what an agent leaves that names no scenario folder and whose parent has exited (a model's `find / …`) is
-  // in no tree and named by no command line: only its launch's job knows it, and the harness asks Hive for that.
+  // in no tree and named by no command line: only its launch's job knows it, and the harness asks Combwork for that.
   const hiddenPidFile = path.join(workRoot, 'left-unnamed-fake', 'claude-home', 'fake-hidden-linger.jsonl')
   const hiddenPid = () => pidIn(hiddenPidFile)
   let hidden = null

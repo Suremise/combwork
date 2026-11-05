@@ -89,13 +89,13 @@ const check = (name, ok, extra = '') => {
   }
   /**
    * Types a line to an agent and checks its CLI took it (#564). Under load a line can reach the fake late, after the end
-   * of a turn Hive already shows, and be dropped while it is still busy (as a line typed during a turn is): typed again.
+   * of a turn Combwork already shows, and be dropped while it is still busy (as a line typed during a turn is): typed again.
    */
   const say = async (id, text) => {
     const key = lib.ptyKey(alpha, id)
     const before = await said(id, text)
     for (let attempt = 0; attempt < 3; attempt++) {
-      // A retry clears what is left on the line first (Ctrl+U); the first try leaves a line Hive typed alone.
+      // A retry clears what is left on the line first (Ctrl+U); the first try leaves a line Combwork typed alone.
       await inv('pty:write', key, attempt ? `\x15${text}` : text)
       await until(async () => lib.plainText(await inv('pty:buffer', key).catch(() => '')).trimEnd().endsWith(text), 5000)
       await inv('pty:write', key, '\r')
@@ -119,7 +119,7 @@ const check = (name, ok, extra = '') => {
     process.exit(1)
   }
 
-  // --- 1. A wake whose first Enter is dropped: Hive presses Enter again and the line is taken; no stall.
+  // --- 1. A wake whose first Enter is dropped: Combwork presses Enter again and the line is taken; no stall.
   const c1 = (await inv('tasks:create', { title: 'Dropped Enter', project: 'alpha', agent: builder.id, column: 'doing' })).number
   script('Reviewer', [`boardreview ${c1} start then ${wait(c1, { column: 'review', fresh: true })}`])
   await say(reviewer.id, wait(c1, { column: 'review' }))
@@ -164,7 +164,7 @@ const check = (name, ok, extra = '') => {
   // project's agent's any more. Cancelling the reviewer's watch leaves it idle with no watch, so #1 is flagged first.
   await inv('watch:cancel', alpha, reviewer.id)
   check('a cancelled watch: after the grace the card it left is flagged', !!(await until(async () => ((await stalledOf(c1)) ?? '').startsWith("Reviewer isn't watching #"), 15000)), String(await stalledOf(c1)))
-  // Hive's loop wake for #1, in Review since section 2 (#405), reaches the reviewer: read with whatever else its inbox
+  // Combwork's loop wake for #1, in Review since section 2 (#405), reaches the reviewer: read with whatever else its inbox
   // had when it read it (#650: in section 2, with the wake whose line it took then), and the reviewer is idle again before
   // anything else is typed to it, or the next line lands while it works and is lost (#571).
   const loopWake = `[CW] #${c1} (Builder's card) is in Review. You review this card in its loop`

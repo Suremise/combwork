@@ -31,7 +31,7 @@ const excludeOf = (p) => {
   fs.mkdirSync(plain, { recursive: true })
   fs.writeFileSync(path.join(plain, 'notes.md'), '# Notes\n')
   lib.gitProject(repo)
-  // .combwork committed with add -A, before Hive ever excluded it.
+  // .combwork committed with add -A, before Combwork ever excluded it.
   fs.mkdirSync(path.join(committed, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(committed, '.combwork', 'notes.md'), 'kept by an old Hive')
   lib.gitProject(committed)

@@ -1,11 +1,11 @@
-// Templates v2 and Hive's own (#1436, SPEC §16.10.6), on fake Claude Code with the Assistant off and Codex turned off:
+// Templates v2 and Combwork's own (#1436, SPEC §16.10.6), on fake Claude Code with the Assistant off and Codex turned off:
 // a workspace opened with 0.9's templates (the workspace's and a project's) copies them into the 0.9 backup's folder,
 // leaves them as they were and never lists them, and says so once in the Notifications panel; importing a 0.9 file is refused, saying why; the Templates view lists
-// Hive's six, read-only, with the preset each suggests; Team 3×3 loaded into a project from the view makes six agents
+// Combwork's six, read-only, with the preset each suggests; Team 3×3 loaded into a project from the view makes six agents
 // named from its key, builders and reviewers paired both ways, in a grid of six, none in a worktree, Codex's agents on
 // Claude Code with a note on their rows, its workflow unticked; Pair loaded from + Add ▾ → Templates with "Also apply its
-// workflow" (HI-1910: Hive's own carry their preset's) ticked lands in Version Control → Workflow with Pair chosen and not
-// saved. Screenshots of the Hive templates, and of
+// workflow" (HI-1910: Combwork's own carry their preset's) ticked lands in Version Control → Workflow with Pair chosen and not
+// saved. Screenshots of the Combwork templates, and of
 // the load dialog's suggestion and connections (HI-2109), in both themes. Dev build (or HIVE_EXE), throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR; a quiet test copy. (0.9's templates copied at the board's real upgrade, and the upgrade waiting:
 // tests/upgradeTemplates.test.ts, on boards made 0.9's.)
@@ -43,7 +43,7 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
   fs.writeFileSync(path.join(ws, '.combwork', 'templates', 'old-pair.json.bak'), v09('Old pair'))
   fs.writeFileSync(path.join(alpha, '.combwork', 'templates', 'mine.json'), v09('Mine'))
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), alpha.toLowerCase()]))
-  // Claude Code only: Codex stays turned off, so Hive's templates' reviewers start on Claude Code's connection (HI-2109: Codex is only their suggestion).
+  // Claude Code only: Codex stays turned off, so Combwork's templates' reviewers start on Claude Code's connection (HI-2109: Codex is only their suggestion).
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -81,11 +81,11 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     await shoot('notice', () => page.locator('.notif-panel'))
     await page.locator('.notif-panel [aria-label="Close"]').click()
 
-    // --- The Templates view: Hive's six first, read-only, each suggesting a preset.
+    // --- The Templates view: Combwork's six first, read-only, each suggesting a preset.
     await page.locator('.activitybar [aria-label="Templates"]').click()
     const sidebar = page.locator('.sidebar')
     const hiveRows = sidebar.locator('.template-row[data-scope="hive"]')
-    check("the Templates view lists Hive's own: Solo, Pair, Pair: one provider, Team 3×3, Team 6×6, Team 6 + pool", !!(await until(async () => JSON.stringify(await hiveRows.evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))) === JSON.stringify(['Solo', 'Pair', 'Pair: one provider', 'Team 3×3', 'Team 6×6', 'Team 6 + pool']), HUNG_MS)), JSON.stringify(await hiveRows.evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))))
+    check("the Templates view lists Combwork's own: Solo, Pair, Pair: one provider, Team 3×3, Team 6×6, Team 6 + pool", !!(await until(async () => JSON.stringify(await hiveRows.evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))) === JSON.stringify(['Solo', 'Pair', 'Pair: one provider', 'Team 3×3', 'Team 6×6', 'Team 6 + pool']), HUNG_MS)), JSON.stringify(await hiveRows.evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))))
     check('…and none of the 0.9 ones (still in the folders)', (await sidebar.locator('.template-row:not([data-scope="hive"])').count()) === 0)
     await sidebar.locator('.template-row[data-scope="hive"][aria-label="Team 3×3"]').click()
     const detail = page.locator('.main-area > .tab-body .template-detail[data-scope="hive"]')
@@ -95,12 +95,12 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     const team = (await detail.locator('table tbody tr').allInnerTexts()).map((r) => r.split('\t').map((c) => c.trim()))
     // (Named as the selected project, alpha, would get them: its key's, #1123 names.)
   check("…its agents: builders on Claude Code, each paired with a reviewer on Codex, named from the selected project's key", team.length === 6 && /^[A-Z]{2,4}-B1$/.test(team[0][0]) && /^Builder\s+paired: [A-Z]{2,4}-R1$/.test(team[0][1]) && team[0][2] === 'Claude Code' && /^Reviewer\s+paired: [A-Z]{2,4}-B3$/.test(team[5][1]) && team[5][2] === 'Codex', JSON.stringify(team))
-    // Its preset as its workflow (HI-1910: Hive's own carry their preset's sections), shown under None | Git.
+    // Its preset as its workflow (HI-1910: Combwork's own carry their preset's sections), shown under None | Git.
     check('…and the preset it carries, as its workflow', /From the preset Team\./.test(await detail.innerText()))
     await shoot('hive-templates', () => page)
 
-    // --- Export… and Duplicate… of Hive's own, clicked (HR3's round 1, 2), while the workspace has another template in
-    // a file of the same name: the Hive one is the one exported and copied; the workspace's is left as it is.
+    // --- Export… and Duplicate… of Combwork's own, clicked (HR3's round 1, 2), while the workspace has another template in
+    // a file of the same name: the Combwork one is the one exported and copied; the workspace's is left as it is.
     const sameFile = path.join(ws, '.combwork', 'templates', 'team-3x3.json')
     const mine = JSON.stringify({ version: 2, name: 'Mine', savedAt: '2026-10-22T10:00:00.000Z', layout: 'auto', agents: [{ name: 'Solo one', role: 'builder', provider: 'claude-code' }] }, null, 2)
     fs.writeFileSync(sameFile, mine)
@@ -113,14 +113,14 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     }, exported)
     await detail.getByRole('button', { name: 'Export…' }).click()
     const out = await until(async () => (fs.existsSync(exported) ? JSON.parse(fs.readFileSync(exported, 'utf8')) : null), HUNG_MS)
-    check("Export… writes Hive's Team 3×3, not the workspace's file of that name", out?.name === 'Team 3×3' && out.agents.length === 6 && out.suggestedPreset === 'team' && out.pairs?.length === 3, JSON.stringify(out).slice(0, 200))
+    check("Export… writes Combwork's Team 3×3, not the workspace's file of that name", out?.name === 'Team 3×3' && out.agents.length === 6 && out.suggestedPreset === 'team' && out.pairs?.length === 3, JSON.stringify(out).slice(0, 200))
     await detail.getByRole('button', { name: 'Duplicate…' }).click()
     const dup = page.locator('.dialog', { hasText: 'Duplicate "Team 3×3"' })
     await until(async () => (await dup.count()) === 1, HUNG_MS)
     await dup.locator('select').selectOption({ label: 'The workspace (every project)' })
     await dup.getByRole('button', { name: 'Duplicate', exact: true }).click()
     const copy = sidebar.locator('.template-row[data-scope="workspace"][aria-label="Team 3×3"]')
-    check("Duplicate… copies Hive's Team 3×3 into the workspace, as its own file", !!(await until(async () => (await copy.count()) === 1, HUNG_MS)) && fs.readdirSync(path.join(ws, '.combwork', 'templates')).some((f) => f !== 'team-3x3.json' && f.endsWith('.json') && JSON.parse(fs.readFileSync(path.join(ws, '.combwork', 'templates', f), 'utf8')).name === 'Team 3×3'), JSON.stringify(fs.readdirSync(path.join(ws, '.combwork', 'templates'))))
+    check("Duplicate… copies Combwork's Team 3×3 into the workspace, as its own file", !!(await until(async () => (await copy.count()) === 1, HUNG_MS)) && fs.readdirSync(path.join(ws, '.combwork', 'templates')).some((f) => f !== 'team-3x3.json' && f.endsWith('.json') && JSON.parse(fs.readFileSync(path.join(ws, '.combwork', 'templates', f), 'utf8')).name === 'Team 3×3'), JSON.stringify(fs.readdirSync(path.join(ws, '.combwork', 'templates'))))
     check("…the workspace's own file of that name untouched", fs.readFileSync(sameFile, 'utf8') === mine)
     await sidebar.locator('.template-row[data-scope="hive"][aria-label="Team 3×3"]').click()
     await until(async () => (await detail.count()) === 1, HUNG_MS)

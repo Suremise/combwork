@@ -1,4 +1,4 @@
-// The Hive Assistant after its conversation ends: the ended bar's Resume and New are buttons a real pointer can
+// The Combwork Assistant after its conversation ends: the ended bar's Resume and New are buttons a real pointer can
 // click (nothing of the terminal on top of them), Resume reopens the same conversation and New a fresh one, both work
 // from the keyboard; the header's own Resume (|▷) resumes it without the ⋯ menu, also in a narrow panel and in the
 // light theme; with no conversation to resume there is Start and no Resume. The Assistant runs the fake Claude Code

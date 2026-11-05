@@ -1,5 +1,5 @@
-// Claude Code's agent view stays off in Hive's sessions: ← on an empty prompt must not move the session into
-// Claude Code's background service (where Hive can't see or stop it). Throwaway profile and workspace; no prompt
+// Claude Code's agent view stays off in Combwork's sessions: ← on an empty prompt must not move the session into
+// Claude Code's background service (where Combwork can't see or stop it). Throwaway profile and workspace; no prompt
 // is sent. If a background job appears anyway, it is stopped and removed. Claude Code runs in a home of the suite's
 // own with a made-up API key (lib.ownClaudeHome, #368), never the user's ~/.claude; the job check asks it about that home.
 const lib = require('./lib.cjs')
@@ -48,8 +48,8 @@ const check = (name, ok, extra = '') => {
   await inv('pty:write', lib.ptyKey(proj, agent.id), '\x1b[D')
   await lib.sleep(6000) // A fixed wait on purpose: this checks that the session does NOT move into Claude Code's background view after ←.
   const left = jobs()
-  check('← on an empty prompt keeps the session in Hive', left.length === 0, JSON.stringify(left))
-  check('the session is still running in Hive', (await inv('session:live'))[0]?.status === 'ready')
+  check('← on an empty prompt keeps the session in Combwork', left.length === 0, JSON.stringify(left))
+  check('the session is still running in Combwork', (await inv('session:live'))[0]?.status === 'ready')
   for (const j of left) {
     try {
       execFileSync(claude, ['stop', j.id], { env: lib.childEnv(claudeHome.env) })

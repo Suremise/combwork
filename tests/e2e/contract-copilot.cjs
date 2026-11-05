@@ -1,8 +1,8 @@
-// The GitHub Copilot CLI's contract with Hive (#638): what the installed Copilot sends Hive (its hooks, and what Hive
+// The GitHub Copilot CLI's contract with Combwork (#638): what the installed Copilot sends Combwork (its hooks, and what Combwork
 // made of each) is recorded through the developer console's own recording (redacted, the header naming the CLI's and
-// Hive's tested-with versions), made into a fixture as `npm run console-fixture` would, and compared with the one
+// Combwork's tested-with versions), made into a fixture as `npm run console-fixture` would, and compared with the one
 // recorded before (tests/fixtures/console/copilot.json): a hook that stops arriving, a field gone or of another type,
-// or Hive reading a hook differently fails; a new hook or field is flagged in the log. Run with the real tier: before a
+// or Combwork reading a hook differently fails; a new hook or field is flagged in the log. Run with the real tier: before a
 // release and after a Copilot update. The real Copilot CLI offline, against the scripted stand-in model
 // (fake-copilot-api.cjs: no sign-in, no credits), in a home of the suite's own with the GitHub CLI's login hidden: never
 // the user's ~/.copilot or gh sign-in. Skipped where Copilot isn't installed. A deliberate change to what Copilot sends
@@ -75,7 +75,7 @@ const check = (name, ok, extra = '') => {
     const seen = (pred) => lib.until(async () => (await ring()).find(pred) ?? null, HUNG_MS)
     await inv('session:start', proj, { agentId: a.id })
     await lib.until(async () => (await inv('session:live')).find((l) => l.agentId === a.id)?.status === 'ready', HUNG_MS)
-    // What Hive recognises on the screen (its prompt, its footer) is noted as the screen draws, whatever the status, and
+    // What Combwork recognises on the screen (its prompt, its footer) is noted as the screen draws, whatever the status, and
     // can come after the agent is ready: the turn waits for each the fixture has. A CLI whose screen changed never shows
     // one; the comparison below says which.
     for (const name of new Set((fixture?.events ?? []).filter((e) => e.kind === 'terminal' && RECOGNITION_MARKERS.includes(e.name)).map((e) => e.name))) await seen((e) => e.kind === 'terminal' && e.name === name)
@@ -91,7 +91,7 @@ const check = (name, ok, extra = '') => {
     const text = fs.readFileSync(stopped.file, 'utf8')
     const rec = parseRecording(text)
     const cli = rec.header?.clis.find((c) => c.provider === 'copilot')
-    check("the recording's header: Hive's version, Copilot's installed and tested-with versions, no text", !!rec.header && rec.header.text === false && cli?.version === (info?.version ?? null) && cli?.tested === (info?.tested?.version ?? null) && rec.end?.reason === 'stopped', JSON.stringify(rec.header))
+    check("the recording's header: Combwork's version, Copilot's installed and tested-with versions, no text", !!rec.header && rec.header.text === false && cli?.version === (info?.version ?? null) && cli?.tested === (info?.tested?.version ?? null) && rec.end?.reason === 'stopped', JSON.stringify(rec.header))
     check("…and the turn's prompt isn't in it", !text.includes('view a.ts then'))
 
     // --- The contract: what Copilot sends now against the recorded fixture.

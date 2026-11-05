@@ -1,11 +1,11 @@
 // The merge queue on the card, in the Git tab and in the Merge dialog (#1357, SPEC §16.9.2-3, OP-13): a project set to
-// "Hive merges" into `integration` (queueFixture.cjs), fake Claude Code agents acting by their own tokens.
+// "Combwork merges" into `integration` (queueFixture.cjs), fake Claude Code agents acting by their own tokens.
 // - a red check's return in the card's Work section: why (the check by name), its output's last lines, Show log
 //   (its run's log), Retry merge; a conflict's return with its files;
 // - Retry merge as the runtime allows it (HI-1667): once per revision after a return, asked so, then not offered and
 //   why; none while a follow-up waits for its reviewer, and why; after Remove from queue, asked with no such limit;
 // - the Git tab's Merge queue section: the queue now and its history (each card, revision, result or reason, when);
-// - the Merge dialog on a branch whose card Hive merges: the card's queue state, Merge disabled with why, Merge
+// - the Merge dialog on a branch whose card Combwork merges: the card's queue state, Merge disabled with why, Merge
 //   anyway (asks first) merging it and recorded on the card as an override;
 // - the project's options switched to "The agent merges" while a card is in its checks: its Work section and the Git
 //   tab's section still show it testing, then merged;
@@ -225,7 +225,7 @@ const f = q.folderHelpers(fx)
     part = await openCard(late.n)
     check('…its Work section: merged (the merge line), no queue part left', !!(await until(async () => /Merged into integration as/.test(await text(dialog.locator('.card-work'))) && (await part.count()) === 0, HUNG_MS)), await text(dialog.locator('.card-work')))
     await closeCard()
-    // --- The Merge dialog on a branch whose card Hive merges (the options back to Hive merging).
+    // --- The Merge dialog on a branch whose card Combwork merges (the options back to Combwork merging).
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
     const dee = await q.agent(fx, h, 'BD', { worktree: true })
     const d = (await inv('tasks:create', { title: 'Dee', project: 'alpha' })).number
@@ -245,7 +245,7 @@ const f = q.folderHelpers(fx)
       await page.locator('.menu-item', { hasText: 'Merge…' }).click()
       await until(async () => (await merge.count()) === 1, HUNG_MS)
     }
-    // While the card's queue is still being read (HR3's round 1 finding 1): Merge stays off, nothing says Hive merges.
+    // While the card's queue is still being read (HR3's round 1 finding 1): Merge stays off, nothing says Combwork merges.
     await h.app.evaluate(() => (process.env.HIVE_TEST_SLOW_IPC = 'worktrees:branchCards=4000*1'))
     await openMerge()
     const branchRead = async () => !!(await merge.locator('code').count()) && /Merges 1 commit/.test(await text(merge))
@@ -345,7 +345,7 @@ const f = q.folderHelpers(fx)
       check('…settled and answered: merged', !!(await until(async () => (await h.card(c.number))?.column === 'done', HUNG_MS)))
       await h.app.close().catch(() => {})
 
-      // --- A stopped advance with commands (HR3's round 1 finding 3): Hive ended after the advance began, before it
+      // --- A stopped advance with commands (HR3's round 1 finding 3): Combwork ended after the advance began, before it
       // touched the files; the merge then put into the folder by hand (its files as merged, main where it was). The
       // journal says nothing was touched, the files say otherwise: §16.9.2's terminal state, with the command that
       // finishes it (main moved to the merge) and the one that undoes it (the files put back). Neither is run.

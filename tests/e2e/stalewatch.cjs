@@ -1,9 +1,9 @@
 // A watch from a builder's previous conversation never holds off its next card (HI-2197, HB3's stall), on the fake
 // Claude Code, alpha's cards in slots:
-// 1. B1's first lane is lent slot-a; given its card there, B1 watches it by key. The lane ends: Hive types /exit, B1's
+// 1. B1's first lane is lent slot-a; given its card there, B1 watches it by key. The lane ends: Combwork types /exit, B1's
 //    CLI exits, and its watch outlives it (watches outlive a launch, for a resume).
 // 2. B1's next lane (slot-b) starts it in a new conversation: the old watch ends before it launches (no "waiting on
-//    cards"), and Hive gives B1 the lane's card.
+//    cards"), and Combwork gives B1 the lane's card.
 // 3. In that conversation B1 watches by a plain number that reads as another card's key (beta's cards made first, so
 //    alpha's numbers run ahead of its keys): refused, naming both; nothing is watched. A Done card by key answers at
 //    once (HI-2153).
@@ -51,7 +51,7 @@ const transcripts = () => {
   lib.git(alpha, ['branch', '-M', 'main'])
   lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.combwork/\n' })
   const env = lib.fakeClaude(userData, home, [alpha, beta, ws, slotA, slotB])
-  // B1 follows Hive's notices as a model does: cw_inbox, then the ack.
+  // B1 follows Combwork's notices as a model does: cw_inbox, then the ack.
   fs.writeFileSync(path.join(home, 'fake-follow-notices.txt'), '')
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))

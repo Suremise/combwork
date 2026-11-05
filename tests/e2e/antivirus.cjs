@@ -115,10 +115,10 @@ const check = (name, ok, extra = '') => {
   check('…asking Defender only for the one not already excluded', JSON.stringify(changes('add-requested').at(-1)?.paths) === JSON.stringify([tests]), JSON.stringify(changes('add-requested')))
   check('…both shown excluded, as read with administrator rights', !!(await lib.until(async () => /no longer scans this folder/.test(await panel.innerText()) && (await rows.allInnerTexts()).every((t) => /Excluded/.test(t)), 5000)) && /with administrator rights/.test(await panel.innerText()), await panel.innerText())
   s = await inv('antivirus:status', false)
-  check('…only the one Hive added is Hive’s', JSON.stringify(s.paths.map((p) => p.addedByHive)) === JSON.stringify([false, true]) && s.slowed === false, JSON.stringify(s.paths))
+  check('…only the one Combwork added is Combwork’s', JSON.stringify(s.paths.map((p) => p.addedByHive)) === JSON.stringify([false, true]) && s.slowed === false, JSON.stringify(s.paths))
   await shot('added-dark')
 
-  // Remove: only what Hive added; the user's own exclusion stays.
+  // Remove: only what Combwork added; the user's own exclusion stays.
   await panel.getByRole('button', { name: 'Remove Combwork’s Exclusions…' }).click()
   const removeDialog = page.locator('.dialog', { hasText: 'Remove the exclusions Combwork added?' })
   await lib.until(async () => (await removeDialog.count()) === 1, 5000)

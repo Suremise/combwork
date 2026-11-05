@@ -22,14 +22,14 @@ export const keepLimits = (name, lang = []) => (name === LANG_SUITE && lang.leng
  * (HI-2159: a language takes about 3 minutes, so a seven-language run reached four in 10).
  */
 export const suiteLimitMs = (name, lang = []) => Math.max(10, name === LANG_SUITE ? 6 * lang.length : 0) * 60_000
-/** A language tag as --lang takes it (pl, pt-BR, en-XA); whether Hive has the language, the suite checks by starting it. */
+/** A language tag as --lang takes it (pl, pt-BR, en-XA); whether Combwork has the language, the suite checks by starting it. */
 const LANG_TAG = /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i
 
 /** Whether a suite starts a real CLI (Claude Code, or Codex in its test home): the real tier, opt-in with --real. */
 export const isRealCli = (s) => (s.needs ?? []).some((n) => n === 'claude' || n === 'codex')
 
 /**
- * The HIVE_TEST_ seams a packaged Hive ignores (src/main reads them in unpackaged builds only, #1591): a suite needing
+ * The HIVE_TEST_ seams a packaged Combwork ignores (src/main reads them in unpackaged builds only, #1591): a suite needing
  * one tests the dev build's behaviour. tests/e2esuites.test.ts checks every HIVE_TEST_ name src reads is here, in
  * or in PACKAGED_SEAMS.
  */
@@ -44,12 +44,12 @@ export const DEV_SEAMS = [
   'HIVE_TEST_UPGRADE_HOLD', 'HIVE_TEST_WAKE_TAKE_MS'
 ]
 /**
- * The seams a packaged Hive honours too, when quiet (#1253: lib.hiveEnv starts every test copy quiet), among them the two
+ * The seams a packaged Combwork honours too, when quiet (#1253: lib.hiveEnv starts every test copy quiet), among them the two
  * every test copy is given, HIVE_TEST_TIPS and HIVE_TEST_TRASH_DIR (#1599: takesTestSeams in src/main/testQuiet.ts).
  */
 export const PACKAGED_SEAMS = ['HIVE_TEST_ASK_LEFTOVERS', 'HIVE_TEST_DIALOG_SNAPSHOT', 'HIVE_TEST_NOTIFY_LOG', 'HIVE_TEST_QUIET', 'HIVE_TEST_TIPS', 'HIVE_TEST_TOKEN_LOG', 'HIVE_TEST_TRASH_DIR']
 /**
- * The test copies' channels a packaged Hive refuses: 0.9 worktree agents (agents:testLegacy; `{ worktree: true })`, an
+ * The test copies' channels a packaged Combwork refuses: 0.9 worktree agents (agents:testLegacy; `{ worktree: true })`, an
  * agent asked for in a worktree, as q.agent does; a 0.9 template's worktree modes) and slots:test. A worktree agent asked
  * of agents:add is refused by any 1.0 build (gitmissing checks that), so isn't one.
  */
@@ -254,7 +254,7 @@ export function suiteOutcome({ code, out }) {
  */
 /**
  * The suite this runner was started inside, or null: the runner marks each suite's environment (E2E_RUN_SUITE, and
- * HIVE_E2E_PORT), and E2E_RUN_SUITE survives into the sessions of the Hive a suite starts, which drop HIVE_ variables.
+ * HIVE_E2E_PORT), and E2E_RUN_SUITE survives into the sessions of the Combwork a suite starts, which drop HIVE_ variables.
  */
 export function parentSuite(env = process.env) {
   if (!env.E2E_RUN_SUITE && !env.HIVE_E2E_PORT) return null

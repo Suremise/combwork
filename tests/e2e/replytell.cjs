@@ -1,6 +1,6 @@
 // The user's replies to agents told to the Assistant (#418), on fake Claude Code sessions (fake-claude/): the Assistant
 // watches a card (cw_wait_for_tasks with wake); the user answers the card's agent by typing in its pane, and the
-// Assistant is woken once with the reply's first line. Not for keystrokes without Enter, nor for a line Hive types into
+// Assistant is woken once with the reply's first line. Not for keystrokes without Enter, nor for a line Combwork types into
 // the agent, nor for a turn its CLI starts by itself after the user's Enter (HI-2410: a background task's end), nor with Settings → Assistant → Tell the Assistant when I reply to an agent off. Dev build, throwaway
 // profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -52,14 +52,14 @@ const check = (name, ok, extra = '') => {
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
     return v
   }
-  /** What Hive typed into the Assistant to wake it (the fake logs each line from Hive). */
+  /** What Combwork typed into the Assistant to wake it (the fake logs each line from Combwork). */
   const wakes = () => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
     return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === 'Assistant').map((w) => w.text)
   }
   /**
    * Types into a terminal as the user does; Enter separately when asked. Into the Assistant (its watches), typed again if
-   * a wake of Hive's disturbed it (lib.typeLine, #1560). Into the builder not (#1560's exemption): its typing is the
+   * a wake of Combwork's disturbed it (lib.typeLine, #1560). Into the builder not (#1560's exemption): its typing is the
    * user's reply under test, which a second try would send twice; a pause before its Enter, on purpose: the fake reads
    * a typed line before its Enter, as a CLI does.
    */
@@ -100,12 +100,12 @@ const check = (name, ok, extra = '') => {
   check('…once, with the reply, the agent and the card', w1.length === 1 && w1[0].startsWith(`[CW] User replied to Builder on ${named}: "C, the hive cell"`), JSON.stringify(w1))
   await until(async () => (await idle(home, 'assistant')) && (await idle(alpha, builder.id)), 20000)
 
-  // A line Hive types into Builder (a task the Assistant gives it, then watches its card) isn't the user's.
+  // A line Combwork types into Builder (a task the Assistant gives it, then watches its card) isn't the user's.
   await type(home, 'assistant', `hive cw_prompt_agent {"project":"alpha","agent":"Builder","text":"work 2"} then hive cw_wait_for_tasks {"cards":[${card}],"column":"review","wake":true}`)
   check('the Assistant gives Builder a task, then watches its card', !!(await until(async () => (await live(alpha, builder.id))?.status === 'working', 15000)) && !!(await until(async () => (await live(home, 'assistant'))?.status === 'watching', 15000)))
   await until(() => idle(alpha, builder.id), 20000)
-  await lib.sleep(2000) // A fixed wait on purpose: this checks that Hive's own line tells nothing.
-  check("Hive's own typed line: no wake", wakes().length === 1, JSON.stringify(wakes().slice(1)))
+  await lib.sleep(2000) // A fixed wait on purpose: this checks that Combwork's own line tells nothing.
+  check("Combwork's own typed line: no wake", wakes().length === 1, JSON.stringify(wakes().slice(1)))
 
   // Settings → Assistant → Tell the Assistant when I reply to an agent, off: the user's reply tells nothing.
   await inv('settings:update', { assistant: { tellReplies: false } })

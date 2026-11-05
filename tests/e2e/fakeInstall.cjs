@@ -1,4 +1,4 @@
-// A stand-in for an installed Hive's resources folder (#1647): an app.asar holding only its package.json (with the
+// A stand-in for an installed Combwork's resources folder (#1647): an app.asar holding only its package.json (with the
 // version), and its build-identity.json when given one, for HIVE_TEST_RESOURCES (an unpackaged build with a test update
 // feed reads its own and the installed copy's identity there; src/main/buildIdentity.ts) and the unit tests.
 const fs = require('fs')

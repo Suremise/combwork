@@ -1,9 +1,9 @@
-// Cards on slots (#1438, SPEC §16.10): Pair with Hive merges and Where cards are built: Each card in its own folder, on
+// Cards on slots (#1438, SPEC §16.10): Pair with Combwork merges and Where cards are built: Each card in its own folder, on
 // fake Claude Code agents, the Assistant off, a temp Git project (its package-lock.json changing, G15 on, the slots'
 // setup a script that records what it installed):
 // 1. A lane of two cards from the window: it gets slot-a before its agents start, and B1, running in the project folder,
 //    is started again there in a new conversation; card 1's start makes its line hive/<KEY>/<KEY>-n-slot-one in slot-a
-//    from the target's head; reviewed, passed, Hive's queue merges it, and the lane keeps slot-a;
+//    from the target's head; reviewed, passed, Combwork's queue merges it, and the lane keeps slot-a;
 //    HI-2335: the lane's no-code card next starts where B1 is (no slot, no lease, slot-a untouched, B1 left in its
 //    conversation there); put back, the lane keeps slot-a's lease; started again, reviewed and Done with no merge;
 // 2. card 2 starts in slot-a, on the lane's same lease, from the new target, installed again first (card 1 changed the lock file), and card 1's
@@ -93,7 +93,7 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     await lib.waitForProvider(inv)
     await lib.openWorkspace(inv, page, ws)
     const until = (fn, ms) => lib.until(fn, ms, 250)
-    // Pair with Hive merges into integration (checked out nowhere), cards in slots, slots brought up to date (G15).
+    // Pair with Combwork merges into integration (checked out nowhere), cards in slots, slots brought up to date (G15).
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
     // G15 on, written into project.json as the Version Control tab will offer it (#1445; this version doesn't yet).
     const pj = path.join(alpha, '.combwork', 'project.json')
@@ -181,8 +181,8 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     check('the lane names its slot', (await lane(started.lane.id))?.slot === 'slot-a')
     const tb1 = await tokenOf(b1.id)
     const s1 = await intent(tb1, c1, 'start')
-    // Its own start, or Hive's for the lane's next card landing first (HI-1990: that start is its reply): slot-a either way.
-    check("card 1's start: built in slot-a, B1 told to end its turn there (or that Hive started it)", s1.status === 200 && same(s1.body?.data?.folder, slotA) && /You'll continue in slot-a|Hive started [A-Z]+-\d+ for you, as your lane's next card/.test(JSON.stringify(s1.body)), JSON.stringify(s1.body))
+    // Its own start, or Combwork's for the lane's next card landing first (HI-1990: that start is its reply): slot-a either way.
+    check("card 1's start: built in slot-a, B1 told to end its turn there (or that Combwork started it)", s1.status === 200 && same(s1.body?.data?.folder, slotA) && /You'll continue in slot-a|Hive started [A-Z]+-\d+ for you, as your lane's next card/.test(JSON.stringify(s1.body)), JSON.stringify(s1.body))
     const base1 = git(alpha, 'rev-parse', 'integration')
     check(`card 1's line ${line(c1, 'slot-one')} is made in slot-a from the target's head`, !!(await until(() => branchIn(slotA) === line(c1, 'slot-one'), HUNG_MS)) && git(slotA, 'rev-parse', 'HEAD') === base1, branchIn(slotA))
     check('card 1 records its slot and lease', ((await inv('tasks:facts', c1)).find((f) => f.kind === 'Started')?.data?.slot ?? '') === 'slot-a')
@@ -191,7 +191,7 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     check('B1 submits card 1', (await intent(tb1, c1, 'submit', { summary: 'Slot one: ready' })).status === 200)
     const tr1 = await tokenOf(r1.id)
     check('R1 reviews and passes it', (await intent(tr1, c1, 'start-review')).status === 200 && (await intent(tr1, c1, 'verdict', { pass: true, comment: 'Slot one: passed' })).status === 200)
-    check("Hive's queue merges card 1: Done", !!(await until(async () => (await card(c1))?.column === 'done', HUNG_MS)), (await card(c1))?.column)
+    check("Combwork's queue merges card 1: Done", !!(await until(async () => (await card(c1))?.column === 'done', HUNG_MS)), (await card(c1))?.column)
     check('…into integration', isIn(rev1, 'integration'))
     const lent = (await slots()).find((s) => s.name === 'slot-a')
     check('the lane keeps slot-a after card 1 is Done', !!lent?.lease && lent.lease.lane === started.lane.id, JSON.stringify(lent))
@@ -202,7 +202,7 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     const b1Run = await live(b1.id)
     const factsN = async () => await inv('tasks:facts', cN)
     const slotNow = async () => (await slots()).find((s) => s.name === 'slot-a')
-    /** The card started: B1's own start, or Hive's for the lane's next card (HI-1990) landing first. */
+    /** The card started: B1's own start, or Combwork's for the lane's next card (HI-1990) landing first. */
     const startN = async () => (await until(async () => ((await card(cN))?.column === 'doing' ? true : (await intent(tb1, cN, 'start')).status === 200 || null), HUNG_MS)) === true
     check("the lane's no-code card starts", await startN(), JSON.stringify(await card(cN)))
     const startedN = (await factsN()).findLast((f) => f.kind === 'Started')?.data
@@ -230,7 +230,7 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     // read from the worktree's HEAD.
     fs.writeFileSync(hold, `const fs = require('fs'); const t = Date.now(); const tick = () => { if (fs.existsSync(${JSON.stringify(holdGo)})) { fs.writeFileSync(${JSON.stringify(holdSaw)}, fs.readFileSync(require('path').join(fs.readFileSync('.git', 'utf8').replace('gitdir:', '').trim(), 'HEAD'), 'utf8').replace('ref: refs/heads/', '').trim()); process.exit(0) } if (Date.now() - t > 120000) process.exit(3); setTimeout(tick, 100) }; tick()\n`)
     const progressRuns = async () => (await inv('progress:snapshot')).runs.filter((r) => r.state === 'running' || r.state === 'queued')
-    // B1's command typed as its shell would get it. Hive may type a wake into B1 at the same moment (card 1's Done, #1553):
+    // B1's command typed as its shell would get it. Combwork may type a wake into B1 at the same moment (card 1's Done, #1553):
     // typeLine types it again when the wake disturbed it or B1 dropped it.
     await lib.typeLine(inv, lib.ptyKey(alpha, b1.id), home, 'B1', `shell: hive-progress --title "B1 holds slot-a" -- node "${hold}"`, {
       ready: async () => ['ready', 'finished'].includes((await live(b1.id))?.status),
@@ -287,7 +287,7 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     check("…slot-a still the first lane's, no other lent", (await slotNow())?.lease?.lane === started.lane.id && (await slots()).filter((x) => x.lease).length === 1, JSON.stringify(await slots()))
     const tb3 = await tokenOf(b3.id)
     const tr3 = await tokenOf(r3.id)
-    // Its first card: B3's own start, or Hive's for the lane's next card (HI-1990) landing first.
+    // Its first card: B3's own start, or Combwork's for the lane's next card (HI-1990) landing first.
     check("the lane's no-code card starts where B3 is", (await until(async () => ((await card(cL1))?.column === 'doing' ? true : (await intent(tb3, cL1, 'start')).status === 200 || null), HUNG_MS)) === true && (await inv('tasks:facts', cL1)).findLast((f) => f.kind === 'Started')?.data?.folder === 'project', JSON.stringify(await inv('tasks:facts', cL1)))
     // A code card comes up later in it: its next card made code (the user's change).
     await inv('tasks:setKind', cL2, 'code', { confirm: true, reason: 'It needs a change after all' })

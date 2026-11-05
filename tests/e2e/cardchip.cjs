@@ -57,12 +57,12 @@ const check = (name, ok, extra = '') => {
   const coder = await lib.addAgent(inv, alpha, { name: 'Coder' })
   await lib.addAgent(inv, alpha, { name: 'Other' })
   await inv('project:updateConfig', alpha, { layout: 'columns2' })
-  // A running session with one exchange (so Hive keeps its record).
+  // A running session with one exchange (so Combwork keeps its record).
   await inv('session:start', alpha, { agentId: coder.id })
   await until(async () => ['waiting', 'ready'].includes((await live(coder.id))?.status), HUNG_MS)
   if ((await live(coder.id))?.status === 'waiting') await inv('pty:write', lib.ptyKey(alpha, coder.id), '\r')
   await until(async () => (await live(coder.id))?.status === 'ready', HUNG_MS)
-  // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+  // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
   await lib.typeLine(inv, lib.ptyKey(alpha, coder.id), claudeHome, null, 'hello', { live: () => live(coder.id) })
   check('Coder ran once', !!(await until(async () => (await live(coder.id))?.status === 'finished', HUNG_MS)))
   const sessionId = (await live(coder.id)).sessionId

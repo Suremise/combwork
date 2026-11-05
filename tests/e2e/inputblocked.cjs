@@ -1,5 +1,5 @@
 // An input that takes no keys (HI-2191), through a real lane and slot, on fake Claude Code agents (fake-claude/) with
-// Claude Code's input box: B1, the lane's builder in slot-a, ends a turn with a dialog of its CLI's own Hive doesn't know
+// Claude Code's input box: B1, the lane's builder in slot-a, ends a turn with a dialog of its CLI's own Combwork doesn't know
 // ("swallow"), drawn under its empty input box as Claude Code 2.1.314 draws its offer to teach auto mode, which takes
 // the keys. Card 1 moved to Done by the user, its card event is typed into B1: its letter goes unanswered three times,
 // so the agent waits for the user with why, once (the Assistant's lane watch wakes once), and nothing is given to it
@@ -36,7 +36,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
   lib.git(alpha, ['branch', '-M', 'main'])
   lib.git(alpha, ['branch', 'integration'])
   const env = lib.fakeClaude(userData, home, [alpha, ws, slotA])
-  // Claude Code's input box (a rule, its prompt mark, a rule), which Hive reads its input from.
+  // Claude Code's input box (a rule, its prompt mark, a rule), which Combwork reads its input from.
   fs.writeFileSync(path.join(home, 'fake-input-box.txt'), '')
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -82,10 +82,10 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     }
     /** What B1's CLI read (fake-input.jsonl), from `from` on. */
     const b1Reads = (from = '') => jsonl('fake-input.jsonl').filter((r) => r.agent === 'B1' && r.at >= from)
-    /** The letters Hive typed into B1's input to see it empty (CLEAR_PROBE). */
+    /** The letters Combwork typed into B1's input to see it empty (CLEAR_PROBE). */
     /**
-     * The letters Hive typed into B1's input to see it empty (CLEAR_PROBE), as keys: one read can carry several (a
-     * Backspace and the next letter), so its keys are counted, not its reads. Hive's own lines are bracketed pastes (an
+     * The letters Combwork typed into B1's input to see it empty (CLEAR_PROBE), as keys: one read can carry several (a
+     * Backspace and the next letter), so its keys are counted, not its reads. Combwork's own lines are bracketed pastes (an
      * "x" in "inbox"), left out.
      */
     const probes = (from) => [...b1Reads(from).filter((r) => !r.data.includes('\x1b[200~')).map((r) => r.data).join('')].filter((k) => k === 'x').length
@@ -126,8 +126,8 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 
     // ---- B1's turn ends on a dialog of its CLI's own, under its empty input box: it takes the keys.
     const b1Key = lib.ptyKey(alpha, b1.id)
-    // Typed only once Hive has nothing to type into B1 now or next: a delivery typed meanwhile would mix with it. From
-    // then on, every letter Hive types into B1 is a try at its input (a line Hive typed after its turn may already be
+    // Typed only once Combwork has nothing to type into B1 now or next: a delivery typed meanwhile would mix with it. From
+    // then on, every letter Combwork types into B1 is a try at its input (a line Combwork typed after its turn may already be
     // the first to find it blocked).
     const before = new Date().toISOString()
     const wakesBefore = assistantWakes().length
@@ -144,7 +144,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
       return s?.status === 'waiting' && s.inputBlocked && s
     })
     check('B1 waits for the user: something on its screen takes its keys', !!blocked && /taking its keys/.test(String(blocked.statusMessage)), JSON.stringify(blocked && { status: blocked.status, message: blocked.statusMessage }))
-    // The fake reads its input late on a busy machine: its log of a key may come after Hive gave up waiting for it.
+    // The fake reads its input late on a busy machine: its log of a key may come after Combwork gave up waiting for it.
     check('…after three letters typed and not answered', !!(await until(() => probes(before) >= 3, 10000)) && probes(before) === 3, `${probes(before)}: ${JSON.stringify(b1Reads(before))}`)
     const header = lib.paneHeader(page, 'B1')
     check('…its pane says so, with Try again', !!(await until(async () => (await header.locator('.pane-status.input-blocked').count()) >= 1)) && (await header.locator('.pane-status.input-blocked button', { hasText: 'Try again' }).count()) === 1)
@@ -190,7 +190,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     check('…then the lane places card 2 with it, once', !!(await until(() => placements(c2) >= 1)) && !!(await until(() => b1Reads(freeAt).some((r) => r.data.includes(`(${c2Key})`)))) && placements(c2) === placedAt + 1, JSON.stringify({ placedAt, placements: placements(c2), reads: b1Reads(freeAt).map((r) => r.data.slice(0, 60)) }))
     check('no delivery was called off after it was blocked', (await cancelled()) === cancelledAt, JSON.stringify([cancelledAt, await cancelled()]))
     check("the lane watch was told once that B1 waits for the user", waitLine().length === 1, JSON.stringify(waitLine()))
-    check('Hive never answered the dialog', JSON.stringify(jsonl('fake-envsetup.jsonl').filter((r) => r.agent === 'B1').map((r) => r.answer)) === '["later"]', JSON.stringify(jsonl('fake-envsetup.jsonl')))
+    check('Combwork never answered the dialog', JSON.stringify(jsonl('fake-envsetup.jsonl').filter((r) => r.agent === 'B1').map((r) => r.answer)) === '["later"]', JSON.stringify(jsonl('fake-envsetup.jsonl')))
     check('the log says when it was blocked and freed', /took no key in 3 clears in a row/.test(hiveLog()) && /its input takes keys again \(Try again: its input took the key\)/.test(hiveLog()))
   } catch (e) {
     check('the suite ran to the end', false, e?.stack ?? String(e))

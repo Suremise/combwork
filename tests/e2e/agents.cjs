@@ -21,7 +21,7 @@ const setupScript = path.join(setupDir, 'setup.cjs')
 fs.writeFileSync(setupScript, "console.log('HIVE-SETUP-RAN ' + JSON.stringify(process.argv.slice(2)))\n")
 const proj = path.join(ws, 'demo')
 fs.mkdirSync(proj, { recursive: true })
-// Git in the test repository, waiting out the Hive under test's own git (lib.git, #199).
+// Git in the test repository, waiting out the Combwork under test's own git (lib.git, #199).
 const g = (cmd, cwd = proj) => lib.git(cwd, cmd)
 g('init -q -b main')
 g('config user.email test@example.com')
@@ -39,7 +39,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
 const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n}.png`) })
 
 ;(async () => {
-  // The fake trusts the project and the worktree Hive makes for the Reviewer below.
+  // The fake trusts the project and the worktree Combwork makes for the Reviewer below.
   const claude = lib.fakeClaude(userData, path.join(scratch, 'agents-claude-home'), [proj, path.join(wtRoot, 'demo', 'reviewer')])
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
@@ -103,7 +103,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   p = await project()
   check('setup cleared', !p.agents.find((a) => a.id === a3.id).needsSetup)
   check('launch folders per agent', fs.existsSync(path.join(proj, '.combwork', `launch-${a1.id}`, 'plugin')) && fs.existsSync(path.join(proj, '.combwork', `launch-${a3.id}`, 'plugin')))
-  // Settings and MCP config in each launch's private folder, in Hive's user data, not the project (#345).
+  // Settings and MCP config in each launch's private folder, in Combwork's user data, not the project (#345).
   check("each launch's settings outside the project", fs.existsSync(path.join(lib.launchDir(userData, l1.runId), 'settings.json')) && fs.existsSync(path.join(lib.launchDir(userData, l3.runId), 'settings.json')) && !fs.existsSync(path.join(proj, '.combwork', `launch-${a1.id}`, 'settings.json')))
   const argsOk = fs.readFileSync(path.join(lib.launchDir(userData, l3.runId), 'settings.json'), 'utf8').includes('PreToolUse')
   check('PreToolUse hook registered', argsOk)
@@ -144,10 +144,10 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   const [h1, h2] = [hooks[l1.sessionId], hooks[l2.sessionId]]
   check("another launch's token is refused", (await post({ url: h1.url, token: h2.token }, { session_id: l1.sessionId, hook_event_name: 'Notification' })).status === 401)
   check('a call naming no launch is refused', (await post({ url: h1.url.replace(/\?.*/, ''), token: h1.token }, { session_id: l1.sessionId, hook_event_name: 'Notification' })).status === 401)
-  // Hive's log says so, once each (#711): a hook a CLI sent but Hive refused leaves a trace on Hive's side.
+  // Combwork's log says so, once each (#711): a hook a CLI sent but Combwork refused leaves a trace on Combwork's side.
   const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
   const refusedLines = () => hiveLog().split('\n').filter((x) => x.includes('Refused a hook call'))
-  check("Hive's log tells of each refused hook call, and why", !!(await lib.until(() => refusedLines().some((x) => x.includes(`run ${l1.runId}: its token didn't match`)) && refusedLines().some((x) => x.includes('named no launch')), 10000)), refusedLines().join(' | '))
+  check("Combwork's log tells of each refused hook call, and why", !!(await lib.until(() => refusedLines().some((x) => x.includes(`run ${l1.runId}: its token didn't match`)) && refusedLines().some((x) => x.includes('named no launch')), 10000)), refusedLines().join(' | '))
   const file = path.join(proj, 'app.txt')
   const pre = (sid, f = file, tool = 'Edit') => hook({ session_id: sid, hook_event_name: 'PreToolUse', tool_name: tool, tool_input: { file_path: f }, cwd: proj })
   let r = await pre(l1.sessionId)
@@ -182,7 +182,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   await shot(page, '5-locks')
 
   // --- A new conversation started in the CLI (/clear, /new): its first prompt carries another session id
-  // for the same launch, and Hive moves the agent to it.
+  // for the same launch, and Combwork moves the agent to it.
   const before = (await inv('session:live')).find((l) => l.agentId === a1.id).sessionId
   const newId = '33333333-4444-4555-8666-777777777777'
   await post(hooks[before], { session_id: newId, hook_event_name: 'UserPromptSubmit', cwd: proj })

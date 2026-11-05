@@ -24,8 +24,8 @@ w('dist/out.js', 'x')
 execSync('git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm init', { cwd: proj, env: lib.gitEnv() })
 w('src/app.ts', 'export const a = 2\n') // modified
 w('src/new.ts', 'new\n') // untracked
-// Fake session attachments: one live-ish group, one archived. Written where Hive kept them before #387, .combwork/images,
-// which Hive moves to .combwork/attachments; the first group also has a log and a PDF.
+// Fake session attachments: one live-ish group, one archived. Written where Combwork kept them before #387, .combwork/images,
+// which Combwork moves to .combwork/attachments; the first group also has a log and a PDF.
 const png = lib.samplePng(400, 200)
 const ids = ['11111111-aaaa-bbbb-cccc-000000000001', '22222222-aaaa-bbbb-cccc-000000000002']
 for (const [i, id] of ids.entries()) {
@@ -138,7 +138,7 @@ const check = (name, ok, extra = '') => {
   await page.getByRole('button', { name: 'Move to Recycle Bin' }).click()
   await lib.until(async () => !exists('.gitignore copy'), 10000)
   check('delete moves ".gitignore copy" to the Recycle Bin', !exists('.gitignore copy'))
-  // A test copy's Recycle Bin is the suite's own trash folder (#414). Hive notes the move in trash.jsonl just after it,
+  // A test copy's Recycle Bin is the suite's own trash folder (#414). Combwork notes the move in trash.jsonl just after it,
   // so the file leaving the project doesn't mean the note is there yet (#441): wait for it.
   check("…the suite's trash folder in a test copy, not the user's", !!(await lib.until(() => lib.trashed('.gitignore copy').some((e) => fs.existsSync(e.to)), 5000)), JSON.stringify(lib.trashed()))
 
@@ -193,10 +193,10 @@ const check = (name, ok, extra = '') => {
   check('…and the clicked row keeps the selection once the paste ends', !!pastedRow && JSON.stringify(kept) === JSON.stringify(['.gitignore']), JSON.stringify({ pastedRow: !!pastedRow, kept }))
   await app.evaluate(() => { process.env.HIVE_TEST_SLOW_IPC = '' })
 
-  // Live update from outside Hive.
+  // Live update from outside Combwork.
   w('made-outside.txt', 'hi')
   await lib.until(async () => (await row('made-outside.txt').count()) === 1, 10000)
-  check('file created outside Hive appears live', (await row('made-outside.txt').count()) === 1)
+  check('file created outside Combwork appears live', (await row('made-outside.txt').count()) === 1)
 
   // Filter.
   await page.locator('.files-filter input').fill('util')

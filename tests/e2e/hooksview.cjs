@@ -1,13 +1,13 @@
 // An agent's ⋯ → Hooks… and live lock blocks in Activity (HI-982), on the fake Claude Code and the fake Codex:
-// 1. each agent's Hooks dialog lists Hive's own hooks (passed for the launch) and the user's seeded one (Claude Code's
+// 1. each agent's Hooks dialog lists Combwork's own hooks (passed for the launch) and the user's seeded one (Claude Code's
 //    settings.json, configured with its loading unverified; Codex's from its own hooks/list, trusted), the user's marked
-//    not observed by Hive; a settings file changed after launch is said to have changed;
-// 2. What fired shows, for each, an edit Hive allowed, one its file lock blocked (with the reason) and a hook the turn
-//    ledger ignored as stale (with why), Hive's reply apart from what it made of it;
+//    not observed by Combwork; a settings file changed after launch is said to have changed;
+// 2. What fired shows, for each, an edit Combwork allowed, one its file lock blocked (with the reason) and a hook the turn
+//    ledger ignored as stale (with why), Combwork's reply apart from what it made of it;
 // 3. Activity shows the live lock block (the file and its holder) while the holder still holds the file, and drops it
 //    once the holder's turn ends;
 // 4. screenshots of the dialog and the block in both themes (--keep-files).
-// Dev build, throwaway profile, workspace and CLI homes; the hooks Hive receives are posted the way the CLIs post them,
+// Dev build, throwaway profile, workspace and CLI homes; the hooks Combwork receives are posted the way the CLIs post them,
 // with each launch's own token. Nothing signs in or spends tokens.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -91,7 +91,7 @@ const check = (name, ok, extra = '') => {
     check("the holder's edit is allowed", !allowed.hookSpecificOutput, JSON.stringify(allowed))
     await post(cl, { hook_event_name: 'UserPromptSubmit', prompt: 'edit x too', prompt_id: 'p-c' })
     const blocked = await post(cl, { hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_use_id: 'c1', tool_input: { file_path: path.join(alpha, 'x.txt') } })
-    check("Cl's edit of the same file is blocked by Hive's lock", blocked.hookSpecificOutput?.permissionDecision === 'deny', JSON.stringify(blocked))
+    check("Cl's edit of the same file is blocked by Combwork's lock", blocked.hookSpecificOutput?.permissionDecision === 'deny', JSON.stringify(blocked))
     await post(cx, { hook_event_name: 'UserPromptSubmit', prompt: 'edit', turn_id: 't-x' })
     const cxAllowed = await post(cx, { hook_event_name: 'PreToolUse', tool_name: 'apply_patch', tool_use_id: 'x1', turn_id: 't-x', tool_input: patch('y.txt') })
     await post(cx, { hook_event_name: 'PostToolUse', tool_name: 'apply_patch', tool_use_id: 'x1', turn_id: 't-x', tool_input: patch('y.txt') })
@@ -140,12 +140,12 @@ const check = (name, ok, extra = '') => {
       const rows = h?.listing.rows ?? []
       const hive = rows.filter((r) => r.source === 'hive')
       const user = rows.filter((r) => r.source === 'user')
-      check(`${a.name}: Hive's hooks listed as passed and observed`, hive.length >= 5 && hive.every((r) => r.status === 'passed' && r.observed) && hive.some((r) => r.event === 'PreToolUse'), JSON.stringify(hive.map((r) => [r.event, r.status])))
-      check(`${a.name}: the user's hook listed, not observed by Hive`, user.length === 1 && !user[0].observed && /user-(claude|codex)-stop/.test(user[0].command) && user[0].status === (a === cx ? 'trusted' : 'unverified'), JSON.stringify(user))
-      check(`${a.name}: no command shows Hive's token, run id or auth file`, !rows.some((r) => /Bearer [0-9a-f]{16}|run=[0-9a-f]{6}|hook-auth/.test(r.command)), JSON.stringify(hive.map((r) => r.command)))
+      check(`${a.name}: Combwork's hooks listed as passed and observed`, hive.length >= 5 && hive.every((r) => r.status === 'passed' && r.observed) && hive.some((r) => r.event === 'PreToolUse'), JSON.stringify(hive.map((r) => [r.event, r.status])))
+      check(`${a.name}: the user's hook listed, not observed by Combwork`, user.length === 1 && !user[0].observed && /user-(claude|codex)-stop/.test(user[0].command) && user[0].status === (a === cx ? 'trusted' : 'unverified'), JSON.stringify(user))
+      check(`${a.name}: no command shows Combwork's token, run id or auth file`, !rows.some((r) => /Bearer [0-9a-f]{16}|run=[0-9a-f]{6}|hook-auth/.test(r.command)), JSON.stringify(hive.map((r) => r.command)))
       const fired = h?.fired ?? []
       check(`${a.name}: what fired has a lock block with its reason`, fired.some((f) => f.event === 'PreToolUse' && f.response === 'blocked' && /Holder is editing x.txt/.test(f.why ?? '')), JSON.stringify(fired.map((f) => [f.event, f.response, f.ledger])))
-      check(`${a.name}: …and a hook the turn ledger ignored, with why, apart from Hive's reply`, fired.some((f) => f.ledger === 'ignored' && !!f.ledgerWhy), JSON.stringify(fired.map((f) => [f.event, f.response, f.ledger, f.ledgerWhy])))
+      check(`${a.name}: …and a hook the turn ledger ignored, with why, apart from Combwork's reply`, fired.some((f) => f.ledger === 'ignored' && !!f.ledgerWhy), JSON.stringify(fired.map((f) => [f.event, f.response, f.ledger, f.ledgerWhy])))
     }
     const cxFired = (await inv('session:hooks', alpha, cx.id)).fired
     check('Cx: …and its allowed edit', cxFired.some((f) => f.event === 'PreToolUse' && f.response === 'allowed'), JSON.stringify(cxFired.map((f) => [f.event, f.response])))
@@ -155,11 +155,11 @@ const check = (name, ok, extra = '') => {
     check("Cl: Claude Code's settings.json changed since launch is said so", clNotes.some((n) => n.kind === 'changed' && n.file.toLowerCase() === claudeSettings.toLowerCase()), JSON.stringify(clNotes))
 
     // --- Codex's listing by its advanced settings (Settings → Advanced): a request it doesn't know, then one it never
-    // answers, each said in the dialog (Hive's own still listed), with no app server left running.
+    // answers, each said in the dialog (Combwork's own still listed), with no app server left running.
     const cxNotes = async () => (await inv('session:hooks', alpha, cx.id)).listing
     await inv('advanced:set', 'codex.hooks.listMethod', 'hooks/nope')
     let listed = await cxNotes()
-    check("with another listing request, Codex's answer (an error) is said, Hive's own still listed", listed.notes.some((n) => n.kind === 'cliUnknown' && /unknown method: hooks\/nope/.test(n.why)) && listed.rows.filter((r) => r.source === 'hive').length >= 5 && !listed.rows.some((r) => r.source === 'user'), JSON.stringify(listed.notes))
+    check("with another listing request, Codex's answer (an error) is said, Combwork's own still listed", listed.notes.some((n) => n.kind === 'cliUnknown' && /unknown method: hooks\/nope/.test(n.why)) && listed.rows.filter((r) => r.source === 'hive').length >= 5 && !listed.rows.some((r) => r.source === 'user'), JSON.stringify(listed.notes))
     await inv('advanced:set', 'codex.hooks.listMethod', 'hooks/list')
     fs.writeFileSync(path.join(codexHome, 'fake-hooks-list-hang.txt'), 'x')
     await inv('advanced:set', 'codex.hooks.listSeconds', 2)
@@ -167,7 +167,7 @@ const check = (name, ok, extra = '') => {
     listed = await cxNotes()
     check('a listing Codex never answers ends at its timeout, said in the dialog', listed.notes.some((n) => n.kind === 'cliUnknown') && Date.now() - asked < HUNG_MS, `${Date.now() - asked} ms ${JSON.stringify(listed.notes)}`)
     const ran = () => (fs.existsSync(appServers) ? fs.readFileSync(appServers, 'utf8').split(/\r?\n/).map(Number).filter((n) => n > 0) : [])
-    check('…and no app server Hive started is left running', ran().length > 0 && !!(await lib.until(() => ran().every((pid) => !lib.processRunning(pid)), HUNG_MS)), JSON.stringify(ran().filter((pid) => lib.processRunning(pid))))
+    check('…and no app server Combwork started is left running', ran().length > 0 && !!(await lib.until(() => ran().every((pid) => !lib.processRunning(pid)), HUNG_MS)), JSON.stringify(ran().filter((pid) => lib.processRunning(pid))))
     fs.rmSync(path.join(codexHome, 'fake-hooks-list-hang.txt'))
     await inv('advanced:set', 'codex.hooks.listSeconds', 20)
     listed = await cxNotes()

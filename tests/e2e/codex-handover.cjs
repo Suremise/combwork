@@ -26,7 +26,7 @@ const check = (name, ok, extra = '') => {
   const hdir = path.join(ws, '.combwork', 'shared', 'handovers')
   fs.rmSync(hdir, { recursive: true, force: true })
   fs.mkdirSync(hdir, { recursive: true })
-  // The goal is this task's alone: "and do nothing else" was taken to cover Hive's later request to write a handover,
+  // The goal is this task's alone: "and do nothing else" was taken to cover Combwork's later request to write a handover,
   // which Codex then refused (#782, run-20261017-011613).
   fs.writeFileSync(
     path.join(hdir, '2026-09-30-demo-test.md'),
@@ -42,7 +42,7 @@ const check = (name, ok, extra = '') => {
   await page.getByText('demo', { exact: true }).first().click()
   await sleep(500)
   const agents = () => inv('workspace:get').then((w) => w.projects.find((p) => p.name === 'demo').agents)
-  // An agent's turn has run (#782): the line Hive gave it (its inbox's doorbell) is in its transcript, it answered after
+  // An agent's turn has run (#782): the line Combwork gave it (its inbox's doorbell) is in its transcript, it answered after
   // it, and the turn is over. Ready alone isn't: a CLI that never took the line is ready too.
   const turnRan = async (id) => {
     const l = (await agents()).find((a) => a.id === id).live
@@ -97,7 +97,7 @@ const check = (name, ok, extra = '') => {
   check('hand over from codex returned', true, `${Math.round((Date.now() - t1) / 1000)}s`)
   const hs = fs.readdirSync(hdir)
   check('codex wrote a new handover', hs.length >= 2, hs.join(', '))
-  // Hive writes its header: the agent, its CLI and the conversation it was written in.
+  // Combwork writes its header: the agent, its CLI and the conversation it was written in.
   const written = hs.filter((f) => f !== '2026-09-30-demo-test.md').map((f) => fs.readFileSync(path.join(hdir, f), 'utf8'))
   const header = written.find((t) => /^- \*\*Author:\*\* /m.test(t)) ?? ''
   check('its header names the author and its CLI', header.includes(`- **Author:** ${cx.name} (Codex)\n`), header.slice(0, 300))

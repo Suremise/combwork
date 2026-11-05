@@ -116,7 +116,7 @@ const check = (name, ok, extra = '') => {
   await lib.openWorkspace(two.inv, two.page, ws)
   await two.page.getByText('alpha', { exact: true }).first().click()
   await lib.until(async () => (await two.page.locator('.session-empty-card').count()) === 1, 10000)
-  // Hive has looked for the CLIs (launch waited for it): Provider Setup would open at once if it were going to.
+  // Combwork has looked for the CLIs (launch waited for it): Provider Setup would open at once if it were going to.
   await lib.sleep(1000) // on purpose: nothing should appear
   const banners = await two.page.locator('.providers-banner').allInnerTexts()
   check('no banner about Claude Code', !banners.some((b) => b.includes('Claude Code')), JSON.stringify(banners))

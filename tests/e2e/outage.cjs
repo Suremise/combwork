@@ -74,7 +74,7 @@ function standIn() {
       await lib.sendPrompt(inv, key, `netdown ${n}`, { submitted: async () => !!(await live())?.failedTurn && (await live()).failedTurn.since !== before })
     }
 
-    // --- On: the turn ends on ECONNREFUSED, and Hive waits while the stand-in drops each check.
+    // --- On: the turn ends on ECONNREFUSED, and Combwork waits while the stand-in drops each check.
     await failTurn(1)
     const waiting = await lib.until(async () => ((await live())?.statusMessage === 'Waiting for the connection…' ? await live() : null), HUNG_MS)
     check('the agent shows "Waiting for the connection…"', !!waiting, JSON.stringify(await live()))

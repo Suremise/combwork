@@ -73,7 +73,7 @@ const check = (name, ok, extra = '') => {
   const idle = (dir, id) => until(async () => ['ready', 'finished'].includes((await live(dir, id))?.status), 60000)
   /**
    * Types a prompt into an agent (as the user does), Enter included, once it is idle: taken once a turn of its starts.
-   * Typed again when a wake of Hive's disturbed it (typeLine).
+   * Typed again when a wake of Combwork's disturbed it (typeLine).
    */
   const say = async (dir, agent, text) => {
     await lib.typeLine(inv, lib.ptyKey(dir, agent.id), claudeHome, agent.name, text, { ready: async () => ['ready', 'finished'].includes((await live(dir, agent.id))?.status), live: () => live(dir, agent.id), hungMs: 60000 })

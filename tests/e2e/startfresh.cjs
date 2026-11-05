@@ -1,5 +1,5 @@
 // Fresh starts at natural breaks (#1437, SPEC §16.10.4): on fake Claude Code agents, the Assistant never started, with
-// Hive "focused" (stubbed: a test window never takes the OS focus) so its notices are banners:
+// Combwork "focused" (stubbed: a test window never takes the OS focus) so its notices are banners:
 // 1. A lane ends (its card Done) with every agent idle: one "A good moment to start fresh" banner, with Start Fresh
 //    (Idle Agents).
 // 2. Its button opens Start Fresh (Idle Agents)' question: the two idle agents start fresh, a working one and a stopped
@@ -50,11 +50,11 @@ const check = (name, ok, extra = '') => {
     const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id) ?? null
     const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
     const say = async (id, text) => {
-      // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+      // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
       await lib.typeLine(inv, lib.ptyKey(alpha, id), home, null, text, { live: () => live(id) })
     }
     const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
-    /** The nudges Hive told, by what ended (its log line names it). */
+    /** The nudges Combwork told, by what ended (its log line names it). */
     const nudges = () => [...hiveLog().matchAll(/Suggested a fresh start in .*?\((.+?)\)/g)].map((m) => m[1])
     /** The decisions not to suggest one, by what ended and why. */
     const notNudged = () => [...hiveLog().matchAll(/No fresh-start suggestion in .*?\((.+?)\): (.+)/g)].map((m) => `${m[1]}: ${m[2].trim()}`)
@@ -74,7 +74,7 @@ const check = (name, ok, extra = '') => {
       }
       await inv('settings:update', { appearance: { theme: 'light' } })
     }
-    // Hive focused: its notices are banners in the window, as the notification settings say.
+    // Combwork focused: its notices are banners in the window, as the notification settings say.
     await app.evaluate(({ BrowserWindow }) => {
       const w = BrowserWindow.getAllWindows()[0]
       w.isFocused = () => true

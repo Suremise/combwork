@@ -5,7 +5,7 @@
 // Start New Conversation starts a new conversation for the agent, and the old one stays in Sessions. A current
 // conversation whose prompt cache expired still gets the re-cache question. Throwaway profile and workspace, the fake
 // Claude Code (fake-claude/); no prompt is typed. The fixture's records are put into the workspace's database once
-// Hive has read the project, with Hive's backups of their transcripts.
+// Combwork has read the project, with Combwork's backups of their transcripts.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -29,7 +29,7 @@ const check = (name, ok, extra = '') => {
 }
 const shot = (page, n) => page.screenshot({ path: path.join(scratch, `freshresume-${n}.png`) })
 
-/** Hive's backup of a transcript: one exchange whose context is 60K tokens, at `at` (long ago: its cache expired). */
+/** Combwork's backup of a transcript: one exchange whose context is 60K tokens, at `at` (long ago: its cache expired). */
 function backup(id, at) {
   const file = path.join(proj, '.combwork', 'sessions', `${id}.jsonl`)
   fs.mkdirSync(path.dirname(file), { recursive: true })

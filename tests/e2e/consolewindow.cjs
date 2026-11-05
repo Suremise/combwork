@@ -1,7 +1,7 @@
 // The developer console's window (#637): hidden (no Help item, no palette entry, the shortcut does nothing, opening is
 // refused) until Settings → Advanced → Show developer features is on; then Help → Developer Console opens it as a window
 // of its own, whose page calls only the console's channels; picking a source shows a fake Claude Code's launch and hooks
-// live, each event's raw payload beside what Hive made of it; event type, provider and search filter the list; pause
+// live, each event's raw payload beside what Combwork made of it; event type, provider and search filter the list; pause
 // holds it (new events counted) and resume fills it in; clear empties it; the shortcut brings the open window forward;
 // it remembers its size; closing it ends capture; Clear while paused drops what was held for good; a console belongs to
 // its window's workspace (switching or closing it there closes the console and ends its capture, another window's
@@ -123,7 +123,7 @@ const check = (name, ok, extra = '') => {
     await lib.until(async () => (await inv('console:sources')).find((s) => s.agentId === b1.id)?.capturing, HUNG_MS)
     check('picking B1 starts its capture, shown live', (await dc.locator('.dc-live').textContent()).includes('Live'))
 
-    // --- B1's launch and hooks arrive, each with what Hive made of it.
+    // --- B1's launch and hooks arrive, each with what Combwork made of it.
     await inv('session:start', alpha, { agentId: b1.id })
     const rows = () => dc.locator('.dc-row').evaluateAll((els) => els.map((e) => ({ seq: Number(e.dataset.seq), kind: e.dataset.kind, name: e.querySelector('.dc-name').textContent, summary: e.querySelector('.dc-summary').textContent })))
     const row = (pred) => lib.until(async () => (await rows()).find(pred), HUNG_MS)
@@ -135,7 +135,7 @@ const check = (name, ok, extra = '') => {
     await detail.waitFor({ timeout: HUNG_MS })
     const raw = await detail.locator('.dc-raw').textContent()
     const made = await detail.locator('.dc-made').textContent()
-    check('a picked event shows its raw payload beside what Hive made of it', raw.includes('hook_event_name') && raw.includes('"SessionStart"') && made.includes('event') && made.includes('"start"'), `${raw.slice(0, 200)} | ${made.slice(0, 200)}`)
+    check('a picked event shows its raw payload beside what Combwork made of it', raw.includes('hook_event_name') && raw.includes('"SessionStart"') && made.includes('event') && made.includes('"start"'), `${raw.slice(0, 200)} | ${made.slice(0, 200)}`)
     await dc.screenshot({ path: path.join(lib.WORK, 'consolewindow-detail.png') })
     await detail.locator('.icon-btn[aria-label="Close (Esc)"]').click()
     await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === b1.id)?.status === 'ready', HUNG_MS)
@@ -235,7 +235,7 @@ const check = (name, ok, extra = '') => {
     const plain = await recordTurn(`edit a.ts ${SPOKEN}`, false)
     check('Record writes the source to a file, and the bar says where', !!plain.saved && plain.lines.length > 2, String(plain.saved))
     const plainHead = plain.lines[0]
-    check("…its header: Hive's version, the CLIs' installed and tested-with versions, no text", plainHead?.type === 'recording' && plainHead.text === false && plainHead.source?.kind === 'session' && plainHead.clis?.some((c) => c.provider === 'claude-code' && c.version), JSON.stringify(plainHead))
+    check("…its header: Combwork's version, the CLIs' installed and tested-with versions, no text", plainHead?.type === 'recording' && plainHead.text === false && plainHead.source?.kind === 'session' && plainHead.clis?.some((c) => c.provider === 'claude-code' && c.version), JSON.stringify(plainHead))
     check('…its events, the prompt among them, and its end', plain.lines.some((l) => l.type === 'event' && l.name === 'UserPromptSubmit') && plain.lines.at(-1)?.type === 'end' && plain.lines.at(-1).reason === 'stopped')
     check('…redacted: the prompt\'s words are not in it', !JSON.stringify(plain.lines).includes(SPOKEN))
     const spoken = await recordTurn(`edit a.ts ${SPOKEN}`, true)
@@ -326,7 +326,7 @@ const check = (name, ok, extra = '') => {
 
     // --- Closing it ends capture; it opens again at its size.
     await dc.close()
-    // The start, held back until after the close, is refused (Hive logs it), and makes no recording.
+    // The start, held back until after the close, is refused (Combwork logs it), and makes no recording.
     await lib.until(() => notStarted() > refusedBefore, HUNG_MS)
     const madeSince = fs.readdirSync(recordingsDir).filter((n) => !filesBefore.has(n))
     check('a recording started just as its console closes never records', madeSince.length === 0 && !(await inv('console:recordings')).latest?.recording, JSON.stringify(madeSince))

@@ -135,7 +135,7 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
     }
     /**
-     * Types a shell command into an agent's fake session, again when a wake of Hive's disturbed it (typeLine): taken once
+     * Types a shell command into an agent's fake session, again when a wake of Combwork's disturbed it (typeLine): taken once
      * a turn of its starts (the command may be held). Resolves with its record once it has ended.
      */
     const shell = async (id, cmd, project = alpha) => {

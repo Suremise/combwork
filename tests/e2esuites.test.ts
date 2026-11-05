@@ -264,7 +264,7 @@ describe('the suites a change needs (affected.mjs)', () => {
     for (const f of ['tests/e2e/run.mjs', 'tests/e2e/runner.mjs', 'tests/e2e/affected.mjs', 'tests/e2e/record.mjs', 'tests/e2e/recycleBin.mjs', 'tests/e2e/concurrency.mjs', 'tests/e2e/tempWorktrees.mjs', 'tests/e2e/runContext.cjs', 'tests/scenarios/harness.cjs', 'tests/scenarios/run.mjs']) {
       const r = affectedSuites([f], names, realNames)
       expect(r.all, f).toBe(true)
-      expect(r.why[0], f).toMatch(/shared by every part of Hive/)
+      expect(r.why[0], f).toMatch(/shared by every part of Combwork/)
     }
     // The scenarios themselves, and the notes on testing, are checked by npm run scenarios and need no suite.
     for (const f of ['tests/scenarios/scenarios.cjs', 'tests/scenarios/README.md', 'tests/README.md', 'scripts/testWaits.mjs']) expect(affectedSuites([f], names, realNames), f).toEqual({ suites: [], why: [] })
@@ -507,8 +507,8 @@ describe('the real tier and environment failures (card #191)', () => {
     const some = selectionOf({ ...base, affected: { suites: ['board', 'review'], why: ['src/main/tasks.ts: board, review', 'docs/SPEC.md: about'] } })
     expect(some).toMatchObject({ how: 'affected', full: false, base: 'main', files: 3 })
     expect(rec(some)).toContain('Selected: `--affected` since main (4255cbc0a1b2), 3 changed files: not the full set, because src/main/tasks.ts: board, review; docs/SPEC.md: about.')
-    const every = selectionOf({ ...base, files: 1, named: ['codex'], affected: { all: true, real: [], why: ['tests/e2e/run.mjs: shared by every part of Hive'] } })
-    expect(rec(every)).toContain('Selected: `--affected` since main (4255cbc0a1b2), 1 changed file: every fake suite (the full set), because tests/e2e/run.mjs: shared by every part of Hive; named: codex.')
+    const every = selectionOf({ ...base, files: 1, named: ['codex'], affected: { all: true, real: [], why: ['tests/e2e/run.mjs: shared by every part of Combwork'] } })
+    expect(rec(every)).toContain('Selected: `--affected` since main (4255cbc0a1b2), 1 changed file: every fake suite (the full set), because tests/e2e/run.mjs: shared by every part of Combwork; named: codex.')
     // A long list of reasons is cut to a few.
     const many = selectionOf({ ...base, files: 9, affected: { suites: ['board'], why: Array.from({ length: 9 }, (_, i) => `f${i}: board`) } })
     expect(selectionLine(many)).toMatch(/f4: board; and 4 more\.$/)
@@ -1535,9 +1535,9 @@ describe('the Hives a suite starts (lib.cjs testExecutable, keepPackagedQuiet, #
     expect(lib.testExecutable(join(lib.ROOT, 'dist', 'win-unpacked', 'Hive.exe'))).toBe('packaged')
     expect(lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'hive-test', 'builds', 'Hive.exe'))).toBe('packaged')
     // Combwork's install (HI-2460) and Hive Desktop's from before.
-    expect(() => lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Combwork', 'Combwork.exe'))).toThrow(/never start the installed Hive/)
-    expect(() => lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Hive', 'Hive.exe'))).toThrow(/never start the installed Hive/)
-    expect(() => lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'programs', 'hive', 'Hive.exe'))).toThrow(/never start the installed Hive/)
+    expect(() => lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Combwork', 'Combwork.exe'))).toThrow(/never start the installed Combwork/)
+    expect(() => lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Hive', 'Hive.exe'))).toThrow(/never start the installed Combwork/)
+    expect(() => lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'programs', 'hive', 'Hive.exe'))).toThrow(/never start the installed Combwork/)
     expect(() => lib.testExecutable('C:\\Elsewhere\\Hive.exe')).toThrow(/never C:\\Elsewhere\\Hive\.exe/)
     // Started hidden: no window is shown before keepPackagedQuiet reaches it.
     expect(lib.PACKAGED_ARGS).toContain('--hidden')

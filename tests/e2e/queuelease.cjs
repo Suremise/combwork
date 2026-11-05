@@ -1,5 +1,5 @@
-// S50 for the merge queue: one runner across Hives (#1358; #1360's app-level proof, SPEC §16.9.3 The runner). Two test
-// Hives (two profiles, their own Agent API ports) open one test workspace whose project is set to "Hive merges" into
+// S50 for the merge queue: one runner across copies of Combwork (#1358; #1360's app-level proof, SPEC §16.9.3 The runner). Two test
+// copies (two profiles, their own Agent API ports) open one test workspace whose project is set to "Combwork merges" into
 // `integration` (queueFixture.cjs), with a card queued and a slow fake check:
 // - A runs the queue (its check running); B, opened meanwhile, doesn't: its Merges tab says "Run by <A's profile>";
 // - A's main process exits mid-check (no quit handler): B takes the queue over, the check process A recorded is
@@ -98,7 +98,7 @@ const queueFolders = () =>
     fs.writeFileSync(fx.go, 'go')
     check('…and the card is merged: Done', !!(await waitHung(async () => (await b.card(one.n))?.column === 'done')), JSON.stringify(await b.kinds(one.n)))
     const integrated = (await b.facts(one.n)).filter((x) => x.kind === 'Integrated')
-    check('…merged once: one Integrated, by Hive, one merge commit on integration', integrated.length === 1 && integrated[0].data.by === 'hive' && integrated[0].data.result === q.head(fx) && lib.git(fx.alpha, ['rev-list', '--merges', '--count', 'main..integration']).trim() === '1', JSON.stringify(integrated))
+    check('…merged once: one Integrated, by Combwork, one merge commit on integration', integrated.length === 1 && integrated[0].data.by === 'hive' && integrated[0].data.result === q.head(fx) && lib.git(fx.alpha, ['rev-list', '--merges', '--count', 'main..integration']).trim() === '1', JSON.stringify(integrated))
     check("B's Merges tab no longer names another runner", !!(await waitHung(async () => !(await tab.text('integration')).includes('Run by'))), await tab.text('integration'))
     await b.page.mouse.move(5, 5)
     await b.page.screenshot({ path: path.join(fx.shots, 'queuelease-2-taken-over.png') })

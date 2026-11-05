@@ -123,7 +123,7 @@ async function waitFor(fn, ms = 15000) {
   // --- Quit, and start again: both windows come back.
   const exited = app.waitForEvent('close', { timeout: 20000 }).then(() => true).catch(() => false)
   await inv1('app:quit').catch(() => undefined)
-  check('Hive quits with no agents running', await exited)
+  check('Combwork quits with no agents running', await exited)
   app = await start()
   await app.firstWindow()
   await waitFor(async () => app.windows().length >= 2, 15000)
@@ -131,7 +131,7 @@ async function waitFor(fn, ms = 15000) {
   const pages = app.windows()
   const shown = []
   for (const pg of pages) shown.push((await invOn(pg)('workspace:get'))?.path ?? null)
-  check('at start, the windows open when Hive quit come back', pages.length === 2 && shown.includes(wsA) && shown.includes(wsB), JSON.stringify(shown))
+  check('at start, the windows open when Combwork quit come back', pages.length === 2 && shown.includes(wsA) && shown.includes(wsB), JSON.stringify(shown))
 
   // --- Closing a window with a running agent: asks, then stops that workspace's agent only.
   const pb = pages[shown.indexOf(wsB)]

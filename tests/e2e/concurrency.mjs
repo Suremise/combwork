@@ -5,7 +5,7 @@
 // runner and a scenario run, and in a second worktree (a git worktree of this one's HEAD with its uncommitted changes,
 // made for the check in this invocation's own folder and removed after unless --keep: tempWorktrees.mjs, #207, so two
 // checkers at once never remove each other's) two e2e runners. One run in each worktree is started with the
-// environment of an agent's shell inside an outer hive-progress (NO_COLOR, CW_PROGRESS_WRAPPED, a Hive Agent API
+// environment of an agent's shell inside an outer hive-progress (NO_COLOR, CW_PROGRESS_WRAPPED, a Combwork Agent API
 // token…) and a shell's git and Node settings pointing elsewhere (GIT_DIR and GIT_WORK_TREE at a decoy repository,
 // NODE_OPTIONS loading a script that notes each Node process it starts in), the other with a plain one; the checker's
 // own environment points git at the decoy too, for its own setup (#208). Checked, each round: every run passes; each
@@ -19,7 +19,7 @@
 // --heavy checks the machine-wide limit on heavy runs instead (slots.mjs), in a pool of slots of its own (so real runs
 // on the machine neither wait for it nor make it wait): three heavy runs (a repeat) started at once from three
 // worktrees with two slots. Checked: two run and the third waits, saying so (and in the Progress panel, through a
-// stand-in for Hive's Agent API), then starts when a slot is let go; no more than two hold slots at any moment; all
+// stand-in for Combwork's Agent API), then starts when a slot is let go; no more than two hold slots at any moment; all
 // pass; a run with --no-wait while the slots are taken fails at once, saying who holds them; with both heavy slots
 // held, a small run takes the side slot and a heavy run is refused (HI-2070: no side slot in the rest); the slot of a run that
 // is killed is taken by the next run without waiting; a pre-merge run (its agent holds the merge slot, as the stand-in
@@ -63,7 +63,7 @@ const SUITES = ['isolation', 'about', 'bridgereport', 'busy']
 const SCENARIO = 'work-on-card'
 /** This invocation's own folder (tempWorktrees.mjs): its worktrees, decoy, heavy-run pool; no other checker's. */
 const RUN = invocationDir()
-/** An agent's shell in Hive running the tests through hive-progress, and a person's own settings. */
+/** An agent's shell in Combwork running the tests through hive-progress, and a person's own settings. */
 const AGENT_SHELL = {
   NO_COLOR: '1',
   FORCE_COLOR: '1',
@@ -181,7 +181,7 @@ async function heavyRound(k, worktrees) {
   console.log(`\n--- Round ${k} of ${repeat} (heavy runs)`)
   const pool = join(RUN, 'heavy-slots')
   rmSync(pool, { recursive: true, force: true })
-  // A stand-in for Hive's Agent API: the runs report their progress to it, and ask it who holds the merge slot (HB).
+  // A stand-in for Combwork's Agent API: the runs report their progress to it, and ask it who holds the merge slot (HB).
   const reports = []
   const api = http.createServer((req, res) => {
     let body = ''
@@ -411,7 +411,7 @@ async function laneWaitCheck(wt) {
 /**
  * A packaged run (HIVE_EXE) of suites none of which can run on it, in the second worktree before anything builds it
  * (#1591): no dev build is made or needed, and the run still writes its record, not valid ("nothing was tested"), with
- * each suite NOT RUN and why, and fails. HIVE_EXE names no file: a run that started a Hive would fail on it.
+ * each suite NOT RUN and why, and fails. HIVE_EXE names no file: a run that started a Combwork would fail on it.
  */
 async function packagedNothingCheck(wt) {
   console.log('\n--- A packaged run where no suite chosen can run, with no dev build (#1591)')

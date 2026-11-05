@@ -1,6 +1,6 @@
 // Typing while the repository lock is taken (HI-1680): a keystroke into a pane goes through main, so a lock step that
 // holds main's thread (its SQLite busy wait, its commits' fsyncs) delayed what the user typed. The lock's steps now
-// run in a worker of their own. Here a project's lock file is held by another connection (as another Hive's commit
+// run in a worker of their own. Here a project's lock file is held by another connection (as another Combwork's commit
 // holds it), so each take of a burst of Git view switches waits in SQLite's busy wait (a second) and fails, while
 // letters are typed into a fake Claude Code's pane: main's longest stall (a timer in main) and each letter's echo stay
 // well under that second. A burst of switches with the lock free, the line updater's kind of burst, is timed too, for

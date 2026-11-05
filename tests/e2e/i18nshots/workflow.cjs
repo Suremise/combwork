@@ -4,8 +4,8 @@
 // (data-section, data-vc-workflow, data-choice, data-group, data-task, data-lane, classes), never English text. The git
 // area's cases ran first and left alpha a repository. See tests/e2e/i18nshots.cjs for ctx.
 //
-// Then 1.0's populated states (#1126 round 2), in a project of their own with long names, "Hive merges" into
-// `integration` (tests/e2e/queueFixture.cjs's helpers, through the route's Hive): its merge queue paused by you with an
+// Then 1.0's populated states (#1126 round 2), in a project of their own with long names, "Combwork merges" into
+// `integration` (tests/e2e/queueFixture.cjs's helpers, through the route's Combwork): its merge queue paused by you with an
 // approved card waiting, that card's dialog with its work (a revision, a check, a pass), a lane whose builder works in a
 // slot from the project's pool, the Slots and copies group listing the pool, and a move you make that its rules refuse.
 const fs = require('fs')
@@ -103,7 +103,7 @@ function runCheck(ctx, agent, key) {
 }
 
 /**
- * The billing project, once per window: a repository on main with `integration` beside it, Hive merging approved cards
+ * The billing project, once per window: a repository on main with `integration` beside it, Combwork merging approved cards
  * into `integration` after a check that passes (run before review and as the merge check); its queue paused by you; a
  * builder and a reviewer (the fake Claude Code); card A approved (so queued, waiting behind the pause), then refused a
  * second submit; card B started in a lane, so its builder works in a slot from the pool.

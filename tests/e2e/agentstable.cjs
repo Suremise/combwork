@@ -83,7 +83,7 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
   const cs = await make('Solo card', one.id, 'solo')
   // Lanes: B1 with R1, B2 with R2 (started with the workspace's token, naming the builder). Idle builders outside slots,
   // B1 and B2 get their lanes in new conversations (HI-2232), each taking the lane's brief as its first turn: quiet first
-  // (idle, nothing of Hive's being typed into them or waiting to be), so each is renewed at once, never left as it is
+  // (idle, nothing of Combwork's being typed into them or waiting to be), so each is renewed at once, never left as it is
   // mid-turn nor owed; then done with their briefs in the new conversations before the suite types into them (HI-2247;
   // quiet alone isn't the brief's turn over, and a line typed during it is dropped: HI-2357, lib.laneBriefDone).
   const quiet = async (n) => lib.agentQuiet(PORT, 'alpha', await live(a[n].id), apiToken)

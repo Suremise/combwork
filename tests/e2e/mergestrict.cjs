@@ -1,8 +1,8 @@
-// Strict, G8 (#1352, SPEC §16.9.1 step 3; S55's strict part): a project set to "Hive merges" into `integration` (checked
+// Strict, G8 (#1352, SPEC §16.9.1 step 3; S55's strict part): a project set to "Combwork merges" into `integration` (checked
 // out in no folder) with Work is up to date with its target branch before it merges on, fake Claude Code agents acting
 // by their own tokens (one builder in the project folder, building each card on the slot its start lends, as 1.0 does:
 // #1573; one reviewer), the Assistant off.
-// - The form offers G8 beside G9 when Hive merges (screenshots of its row, both themes), and saves it.
+// - The form offers G8 beside G9 when Combwork merges (screenshots of its row, both themes), and saves it.
 // - The target moves after the review passed: the queue brings the reviewed revision up to date on its own ref
 //   (`Updated`, carried), merges it, and the card's slot is untouched (its HEAD and status).
 // - A conflict with the moved target: back to the builder (notUpToDate) with the file, its slot untouched; the
@@ -44,7 +44,7 @@ const who = ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.ident
     const column = async (n) => (await h.card(n))?.column
     const facts = async (n, kind) => (await h.facts(n)).filter((x) => x.kind === kind)
 
-    // --- The form: G8 beside G9 while Hive merges; saved through the form.
+    // --- The form: G8 beside G9 while Combwork merges; saved through the form.
     await h.page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
     await h.page.locator('.git-sections [data-section="workflow"]').click()
     const section = h.page.locator('.workflow-form')

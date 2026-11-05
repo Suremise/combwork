@@ -54,7 +54,7 @@ const claude = { provider: 'claude-code', found: false, checking: false, path: n
 
 async function openSetup(app, page, lang = 'en') {
   const sendEvent = (e) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), e)
-  // Hive has finished looking for the CLIs (launch waits for it): nothing it finds replaces the stand-ins.
+  // Combwork has finished looking for the CLIs (launch waits for it): nothing it finds replaces the stand-ins.
   await sendEvent({ type: 'provider-install', provider: 'codex', info: codex(lang) })
   await sendEvent({ type: 'provider-install', provider: 'claude-code', info: claude })
   // A fake clipboard in the page: what a Copy button writes, never the machine's.

@@ -53,7 +53,7 @@ const until = async (fn, ms = 10000) => {
   await app.evaluate(({ Notification }) => {
     Notification.isSupported = () => true
   })
-  // The sign-in notifications Hive would have shown (a finish is told too, separately).
+  // The sign-in notifications Combwork would have shown (a finish is told too, separately).
   const signInNotes = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((e) => e.kind === 'notification' && /sign in/i.test(e.title ?? ''))
   const expire = (expired) => fs.writeFileSync(path.join(claudeHome, 'fake-signin.json'), JSON.stringify({ expired }))
 

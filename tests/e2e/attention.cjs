@@ -1,4 +1,4 @@
-// Who a Codex agent asks: Hive says an agent needs you only while a person is asked. Codex's auto-reviewer answering
+// Who a Codex agent asks: Combwork says an agent needs you only while a person is asked. Codex's auto-reviewer answering
 // a permission request (Approve for me) isn't you being asked; an approval prompt is (waiting, told once, over once
 // answered); an async question is asked while Codex works on (a pending question, told once, gone once answered).
 // The fake Codex (fake-codex/) sends Codex 0.160.0's hooks and terminal titles. Dev build, throwaway profile,
@@ -60,7 +60,7 @@ const check = (name, ok, extra = '') => {
   check('the agents start', !!(await until(async () => (await live(reviewed.id))?.status === 'ready' && (await live(asking.id))?.status === 'ready', 20000)), `${(await live(reviewed.id))?.status} ${(await live(asking.id))?.status}`)
   check('in their modes', (await live(reviewed.id))?.permissionMode === 'approve-for-me' && (await live(asking.id))?.permissionMode === 'ask', `${(await live(reviewed.id))?.permissionMode} ${(await live(asking.id))?.permissionMode}`)
 
-  // Every state an agent goes through (status | message | question | review), and the times Hive says it needs you (the log).
+  // Every state an agent goes through (status | message | question | review), and the times Combwork says it needs you (the log).
   const seen = new Map()
   const watch = setInterval(async () => {
     try {
@@ -199,7 +199,7 @@ const check = (name, ok, extra = '') => {
   {
     const before = told('Asking')
     // The question first, told on its own, then the prompt: a new need, told too. The fake holds before the prompt until
-    // Hive shows the question (#329): sent at once, the prompt's hooks could reach Hive before Codex's title (its sign
+    // Combwork shows the question (#329): sent at once, the prompt's hooks could reach Combwork before Codex's title (its sign
     // that a person must act) said the question was asked, and both then came on with the title, rightly told together
     // in one notice.
     await turn(asking, 'question then hold then approve')

@@ -10,7 +10,7 @@
 // first commit stays on Git's page, with Make first commit…. Git's global config is the suite's own, with no identity (GIT_CONFIG_GLOBAL), and
 // no system config (GIT_CONFIG_NOSYSTEM). Dev build, throwaway profile and workspace.
 // Dev build only (#1580): 0.9 worktrees on purpose: Tree, Blank Tree and Late Tree are 0.9 worktree agents
-// (agents:testLegacy, refused by a packaged build), checking a worktree from a repository Hive initialised.
+// (agents:testLegacy, refused by a packaged build), checking a worktree from a repository Combwork initialised.
 const lib = require('./lib.cjs')
 const { execFileSync } = require('child_process')
 const fs = require('fs')
@@ -57,7 +57,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitini
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const text = (loc) => loc.innerText().catch(() => '')
-    // Hive made the project's .combwork when it opened the workspace: it must stay out of the first commit.
+    // Combwork made the project's .combwork when it opened the workspace: it must stay out of the first commit.
     check('the project has a .combwork', !!(await lib.until(() => fs.existsSync(path.join(proj, '.combwork')), HUNG_MS)))
 
     // --- The Version Control tab of a project without git: None's page has no Initialise; Git's page has it (HI-1905).

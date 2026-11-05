@@ -67,7 +67,7 @@ const write = (file, text) => {
   for (let i = 1; i <= 11; i++) fs.mkdirSync(path.join(ws, `p${String(i).padStart(2, '0')}`), { recursive: true })
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
 
-  // The fixtures: Hive's backups (archive, sessions), the CLI's copies, and attachments.
+  // The fixtures: Combwork's backups (archive, sessions), the CLI's copies, and attachments.
   const sessions = [
     { id: OLD_CLI, name: 'Old with CLI copy', archived: true, days: 200, cli: true, n: 1 },
     { id: OLD_GONE, name: 'Old, CLI lost it', archived: true, days: 200, cli: false, n: 2 },
@@ -75,7 +75,7 @@ const write = (file, text) => {
     { id: OPEN, name: 'Not archived', archived: false, days: 200, cli: true, n: 4 }
   ]
   for (const s of sessions) {
-    // Hive's backups of ended sessions are kept compressed (#1110).
+    // Combwork's backups of ended sessions are kept compressed (#1110).
     write(path.join(hive, s.archived ? 'archive' : 'sessions', `${s.id}.jsonl.gz`), zlib.gzipSync(transcript(s.id, s.n)))
     if (s.cli) write(path.join(cliDir, `${s.id}.jsonl`), transcript(s.id, s.n))
     write(path.join(hive, 'attachments', s.id, 'shot.png'), lib.samplePng(40 + s.n * 10, 30))

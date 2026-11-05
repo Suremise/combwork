@@ -4,9 +4,9 @@
 // shows the chain; hive-mcp.js gets the chain's texts through CW_DIALECT_FILE; the Agent API speaks each caller's
 // chain (an agent's pinned one, the API chain for the workspace token, which follows the files), and with two windows
 // the workspace the request names, never the focused window's (HR1 on HI-2443); a launch with no dialect and a model
-// Hive can't name says "model unknown", and one it can name records nothing new. Runs the fake Claude Code (with no
+// Combwork can't name says "model unknown", and one it can name records nothing new. Runs the fake Claude Code (with no
 // model catalogue, FAKE_CLAUDE_MODELS=fail, so the CLI's default model is unknown) and the fake Codex (whose session
-// contract Hive says itself, as developer_instructions). Dev build, throwaway profile, workspaces, CLAUDE_CONFIG_DIR
+// contract Combwork says itself, as developer_instructions). Dev build, throwaway profile, workspaces, CLAUDE_CONFIG_DIR
 // and CODEX_HOME.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -78,7 +78,7 @@ function initialize(def) {
   lib.gitProject(proj)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([proj.toLowerCase(), ws.toLowerCase()]))
   // The workspace's own dialect (every session's, and the API chain's), and a test copy for Claude Code beside the
-  // empty files Hive ships (synced in as the workspace opens).
+  // empty files Combwork ships (synced in as the workspace opens).
   fs.mkdirSync(path.join(dialects, 'claude-code'), { recursive: true })
   writeWorkspace('WS-HOST-1', 'WS-ROUTE-1')
   writeTestCopy('MODEL-HOST-1', 'MODEL-ROUTE-1')
@@ -171,7 +171,7 @@ function initialize(def) {
   check("Clara's hive server is given its chain's file, and its shell too (for hive-progress)", !!file && fs.existsSync(file) && launch.env?.CW_DIALECT_FILE === file && mcp.env.CW_DIALECT === d1?.hash, JSON.stringify({ file, env: launch?.env }))
   const instructions = (await initialize(mcp))?.instructions ?? ''
   check('…which its hive server speaks: the contract opens with the test copy\'s line', instructions.startsWith('MODEL-HOST-1 alpha.'), instructions.slice(0, 160))
-  check("Cody's contract (Hive's own developer_instructions) opens with the Workspace file's line", codexTold().startsWith('WS-HOST-1 alpha.'), codexTold().slice(0, 160))
+  check("Cody's contract (Combwork's own developer_instructions) opens with the Workspace file's line", codexTold().startsWith('WS-HOST-1 alpha.'), codexTold().slice(0, 160))
   // The Agent API answers an agent in its own chain.
   const claraToken = launch?.token
   check("Clara's own token is said the test copy's text", (await noRouteSaid(claraToken)).startsWith('MODEL-ROUTE-1 GET'), await noRouteSaid(claraToken))
@@ -209,10 +209,10 @@ function initialize(def) {
   const d4 = (await agentNow(clara.id))?.live?.launched
   check('…gets no dialect file, in its hive server or its shell', !plainMcp.env.CW_DIALECT_FILE && !plain.env?.CW_DIALECT_FILE, JSON.stringify(plain.env))
   check('…and its launch record says only "model unknown" (Auto, no model chosen, none the CLI names: decision Q4)', JSON.stringify(d4?.dialect) === JSON.stringify({ modelUnknown: true }), JSON.stringify(d4))
-  check('…and Hive\'s own English', (await noRouteSaid(plain.token)).startsWith('No route for GET'), await noRouteSaid(plain.token))
-  // A model Hive can name: a launch with no dialect records nothing of one (as before dialects).
+  check('…and Combwork\'s own English', (await noRouteSaid(plain.token)).startsWith('No route for GET'), await noRouteSaid(plain.token))
+  // A model Combwork can name: a launch with no dialect records nothing of one (as before dialects).
   await lib.setLaunch(inv, proj, clara.id, { model: 'claude-opus-5-5' })
-  check('Clara restarts on a model Hive can name', !!(await restart(clara.id)))
+  check('Clara restarts on a model Combwork can name', !!(await restart(clara.id)))
   const d5 = (await agentNow(clara.id))?.live?.launched
   check('…and her launch record has no dialect in it (the Default, its model known)', !!d5 && !('dialect' in d5), JSON.stringify(d5))
   await page.screenshot({ path: path.join(lib.WORK, 'dialectlaunch.png') })

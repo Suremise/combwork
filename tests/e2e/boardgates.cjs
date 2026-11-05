@@ -146,7 +146,7 @@ const check = (name, ok, extra = '') => {
     const b = await create('Tidy the menu', 'alpha')
     await inv('tasks:move', b, 'doing', { agent: 'b1' })
     // Its start's slot work recorded first (#1548: SlotPrepared, PlacementClaimed, then BuilderPlaced, its last, come
-    // after the move's reply; slotCards.ts), so what follows compares only what the drag records: the facts Hive
+    // after the move's reply; slotCards.ts), so what follows compares only what the drag records: the facts Combwork
     // records, not what a reconcile observes of the folder and its target meanwhile (TargetMoved, #1543).
     const recorded = async (n) => (await inv('tasks:facts', n)).filter((f) => f.source === 'recorded').map((f) => f.kind)
     await lib.until(async () => (await facts(b)).includes('BuilderPlaced'), HUNG_MS)

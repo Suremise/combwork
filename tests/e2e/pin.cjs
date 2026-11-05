@@ -24,7 +24,7 @@ async function start() {
   return app
 }
 const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
-/** The window's real state (Hive asks Electron), and what its title bar shows. */
+/** The window's real state (Combwork asks Electron), and what its title bar shows. */
 const onTop = (page) => invOn(page)('window:getAlwaysOnTop')
 const pinLit = async (page) => (await page.locator('.titlebar-pin.on').count()) === 1 && (await page.locator('.titlebar-pin').getAttribute('aria-pressed')) === 'true'
 const both = async (page, on) => (await onTop(page)) === on && (await pinLit(page)) === on
@@ -164,7 +164,7 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
   await p2.locator('.titlebar-pin').click()
   check('pinning and unpinning the second leaves the first on', (await lib.until(() => both(p2, false), 5000)) && (await both(p1, true)))
 
-  // --- Remembered by workspace, in Hive's own config (never the workspace's .combwork).
+  // --- Remembered by workspace, in Combwork's own config (never the workspace's .combwork).
   await lib.until(() => (JSON.parse(fs.readFileSync(cfgFile, 'utf8')).alwaysOnTop ?? {})[wsA.toLowerCase()] === true, 5000)
   const saved = JSON.parse(fs.readFileSync(cfgFile, 'utf8')).alwaysOnTop ?? {}
   check("config.json remembers A's pin only", saved[wsA.toLowerCase()] === true && !(wsB.toLowerCase() in saved), JSON.stringify(saved))
@@ -180,7 +180,7 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
   // --- Quit and start again: each window comes back with its own pin.
   const exited = app.waitForEvent('close', { timeout: 20000 }).then(() => true).catch(() => false)
   await inv1('app:quit').catch(() => undefined)
-  check('Hive quits', await exited)
+  check('Combwork quits', await exited)
   app = await start()
   await app.firstWindow()
   await lib.until(async () => {

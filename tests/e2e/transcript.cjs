@@ -1,4 +1,4 @@
-// Sessions tab transcript viewer, in a throwaway profile and workspace. Transcripts are Hive backups
+// Sessions tab transcript viewer, in a throwaway profile and workspace. Transcripts are Combwork backups
 // (.combwork/sessions), so nothing is read from or written to the real ~/.claude. Never touches the clipboard.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -197,7 +197,7 @@ const text = (loc) => loc.textContent({ timeout: 1000 }).then((got) => got ?? ''
   await page.screenshot({ path: path.join(shots, '7-light.png') })
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
 
-  // Rename (the tag) and delete show on hover; deleting moves Hive's copy to the Recycle Bin and hides the session.
+  // Rename (the tag) and delete show on hover; deleting moves Combwork's copy to the Recycle Bin and hides the session.
   const row = page.locator('.session-row', { hasText: 'Zebra test fix' })
   await page.mouse.move(600, 5)
   check('row buttons are hidden until hover', !(await row.locator('.row-actions').isVisible()))
@@ -213,9 +213,9 @@ const text = (loc) => loc.textContent({ timeout: 1000 }).then((got) => got ?? ''
   await row.locator('.row-actions [aria-label="Delete session"]').click()
   await page.locator('.dialog-footer button', { hasText: /^Delete$/ }).click()
   check('the deleted session leaves the list', await becomes(async () => (await page.locator('.session-row', { hasText: 'Zebra test fix' }).count()) === 0))
-  check("Hive's copy is gone", await becomes(() => !fs.existsSync(path.join(sessDir, `${A}.jsonl`))))
+  check("Combwork's copy is gone", await becomes(() => !fs.existsSync(path.join(sessDir, `${A}.jsonl`))))
   const sessionsFile = () => sessionsOf(proj)
-  check('Hive remembers it as deleted', await becomes(() => { const f = sessionsFile(); return !f.sessions.some((s) => s.id === A) && f.deleted?.includes(A) }), JSON.stringify(sessionsFile().deleted))
+  check('Combwork remembers it as deleted', await becomes(() => { const f = sessionsFile(); return !f.sessions.some((s) => s.id === A) && f.deleted?.includes(A) }), JSON.stringify(sessionsFile().deleted))
   check('the list leaves it out', !(await inv('session:list', proj)).some((s) => s.id === A))
   const kept = (await inv('session:keptUsage', proj)).find((s) => s.id === A)
   check('what it used stays in the totals', !!kept?.deleted && kept.usage?.requests > 0 && Object.keys(kept.usage.days ?? {}).length > 0, JSON.stringify(kept && { requests: kept.usage?.requests }))

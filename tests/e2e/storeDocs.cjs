@@ -83,7 +83,7 @@ function storeMeta(ws, store, key, scope = '') {
 }
 
 /**
- * Saves one entry of a store as Hive would (a suite's stand-in for editing its file by hand): in its place if it is
+ * Saves one entry of a store as Combwork would (a suite's stand-in for editing its file by hand): in its place if it is
  * there, else last; `meta` values set beside it (JSON-encoded here). In one transaction.
  */
 function putStoreDoc(ws, store, key, doc, { scope = '', meta = {} } = {}) {
@@ -93,7 +93,7 @@ function putStoreDoc(ws, store, key, doc, { scope = '', meta = {} } = {}) {
     if (store === 'deliveries' && hasTable(db, 'deliveries')) {
       // Its table (#1211): the delivery's row, by its id.
       const row = codec.deliveryToRow(scope, doc)
-      if (!row) throw new Error(`not a delivery Hive keeps: ${JSON.stringify(doc)}`)
+      if (!row) throw new Error(`not a delivery Combwork keeps: ${JSON.stringify(doc)}`)
       db.prepare('DELETE FROM deliveries WHERE host = ? AND id = ?').run(scope, doc.id)
       codec.insert(db, 'deliveries', row)
       for (const [k, v] of Object.entries(meta)) db.prepare('INSERT INTO store_meta (store, scope, key, value) VALUES (?, ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET value = excluded.value').run(store, scope, k, JSON.stringify(v))
@@ -114,7 +114,7 @@ function putStoreDoc(ws, store, key, doc, { scope = '', meta = {} } = {}) {
 }
 
 /**
- * A session host's records as Hive keeps them (#1061: rows of the `sessions` store, under its project's id), in the form
+ * A session host's records as Combwork keeps them (#1061: rows of the `sessions` store, under its project's id), in the form
  * its sessions.json had: `{ version, sessions, deleted?, deletedUsage? }`. Empty while there are none (or no database).
  */
 function sessionsOf(host) {
@@ -153,7 +153,7 @@ function sessionsOf(host) {
 }
 
 /**
- * Replaces a session host's records as Hive would (a suite's stand-in for writing its sessions.json by hand, which Hive
+ * Replaces a session host's records as Combwork would (a suite's stand-in for writing its sessions.json by hand, which Combwork
  * only moves in before it first reads them): `f` in sessions.json's form. In one transaction, marked moved in.
  */
 function putSessions(host, f) {
@@ -166,7 +166,7 @@ function putSessions(host, f) {
       for (const t of ['sessions', 'sessions_deleted', 'sessions_deleted_usage']) db.prepare(`DELETE FROM ${t} WHERE host = ?`).run(p.scope)
       ;(f.sessions ?? []).forEach((rec, i) => {
         const r = codec.sessionToRows(p.scope, i, rec)
-        if (!r) throw new Error(`not a session record Hive keeps: ${JSON.stringify(rec)}`)
+        if (!r) throw new Error(`not a session record Combwork keeps: ${JSON.stringify(rec)}`)
         codec.insert(db, 'sessions', r.row)
         for (const c of r.cards) codec.insert(db, 'session_cards', c)
       })

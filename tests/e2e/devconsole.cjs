@@ -1,7 +1,7 @@
 // The developer console's capture (#636): nothing is captured until someone watches; a watched agent's launch, hooks
-// and status line arrive live, each next to what Hive made of it (the status it set), redacted (the prompt's text never
+// and status line arrive live, each next to what Combwork made of it (the status it set), redacted (the prompt's text never
 // reaches the console); an agent reads its own session over the Agent API and no other source (refused as unknown);
-// Hive's own events show an agent's API call; the setting off refuses every read; and reads never start capture: with no
+// Combwork's own events show an agent's API call; the setting off refuses every read; and reads never start capture: with no
 // console open (before it opens and after it closes) they are told nothing is captured, and nothing is kept.
 // Fake Claude Code; dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -65,7 +65,7 @@ const check = (name, ok, extra = '') => {
       return list.some((s) => s.agentId === b1.id) && list.some((s) => s.agentId === b2.id) ? list : null
     }, HUNG_MS)
     const b1Source = sources?.find((s) => s.agentId === b1.id)
-    check("the window lists the workspace's agents, its Assistant and Hive as sources", !!b1Source && sources.some((s) => s.kind === 'assistant') && sources.some((s) => s.kind === 'hive'), JSON.stringify(sources))
+    check("the window lists the workspace's agents, its Assistant and Combwork as sources", !!b1Source && sources.some((s) => s.kind === 'assistant') && sources.some((s) => s.kind === 'hive'), JSON.stringify(sources))
     check('…none of them captured while nobody watches', sources?.every((s) => !s.capturing && s.events === 0), JSON.stringify(sources))
 
     // --- Every listed source reads back with exactly the arguments the listing gives (long and alike names too).
@@ -85,7 +85,7 @@ const check = (name, ok, extra = '') => {
     check('a read with no console open: nothing captured, and it says so', before.status === 200 && before.body.source.capturing === false && before.body.events.length === 0, JSON.stringify(before.body))
     check('…and starts no capture', (await inv('console:sources')).every((s) => !s.capturing), JSON.stringify(await inv('console:sources')))
 
-    // --- The window watches B1 before it starts: its launch, hooks and status line arrive live, with what Hive made of each.
+    // --- The window watches B1 before it starts: its launch, hooks and status line arrive live, with what Combwork made of each.
     await page.evaluate(() => {
       window.__console = []
       window.hive.onEvent((e) => {
@@ -101,7 +101,7 @@ const check = (name, ok, extra = '') => {
     const launched = await seen((e) => e.kind === 'launch')
     check("its launch: the CLI, its version and its known option names, the rest counted", typeof launched?.raw?.otherArgs === 'number' && launched.raw.otherArgs >= 2 && launched.raw.switches?.includes('--session-id') && launched.raw.switches.includes('--allowedTools') && launched?.made?.status !== undefined && !JSON.stringify(launched).includes(PRIVATE), JSON.stringify(launched))
     const started = await seen((e) => e.kind === 'hook' && e.name === 'SessionStart')
-    check('SessionStart arrives next to what Hive made of it', started?.made?.event?.kind === 'start' && typeof started.made.status === 'string' && started.summary.startsWith('SessionStart → start;'), JSON.stringify(started))
+    check('SessionStart arrives next to what Combwork made of it', started?.made?.event?.kind === 'start' && typeof started.made.status === 'string' && started.summary.startsWith('SessionStart → start;'), JSON.stringify(started))
     check('…from the provider that sent it', started?.provider === 'claude-code')
     await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === b1.id)?.status === 'ready', HUNG_MS)
 
@@ -109,14 +109,14 @@ const check = (name, ok, extra = '') => {
     const sent = await lib.sendPrompt(inv, key, `edit a.ts window 150000 ${PRIVATE}`, { submitted: async () => !!(await live()).find((e) => e.name === 'UserPromptSubmit') })
     check('the prompt is taken', sent > 0)
     const prompt = await seen((e) => e.name === 'UserPromptSubmit')
-    check('UserPromptSubmit: Hive took it for a prompt and set the agent working', prompt?.made?.event?.kind === 'prompt' && prompt.made.status === 'working', JSON.stringify(prompt?.made))
+    check('UserPromptSubmit: Combwork took it for a prompt and set the agent working', prompt?.made?.event?.kind === 'prompt' && prompt.made.status === 'working', JSON.stringify(prompt?.made))
     check('…its text hidden, only its length kept', /^<text: \d+ chars>$/.test(prompt?.raw?.prompt ?? ''), JSON.stringify(prompt?.raw))
     const pre = await seen((e) => e.name === 'PreToolUse')
     check('PreToolUse (Edit): its tool and file kept, its edit hidden', pre?.raw?.tool_name === 'Edit' && (pre.raw.tool_input?.file_path ?? '').endsWith('a.ts') && (pre.raw.tool_input?.old_string ?? '').startsWith('<text'), JSON.stringify(pre?.raw))
     const stop = await seen((e) => e.name === 'Stop')
-    check('Stop: Hive ended the turn', stop?.made?.event?.kind === 'stop' && stop.made.actions?.includes('turnEnded'), JSON.stringify(stop?.made))
+    check('Stop: Combwork ended the turn', stop?.made?.event?.kind === 'stop' && stop.made.actions?.includes('turnEnded'), JSON.stringify(stop?.made))
     const statusLine = await seen((e) => e.kind === 'statusline')
-    check('the status line: next to the context window Hive read from it', statusLine?.made?.contextWindow === 150000 && /window 150000/.test(statusLine.summary), JSON.stringify(statusLine))
+    check('the status line: next to the context window Combwork read from it', statusLine?.made?.contextWindow === 150000 && /window 150000/.test(statusLine.summary), JSON.stringify(statusLine))
     const all = JSON.stringify(await live())
     check('the prompt\'s words reach no event (raw, made or summary)', !all.includes(PRIVATE))
     const snap = await inv('console:snapshot', b1Source.id, 0)
@@ -143,16 +143,16 @@ const check = (name, ok, extra = '') => {
     const listed = await api('GET', '/v1/console/sources', b1Token)
     check('…and lists only its own session', listed.status === 200 && listed.body.total === 1 && listed.body.sources[0].select?.agent === b1.id && listed.body.sources[0].label === 'alpha · B1' && listed.body.sources[0].capturing === true, JSON.stringify(listed.body))
 
-    // --- Hive's own events, once the window watches them too: B1's API call shows there and in B1's session.
+    // --- Combwork's own events, once the window watches them too: B1's API call shows there and in B1's session.
     const notYet = await api('GET', '/v1/console/events?source=hive')
-    check("Hive's events aren't captured until the window watches them", notYet.status === 200 && notYet.body.source.capturing === false, JSON.stringify(notYet.body))
+    check("Combwork's events aren't captured until the window watches them", notYet.status === 200 && notYet.body.source.capturing === false, JSON.stringify(notYet.body))
     await inv('console:subscribe', [b1Source.id, sources.find((s) => s.kind === 'hive').id])
     await api('GET', '/v1/status', b1Token)
     const hiveEvents = await lib.until(async () => {
       const r = await api('GET', '/v1/console/events?source=hive')
       return r.body?.events?.find((e) => e.kind === 'api' && e.name === 'GET /v1/status') ? r.body : null
     }, HUNG_MS)
-    check("an agent's API call is in Hive's events, who made it and how it went", /by agent .* → 200 ok/.test(hiveEvents?.events.find((e) => e.name === 'GET /v1/status')?.summary ?? ''), JSON.stringify(hiveEvents))
+    check("an agent's API call is in Combwork's events, who made it and how it went", /by agent .* → 200 ok/.test(hiveEvents?.events.find((e) => e.name === 'GET /v1/status')?.summary ?? ''), JSON.stringify(hiveEvents))
     check('…and in its own session', (await inv('console:snapshot', b1Source.id, 0)).some((e) => e.kind === 'api' && e.name === 'GET /v1/status'))
     check("…but the console's own reads aren't", !(await inv('console:snapshot', b1Source.id, 0)).some((e) => e.name.includes('/v1/console')))
 

@@ -32,7 +32,7 @@ const check = (name, ok, extra = '') => {
 const id = (n) => `0f5c2a8e-2222-4333-8444-5555666${String(n).padStart(5, '0')}`
 const at = (h) => new Date(Date.UTC(2026, 9, 4, h, 0, 0)).toISOString()
 const old = new Date(Date.UTC(2026, 9, 4, 0, 0, 0))
-/** A Claude Code transcript (Hive's backup of it, or the CLI's own). */
+/** A Claude Code transcript (Combwork's backup of it, or the CLI's own). */
 const claudeLines = (sid, h, text) =>
   [
     { type: 'user', sessionId: sid, timestamp: at(h), message: { role: 'user', content: text } },
@@ -117,7 +117,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
     rec(C.gone, 'Gone session', 5, { agentId: claude.id, agentName: 'Claude' }),
     rec(C.coder, 'Coder work', 4, { agentId: 'a-0c0de00', agentName: 'Coder' }),
     rec(C.codex, 'Codex work', 9, { agent: 'codex', agentId: codexette.id, agentName: 'Codexette', transcriptPath: rolloutFile(C.codex, 9) }),
-    // A guardian review adopted before Hive told sub-sessions apart: its record doesn't say so.
+    // A guardian review adopted before Combwork told sub-sessions apart: its record doesn't say so.
     rec(C.adopted, 'Adopted review', 5, { agent: 'codex', transcriptPath: rolloutFile(C.adopted, 5) }),
     // A session in a worktree, with a guardian review there.
     rec(C.wt, 'Worktree work', 1, { agent: 'codex', agentId: codexette.id, agentName: 'Codexette', cwd: wtDir, branch: 'hive/spike', transcriptPath: rolloutFile(C.wt, 1) })
@@ -171,13 +171,13 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
     await inv('settings:update', { appearance: { theme: 'dark' } })
     await list.evaluate((e, w) => (e.style.width = w), width)
   }
-  // The whole list's first read held (its session:list, asked before Hive's own), so the note stays while it is shot.
+  // The whole list's first read held (its session:list, asked before Combwork's own), so the note stays while it is shot.
   await app.evaluate(() => {
     process.env.HIVE_TEST_SLOW_IPC = 'session:list=20000*1'
   })
   await page.locator('.tab', { hasText: 'Sessions' }).click()
   const note = page.locator('.sessions-scope[data-loading="others"]')
-  check('the note shows while the sessions started outside Hive are read', !!(await lib.until(async () => (await note.count()) === 1, HUNG_MS)))
+  check('the note shows while the sessions started outside Combwork are read', !!(await lib.until(async () => (await note.count()) === 1, HUNG_MS)))
   await narrowShots('loading', note)
   check('…and goes once they are read', !!(await lib.until(async () => (await note.count()) === 0, HELD_LIST_HUNG_MS)))
   await app.evaluate(() => {
@@ -392,7 +392,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   await lib.until(async () => !(await names()).includes('Tray fixes'), 8000)
   const after = await names()
   check('the rest are gone; the running and held ones stay', !after.includes('Tray fixes') && !after.includes('Gone session') && after.includes('Old notes') && after.includes('Running now'), JSON.stringify(after))
-  check("Hive's copy of a deleted one is in the Recycle Bin, the held one's is kept", !fs.existsSync(backup(C.tray)) && fs.existsSync(backup(C.notes)))
+  check("Combwork's copy of a deleted one is in the Recycle Bin, the held one's is kept", !fs.existsSync(backup(C.tray)) && fs.existsSync(backup(C.notes)))
   check("…the suite's trash folder in a test copy (#414)", lib.trashed(backup(C.tray)).length === 1)
   check("the CLI's own transcripts are untouched", fs.existsSync(terminalFile) && fs.existsSync(rolloutFile(C.codex, 9)))
   holder.kill()
@@ -415,7 +415,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   const archived = await names()
   check('the archived session and its sub-sessions leave the tree', !archived.includes('Codex work') && !archived.includes('Review rm'), JSON.stringify(archived))
   check('the guardian review whose session isn’t listed stays', archived.includes('Lost review'))
-  check('it is archived in Hive', sessionsOf(alpha).sessions.find((s) => s.id === C.codex)?.archived === true)
+  check('it is archived in Combwork', sessionsOf(alpha).sessions.find((s) => s.id === C.codex)?.archived === true)
   await page.getByText('Archived', { exact: true }).click()
   await lib.until(async () => (await names()).includes('Codex work'), 5000)
   check('Archived shows it again, with its sub-sessions', (await names()).includes('Codex work') && (await names()).includes('Review rm'))

@@ -65,8 +65,8 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const dialog = page.locator('.dialog')
     const workflowLine = () => text(head.locator('[data-action="vc-workflow"]'))
     /**
-     * An agent's intent (`who`: its token), sent again while Hive answers evidence.changed, whose next step is "Try again:
-     * Hive reads it afresh" (what it read moved as it decided: a merge's reconcile, the folder's commits read), as an agent
+     * An agent's intent (`who`: its token), sent again while Combwork answers evidence.changed, whose next step is "Try again:
+     * Combwork reads it afresh" (what it read moved as it decided: a merge's reconcile, the folder's commits read), as an agent
      * does, a few times at most.
      */
     const send = async (who, n, name, body = {}) => {
@@ -249,7 +249,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     await shoot('1-step-pair', { loc: page.locator('.vc-view') })
     check('Choose → Use Pair: the header reads "Workflow: Git · Pair"', await choose('Pair'), await workflowLine())
     const options = projectJson(alpha).workflow?.options ?? {}
-    check("…saved: Hive merges into main, cards on slots, typecheck before review and on the merged result, the repository's identity", projectJson(alpha).workflow?.preset === 'pair' && projectJson(alpha).workflow?.presetAsked === 'chosen' && options.finish === 'hiveMerges' && options.target === 'main' && options.folder === 'slots' && JSON.stringify(options.preChecks) === '["typecheck"]' && JSON.stringify(options.mergeChecks) === '["typecheck"]' && options.identity?.email === fx.identity.email, JSON.stringify(projectJson(alpha).workflow))
+    check("…saved: Combwork merges into main, cards on slots, typecheck before review and on the merged result, the repository's identity", projectJson(alpha).workflow?.preset === 'pair' && projectJson(alpha).workflow?.presetAsked === 'chosen' && options.finish === 'hiveMerges' && options.target === 'main' && options.folder === 'slots' && JSON.stringify(options.preChecks) === '["typecheck"]' && JSON.stringify(options.mergeChecks) === '["typecheck"]' && options.identity?.email === fx.identity.email, JSON.stringify(projectJson(alpha).workflow))
     const identity = options.identity ?? fx.identity
     const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, '-c', `user.email=${identity.email}`, ...args]).trim()
     // Pair, its Maximum agents raised to 3 as a user would (HI-2131, as HI-2091): G14's builder B2 below is alpha's third.
@@ -305,7 +305,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     }
     const shell = async (cmd) => {
       const before = shells().length
-      // Hive may type a wake into B1 as the suite types: each try waits for B1 idle with its inbox quiet (HI-1918), and
+      // Combwork may type a wake into B1 as the suite types: each try waits for B1 idle with its inbox quiet (HI-1918), and
       // typeLine types it again when the wake took or wiped it.
       await lib.typeLine(inv, lib.ptyKey(alpha, b1.id), fx.claudeHome, 'B1', `shell: ${cmd}`, { ready: async () => lib.agentQuiet(PORT, 'alpha', await live(b1.id), tokens.b1), strict: true, live: () => live(b1.id), hungMs: HUNG_MS })
       await waitHung(() => shells().length > before)
@@ -350,7 +350,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     // B1 is started again in the lane's slot (a new conversation, a launch with its own token, read by retoken).
     check("…B1 runs in the lane's slot", !!(await waitHung(async () => (await idle(b1.id)) && (await live(b1.id))?.cwd?.toLowerCase() === wt?.toLowerCase())), JSON.stringify(await live(b1.id)))
     await retoken()
-    /** Hive has made the card's line in the lane's slot (the start names the folder and the line). */
+    /** Combwork has made the card's line in the lane's slot (the start names the folder and the line). */
     const onLine = (s) => waitHung(() => s.body?.data?.folder?.toLowerCase() === wt?.toLowerCase() && git(wt, 'branch', '--show-current') === s.body?.data?.line)
 
     // --- One: start, a counted check, submit.
@@ -406,7 +406,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     fs.writeFileSync(fx.go, 'go')
     check('One is merged by the queue: Done', await done(c1), JSON.stringify(await kinds(c1)))
     const i1 = await integrated(c1)
-    check("…Integrated by Hive at the approved revision: a merge commit of B1's line", i1?.data?.by === 'hive' && git(alpha, 'rev-parse', 'main^2') === rev1, JSON.stringify(i1))
+    check("…Integrated by Combwork at the approved revision: a merge commit of B1's line", i1?.data?.by === 'hive' && git(alpha, 'rev-parse', 'main^2') === rev1, JSON.stringify(i1))
     await toTab('alpha')
     await section('branches')
     const later = await send(b2, dep, 'start')
@@ -560,14 +560,14 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     }
     gcommit('one.txt', gk1)
     gcommit('two.txt', gk2)
-    // Once Hive has read the folder's new commits (each attributed to its card by its trailer), as S11's core does before
+    // Once Combwork has read the folder's new commits (each attributed to its card by its trailer), as S11's core does before
     // its submits: a submit while they are read is refused to try again (evidence.changed).
     check("S11: each card's commit attributed to it by its trailer", !!(await waitHung(async () => (await kinds(gc1)).includes('CommitAttributed') && (await kinds(gc2)).includes('CommitAttributed'))), JSON.stringify({ one: await kinds(gc1), two: await kinds(gc2) }))
     const gsub2 = await send(g2, gc2, 'submit', { summary: 'two' })
     const gsub1 = await send(g1, gc1, 'submit', { summary: 'one' })
     check('S11: both submit in the shared folder: Done, nothing checked', gsub1.status === 200 && gsub2.status === 200 && (await done(gc1)) && (await done(gc2)), JSON.stringify({ gsub1: gsub1.body, gsub2: gsub2.body }))
     check("…two's submission is its own commit only",((await factsOf(gc2, 'Submitted')).at(-1)?.data?.files ?? []).map((x) => x.path).join() === 'two.txt', JSON.stringify((await factsOf(gc2, 'Submitted')).at(-1)?.data))
-    // G16 (#1481): G1 edits three.txt on its next card (its CLI's edit hook takes Hive's file lock); G2's commit sweeps it
+    // G16 (#1481): G1 edits three.txt on its next card (its CLI's edit hook takes Combwork's file lock); G2's commit sweeps it
     // in: G2's submit warns, naming G1's card, and goes through.
     const gc3 = (await inv('tasks:create', { title: 'Gamma three', project: 'gamma' })).number
     const gc4 = (await inv('tasks:create', { title: 'Gamma four', project: 'gamma' })).number

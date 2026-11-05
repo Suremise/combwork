@@ -1,10 +1,10 @@
 // The run context (#203): everything a test run, and each suite in it, has of its own, so runs never assume they are
 // alone on the machine or inherit whatever environment they were started from.
 //
-// - The environment, here: every child a test starts (a suite, a test copy of Hive, the hive MCP server, the
+// - The environment, here: every child a test starts (a suite, a test copy of Combwork, the hive MCP server, the
 //   hive-progress wrapper) gets an environment built from an allowlist (ALLOW: Windows' own variables, the user's
 //   folders, the network's proxy and certificates) plus what the context sets itself (a profile, quiet, ports, the
-//   suite's folders, CLI homes). Nothing else from the parent: not the variables of the Hive session it was started
+//   suite's folders, CLI homes). Nothing else from the parent: not the variables of the Combwork session it was started
 //   from (HIVE_API_TOKEN…, HIVE_PROGRESS_*), not NO_COLOR or FORCE_COLOR, not ELECTRON_RUN_AS_NODE, not CLAUDE_* or
 //   ANTHROPIC_* (the real tier uses the CLIs' own sign-in). Test settings a person may set for a run are passed on by
 //   name (PASS_ENV); a new one is added there, with what it is for. tests/e2esuites.test.ts fails for a suite or the
@@ -13,9 +13,9 @@
 //   from, so the children they start themselves (the build, git, where.exe, taskkill) get baseEnv() too, never what a
 //   call without env inherits (GIT_DIR and GIT_WORK_TREE would point their git at another repository, NODE_OPTIONS
 //   reach the build). The unit test fails for a child_process call there without env. Not a child, the runners'
-//   progress reporting (tests/progressReport.mts) keeps reading the shell's Hive variables: it reports to that Hive.
+//   progress reporting (tests/progressReport.mts) keeps reading the shell's Combwork variables: it reports to that Combwork.
 // - Folders: the work folder (WORK: the lane's, which the runner gives each suite as HIVE_E2E_DIR) and the CLI test
-//   homes (CODEX_HOME, CLAUDE_TEST_HOME). What a test copy of Hive deletes goes to its trash folder in the suite's
+//   homes (CODEX_HOME, CLAUDE_TEST_HOME). What a test copy of Combwork deletes goes to its trash folder in the suite's
 //   (HIVE_TEST_TRASH_DIR, `<work>	rash`, #414), never the user's Recycle Bin, and goes with the suite's folder.
 // - The temp folder (TEMP, TMP, TMPDIR in ALLOW): the run's own in hive-test\tmp, which the runner sets before it
 //   starts anything (tests/tempDir.ts startRunTemp, HI-2102), never %TEMP%.
@@ -75,17 +75,17 @@ const ALLOW = [
 const PASS_ENV = {
   HIVE_TEST_CODEX_HOME: 'another Codex test home (CODEX_HOME above)',
   HIVE_TEST_CLAUDE_HOME: 'another Claude Code test home (CLAUDE_TEST_HOME above)',
-  HIVE_TEST_QUIET: '0 shows the test copies of Hive (taking focus, notifying), to watch a run',
+  HIVE_TEST_QUIET: '0 shows the test copies of Combwork (taking focus, notifying), to watch a run',
   HIVE_TEST_PROGRESS_TIMINGS: "where the Progress panel's suite timings are kept (tests/progressReport.mts)",
   HIVE_PROGRESS_CHECK_DEV: "1: packaged-progress checks the dev build's hive-progress",
-  HIVE_EXE: 'plan and lib.launch run this packaged Hive executable instead of the dev build (the Sandbox upgrade checks, #1227)',
+  HIVE_EXE: 'plan and lib.launch run this packaged Combwork executable instead of the dev build (the Sandbox upgrade checks, #1227)',
   HIVE_E2E_HIVE09: "boardupgrade's 0.9 Hive: a 0.9.x win-unpacked folder (else the main checkout's dist/win-unpacked, when it is 0.9.x)",
   REPLYSIZE_OUT: "replysize's report file, in the work folder"
 }
 
 /**
- * What the runner sets for each suite, carried from a suite into the test copies of Hive it starts: a runner started
- * inside a suite (progressreport runs one in its Hive's agent shell, which drops HIVE_ variables) knows from these that
+ * What the runner sets for each suite, carried from a suite into the test copies of Combwork it starts: a runner started
+ * inside a suite (progressreport runs one in its Combwork's agent shell, which drops HIVE_ variables) knows from these that
  * it is nested, and which ports and folders to keep clear of (runner.mjs); which kinds of test slot its run holds for
  * what runs inside it (E2E_RUN_SLOTS, slots.mjs heldCredit, HI-2070); and where those copies note the CLIs they
  * selected (HIVE_TEST_CLI_LOG, in the suite's folder: the run record's real CLIs, #365).
@@ -110,10 +110,10 @@ function apply(env, vars) {
 }
 
 /**
- * PATH without the folders of the hive-progress shims the user's Hives install (`%APPDATA%\Combwork\bin`, `Combwork-Dev\bin`,
+ * PATH without the folders of the hive-progress shims the user's copies of Combwork install (`%APPDATA%\Combwork\bin`, `Combwork-Dev\bin`,
  * and before HI-2461 `Hive\bin`, `Hive-Dev\bin`),
- * which an agent's session has on its PATH (#1253): they run the installed Hive.exe (or the main checkout's dev build), so
- * a test's `hive-progress` would start another Hive than its own, and report to the user's. A test Hive puts its own
+ * which an agent's session has on its PATH (#1253): they run the installed Combwork.exe (or the main checkout's dev build), so
+ * a test's `hive-progress` would start another Combwork than its own, and report to the user's. A test Combwork puts its own
  * shims on its sessions' PATH.
  */
 function withoutHiveShims(env, parent) {
@@ -126,28 +126,28 @@ function withoutHiveShims(env, parent) {
   return env
 }
 
-/** The allowlisted environment, and nothing else: for a child that isn't Hive (git, a test server). */
+/** The allowlisted environment, and nothing else: for a child that isn't Combwork (git, a test server). */
 function baseEnv(parent = process.env) {
   return withoutHiveShims(pick(parent, ALLOW), parent)
 }
 
 /**
- * A child that is part of Hive but not a copy of it (the hive MCP server, the hive-progress wrapper, a bridge): the
+ * A child that is part of Combwork but not a copy of it (the hive MCP server, the hive-progress wrapper, a bridge): the
  * allowlist and `vars` (the Agent API URL and token it should use, ELECTRON_RUN_AS_NODE where Electron runs it as Node).
  */
 function childEnv(vars = {}, parent = process.env) {
   return apply(baseEnv(parent), vars)
 }
 
-/** The environments hiveEnv built: lib.cjs's _electron.launch refuses any other (so no suite starts Hive with its own). */
+/** The environments hiveEnv built: lib.cjs's _electron.launch refuses any other (so no suite starts Combwork with its own). */
 const built = new WeakSet()
 
-/** Where the test copies of Hive a suite starts put what they delete (#414): its work folder's `trash`. */
+/** Where the test copies of Combwork a suite starts put what they delete (#414): its work folder's `trash`. */
 const trashDir = (parent = process.env) => path.join(parent.HIVE_E2E_DIR || WORK, 'trash')
 
 /**
- * The CLI homes a test copy of Hive gets unless its suite gives it others (#382): empty folders in its work folder's
- * `cli-homes`, so Hive's look for the CLIs when it starts (`claude auth status`, `codex login status`, Copilot's
+ * The CLI homes a test copy of Combwork gets unless its suite gives it others (#382): empty folders in its work folder's
+ * `cli-homes`, so Combwork's look for the CLIs when it starts (`claude auth status`, `codex login status`, Copilot's
  * config.json and `gh auth status`, #452) reads them, never the user's ~/.claude, ~/.codex, ~/.copilot or GitHub CLI
  * login (an empty GH_CONFIG_DIR hides it: Copilot falls back to it). A suite passes a test home instead (the fake
  * Claude Code's, its own, the Codex test home) in hiveEnv's vars.
@@ -158,9 +158,9 @@ function cliHomes(parent = process.env) {
 }
 
 /**
- * The commit identity of a test copy of Hive's git (#1466), in the global git config it gets (gitConfig), so its screens
+ * The commit identity of a test copy of Combwork's git (#1466), in the global git config it gets (gitConfig), so its screens
  * (the Version Control tab's Commit identity, the Initialise dialog's "will commit as") and its commits never show the
- * machine's. A suite that needs none, or another, gives its Hive a GIT_CONFIG_GLOBAL of its own (gitinit, p5scenarios).
+ * machine's. A suite that needs none, or another, gives its Combwork a GIT_CONFIG_GLOBAL of its own (gitinit, p5scenarios).
  */
 const TEST_GIT_IDENTITY = { name: 'Hive Test', email: 'hive-test@example.invalid' }
 
@@ -170,9 +170,9 @@ const gitConfig = (parent = process.env) => path.join(parent.HIVE_E2E_DIR || WOR
 /**
  * Writes a work folder's global git config: the test identity, and line endings as they are stored (core.autocrlf
  * false, git's own default): with no system config (GIT_CONFIG_NOSYSTEM) nothing else is read, so a suite's git and its
- * test Hive's check files out the same on any machine; Git for Windows' system autocrlf=true for one and not the other
- * made Hive take CRLF checkouts for uncommitted changes (#1466 round 1). Only when it says something else (or nothing),
- * so a test Hive already reading it never finds it half written.
+ * test Combwork's check files out the same on any machine; Git for Windows' system autocrlf=true for one and not the other
+ * made Combwork take CRLF checkouts for uncommitted changes (#1466 round 1). Only when it says something else (or nothing),
+ * so a test Combwork already reading it never finds it half written.
  */
 function writeGitConfig(file) {
   const text = `[user]\n\tname = ${TEST_GIT_IDENTITY.name}\n\temail = ${TEST_GIT_IDENTITY.email}\n[core]\n\tautocrlf = false\n`
@@ -189,7 +189,7 @@ function writeGitConfig(file) {
 
 /**
  * A suite's git on its fixtures (lib.git, its repositories and worktrees): the allowlist, and the git config its test
- * Hive has (gitConfig, no system config), so both read the same settings (#1466). Not the runners' git on the checkout
+ * Combwork has (gitConfig, no system config), so both read the same settings (#1466). Not the runners' git on the checkout
  * under test (baseEnv): that worktree is checked out with the machine's settings.
  */
 function gitEnv(vars = {}, parent = process.env) {
@@ -216,7 +216,7 @@ function isUserCliHome(dir, parent = process.env) {
 }
 
 /**
- * A test copy of Hive's environment: the allowlist; quiet (unless HIVE_TEST_QUIET=0 was set for the run) and with tips
+ * A test copy of Combwork's environment: the allowlist; quiet (unless HIVE_TEST_QUIET=0 was set for the run) and with tips
  * off (a profile that sets Show a tip turns them on); in English (HIVE_LANG=en, #767: suites find the window by its English
  * text, and dates and numbers format the same on any Windows; `vars` can set another language); its trash folder (HIVE_TEST_TRASH_DIR: the suite's, #414, so it
  * never uses the user's Recycle Bin); the CLI homes (CLAUDE_CONFIG_DIR, CODEX_HOME, COPILOT_HOME, GH_CONFIG_DIR: empty
@@ -224,7 +224,7 @@ function isUserCliHome(dir, parent = process.env) {
  * work folder's, with the test identity and line endings, gitConfig, #1466; GIT_CONFIG_NOSYSTEM), so its git never reads
  * the user's ~/.gitconfig or the machine's, and matches its suite's (gitEnv); the suite's Agent API port from its runner
  * (HIVE_E2E_PORT), and the CARRIED variables; then `vars` (its profile, HIVE_USER_DATA, always; a port, test CLI homes,
- * test hooks), where undefined removes one (lib.cjs refuses to start a test Hive without each home or a global git config).
+ * test hooks), where undefined removes one (lib.cjs refuses to start a test Combwork without each home or a global git config).
  */
 function hiveEnv(vars = {}, parent = process.env) {
   const env = baseEnv(parent)
@@ -251,9 +251,9 @@ const isHiveEnv = (env) => !!env && built.has(env)
 /**
  * A suite's environment, from its runner: the allowlist, the PASS_ENV settings, and its run context: its folder
  * (HIVE_E2E_DIR, which WORK reads), its Agent API port (HIVE_E2E_PORT, lib.port()), and the same said without the
- * HIVE_ prefix (E2E_RUN_*), which survive into a test Hive's agent shells; the kinds of test slot its run holds or was
+ * HIVE_ prefix (E2E_RUN_*), which survive into a test Combwork's agent shells; the kinds of test slot its run holds or was
  * given for what runs inside it (slots: E2E_RUN_SLOTS, slots.mjs creditFor, HI-2070: none from a light run); and the
- * file its test copies of Hive note the CLIs they selected in (cliLog: HIVE_TEST_CLI_LOG, #365).
+ * file its test copies of Combwork note the CLIs they selected in (cliLog: HIVE_TEST_CLI_LOG, #365).
  */
 function suiteEnv({ name, port = null, work = null, runDir, cliLog = null, slots = '' }, parent = process.env) {
   const env = apply(baseEnv(parent), pick(parent, Object.keys(PASS_ENV)))

@@ -6,7 +6,7 @@
 // Overview has one line linking there; Changes' project folder says so only while one holds work; Storage has a line
 // for them; the Agent API's project status counts them for the Assistant (no way to remove them). Without git, nothing is
 // removed. Then one is merged from Changes and removed after (its commit on the main branch, its folder and branch gone). A throwaway repository with worktree agents
-// added through Hive (not started), fake Claude Code configured, throwaway profile and workspace, quiet.
+// added through Combwork (not started), fake Claude Code configured, throwaway profile and workspace, quiet.
 // Dev build only (#1580): 0.9 worktrees on purpose: Merged, Ahead and Claudette are 0.9 worktree agents
 // (agents:testLegacy, refused by a packaged build), whose worktrees are left unused.
 const lib = require('./lib.cjs')
@@ -245,7 +245,7 @@ function pathWithoutGit() {
   await lib.until(async () => (await danger.count()) === 1, 5000)
   check('Remove anyway… names what goes', (await danger.innerText()).includes(`1 commit on ${ahead.worktree.branch} not on ${main}`), await danger.innerText())
   await shot('anyway')
-  // Changed while the question is open: confirming removes nothing; the question closes, Hive checks again and asks
+  // Changed while the question is open: confirming removes nothing; the question closes, Combwork checks again and asks
   // afresh with what it holds now (#377), never a Try Again with the spent check.
   fs.writeFileSync(path.join(ahead.worktree.path, 'later.txt'), 'written after the question')
   await danger.getByRole('button', { name: 'Remove Anyway' }).click()

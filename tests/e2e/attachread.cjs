@@ -1,5 +1,5 @@
-// A reviewer in a review copy reads the builder's attached files through Hive (HI-1751: HR2, a Codex reviewer, couldn't
-// read HI-1702's evidence: the document tools refuse .combwork, and it rightly didn't go round Hive to the files). A fake
+// A reviewer in a review copy reads the builder's attached files through Combwork (HI-1751: HR2, a Codex reviewer, couldn't
+// read HI-1702's evidence: the document tools refuse .combwork, and it rightly didn't go round Combwork to the files). A fake
 // Claude Code builder (B1) attaches a probe, its results (over a page long, a character of several bytes at the page's
 // end) and a screenshot to its card, and submits; a fake Codex reviewer (R1) and a fake Claude Code one (E1, either) each
 // start a review, which leases each a review copy, and call cw_read_attachment through their launch's own hive MCP
@@ -125,7 +125,7 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
     const nextOf = (reply) => Number(/more from offset (\d+)\)/.exec(reply)?.[1] ?? NaN)
     /**
      * Every page of a text attachment, as the agent reads them, from the offset each reply names: each page's byte range
-     * (its line) and its text as the transcript shows it (Hive's transcript view keeps a tool result's first 4,000
+     * (its line) and its text as the transcript shows it (Combwork's transcript view keeps a tool result's first 4,000
      * characters: the pages joined in full are replysize's and the unit tests'). Checked: the ranges follow on from 0 to
      * the file's size, and each page's text is the file's from its first byte.
      */
@@ -148,7 +148,7 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
       return { ok: false, ranges }
     }
 
-    // --- R1 (Codex) starts its review of A: a review copy; then reads the evidence through Hive.
+    // --- R1 (Codex) starts its review of A: a review copy; then reads the evidence through Combwork.
     const codexToken = async () => {
       const run = (await live(alpha, r1.id))?.runId
       const launch = await until(() => lines(path.join(codexHome, 'fake-launches.jsonl')).findLast((l) => l.args.some((y) => run && y.includes(run))), HUNG_MS)
@@ -163,7 +163,7 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
     const inCopy = (r) => (r.body?.changes ?? []).find((s) => /^Review in .*[\\/]copies[\\/]copy-\d+ at /.test(s))
     check(`R1 (Codex) starts its review of ${keys[a]} in a review copy`, ra.status === 200 && !!inCopy(ra), JSON.stringify(ra.body))
     const p1 = await ask(alpha, r1.id, { card: a, name: 'probe.cjs' })
-    check('…reads the probe through Hive, whole', p1 === `probe.cjs (${Buffer.byteLength(probe)} bytes)\n\n${probe}`, p1)
+    check('…reads the probe through Combwork, whole', p1 === `probe.cjs (${Buffer.byteLength(probe)} bytes)\n\n${probe}`, p1)
     const r1Results = await allPages(alpha, r1.id, a, 'results.txt', results)
     // The 4-byte character across the page's end: the first page stops before it, the second starts with it.
     check('…and the results in pages from the offset each names, from 0 to its size, each its bytes (a 4-byte character at the page end starting the second)', r1Results.ok && r1Results.ranges.length >= 2 && r1Results.ranges[1].from === PAGE - 2 && r1Results.ranges[1].starts.startsWith('😀run 1'), JSON.stringify(r1Results))
@@ -178,7 +178,7 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
     const rc = await startReview(e1Token, c)
     check(`E1 (Claude Code) starts its review of ${keys[c]} in a review copy`, rc.status === 200 && !!inCopy(rc), JSON.stringify(rc.body))
     const p2 = await ask(alpha, e1.id, { card: c, name: 'probe.cjs' })
-    check('…reads its probe through Hive, whole', p2 === `probe.cjs (${Buffer.byteLength(probe)} bytes)\n\n${probe}`, p2)
+    check('…reads its probe through Combwork, whole', p2 === `probe.cjs (${Buffer.byteLength(probe)} bytes)\n\n${probe}`, p2)
     const e1Results = await allPages(alpha, e1.id, a, 'results.txt', results)
     check("…and A's results, in the same pages", e1Results.ok && JSON.stringify(e1Results.ranges) === JSON.stringify(r1Results.ranges), JSON.stringify(e1Results))
 

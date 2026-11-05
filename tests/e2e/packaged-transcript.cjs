@@ -1,4 +1,4 @@
-// Sessions tab transcript viewer, in a throwaway profile and workspace. Transcripts are Hive backups
+// Sessions tab transcript viewer, in a throwaway profile and workspace. Transcripts are Combwork backups
 // (.combwork/sessions), so nothing is read from or written to the real ~/.claude. Never touches the clipboard.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')

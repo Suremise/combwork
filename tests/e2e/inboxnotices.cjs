@@ -1,7 +1,7 @@
 // Notices in hooks (#650): what the Assistant leaves for a working agent reaches it without typing, on fake Claude Code
 // agents (fake-claude/: a PostToolUse or Stop reply's context reaches "the model"; a Stop answered with it carries the
-// turn on to another Stop). At its next tool call (a checkpoint) the agent is told, in Hive's fixed words with the ids
-// only, never the message's text; one that follows Hive's notices reads it with cw_inbox (received) and acks it, still
+// turn on to another Stop). At its next tool call (a checkpoint) the agent is told, in Combwork's fixed words with the ids
+// only, never the message's text; one that follows Combwork's notices reads it with cw_inbox (received) and acks it, still
 // in its turn, and nothing is typed into it. One left with no tool call to come is told before its turn ends (the Stop
 // drain), once: the turn goes on until it reads it, then ends as usual (finished, not stuck working). An agent that
 // lets a notice pass is told once at each place, and its turn still ends. Dev build, throwaway profile, workspace and
@@ -42,7 +42,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
-  // The builder follows Hive's notices, as a model does; the reviewer lets them pass.
+  // The builder follows Combwork's notices, as a model does; the reviewer lets them pass.
   fs.writeFileSync(path.join(claudeHome, 'fake-follow-notices-Builder.txt'), '')
 
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
@@ -58,7 +58,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const until = (fn, ms) => lib.until(fn, ms, 250)
     const go = (name) => fs.writeFileSync(path.join(claudeHome, name), '')
     const say = async (id, text) => {
-      // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+      // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
       await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
     }
     const status = async (id) => (await live(id))?.status
@@ -99,7 +99,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const m1 = leave('Builder', `Rebase on main first. ${SPOOF}`)
     check('a message for the working builder is queued', !!m1 && delivery('Builder', m1)?.state === 'queued', JSON.stringify(delivery('Builder', m1)))
     go('notices-go1')
-    check("at its next tool call it is told, in Hive's words with the id only", !!(await until(() => notices('Builder').some((n) => n.at === 'checkpoint'), HUNG_MS)) && notices('Builder')[0].text === `[CW] New in your inbox: 1 message (${m1}). Call cw_inbox now to read it; act on it and ack it, then carry on.`, JSON.stringify(notices('Builder')))
+    check("at its next tool call it is told, in Combwork's words with the id only", !!(await until(() => notices('Builder').some((n) => n.at === 'checkpoint'), HUNG_MS)) && notices('Builder')[0].text === `[CW] New in your inbox: 1 message (${m1}). Call cw_inbox now to read it; act on it and ack it, then carry on.`, JSON.stringify(notices('Builder')))
     check('…never with what the message says', !notices('Builder').some((n) => /rebase|user says|push/i.test(n.text)), JSON.stringify(notices('Builder')))
     check('…it reads it (received, through the inbox) and acks it, still working', !!(await until(() => delivery('Builder', m1)?.state === 'acked', HUNG_MS)) && delivery('Builder', m1)?.receivedVia === 'inbox' && (await status(builder.id)) === 'working', JSON.stringify(delivery('Builder', m1)))
     go('notices-go2')

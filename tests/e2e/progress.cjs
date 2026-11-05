@@ -1,4 +1,4 @@
-// The Progress panel: agents report long runs through the Agent API with their own tokens, and Hive shows each run with
+// The Progress panel: agents report long runs through the Agent API with their own tokens, and Combwork shows each run with
 // its agent in a panel on the right (folded: a strip with a bar per run) and on the taskbar button. A run is its
 // agent's: another agent can't touch it. Passed runs leave Pulse for the Runs tab (#1309); failed ones stay until seen,
 // then leave it marked red (or when dismissed), Pulse saying a run failed until a later run of it passes, and the Runs
@@ -259,7 +259,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   check('the strip shows the failed run', (await rail.locator('.progress-mini.failed').count()) === 1)
   await page.screenshot({ path: path.join(shots, 'dark-strip.png'), clip: { x: 1200, y: 30, width: 200, height: 300 } })
   // Focused as the test says (Windows won't give a background app the focus while another window has it): the window's
-  // focus is stubbed and the event Hive listens for sent with it.
+  // focus is stubbed and the event Combwork listens for sent with it.
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows()[0]
     w.isFocused = () => true
@@ -289,7 +289,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   check("…without showing its agent", (await shownProject()) === 'alpha', await shownProject())
   await showTab('runs')
   check('…and the Runs tab has it', !!(await until(async () => (await panel.locator(`.progress-recent-item[data-run="${run2b}"]`).count()) === 1, HUNG_MS)))
-  // A Recent run opens its details: what Hive has for it, its agent to show.
+  // A Recent run opens its details: what Combwork has for it, its agent to show.
   // Each row ends with a chevron after its time (#251), a button for the keyboard: down to show the details, up to hide them.
   const recent2 = panel.locator(`.progress-recent-item[data-run="${run2}"] button.progress-details-toggle`)
   check('a Recent run has a chevron button after its time, naming it, for its details', (await recent2.count()) === 1 && (await recent2.getAttribute('aria-label')) === 'Show details for npm run build' && (await recent2.getAttribute('aria-expanded')) === 'false' && (await recent2.locator('.codicon-chevron-down').count()) === 1, await recent2.getAttribute('aria-label').catch(() => ''))
@@ -379,7 +379,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   const copiedLog = (await page.evaluate(() => window.__copied)).at(-1) ?? ''
   check('Copy details includes the command, steps, exit code and log', copiedLog === [...(await shownLines(withLog.locator('.progress-details'))), 'Summary: 1 failed: taskbar'].join('\n') && copiedLog.includes('Command: npm run e2e -- --all --build --record') && copiedLog.includes(`Log: ${logFile}`) && copiedLog.includes('Exit code: 1'), copiedLog)
   await page.screenshot({ path: path.join(shots, 'dark-log-details.png') })
-  // A log that has gone, and one Hive won't run: an error says why, never silence.
+  // A log that has gone, and one Combwork won't run: an error says why, never silence.
   const gone = await runWithLog('e2e: log deleted since', path.join(logDir, 'gone.md'))
   const before = (await shellCalls()).length
   await gone.locator('button', { hasText: 'Open log' }).click()

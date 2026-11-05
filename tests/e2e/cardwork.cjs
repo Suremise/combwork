@@ -64,7 +64,7 @@ const commit = (dir, file, text, message) => {
   const idle = async (p, id) => ['ready', 'finished'].includes((await live(p, id))?.status)
   const say = async (p, id, text) => {
     await lib.until(() => idle(p, id), HUNG_MS)
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(p, id), claudeHome, null, text, { live: () => live(p, id) })
   }
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)

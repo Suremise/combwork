@@ -1,4 +1,4 @@
-// The Hive Assistant changes Hive's settings (#186). With Settings → Assistant → Control → Change settings on, its
+// The Combwork Assistant changes Combwork's settings (#186). With Settings → Assistant → Control → Change settings on, its
 // cw_update_setting changes a setting as Settings would: Settings shows the new value (modified), its panel lists the
 // change with old → new and an Undo button (#1283), and Undo puts the old value back (the change struck through, undone).
 // A project's setting changes in Project Settings. Its own Control and other sensitive settings are refused and listed as
@@ -54,7 +54,7 @@ const check = (name, ok, extra = '') => {
   const say = async (text) => !!(await prompts.say(text))
   /**
    * Evidence for a turn that didn't finish (#551: the restarted Assistant's terminal ended just after its first call):
-   * the session's state, how each fake ended (fake-exits.jsonl: none for one ended from outside), and Hive's log of
+   * the session's state, how each fake ended (fake-exits.jsonl: none for one ended from outside), and Combwork's log of
    * terminals and the Assistant.
    */
   const whyNotFinished = async () => {
@@ -160,7 +160,7 @@ const check = (name, ok, extra = '') => {
   // lock by setting the file's key (its path in lower case) in its map of locks, in the same step as the call. While the
   // user's write holds project.json, a set of that key to the queue's promise is a change queued behind it: past all its
   // checks before the lock. Only a promise counts: other maps use the same key (HI-1850: project.json's kept reads,
-  // HI-1814, set it on every read, and the lock's call count beside it). Counted from Map.prototype.set in Hive's main
+  // HI-1814, set it on every read, and the lock's call count beside it). Counted from Map.prototype.set in Combwork's main
   // process only while a race waits for it, then put back. Were the lock kept some other way, no set would come and the
   // check fails, rather than passing without the race.
   const watchLockQueue = () =>
@@ -261,11 +261,11 @@ const check = (name, ok, extra = '') => {
   const renamedText = await showsText('the renamed model', renamed, relabel)
   check('…listed as the label that changed', relabel.test(renamedText), renamedText)
 
-  // --- A provider's prices: null puts back Hive's, a shipped model removed from the table too (#315); Undo removes it again.
+  // --- A provider's prices: null puts back Combwork's, a shipped model removed from the table too (#315); Undo removes it again.
   const removedNow = async () => JSON.stringify((await settings()).providers['claude-code'].pricesRemoved ?? [])
   await inv('settings:setProviderPrices', 'claude-code', {}, ['claude-opus-4-8'])
   check('it resets the API prices', await say('hive cw_update_setting {"id":"claude-code.prices","value":null}'))
-  check("…and the removed model has Hive's price again", (await removedNow()) === '[]', await removedNow())
+  check("…and the removed model has Combwork's price again", (await removedNow()) === '[]', await removedNow())
   const reset = panel.locator('.assistant-action', { hasText: 'API prices' }).first()
   const putBack = /claude-opus-4-8: removed → claude-opus-4-8: Combwork's price/
   const resetText = await showsText('the prices reset', reset, putBack)
@@ -273,7 +273,7 @@ const check = (name, ok, extra = '') => {
   await reset.getByRole('button', { name: /^Undo: / }).click()
   check('…and Undo removes it again', !!(await lib.until(async () => (await removedNow()) === '["claude-opus-4-8"]', HUNG_MS)), await removedNow())
 
-  // --- Refused: its own Control, and what Hive runs.
+  // --- Refused: its own Control, and what Combwork runs.
   check('it tries to raise its own Control', await say('hive cw_update_setting {"id":"assistant.control","value":"look"}'))
   check('…which stays as it was', (await settings()).assistant.control === 'projects')
   const controlRefused = panel.locator('.assistant-action.failed', { hasText: 'Change Settings → Assistant → Control' })

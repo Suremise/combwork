@@ -134,7 +134,7 @@ const HUNG_MS = 10000
   await row('code.ts').click()
   await lib.until(async () => (await pane.locator('.monaco .view-lines').innerText().catch(() => '')).replace(/\u00a0/g, ' ').includes('draft = true'), 10000)
   check('draft: edits restored when coming back', (await pane.locator('.monaco .view-lines').innerText()).replace(/ /g, ' ').includes('draft = true'))
-  // A hover's Markdown goes through Monaco's sanitiser (domSanitize: Hive's DOMPurify since #1141): the type of
+  // A hover's Markdown goes through Monaco's sanitiser (domSanitize: Combwork's DOMPurify since #1141): the type of
   // `answer`, rendered.
   const hoverText = () => page.locator('.monaco-hover:not(.hidden) .monaco-hover-content').first().innerText().catch(() => '')
   // Where `answer` is drawn in its line (the editor's spans split a line as its tokens fall).
@@ -262,7 +262,7 @@ const HUNG_MS = 10000
     const opaque = !!shown && rgb(shown.surface).length === 3
     check(`editor menu (${theme}): a surface and a border`, opaque && parseFloat(shown.border) >= 1)
     check(`editor menu (${theme}): entries readable`, opaque && !!shown.plain && contrast(shown.plain.fg, shown.surface) >= 4.5)
-    // Hovered entries are filled, like Hive's own menus.
+    // Hovered entries are filled, like Combwork's own menus.
     const entry = await page.evaluate(() => {
       const root = [...document.querySelectorAll('.shadow-root-host')].map((h) => h.shadowRoot).find((r) => r?.querySelector('.monaco-menu .action-label'))
       const r = root?.querySelector('.action-menu-item')?.getBoundingClientRect()

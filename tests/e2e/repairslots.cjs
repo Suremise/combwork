@@ -1,7 +1,7 @@
 // Repair a Moved Workspace on slots (#1447, SPEC §16.10.2), on fake Claude Code agents, the Assistant off: alpha (Pair
-// with Hive merges into integration, cards in slots) with B1's 0.9 worktree hb1 (adopted: carried), R1's own worktree
+// with Combwork merges into integration, cards in slots) with B1's 0.9 worktree hb1 (adopted: carried), R1's own worktree
 // hr1 (a retired home), a lane of B2's whose card started in slot-a, and a review copy copy-1. B1 has a conversation in
-// hb1. The workspace and its worktrees folder are moved together; Hive opens it there:
+// hb1. The workspace and its worktrees folder are moved together; Combwork opens it there:
 // - the plan names each by its slot, copy or home ("hb2 (carried, HB2)", "slot-a (B2, AL-1)", "copy-1", "R1's old
 //   folder"), screenshots in light and dark;
 // - Repair relinks them all: git lists them at their new folders, their rows follow, the card in slot-a follows its
@@ -134,12 +134,12 @@ const isIn = (dir, rev, ref) => {
     await until(async () => same((await live(alpha, 'b2'))?.cwd, slotA) && (await idle(alpha, 'b2')), HUNG_MS)
     const tb2Before = await tokenOf(alpha, 'b2')
     // B2 in a turn (until a file the test never makes): its card's slot is prepared only once it is quiet, so the
-    // preparation is still owed as Hive closes, and runs after Repair (HI-1791: in slot-a's new folder).
+    // preparation is still owed as Combwork closes, and runs after Repair (HI-1791: in slot-a's new folder).
     await lib.typeLine(inv, lib.ptyKey(alpha, 'b2'), home, null, 'holduntil repairslots-never', { live: () => live(alpha, 'b2') })
     check('…B2 in its turn', !!(await until(async () => (await live(alpha, 'b2'))?.status === 'working', HUNG_MS)))
     const s1 = await intent(tb2Before, c1, 'start')
     check(`${key} starts in slot-a`, s1.status === 200 && same(s1.body?.data?.folder, slotA), JSON.stringify(s1.body))
-    check('…its preparation owed as Hive closes (B2 busy)', !(await inv('tasks:facts', c1)).some((f) => f.kind === 'SlotPrepared') && (await live(alpha, 'b2'))?.status === 'working', JSON.stringify((await inv('tasks:facts', c1)).map((f) => f.kind)))
+    check('…its preparation owed as Combwork closes (B2 busy)', !(await inv('tasks:facts', c1)).some((f) => f.kind === 'SlotPrepared') && (await live(alpha, 'b2'))?.status === 'working', JSON.stringify((await inv('tasks:facts', c1)).map((f) => f.kind)))
     await h.app.close()
     h = null
     // A review copy, as #1435's pool keeps one (its worktree, detached, and its row).
@@ -209,7 +209,7 @@ const isIn = (dir, rev, ref) => {
     const tr1 = await tokenOf(alpha2, 'r1')
     const passed = (await intent(tb2, c1, 'submit', { summary: 'Moved along' })).status === 200 && (await intent(tr1, c1, 'start-review')).status === 200 && (await intent(tr1, c1, 'verdict', { pass: true, comment: 'Moved along: passed' })).status === 200
     check('the lane carries on: submitted, reviewed and passed', passed)
-    check('…and merged by Hive’s queue', !!(await until(async () => (await card(c1))?.column === 'done', HUNG_MS)) && isIn(alpha2, rev, 'integration'), (await card(c1))?.column)
+    check('…and merged by Combwork’s queue', !!(await until(async () => (await card(c1))?.column === 'done', HUNG_MS)) && isIn(alpha2, rev, 'integration'), (await card(c1))?.column)
   } catch (e) {
     check('no exception', false, e?.stack ?? String(e))
   } finally {

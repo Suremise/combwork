@@ -66,7 +66,7 @@ async function advancedFile(ctx) {
   return path.join((await ctx.inv('app:info')).userData, 'advanced.json')
 }
 
-/** Shows one of Advanced's tabs (HI-1839: Hive, then each CLI), by its group's id, whatever the language. */
+/** Shows one of Advanced's tabs (HI-1839: Combwork, then each CLI), by its group's id, whatever the language. */
 async function advancedTab(ctx, group) {
   const tab = ctx.page.locator(`.advanced-tabs [role="tab"][data-tab="${group}"]`)
   await tab.click()
@@ -75,7 +75,7 @@ async function advancedTab(ctx, group) {
 
 /**
  * Advanced's list with what it says about values: one that isn't valid (below its range), one that no longer finds
- * what the CLI was recorded showing, an id this Hive doesn't know, and each one's default beside it. Modified only.
+ * what the CLI was recorded showing, an id this Combwork doesn't know, and each one's default beside it. Modified only.
  */
 async function advancedNotes(ctx) {
   const { page } = ctx
@@ -117,7 +117,7 @@ async function advancedTyped(ctx) {
 async function closeAdvancedTyped(ctx) {
   const state = await ctx.inv('advanced:state')
   if (state?.values?.['codex.rateLimits.field'] !== undefined) throw new Error('the refused value was saved')
-  // The next screens find Advanced on Hive's tab again.
+  // The next screens find Advanced on Combwork's tab again.
   await advancedTab(ctx, 'hive')
   await openSection(ctx, 'general')
 }

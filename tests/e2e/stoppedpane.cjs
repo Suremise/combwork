@@ -4,7 +4,7 @@
 // moment, so the window between is seen), before the session runs. A lane's end's quit says "its lane ended", the CLI
 // crashing "its CLI exited with code 1", and a failed start keeps its failed bar. Screenshots in both themes, Panes and
 // Tiles. The fake Claude Code; throwaway profile and workspace. Dev build only: a lane's end's quit is the test copies'
-// slots:test channel, and the held and refused starts their IPC test seams, which a packaged Hive refuses.
+// slots:test channel, and the held and refused starts their IPC test seams, which a packaged Combwork refuses.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -127,7 +127,7 @@ const check = (name, ok, extra = '') => {
     check('a crash: "its CLI exited with code 1"', !!(await lib.until(async () => (await text(bar.locator('.grow'))).endsWith('· its CLI exited with code 1') && (await bar.getAttribute('data-stopped')) === 'crashed', HUNG_MS)), await text(bar))
     await shots('crashed')
 
-    // --- A start refused by Hive: the starting look ends with it, and the stopped one is back as it was.
+    // --- A start refused by Combwork: the starting look ends with it, and the stopped one is back as it was.
     await app.evaluate(() => { process.env.HIVE_TEST_FAIL_IPC = 'session:start*1' })
     await bar.getByRole('button', { name: 'New Session' }).click()
     check('a refused start: stopped again, its bar and dimming back', !!(await lib.until(async () => (await text(bar.locator('.grow'))).endsWith('· its CLI exited with code 1') && (await host.evaluate((h) => h.classList.contains('dimmed'))) && (await bar.getByRole('button', { name: 'New Session' }).isEnabled()), HUNG_MS)), await text(bar))

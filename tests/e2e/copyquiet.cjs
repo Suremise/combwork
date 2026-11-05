@@ -1,7 +1,7 @@
 // Copies: wait for one to be free (cw.copies.quietWaitMinutes, #1563, tests/workflow/README.md's P7 table) in the app:
 // a pool of one review copy, fake Claude Code agents (B1 builds two cards in the project folder; R1 and R2 review), the
 // wait set to its least, 1 minute:
-// - R1 reviews A in copy-1 and gives its verdict while still working (a turn held open, sent once the turn Hive's reviewer
+// - R1 reviews A in copy-1 and gives its verdict while still working (a turn held open, sent once the turn Combwork's reviewer
 //   pool typed A into has ended, HI-2046): copy-1 is returned but held back (returning) while R1 is busy;
 // - R2's start review on B waits for a copy ("the pool's 1 copy is in use; copy-1, returned 0 min ago, is held back by
 //   R1 (working)", HI-1764) while the copy is within the wait;
@@ -94,7 +94,7 @@ const lines = (file) => {
     // --- R1 reviews A in copy-1; its verdict while it works returns the copy, held back.
     const ra = await call(tr1, 'PATCH', `/v1/tasks/${a}`, { review: 'start', reply: 'short' })
     check("R1's start review leases copy-1", ra.status === 200 && !!(await until(async () => (await copy1())?.state === 'leased' && (await copy1())?.lease?.agent === r1.id, HUNG_MS)), JSON.stringify({ ra: ra.body, copies: await copies() }))
-    // HI-2175: Hive's reviewer pool gives each card in Review outside a lane to an idle reviewer and types it in (HI-2046),
+    // HI-2175: Combwork's reviewer pool gives each card in Review outside a lane to an idle reviewer and types it in (HI-2046),
     // a turn of R1's own: the held-open turn is a new one, sent once that has ended, never that turn taken for it.
     const idle = await until(async () => ['ready', 'finished'].includes((await live(r1.id))?.status), HUNG_MS)
     const before = (await live(r1.id))?.turn?.id ?? null

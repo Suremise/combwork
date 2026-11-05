@@ -1,5 +1,5 @@
 // The i18nshots route's text report (#899): its layout check (layoutReport.cjs) on a page seeded with the kinds of
-// problems the language runs found in #886, #887, #890 and #892, now fixed in Hive: a menu detail cut off with "…", a
+// problems the language runs found in #886, #887, #890 and #892, now fixed in Combwork: a menu detail cut off with "…", a
 // board column heading wrapping under its buttons, a table's last column cut off and a table scrolling sideways, a
 // banner squeezed into a narrow column, a command name broken mid-word, a badge over its label, a button past the
 // window's edge, and English left beside its translation. Each must be reported, and a clean part of the page
@@ -11,9 +11,9 @@
 // Japanese and Chinese text wrapping between characters (not mid-word: they have no spaces between words), a Latin word
 // broken inside Japanese text (mid-word), and a translation ending in a word a placeholder message ends in ("Notes de
 // version", not English left). HI-1915 added the user's own words equal to a message (a template named "Pair") or
-// fitting a placeholder message ("Waiting for the release" as a blocked reason), where Hive shows them (authored): not
-// English left; the same words in Hive's own controls (a preset button "Pair", a status "Waiting for the agents") still
-// are. The page runs in a bare Electron window (no Hive), hidden.
+// fitting a placeholder message ("Waiting for the release" as a blocked reason), where Combwork shows them (authored): not
+// English left; the same words in Combwork's own controls (a preset button "Pair", a status "Waiting for the agents") still
+// are. The page runs in a bare Electron window (no Combwork), hidden.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -41,7 +41,7 @@ const ENGLISH = {
   'workflow.preset.pair': 'Pair'
 }
 const TRANSLATIONS = { 'board.agent.notRunning': 'Nie działa', 'board.agent.removed': '{agent} (usunięty)', 'panes.waitingFor': 'Czekam na {what}', 'providers.version': 'Wersja {provider}', 'shell.ok': 'OK', 'workspace.kind': 'projekt', 'workflow.preset.pair': 'Para' }
-// What the user wrote, where Hive shows it (HI-1915): English there is theirs.
+// What the user wrote, where Combwork shows it (HI-1915): English there is theirs.
 const AUTHORED = [
   { text: 'Pair', within: '.template-row, .template-detail-title' },
   { text: 'Waiting for the release', within: '.task-blocked' }
@@ -147,10 +147,10 @@ app.whenReady().then(() => {
     check('a line cut in half by the box around it (#899 round 1: at the bottom)', has('cut-off', 'Druga linia'), said())
     check('English left: a translated message shown in English', has('english', 'Not running'), said())
     check('English left: a message with a placeholder', has('english', 'Alice (removed)'), said())
-    // HI-1915: the user's words where Hive shows them aren't English left; the same words in Hive's own controls are.
+    // HI-1915: the user's words where Combwork shows them aren't English left; the same words in Combwork's own controls are.
     const englishAt = (text, where) => issues.some((i) => i.kind === 'english' && i.text === text && where.test(i.where))
-    check("English left: Hive's own control, untranslated, though the user named a template the same (the positive control)", englishAt('Pair', /button\.preset/), said())
-    check("English left: Hive's own status, untranslated, fitting a placeholder message (the positive control)", englishAt('Waiting for the agents', /span\.status/), said())
+    check("English left: Combwork's own control, untranslated, though the user named a template the same (the positive control)", englishAt('Pair', /button\.preset/), said())
+    check("English left: Combwork's own status, untranslated, fitting a placeholder message (the positive control)", englishAt('Waiting for the agents', /span\.status/), said())
     check("English left: not a template's name the user gave, equal to a message (HI-1915: \"Pair\")", !issues.some((i) => i.kind === 'english' && /template-row|template-detail-title/.test(i.where)), said())
     check("English left: not a blocked reason the user gave, fitting a placeholder message (HI-1915: \"Waiting for {what}\")", !issues.some((i) => i.kind === 'english' && /task-blocked/.test(i.where)), said())
     const clean = ['To jest zwykły', 'Ustawienia', 'Zapisz', 'Nowy', 'npm run', 'Pierwszy', 'Drugi', 'Trzeci', 'Nie działa', 'Bob (usunięty)', 'OK', 'To do', 'hive-test', 'Users', 'przyciskiem', 'Nagłówek', 'Wiersz', 'Okno dialogowe', 'Tylko dla', 'Opis umiejętności', 'Someone', 'applyPermissionModes', 'Etykieta paska', 'Menu nad', 'エージェント', '报告', 'Notes de version']

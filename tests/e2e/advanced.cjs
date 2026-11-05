@@ -32,7 +32,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
   fs.mkdirSync(alpha, { recursive: true })
   fs.mkdirSync(userData, { recursive: true })
   const claudeEnv = lib.fakeClaude(userData, claudeHome)
-  // An override made for an older Claude Code, one that isn't valid, and one this Hive doesn't know.
+  // An override made for an older Claude Code, one that isn't valid, and one this Combwork doesn't know.
   fs.writeFileSync(file, JSON.stringify({ format: 1, values: { 'claude-code.trust.prompt': 'trust (this|the) folder', 'cw.mcp.replySeconds': 'soon', 'hive.someday': 1 }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.0', value: 'trust (this|the) folder' } } }, null, 2))
 
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, ...claudeEnv })
@@ -59,7 +59,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     const visibleIds = () => list.locator('.advanced-row').evaluateAll((rows) => rows.filter((r) => r.checkVisibility()).map((r) => r.getAttribute('data-advanced')))
     const t0 = await lib.until(async () => { const t = await tabs(); return t.length ? t : null }, HUNG_MS)
     check('tabs: Combwork, then each CLI in the providers’ order, Combwork first chosen', JSON.stringify(t0?.map((t) => t.label)) === JSON.stringify(['Combwork', 'Claude Code', 'Codex', 'GitHub Copilot']) && t0[0].selected, JSON.stringify(t0))
-    check('…each with its icon: Hive’s mark, then each CLI’s own', /tab-hex/.test(t0[0].icon ?? '') && t0.slice(1).every((t) => /provider-icon/.test(t.icon ?? '')), JSON.stringify(t0.map((t) => t.icon)))
+    check('…each with its icon: Combwork’s mark, then each CLI’s own', /tab-hex/.test(t0[0].icon ?? '') && t0.slice(1).every((t) => /provider-icon/.test(t.icon ?? '')), JSON.stringify(t0.map((t) => t.icon)))
     check('…no counts while nothing filters', t0.every((t) => t.count === null))
     const providers = (await inv('settings:get')).providers
     const enabled = (id) => !!providers?.[id]?.enabled
@@ -130,7 +130,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     fs.writeFileSync(file, JSON.stringify(edited, null, 2))
     check('a hand edit of advanced.json shows in the list', !!(await lib.until(async () => (await row('codex.hooks.timeoutSeconds').locator('input').inputValue()) === '9' && (await row('codex.hooks.timeoutSeconds').locator('.modified').count()) === 1, HUNG_MS)))
     check('…a number written as text shows as that number, valid', (await reply.locator('input').inputValue()) === '600' && !/Not valid/.test(await reply.innerText()), await reply.locator('input').inputValue())
-    // Hive records the Codex version a hand edit was made for in the file itself.
+    // Combwork records the Codex version a hand edit was made for in the file itself.
     check('…and records in the file the Codex version it was made for', !!(await lib.until(() => readFile().madeFor?.['codex.hooks.timeoutSeconds']?.version !== undefined, HUNG_MS)), JSON.stringify(readFile().madeFor))
     fs.writeFileSync(file, '{ "values": ')
     check("a file it can't read is said so, keeping what it read", !!(await lib.until(async () => /advanced\.json isn't valid JSON/.test(await list.innerText()) && (await row('codex.hooks.timeoutSeconds').locator('input').inputValue()) === '9', HUNG_MS)))
@@ -185,7 +185,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     await lib.until(async () => !('cw.restart.resumeAfterUpdate' in readFile().values) && (await shownOwn()) === "on (Settings')", HUNG_MS)
 
     // --- A list of folders (HI-2480): written and shown semicolons apart (a comma can be in a folder's name), edited as
-    // shown, a workspace's own over Hive's, and an empty box back to the default (Hive's) or to Hive's (a workspace's).
+    // shown, a workspace's own over Combwork's, and an empty box back to the default (Combwork's) or to Combwork's (a workspace's).
     const folders = row('cw.cards.attachmentFolders')
     const foldersHive = folders.getByLabel('Combwork: Card attachments: more folders', { exact: true })
     const foldersOwn = folders.getByLabel('Combwork: Card attachments: more folders, this workspace', { exact: true })
@@ -208,7 +208,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     check("…a workspace's own list goes in workspace.json", !!(await lib.until(() => JSON.stringify(wsOwn()['cw.cards.attachmentFolders']) === JSON.stringify(['F:\\Workspace evidence']), HUNG_MS)), JSON.stringify(wsOwn()))
     await foldersOwn.fill('')
     await foldersOwn.press('Enter')
-    check("…emptied, it goes from workspace.json: Hive's list applies", !!(await lib.until(() => !('cw.cards.attachmentFolders' in wsOwn()), HUNG_MS)), JSON.stringify(wsOwn()))
+    check("…emptied, it goes from workspace.json: Combwork's list applies", !!(await lib.until(() => !('cw.cards.attachmentFolders' in wsOwn()), HUNG_MS)), JSON.stringify(wsOwn()))
     // HI-2537: every change reloads the advanced state, giving each list a new array. One landing while a box is being
     // typed in (the workspace's save above, late under load) reset it, so the Enter below saved nothing. Here a hand edit
     // of advanced.json reloads it while text is typed and not saved: shown in its row, the typed text is still there.
@@ -219,7 +219,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     check('…a reload while a list is being typed keeps what is typed', !!(await lib.until(async () => (await row('codex.hooks.timeoutSeconds').locator('input').inputValue()) === '11', HUNG_MS)) && (await foldersHive.inputValue()) === 'C:\\Half typed', await foldersHive.inputValue())
     await foldersHive.fill('')
     await foldersHive.press('Enter')
-    check("…Hive's emptied goes from advanced.json: the default, none", !!(await lib.until(() => !('cw.cards.attachmentFolders' in readFile().values), HUNG_MS)), JSON.stringify(readFile().values))
+    check("…Combwork's emptied goes from advanced.json: the default, none", !!(await lib.until(() => !('cw.cards.attachmentFolders' in readFile().values), HUNG_MS)), JSON.stringify(readFile().values))
     await foldersHive.fill('evidence')
     await foldersHive.press('Enter')
     check('…a folder that is not a full path is refused, saying what it takes', !!(await lib.until(async () => /takes up to 20 folders, each a full path/.test(await folders.innerText()), HUNG_MS)) && !('cw.cards.attachmentFolders' in readFile().values), await folders.innerText())
@@ -302,7 +302,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     // Settings' own Modified only, at the top, filters the list too.
     await page.locator('.settings-top').getByLabel('Modified only').check()
     check("Settings' Modified only lists only the changed advanced values", !!(await lib.until(async () => (await ids()) === changedIds, HUNG_MS)), await ids())
-    check('…each tab counting its changed ones (Hive 2, Claude Code 1, Codex 2, GitHub Copilot 0)', !!(await lib.until(async () => JSON.stringify((await tabs()).map((t) => t.count)) === '[2,1,2,0]', HUNG_MS)), JSON.stringify(await tabs()))
+    check('…each tab counting its changed ones (Combwork 2, Claude Code 1, Codex 2, GitHub Copilot 0)', !!(await lib.until(async () => JSON.stringify((await tabs()).map((t) => t.count)) === '[2,1,2,0]', HUNG_MS)), JSON.stringify(await tabs()))
     await page.locator('.settings-top').getByLabel('Modified only').uncheck()
     await page.locator('.settings-nav .row', { hasText: 'Advanced' }).click()
     await list.getByLabel('Modified only').check()
@@ -321,7 +321,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     await list.getByLabel('Modified only').uncheck()
     await page.locator('.setting', { hasText: 'Reset all settings' }).getByRole('button', { name: 'Reset' }).click()
     await page.locator('[role="dialog"]').getByRole('button', { name: 'Reset' }).click()
-    check('Reset all settings clears advanced.json (keeping ids this Hive doesn\'t know)', !!(await lib.until(() => JSON.stringify(readFile().values) === '{"hive.someday":1}', HUNG_MS)), JSON.stringify(readFile().values))
+    check('Reset all settings clears advanced.json (keeping ids this Combwork doesn\'t know)', !!(await lib.until(() => JSON.stringify(readFile().values) === '{"hive.someday":1}', HUNG_MS)), JSON.stringify(readFile().values))
     check("…and the list shows the defaults, the workspace's own kept", !!(await lib.until(async () => (await row('codex.trust.prompt').locator('.modified').count()) === 0 && JSON.parse(fs.readFileSync(wsFile, 'utf8')).advanced?.['cw.progress.lanesShown'] === 2, HUNG_MS)))
   } finally {
     await app.close()
