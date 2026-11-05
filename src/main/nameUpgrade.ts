@@ -103,14 +103,14 @@ export async function upgradeWorkspace(ws: string, o: UpgradeOptions): Promise<v
   await step('projects', o.stop, async () => {
     // Each project, then each folder its agents worked in that the board's records name (slots, worktrees, copies: the
     // same repository's exclude file, already done, and their own skill copies).
-    const recorded = (await o.copyFolders(join(dir, NEW_DB_FILE))).filter((f) => existsSync(f))
+    const copyFolders = (await o.copyFolders(join(dir, NEW_DB_FILE))).filter((f) => existsSync(f))
     for (const p of o.projects) {
       o.stop()
       await upgradeProject(p, [])
       await record(p)
     }
     o.stop()
-    await upgradeProject(null, recorded)
+    await upgradeProject(null, copyFolders)
   })
   o.stop()
   await record(ws)
