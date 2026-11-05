@@ -61,7 +61,7 @@ const jsonl = (file) => lines(file).map((l) => JSON.parse(l))
 const commitIn = (dir, files, message, trailer) => {
   for (const [f, text] of Object.entries(files)) fs.writeFileSync(path.join(dir, f), text)
   lib.git(dir, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
-  lib.git(dir, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', message, ...(trailer ? ['-m', `Hive-Card: ${trailer}`] : [])])
+  lib.git(dir, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', message, ...(trailer ? ['-m', `Combwork-Card: ${trailer}`] : [])])
   return git(dir, 'rev-parse', 'HEAD')
 }
 const isIn = (dir, rev, ref) => {

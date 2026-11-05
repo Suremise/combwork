@@ -901,7 +901,7 @@ async function boardPatch(n, change) {
     const apiToken = JSON.parse(fs.readFileSync(env.CW_API_TOKEN_FILE, 'utf8')).token
     const res = await fetch(`${env.CW_API_URL}/v1/tasks/${n}`, {
       method: 'PATCH',
-      headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json', 'X-Hive-Workspace': encodeURIComponent(env.CW_WORKSPACE) },
+      headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json', 'X-Combwork-Workspace': encodeURIComponent(env.CW_WORKSPACE) },
       body: JSON.stringify({ ...change, reply: 'short' })
     })
     record = { n, ...change, status: res.status, body: await res.json().catch(() => null) }

@@ -76,14 +76,14 @@ function traced(before = new Set()) {
     await lib.openWorkspace(inv, page, ws)
 
     // --- A hook and an alias through sh, from the real git Combwork starts.
-    await inv('git:createBranch', repo, 'hive/direct')
+    await inv('git:createBranch', repo, 'cw/direct')
     const said = await lib.until(() => (fs.existsSync(hookOut) && fs.readFileSync(hookOut, 'utf8').includes('alias-through-sh') ? fs.readFileSync(hookOut, 'utf8') : null), HUNG_MS)
     check("Combwork's checkout ran the hook, and the hook the alias through sh", !!said, said ?? 'no hook output')
     // Git puts its exec-path first itself; then the launcher's folders, then ~/bin (the real git alone, with no MSYSTEM,
     // would put ~/bin first).
     // The MinGW folder is Git's build's (mingw64, or ucrt64 from Git 2.5x; gitTool.ts's MINGW): the same one throughout.
     check("…the hook's PATH starts as through the launcher: git's exec-path, its MinGW bin, /usr/bin, ~/bin; sed from /usr/bin", /^first=\/(mingw64|ucrt64|clangarm64|mingw32)\/libexec\/git-core:\/\1\/bin:\/usr\/bin:[^:]*\/bin(:|$)/m.test(said ?? '') && !/^first=.*:\/(mingw64|ucrt64|clangarm64|mingw32)\/bin:.*:\/\1\/bin(:|$)/m.test(said ?? '') && /^sed=\/usr\/bin\/sed$/m.test(said ?? ''), said)
-    check('…and it switched the branch', lib.git(repo, ['rev-parse', '--abbrev-ref', 'HEAD']).trim() === 'hive/direct')
+    check('…and it switched the branch', lib.git(repo, ['rev-parse', '--abbrev-ref', 'HEAD']).trim() === 'cw/direct')
     await inv('git:history', repo)
     await inv('git:status', repo)
 

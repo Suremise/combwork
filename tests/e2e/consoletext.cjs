@@ -52,7 +52,7 @@ const check = (name, ok, extra = '') => {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 850 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await lib.waitForProvider(inv)
     const apiToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
@@ -86,7 +86,7 @@ const check = (name, ok, extra = '') => {
       await dc.locator('.dc-detail .dc-raw').waitFor({ timeout: HUNG_MS })
       return { seq: r.seq, raw: await dc.locator('.dc-detail .dc-raw').textContent() }
     }
-    const ring = () => dc.evaluate((src) => window.hive.invoke('console:snapshot', src, 0), source)
+    const ring = () => dc.evaluate((src) => window.combwork.invoke('console:snapshot', src, 0), source)
     const recordBoxTicked = async () => {
       await dc.locator('.dc-record').click()
       const box = dc.locator('.dc-record-menu input[type="checkbox"]')

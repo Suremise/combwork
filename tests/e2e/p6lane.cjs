@@ -556,7 +556,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const gcommit = (file, key) => {
       fs.writeFileSync(path.join(gamma, file), `${file}\n`)
       lib.git(gamma, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', file])
-      lib.git(gamma, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', file, '-m', `Hive-Card: ${key}`])
+      lib.git(gamma, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', file, '-m', `Combwork-Card: ${key}`])
     }
     gcommit('one.txt', gk1)
     gcommit('two.txt', gk2)

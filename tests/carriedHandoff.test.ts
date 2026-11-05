@@ -44,7 +44,7 @@ let store: InstanceType<typeof SlotStore>
  * with no worktree (the pool's size is the builders': room for one slot beside the four adopted).
  */
 function writeProject(): void {
-  const agent = (id: string) => ({ id, name: id.toUpperCase(), provider: 'claude-code', workflowRole: 'builder', worktree: { path: wt(`h${id}`), branch: `hive/h${id}`, base: 'main' } })
+  const agent = (id: string) => ({ id, name: id.toUpperCase(), provider: 'claude-code', workflowRole: 'builder', worktree: { path: wt(`h${id}`), branch: `cw/h${id}`, base: 'main' } })
   const b5 = { id: 'b5', name: 'B5', provider: 'claude-code', workflowRole: 'builder' }
   writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id: projectId, agents: [...['b1', 'b2', 'b3', 'b4'].map(agent), b5] }))
 }
@@ -58,7 +58,7 @@ let card2 = 0
 beforeAll(async () => {
   gitRepo(project)
   commit(project, { '.gitignore': '.combwork/\n', 'a.txt': 'a\n' }, 'first')
-  for (const a of ['b1', 'b2', 'b3', 'b4']) sh(project, 'worktree', 'add', '-q', '-b', `hive/h${a}`, wt(`h${a}`))
+  for (const a of ['b1', 'b2', 'b3', 'b4']) sh(project, 'worktree', 'add', '-q', '-b', `cw/h${a}`, wt(`h${a}`))
   mkdirSync(join(project, '.combwork'), { recursive: true })
   writeProject()
   await ws.open(wsPath)
@@ -105,7 +105,7 @@ describe("an adopted worktree handed over to its agent's first card (#1441)", ()
     // Its head not in the target: not handed over; once merged, it can be (a dry start changes nothing).
     commit(wt('hb1'), { 'b.txt': 'b\n' }, 'unmerged work')
     expect(await start(card1, 'b1', true).then((r) => (r && 'slot' in r ? r.slot : null))).not.toBe('hb1')
-    sh(project, 'merge', '-q', '--ff-only', 'hive/hb1')
+    sh(project, 'merge', '-q', '--ff-only', 'cw/hb1')
     expect(await start(card1, 'b1', true).then((r) => (r && 'slot' in r ? r.slot : null))).toBe('hb1')
     expect(open('b1')?.kind).toBe('carried')
 

@@ -405,27 +405,27 @@ async function pauseForRulesOff(wf: Workflow, q: MergeQueue, target: string): Pr
   await wf.locked(() => wf.store.setQueuePause(target, { reason: 'rulesOff', card: first.card.key }, true)) // i18n-ignore: a pause reason's code, not text
 }
 
-/** A card's test merge's ref (`refs/hive/queue/<key>`), once its entry has an outcome. */
+/** A card's test merge's ref (`refs/cw/queue/<key>`), once its entry has an outcome. */
 async function dropQueuePin(projectPath: string, cardKey: string): Promise<void> {
   const key = cardKey.replace(/[^A-Za-z0-9._-]/g, '-')
-  await git(projectPath, ['update-ref', '-d', `refs/hive/queue/${key}`])
-  // Its entries' strict updates (#1352: `refs/hive/queue/<entry>`, `AM-12/e7` as `AM-12-e7`).
-  const r = await git(projectPath, ['for-each-ref', '--format=%(refname)', `refs/hive/queue/${key}-e*`])
+  await git(projectPath, ['update-ref', '-d', `refs/cw/queue/${key}`])
+  // Its entries' strict updates (#1352: `refs/cw/queue/<entry>`, `AM-12/e7` as `AM-12-e7`).
+  const r = await git(projectPath, ['for-each-ref', '--format=%(refname)', `refs/cw/queue/${key}-e*`])
   for (const ref of r.ok ? r.out.split(/\r?\n/).filter(Boolean) : []) await git(projectPath, ['update-ref', '-d', ref])
 }
 
 /**
- * The submissions' pins (`refs/hive/cards/<key>/<n>`, §16.9.3) of the project's cards that are archived, or gone:
+ * The submissions' pins (`refs/cw/cards/<key>/<n>`, §16.9.3) of the project's cards that are archived, or gone:
  * removed. A pin keeps what was reviewed until its card is archived.
  */
 export async function prunePins(wf: Workflow, projectPath: string): Promise<void> {
-  const r = await git(projectPath, ['for-each-ref', '--format=%(refname)', 'refs/hive/cards/'])
+  const r = await git(projectPath, ['for-each-ref', '--format=%(refname)', 'refs/cw/cards/'])
   if (!r.ok) return
-  const keys = new Set(r.out.split(/\r?\n/).map((l) => /^refs\/hive\/cards\/([^/]+)\//.exec(l.trim())?.[1]).filter((k): k is string => !!k))
+  const keys = new Set(r.out.split(/\r?\n/).map((l) => /^refs\/cw\/cards\/([^/]+)\//.exec(l.trim())?.[1]).filter((k): k is string => !!k))
   for (const key of keys) {
     const card = wf.store.cardByKey(key)
     if (card && !wf.store.isArchived(card.id)) continue
-    const refs = r.out.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith(`refs/hive/cards/${key}/`))
+    const refs = r.out.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith(`refs/cw/cards/${key}/`))
     for (const ref of refs) await git(projectPath, ['update-ref', '-d', ref])
   }
 }

@@ -16,7 +16,7 @@ const NONE: ForYouSummary = { items: [], count: 0 }
  * read stays the same objects (HI-1806): a card's chip renders again only when its own requests change.
  */
 let lastRead: ForYouSummary = NONE
-const readForYou = sharedRead<ForYouSummary>(() => window.hive.invoke('tasks:forYou').then((s) => (lastRead = keepSame(lastRead, s))))
+const readForYou = sharedRead<ForYouSummary>(() => window.combwork.invoke('tasks:forYou').then((s) => (lastRead = keepSame(lastRead, s))))
 
 /**
  * For you as a view last accepted it, with its workspace (HI-2080, HR1's round 1): only a read its scoped load took (one

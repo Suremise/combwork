@@ -59,28 +59,28 @@ const isIn = (dir, rev, ref) => {
 
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`]) fs.rmSync(d, { recursive: true, force: true })
-  // 0.9's layout: alpha with B1's worktree hb1 (on hive/hb1, from integration), R1 in the project folder; solo with Me's.
+  // 0.9's layout: alpha with B1's worktree hb1 (on cw/hb1, from integration), R1 in the project folder; solo with Me's.
   lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   lib.git(alpha, ['branch', 'integration'])
   // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
   lib.git(alpha, ['config', 'user.name', identity.name])
   lib.git(alpha, ['config', 'user.email', identity.email])
-  lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hb1', hb1, 'integration'])
-  for (const o of others) lib.git(alpha, ['worktree', 'add', '-q', '-b', `hive/hb${o.n}`, o.tree, 'integration'])
-  lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hr2', hr2, 'integration'])
+  lib.git(alpha, ['worktree', 'add', '-q', '-b', 'cw/hb1', hb1, 'integration'])
+  for (const o of others) lib.git(alpha, ['worktree', 'add', '-q', '-b', `cw/hb${o.n}`, o.tree, 'integration'])
+  lib.git(alpha, ['worktree', 'add', '-q', '-b', 'cw/hr2', hr2, 'integration'])
   lib.gitProject(solo, { 's.txt': 's\n', '.gitignore': '.combwork/\n' })
   lib.git(solo, ['branch', '-M', 'main'])
-  lib.git(solo, ['worktree', 'add', '-q', '-b', 'hive/me', meTree, 'main'])
+  lib.git(solo, ['worktree', 'add', '-q', '-b', 'cw/me', meTree, 'main'])
   const agents = {
     [alpha]: [
-      { id: 'b1', name: 'B1', provider: 'claude-code', workflowRole: 'builder', worktree: { path: hb1, branch: 'hive/hb1', base: 'integration' } },
+      { id: 'b1', name: 'B1', provider: 'claude-code', workflowRole: 'builder', worktree: { path: hb1, branch: 'cw/hb1', base: 'integration' } },
       { id: 'r1', name: 'R1', provider: 'claude-code', workflowRole: 'reviewer' },
-      ...others.map((o) => ({ id: `b${o.n}`, name: `B${o.n}`, provider: 'claude-code', workflowRole: 'builder', worktree: { path: o.tree, branch: `hive/hb${o.n}`, base: 'integration' } })),
-      { id: 'r2', name: 'R2', provider: 'claude-code', workflowRole: 'reviewer', worktree: { path: hr2, branch: 'hive/hr2', base: 'integration' } },
+      ...others.map((o) => ({ id: `b${o.n}`, name: `B${o.n}`, provider: 'claude-code', workflowRole: 'builder', worktree: { path: o.tree, branch: `cw/hb${o.n}`, base: 'integration' } })),
+      { id: 'r2', name: 'R2', provider: 'claude-code', workflowRole: 'reviewer', worktree: { path: hr2, branch: 'cw/hr2', base: 'integration' } },
       ...[3, 4, 5, 6].map((n) => ({ id: `r${n}`, name: `R${n}`, provider: 'claude-code', workflowRole: 'reviewer' }))
     ],
-    [solo]: [{ id: 'me', name: 'Me', provider: 'claude-code', worktree: { path: meTree, branch: 'hive/me', base: 'main' } }]
+    [solo]: [{ id: 'me', name: 'Me', provider: 'claude-code', worktree: { path: meTree, branch: 'cw/me', base: 'main' } }]
   }
   for (const [p, list] of Object.entries(agents)) {
     fs.mkdirSync(path.join(p, '.combwork'), { recursive: true })
@@ -198,7 +198,7 @@ const isIn = (dir, rev, ref) => {
     check("…merged by Combwork's queue: Done", !!(await until(async () => (await card(c1))?.column === 'done', HUNG_MS)) && isIn(alpha, git(hb1, 'rev-parse', 'HEAD'), 'integration'), (await card(c1))?.column)
     const s2 = await intent(tb1b, c2, 'start')
     check('card 2 starts in hb1 too (the lane goes on there)', s2.status === 200 && same(s2.body?.data?.folder, hb1), JSON.stringify(s2.body))
-    check('…on its own branch, no per-card line', branchIn(hb1) === 'hive/hb1')
+    check('…on its own branch, no per-card line', branchIn(hb1) === 'cw/hb1')
     const rev2 = commitIn(hb1, { 'two.txt': 'two\n' }, 'Old two')
     check('card 2 submitted, reviewed and passed', await pass(tb1b, tr1, c2, 'Old two'))
     check('…merged: the lane ends', !!(await until(async () => (await card(c2))?.column === 'done' && !!(await lane(started.lane.id))?.endedAt, HUNG_MS)) && isIn(alpha, rev2, 'integration'))
@@ -207,7 +207,7 @@ const isIn = (dir, rev, ref) => {
     // hb1, free, renamed slot-a with Repair's steps; B1's last conversation goes with it.
     const renamed = await until(async () => (await slots(alpha)).find((s) => s.name === 'slot-a'), HUNG_MS)
     check('hb1 is renamed slot-a once free', !!renamed && same(renamed.folder, slotA) && !fs.existsSync(hb1) && !(await slots(alpha)).some((s) => s.name === 'hb1'), JSON.stringify(await slots(alpha)))
-    check("…git lists it there, on B1's branch", git(alpha, 'worktree', 'list', '--porcelain').toLowerCase().includes(slotA.toLowerCase().replace(/\\/g, '/')) && branchIn(slotA) === 'hive/hb1')
+    check("…git lists it there, on B1's branch", git(alpha, 'worktree', 'list', '--porcelain').toLowerCase().includes(slotA.toLowerCase().replace(/\\/g, '/')) && branchIn(slotA) === 'cw/hb1')
     const moved = await sessionOf(alpha, b1Old.sessionId)
     check("…B1's conversation recorded in slot-a", same(moved?.cwd, slotA), JSON.stringify(moved))
     await inv('session:start', alpha, { agentId: 'b1', resumeId: b1Old.sessionId })
@@ -224,7 +224,7 @@ const isIn = (dir, rev, ref) => {
     const folder = path.join(root, next.slot ?? 'none')
     await until(async () => same((await live(alpha, 'b1'))?.cwd, folder) && (await idle(alpha, 'b1')), HUNG_MS)
     const s3 = await intent(await tokenOf(alpha, 'b1'), c3, 'start')
-    check(`…card 3 is built there on its own line hive/${key}/${key}-${c3}-new-three`, s3.status === 200 && same(s3.body?.data?.folder, folder) && !!(await until(() => branchIn(folder) === `hive/${key}/${key}-${c3}-new-three`, HUNG_MS)), JSON.stringify(s3.body))
+    check(`…card 3 is built there on its own line cw/${key}/${key}-${c3}-new-three`, s3.status === 200 && same(s3.body?.data?.folder, folder) && !!(await until(() => branchIn(folder) === `cw/${key}/${key}-${c3}-new-three`, HUNG_MS)), JSON.stringify(s3.body))
 
     // Me's first card under slots: the handoff, its conversation going on.
     const tMe = await tokenOf(solo, 'me')

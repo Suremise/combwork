@@ -698,7 +698,7 @@ describe('refusals name the user as you in the window, as the user to agents (HI
     expect(r.next).toBe("Move it anyway only with the user's reason. One they gave with their request is enough (\"I merged it by hand\", say): move it again with override and that reason, in their words. With none, tell them which rules this skips and ask for theirs.")
     expect(r.change).toBe('These rules are set in Version Control, where the user can change them.')
     expect(refusal('loop.followUpChecked', { card: 'AL-1' }).next).toBe("Wait for the reviewer's ok or gaps; if none comes, ask the user.")
-    expect(refusal('lane.lineBehind', { card: 'AL-2', line: 'hive/AL-2', target: 'main', earlier: 'AL-1' }).next).toBe('Leave it as it is: Combwork brings hive/AL-2 up to date with main once you are idle, or asks the user, and tells you when AL-2 can start.')
+    expect(refusal('lane.lineBehind', { card: 'AL-2', line: 'cw/AL-2', target: 'main', earlier: 'AL-1' }).next).toBe('Leave it as it is: Combwork brings cw/AL-2 up to date with main once you are idle, or asks the user, and tells you when AL-2 can start.')
     expect(refusal('merge.hiveMerges', { card: 'AL-1', target: 'main', queue: 'paused', waits: 'answer' }).next).toBe('It is in the merge queue for main, which is paused until the user answers in For you: wait for Done, or for it to come back.')
     expect(refusal('platform.unknown', { card: 'AL-1', offer: 'repositoryGone' }).next).toMatch(/^The project's Git repository is gone: ask the user to restore it/)
   })

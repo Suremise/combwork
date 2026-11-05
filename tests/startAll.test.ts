@@ -119,14 +119,14 @@ describe("the confirms' table (#572): what happens to each agent, and Remove All
   it('the plain text says every cell the table shows, the card too (a reviewer\'s as such), a line an agent (#572)', () => {
     const columns = [{}, { cell: (t: string) => `card ${t}` }, { cell: (t: string) => `worktree ${t}` }, {}]
     const text = agentRowsText(columns, [
-      { name: 'W', cells: [{ text: 'Working…' }, { text: '#12 Lanes' }, { text: 'hive/w' }, { text: batchOutcome('start', live('working')).text }] },
+      { name: 'W', cells: [{ text: 'Working…' }, { text: '#12 Lanes' }, { text: 'cw/w' }, { text: batchOutcome('start', live('working')).text }] },
       { name: 'R', cells: [{ text: 'Watching' }, { text: 'reviewing #12 Lanes' }, { text: '' }, { text: batchOutcome('start', live('watching')).text }] },
-      { name: 'S', cells: [{ text: 'Not running' }, { text: '' }, { text: removeWorktreeText({ branch: 'hive/s', check: { removable: false, reason: '2 unmerged commits' } }) }, { text: 'Removed' }] }
+      { name: 'S', cells: [{ text: 'Not running' }, { text: '' }, { text: removeWorktreeText({ branch: 'cw/s', check: { removable: false, reason: '2 unmerged commits' } }) }, { text: 'Removed' }] }
     ])
     expect(text.split('\n')).toEqual([
-      '• W — Working… · card #12 Lanes · worktree hive/w · Stopped (will be interrupted), then a new session',
+      '• W — Working… · card #12 Lanes · worktree cw/w · Stopped (will be interrupted), then a new session',
       '• R — Watching · card reviewing #12 Lanes · Stopped (its card loop pauses until it is resumed), then a new session',
-      '• S — Not running · worktree hive/s: always kept (2 unmerged commits) · Removed'
+      '• S — Not running · worktree cw/s: always kept (2 unmerged commits) · Removed'
     ])
   })
 
@@ -135,8 +135,8 @@ describe("the confirms' table (#572): what happens to each agent, and Remove All
   })
 
   it("Remove All's worktree cell says whether the box can delete it (#291)", () => {
-    expect(removeWorktreeText({ branch: 'hive/b1', check: { removable: true } })).toBe('hive/b1: merged and clean')
-    expect(removeWorktreeText({ branch: 'hive/b2', check: { removable: false, reason: '2 commits not merged' } })).toBe('hive/b2: always kept (2 commits not merged)')
-    expect(removeWorktreeText({ branch: 'hive/b3' })).toBe("hive/b3: always kept (couldn't be checked)")
+    expect(removeWorktreeText({ branch: 'cw/b1', check: { removable: true } })).toBe('cw/b1: merged and clean')
+    expect(removeWorktreeText({ branch: 'cw/b2', check: { removable: false, reason: '2 commits not merged' } })).toBe('cw/b2: always kept (2 commits not merged)')
+    expect(removeWorktreeText({ branch: 'cw/b3' })).toBe("cw/b3: always kept (couldn't be checked)")
   })
 })

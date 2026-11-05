@@ -58,7 +58,7 @@ const check = (name, ok, extra = '') => {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1500, height: 900 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const live = async (p, agentId) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === agentId)
     const until = async (fn, ms) => {
@@ -226,7 +226,7 @@ const check = (name, ok, extra = '') => {
   try {
     const page = await again.firstWindow()
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const counted = async () => Object.fromEntries(((await inv('metrics:query', { scope: { kind: 'project', project: 'alpha' } })).safeguards ?? []).filter((r) => r.agent === 'Tester').map((r) => [r.model, r.stops]).sort(([x], [y]) => x.localeCompare(y)))
     const same = await lib.until(async () => JSON.stringify(await counted()) === JSON.stringify(expected), HUNG_MS)

@@ -14,7 +14,7 @@ describe('the Load template dialog (#268)', () => {
   it('marks agents a new one of the same name replaces, with each agent\'s role, pairing and connection; a removed worktree agent\'s worktree stays', () => {
     const plan = {
       remove: [
-        { id: 'a', name: 'Claude', running: false, dirty: 0, worktree: { path: 'D:/x/site/claude', branch: 'hive/claude' } },
+        { id: 'a', name: 'Claude', running: false, dirty: 0, worktree: { path: 'D:/x/site/claude', branch: 'cw/claude' } },
         { id: 'b', name: 'Old', running: false, dirty: 0 }
       ],
       create: [
@@ -25,7 +25,7 @@ describe('the Load template dialog (#268)', () => {
     }
     const at = (i: number): ConnectionOption | null => [options[1], null][i]
     const text = templateLoadDetail(plan, at)
-    expect(text).toContain('• Claude (its worktree and branch hive/claude stay): replaced by a new agent with the same name')
+    expect(text).toContain('• Claude (its worktree and branch cw/claude stay): replaced by a new agent with the same name')
     expect(text).toContain('• Old\n')
     expect(text).toMatch(/• claude — Builder \(paired: Reviewer\) \(new\): Claude · High \(opus · High · \S[^)]*\)\n/)
     expect(text).toContain('• Reviewer — Reviewer (paired: claude): no connection\n')
@@ -40,7 +40,7 @@ describe('the Load template dialog (#268)', () => {
 
   it("as a table (#511): each created agent in the template's order, its role, note, pairing, suggested CLI and connection", () => {
     const plan = {
-      remove: [{ id: 'a', name: 'Claude', running: false, dirty: 0, worktree: { path: 'D:/x/site/claude', branch: 'hive/claude' } }],
+      remove: [{ id: 'a', name: 'Claude', running: false, dirty: 0, worktree: { path: 'D:/x/site/claude', branch: 'cw/claude' } }],
       create: [
         { name: 'HI-B1', role: 'builder' as const, note: 'UI', provider: 'claude-code' as const },
         { name: 'claude', role: 'either' as const },
@@ -54,7 +54,7 @@ describe('the Load template dialog (#268)', () => {
       ['claude', 'either', undefined, undefined, undefined, 'Personal', true],
       ['HI-R1', 'reviewer', undefined, 'HI-B1', 'codex', 'Work', false]
     ])
-    expect(v.removed).toEqual([{ name: 'Claude', note: 'its worktree and branch hive/claude stay', replaced: true }])
+    expect(v.removed).toEqual([{ name: 'Claude', note: 'its worktree and branch cw/claude stay', replaced: true }])
     expect(v.notes).toEqual(["Their conversations stay in the Sessions tab, and their open cards go back (Active ones to Todo). The layout becomes the template's."])
   })
 

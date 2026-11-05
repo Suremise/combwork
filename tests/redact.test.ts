@@ -11,7 +11,7 @@ const ctx: RedactContext = {
     { name: 'acme', as: '<workspace>' },
     { name: 'billing', as: '<project>' },
     { name: 'Two', as: '<agent>' },
-    { name: 'hive/two', as: '<branch>' }
+    { name: 'cw/two', as: '<branch>' }
   ]
 }
 
@@ -23,7 +23,7 @@ describe('diagnostics redaction', () => {
   })
 
   it('names of workspaces, projects, agents and branches, as words only', () => {
-    expect(redact('[sessions] billing#Two started on hive/two', ctx)).toBe('[sessions] <project>#<agent> started on <branch>')
+    expect(redact('[sessions] billing#Two started on cw/two', ctx)).toBe('[sessions] <project>#<agent> started on <branch>')
     expect(redact('two-factor between billings', ctx)).toBe('two-factor between billings')
   })
 
@@ -227,7 +227,7 @@ describe('diagnostics redaction of the log', () => {
     expect(out).not.toContain('<path>')
     const sessions: RedactContext = { ...ctx, names: [{ name: 'sessions', as: '<project>' }] }
     expect(redactLog(`${T} [sessions] sessions finished`, sessions)).toBe(`${T} [sessions] <project> finished`)
-    expect(redactLog(`${T} [main] D:\\dev\\hive\\out\\main\\index.js:5`, { ...ctx, app: 'D:\\dev\\hive' })).toBe(`${T} [main] <hive>\\out\\main\\index.js:5`)
+    expect(redactLog(`${T} [main] D:\\dev\\hive\\out\\main\\index.js:5`, { ...ctx, app: 'D:\\dev\\hive' })).toBe(`${T} [main] <combwork>\\out\\main\\index.js:5`)
   })
 
   it("lines logged before Combwork marked the user's text keep only their time, level and scope", () => {

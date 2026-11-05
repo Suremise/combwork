@@ -126,7 +126,7 @@ const OWN = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown 
     check('B1 runs in the project folder', same(first?.cwd, alpha), JSON.stringify(first))
     const started = tool(await serverOf(b1.id), 'cw_start_card', { card: `#${n1}` })
     const slotA = (started.text.match(/folder: ([^;\n]+)/) ?? [])[1]?.trim()
-    check("B1's start reply names its slot's folder and line, and says it continues there", !started.isError && !!slotA && /line: hive\//.test(started.text) && /You'll continue in slot-\w+, on hive\//.test(started.text), started.text)
+    check("B1's start reply names its slot's folder and line, and says it continues there", !started.isError && !!slotA && /line: cw\//.test(started.text) && /You'll continue in slot-\w+, on cw\//.test(started.text), started.text)
     const inSlot = await until(async () => {
       const s = await live(b1.id)
       return s && same(s.cwd, slotA) && s.sessionId !== first.sessionId ? s : null

@@ -38,7 +38,7 @@ const check = (name, ok, extra = '') => {
   const { app, page } = await lib.launch({ userData, viewport: { width: 1400, height: 950 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     const text = (loc) => loc.innerText().catch(() => '')
     await lib.openWorkspace(inv, page, ws)
     const wsJson = () => JSON.parse(fs.readFileSync(path.join(ws, '.combwork', 'workspace.json'), 'utf8'))
@@ -241,7 +241,7 @@ const check = (name, ok, extra = '') => {
       process.env.CW_TEST_FAIL_IPC = 'slots:setLevelDefault*1'
     })
     await wsCopy.locator('.s-title').click()
-    const probe = await page.evaluate(() => window.hive.invoke('slots:setLevelDefault', 'workspace', 'copy', 'ext.env').then(() => 'saved', () => 'failed'))
+    const probe = await page.evaluate(() => window.combwork.invoke('slots:setLevelDefault', 'workspace', 'copy', 'ext.env').then(() => 'saved', () => 'failed'))
     await app.evaluate(() => {
       delete process.env.CW_TEST_FAIL_IPC
     })

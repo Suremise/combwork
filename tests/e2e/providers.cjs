@@ -19,7 +19,7 @@ const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${
   page.on('pageerror', (e) => results.push(`PAGEERROR ${e.message}`))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   check('no setup dialog on a fresh install', (await page.locator('.dialog', { hasText: 'Provider Setup' }).count()) === 0)
   check('welcome offers choosing agents', (await page.locator('.welcome-link', { hasText: 'Choose your coding agents' }).count()) === 1)
   await lib.openWorkspace(inv, page, ws)

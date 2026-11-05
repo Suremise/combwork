@@ -34,7 +34,7 @@ const check = (name, ok, extra = '') => {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 900 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const keyOf = async (name) => (await inv('project:keys')).find((k) => path.basename(k.projectPath) === name) ?? null
     check('the workspace’s project has its key (hive: HI)', !!(await lib.until(async () => (await keyOf('hive'))?.key === 'HI', HUNG_MS)), JSON.stringify(await inv('project:keys')))

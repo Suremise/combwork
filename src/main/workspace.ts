@@ -2078,7 +2078,7 @@ const BY_PATH = new Set<string>([
 
 export const workspace: WorkspaceService = new Proxy({} as WorkspaceService, {
   get(_t, key: string) {
-    // Any open workspace's files may be read (hive-img:, file IPC) — each window only shows its own.
+    // Any open workspace's files may be read (combwork-img:, file IPC) — each window only shows its own.
     if (key === 'isAllowedPath') return (p: string, extra?: string[]) => [...services].some((w) => w.isAllowedPath(p, extra))
     if (BY_PATH.has(key)) {
       return (p: string, ...rest: unknown[]) => {

@@ -66,7 +66,7 @@ export type TextRow = { name: string; cells: readonly { text: string }[] } | { g
 
 /**
  * An agents table as plain text (#572), for screen readers and a confirm's copy: a line an agent with every cell the
- * table shows, in its order ("• B1 — Working… · card #12 Lanes · worktree hive/b1 · Stopped (will be interrupted),
+ * table shows, in its order ("• B1 — Working… · card #12 Lanes · worktree cw/b1 · Stopped (will be interrupted),
  * then a new session"; an empty cell left out), and a heading's line ("workspace-a:") over its agents.
  */
 export function agentRowsText(columns: readonly TextColumn[], rows: readonly TextRow[]): string {

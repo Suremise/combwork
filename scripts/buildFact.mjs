@@ -90,7 +90,7 @@ export function postBuild(fact, { url, token, workspace }, timeoutMs = 10_000) {
       const u = new URL('/v1/builds', url)
       const body = JSON.stringify(fact)
       const headers = { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body), authorization: `Bearer ${token}` }
-      if (workspace) headers['x-hive-workspace'] = encodeURIComponent(workspace)
+      if (workspace) headers['x-combwork-workspace'] = encodeURIComponent(workspace)
       req = request(u, { method: 'POST', headers }, (res) => {
         let text = ''
         res.setEncoding('utf8')

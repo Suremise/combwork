@@ -31,14 +31,14 @@
 !ifndef BUILD_UNINSTALLER
 ; How long it waits (ms): a test harness shortens it (tests/installer, #1647).
 !define /ifndef CW_INSTALLER_WAIT_MS 600000
-LangString hiveInstallerBusy 1033 "Another Hive installer is still running, or Hive couldn't tell whether one is. Nothing was installed: run this installer again once the other one has finished."
-LangString hiveInstallerBusy 1031 "Ein anderes Hive-Installationsprogramm läuft noch, oder Hive konnte nicht feststellen, ob eines läuft. Es wurde nichts installiert: Starten Sie dieses Installationsprogramm erneut, sobald das andere fertig ist."
-LangString hiveInstallerBusy 3082 "Todavía se está ejecutando otro instalador de Hive, o Hive no ha podido saber si lo hay. No se ha instalado nada: vuelve a ejecutar este instalador cuando el otro haya terminado."
-LangString hiveInstallerBusy 1036 "Un autre programme d'installation de Hive est encore en cours, ou Hive n'a pas pu savoir s'il y en a un. Rien n'a été installé : relancez ce programme d'installation une fois l'autre terminé."
-LangString hiveInstallerBusy 1041 "別の Hive インストーラーがまだ実行中か、実行中かどうかを確認できませんでした。何もインストールされていません。もう一方が終了してから、このインストーラーをもう一度実行してください。"
-LangString hiveInstallerBusy 1045 "Inny instalator Hive nadal działa albo Hive nie mógł ustalić, czy działa. Nic nie zostało zainstalowane: uruchom ten instalator ponownie, gdy tamten się zakończy."
-LangString hiveInstallerBusy 1046 "Outro instalador do Hive ainda está em execução, ou o Hive não conseguiu saber se há um. Nada foi instalado: execute este instalador de novo quando o outro terminar."
-LangString hiveInstallerBusy 2052 "另一个 Hive 安装程序仍在运行，或者 Hive 无法确定是否有安装程序在运行。未安装任何内容：请在另一个安装程序结束后重新运行此安装程序。"
+LangString hiveInstallerBusy 1033 "Another Combwork installer is still running, or Combwork couldn't tell whether one is. Nothing was installed: run this installer again once the other one has finished."
+LangString hiveInstallerBusy 1031 "Ein anderes Combwork-Installationsprogramm läuft noch, oder Combwork konnte nicht feststellen, ob eines läuft. Es wurde nichts installiert: Starten Sie dieses Installationsprogramm erneut, sobald das andere fertig ist."
+LangString hiveInstallerBusy 3082 "Todavía se está ejecutando otro instalador de Combwork, o Combwork no ha podido saber si lo hay. No se ha instalado nada: vuelve a ejecutar este instalador cuando el otro haya terminado."
+LangString hiveInstallerBusy 1036 "Un autre programme d'installation de Combwork est encore en cours, ou Combwork n'a pas pu savoir s'il y en a un. Rien n'a été installé : relancez ce programme d'installation une fois l'autre terminé."
+LangString hiveInstallerBusy 1041 "別の Combwork インストーラーがまだ実行中か、実行中かどうかを確認できませんでした。何もインストールされていません。もう一方が終了してから、このインストーラーをもう一度実行してください。"
+LangString hiveInstallerBusy 1045 "Inny instalator Combwork nadal działa albo Combwork nie mógł ustalić, czy działa. Nic nie zostało zainstalowane: uruchom ten instalator ponownie, gdy tamten się zakończy."
+LangString hiveInstallerBusy 1046 "Outro instalador do Combwork ainda está em execução, ou o Combwork não conseguiu saber se há um. Nada foi instalado: execute este instalador de novo quando o outro terminar."
+LangString hiveInstallerBusy 2052 "另一个 Combwork 安装程序仍在运行，或者 Combwork 无法确定是否有安装程序在运行。未安装任何内容：请在另一个安装程序结束后重新运行此安装程序。"
 
 !macro preInit
   ${IfNot} ${UAC_IsInnerInstance}

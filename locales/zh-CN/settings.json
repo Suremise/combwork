@@ -528,7 +528,7 @@
   "settings.advanced.hive.skills.removeIdleCopies.never": "从不",
   "settings.advanced.hive.skills.removeIdleCopies.slots": "仅槽位",
   "settings.advanced.hive.skills.removeIdleCopies.title": "文件夹中没有智能体工作时删除 Combwork 的技能副本",
-  "settings.advanced.hive.slots.deleteMergedLines.desc": "在槽位中完成的每张卡片都有自己的分支，例如 hive/AM/AM-12-fix-the-login。卡片进入“已完成”且目标分支已包含该分支的工作（压缩合并也算）后，Combwork 会删除该分支并在卡片上记录。含有未合并工作或在某处检出的分支永远不会被删除。关闭后分支会保留。",
+  "settings.advanced.hive.slots.deleteMergedLines.desc": "在槽位中完成的每张卡片都有自己的分支，例如 cw/AM/AM-12-fix-the-login。卡片进入“已完成”且目标分支已包含该分支的工作（压缩合并也算）后，Combwork 会删除该分支并在卡片上记录。含有未合并工作或在某处检出的分支永远不会被删除。关闭后分支会保留。",
   "settings.advanced.hive.slots.deleteMergedLines.title": "卡片合并后删除其分支",
   "settings.advanced.hive.slots.removeIdle.desc": "项目保留与构建者数量相同的槽位。超出部分的空闲槽位如果一天未被使用，就会被移除：先运行它的归档命令，如果失败则保留该槽位。Combwork 绝不会移除其中有智能体或进程、有租借、有正在进行的合并，或有未提交、未合并工作的槽位。关闭后，闲置槽位会一直保留，直到你移除它们。",
   "settings.advanced.hive.slots.removeIdle.title": "一天后移除闲置槽位",

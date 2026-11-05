@@ -134,7 +134,7 @@ async function startOld(old, mayFail = false, ms = HUNG_MS) {
   try {
     const page = await app.firstWindow()
     await lib.appReady(page)
-    const inv = boundedInv('0.9 Hive', (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a]), ms)
+    const inv = boundedInv('0.9 Hive', (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a]), ms)
     running.push({ name: '0.9', app, page })
     if (!mayFail) {
       await lib.openWorkspace(inv, page, ws)

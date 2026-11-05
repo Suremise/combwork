@@ -45,7 +45,7 @@ const check = (name, ok, extra = '') => {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const info = await inv('workspace:refresh')
   const home = info.assistant.path
@@ -410,7 +410,7 @@ const check = (name, ok, extra = '') => {
   // Started in the page and left there: the write is held on purpose.
   const userWrite = (value) =>
     page.evaluate(([p, v]) => {
-      window.__userWrite = window.hive.invoke('project:updateConfig', p, { compactSuggestTokens: v }).then(() => 'saved', (e) => e.message)
+      window.__userWrite = window.combwork.invoke('project:updateConfig', p, { compactSuggestTokens: v }).then(() => 'saved', (e) => e.message)
     }, [alpha, value])
   const alphaAgents = async () => (await inv('workspace:get')).projects.find((x) => x.name === 'alpha').agents.map((a) => a.name)
   const lastRefusal = async () => (await inv('assistant:actions')).filter((a) => !a.ok).at(-1)

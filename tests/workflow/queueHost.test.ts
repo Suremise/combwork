@@ -132,7 +132,7 @@ async function begun(hook: 'afterStarted' | 'afterAdvance') {
   return { e, card, ws }
 }
 
-const queueRefs = (e: Env): string[] => sh(e.project, 'for-each-ref', '--format=%(refname)', 'refs/hive/queue/').split(/\r?\n/).filter(Boolean)
+const queueRefs = (e: Env): string[] => sh(e.project, 'for-each-ref', '--format=%(refname)', 'refs/cw/queue/').split(/\r?\n/).filter(Boolean)
 
 describe('the merge queue host (#1348)', () => {
   it('an entry recovered to run again while the rules were off: paused rulesOff, and merged once they are on again', async () => {

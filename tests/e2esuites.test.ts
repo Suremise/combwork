@@ -744,11 +744,11 @@ describe('whether the dev build is from this source (build.mjs)', () => {
 })
 
 describe("the installer's suites check the packaged build they test (#274)", () => {
-  const info = { version: '0.3.1', code: 'abc123+def', head: 'abc123', branch: 'hive/claudio' }
+  const info = { version: '0.3.1', code: 'abc123+def', head: 'abc123', branch: 'cw/claudio' }
 
   it('dist/win-unpacked from this code is fine; from other code, or with no record of its own, is said', () => {
     expect(packagedStatus(info, 'abc123+def')).toBeNull()
-    expect(packagedStatus(info, 'abc123')).toMatch(/is from other code \(abc123\+def, hive\/claudio; this is abc123\)/)
+    expect(packagedStatus(info, 'abc123')).toMatch(/is from other code \(abc123\+def, cw\/claudio; this is abc123\)/)
     expect(packagedStatus(null, 'abc123')).toMatch(/has no record of what it was built from/)
   })
 
@@ -2625,7 +2625,7 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
     // Combwork answers for the launch, asked with the waiting run's own session and in the holder's workspace.
     const asked: { url: string; workspace: string | null }[] = []
     const api = (running: boolean | 'down') => async (url: string, init: { headers: Record<string, string> }) => {
-      asked.push({ url, workspace: init.headers['X-Hive-Workspace'] ?? null })
+      asked.push({ url, workspace: init.headers['X-Combwork-Workspace'] ?? null })
       if (running === 'down') throw new Error('ECONNREFUSED')
       return { ok: true, json: async () => ({ running }) }
     }
@@ -2792,7 +2792,7 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
     const holder = (name: string, kind = 'agent') => ({ holder: { kind, name } })
     expect(await holdsMergeSlot(session, { fetch: answer(holder('HB4')) })).toBe(true)
     expect(calls[0].url).toBe('http://127.0.0.1:1/v1/projects/hive/merge-slot')
-    expect(calls[0].init.headers).toMatchObject({ Authorization: 'Bearer tok', 'X-Hive-Workspace': encodeURIComponent('D:/ws') })
+    expect(calls[0].init.headers).toMatchObject({ Authorization: 'Bearer tok', 'X-Combwork-Workspace': encodeURIComponent('D:/ws') })
     expect(await holdsMergeSlot(session, { fetch: answer(holder('HB1')) })).toBe(false)
     expect(await holdsMergeSlot(session, { fetch: answer(holder('HB4', 'user')) })).toBe(false)
     expect(await holdsMergeSlot(session, { fetch: answer({ holder: null }) })).toBe(false)

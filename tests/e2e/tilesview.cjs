@@ -367,7 +367,7 @@ const check = (name, ok, extra = '') => {
     check('Move Agent Right on C, its save held: shown at once, not saved yet', !!(await lib.until(async () => (await tileNames()).join() === order(held.slice(0, 12)), HUNG_MS)) && saved() === order(swapped), `${saved()} / ${(await tileNames()).join()}`)
     await page.evaluate(() => {
       window.__olderOrder = null
-      window.hive.onEvent((e) => {
+      window.combwork.onEvent((e) => {
         const p = e.type === 'workspace-changed' && window.__olderOrder === null ? e.workspace?.projects.find((x) => x.name === 'alpha') : null
         if (p) window.__olderOrder = p.agents.map((a) => a.name).join()
       })

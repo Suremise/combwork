@@ -44,7 +44,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
   fs.writeFileSync(path.join(old, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [], workflow: { platform: 'git', preset: null, options: { review: 'none', finish: 'notChecked', folder: 'project' } } }))
 
   let { app, page } = await lib.launch({ userData, viewport: { width: 1400, height: 900 } })
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     const text = async (loc) => ((await loc.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ').trim()

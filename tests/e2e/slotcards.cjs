@@ -2,7 +2,7 @@
 // fake Claude Code agents, the Assistant off, a temp Git project (its package-lock.json changing, G15 on, the slots'
 // setup a script that records what it installed):
 // 1. A lane of two cards from the window: it gets slot-a before its agents start, and B1, running in the project folder,
-//    is started again there in a new conversation; card 1's start makes its line hive/<KEY>/<KEY>-n-slot-one in slot-a
+//    is started again there in a new conversation; card 1's start makes its line cw/<KEY>/<KEY>-n-slot-one in slot-a
 //    from the target's head; reviewed, passed, Combwork's queue merges it, and the lane keeps slot-a;
 //    HI-2335: the lane's no-code card next starts where B1 is (no slot, no lease, slot-a untouched, B1 left in its
 //    conversation there); put back, the lane keeps slot-a's lease; started again, reviewed and Done with no merge;
@@ -164,7 +164,7 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     const cL1 = (await inv('tasks:create', { title: 'Name the release', project: 'alpha', kind: 'no-code' })).number
     const cL2 = (await inv('tasks:create', { title: 'Later made code', project: 'alpha', kind: 'no-code' })).number
     const key = (await card(c1)).key.split('-')[0]
-    const line = (n, slug) => `hive/${key}/${key}-${n}-${slug}`
+    const line = (n, slug) => `cw/${key}/${key}-${n}-${slug}`
 
     // --- 1. A lane of two cards: slot-a lent before its agents start; B1 started again there in a new conversation.
     await inv('session:start', alpha, { agentId: b1.id })

@@ -91,7 +91,7 @@ const AGENTS = ['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'c1', 'c2'
 const treeOf = (a: string): string => (a === 'x1' ? wt('x1') : wt(`h${a}`))
 
 function writeProject(): void {
-  const agent = (id: string) => ({ id, name: id.toUpperCase(), provider: 'claude-code', workflowRole: 'builder', worktree: { path: treeOf(id), branch: `hive/h${id}`, base: 'main' } })
+  const agent = (id: string) => ({ id, name: id.toUpperCase(), provider: 'claude-code', workflowRole: 'builder', worktree: { path: treeOf(id), branch: `cw/h${id}`, base: 'main' } })
   writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id: projectId, agents: AGENTS.map(agent) }))
 }
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(ws, fn)
@@ -148,8 +148,8 @@ function realRenamer(hooks: Parameters<typeof worktreeRenamer>[2] = {}): Renamer
 beforeAll(async () => {
   gitRepo(project)
   commit(project, { '.gitignore': '.combwork/\n', 'a.txt': 'a\n' }, 'first')
-  for (const a of AGENTS) sh(project, 'worktree', 'add', '-q', '-b', `hive/h${a}`, treeOf(a))
-  sh(project, 'worktree', 'add', '-q', '-b', 'hive/x1', treeOf('x1'))
+  for (const a of AGENTS) sh(project, 'worktree', 'add', '-q', '-b', `cw/h${a}`, treeOf(a))
+  sh(project, 'worktree', 'add', '-q', '-b', 'cw/x1', treeOf('x1'))
   mkdirSync(join(project, '.combwork'), { recursive: true })
   writeProject()
   await ws.open(wsPath)
@@ -202,7 +202,7 @@ describe("a worktree moved with Repair's helpers (#1441)", () => {
 
   it('another worktree arriving at the destination after the check: this one is moved back, the other left as it is', async () => {
     const dest = wt('x1-raced')
-    const r = realRenamer({ beforeGitMove: async (_from, to) => void sh(project, 'worktree', 'add', '-q', '-b', 'hive/intruder', to) })
+    const r = realRenamer({ beforeGitMove: async (_from, to) => void sh(project, 'worktree', 'add', '-q', '-b', 'cw/intruder', to) })
     const tree = (await r.identity(wt('x1')))!
     expect(await r.move(wt('x1'), dest, tree)).toBe(false)
     const gitSays = await listed()
@@ -212,7 +212,7 @@ describe("a worktree moved with Repair's helpers (#1441)", () => {
     expect(gitSays).toContain(dest.toLowerCase())
     expect(gitSays.some((p) => p.startsWith(`${dest.toLowerCase()}\\`))).toBe(false)
     expect(await r.identity(dest)).not.toBe(tree)
-    expect(sh(dest, 'branch', '--show-current')).toBe('hive/intruder')
+    expect(sh(dest, 'branch', '--show-current')).toBe('cw/intruder')
     // Putting back never touches the other worktree, and following refuses (this one isn't there).
     expect(await r.back(wt('x1'), dest, tree)).toBe(true)
     await expect(r.follow(wt('x1'), dest, tree)).rejects.toThrow()
@@ -399,7 +399,7 @@ describe('renames at once, and cut short (#1441, HR1 round 1 findings 1 and 2)',
       ...r,
       move: async (from, to) => {
         mkdirSync(join(to, '..'), { recursive: true })
-        sh(project, 'worktree', 'add', '-q', '-b', 'hive/intruder-c3', to)
+        sh(project, 'worktree', 'add', '-q', '-b', 'cw/intruder-c3', to)
         sh(project, 'worktree', 'move', from, to)
         await crashed.wait()
         return never()
@@ -415,7 +415,7 @@ describe('renames at once, and cut short (#1441, HR1 round 1 findings 1 and 2)',
     expect(store.slot(name)).toMatchObject({ state: 'ready', op: null })
     expect(intentOf(name)).toBeNull()
     expect(await cwdOf('s-c3')).toBe(wt('hc3').toLowerCase())
-    expect(sh(intent.to, 'branch', '--show-current')).toBe('hive/intruder-c3')
+    expect(sh(intent.to, 'branch', '--show-current')).toBe('cw/intruder-c3')
     expect((await listed()).some((p) => p.startsWith(`${intent.to.toLowerCase()}\\`))).toBe(false)
   })
 

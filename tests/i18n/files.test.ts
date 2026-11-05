@@ -101,7 +101,7 @@ describe('the sentences once built by hand read as before, in English', () => {
     expect(tr(m('files.git.inFolder'), { status: 'Added' })).toBe('Added (contains changes)')
     expect(tr(m('files.details.extFile'), { ext: 'PNG' })).toBe('PNG file')
     expect(tr(m('files.details.selected'), { count: 2 })).toBe('2 items selected')
-    expect(tr(m('files.root.worktree'), { agent: 'One', branch: 'hive/one' })).toBe("One's worktree · hive/one")
+    expect(tr(m('files.root.worktree'), { agent: 'One', branch: 'cw/one' })).toBe("One's worktree · cw/one")
     expect(tr(m('files.csv.firstRows'), { count: 5000 })).toBe('Showing the first 5,000 rows. Switch to Edit to see everything.')
   })
 

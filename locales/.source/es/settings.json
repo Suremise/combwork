@@ -538,7 +538,7 @@
   "settings.advanced.hive.skills.removeIdleCopies.never": "Never",
   "settings.advanced.hive.skills.removeIdleCopies.slots": "Slots only",
   "settings.advanced.hive.skills.removeIdleCopies.title": "Remove Combwork's skill copies when no agent works in the folder",
-  "settings.advanced.hive.slots.deleteMergedLines.desc": "Each card built in a slot works on a branch of its own, such as hive/AM/AM-12-fix-the-login. Once the card is Done and its target branch contains the branch's work (a squash merge too), Combwork deletes the branch and notes it on the card. A branch with work that isn't merged, or checked out somewhere, is never deleted. Turned off, the branches stay.",
+  "settings.advanced.hive.slots.deleteMergedLines.desc": "Each card built in a slot works on a branch of its own, such as cw/AM/AM-12-fix-the-login. Once the card is Done and its target branch contains the branch's work (a squash merge too), Combwork deletes the branch and notes it on the card. A branch with work that isn't merged, or checked out somewhere, is never deleted. Turned off, the branches stay.",
   "settings.advanced.hive.slots.deleteMergedLines.title": "Delete a card's branch once it's merged",
   "settings.advanced.hive.slots.removeIdle.desc": "A project keeps as many slots as it has builders. A free slot beyond that, unused for a day, is removed: its archive command runs first, and it is kept if that fails. Combwork never removes one with an agent or a process in it, a lease, a merge in flight, or work that isn't committed and merged. Turned off, idle slots stay until you remove them.",
   "settings.advanced.hive.slots.removeIdle.title": "Remove idle slots after a day",

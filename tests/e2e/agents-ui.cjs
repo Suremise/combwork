@@ -15,9 +15,9 @@ fs.mkdirSync(proj, { recursive: true })
 const g = (cmd, cwd = proj) => lib.git(cwd, cmd)
 g('init -q -b main'); g('config user.email t@e.com'); g('config user.name T')
 fs.writeFileSync(path.join(proj, 'a.txt'), 'a\n'); g('add -A'); g('commit -q -m init')
-// A branch from before #703 in the way of hive/ws/demo/…: an agent once called "ws" had hive/ws. New branches go to
-// hive/ws-2/demo/…, the dialog's default too, and it stays.
-g('branch hive/ws')
+// A branch in the way of cw/ws/demo/…: cw/ws, made outside Combwork. New branches go to
+// cw/ws-2/demo/…, the dialog's default too, and it stays.
+g('branch cw/ws')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.log(ok ? 'PASS' : 'FAIL', name, extra) }
@@ -29,7 +29,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 950 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await inv('workspace:open', ws); await sleep(800)
   await page.getByText('demo', { exact: true }).first().click(); await sleep(500)
   await inv('project:updateConfig', proj, { worktreeSetup: 'npm install' }); await inv('workspace:refresh'); await sleep(300)
@@ -108,10 +108,10 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await lib.until(async () => (await addDialog.count()) === 0, HUNG_MS)
   // A 0.9 agent in its own worktree (#1451: 1.0 makes none; made as an upgraded project has one), for the Merge dialog,
   // Files' folder picker and Remove below.
-  await lib.addAgent(inv, proj, { location: 'new-worktree', name: 'Tester', branch: 'hive/ws-2/demo/tester' })
+  await lib.addAgent(inv, proj, { location: 'new-worktree', name: 'Tester', branch: 'cw/ws-2/demo/tester' })
   await lib.until(async () => (await inv('workspace:refresh')).projects[0].agents.some((a) => a.name === 'Tester'), 15000)
   let p = (await inv('workspace:refresh')).projects[0]
-  check('the 0.9 agent on its branch, shown as its 0.9 worktree (#1442)', p.agents.some((a) => a.name === 'Tester' && a.worktree?.branch === 'hive/ws-2/demo/tester' && a.place?.is === 'legacy' && a.place.branch === 'hive/ws-2/demo/tester'), JSON.stringify(p.agents.map((a) => a.place)))
+  check('the 0.9 agent on its branch, shown as its 0.9 worktree (#1442)', p.agents.some((a) => a.name === 'Tester' && a.worktree?.branch === 'cw/ws-2/demo/tester' && a.place?.is === 'legacy' && a.place.branch === 'cw/ws-2/demo/tester'), JSON.stringify(p.agents.map((a) => a.place)))
   check('two agents: two columns, automatically', (p.config.layout ?? 'auto') === 'auto' && (await page.locator('.agent-pane').count()) === 2, JSON.stringify(p.config.layout))
   await sleep(500)
   await page.screenshot({ path: path.join(scratch, 'ui-2-strip.png') })

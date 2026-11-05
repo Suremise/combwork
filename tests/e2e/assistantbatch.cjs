@@ -49,7 +49,7 @@ const check = (name, ok, extra = '') => {
   })
   await lib.fitWindow(app, page, { width: 1600, height: 950 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const home = (await inv('workspace:refresh')).assistant.path
   const assistantKey = lib.ptyKey(home, 'assistant')

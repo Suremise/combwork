@@ -23,14 +23,14 @@ const check = (name, ok, extra = '') => {
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const agent = await lib.soloAgent(inv, proj)
 
   // Start and close in the same moment: the close must see the start in progress and cancel it.
   const [start, close] = await page.evaluate(
     ([p, id]) =>
-      Promise.allSettled([window.hive.invoke('session:start', p, { agentId: id }), window.hive.invoke('workspace:close')]).then((r) =>
+      Promise.allSettled([window.combwork.invoke('session:start', p, { agentId: id }), window.combwork.invoke('workspace:close')]).then((r) =>
         r.map((x) => (x.status === 'fulfilled' ? { ok: true, value: x.value } : { ok: false, error: String(x.reason?.message ?? x.reason) }))
       ),
     [proj, agent.id]

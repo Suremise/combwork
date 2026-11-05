@@ -6,7 +6,7 @@
 // workspace's opening):
 // - **release**: a card's lease its card's current cycle doesn't use (Todo, Done, or another lease), ended in the write
 //   that reads the card; a lane's once the lane has ended. With the rules off too (data safety).
-// - **prepare**: the card's line `hive/<KEY>/<KEY>-<n>-<slug>` checked out in the slot from the target's head (G15: its
+// - **prepare**: the card's line `cw/<KEY>/<KEY>-<n>-<slug>` checked out in the slot from the target's head (G15: its
 //   dependencies installed again on a changed lock file), once the lease's builder is quiet (not in a turn, nothing
 //   typed or queued, no run or background task), as #1429's warming operation on the lent slot, under the folder's fence
 //   (#646: nothing typed into or started in it meanwhile) and the repository's lock for the switch; recorded as
@@ -1670,7 +1670,7 @@ export async function deleteMergedLine(ws: WorkspaceService, projectPath: string
   if (begun) return withRepoLock(projectPath, () => settleDeletion(projectPath, wf, card, n, begun), { quiet: true, project: projectPath }).catch(() => false)
   const s = wf.state(card)
   const c = cycleIn(wf.store.facts(n))
-  if (!c || s.stage !== 'done' || c.deleted || !s.started?.line?.startsWith('hive/')) return false
+  if (!c || s.stage !== 'done' || c.deleted || !s.started?.line?.startsWith('cw/')) return false
   if (!allowed()) return false
   const line = s.started.line
   const target = s.integrated?.target || s.started.target

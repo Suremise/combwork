@@ -19,12 +19,12 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   const page = await app.firstWindow()
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await inv('workspace:open', ws); await sleep(800)
   // "How do you work?" answered (#1423), as a user does once: its step, shown once the form is read, moves what is dragged.
   await inv('workflow:presetNotNow', path.join(ws, 'demo'), 'git')
   // …and the window has the answer (the refresh it makes), before anything is measured.
-  await lib.until(async () => (await page.evaluate(() => window.hive.invoke('workspace:refresh')))?.projects.find((p) => p.name === 'demo')?.config.workflow?.presetAsked === 'notNow', 10000)
+  await lib.until(async () => (await page.evaluate(() => window.combwork.invoke('workspace:refresh')))?.projects.find((p) => p.name === 'demo')?.config.workflow?.presetAsked === 'notNow', 10000)
   await page.getByText('demo', { exact: true }).first().click(); await sleep(400)
 
   const drag = async (handle, dx) => {

@@ -210,7 +210,7 @@ export function needsSlot({ count, repeat = 1 }, env = process.env) {
 /**
  * A GET of Combwork's Agent API with the session's own variables, which the runners read from the shell they were started
  * in, as their progress reporting does: the reply's JSON, or null when no Combwork agent runs this, or the API doesn't answer
- * in time or refuses. workspace: the X-Hive-Workspace to name (the session's own by default).
+ * in time or refuses. workspace: the X-Combwork-Workspace to name (the session's own by default).
  */
 async function apiGet(path, env, { fetch = globalThis.fetch, timeoutMs = 3000, workspace = env.CW_WORKSPACE } = {}) {
   const url = env.CW_API_URL?.replace(/\/+$/, '')
@@ -227,7 +227,7 @@ async function apiGet(path, env, { fetch = globalThis.fetch, timeoutMs = 3000, w
   if (!token) return null
   try {
     const res = await fetch(`${url}${path}`, {
-      headers: { Authorization: `Bearer ${token}`, ...(workspace ? { 'X-Hive-Workspace': encodeURIComponent(workspace) } : {}) },
+      headers: { Authorization: `Bearer ${token}`, ...(workspace ? { 'X-Combwork-Workspace': encodeURIComponent(workspace) } : {}) },
       signal: AbortSignal.timeout(timeoutMs)
     })
     return res.ok ? await res.json() : null

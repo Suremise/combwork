@@ -34,10 +34,10 @@ function pathWithoutGit() {
   lib.gitProject(repo)
   const main = lib.git(repo, ['rev-parse', '--abbrev-ref', 'HEAD']).trim()
   fs.mkdirSync(path.dirname(tree), { recursive: true })
-  lib.git(repo, ['worktree', 'add', '-q', '-b', 'hive/wt', tree, main])
+  lib.git(repo, ['worktree', 'add', '-q', '-b', 'cw/wt', tree, main])
   // A worktree agent, as Add Agent would have saved it: merged and clean, so Remove All's box would delete it with git.
   fs.mkdirSync(path.join(repo, '.combwork'), { recursive: true })
-  fs.writeFileSync(path.join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-wt', name: 'Treeling', provider: 'claude-code', worktree: { path: tree, branch: 'hive/wt', base: main } }] }))
+  fs.writeFileSync(path.join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-wt', name: 'Treeling', provider: 'claude-code', worktree: { path: tree, branch: 'cw/wt', base: main } }] }))
   lib.enableProviders(userData)
   const hidden = pathWithoutGit()
   check('the test copy gets a PATH without git', !hidden.toLowerCase().includes('\\git\\cmd'))
@@ -117,7 +117,7 @@ function pathWithoutGit() {
   check('worktree checks: not removable, because git is missing', checks.length === 1 && checks[0].removable === false && checks[0].reason === MISSING, JSON.stringify(checks))
   const removed = await inv('agents:remove', repo, 'a-wt', { deleteWorktree: 'merged-clean' })
   check('removing with "merged and clean" keeps the worktree, saying why', removed.worktree?.deleted === false && removed.worktree.reason === MISSING && fs.existsSync(tree), JSON.stringify(removed))
-  check('…and its branch', lib.git(repo, ['branch', '--format=%(refname:short)']).includes('hive/wt'))
+  check('…and its branch', lib.git(repo, ['branch', '--format=%(refname:short)']).includes('cw/wt'))
 
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')

@@ -84,7 +84,7 @@ const text = (loc) => loc.textContent({ timeout: 1000 }).then((got) => got ?? ''
   page.on('pageerror', (e) => results.push(`PAGEERROR ${e.message}`))
   page.on('console', (m) => m.type() === 'error' && results.push(`CONSOLE ${m.text().slice(0, 200)}`))
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('demo', { exact: true }).first().click()
   await page.locator('.tab', { hasText: 'Sessions' }).click()

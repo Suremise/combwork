@@ -64,7 +64,7 @@ async function launch(profile, extraEnv = {}) {
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
   await page.keyboard.press('Escape') // first-run setup dialog, if any
-  return { app, page, inv: (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a]) }
+  return { app, page, inv: (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a]) }
 }
 const waitFor = async (fn, ms = 20000) => { const t = Date.now(); while (Date.now() - t < ms) { if (await fn()) return true; await sleep(250) } return false }
 const statusText = (page) => page.locator('.statusbar .status-item').last().innerText()
@@ -112,7 +112,7 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   await dlg.locator('button', { hasText: 'Later' }).click(); await sleep(300)
   // Tray and palette commands exist
   // About shows the status row
-  await page.evaluate(() => window.hive.invoke('app:info'))
+  await page.evaluate(() => window.combwork.invoke('app:info'))
   // Restart and Update goes through the quit flow; test mode quits without installing.
   const closed = new Promise((r) => app.process().once('exit', r))
   await inv('update:install')
@@ -139,7 +139,7 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   await app.close()
   ;({ app, page, inv } = await launch('upd-b', { CW_UPDATE_FEED: feed, CW_UPDATE_DELAY: '600000' }))
   await page.keyboard.press('Escape')
-  await page.evaluate(() => window.hive.invoke('update:check'))
+  await page.evaluate(() => window.combwork.invoke('update:check'))
   let st = await inv('update:state')
   check('manual check finds 9.1.2', st.status === 'available' && st.version === '9.1.2', JSON.stringify({ s: st.status, v: st.version }))
   await inv('update:skip', '9.1.2')

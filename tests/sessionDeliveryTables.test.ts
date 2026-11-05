@@ -49,7 +49,7 @@ const fullSession = (id: string, over: Rec = {}): Rec => ({
   agentId: 'a1',
   agentName: 'Coder',
   cwd: 'D:\\w\\p',
-  branch: 'hive/a1',
+  branch: 'cw/a1',
   transcriptPath: 'C:\\t.jsonl',
   handedOverFrom: 'older',
   cards: [{ number: 5, title: 'Five' }, { number: 6, title: 'Six', review: true }],

@@ -32,7 +32,7 @@ const check = (name, ok, extra = '') => {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   // beta: one agent, never started, two columns chosen (its second pane empty where there is room for two).
   await lib.addAgent(inv, beta, { name: 'Coder' })
@@ -267,7 +267,7 @@ const check = (name, ok, extra = '') => {
     dpage.on('pageerror', (e) => check('German: no page errors', false, e.message))
     await lib.fitWindow(de, dpage, { width: 900, height: 860 })
     await lib.appReady(dpage)
-    const dinv = (ch, ...a) => dpage.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const dinv = (ch, ...a) => dpage.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await dpage.locator('.project-row', { hasText: 'beta' }).first().click()
     const placeholders = () =>
       dpage.evaluate(() =>

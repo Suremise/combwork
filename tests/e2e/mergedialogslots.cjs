@@ -51,7 +51,7 @@ const git = (cwd, args) => lib.git(cwd, ['-c', `user.name=${fx.identity.name}`, 
     const b1 = await lib.addAgent(inv, fx.alpha, { name: 'B1' })
     const lent = await inv('slots:test', fx.alpha, { op: 'lend', agent: b1.id, card: 101 })
     check('slot-a is lent to B1', lent.ok && lent.slot.name === 'slot-a', JSON.stringify(lent))
-    const slotLine = 'hive/AL/AL-101-slot-work'
+    const slotLine = 'cw/AL/AL-101-slot-work'
     git(lent.slot.folder, ['checkout', '-q', '-b', slotLine])
     fs.writeFileSync(path.join(lent.slot.folder, 's.txt'), 'slot work\n')
     git(lent.slot.folder, ['add', '-A'])

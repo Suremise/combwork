@@ -33,7 +33,7 @@ import { ensureMigrated, saveConnections } from './connectionMoves'
 import { baseConnection } from '../shared/accounts'
 import { assertNameFree, withAgentNames, workspaceAgents } from './agentNames'
 import { sameAgentName } from '../shared/agentNames'
-import { chooseSpace, hiveBranch, reusableBranches, type BranchHome } from '../shared/hiveBranches'
+import { agentBranch, chooseSpace, reusableBranches, type BranchHome } from '../shared/agentBranches'
 import { projectPreferences } from './workflow/preferences'
 import { legacyWorktree } from './agentFolders'
 import { legacySetupPending } from '../shared/agentFolders'
@@ -250,9 +250,9 @@ export async function branchHome(projectPath: string, reads?: wt.RepoReads): Pro
 
 /**
  * The project's unused worktree on `branch` (#456), checked against `base`: one in Hive's worktrees folder for the
- * project that git lists on that branch and no agent (`others`) works in. When `branch` is the full-form branch of the
- * agent called `name`, one on the branch Hive made for that name before (hive/<its slug>, #703) is found too, the full
- * form first. Null when there is none.
+ * project that git lists on that branch and no agent (`others`) works in. When `branch` is the branch of the agent
+ * called `name`, one on the same agent's branch in another of the project's workspace parts is found too, its own
+ * first. Null when there is none.
  */
 export async function matchingWorktree(projectPath: string, branch: string, base: string, others: readonly AgentDef[], name?: string): Promise<WorktreeMatch | null> {
   const m = await matchingTree(projectPath, branch, base, others, name)
@@ -290,7 +290,7 @@ async function recordSpace(projectPath: string, space: string): Promise<void> {
 }
 
 /**
- * Where a new worktree for an agent called `name` goes in this project: a new branch `hive/<workspace>/<project>/<name>`
+ * Where a new worktree for an agent called `name` goes in this project: a new branch `cw/<workspace>/<project>/<name>`
  * (#703) in the project's own repository and a folder in the workspace's worktree location under the project's name, each numbered (`-2`) when taken.
  * `taken`: branches and folders (`placeKey`s) a plan has already given out. Shared by adding an agent and by a template's
  * load plan (#268), so what the plan shows is what the load makes. `reads`: the branches as one operation read them (#732).
@@ -299,7 +299,7 @@ export async function newWorktreePlace(projectPath: string, name: string, branch
   // One read of the branches for both (#732): its workspace part and a free name.
   const repo = reads ?? new wt.RepoReads(projectPath)
   const home = await branchHome(projectPath, repo)
-  const generated = hiveBranch(home, name)
+  const generated = agentBranch(home, name)
   // The default Hive generates for this name, whether left out or sent back as it was shown (the Add Agent dialog and the
   // Agent API send the branch they show, #703 round 4); a branch of the user's own is never taken as a part Hive gave.
   const supplied = branch?.trim()

@@ -60,7 +60,7 @@ const check = (name, ok, extra = '') => {
     }, 60000)
     return call.finally(() => clearTimeout(t))
   }
-  let inv = (ch, ...a) => watched(page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a]), `inv ${ch}`)
+  let inv = (ch, ...a) => watched(page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a]), `inv ${ch}`)
   await lib.openWorkspace(inv, page, ws)
   const home = (await inv('workspace:refresh')).assistant.path
   const key = lib.ptyKey(home, 'assistant')
@@ -299,7 +299,7 @@ const check = (name, ok, extra = '') => {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  inv = (ch, ...a) => watched(page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a]), `inv ${ch}`)
+  inv = (ch, ...a) => watched(page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a]), `inv ${ch}`)
   await lib.until(async () => (await panel().count()) === 1, 10000)
   if ((await panel().count()) === 0) {
     await page.evaluate(() => document.activeElement?.blur())

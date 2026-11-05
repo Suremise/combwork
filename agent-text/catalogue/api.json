@@ -1213,10 +1213,10 @@
     "text": "\"{project}\" is a project in several open workspaces: name it as <workspace>/<project>, e.g. {workspace}/{project}"
   },
   "api.workspace.sayWhich": {
-    "text": "Several workspaces are open in Combwork: say which with ?workspace=<name> or the X-Hive-Workspace header"
+    "text": "Several workspaces are open in Combwork: say which with ?workspace=<name> or the X-Combwork-Workspace header"
   },
   "api.workspace.severalNamed": {
-    "text": "Several open workspaces are named \"{name}\" ({paths}): say which by its full path in the X-Hive-Workspace header or ?workspace="
+    "text": "Several open workspaces are named \"{name}\" ({paths}): say which by its full path in the X-Combwork-Workspace header or ?workspace="
   },
   "api.workspace.unknown": {
     "text": "Unknown workspace \"{name}\": it isn't open in Combwork"

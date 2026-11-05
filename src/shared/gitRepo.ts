@@ -105,10 +105,10 @@ export type BranchUpdateHow = 'merge' | 'rebase'
 
 /** A remote branch as Branches & remotes groups it (#1642). */
 export interface GitRemoteBranchRow {
-  /** As git names it: nas/hive/hb1. */
+  /** As git names it: nas/cw/hb1. */
   name: string
   remote: string
-  /** On the remote: hive/hb1. */
+  /** On the remote: cw/hb1. */
   branch: string
   sha: string
   date: number

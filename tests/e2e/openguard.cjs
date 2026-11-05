@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
     /** Starts an IPC call in the window, its outcome kept under `key` (ok, or its error's text). */
     const start = (key, ch, ...args) => page.evaluate(([k, c, a]) => {
       window.__guard = window.__guard ?? {}
-      window.hive.invoke(c, ...a).then(() => (window.__guard[k] = { ok: true }), (e) => (window.__guard[k] = { error: String(e) }))
+      window.combwork.invoke(c, ...a).then(() => (window.__guard[k] = { ok: true }), (e) => (window.__guard[k] = { error: String(e) }))
     }, [key, ch, args])
     const outcome = (key) => page.evaluate((k) => window.__guard?.[k] ?? null, key)
 

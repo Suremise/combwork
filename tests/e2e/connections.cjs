@@ -42,7 +42,7 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
   const { app, page } = await lib.launch({ userData, env: { ...env, CW_TEST_CLI_HOME_CONNECTION: '0' }, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    const invOn = (p) => (ch, ...a) => p.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const invOn = (p) => (ch, ...a) => p.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     const inv = invOn(page)
     const failure = (p) => p.then(() => null, (e) => String(e?.message ?? e))
     await lib.openWorkspace(inv, page, ws1)

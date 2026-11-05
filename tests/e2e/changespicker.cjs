@@ -38,7 +38,7 @@ const git = (cwd, ...a) => lib.git(cwd, ['-c', 'user.email=t@t', '-c', 'user.nam
 /** A worktree agent of `project` as Add Agent saves it, its worktree made with git in Combwork's folder. */
 function inUse(project, name) {
   const main = git(project, 'rev-parse', '--abbrev-ref', 'HEAD').trim()
-  const wt = { path: path.join(trees, path.basename(project), name.toLowerCase()), branch: `hive/${name.toLowerCase()}`, base: main }
+  const wt = { path: path.join(trees, path.basename(project), name.toLowerCase()), branch: `cw/${name.toLowerCase()}`, base: main }
   git(project, 'worktree', 'add', '-q', '-b', wt.branch, wt.path, main)
   return { id: `a-${name.toLowerCase()}`, name, provider: 'claude-code', worktree: wt }
 }
@@ -51,7 +51,7 @@ function inUse(project, name) {
   // Combwork are unused.
   const coder = inUse(repo, 'Coder')
   const b4 = path.join(trees, 'repo', 'b4')
-  git(repo, 'worktree', 'add', '-q', '-b', 'hive/b4', b4, main)
+  git(repo, 'worktree', 'add', '-q', '-b', 'cw/b4', b4, main)
   fs.writeFileSync(path.join(b4, 'b4.txt'), 'work\n')
   git(b4, 'add', '-A')
   git(b4, 'commit', '-qm', 'B4 work')
@@ -63,9 +63,9 @@ function inUse(project, name) {
   fs.writeFileSync(path.join(repo, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: [{ id: 'b4-session', agent: 'claude-code', name: 'B4 work', createdAt: at, lastActiveAt: at, archived: false, agentId: 'a-b4', agentName: 'B4', cwd: b4 }] }))
   // cold: no agents, one unused worktree (its agent was removed, keeping it).
   const coldMain = git(cold, 'rev-parse', '--abbrev-ref', 'HEAD').trim()
-  git(cold, 'worktree', 'add', '-q', '-b', 'hive/old', path.join(trees, 'cold', 'old'), coldMain)
+  git(cold, 'worktree', 'add', '-q', '-b', 'cw/old', path.join(trees, 'cold', 'old'), coldMain)
   // coldfail: the same, its first listing failing; plain: no worktrees, its first listing failing.
-  git(coldfail, 'worktree', 'add', '-q', '-b', 'hive/kept', path.join(trees, 'coldfail', 'kept'), git(coldfail, 'rev-parse', '--abbrev-ref', 'HEAD').trim())
+  git(coldfail, 'worktree', 'add', '-q', '-b', 'cw/kept', path.join(trees, 'coldfail', 'kept'), git(coldfail, 'rev-parse', '--abbrev-ref', 'HEAD').trim())
   // busy: its only worktree is in use.
   fs.mkdirSync(path.join(busy, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(busy, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [inUse(busy, 'Solo')] }))
@@ -127,7 +127,7 @@ function inUse(project, name) {
   const labels = folders.map((o) => o.label)
   check('the picker: Branches first, then Unused worktrees, then each unused one, then those in use, then the project folder last', all[0].value.startsWith('compare:') && all.findIndex((o) => !(o.value.startsWith('compare:') || o.value === 'leftovers')) === all.length - folders.length, JSON.stringify(all.map((o) => o.value)))
   check('…its folders: Unused worktrees first, then each unused one, then those in use, then the project folder last', values[0] === 'unused' && values[values.length - 1] === '' && values.indexOf(coder.id) > values.findIndex((v) => v.startsWith('unused:')) && values.filter((v) => v.startsWith('unused:')).length === 2, JSON.stringify(labels))
-  check('…each unused one says who made it', labels.some((l) => l.startsWith('hive/b4 · was B4')) && labels.some((l) => l.startsWith('experiment · not made by Combwork')), JSON.stringify(labels))
+  check('…each unused one says who made it', labels.some((l) => l.startsWith('cw/b4 · was B4')) && labels.some((l) => l.startsWith('experiment · not made by Combwork')), JSON.stringify(labels))
   check('…and Unused worktrees counts them', labels[0] === 'Unused worktrees (2)', labels[0])
   await shots('populated')
 
@@ -157,13 +157,13 @@ function inUse(project, name) {
 
   // --- The other pages say what they show.
   // Coder's 0.9 worktree became the slot kept for it as the project opened (#1441): listed as where it works (#1569).
-  check('…the folder Coder works in, as in use: the slot kept for it, with its branch', labels.includes('Coder · carried: coder · hive/coder'), JSON.stringify(labels))
+  check('…the folder Coder works in, as in use: the slot kept for it, with its branch', labels.includes('Coder · carried: coder · cw/coder'), JSON.stringify(labels))
   await picker.selectOption(coder.id)
   check("an agent's folder: what it shows", !!(await lib.until(async () => (await about.getAttribute('data-about')) === 'agent', 8000)) && (await about.innerText()).includes('Coder works in coder, the slot kept for it: everything on its branch since it left master.'), await about.innerText().catch(() => ''))
-  check('…its branch since it left its base, and Merge hive/coder…', !!(await lib.until(async () => (await page.locator('.split-list').innerText()).includes('hive/coder since it left master') && (await page.locator('.split-list [aria-label="Merge hive/coder…"]').count()) === 1, 8000)), await page.locator('.split-list').innerText().catch(() => ''))
+  check('…its branch since it left its base, and Merge cw/coder…', !!(await lib.until(async () => (await page.locator('.split-list').innerText()).includes('cw/coder since it left master') && (await page.locator('.split-list [aria-label="Merge cw/coder…"]').count()) === 1, 8000)), await page.locator('.split-list').innerText().catch(() => ''))
   await shots('agent-slot')
   await picker.selectOption(`unused:${b4}`)
-  check('an unused one: what it shows', !!(await lib.until(async () => (await about.getAttribute('data-about')) === 'unused-one', 8000)) && (await about.innerText()).includes('hive/b4'), await about.innerText().catch(() => ''))
+  check('an unused one: what it shows', !!(await lib.until(async () => (await about.getAttribute('data-about')) === 'unused-one', 8000)) && (await about.innerText()).includes('cw/b4'), await about.innerText().catch(() => ''))
   await picker.selectOption('')
   check('the project folder, last: what it shows', !!(await lib.until(async () => (await about.getAttribute('data-about')) === 'project', 8000)))
   await shots('project-folder')

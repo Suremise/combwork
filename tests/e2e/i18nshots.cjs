@@ -122,7 +122,7 @@ if (require.main === module) {
       page.on('console', (m) => m.type() === 'warning' && /i18n|message/i.test(m.text()) && result.errors.push(m.text().slice(0, 300)))
       await lib.fitWindow(app, page, { width: 1400, height: 860 })
       await lib.appReady(page)
-      const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+      const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
 
       const info = (await inv('app:info')).language
       result.language = info.code

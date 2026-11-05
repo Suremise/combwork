@@ -574,7 +574,7 @@ describe("the window's merge queues and badges on a board shaped like a long-use
     })
     // In flight: one queued, ten started (one of them since Done, and one put back in Todo: neither in flight).
     const queued = await approved(w, wt)
-    const started = { folder: 'project', line: 'hive/x', base: 'base0000aaaa', target: 'main', builder: 'Builder', cardKind: 'code' as const }
+    const started = { folder: 'project', line: 'cw/x', base: 'base0000aaaa', target: 'main', builder: 'Builder', cardKind: 'code' as const }
     const others: number[] = []
     for (let i = 0; i < 10; i++) others.push((await inWorkspace(w, () => tasks.createTask({ title: `Started ${i}`, project: 'p' }, user))).number)
     await store.boardWrite(w, async () =>

@@ -113,7 +113,7 @@ export function useAttachDrafts(onError: (text: string) => void) {
       count++
       total += file.size
       const name = file.name || 'pasted.png' // i18n-ignore: a file name
-      added.push({ key: `draft-${next.current++}`, file, path: window.hive.pathForFile(file) || null, url: URL.createObjectURL(file), name, kind: attachmentKind(name), size: file.size })
+      added.push({ key: `draft-${next.current++}`, file, path: window.combwork.pathForFile(file) || null, url: URL.createObjectURL(file), name, kind: attachmentKind(name), size: file.size })
     }
     if (!added.length) return
     setDrafts((d) => ({ ...d, [box]: [...d[box], ...added] }))
@@ -188,7 +188,7 @@ export function attachmentLookup(list: CardAttachment[], drafts: Record<DraftBox
 export function openAttachmentLink(href: string, list: CardAttachment[]): boolean {
   if (!href.startsWith(ATTACHMENT_ANCHOR)) return false
   const a = list.find((x) => x.id === href.slice(ATTACHMENT_ANCHOR.length))
-  if (a && !a.missing) void (a.kind === 'image' || a.kind === 'pdf' ? window.hive.invoke('app:openPath', a.path) : window.hive.invoke('app:showInFolder', a.path))
+  if (a && !a.missing) void (a.kind === 'image' || a.kind === 'pdf' ? window.combwork.invoke('app:openPath', a.path) : window.combwork.invoke('app:showInFolder', a.path))
   return true
 }
 
@@ -294,8 +294,8 @@ export function CardAttachmentSection({ groups, kind, reload, onOpen }: { groups
     await reload()
   }
   const menuFor = (g: CardAttachmentGroup, a: CardAttachment): MenuEntry[] => [
-    ...(!a.missing && (a.kind === 'image' || a.kind === 'pdf') ? [{ label: tr(M.open), icon: 'link-external', onClick: () => void window.hive.invoke('app:openPath', a.path) }] : []),
-    ...(!a.missing ? [{ label: tr(M.show), icon: 'folder-opened', onClick: () => void window.hive.invoke('app:showInFolder', a.path) }] : []),
+    ...(!a.missing && (a.kind === 'image' || a.kind === 'pdf') ? [{ label: tr(M.open), icon: 'link-external', onClick: () => void window.combwork.invoke('app:openPath', a.path) }] : []),
+    ...(!a.missing ? [{ label: tr(M.show), icon: 'folder-opened', onClick: () => void window.combwork.invoke('app:showInFolder', a.path) }] : []),
     { separator: true },
     { label: tr(M.remove), icon: 'trash', danger: true, onClick: () => void remove(g, a) }
   ]
@@ -385,8 +385,8 @@ export function CardAttachmentList({ card, label, list, reload, readOnly }: { ca
                 </Tooltip>
                 <span className="faint small">{a.missing ? tr(M.missing) : tr(M.meta, { size: formatBytes(a.size), by: a.by, when: timeAgo(a.at) })}</span>
               </div>
-              {!a.missing && (a.kind === 'image' || a.kind === 'pdf') && <IconButton icon="link-external" title={tr(M.open)} onClick={() => void window.hive.invoke('app:openPath', a.path)} />}
-              {!a.missing && <IconButton icon="folder-opened" title={tr(M.show)} onClick={() => void window.hive.invoke('app:showInFolder', a.path)} />}
+              {!a.missing && (a.kind === 'image' || a.kind === 'pdf') && <IconButton icon="link-external" title={tr(M.open)} onClick={() => void window.combwork.invoke('app:openPath', a.path)} />}
+              {!a.missing && <IconButton icon="folder-opened" title={tr(M.show)} onClick={() => void window.combwork.invoke('app:showInFolder', a.path)} />}
               {!readOnly && <IconButton icon="trash" title={tr(M.remove)} disabled={busy === a.id} onClick={() => void remove(a)} />}
             </div>
           ))}

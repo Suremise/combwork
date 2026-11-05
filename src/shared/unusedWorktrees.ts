@@ -94,7 +94,7 @@ export function kindLabel(w: Pick<UnusedWorktree, 'kind'>): string {
 /** Whether it is one of the slot pool's (#1450): removed only by its guarded clean-up, never given to an agent. */
 export const isSlotRow = (w: Pick<UnusedWorktree, 'slot'>): boolean => !!w.slot
 
-/** One unused worktree in the Changes tab's picker (#476): "hive/b4 · was B4 · holds work", "slot-b · slot with changes, not lent · …". */
+/** One unused worktree in the Changes tab's picker (#476): "cw/b4 · was B4 · holds work", "slot-b · slot with changes, not lent · …". */
 export function unusedPickerLabel(w: UnusedWorktree): string {
   return [unusedName(w), kindLabel(w) || originLabel(w), tr(w.check.removable ? M.pickMerged : holdsWork(w) ? M.pickWork : M.pickNotChecked)].filter(Boolean).join(' · ')
 }
@@ -134,7 +134,7 @@ export function lostByRemoving(w: UnusedWorktree): string[] | null {
 
 /**
  * What adding an agent did about an unused worktree it could reuse (#456), as the dialog's notice and the Agent API's
- * reply say it: "reused hive/b4, brought up to main at 66ce11b", or why it made a new one. In English (the Agent API's,
+ * reply say it: "reused cw/b4, brought up to main at 66ce11b", or why it made a new one. In English (the Agent API's,
  * and the log's) unless given the window's tr().
  */
 export function reuseNote(r: WorktreeReuse, t?: Tr): string {

@@ -71,7 +71,7 @@ const check = (name, ok, extra = '') => {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1500, height: 900 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
     const facts = async (n) => (await inv('tasks:facts', n)).map((f) => f.kind)

@@ -81,7 +81,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     const b2 = await lib.addAgent(inv, alpha, { name: 'B2', workflowRole: 'builder' })
     // R1, a reviewer from before 1.0 in its own worktree (made as an upgraded project has one, #1451), whose worktree is a
     // retired home (#1441): it resumes there.
-    lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hr1', hr1])
+    lib.git(alpha, ['worktree', 'add', '-q', '-b', 'cw/hr1', hr1])
     const r1 = await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'reviewer', location: 'existing-worktree', worktreePath: hr1 })
     check('three agents', !!b1?.id && !!b2?.id && !!r1?.id, JSON.stringify({ b1, b2, r1 }))
 
@@ -101,7 +101,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     await page.mouse.move(5, 5)
 
     // --- 3. B2's carried slot hb2.
-    lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hb2', hb2])
+    lib.git(alpha, ['worktree', 'add', '-q', '-b', 'cw/hb2', hb2])
     const carried = await op({ op: 'carry', agent: b2.id, slot: 'hb2', folder: hb2 })
     check("B2's own worktree hb2 is its carried slot", carried?.kind === 'carried' && carried.agent === b2.id, JSON.stringify(carried))
     // The test channel adopts it without the upgrade's refresh after (#1441): the window reads the project again.

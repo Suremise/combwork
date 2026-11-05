@@ -84,7 +84,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 950 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (agentId) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === agentId)
   await page.getByText('alpha', { exact: true }).first().click()
@@ -120,7 +120,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
     // A guardian review adopted before Combwork told sub-sessions apart: its record doesn't say so.
     rec(C.adopted, 'Adopted review', 5, { agent: 'codex', transcriptPath: rolloutFile(C.adopted, 5) }),
     // A session in a worktree, with a guardian review there.
-    rec(C.wt, 'Worktree work', 1, { agent: 'codex', agentId: codexette.id, agentName: 'Codexette', cwd: wtDir, branch: 'hive/spike', transcriptPath: rolloutFile(C.wt, 1) })
+    rec(C.wt, 'Worktree work', 1, { agent: 'codex', agentId: codexette.id, agentName: 'Codexette', cwd: wtDir, branch: 'cw/spike', transcriptPath: rolloutFile(C.wt, 1) })
   )
   putSessions(alpha, file)
   write(backup(C.tray), claudeLines(C.tray, 10, 'Fix the tray icon'))
@@ -363,9 +363,9 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   const subWhy = await tipFor(blocked)
   check('…because it is a sub-session', /guardian review Codex ran for another session/.test(subWhy), subWhy)
   await page.screenshot({ path: path.join(lib.WORK, 'sessiontree-2-cant-resume.png') })
-  const refused = await page.evaluate(([folder, sid, agentId]) => window.hive.invoke('session:start', folder, { resumeId: sid, agentId }).then(() => 'started', (e) => String(e.message ?? e)), [alpha, C.g1, codexette.id])
+  const refused = await page.evaluate(([folder, sid, agentId]) => window.combwork.invoke('session:start', folder, { resumeId: sid, agentId }).then(() => 'started', (e) => String(e.message ?? e)), [alpha, C.g1, codexette.id])
   check('main refuses to resume a sub-session too', /not a conversation: it can't be resumed/.test(refused), refused)
-  const refusedOld = await page.evaluate(([folder, sid, agentId]) => window.hive.invoke('session:start', folder, { resumeId: sid, agentId }).then(() => 'started', (e) => String(e.message ?? e)), [alpha, C.adopted, codexette.id])
+  const refusedOld = await page.evaluate(([folder, sid, agentId]) => window.combwork.invoke('session:start', folder, { resumeId: sid, agentId }).then(() => 'started', (e) => String(e.message ?? e)), [alpha, C.adopted, codexette.id])
   check('…and one adopted before sub-sessions were told apart', /not a conversation: it can't be resumed/.test(refusedOld), refusedOld)
 
   // --- Delete all on the Claude agent: the running session and a backup another program holds are skipped.

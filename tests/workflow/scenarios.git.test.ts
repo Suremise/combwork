@@ -945,7 +945,7 @@ describe('a follow-up submitted in Review (HI-1832): the revision under review m
     expect(s.started?.builder).toBe('B1')
     // No move written, and its pin is the card's second.
     expect(e.store.facts(card.id).filter((f) => f.kind === 'Moved').map((f) => (f.data as FactData['Moved']).to)).toEqual(['active', 'review'])
-    expect(sh(e.project, 'rev-parse', `refs/hive/cards/${card.key.toLowerCase()}/2`).trim()).toBe(now)
+    expect(sh(e.project, 'rev-parse', `refs/cw/cards/${card.key.toLowerCase()}/2`).trim()).toBe(now)
     // No lane holds it (HI-2046, HR1's round 1): R1 keeps it, carried onto the follow-up in the submit's write, and the
     // reviewer pool's pass tells it to start again (reviewerPool.test.ts), so nothing is woken here.
     expect(e.wakes).toEqual([])

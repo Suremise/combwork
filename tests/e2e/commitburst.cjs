@@ -28,7 +28,7 @@ const check = (name, ok, extra = '') => {
     await lib.appReady(h.page)
     const largest = () => h.page.evaluate(() => window.__hiveCommitBurst?.().max ?? null)
     const longest = () => h.page.evaluate(() => window.__hiveCommitBurst?.().chain ?? null)
-    check("a test copy's window watches React's commits", await h.page.evaluate(() => window.hive.commitWatch === true && typeof window.__hiveCommitBurst === 'function'))
+    check("a test copy's window watches React's commits", await h.page.evaluate(() => window.combwork.commitWatch === true && typeof window.__hiveCommitBurst === 'function'))
     // Opening the window is calibration data for step 2 (HI-1759), not judged here: only that it was counted.
     const opening = await largest()
     console.log(`INFO opening the window: ${opening} commits at most within 250 ms`)

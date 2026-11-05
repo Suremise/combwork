@@ -87,7 +87,7 @@ export interface ReadCatalog {
 export function readCatalog(raw: unknown, url: string): ReadCatalog {
   // Its own fields named as the format names them, in English (inside mcp.catalog.notRead's {reason}).
   if (!isObject(raw)) throw new Error('catalog: an object') // i18n-ignore: catalog.json's format, in its own terms
-  if (raw.schemaVersion !== CATALOG_SCHEMA_VERSION) throw new Error(`schemaVersion: ${JSON.stringify(raw.schemaVersion)} (this Hive reads ${CATALOG_SCHEMA_VERSION})`) // i18n-ignore: catalog.json's format, in its own terms
+  if (raw.schemaVersion !== CATALOG_SCHEMA_VERSION) throw new Error(`schemaVersion: ${JSON.stringify(raw.schemaVersion)} (this Combwork reads ${CATALOG_SCHEMA_VERSION})`) // i18n-ignore: catalog.json's format, in its own terms
   if (!isText(raw.name)) throw new Error('name: one line') // i18n-ignore: catalog.json's format, in its own terms
   if (!Array.isArray(raw.servers)) throw new Error('servers: a list') // i18n-ignore: catalog.json's format, in its own terms
   const fileZips = isFileUrl(url)

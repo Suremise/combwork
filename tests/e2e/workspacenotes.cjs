@@ -64,7 +64,7 @@ const check = (name, ok, extra = '') => {
   try {
     await lib.fitWindow(app, page, { width: 1400, height: 850 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.waitForProvider(inv, 'codex')
     if (copilot) await lib.waitForProvider(inv, 'copilot')
     await lib.openWorkspace(inv, page, ws)

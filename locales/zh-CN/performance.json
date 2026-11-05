@@ -402,7 +402,7 @@
   "performance.toolList.chars": "字符",
   "performance.toolList.descriptions": "描述",
   "performance.toolList.empty": "没有工具列表。",
-  "performance.toolList.heading": "hive 工具列表",
+  "performance.toolList.heading": "Combwork 工具列表",
   "performance.toolList.params": "参数",
   "performance.toolList.schemas": "模式",
   "performance.toolList.starts": "启动次数",

@@ -230,10 +230,10 @@ export function slugOf(title: string): string {
     .replace(/-+$/, '')
 }
 
-/** A card's line (§16.10.1): `hive/<KEY>/<card key>-<slug>` (`hive/AM/AM-12-fix-the-login`); no slug, the key alone. */
+/** A card's line (§16.10.1): `cw/<KEY>/<card key>-<slug>` (`cw/AM/AM-12-fix-the-login`); no slug, the key alone. */
 export function lineName(projectKey: string, card: Pick<CardRecord, 'key' | 'title'>): string {
   const slug = slugOf(card.title)
-  return `hive/${projectKey}/${card.key}${slug ? `-${slug}` : ''}`
+  return `cw/${projectKey}/${card.key}${slug ? `-${slug}` : ''}`
 }
 
 const ORDER: StageId[] = ['todo', 'active', 'review', 'approved', 'merging', 'done']
@@ -1583,7 +1583,7 @@ export class Workflow {
       ...(g.warnings.length ? { warnings: g.warnings } : {}),
       ...(g.inputs.focused ? { focused: g.inputs.focused } : {})
     })
-    if (g.revision) w.action('pin', { ref: `refs/hive/cards/${g.card.key.toLowerCase()}/${st.submissions.length + 1}`, revision: g.revision, submission: sub.seq })
+    if (g.revision) w.action('pin', { ref: `refs/cw/cards/${g.card.key.toLowerCase()}/${st.submissions.length + 1}`, revision: g.revision, submission: sub.seq })
     if (g.o.review === 'none') {
       this.finish(w, g.fin)
       return

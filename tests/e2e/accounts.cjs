@@ -60,7 +60,7 @@ const check = (name, ok, extra = '') => {
   const { app, page } = await lib.launch({ userData, env, viewport: { width: 1400, height: 950 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    const invOn = (p) => (ch, ...a) => p.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const invOn = (p) => (ch, ...a) => p.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     const inv = invOn(page)
     await lib.openWorkspace(inv, page, ws1)
     const list = () => inv('connections:list')

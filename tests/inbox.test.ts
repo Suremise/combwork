@@ -6,11 +6,11 @@ const live = (status: SessionStatus, statusSince: string, unseen = false, extra:
   ({ provider: 'claude-code', runId: 'r', projectPath: '', agentId: '', cwd: '', sessionId: '', status, statusSince, unseen, startedAt: '', launchSignature: '', ...extra }) as LiveSessionState
 
 const agent = (id: string, l: LiveSessionState | null, worktree = false): AgentInfo =>
-  ({ id, name: id, live: l, restartNeeded: false, resume: null, place: worktree ? { folder: `C:/wt/${id}`, is: 'legacy', name: id, branch: `hive/${id}`, base: 'main' } : { folder: 'C:/ws', is: 'project', name: null, branch: null } }) as AgentInfo
+  ({ id, name: id, live: l, restartNeeded: false, resume: null, place: worktree ? { folder: `C:/wt/${id}`, is: 'legacy', name: id, branch: `cw/${id}`, base: 'main' } : { folder: 'C:/ws', is: 'project', name: null, branch: null } }) as AgentInfo
 
 const project = (name: string, agents: AgentInfo[]): ProjectInfo => ({ name, path: `C:/ws/${name}`, agents }) as ProjectInfo
 
-const work = (ahead: number, dirty: number): AgentBranchStatus => ({ branch: 'hive/x', base: 'main', into: 'main', ahead, dirty, diff: { files: 3, insertions: 120, deletions: 40 } })
+const work = (ahead: number, dirty: number): AgentBranchStatus => ({ branch: 'cw/x', base: 'main', into: 'main', ahead, dirty, diff: { files: 3, insertions: 120, deletions: 40 } })
 
 describe('attention inbox', () => {
   it('asks you: waiting (seen or not) or signing in; finished unseen is told apart, never as a need (#1632)', () => {

@@ -274,7 +274,7 @@ function sessionItems(project: ProjectInfo, live: LiveSessionState | null | unde
 // Dragging an agent (its pane header, or its tile in the Tiles view, #993) changes the project's order, which the panes
 // and tiles follow (#135): dropped on another agent's pane or tile the two swap, on an empty pane to the end, on a page
 // button to the end of that page (held over one, that page shows).
-const AGENT_DRAG = 'application/x-hive-agent'
+const AGENT_DRAG = 'application/x-combwork-agent'
 
 export function agentDragProps(project: ProjectInfo, a: AgentInfo) {
   // A lone agent too, in panes side by side: it can go to any cell (#762).
@@ -1865,7 +1865,7 @@ function PlaceMark({ project, a }: { project: ProjectInfo; a: AgentInfo }) {
 /** "<b>B1</b> is not running.", the agent's name in bold. */
 const notRunningText = (agent: string): ReactNode[] => tRich<ReactNode>(msg({ id: 'panes.body.notRunning', defaultMessage: '<b>{agent}</b> is not running.', description: "A pane of an agent that isn't running ({agent}: its name, in bold; keep the <b> tags around it)." }), { agent, b: (chunks) => <strong key="b">{chunks}</strong> })
 
-/** "Works in its own worktree on <code>hive/b1</code>." */
+/** "Works in its own worktree on <code>cw/b1</code>." */
 const ownWorktreeText = (branch: string): ReactNode[] => tRich<ReactNode>(msg({ id: 'panes.body.worktree', defaultMessage: 'Works in its own worktree on <code>{branch}</code>.', description: "A stopped worktree agent's pane: its branch ({branch}, shown as code; keep the <code> tags around it)." }), { branch, code: (chunks) => <code key="code">{chunks}</code> })
 
 const code = (chunks: ReactNode[]): ReactNode => <code key="code">{chunks}</code>

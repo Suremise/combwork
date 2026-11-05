@@ -54,7 +54,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitini
   const { app, page } = await lib.launch({ userData, env: { ...claude, CW_API_PORT: lib.port(47877), CW_TEST_FAIL_IPC: 'git:init*1', GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: '1' }, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const text = (loc) => loc.innerText().catch(() => '')
     // Combwork made the project's .combwork when it opened the workspace: it must stay out of the first commit.

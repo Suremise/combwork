@@ -42,7 +42,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
   fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }] }))
 
   const { app, page } = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_CLI_HOME_CONNECTION: '0' }, viewport: { width: 1400, height: 900 } })
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const liveNow = () => inv('session:live').catch(() => null)
   /**
    * Stops every session still live, each on its own (one that fails leaves the rest to stop), and waits until none is:
@@ -60,7 +60,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     await lib.openWorkspace(inv, page, ws)
     const userToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const api = async (method, route, body, token = userToken) => {
-      const r = await fetch(`http://127.0.0.1:${PORT}${route}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Hive-Workspace': encodeURIComponent(ws) }, ...(body ? { body: JSON.stringify(body) } : {}) })
+      const r = await fetch(`http://127.0.0.1:${PORT}${route}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Combwork-Workspace': encodeURIComponent(ws) }, ...(body ? { body: JSON.stringify(body) } : {}) })
       return { status: r.status, body: await r.json().catch(() => null) }
     }
     const live = async (project, agentId) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === project.toLowerCase() && s.agentId === agentId && s.status !== 'stopped') ?? null

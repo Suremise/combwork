@@ -346,7 +346,7 @@ const notices = new AsyncLocalStorage<Set<string>>()
 
 async function api(method: string, path: string, body?: unknown, replyMs?: number): Promise<unknown> {
   // agent-protocol: an HTTP header
-  const headers = { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', ...(WORKSPACE ? { 'X-Hive-Workspace': encodeURIComponent(WORKSPACE) } : {}) }
+  const headers = { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', ...(WORKSPACE ? { 'X-Combwork-Workspace': encodeURIComponent(WORKSPACE) } : {}) }
   const res = await agentApiCall(API + path, method, headers, body === undefined ? undefined : JSON.stringify(body), replyMs ?? REPLY_SECONDS * 1000)
   if (res.notice) {
     try {
@@ -1481,7 +1481,7 @@ function flushReports(): void {
   void fetch(API + '/v1/metrics/mcp', {
     method: 'POST',
     // agent-protocol: an HTTP header
-    headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', ...(WORKSPACE ? { 'X-Hive-Workspace': encodeURIComponent(WORKSPACE) } : {}) },
+    headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', ...(WORKSPACE ? { 'X-Combwork-Workspace': encodeURIComponent(WORKSPACE) } : {}) },
     body: JSON.stringify(body),
     signal: stop.signal
   })
@@ -1618,7 +1618,7 @@ function sayConnected(): void {
   void fetch(API + '/v1/launch/connected', {
     method: 'POST',
     // agent-protocol: an HTTP header
-    headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', ...(WORKSPACE ? { 'X-Hive-Workspace': encodeURIComponent(WORKSPACE) } : {}) },
+    headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', ...(WORKSPACE ? { 'X-Combwork-Workspace': encodeURIComponent(WORKSPACE) } : {}) },
     body: '{}',
     signal: stop.signal
   })

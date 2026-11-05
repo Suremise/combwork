@@ -868,7 +868,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     // Each with the watch it had then (HI-2086): the watch a turn ended with, even once a wake has ended it since.
     await page.evaluate((who) => {
       window.__subjectStatuses = []
-      window.hive.onEvent((e) => {
+      window.combwork.onEvent((e) => {
         if (e.type === 'session-status' && e.state?.agentId === who.agentId && String(e.state.projectPath).toLowerCase() === who.host.toLowerCase()) window.__subjectStatuses.push({ status: e.state.status, watch: e.state.watch ?? null })
       })
     }, { host, agentId })

@@ -174,9 +174,9 @@ export class RepoReads {
 
 /**
  * A branch name git can make: wanted, else wanted-2, wanted-3… `taken`: names to avoid too (a plan's earlier ones). Not
- * one that exists, nor one a branch is inside (hive/ws/x while hive/ws/x/y exists), case aside: on Windows git keeps
- * branches as files, so hive/HIVE/… and hive/hive/… would be the same one (#703). A branch it would be inside (hive/ws for
- * hive/ws/alpha/b1) can't be numbered away: refused, saying which (`branchSpace` keeps Hive's own clear of that).
+ * one that exists, nor one a branch is inside (cw/ws/x while cw/ws/x/y exists), case aside: on Windows git keeps
+ * branches as files, so cw/Work/… and cw/work/… would be the same one (#703). A branch it would be inside (cw/ws for
+ * cw/ws/alpha/b1) can't be numbered away: refused, saying which (`branchSpace` keeps Hive's own clear of that).
  */
 export async function uniqueBranch(cwd: string, wanted: string, taken: ReadonlySet<string> = new Set(), reads?: RepoReads): Promise<string> {
   const existing = [...new Set([...(await (reads ? reads.branchesStrict().catch(() => []) : localBranches(cwd))), ...taken].map((b) => b.toLowerCase()))]

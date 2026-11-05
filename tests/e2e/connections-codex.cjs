@@ -53,7 +53,7 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
   const { app, page } = await lib.launch({ userData, env, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     const failure = (p) => p.then(() => null, (e) => String(e?.message ?? e))
     await lib.waitForProvider(inv, 'codex')
     await lib.openWorkspace(inv, page, ws)

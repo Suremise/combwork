@@ -36,7 +36,10 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 800 })
   await lib.appReady(page)
-  let inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  // HI-2588: the preload bridge is window.combwork, renamed outright: window.hive is gone.
+  const bridge = await page.evaluate(() => ({ combwork: typeof window.combwork?.invoke, hive: typeof window.hive }))
+  check('the preload bridge is window.combwork, and window.hive is not there', bridge.combwork === 'function' && bridge.hive === 'undefined', JSON.stringify(bridge))
+  let inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const until = (fn, ms = 10000) => lib.until(fn, ms)
 
@@ -242,7 +245,7 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 800 })
   await lib.appReady(page)
-  inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   if (!(await inv('workspace:get'))?.path) await lib.openWorkspace(inv, page, ws)
   await page.getByRole('button', { name: 'Task Board' }).click()
   await until(async () => (await page.locator('.board-column').count()) === 6, 10000)
@@ -260,7 +263,7 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   const pageB = app.windows().find((w) => w !== page)
   pageB.on('pageerror', (e) => check('no page errors (second window)', false, e.message))
   await lib.appReady(pageB)
-  const invB = (ch, ...a) => pageB.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const invB = (ch, ...a) => pageB.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(invB, pageB, wsB)
   const bCard = (await invB('tasks:create', { title: 'A card of workspace B', project: 'beta' })).number
   await pageB.getByRole('button', { name: 'Task Board' }).click()
@@ -292,7 +295,7 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   const byWorkspace = async (folder) => {
     for (const w of app.windows()) {
       await lib.appReady(w)
-      if ((await w.evaluate(() => window.hive.invoke('workspace:get')))?.path?.toLowerCase() === folder.toLowerCase()) return w
+      if ((await w.evaluate(() => window.combwork.invoke('workspace:get')))?.path?.toLowerCase() === folder.toLowerCase()) return w
     }
     return null
   }

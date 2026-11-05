@@ -33,7 +33,7 @@ let store: InstanceType<typeof SlotStore>
 
 /** The agents: b1 with a card in flight, b2 in a running lane, b3 with nothing, b4's worktree gone, r1 a reviewer. */
 function writeProject(): void {
-  const agent = (id: string, role: string, worktree = true) => ({ id, name: id.toUpperCase(), provider: 'claude-code', workflowRole: role, ...(worktree ? { worktree: { path: wt(`h${id}`), branch: `hive/h${id}`, base: 'main' } } : {}) })
+  const agent = (id: string, role: string, worktree = true) => ({ id, name: id.toUpperCase(), provider: 'claude-code', workflowRole: role, ...(worktree ? { worktree: { path: wt(`h${id}`), branch: `cw/h${id}`, base: 'main' } } : {}) })
   const agents = [agent('b1', 'builder'), agent('b2', 'builder'), agent('b3', 'builder'), agent('b4', 'builder'), agent('r1', 'reviewer'), agent('b5', 'builder', false)]
   writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id: projectId, agents }))
 }
@@ -50,7 +50,7 @@ beforeAll(async () => {
   gitRepo(project)
   commit(project, { '.gitignore': '.combwork/\n', 'a.txt': 'a\n' }, 'first')
   // Every agent's 0.9 worktree but b4's (deleted since: not adopted).
-  for (const a of ['b1', 'b2', 'b3', 'r1']) sh(project, 'worktree', 'add', '-q', '-b', `hive/h${a}`, wt(`h${a}`))
+  for (const a of ['b1', 'b2', 'b3', 'r1']) sh(project, 'worktree', 'add', '-q', '-b', `cw/h${a}`, wt(`h${a}`))
   mkdirSync(join(project, '.combwork'), { recursive: true })
   writeProject()
   await ws.open(wsPath)
@@ -130,7 +130,7 @@ describe("agents' worktrees become slots (#1441)", () => {
 
   it("another Combwork's adoption first (its own connection): this one adds no second carried lease", async () => {
     // b5 gets a worktree now, adopted by another Combwork before this one's migration runs again.
-    sh(project, 'worktree', 'add', '-q', '-b', 'hive/hb5', wt('hb5'))
+    sh(project, 'worktree', 'add', '-q', '-b', 'cw/hb5', wt('hb5'))
     const other = new SlotStore(fileSlotConn(boardFile(wsPath)), projectId)
     try {
       expect(await other.carry('b5', { name: 'hb5', folder: wt('hb5'), target: 'main' })).not.toBeNull()
@@ -138,7 +138,7 @@ describe("agents' worktrees become slots (#1441)", () => {
       other.conn.close()
     }
     const cfg = JSON.parse(readFileSync(join(project, '.combwork', 'project.json'), 'utf8'))
-    cfg.agents.find((a: { id: string }) => a.id === 'b5').worktree = { path: wt('hb5'), branch: 'hive/hb5', base: 'main' }
+    cfg.agents.find((a: { id: string }) => a.id === 'b5').worktree = { path: wt('hb5'), branch: 'cw/hb5', base: 'main' }
     writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify(cfg))
     await boardWrite(ws, async () => boardWriteOp(ws, (db) => db.prepare("DELETE FROM board_meta WHERE key = 'slot_migration'").run()))
     await migrateSlots(ws)
@@ -171,7 +171,7 @@ describe("agents' worktrees become slots (#1441)", () => {
     const b4 = folderAgent(JSON.parse(readFileSync(join(project, '.combwork', 'project.json'), 'utf8')).agents.find((a: { id: string }) => a.id === 'b4'))
     expect(await run(() => slotsMigrated(project, 'b4'))).toBe(false)
     expect(launchFolder(await run(() => folderFacts(project)), b4, 'build').toLowerCase()).toBe(wt('hb4').toLowerCase())
-    sh(project, 'worktree', 'add', '-q', '-b', 'hive/hb4', wt('hb4'))
+    sh(project, 'worktree', 'add', '-q', '-b', 'cw/hb4', wt('hb4'))
     await migrateSlots(ws)
     expect(carriedOf(ws, projectId, 'b4')?.slot).toBe('hb4')
     expect(await run(() => slotsMigrated(project, 'b4'))).toBe(true)
@@ -196,12 +196,12 @@ describe("Darren's workspace's shape, and solo agents (#1441)", () => {
   let dStore: InstanceType<typeof SlotStore>
   let soloStore: InstanceType<typeof SlotStore>
   const cfgFile = (p: string) => join(p, '.combwork', 'project.json')
-  const builder = (n: number) => ({ id: `hb${n}`, name: `HB${n}`, provider: 'claude-code', workflowRole: 'builder', worktree: { path: join(dTrees, 'hive', `hb${n}`), branch: `hive/hb${n}`, base: 'main' } })
+  const builder = (n: number) => ({ id: `hb${n}`, name: `HB${n}`, provider: 'claude-code', workflowRole: 'builder', worktree: { path: join(dTrees, 'hive', `hb${n}`), branch: `cw/hb${n}`, base: 'main' } })
   const reviewer = (n: number) => ({ id: `hr${n}`, name: `HR${n}`, provider: 'codex', workflowRole: 'reviewer' })
   const agentsOf = (p: string): { id: string }[] => JSON.parse(readFileSync(cfgFile(p), 'utf8')).agents
   const writeD = (p: string, agents: object[]) => writeFileSync(cfgFile(p), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, ...(ids[p] ? { id: ids[p] } : {}), agents }))
   const dAgents = () => [1, 2, 3, 4, 5, 6].flatMap((n) => [builder(n), reviewer(n)])
-  const soloAgents = () => [{ id: 'me', name: 'Me', provider: 'claude-code', worktree: { path: join(dTrees, 'solo', 'me'), branch: 'hive/me', base: 'main' } }]
+  const soloAgents = () => [{ id: 'me', name: 'Me', provider: 'claude-code', worktree: { path: join(dTrees, 'solo', 'me'), branch: 'cw/me', base: 'main' } }]
   const bareAgents = () => [{ id: 'only', name: 'Only', provider: 'claude-code' }]
   const sessionAt = (p: string, id: string, agentId: string, cwd: string) => runD(() => workspace.upsertSession(p, { id, agent: 'claude-code', agentId, cwd, name: id, lastActiveAt: new Date().toISOString() }))
   const recordOf = async (p: string, id: string) => (await runD(() => workspace.sessionsFile(p))).sessions.find((r) => r.id === id)!
@@ -215,10 +215,10 @@ describe("Darren's workspace's shape, and solo agents (#1441)", () => {
       commit(p, { '.gitignore': '.combwork/\n', 'a.txt': 'a\n' }, 'first')
       mkdirSync(join(p, '.combwork'), { recursive: true })
     }
-    for (const n of [1, 2, 3, 4, 5, 6]) sh(hive, 'worktree', 'add', '-q', '-b', `hive/hb${n}`, join(dTrees, 'hive', `hb${n}`))
+    for (const n of [1, 2, 3, 4, 5, 6]) sh(hive, 'worktree', 'add', '-q', '-b', `cw/hb${n}`, join(dTrees, 'hive', `hb${n}`))
     commit(join(dTrees, 'hive', 'hb4'), { 'b.txt': 'unmerged\n' }, 'unmerged')
     sh(hive, 'worktree', 'remove', '--force', join(dTrees, 'hive', 'hb6'))
-    sh(solo, 'worktree', 'add', '-q', '-b', 'hive/me', join(dTrees, 'solo', 'me'))
+    sh(solo, 'worktree', 'add', '-q', '-b', 'cw/me', join(dTrees, 'solo', 'me'))
     writeD(hive, dAgents())
     writeD(solo, soloAgents())
     writeD(bare, bareAgents())

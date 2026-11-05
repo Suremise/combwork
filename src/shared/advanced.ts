@@ -1043,8 +1043,8 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.hive.slots.deleteMergedLines.title', defaultMessage: "Delete a card's branch once it's merged", description: "An advanced setting's title (Settings → Advanced), listed under Combwork. Each card built in a slot (a worktree Hive lends) gets a branch of its own." }),
     desc: msg({
       id: 'settings.advanced.hive.slots.deleteMergedLines.desc',
-      defaultMessage: "Each card built in a slot works on a branch of its own, such as hive/AM/AM-12-fix-the-login. Once the card is Done and its target branch contains the branch's work (a squash merge too), Combwork deletes the branch and notes it on the card. A branch with work that isn't merged, or checked out somewhere, is never deleted. Turned off, the branches stay.",
-      description: 'What the advanced setting "Delete a card\'s branch once it\'s merged" does (Settings → Advanced, under Combwork). A slot is a worktree Hive lends to a card or a lane. Keep hive/AM/AM-12-fix-the-login as it is (an example branch name).'
+      defaultMessage: "Each card built in a slot works on a branch of its own, such as cw/AM/AM-12-fix-the-login. Once the card is Done and its target branch contains the branch's work (a squash merge too), Combwork deletes the branch and notes it on the card. A branch with work that isn't merged, or checked out somewhere, is never deleted. Turned off, the branches stay.",
+      description: 'What the advanced setting "Delete a card\'s branch once it\'s merged" does (Settings → Advanced, under Combwork). A slot is a worktree Combwork lends to a card or a lane. Keep cw/AM/AM-12-fix-the-login as it is (an example branch name).'
     }),
     kind: 'boolean',
     default: true,

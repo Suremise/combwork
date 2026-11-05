@@ -21,7 +21,7 @@ const pseudo = (s: string): boolean => s.includes('[') && !/\b(?:the|and|of|in|i
 
 const origins = () => [
   sessionOrigin(PROJECT, [{ id: 'a-1', name: 'Coder' }], { source: 'hive', agentId: 'a-1', agentName: 'Coder', cwd: PROJECT } as never)!,
-  sessionOrigin(PROJECT, [], { source: 'hive', agentId: 'a-2', agentName: 'Helper', cwd: 'C:\\ws\\hive-wt\\b1', branch: 'hive/b1' } as never)!,
+  sessionOrigin(PROJECT, [], { source: 'hive', agentId: 'a-2', agentName: 'Helper', cwd: 'C:\\ws\\hive-wt\\b1', branch: 'cw/b1' } as never)!,
   sessionOrigin(PROJECT, [], { source: 'hive', agentId: 'a-3', cwd: PROJECT } as never)!,
   sessionOrigin(PROJECT, [], { source: 'hive', cwd: PROJECT } as never)!
 ]
@@ -42,7 +42,7 @@ describe('the sessions area', () => {
     expect([removedAgentName('Coder'), removedAgentName(null)]).toEqual(['Coder (removed)', 'Removed agent'])
     const [mine, gone, unnamed, none] = origins()
     expect(mine).toEqual({ agent: 'Coder', location: 'Project folder', label: 'Coder · Project folder', detail: `Ran in ${PROJECT}\nAgent Coder (a-1).` })
-    expect(gone.label).toBe('Helper (removed) · Worktree · hive/b1')
+    expect(gone.label).toBe('Helper (removed) · Worktree · cw/b1')
     expect(gone.detail).toBe('Ran in C:\\ws\\hive-wt\\b1\nIts agent (a-2) has since been removed.')
     expect(unnamed.agent).toBe('Removed agent')
     expect(none.detail).toBe(`Ran in ${PROJECT}\nNo agent recorded (adopted, or from before Combwork recorded agents).`)
@@ -58,7 +58,7 @@ describe('the sessions area', () => {
     const [mine, gone] = origins()
     expect(mine.agent).toBe('Coder')
     expect(gone.detail).toContain('C:\\ws\\hive-wt\\b1')
-    expect(gone.location).toContain('hive/b1')
+    expect(gone.location).toContain('cw/b1')
   })
 
   // #815: translators work from locales/en, so its English keeps the source's line breaks and separators. A language
@@ -68,7 +68,7 @@ describe('the sessions area', () => {
     const en = { ...catalogue('sessions'), ...catalogue('panes'), ...catalogue('project') }
     const ids = ['sessions.view.usage', 'project.settings.inheritList']
     const messages = ids.map((id) => msg({ id, defaultMessage: en[id].defaultMessage, description: en[id].description }))
-    const values = { context: '120K', output: '8K', prompts: 3, compactions: 1, left: '4m', session: 'S', since: 'today', id: 'abc', branch: 'hive/b1', path: 'C:\\wt', base: 'main', value: 'a\nb' }
+    const values = { context: '120K', output: '8K', prompts: 3, compactions: 1, left: '4m', session: 'S', since: 'today', id: 'abc', branch: 'cw/b1', path: 'C:\\wt', base: 'main', value: 'a\nb' }
     const shown = (cache: string) => messages.map((m) => tr(m as never, { ...values, cache } as never))
     const english = shown('warm')
     expect(english[0]).toBe('120K context · 8K output · 3 prompts · 1 compaction · cache warm 4m')

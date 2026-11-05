@@ -60,7 +60,7 @@ const SAMPLE: RefusalValues = {
   rules: 'submit.checksPassed, approval.given',
   key: 'AM-12',
   earlier: 'AM-11',
-  line: 'hive/b1',
+  line: 'cw/b1',
   alias: '#1061',
   what: workflowText(UNREADABLE.head, { where: 'D:\\work\\am' }),
   rule: 'submit.checksPassed',

@@ -57,8 +57,8 @@ const isIn = (dir, rev, ref) => {
   // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
   lib.git(alpha0, ['config', 'user.name', identity.name])
   lib.git(alpha0, ['config', 'user.email', identity.email])
-  lib.git(alpha0, ['worktree', 'add', '-q', '-b', 'hive/hb1', path.join(treesOf(before), 'hb1'), 'integration'])
-  lib.git(alpha0, ['worktree', 'add', '-q', '-b', 'hive/hr1', path.join(treesOf(before), 'hr1'), 'main'])
+  lib.git(alpha0, ['worktree', 'add', '-q', '-b', 'cw/hb1', path.join(treesOf(before), 'hb1'), 'integration'])
+  lib.git(alpha0, ['worktree', 'add', '-q', '-b', 'cw/hr1', path.join(treesOf(before), 'hr1'), 'main'])
   fs.mkdirSync(path.join(alpha0, '.combwork'), { recursive: true })
   fs.writeFileSync(
     path.join(alpha0, '.combwork', 'project.json'),
@@ -66,8 +66,8 @@ const isIn = (dir, rev, ref) => {
       version: 2,
       platform: 'git',
       agents: [
-        { id: 'b1', name: 'B1', provider: 'claude-code', workflowRole: 'builder', worktree: { path: path.join(treesOf(before), 'hb1'), branch: 'hive/hb1', base: 'integration' } },
-        { id: 'r1', name: 'R1', provider: 'claude-code', workflowRole: 'reviewer', worktree: { path: path.join(treesOf(before), 'hr1'), branch: 'hive/hr1', base: 'main' } },
+        { id: 'b1', name: 'B1', provider: 'claude-code', workflowRole: 'builder', worktree: { path: path.join(treesOf(before), 'hb1'), branch: 'cw/hb1', base: 'integration' } },
+        { id: 'r1', name: 'R1', provider: 'claude-code', workflowRole: 'reviewer', worktree: { path: path.join(treesOf(before), 'hr1'), branch: 'cw/hr1', base: 'main' } },
         { id: 'b2', name: 'B2', provider: 'claude-code', workflowRole: 'builder' }
       ]
     }, null, 2)

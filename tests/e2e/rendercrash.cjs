@@ -51,7 +51,7 @@ process.on('uncaughtException', (e) => {
   const page = await app.firstWindow()
   await lib.fitWindow(app, page, { width: 1300, height: 800 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click()
   const agent = await lib.addAgent(inv, alpha, { name: 'Steady' })
@@ -81,7 +81,7 @@ process.on('uncaughtException', (e) => {
       app.evaluate(({ BrowserWindow }, c) => BrowserWindow.getAllWindows()[0].webContents.executeJavaScript(c), code),
       new Promise((_, reject) => setTimeout(() => reject(new Error('no answer from the page')), 3000))
     ])
-  const invMain = (ch, ...a) => js(`window.hive.invoke(${JSON.stringify(ch)}, ...${JSON.stringify(a)})`)
+  const invMain = (ch, ...a) => js(`window.combwork.invoke(${JSON.stringify(ch)}, ...${JSON.stringify(a)})`)
   const liveMain = async () => (await invMain('session:live')).find((s) => s.agentId === agent.id)
   const shot = async (name) => {
     const b64 = await app.evaluate(async ({ BrowserWindow }) => (await BrowserWindow.getAllWindows()[0].webContents.capturePage()).toPNG().toString('base64'))
@@ -93,7 +93,7 @@ process.on('uncaughtException', (e) => {
     await app.evaluate(({ BrowserWindow }) => void BrowserWindow.getAllWindows()[0].webContents.forcefullyCrashRenderer())
     await lib.sleep(1000) // A fixed wait on purpose: the crash has to take the page down first, so what follows sees the reloaded page, not the old one.
   }
-  const pageBack = () => until(() => js("!!window.hive && !!document.querySelector('.menubar')"), 20000)
+  const pageBack = () => until(() => js("!!window.combwork && !!document.querySelector('.menubar')"), 20000)
   const toastText = () => js(`[...document.querySelectorAll('.toast')].map((t) => t.innerText).find((t) => t.includes("Combwork's window stopped and was reloaded")) ?? ''`)
 
   // --- A crash: reloaded, with a note, the agent still running and its terminal attached.

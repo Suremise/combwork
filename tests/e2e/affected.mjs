@@ -519,7 +519,7 @@ export const AREAS = [
   { paths: ['src/main/templateUpgrade.ts', 'tests/e2e/templatesv2.cjs'], suites: ['templatesv2'] },
   { paths: ['src/main/agentNames.ts', 'src/shared/agentNames.ts'], suites: ['agents', 'agents-ui', 'templatenames', 'templates'] },
   { paths: ['tests/e2e/templatenames.cjs'], suites: ['templatenames'] },
-  { paths: ['src/shared/hiveBranches.ts'], suites: ['agents', 'agents-ui', 'templates', 'templateshare', 'unusedwt', 'changespicker', 'removeall', 'wtrecreate'] },
+  { paths: ['src/shared/agentBranches.ts'], suites: ['agents', 'agents-ui', 'templates', 'templateshare', 'unusedwt', 'changespicker', 'removeall', 'wtrecreate'] },
   { paths: ['src/renderer/src/stripMenus.ts'], suites: ['templates'] },
   { paths: ['src/renderer/src/components/Templates.tsx'], suites: ['templateshare', 'templatesv2'] },
   { paths: ['src/renderer/src/assets/'], suites: ['about', 'providers'] },

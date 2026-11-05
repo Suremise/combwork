@@ -19,10 +19,10 @@ import { followMovedLink } from './combworkMove'
 const log = createLogger('files')
 
 const HIDDEN = new Set(['.git'])
-/** Files the hive-img: protocol may serve to the renderer (image and PDF previews). */
+/** Files the combwork-img: protocol may serve to the renderer (image and PDF previews). */
 export const SERVABLE_EXT = /\.(png|jpe?g|gif|webp|bmp|ico|pdf)$/i
 const SERVABLE_TYPES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp', ico: 'image/x-icon', pdf: 'application/pdf' }
-/** The content type hive-img: serves a servable file as. */
+/** The content type combwork-img: serves a servable file as. */
 export const servableType = (p: string): string => SERVABLE_TYPES[p.slice(p.lastIndexOf('.') + 1).toLowerCase()] ?? 'application/octet-stream'
 
 const toRel = (root: string, abs: string): string => relative(root, abs).split(sep).join('/')

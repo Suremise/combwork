@@ -46,7 +46,7 @@ const check = (name, ok, extra = '') => {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const until = (fn, ms = 10000) => lib.until(fn, ms)
   const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
@@ -287,9 +287,12 @@ const check = (name, ok, extra = '') => {
   const coderToken = launch.token
   // HI-2262: its session has the token's file, never the token in its environment (an `env` listing printed it).
   check("Coder's session has CW_API_TOKEN_FILE and its token, never CW_API_TOKEN", !!launch.env?.CW_API_TOKEN_FILE && /^[0-9a-f]{64}$/.test(coderToken ?? '') && !('CW_API_TOKEN' in (launch.env ?? {})), JSON.stringify(Object.keys(launch.env ?? {})))
+  let oldNotice = false
   const asCoder = async (p, method = 'GET', body) => {
-    const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${coderToken}`, 'X-Hive-Workspace': encodeURIComponent(ws), 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
-    const notice = res.headers.get('x-hive-notice')
+    const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${coderToken}`, 'X-Combwork-Workspace': encodeURIComponent(ws), 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
+    const notice = res.headers.get('x-combwork-notice')
+    // HI-2588: renamed outright: the name before 1.1 is never sent.
+    if (res.headers.has('x-hive-notice')) oldNotice = true
     return { status: res.status, notice: notice ? decodeURIComponent(notice) : null }
   }
   await inv('tasks:update', n, { agent: coder.id })
@@ -329,6 +332,7 @@ const check = (name, ok, extra = '') => {
   const moved = await asCoder(`/v1/tasks/${n}`, 'PATCH', { column: 'review', reply: 'short' })
   check('moving the card to Review with a decision unread: that reply flags it', moved.status === 200 && moved.notice === `[CW] ${named} has 1 new decision since you last read it: read the card (cw_read_task) at your next checkpoint.`, JSON.stringify(moved))
   check('…and once out of its hands, its next replies say nothing more', (await asCoder('/v1/projects/alpha')).notice === null)
+  check('no reply carried the old X-Hive-Notice header (HI-2588)', !oldNotice)
 
   await app.close()
   console.log(failed ? `\n${failed} check(s) failed` : '\nAll checks passed')
