@@ -56,7 +56,7 @@ describe('Assistant settings', () => {
     expect(at({})).toBe(500000)
     expect(at({ compactSuggestTokens: 300000 })).toBe(300000)
     expect(at({ compactSuggestTokens: 0 })).toBe(0)
-    // A value the host's file kept (an older Combwork's, or the project setting's) doesn't win over Settings → Assistant.
+    // A value the host's file kept (an older Hive's, or the project setting's) doesn't win over Settings → Assistant.
     expect(at({}, { compactSuggestTokens: 50000 })).toBe(500000)
     // Settings that lack it (a missing assistant section) still get the default.
     expect(compactThreshold(assistantProjectConfig(cfg(), {} as AppSettings), 200000)).toBe(500000)

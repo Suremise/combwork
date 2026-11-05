@@ -1,5 +1,5 @@
 // The board in SQLite (#1017): the database layer (settings, migrations, a file from a newer Combwork), the move of the cards'
-// files into it (once, checked, the folder kept as a backup and a stub left for older versions), cards an older Combwork saved
+// files into it (once, checked, the folder kept as a backup and a stub left for older versions), cards an older Hive saved
 // meanwhile, Export Board to JSON (an export read back is the same board), and the window's board with archived cards in short.
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
 import { join, resolve, sep } from 'path'
@@ -332,7 +332,7 @@ describe("moving the cards' files in (#1017)", () => {
     const again = await open(ws)
     expect((await inWorkspace(again, () => tasks.allTasks(again))).map((c) => c.number).sort((a, b) => a - b)).toEqual([1, 2, 40])
     expect(hiveFolders(ws).filter((f) => f.startsWith('tasks.'))).toEqual([kept])
-    // Closed, the stub's next number is the board's (an older Combwork opening it never reuses one).
+    // Closed, the stub's next number is the board's (an older Hive opening it never reuses one).
     await disposeWorkspaceService(again)
     expect(JSON.parse(readFileSync(join(ws, '.combwork', 'tasks', 'board.json'), 'utf8')).next).toBe(41)
   })
@@ -361,8 +361,8 @@ describe("moving the cards' files in (#1017)", () => {
   })
 })
 
-describe("cards an older Combwork saved meanwhile (#1017 downgrade, Darren's decision of 17 Oct: none taken back on its own)", () => {
-  /** A workspace moved to the board (its board opened once and closed), and the stub an older Combwork writes in. */
+describe("cards an older Hive saved meanwhile (#1017 downgrade, Darren's decision of 17 Oct: none taken back on its own)", () => {
+  /** A workspace moved to the board (its board opened once and closed), and the stub an older Hive writes in. */
   async function moved(files: Record<string, string>): Promise<{ ws: string; stub: string }> {
     const ws = workspaceWith(files)
     const w = await open(ws)
@@ -523,7 +523,7 @@ describe('reviewing the set-aside cards (#1044, Darren\'s decision on #1017: the
     expect((await inWorkspace(w, () => tasks.createTask({ title: 'After', project: 'p' }, user))).number).toBe(7)
   })
 
-  it('Add keeps every field the older Combwork stored: its own fields and past holds for its cost; a review under way there ends (#1044 round 1)', async () => {
+  it('Add keeps every field the older Hive stored: its own fields and past holds for its cost; a review under way there ends (#1044 round 1)', async () => {
     const holds = [
       { agent: 'a-past', name: 'Past Builder', role: 'build', from: '2026-10-05T01:00:00.000Z', to: '2026-10-05T02:00:00.000Z' },
       { agent: 'a-rev', name: 'Past Reviewer', role: 'review', from: '2026-10-05T03:00:00.000Z' }
@@ -591,8 +591,8 @@ describe('reviewing the set-aside cards (#1044, Darren\'s decision on #1017: the
 
 const titlesOf = async (w: WS): Promise<string[]> => (await inWorkspace(w, () => tasks.allTasks(w))).map((c) => `#${c.number} ${c.title}`).sort()
 
-describe('numbers an older Combwork could take (#1017 round 1)', () => {
-  it("the stub's next number moves on as each number is taken, before Combwork closes (ended without closing, an older Combwork never reuses one)", async () => {
+describe('numbers an older Hive could take (#1017 round 1)', () => {
+  it("the stub's next number moves on as each number is taken, before Combwork closes (ended without closing, an older Hive never reuses one)", async () => {
     const ws = workspaceWith({ '1.json': fileOf(card(1)) })
     const w = await open(ws)
     const made = await inWorkspace(w, () => tasks.createTask({ title: 'Made in 0.9', project: 'p' }, user))
@@ -606,7 +606,7 @@ describe('numbers an older Combwork could take (#1017 round 1)', () => {
     let w = await open(ws)
     expect((await inWorkspace(w, () => tasks.createTask({ title: 'Next', project: 'p' }, user))).number).toBe(3)
     await disposeWorkspaceService(w)
-    // A damaged file an older Combwork left in the stub: its number is past the board's, and kept from new cards.
+    // A damaged file an older Hive left in the stub: its number is past the board's, and kept from new cards.
     writeFileSync(join(ws, '.combwork', 'tasks', '9.json'), '{ damaged too')
     w = await open(ws)
     expect((await inWorkspace(w, () => tasks.createTask({ title: 'After', project: 'p' }, user))).number).toBe(10)
@@ -623,7 +623,7 @@ describe('Export Board to JSON (#1017)', () => {
     expect(readdirSync(out).sort()).toEqual(['1.json', '2.json', 'board.json'])
     expect(JSON.parse(readFileSync(join(out, '1.json'), 'utf8'))).toEqual(store.cardDoc(w, 1))
     expect(JSON.parse(readFileSync(join(out, 'board.json'), 'utf8')).next).toBe(9)
-    // The export as an older Combwork's board folder, opened by this one: the same cards.
+    // The export as an older Hive's board folder, opened by this one: the same cards.
     const copy = workspaceWith(Object.fromEntries(readdirSync(out).map((f) => [f, readFileSync(join(out, f), 'utf8')])))
     // Its project the same project (its id with it), as a workspace copied whole would have it.
     writeFileSync(join(copy, 'p', '.combwork', 'project.json'), readFileSync(join(ws, 'p', '.combwork', 'project.json')))

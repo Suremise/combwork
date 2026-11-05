@@ -50,7 +50,7 @@ function project(ws: string, name: string, extra: Record<string, unknown> = {}, 
   writeFileSync(join(p, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: sessions.map((id) => ({ id, agent: 'claude-code', name: id, createdAt: '2026-10-01T00:00:00.000Z', lastActiveAt: '2026-10-01T00:00:00.000Z', archived: false })) }))
   return p
 }
-/** A handover as an older Combwork wrote it (no owner recorded): its name's project slug, and its header. */
+/** A handover as an older Hive wrote it (no owner recorded): its name's project slug, and its header. */
 function oldHandover(ws: string, file: string, projectName: string, session?: string): void {
   mkdirSync(join(ws, '.combwork', 'shared', 'handovers'), { recursive: true })
   writeFileSync(join(ws, '.combwork', 'shared', 'handovers', file), `# Handover\n\n- **Project:** ${projectName}\n${session ? `- **Session:** ${session}\n` : ''}- **Date:** 2026-10-01 10:00 (2026-10-01T10:00:00Z)\n\nWhere things stand.\n`)
@@ -110,7 +110,7 @@ describe('a project renamed: found by its id (#514)', () => {
   it('from before (project.json lastPath in this folder, no record yet): once; a copy, even of a renamed project, never', async () => {
     const ws = newWs()
     project(ws, 'website', { id: 'p-00000000aaaa', lastPath: join(ws, 'hive-website') })
-    // Copied by an older Combwork (no ids), its original still a project.
+    // Copied by an older Hive (no ids), its original still a project.
     project(ws, 'old', { lastPath: join(ws, 'old') })
     cpSync(join(ws, 'old'), join(ws, 'old-2'), { recursive: true })
     let w = await open(ws)

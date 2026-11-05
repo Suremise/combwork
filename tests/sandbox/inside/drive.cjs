@@ -115,7 +115,7 @@ async function providerSetup() {
 /** HKCU's Run values that start Hive.exe or Combwork.exe (Launch at login): [{ name, command }]. */
 function runValues() {
   try {
-    const out = ps("$k = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'; if (Test-Path $k) { $i = Get-Item $k; @($i.Property | ForEach-Object { [ordered]@{ name = $_; command = [string]$i.GetValue($_) } } | Where-Object { $_.command -match 'Combwork\\.exe|Combwork\\.exe' }) | ConvertTo-Json -Compress }")
+    const out = ps("$k = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'; if (Test-Path $k) { $i = Get-Item $k; @($i.Property | ForEach-Object { [ordered]@{ name = $_; command = [string]$i.GetValue($_) } } | Where-Object { $_.command -match 'Hive\\.exe|Combwork\\.exe' }) | ConvertTo-Json -Compress }")
     if (!out) return []
     const v = JSON.parse(out)
     return Array.isArray(v) ? v : [v]

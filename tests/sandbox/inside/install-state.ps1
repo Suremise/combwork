@@ -2,7 +2,7 @@
 #   install-state.ps1 -Out C:\out\<name>.json
 # Both identities (HI-2460): Combwork (it.surmise.combwork, Programs\Combwork\Combwork.exe) and Hive Desktop before it
 # (com.hive.desktop, Programs\Hive\Hive.exe). Installed-apps entries (HKCU and HKLM Uninstall keys whose DisplayName
-# starts with "Combwork" or "Combwork"), each install folder, the profile folders (roaming and local, with the installer's
+# starts with "Hive" or "Combwork"), each install folder, the profile folders (roaming and local, with the installer's
 # record), the shortcuts on the Desktop and in the Start menu (with their targets), and the Run values that start
 # either exe (Launch at login). `installDir` and `profileDir` are the current app's: Combwork's when it is installed.
 param([Parameter(Mandatory = $true)][string]$Out)

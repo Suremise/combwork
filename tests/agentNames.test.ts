@@ -119,7 +119,7 @@ describe('Combwork keeps agent names unique across the workspace', () => {
   it('a rename to a name taken elsewhere is refused; its own name again is no change, even one it shares from before', async () => {
     const oldId = ids(beta)[0]
     await expect(run(() => updateAgent(beta, oldId, { name: 'r1' }))).rejects.toThrow(/already an agent called "R1" in alpha/)
-    // A duplicate from before (written as an older Combwork might have): it keeps working, and saves its other settings.
+    // A duplicate from before (written as an older Hive might have): it keeps working, and saves its other settings.
     await run(() => w.mutateProjectConfig(beta, (c) => ({ agents: c.agents.map((a) => (a.id === oldId ? { ...a, name: 'B1' } : a)) })))
     expect((await run(() => updateAgent(beta, oldId, { name: 'B1', role: 'builder' }))).role).toBe('builder')
     await run(() => updateAgent(beta, oldId, { name: 'Old' }))

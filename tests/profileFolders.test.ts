@@ -5,7 +5,7 @@ import { chooseProfile, choiceLine } from '../src/main/profileFolders'
 import { tempDir } from './tempDir'
 
 // HI-2461: the app only chooses its profile folders (the installer moves them, HI-2460): Combwork's when it is there,
-// Combwork's as a fallback, never moving, locking or deleting; and after the installer's move, the sign-in check once.
+// Hive's as a fallback, never moving, locking or deleting; and after the installer's move, the sign-in check once.
 
 const accounts = vi.hoisted(() => ({ list: [] as { id: string; name: string; kind?: string }[] }))
 const toasts = vi.hoisted(() => [] as { level: string; title: string; message?: string }[])
@@ -28,7 +28,7 @@ describe('choosing the profile folder (HI-2461)', () => {
     expect(chooseProfile(p, 'Hive', 'Combwork')).toMatchObject({ use: join(p, 'Combwork'), fallback: false })
   })
 
-  it("not moved yet: Combwork's is used as the fallback, and left as it is", () => {
+  it("not moved yet: Hive's is used as the fallback, and left as it is", () => {
     const p = tempDir('pf-fallback-')
     mkdirSync(join(p, 'Hive'))
     writeFileSync(join(p, 'Hive', 'config.json'), '{}')
@@ -39,7 +39,7 @@ describe('choosing the profile folder (HI-2461)', () => {
     expect(tree(join(p, 'Hive'))).toEqual(['config.json'])
   })
 
-  it("both there: Combwork's is used, and Combwork's is never touched", () => {
+  it("both there: Combwork's is used, and Hive's is never touched", () => {
     const p = tempDir('pf-both-')
     mkdirSync(join(p, 'Combwork'))
     mkdirSync(join(p, 'Hive'))
@@ -48,7 +48,7 @@ describe('choosing the profile folder (HI-2461)', () => {
     expect(readFileSync(join(p, 'Hive', 'kept.txt'), 'utf8')).toBe('old')
   })
 
-  it("a file named like Combwork's folder: Combwork's folder is used", () => {
+  it("a file named like Combwork's folder: Hive's folder is used", () => {
     const p = tempDir('pf-file-')
     writeFileSync(join(p, 'Combwork'), 'not a folder')
     mkdirSync(join(p, 'Hive'))
@@ -69,7 +69,7 @@ describe('choosing the profile folder (HI-2461)', () => {
     }
   })
 
-  it("Combwork's folder that can't be looked at, Combwork's missing: Combwork's is used (never a blank Combwork in its place), for roaming and local alike", () => {
+  it("Hive's folder that can't be looked at, Combwork's missing: Hive's is used (never a blank Combwork in its place), for roaming and local alike", () => {
     const p = tempDir('pf-legacy-unreadable-')
     for (const parent of [join(p, 'appdata'), join(p, 'localappdata')]) {
       mkdirSync(parent, { recursive: true })
@@ -88,7 +88,7 @@ describe('choosing the profile folder (HI-2461)', () => {
     }
   })
 
-  it("only ENOENT and ENOTDIR count as missing: Combwork's folder is used then", () => {
+  it("only ENOENT and ENOTDIR count as missing: Hive's folder is used then", () => {
     const p = tempDir('pf-missing-')
     mkdirSync(join(p, 'Hive'))
     for (const code of ['ENOENT', 'ENOTDIR']) {
@@ -128,7 +128,7 @@ describe('the fallback notice (HI-2461)', () => {
 })
 
 describe("a start between the installer's record and its rename (HI-2460)", () => {
-  it("runs on Combwork's folders, says so, and never checks sign-ins: the record waits in Combwork's folder, untouched", async () => {
+  it("runs on Hive's folders, says so, and never checks sign-ins: the record waits in Hive's folder, untouched", async () => {
     const { setProfileChoices } = await import('../src/main/profileFolders')
     const { startProfileNotices } = await import('../src/main/profileNotices')
     toasts.length = 0

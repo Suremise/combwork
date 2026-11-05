@@ -374,7 +374,7 @@ describe('a workspace', () => {
       expect(cfg.agents.find((a) => a.id === 'assistant')).toMatchObject({ mode: 'my-own' })
       expect(cfg.agents.find((a) => a.id === 'assistant')).not.toHaveProperty('persona')
 
-      // An older Combwork opening it again makes .combwork/personas once more: it is left alone, and .combwork/modes is used.
+      // An older Hive opening it again makes .combwork/personas once more: it is left alone, and .combwork/modes is used.
       mkdirSync(legacy, { recursive: true })
       writeFileSync(join(legacy, 'coordinator.md'), OLD_COORDINATOR)
       await wsMod.inWorkspace(w, () => mod.syncBundled())

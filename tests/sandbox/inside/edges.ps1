@@ -135,7 +135,7 @@ try {
   LetGo $held
   WaitFor { Free $hiveExe } 'Hive.exe let go'
 
-  # 8.5: Combwork running on Combwork's folders (the fallback), with its window: the installer closes it, removes what is
+  # 8.5: Combwork running on Hive's folders (the fallback), with its window: the installer closes it, removes what is
   # left of Hive Desktop, and moves the folders.
   InstallPrev
   $p = Start-Process -FilePath $combExe -PassThru

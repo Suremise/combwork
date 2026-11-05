@@ -251,7 +251,7 @@ function exportFile(opts: { scope?: any; sanitized?: boolean; own?: boolean; obs
     dropped: opts.dropped ?? 0,
     ...(opts.unattributed ? { lossesUnattributed: true } : {})
   }
-  return JSON.stringify({ schema: 'hive-metrics/1', app: { name: 'Combwork', version: '0.3.1' }, exportedAt: new Date(to).toISOString(), sanitized: !!opts.sanitized, report })
+  return JSON.stringify({ schema: 'hive-metrics/1', app: { name: 'Hive', version: '0.3.1' }, exportedAt: new Date(to).toISOString(), sanitized: !!opts.sanitized, report })
 }
 
 describe('what Compare says about its measures', () => {

@@ -509,7 +509,7 @@ describe('moved into the workspace database (#1019)', () => {
   const hourOf = (t: number) => Math.floor(t / HOUR) * HOUR
   const dirOf = (path: string) => join(path, '.combwork', 'metrics')
   const backups = (path: string) => readdirSync(dirOf(path)).filter((f) => f.startsWith('metrics.json.imported-'))
-  /** A workspace folder never opened, with its metrics folder (an older Combwork's). */
+  /** A workspace folder never opened, with its metrics folder (an older Hive's). */
   const fresh = () => {
     const path = join(base, `ws-${++n}`)
     mkdirSync(dirOf(path), { recursive: true })
@@ -594,7 +594,7 @@ describe('moved into the workspace database (#1019)', () => {
     expect(whole(w)).toEqual(before)
     await w.close()
     await metrics.flushMetrics()
-    // An older Combwork's metrics.json written after the move: kept as a backup too, never read.
+    // An older Hive's metrics.json written after the move: kept as a backup too, never read.
     const later = JSON.stringify({ version: 1, buckets: [{ start: hourOf(T0), span: 'hour', projects: { beta: { api: { 'GET /v1/tasks agent ok': series } } } }] })
     writeFileSync(join(dirOf(path), 'metrics.json'), later)
     await w.open(path)
@@ -638,7 +638,7 @@ describe('moved into the workspace database (#1019)', () => {
     expect(data.observed.length).toBeGreaterThan(1)
     await disposeWorkspaceService(src)
 
-    // An older Combwork's workspace with that metrics.json: the reports the Overview and Performance show, the whole range
+    // An older Hive's workspace with that metrics.json: the reports the Overview and Performance show, the whole range
     // and the last two days (hourly), for the workspace and each project.
     // Recording off while it is opened and reopened: a reopen is a new stretch of observation otherwise (a close is a
     // gap), the one difference that isn't the move's.

@@ -323,6 +323,24 @@ test('what the Sandbox driver relies on in Combwork\'s window, IPC and Agent API
   for (const f of ['fake-claude/fake-claude.cjs', 'fake-bridge.cjs']) assert.ok(fs.existsSync(path.join(__dirname, 'e2e', f)), f)
 })
 
+// The driver's Launch at login reading (drive.cjs runValues, HI-2460): HKCU's Run values that start either exe, Hive Desktop's
+// Hive.exe before the upgrade and Combwork.exe after, so 4.login-registered sees the old one and 4.login-moved a stale one
+// (HI-2567 round 1's finding). Its PowerShell filter, -match (case-insensitive), applied to stand-in Run values.
+test("the driver's Launch at login reading keeps Hive.exe's and Combwork.exe's Run values, and nothing else", () => {
+  const drive = fs.readFileSync(path.join(SANDBOX, 'inside', 'drive.cjs'), 'utf8')
+  const body = drive.slice(drive.indexOf('function runValues()'))
+  const filter = /\$_\.command -match '([^']+)'/.exec(body.slice(0, body.indexOf('\n}')))?.[1]
+  assert.ok(filter, 'runValues filters its Run values with -match')
+  const re = new RegExp(filter.replace(/\\\\/g, '\\'), 'i')
+  const hive = { name: 'electron.app.Hive Desktop', command: '"C:\\Users\\u\\AppData\\Local\\Programs\\Hive\\Hive.exe" --hidden' }
+  const combwork = { name: 'electron.app.Combwork', command: '"C:\\Users\\u\\AppData\\Local\\Programs\\Combwork\\Combwork.exe" --hidden' }
+  const other = { name: 'OneDrive', command: '"C:\\Program Files\\Microsoft OneDrive\\OneDrive.exe" /background' }
+  const kept = (values: { name: string; command: string }[]) => values.filter((v) => re.test(v.command)).map((v) => v.name)
+  assert.deepStrictEqual(kept([hive, other]), [hive.name])
+  assert.deepStrictEqual(kept([hive, combwork, other]), [hive.name, combwork.name])
+  assert.deepStrictEqual(kept([other]), [])
+})
+
 // The driver's readiness (tests/sandbox/inside/ready.cjs): what Combwork says is done, never a quiet spell. Each case holds a
 // loading state unchanged for many polls before the ready one: the wait must not end on it (HI-2298 round 2's finding).
 const ready = require('./sandbox/inside/ready.cjs')
