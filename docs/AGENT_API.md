@@ -606,7 +606,7 @@ The event stream sends `queue-changed` (`{ workspacePath, project, target }`: re
 
 From api.version 9 (#1561). The two releases an agent's ⋯ menu offers in Combwork's window (SPEC §16.10.3), by slot name: a **carried slot** (an agent's 0.9 worktree, kept for it as a slot since the upgrade) stops being kept for it, and a **held writer** (an agent's run that has ended but still holds its slot, because Combwork doesn't know that everything it started there has ended: Combwork closed unexpectedly with it running, or its processes were kept running) is cleared. Anyone who may read the project lists them (a project agent its own project's). Releasing is the user's (in Combwork's window) and the Assistant's within Settings → Assistant → Control (Control agents): a project agent is refused (`403`), and so is a script (`403`). Each release the Assistant makes is in its actions (`release-slot`), and undo can't take it back.
 
-`GET /v1/projects/{name}/slots/releasable` — what the project has to release:
+`GET /v1/projects/{name}/slots/releasable` — what the project has to release (from api.version 14, HI-2591, a held writer names its Combwork as `combwork`; it was `hive`):
 
 ```json
 { "project": "alpha",
