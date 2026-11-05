@@ -42,7 +42,7 @@ vi.setConfig({ testTimeout: 30_000 })
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
 const HUNG_MS = 10_000
 
-const fact = { kind: 'baseline', version: '1.0.0-rc.1', commit: '1fef5341a2b3c4d5e6f708192a3b4c5d6e7f8091', branch: '1.0.0', installer: 'D:\\HIVE\\hive\\dist\\Hive-Setup-1.0.0-rc.1.exe', builtAt: '2026-10-24T11:00:00.000Z', by: 'dist' }
+const fact = { kind: 'baseline', version: '1.0.0-rc.1', commit: '1fef5341a2b3c4d5e6f708192a3b4c5d6e7f8091', branch: '1.0.0', installer: 'D:\\Work\\demo\\dist\\Combwork-Setup-1.0.0-rc.1.exe', builtAt: '2026-10-24T11:00:00.000Z', by: 'dist' }
 
 describe('a build fact', () => {
   it('has the same kinds in the scripts and in Combwork', () => {
@@ -114,16 +114,16 @@ describe('a build fact', () => {
   })
 
   it("reads the installer's path from dist's lines", () => {
-    expect(script.installerOf(['Installer: D:\\HIVE\\hive\\dist\\Hive-Setup-1.0.0.exe (copied from this worktree, which keeps its own)'])).toBe('D:\\HIVE\\hive\\dist\\Hive-Setup-1.0.0.exe')
-    expect(script.installerOf(['Not copied to the main checkout: no.', 'Installer: C:\\wt\\dist\\Hive-Setup-1.0.0.exe (this worktree). Run again with --replace to copy it over anyway.'])).toBe('C:\\wt\\dist\\Hive-Setup-1.0.0.exe')
-    expect(script.installerOf(['Installer: C:\\wt\\dist\\Hive-Setup-1.0.0.exe'])).toBe('C:\\wt\\dist\\Hive-Setup-1.0.0.exe')
+    expect(script.installerOf(['Installer: D:\\Work\\demo\\dist\\Combwork-Setup-1.0.0.exe (copied from this worktree, which keeps its own)'])).toBe('D:\\Work\\demo\\dist\\Combwork-Setup-1.0.0.exe')
+    expect(script.installerOf(['Not copied to the main checkout: no.', 'Installer: C:\\wt\\dist\\Combwork-Setup-1.0.0.exe (this worktree). Run again with --replace to copy it over anyway.'])).toBe('C:\\wt\\dist\\Combwork-Setup-1.0.0.exe')
+    expect(script.installerOf(['Installer: C:\\wt\\dist\\Combwork-Setup-1.0.0.exe'])).toBe('C:\\wt\\dist\\Combwork-Setup-1.0.0.exe')
     expect(script.installerOf([])).toBeNull()
   })
 })
 
 describe('the scripts tell Combwork of a build', () => {
   const ws = join(base, 'scripts-ws')
-  const repo = join(ws, 'hive')
+  const repo = join(ws, 'demo')
   const markers = (): string[] => (existsSync(join(ws, '.combwork', 'builds')) ? readdirSync(join(ws, '.combwork', 'builds')) : [])
   const env = { CW_WORKSPACE: ws }
   // The session's token in its file (HI-2262: never CW_API_TOKEN).

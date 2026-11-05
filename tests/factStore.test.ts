@@ -717,9 +717,9 @@ describe("a card by its key (#1294)", () => {
   })
 
   it('the name form trailers were written with still finds a card where its name is no key; a card without a key keeps that name', () => {
-    const { file, ids } = board([['other', 1], ['hive', 1], ['alpha-web', null]], [['p-other', 'OT', true], ['p-hive', 'HI', true]])
-    const hive = storeOf(file, 'hive')
-    expect(byKey(hive, [`hive-${ids[1]}`, 'HI-1', 'hive-1'])).toEqual({ [`hive-${ids[1]}`]: ids[1], 'HI-1': ids[1], 'hive-1': null })
+    const { file, ids } = board([['other', 1], ['demo', 1], ['alpha-web', null]], [['p-other', 'OT', true], ['p-demo', 'DE', true]])
+    const demo = storeOf(file, 'demo')
+    expect(byKey(demo, [`demo-${ids[1]}`, 'DE-1', 'demo-1'])).toEqual({ [`demo-${ids[1]}`]: ids[1], 'DE-1': ids[1], 'demo-1': null })
     const web = storeOf(file, 'alpha-web')
     expect([web.projectKey(), web.card(ids[2]).key, web.cardByKey(`alpha-web-${ids[2]}`)?.id]).toEqual(['alpha-web', `alpha-web-${ids[2]}`, ids[2]])
   })

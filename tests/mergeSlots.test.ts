@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HOLD_MS, KEEP_PLACE_MS, MAX_WAIT_MS, MergeSlots, PROGRESS_FRESH_MS, parseSlotRecords, slotBranch, slotCards, type SlotAgent } from '../src/main/mergeSlots'
 
-const P = 'C:\\ws\\hive'
+const P = 'C:\\ws\\alpha'
 const agent = (name: string, runId = `${name}-run`): SlotAgent => ({ projectPath: P, agentId: name.toLowerCase(), agentName: name, runId })
 
 function setup() {
@@ -396,12 +396,12 @@ describe('merge slot', () => {
 
   it('lists a workspace\'s slots, not another folder\'s with a similar name', async () => {
     const { slots, start } = setup()
-    const [a, b] = [agent('A'), { ...agent('B'), projectPath: 'C:\\ws2\\hive' }]
+    const [a, b] = [agent('A'), { ...agent('B'), projectPath: 'C:\\ws2\\alpha' }]
     start(a, b)
     await slots.claim(a, P, 'main', [], 0)
-    await slots.claim(b, 'C:\\ws2\\hive', 'main', [], 0)
+    await slots.claim(b, 'C:\\ws2\\alpha', 'main', [], 0)
     expect(slots.list('C:\\ws').map((s) => s.project)).toEqual([P])
-    expect(slots.list('C:\\WS2').map((s) => s.project)).toEqual(['C:\\ws2\\hive'])
+    expect(slots.list('C:\\WS2').map((s) => s.project)).toEqual(['C:\\ws2\\alpha'])
   })
 
   it('keeps a record of agents\' holds that a restart can read back, ignoring anything malformed', async () => {

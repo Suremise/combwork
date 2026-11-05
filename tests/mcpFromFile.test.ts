@@ -195,12 +195,12 @@ describe('Add MCP Server from File', () => {
     expect(preview.runs).toEqual(['Runs: node ${CW_MCP_DIR}/both/new.js'])
     await run(() => mcp.addMcpFromFile(file('both.zip', both), 'both'))
     expect(readdirSync(join(mcpDir, 'both'))).toEqual(['new.js'])
-    // The names before 1.1 (hive-mcp.json, ${HIVE_MCP_DIR}) aren't read: a zip with only them has no definition, and
-    // an old variable in a definition stays as written (it isn't the MCP folder).
-    await expect(run(() => mcp.previewMcpFile(file('old.zip', zipSync({ 'old/hive-mcp.json': json(CW), 'old/server.js': strToU8('//') }))))).rejects.toThrow('No combwork-mcp.json or combwork-mcp.example.json found')
-    await expect(run(() => mcp.previewMcpFile(file('old.zip', zipSync({ 'hive-mcp.example.json': json(CW) }))))).rejects.toThrow('No combwork-mcp.json')
-    expect(mcp.toLaunchDef({ command: 'node', args: ['${HIVE_MCP_DIR}/a/x.js'] }, 'C:\\ws\\.combwork\\mcp').args).toEqual(['${HIVE_MCP_DIR}/a/x.js'])
-    expect(mcp.retarget({ command: 'node', args: ['${HIVE_MCP_DIR}/a/x.js'] }, 'a', 'b').args).toEqual(['${HIVE_MCP_DIR}/a/x.js'])
+    // Other names (my-mcp.json, ${MY_MCP_DIR}) aren't read: a zip with only them has no definition, and
+    // another variable in a definition stays as written (it isn't the MCP folder).
+    await expect(run(() => mcp.previewMcpFile(file('old.zip', zipSync({ 'old/my-mcp.json': json(CW), 'old/server.js': strToU8('//') }))))).rejects.toThrow('No combwork-mcp.json or combwork-mcp.example.json found')
+    await expect(run(() => mcp.previewMcpFile(file('old.zip', zipSync({ 'my-mcp.example.json': json(CW) }))))).rejects.toThrow('No combwork-mcp.json')
+    expect(mcp.toLaunchDef({ command: 'node', args: ['${MY_MCP_DIR}/a/x.js'] }, 'C:\\ws\\.combwork\\mcp').args).toEqual(['${MY_MCP_DIR}/a/x.js'])
+    expect(mcp.retarget({ command: 'node', args: ['${MY_MCP_DIR}/a/x.js'] }, 'a', 'b').args).toEqual(['${MY_MCP_DIR}/a/x.js'])
     // A .json named as a definition is named after its folder.
     const dir = join(files, `case-${cases}`, 'cw-notes')
     mkdirSync(dir, { recursive: true })
@@ -341,8 +341,8 @@ describe('Add MCP Server from File', () => {
     await expect(run(() => mcp.previewMcpFile(file('server.txt', 'x')))).rejects.toThrow('Choose a .json definition or a .zip of a server folder.')
     await expect(run(() => mcp.previewMcpFile(file('x.json', '{oops')))).rejects.toThrow("x.json isn't valid JSON")
     await expect(run(() => mcp.addMcpFromFile(file('x.json', JSON.stringify({ command: 'node' })), 'combwork'))).rejects.toThrow('"combwork" is reserved')
-    // A file named combwork.json gets another name to suggest; hive.json is an ordinary name (HI-2594).
+    // A file named combwork.json gets another name to suggest; any other is an ordinary name (HI-2594).
     expect((await run(() => mcp.previewMcpFile(file('combwork.json', JSON.stringify({ command: 'node' }))))).name).toBe('server')
-    expect((await run(() => mcp.previewMcpFile(file('hive.json', JSON.stringify({ command: 'node' }))))).name).toBe('hive')
+    expect((await run(() => mcp.previewMcpFile(file('acme.json', JSON.stringify({ command: 'node' }))))).name).toBe('acme')
   })
 })

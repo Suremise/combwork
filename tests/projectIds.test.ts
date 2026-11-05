@@ -64,25 +64,25 @@ describe('orphanNames', () => {
   const r = (name: string, ...agents: string[]) => ({ name, agents })
   const projects = [
     { name: 'website', agents: new Set(['a-claude', 'a-wb1']) },
-    { name: 'hive', agents: new Set(['a-hb1']) }
+    { name: 'acme', agents: new Set(['a-hb1']) }
   ]
 
   it("gives a name's records to the one project whose agents worked on them, the agentless ones too", () => {
-    expect(orphanNames([r('hive-website', 'a-claude'), r('hive-website'), r('hive', 'a-hb1'), r('')], ['website', 'hive'], projects)).toEqual([{ from: 'hive-website', to: 'website' }])
+    expect(orphanNames([r('acme-website', 'a-claude'), r('acme-website'), r('acme', 'a-hb1'), r('')], ['website', 'acme'], projects)).toEqual([{ from: 'acme-website', to: 'website' }])
   })
 
   it("leaves a name alone when its records' agents are no project's, or more than one's", () => {
-    expect(orphanNames([r('gone', 'a-nobody'), r('gone')], ['website', 'hive'], projects)).toEqual([])
-    expect(orphanNames([r('mixed', 'a-claude'), r('mixed', 'a-hb1')], ['website', 'hive'], projects)).toEqual([])
+    expect(orphanNames([r('gone', 'a-nobody'), r('gone')], ['website', 'acme'], projects)).toEqual([])
+    expect(orphanNames([r('mixed', 'a-claude'), r('mixed', 'a-hb1')], ['website', 'acme'], projects)).toEqual([])
   })
 
   it('a project Repair is moving from that name takes them, whatever their agents', () => {
-    expect(orphanNames([r('old', 'a-hb1')], ['website', 'hive'], projects, [{ from: 'OLD', to: 'website' }])).toEqual([{ from: 'old', to: 'website' }])
+    expect(orphanNames([r('old', 'a-hb1')], ['website', 'acme'], projects, [{ from: 'OLD', to: 'website' }])).toEqual([{ from: 'old', to: 'website' }])
   })
 
   it("never takes a name that is the workspace's (a hidden or removed project's), nor one shown as gone", () => {
-    expect(orphanNames([r('Parked', 'a-claude')], ['website', 'hive', 'parked'], projects)).toEqual([])
-    expect(orphanNames([r(goneProject('site'), 'a-claude')], ['website', 'hive'], projects)).toEqual([])
+    expect(orphanNames([r('Parked', 'a-claude')], ['website', 'acme', 'parked'], projects)).toEqual([])
+    expect(orphanNames([r(goneProject('site'), 'a-claude')], ['website', 'acme'], projects)).toEqual([])
   })
 })
 
@@ -122,7 +122,7 @@ describe('a workspace', () => {
   beforeAll(async () => {
     project(wsPath, 'alpha', { agents: [{ id: 'a1', name: 'A1', provider: 'claude-code' }, { id: 'r1', name: 'R1', provider: 'claude-code' }] })
     project(wsPath, 'beta')
-    // Renamed from old-site while Combwork was closed, before projects had ids (as hive-website → website): its agent
+    // Renamed from old-site while Combwork was closed, before projects had ids (as acme-website → website): its agent
     // Claude was removed since, but its sessions are still the project's.
     project(wsPath, 'site', {}, [{ agentId: 'a-claude' }])
     // A card saved before ids, by a project of the workspace: it gets the id when the workspace opens.

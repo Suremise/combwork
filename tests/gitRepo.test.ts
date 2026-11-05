@@ -1089,7 +1089,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     const { withRepoLocks } = await import('../src/main/repoLock')
     // Another Combwork's own queue of workflow writes: a second, independently loaded instance of the module.
     const ours = await import('../src/main/workflow/writes')
-    const otherCombwork = (await import(/* @vite-ignore */ `../src/main/workflow/writes?another-hive=${Date.now()}`)) as typeof ours
+    const otherCombwork = (await import(/* @vite-ignore */ `../src/main/workflow/writes?another-combwork=${Date.now()}`)) as typeof ours
     expect(otherCombwork.workflowWrite).not.toBe(ours.workflowWrite)
     const d = door()
     refDoor = d.door

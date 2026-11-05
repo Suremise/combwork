@@ -87,9 +87,9 @@ describe('agentApiCall (#371)', () => {
     expect(await agentApiCall(`${url}/v1/projects/alpha`, 'GET', {}, undefined)).toEqual({ status: 200, text: '{}', notice: line })
   })
 
-  it('HI-2588: the header by its name before 1.1, X-Hive-Notice, is not read (renamed outright)', async () => {
+  it('HI-2588: a notice header by any other name (X-Other-Notice) is not read', async () => {
     server = createServer((_req, res) => {
-      res.setHeader('X-Hive-Notice', encodeURIComponent('[CW] an old notice'))
+      res.setHeader('X-Other-Notice', encodeURIComponent('[CW] an old notice'))
       res.end('{}')
     })
     await new Promise<void>((r) => server!.listen(0, '127.0.0.1', () => r()))

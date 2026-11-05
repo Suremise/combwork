@@ -108,7 +108,7 @@ describe('MCP servers per project (HI-2059)', () => {
   const projectMcp = (p: string) => json(join(p, '.combwork', 'project.json')).mcp
 
   /** The servers a launch in a project gets (its agent's), but Combwork's own: the launch's own reader. */
-  const gets = async (p: string): Promise<string[]> => run(async () => Object.keys((await sessions.effective(p, { id: 'a1', name: 'Builder', provider: 'claude-code' } as never)).mcpServers).filter((n) => n !== 'hive').sort())
+  const gets = async (p: string): Promise<string[]> => run(async () => Object.keys((await sessions.effective(p, { id: 'a1', name: 'Builder', provider: 'claude-code' } as never)).mcpServers).filter((n) => n !== 'combwork').sort())
   /** Which projects a server runs in, as a launch decides it. */
   const onIn = async (name: string): Promise<string[]> => {
     const out: string[] = []

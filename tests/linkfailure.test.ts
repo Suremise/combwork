@@ -59,7 +59,7 @@ describe('a link Combwork is refused', () => {
     const project = join(base, 'project')
     mkdirSync(project, { recursive: true })
     const src = skill('claude-skill')
-    const delivered = await claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills: [{ name: 'claude-skill', sourcePath: src }], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/hive/hook-auth/x.txt', privateDir: `${project}-private` } as never)
+    const delivered = await claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills: [{ name: 'claude-skill', sourcePath: src }], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/demo/hook-auth/x.txt', privateDir: `${project}-private` } as never)
     const copy = join(project, '.combwork', 'launch-a1', 'plugin', 'skills', 'claude-skill')
     for (const f of PLAIN) expect(readFileSync(join(copy, f), 'utf8').length, f).toBeGreaterThan(0)
     expect(delivered['claude-skill']).toEqual({ revision: await contentHash(copy), problem: expect.any(String), lasting: true })

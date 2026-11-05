@@ -21,13 +21,13 @@ beforeEach(() => {
 describe('Always on Top', () => {
   it('is remembered for the workspace, whatever the path case, and forgotten when turned off', () => {
     const w = fakeWindow()
-    expect(setPinned(w as never, 'C:\\Work\\Hive', true)).toBe(true)
-    expect(store.cfg.alwaysOnTop).toEqual({ 'c:\\work\\hive': true })
-    expect(pinnedFor('c:\\WORK\\hive')).toBe(true)
+    expect(setPinned(w as never, 'C:\\Work\\Acme', true)).toBe(true)
+    expect(store.cfg.alwaysOnTop).toEqual({ 'c:\\work\\acme': true })
+    expect(pinnedFor('c:\\WORK\\acme')).toBe(true)
     expect(pinnedFor('C:\\Work\\Other')).toBe(false)
-    expect(setPinned(w as never, 'C:\\Work\\Hive', false)).toBe(false)
+    expect(setPinned(w as never, 'C:\\Work\\Acme', false)).toBe(false)
     expect(store.cfg.alwaysOnTop).toEqual({})
-    expect(pinnedFor('C:\\Work\\Hive')).toBe(false)
+    expect(pinnedFor('C:\\Work\\Acme')).toBe(false)
   })
 
   it('a window with no workspace can be pinned, and nothing is remembered', () => {

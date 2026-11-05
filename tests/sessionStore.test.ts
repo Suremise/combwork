@@ -108,7 +108,7 @@ describe("a host's sessions.json moved into the workspace's database (#1061)", (
     expect((await run(() => workspace.sessionsFile(p))).sessions.map((s) => s.id)).toEqual(['late'])
   })
 
-  it('a file found after it moved in (a crash before its rename, or an older Hive) is kept unread: the records stay the database’s', async () => {
+  it('a file found after it moved in (a crash before its rename, or an older version) is kept unread: the records stay the database’s', async () => {
     const p = join(wsPath, 'beta')
     await run(() => workspace.sessionsFile(p))
     writeFileSync(join(p, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: [rec('stale')] }))

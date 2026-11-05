@@ -24,7 +24,7 @@ const SID = '0f5c2a8e-1111-4222-8333-944455556666'
 const SID2 = '0f5c2a8e-1111-4222-8333-944455557777'
 
 describe('sessions.backupAllNow', () => {
-  async function hive() {
+  async function combwork() {
     vi.resetModules()
     const profile = tempDir('cw-shutdown-')
     const electron = await import('electron')
@@ -41,7 +41,7 @@ describe('sessions.backupAllNow', () => {
   }
 
   it('backs up each transcript before it returns, without reading it for usage or cost', async () => {
-    const { sessions, profile, add, backup } = await hive()
+    const { sessions, profile, add, backup } = await combwork()
     const t = join(profile, 'one.jsonl')
     writeFileSync(t, '{"a":1}\n')
     add('a1', SID, t)
@@ -57,7 +57,7 @@ describe('sessions.backupAllNow', () => {
   })
 
   it('counts a failure, and leaves out what is past its time', async () => {
-    const { sessions, profile, add } = await hive()
+    const { sessions, profile, add } = await combwork()
     add('a1', SID, join(profile, 'missing.jsonl'))
     expect(sessions.backupAllNow(2000)).toEqual({ saved: 0, incomplete: 0, skipped: 0, failed: 1 })
     const t = join(profile, 'two.jsonl')
@@ -70,7 +70,7 @@ describe('sessions.backupAllNow', () => {
     afterEach(() => void (slow.ms = 0))
 
     it("stops at its time: a copy it can't finish is incomplete, and the next session isn't tried", async () => {
-      const { sessions, profile, add } = await hive()
+      const { sessions, profile, add } = await combwork()
       for (const [agent, sid] of [['a1', SID], ['a2', SID2]]) {
         const t = join(profile, `${agent}.jsonl`)
         writeFileSync(t, Buffer.alloc(8 * 1024 * 1024, 'x'))
@@ -87,7 +87,7 @@ describe('sessions.backupAllNow', () => {
   })
 
   it('does nothing with transcript backups turned off', async () => {
-    const { sessions, config, profile, add } = await hive()
+    const { sessions, config, profile, add } = await combwork()
     const t = join(profile, 'three.jsonl')
     writeFileSync(t, '{}\n')
     add('a1', SID, t)

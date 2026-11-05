@@ -1,5 +1,5 @@
 // The board in SQLite (#1017): the database layer (settings, migrations, a file from a newer Combwork), the move of the cards'
-// files into it (once, checked, the folder kept as a backup and a stub left for older versions), cards an older Hive saved
+// files into it (once, checked, the folder kept as a backup and a stub left for older versions), cards an older version saved
 // meanwhile, Export Board to JSON (an export read back is the same board), and the window's board with archived cards in short.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'fs'
 import { join, resolve, sep } from 'path'
@@ -87,7 +87,7 @@ describe('the database layer (db.ts)', () => {
     const dir = join(base, `layer-${++n}`, 'backups')
     mkdirSync(dir, { recursive: true })
     // Another database sharing the folder, one whose name starts the same, and files not of the form: all kept.
-    const others = ['journal-v1-2026-01-01T00-00-00-000Z.db', 'hive-journal-v1-2026-01-01T00-00-00-000Z.db', 'hive-v1-notes.db', 'hive-v1-2026-01-01T00-00-00-000Z.db.txt']
+    const others = ['journal-v1-2026-01-01T00-00-00-000Z.db', 'combwork-journal-v1-2026-01-01T00-00-00-000Z.db', 'combwork-v1-notes.db', 'combwork-v1-2026-01-01T00-00-00-000Z.db.txt']
     for (const f of others) writeFileSync(join(dir, f), '')
     const db = new DatabaseSync(':memory:')
     try {
@@ -95,9 +95,9 @@ describe('the database layer (db.ts)', () => {
       // Five copies at different seconds, minutes, days and versions, made out of order: the newest three by time remain.
       const times = ['2026-10-17T22-08-09-123Z', '2026-10-15T10-00-00-000Z', '2026-10-17T22-08-10-000Z', '2026-10-17T23-59-59-999Z', '2026-10-16T08-30-00-500Z']
       const versions = [1, 3, 2, 1, 2]
-      times.forEach((t, i) => backupTo(db, dir, 'hive', versions[i], new Date(t.replace(/T(\d\d)-(\d\d)-(\d\d)-(\d{3})Z/, 'T$1:$2:$3.$4Z'))))
+      times.forEach((t, i) => backupTo(db, dir, 'combwork', versions[i], new Date(t.replace(/T(\d\d)-(\d\d)-(\d\d)-(\d{3})Z/, 'T$1:$2:$3.$4Z'))))
       const kept = readdirSync(dir).filter((f) => !others.includes(f)).sort()
-      expect(kept).toEqual(['hive-v1-2026-10-17T22-08-09-123Z.db', 'hive-v1-2026-10-17T23-59-59-999Z.db', 'hive-v2-2026-10-17T22-08-10-000Z.db'])
+      expect(kept).toEqual(['combwork-v1-2026-10-17T22-08-09-123Z.db', 'combwork-v1-2026-10-17T23-59-59-999Z.db', 'combwork-v2-2026-10-17T22-08-10-000Z.db'])
       // Each is a whole copy.
       for (const f of kept) {
         const copy = new DatabaseSync(join(dir, f), { readOnly: true })
@@ -372,7 +372,7 @@ describe("moving the cards' files in (#1017)", () => {
 
 /**
  * The stub 0.9 to 1.0 left in a workspace's old cards' folder for older versions (no version writes one since 1.1,
- * HI-2594), with the board's next number: what an older Hive saved cards in before the workspace moved to `.combwork`.
+ * HI-2594), with the board's next number: what an older version saved cards in before the workspace moved to `.combwork`.
  * The workspace is as before its names upgrade (no record), whose files step sets the stub's cards aside at the next
  * open, under the move's lock, and removes it (nameUpgradeFiles.ts moveOldStub, HR1's round 1).
  */
@@ -385,8 +385,8 @@ function leaveStub(ws: string, next: number): string {
   return stub
 }
 
-describe("cards an older Hive saved meanwhile (#1017 downgrade, Darren's decision of 17 Oct: none taken back on its own)", () => {
-  /** A workspace moved to the board (its board opened once and closed), and the stub 1.0 left, an older Hive's cards in it. */
+describe("cards an older version saved meanwhile (#1017 downgrade, Darren's decision of 17 Oct: none taken back on its own)", () => {
+  /** A workspace moved to the board (its board opened once and closed), and the stub 1.0 left, an older version's cards in it. */
   async function moved(files: Record<string, string>): Promise<{ ws: string; stub: string }> {
     const ws = workspaceWith(files)
     const w = await open(ws)
@@ -550,7 +550,7 @@ describe('reviewing the set-aside cards (#1044, Darren\'s decision on #1017: the
     expect((await inWorkspace(w, () => tasks.createTask({ title: 'After', project: 'p' }, user))).number).toBe(7)
   })
 
-  it('Add keeps every field the older Hive stored: its own fields and past holds for its cost; a review under way there ends (#1044 round 1)', async () => {
+  it('Add keeps every field the older version stored: its own fields and past holds for its cost; a review under way there ends (#1044 round 1)', async () => {
     const holds = [
       { agent: 'a-past', name: 'Past Builder', role: 'build', from: '2026-10-05T01:00:00.000Z', to: '2026-10-05T02:00:00.000Z' },
       { agent: 'a-rev', name: 'Past Reviewer', role: 'review', from: '2026-10-05T03:00:00.000Z' }
@@ -619,7 +619,7 @@ describe('reviewing the set-aside cards (#1044, Darren\'s decision on #1017: the
 
 const titlesOf = async (w: WS): Promise<string[]> => (await inWorkspace(w, () => tasks.allTasks(w))).map((c) => `#${c.number} ${c.title}`).sort()
 
-describe('numbers an older Hive could take (#1017 round 1)', () => {
+describe('numbers an older version could take (#1017 round 1)', () => {
   it('a number taken writes nothing for older versions (HI-2594): no stub is made or moved on', async () => {
     const ws = workspaceWith({ '1.json': fileOf(card(1)) })
     const w = await open(ws)
@@ -633,7 +633,7 @@ describe('numbers an older Hive could take (#1017 round 1)', () => {
     let w = await open(ws)
     expect((await inWorkspace(w, () => tasks.createTask({ title: 'Next', project: 'p' }, user))).number).toBe(3)
     await disposeWorkspaceService(w)
-    // A damaged file an older Hive left in 1.0's stub: its number is past the board's, and kept from new cards.
+    // A damaged file an older version left in 1.0's stub: its number is past the board's, and kept from new cards.
     writeFileSync(join(leaveStub(ws, 4), '9.json'), '{ damaged too')
     w = await open(ws)
     expect((await inWorkspace(w, () => tasks.createTask({ title: 'After', project: 'p' }, user))).number).toBe(10)
@@ -650,7 +650,7 @@ describe('Export Board to JSON (#1017)', () => {
     expect(readdirSync(out).sort()).toEqual(['1.json', '2.json', 'board.json'])
     expect(JSON.parse(readFileSync(join(out, '1.json'), 'utf8'))).toEqual(store.cardDoc(w, 1))
     expect(JSON.parse(readFileSync(join(out, 'board.json'), 'utf8')).next).toBe(9)
-    // The export as an older Hive's board folder, opened by this one: the same cards.
+    // The export as an older version's board folder, opened by this one: the same cards.
     const copy = workspaceWith(Object.fromEntries(readdirSync(out).map((f) => [f, readFileSync(join(out, f), 'utf8')])))
     // Its project the same project (its id with it), as a workspace copied whole would have it.
     writeFileSync(join(copy, 'p', '.combwork', 'project.json'), readFileSync(join(ws, 'p', '.combwork', 'project.json')))

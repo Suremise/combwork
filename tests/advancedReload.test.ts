@@ -45,7 +45,7 @@ afterEach(() => {
 })
 
 const setting = 'cw.mcp.replySeconds'
-const legacy = 'hive.assistant.otherMcpServers'
+const legacy = 'cw.assistant.otherMcpServers'
 const text = (values: Record<string, unknown>): string => JSON.stringify({ format: 1, values })
 function opened(values: Record<string, unknown>) {
   const folder = tempDir('cw-advanced-reload-')

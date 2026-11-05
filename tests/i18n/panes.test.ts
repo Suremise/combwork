@@ -48,7 +48,7 @@ const watches = [
 ]
 /** The English label agents read for each watch above. */
 const agentLabel = (w: (typeof watches)[number]): string =>
-  w.agents ? agentWatchLabel({ agents: w.agents.map((name) => ({ name, project: 'hive', id: name })) } as never) : w.lanes ? laneWatchLabel({ ids: w.lanes[0] === 'all' ? 'all' : w.lanes, events: [] }, w.cards, [], 'laneTitles' in w ? w.laneTitles : undefined) : watchLabel({ cards: w.cards, column: w.column })
+  w.agents ? agentWatchLabel({ agents: w.agents.map((name) => ({ name, project: 'alpha', id: name })) } as never) : w.lanes ? laneWatchLabel({ ids: w.lanes[0] === 'all' ? 'all' : w.lanes, events: [] }, w.cards, [], 'laneTitles' in w ? w.laneTitles : undefined) : watchLabel({ cards: w.cards, column: w.column })
 
 describe('the panes area', () => {
   it('locales/en/panes.json has a note for translators on every message', () => {
@@ -96,7 +96,7 @@ describe('the panes area', () => {
     for (const t of window) expect(pseudo(t), t).toBe(true)
     expect(unknownStateText(silent, NOW)).toBe('Silent 23 min · state unknown')
     expect(safeguardText(notes[1], label)).toBe('A safety classifier stopped a response at 15:12 (3 this session). Its CLI asks what to do about it.')
-    expect(agentPart({ name: 'B6', project: 'hive' }, 'stopped', { status: 'stopped' } as never)).toBe('B6 (hive) stopped')
-    expect(agentLimitLine({ agents: [{ name: 'B6', project: 'hive', id: 'x' }] } as never, 30)).toMatch(/^\[CW\] B6 is still working after 30 min/)
+    expect(agentPart({ name: 'B6', project: 'alpha' }, 'stopped', { status: 'stopped' } as never)).toBe('B6 (alpha) stopped')
+    expect(agentLimitLine({ agents: [{ name: 'B6', project: 'alpha', id: 'x' }] } as never, 30)).toMatch(/^\[CW\] B6 is still working after 30 min/)
   })
 })

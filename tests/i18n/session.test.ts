@@ -51,7 +51,7 @@ const GERMAN = {
   'agents.codex.signInHelp': 'Melde dich erneut an: Hilfe → Agent-Einrichtung → Codex → Anmelden.',
   'session.tracker.title': 'Combwork kann die Prozesse der Agenten nicht verfolgen',
   'session.tracker.body': '{reason}. {detail} Hilfe → Diagnose kopieren sagt warum.',
-  'session.tracker.stopped': 'Hives Prozessverfolgung wurde beendet ({why})',
+  'session.tracker.stopped': 'Die Prozessverfolgung von Combwork wurde beendet ({why})',
   'session.tracker.lost': '{launches, plural, =0 {Was Agenten starten, wird bis zu ihrem Neustart nicht verfolgt.} one {Was der laufende Agent startet, wird bis zu seinem Neustart nicht verfolgt.} other {Was die # laufenden Agenten starten, wird bis zu ihrem Neustart nicht verfolgt.}}'
 }
 
@@ -258,7 +258,7 @@ describe('notices: the user in their language, the Agent API in English', () => 
     noteUntracked(withValues(M('session.tracker.stopped'), { why: 'exit 1' }), withValues(M('session.tracker.lost'), { launches: 2 }))
     const t = seen.find((x) => x.type === 'toast')!.toast!
     expect(t.title).toBe('Combwork kann die Prozesse der Agenten nicht verfolgen')
-    expect(t.message).toBe('Hives Prozessverfolgung wurde beendet (exit 1). Was die 2 laufenden Agenten starten, wird bis zu ihrem Neustart nicht verfolgt. Hilfe → Diagnose kopieren sagt warum.')
+    expect(t.message).toBe('Die Prozessverfolgung von Combwork wurde beendet (exit 1). Was die 2 laufenden Agenten starten, wird bis zu ihrem Neustart nicht verfolgt. Hilfe → Diagnose kopieren sagt warum.')
     // Diagnostics reads the tracker's problem in English (none here: the tracker never failed in this run).
     expect(trackingProblem()).toBeNull()
   })

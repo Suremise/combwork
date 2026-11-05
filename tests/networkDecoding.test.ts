@@ -1,5 +1,5 @@
 // No network reply reaches Node's Brotli decoder (#1582, CVE-2026-111497; kept after HI-1503's Electron with Node 24.22.1).
-// fetch decompresses `Content-Encoding: br` with it, so Combwork's code that runs in Node (main, preload, shared, the hive
+// fetch decompresses `Content-Encoding: br` with it, so Combwork's code that runs in Node (main, preload, shared, its
 // MCP server) calls fetch only for Combwork's own local API, and decompresses Brotli only for its own data. Network calls
 // go through plainHttpsJson, which refuses an encoded reply.
 import { readdirSync, readFileSync } from 'fs'

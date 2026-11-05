@@ -47,12 +47,12 @@ describe('the setting', () => {
   })
   it("reads the workspace's own over Combwork's; empty, none", async () => {
     expect(agentTempSetting(null)).toBeNull()
-    await advanced.set(AGENT_TEMP_FOLDER_ID, 'D:\\hive-wide')
-    expect(agentTempSetting(null)).toBe('D:\\hive-wide')
+    await advanced.set(AGENT_TEMP_FOLDER_ID, 'D:\\app-wide')
+    expect(agentTempSetting(null)).toBe('D:\\app-wide')
     const ws = { config: { advanced: { [AGENT_TEMP_FOLDER_ID]: ['E:\\own'] } } } as unknown as Parameters<typeof agentTempSetting>[0]
     expect(agentTempSetting(ws)).toBe('E:\\own')
     const emptied = { config: { advanced: { [AGENT_TEMP_FOLDER_ID]: [] } } } as unknown as Parameters<typeof agentTempSetting>[0]
-    expect(agentTempSetting(emptied)).toBe('D:\\hive-wide')
+    expect(agentTempSetting(emptied)).toBe('D:\\app-wide')
     await advanced.set(AGENT_TEMP_FOLDER_ID, [])
     expect(agentTempSetting(null)).toBeNull()
   })

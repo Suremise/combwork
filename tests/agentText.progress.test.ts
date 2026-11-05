@@ -19,7 +19,7 @@ afterEach(() => setProcessChain(null))
 
 const seenIn = (texts: string[]): Set<string> => new Set(texts.flatMap((t) => [...t.matchAll(/⟦([^/⟧][^⟧]*)⟧/g)].map((m) => m[1])))
 
-describe('the canary dialect over hive-progress (card 5)', () => {
+describe('the canary dialect over cw-progress (card 5)', () => {
   it("finds every word of the wrapper's text in the catalogue, and each progress id in some line", () => {
     setProcessChain(chain(canaryTexts(catalogue)))
     const out: { text: string; values: string[] }[] = []

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { syncLoginItemAtStart } from '../src/main/loginItem'
 
-// HI-2460: an update that moves the exe (Hive.exe → Combwork.exe) needs Launch at login written again for the new one,
+// HI-2460: an update that moves the exe (renamed, or in a new install folder) needs Launch at login written again for the new one,
 // only while the setting is on and only by the installed app.
 describe('Launch at login at start (HI-2460)', () => {
   const calls: unknown[] = []

@@ -38,8 +38,8 @@ describe("a delivery's receipt and ack in the log (HI-2036)", async () => {
     setInbox: () => undefined
   })
   deliveries.setSenderCheckForTests(() => null)
-  const hive: DeliverySender = { kind: 'combwork', name: 'Combwork' }
-  const make = (body = 'Use the staging database.') => deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1', conversation: 's1', kind: 'rebrief', from: hive, body })
+  const combwork: DeliverySender = { kind: 'combwork', name: 'Combwork' }
+  const make = (body = 'Use the staging database.') => deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1', conversation: 's1', kind: 'rebrief', from: combwork, body })
   const lines = (id: string) => logged.lines.filter((l) => l.startsWith(`Delivery ${id} `))
   beforeEach(() => {
     alpha = join(base, `alpha${++n}`)

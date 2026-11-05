@@ -349,7 +349,7 @@ describe("a Claude Code launch's settings: the offer turned off (HI-1959)", () =
     mkdirSync(cwd, { recursive: true })
     const ctx = {
       projectPath: cwd, agentId: 'a1', executable: 'C:\\bin\\claude.exe', cwd, workspacePath: cwd, runId: 'r', sessionId: '00000000-0000-4000-8000-000000000000',
-      resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs, hookUrl: 'http://127.0.0.1:9/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: join(base, `${name}-private`), guidance: '', env: {}, allowBackgroundSessions: true, use200kContext: false
+      resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs, hookUrl: 'http://127.0.0.1:9/hook?run=r', hookAuthFile: 'C:/cw/hook-auth/r.txt', privateDir: join(base, `${name}-private`), guidance: '', env: {}, allowBackgroundSessions: true, use200kContext: false
     }
     await claudeCode.prepareLaunch(ctx as never)
     return JSON.parse(readFileSync(join(ctx.privateDir, 'settings.json'), 'utf8')) as Record<string, unknown>

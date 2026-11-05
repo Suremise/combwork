@@ -251,7 +251,7 @@ function exportFile(opts: { scope?: any; sanitized?: boolean; own?: boolean; obs
     dropped: opts.dropped ?? 0,
     ...(opts.unattributed ? { lossesUnattributed: true } : {})
   }
-  return JSON.stringify({ schema: 'combwork-metrics/1', app: { name: 'Hive', version: '0.3.1' }, exportedAt: new Date(to).toISOString(), sanitized: !!opts.sanitized, report })
+  return JSON.stringify({ schema: 'combwork-metrics/1', app: { name: 'Combwork', version: '0.3.1' }, exportedAt: new Date(to).toISOString(), sanitized: !!opts.sanitized, report })
 }
 
 describe('what Compare says about its measures', () => {
@@ -262,9 +262,9 @@ describe('what Compare says about its measures', () => {
 })
 
 describe('Performance exports', () => {
-  it("1.0's export (hive-metrics/1) is refused, saying what it is; a benchmark's old id is no Combwork file (HI-2611)", () => {
+  it("1.0's export (hive-metrics/1) is refused, saying what it is; a benchmark under another schema id is no Combwork file (HI-2611)", () => {
     expect(parseArtifact(exportFile({ requests: { alpha: 24 } }).replace('combwork-metrics/1', 'hive-metrics/1'), WS)).toMatchObject({ error: 'It is a Performance export from Hive 1.0, which Combwork doesn’t import. Export again from Combwork to compare.' })
-    expect(parseArtifact(fixture('baseline').replace('combwork-benchmark/1', 'hive-benchmark/1'), WS)).toMatchObject({ error: expect.stringMatching(/isn’t a Combwork benchmark/) })
+    expect(parseArtifact(fixture('baseline').replace('combwork-benchmark/1', 'other-benchmark/1'), WS)).toMatchObject({ error: expect.stringMatching(/isn’t a Combwork benchmark/) })
   })
 
   it('compared per hour recorded, with the filters and coverage that make them comparable', () => {

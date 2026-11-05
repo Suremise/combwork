@@ -17,13 +17,13 @@ const probe = (over: Record<string, unknown> = {}) => ({
   ...over
 })
 const folders: { path: string; kind: AvPathKind; unsafe?: string }[] = [
-  { path: 'D:\\Development\\HIVE', kind: 'workspace' },
-  { path: 'D:\\Development\\HIVE.worktrees', kind: 'worktrees' },
+  { path: 'D:\\Development\\ACME', kind: 'workspace' },
+  { path: 'D:\\Development\\ACME.worktrees', kind: 'worktrees' },
   { path: 'C:\\Users\\Dev\\AppData\\Local\\combwork-test', kind: 'tests' }
 ]
 const now = new Date('2026-10-06T18:00:00Z')
 type Admin = { at: string; exclusions: string[]; devDrives?: Record<string, 'trusted' | 'untrusted' | 'no'> }
-const status = (raw: unknown, opts: { added?: string[]; adminCheck?: Admin; folders?: typeof folders } = {}) => statusOf('D:\\Development\\HIVE', parseProbe(raw), opts.folders ?? folders, { added: opts.added ?? [], adminCheck: opts.adminCheck ?? null, now })
+const status = (raw: unknown, opts: { added?: string[]; adminCheck?: Admin; folders?: typeof folders } = {}) => statusOf('D:\\Development\\ACME', parseProbe(raw), opts.folders ?? folders, { added: opts.added ?? [], adminCheck: opts.adminCheck ?? null, now })
 const GUARDED = ['C:\\Users\\Dev', 'C:\\Users\\Dev\\AppData\\Roaming', 'C:\\Users\\Dev\\AppData\\Local', 'C:\\Windows', 'C:\\Program Files', 'C:\\ProgramData', 'C:\\Users\\Public']
 
 describe('antivirus (#316)', () => {
@@ -47,10 +47,10 @@ describe('antivirus (#316)', () => {
   })
 
   it('an exclusion covers its folder and what is inside it, in any case, but not a sibling with a longer name or a variable', () => {
-    expect(covered('D:\\Development\\HIVE', ['d:\\development\\hive\\'])).toBe(true)
-    expect(covered('D:\\Development\\HIVE.worktrees', ['D:\\Development'])).toBe(true)
-    expect(covered('D:\\Development\\HIVE.worktrees', ['D:\\Development\\HIVE'])).toBe(false)
-    expect(covered('D:/Development/HIVE', ['D:\\Development\\HIVE'])).toBe(true)
+    expect(covered('D:\\Development\\ACME', ['d:\\development\\acme\\'])).toBe(true)
+    expect(covered('D:\\Development\\ACME.worktrees', ['D:\\Development'])).toBe(true)
+    expect(covered('D:\\Development\\ACME.worktrees', ['D:\\Development\\ACME'])).toBe(false)
+    expect(covered('D:/Development/ACME', ['D:\\Development\\ACME'])).toBe(true)
     // The 6 Oct manual entry kept "$env:LOCALAPPDATA" literally: it matches nothing.
     expect(covered('C:\\Users\\Dev\\AppData\\Local\\combwork-test', ['$env:LOCALAPPDATA\\combwork-test', '%LOCALAPPDATA%\\combwork-test'])).toBe(false)
     expect(normPath('D:\\A\\B\\')).toBe('d:\\a\\b')
@@ -88,7 +88,7 @@ describe('antivirus (#316)', () => {
     const s = status(probe())
     expect([s.scan, s.realTime, s.exclusionsFrom, s.slowed]).toEqual(['defender', true, null, true])
     expect(s.paths.map((p) => [p.kind, p.state, p.devDrive])).toEqual([['workspace', 'unknown', 'no'], ['worktrees', 'unknown', 'no'], ['tests', 'unknown', 'no']])
-    expect(s.offerKey).toBe('c:\\users\\dev\\appdata\\local\\combwork-test|d:\\development\\hive|d:\\development\\hive.worktrees')
+    expect(s.offerKey).toBe('c:\\users\\dev\\appdata\\local\\combwork-test|d:\\development\\acme|d:\\development\\acme.worktrees')
   })
 
   it('an unsafe folder is listed but never offered or counted', () => {
@@ -97,7 +97,7 @@ describe('antivirus (#316)', () => {
   })
 
   it('a visible list says which folders are excluded; all of them excluded is not slowed', () => {
-    const some = status(probe({ exclusions: ['D:\\Development\\HIVE'] }))
+    const some = status(probe({ exclusions: ['D:\\Development\\ACME'] }))
     expect([some.exclusionsFrom, some.paths.map((p) => p.state), some.slowed]).toEqual(['live', ['excluded', 'not-excluded', 'not-excluded'], true])
     const all = status(probe({ exclusions: ['D:\\Development', 'C:\\Users\\Dev\\AppData\\Local\\combwork-test'] }))
     expect([all.paths.every((p) => p.state === 'excluded'), all.slowed, all.offerKey]).toEqual([true, false, ''])
@@ -106,7 +106,7 @@ describe('antivirus (#316)', () => {
   it('with the list hidden: what Combwork added counts as excluded (unconfirmed), and an administrator check is used', () => {
     const added = status(probe(), { added: folders.map((f) => f.path.toUpperCase()) })
     expect([added.paths.map((p) => [p.state, p.addedByCombwork]), added.slowed]).toEqual([[['added', true], ['added', true], ['added', true]], false])
-    const checked = status(probe(), { adminCheck: { at: '2026-10-06T17:00:00Z', exclusions: ['D:\\Development\\HIVE'] } })
+    const checked = status(probe(), { adminCheck: { at: '2026-10-06T17:00:00Z', exclusions: ['D:\\Development\\ACME'] } })
     expect([checked.exclusionsFrom, checked.adminCheckedAt, checked.paths.map((p) => p.state)]).toEqual(['admin-check', '2026-10-06T17:00:00Z', ['excluded', 'not-excluded', 'not-excluded']])
     expect(status(probe({ exclusions: [] }), { adminCheck: { at: 'x', exclusions: ['D:\\Development'] } }).paths[0].state).toBe('not-excluded')
   })
@@ -136,15 +136,15 @@ describe('antivirus (#316)', () => {
   })
 
   it('an elevated change: declined, failing to start, refused by Defender or by policy, or done', () => {
-    const ws = 'D:\\Development\\HIVE'
-    const trees = 'D:\\Development\\HIVE.worktrees'
+    const ws = 'D:\\Development\\ACME'
+    const trees = 'D:\\Development\\ACME.worktrees'
     expect(changeOutcome('add', { started: false, cancelled: true }, null).outcome).toBe('refused')
     expect(changeOutcome('add', { started: false, error: 'boom' }, null)).toMatchObject({ outcome: 'error', message: expect.stringContaining('boom') })
     expect(changeOutcome('add', { started: true }, null).outcome).toBe('error')
     expect(changeOutcome('add', { started: true }, { ok: false, error: 'Operation failed with the following error: 0x800106ba', requested: [ws], listed: true, exclusions: [] }).outcome).toBe('policy')
     expect(changeOutcome('add', { started: true }, { ok: false, error: 'Something else', requested: [ws], listed: true, exclusions: [] }).outcome).toBe('error')
-    const done = changeOutcome('add', { started: true }, { ok: true, requested: [ws, trees], listed: true, exclusions: ['d:\\development\\hive', trees, 'E:\\Other'] })
-    expect(done).toMatchObject({ outcome: 'done', added: [ws, trees], exclusions: ['d:\\development\\hive', trees, 'E:\\Other'] })
+    const done = changeOutcome('add', { started: true }, { ok: true, requested: [ws, trees], listed: true, exclusions: ['d:\\development\\acme', trees, 'E:\\Other'] })
+    expect(done).toMatchObject({ outcome: 'done', added: [ws, trees], exclusions: ['d:\\development\\acme', trees, 'E:\\Other'] })
     // Accepted but not listed afterwards: a policy keeps local exclusions from applying; only what is listed counts as added.
     expect(changeOutcome('add', { started: true }, { ok: true, requested: [ws, trees], listed: true, exclusions: [ws] })).toMatchObject({ outcome: 'policy', added: [ws] })
     expect(changeOutcome('remove', { started: true }, { ok: true, requested: [ws], listed: true, exclusions: ['E:\\Other'] })).toMatchObject({ outcome: 'done', removed: [ws] })
@@ -190,12 +190,12 @@ describe('antivirus: Defender’s hidden-list answer (#316 round 3)', () => {
 })
 
 describe('antivirus: Combwork’s exclusions of folders that are gone (#1389)', () => {
-  const OLD = 'E:\\Old\\HIVE'
+  const OLD = 'E:\\Old\\ACME'
   const gone = (raw: unknown, opts: { added?: string[]; adminCheck?: Admin; missing: string[] }) =>
-    statusOf('D:\\Development\\HIVE', parseProbe(raw), folders, { added: opts.added ?? [], adminCheck: opts.adminCheck ?? null, now, missing: opts.missing }).gone
+    statusOf('D:\\Development\\ACME', parseProbe(raw), folders, { added: opts.added ?? [], adminCheck: opts.adminCheck ?? null, now, missing: opts.missing }).gone
 
   it('with Defender’s list known, only those it lists itself; with it hidden, every one Combwork recorded, unconfirmed', () => {
-    const added = [OLD, 'E:\\Old\\HIVE.worktrees', 'F:\\Gone']
+    const added = [OLD, 'E:\\Old\\ACME.worktrees', 'F:\\Gone']
     // Listed now: Combwork's entries for OLD and F:\Gone; the worktrees' was taken away (in Windows Security, say).
     expect(gone(probe({ exclusions: [OLD, 'f:\\gone\\', 'E:\\Old'] }), { added, missing: added })).toEqual([{ path: OLD, state: 'excluded' }, { path: 'F:\\Gone', state: 'excluded' }])
     // A parent the user excluded isn't Combwork's entry: not listed itself, not shown.
@@ -207,7 +207,7 @@ describe('antivirus: Combwork’s exclusions of folders that are gone (#1389)', 
   })
 
   it('never the workspace’s own folders, a folder twice, one that exists, nor without Defender', () => {
-    expect(goneExclusions(['D:\\Development\\HIVE', OLD, 'e:\\old\\hive\\'], folders, null)).toEqual([{ path: OLD, state: 'added' }])
+    expect(goneExclusions(['D:\\Development\\ACME', OLD, 'e:\\old\\acme\\'], folders, null)).toEqual([{ path: OLD, state: 'added' }])
     // Only what the caller found missing: an existing folder Combwork excluded is the workspace's business, not here.
     expect(gone(probe(), { added: [OLD, 'E:\\There'], missing: [OLD] })?.map((g) => g.path)).toEqual([OLD])
     expect(gone(probe({ defender: { antivirus: true, realTime: true, mode: 'Passive' } }), { added: [OLD], missing: [OLD] })).toBeUndefined()
@@ -215,11 +215,11 @@ describe('antivirus: Combwork’s exclusions of folders that are gone (#1389)', 
 })
 
 describe('antivirus: moving Combwork’s exclusions with a moved workspace (#1302)', () => {
-  // The workspace moved from D:\Development\HIVE to E:\Work\HIVE: the new folders and the old, as moveDefenderPlan probes them.
-  const OLD = ['D:\\Development\\HIVE', 'D:\\Development\\HIVE.worktrees']
+  // The workspace moved from D:\Development\ACME to E:\Work\ACME: the new folders and the old, as moveDefenderPlan probes them.
+  const OLD = ['D:\\Development\\ACME', 'D:\\Development\\ACME.worktrees']
   const moved: typeof folders = [
-    { path: 'E:\\Work\\HIVE', kind: 'workspace' },
-    { path: 'E:\\Work\\HIVE.worktrees', kind: 'worktrees' },
+    { path: 'E:\\Work\\ACME', kind: 'workspace' },
+    { path: 'E:\\Work\\ACME.worktrees', kind: 'worktrees' },
     { path: OLD[0], kind: 'workspace' },
     { path: OLD[1], kind: 'worktrees' }
   ]
@@ -227,14 +227,14 @@ describe('antivirus: moving Combwork’s exclusions with a moved workspace (#130
 
   it('moves Combwork’s exclusions: its old entries removed, the same kinds of new folder added', () => {
     const p = plan(probe({ exclusions: OLD }), { added: OLD })
-    expect([p.remove, p.add, p.theirs]).toEqual([OLD, ['E:\\Work\\HIVE', 'E:\\Work\\HIVE.worktrees'], []])
-    expect([p.old.map((x) => x.path), p.now.map((x) => x.path), p.exclusionsFrom]).toEqual([OLD, ['E:\\Work\\HIVE', 'E:\\Work\\HIVE.worktrees'], 'live'])
+    expect([p.remove, p.add, p.theirs]).toEqual([OLD, ['E:\\Work\\ACME', 'E:\\Work\\ACME.worktrees'], []])
+    expect([p.old.map((x) => x.path), p.now.map((x) => x.path), p.exclusionsFrom]).toEqual([OLD, ['E:\\Work\\ACME', 'E:\\Work\\ACME.worktrees'], 'live'])
     // Only the kinds Combwork had: the workspace's exclusion moves, the worktrees (never Combwork's) get nothing.
     const one = plan(probe({ exclusions: [OLD[0]] }), { added: [OLD[0]] })
-    expect([one.remove, one.add]).toEqual([[OLD[0]], ['E:\\Work\\HIVE']])
+    expect([one.remove, one.add]).toEqual([[OLD[0]], ['E:\\Work\\ACME']])
     // A new folder that shows excluded now is still a candidate: the elevated run adds only what its live list, once
     // Combwork's old entries are gone, doesn't cover (an administrator read may be stale, or the cover may be Combwork's own).
-    expect(plan(probe({ exclusions: [...OLD, 'E:\\Work'] }), { added: OLD }).add).toEqual(['E:\\Work\\HIVE', 'E:\\Work\\HIVE.worktrees'])
+    expect(plan(probe({ exclusions: [...OLD, 'E:\\Work'] }), { added: OLD }).add).toEqual(['E:\\Work\\ACME', 'E:\\Work\\ACME.worktrees'])
   })
 
   it('a workspace moved inside its old folder: the new folders Combwork’s old entry covers are candidates, whatever their kind', () => {
@@ -266,25 +266,25 @@ describe('antivirus: moving Combwork’s exclusions with a moved workspace (#130
 
   it('never anything broader: an unsafe new folder isn’t added', () => {
     const p = plan(probe({ exclusions: OLD }), { added: OLD, folders: [{ path: 'E:\\', kind: 'workspace', unsafe: 'a whole drive' }, ...moved.slice(1)] })
-    expect([p.remove, p.add]).toEqual([OLD, ['E:\\Work\\HIVE.worktrees']])
+    expect([p.remove, p.add]).toEqual([OLD, ['E:\\Work\\ACME.worktrees']])
   })
 
   it('with the list hidden: Combwork’s record says what is its own; the user’s can’t be known', () => {
     const p = plan(probe(), { added: OLD })
-    expect([p.exclusionsFrom, p.remove, p.add, p.theirs]).toEqual([null, OLD, ['E:\\Work\\HIVE', 'E:\\Work\\HIVE.worktrees'], []])
+    expect([p.exclusionsFrom, p.remove, p.add, p.theirs]).toEqual([null, OLD, ['E:\\Work\\ACME', 'E:\\Work\\ACME.worktrees'], []])
     // An administrator check read before the move is used as the Antivirus panel uses it.
-    const checked = plan(probe(), { added: OLD, adminCheck: { at: '2026-10-06T17:00:00Z', exclusions: [...OLD, 'E:\\Work\\HIVE.worktrees'] } })
-    expect([checked.exclusionsFrom, checked.adminCheckedAt, checked.add]).toEqual(['admin-check', '2026-10-06T17:00:00Z', ['E:\\Work\\HIVE', 'E:\\Work\\HIVE.worktrees']])
+    const checked = plan(probe(), { added: OLD, adminCheck: { at: '2026-10-06T17:00:00Z', exclusions: [...OLD, 'E:\\Work\\ACME.worktrees'] } })
+    expect([checked.exclusionsFrom, checked.adminCheckedAt, checked.add]).toEqual(['admin-check', '2026-10-06T17:00:00Z', ['E:\\Work\\ACME', 'E:\\Work\\ACME.worktrees']])
   })
 
   it('nothing to move unless Defender is the active antivirus', () => {
     const other = plan(probe({ exclusions: OLD, defender: { antivirus: true, realTime: true, mode: 'Passive Mode' }, products: [{ name: 'Norton Security', state: NORTON_ON }] }), { added: OLD })
     expect([other.scan, other.remove, other.add, other.theirs]).toEqual(['other', [], [], []])
-    expect(defenderMovePlan(emptyStatus('E:\\Work\\HIVE', 'test-copy', moved, now), OLD)).toMatchObject({ scan: 'test-copy', remove: [], add: [] })
+    expect(defenderMovePlan(emptyStatus('E:\\Work\\ACME', 'test-copy', moved, now), OLD)).toMatchObject({ scan: 'test-copy', remove: [], add: [] })
   })
 
   it('the elevated move: done, already skipped, accepted but not applied, refused by policy, or declined', () => {
-    const NEW = ['E:\\Work\\HIVE', 'E:\\Work\\HIVE.worktrees']
+    const NEW = ['E:\\Work\\ACME', 'E:\\Work\\ACME.worktrees']
     const done = changeOutcome('move', { started: true }, { ok: true, requested: NEW, removing: OLD, listed: true, exclusions: [...NEW, 'C:\\Other'] })
     expect(done).toMatchObject({ outcome: 'done', added: NEW, removed: OLD, message: expect.stringContaining('2 removed, 2 added') })
     // The new folders were already covered: only the removal.

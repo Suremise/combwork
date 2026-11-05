@@ -35,7 +35,7 @@ function repo(two = false): { dir: string; run: (...a: string[]) => string; head
   return { dir, run, head: () => run('rev-parse', 'HEAD') }
 }
 
-const PROJECT = join(base, 'hive')
+const PROJECT = join(base, 'alpha')
 const agent: ProgressCaller = { source: 'agent', workspacePath: base, projectPath: PROJECT, agentId: 'b1', agentName: 'B1', provider: null }
 const script: ProgressCaller = { source: 'api', workspacePath: base }
 
@@ -80,7 +80,7 @@ describe("a run's card, revision and check (#1220)", () => {
   })
 
   it('takes a card named as #N, of the caller\'s own project for an agent, and refuses a plain number or a key with the form to use', async () => {
-    const d = deps({ cards: { 12: { project: 'hive' }, 40: { project: 'website' } } })
+    const d = deps({ cards: { 12: { project: 'alpha' }, 40: { project: 'website' } } })
     expect((await resolveRunLink(agent, { card: '#12' }, d)).card).toBe(12)
     // Another project's card is unknown to an agent, as an unknown one is; a script may name any.
     await expect(resolveRunLink(agent, { card: '#40' }, d)).rejects.toThrow('Unknown card #40')
@@ -89,7 +89,7 @@ describe("a run's card, revision and check (#1220)", () => {
     await expect(resolveRunLink(agent, { card: '12' }, d)).rejects.toThrow(/a plain number isn't taken/)
     await expect(resolveRunLink(agent, { card: 12 }, d)).rejects.toThrow(/a plain number isn't taken/)
     // Keys (#1219): its own project's, any case; another project's, or one nobody has, as unknown, in the words it used.
-    const k = deps({ cards: { 12: { project: 'hive' }, 40: { project: 'website' } }, keys: { 'HI-12': 12, 'WE-1': 40 } })
+    const k = deps({ cards: { 12: { project: 'alpha' }, 40: { project: 'website' } }, keys: { 'HI-12': 12, 'WE-1': 40 } })
     expect((await resolveRunLink(agent, { card: 'hi-12' }, k)).card).toBe(12)
     await expect(resolveRunLink(agent, { card: 'WE-1' }, k)).rejects.toThrow('Unknown card WE-1')
     await expect(resolveRunLink(agent, { card: 'HI-99' }, k)).rejects.toThrow('Unknown card HI-99')
@@ -133,9 +133,9 @@ describe("a run's card, revision and check (#1220)", () => {
   })
 
   it("--check runs the project's configured command for the name, and says so when there is none", async () => {
-    const d = deps({ cards: { 40: { project: 'website' } }, commands: { hive: { typecheck: 'npm run typecheck' }, website: { test: 'npm test' } } })
+    const d = deps({ cards: { 40: { project: 'website' } }, commands: { alpha: { typecheck: 'npm run typecheck' }, website: { test: 'npm test' } } })
     expect((await resolveRunLink(agent, { check: 'typecheck' }, d)).check).toEqual({ name: 'typecheck', command: 'npm run typecheck' })
-    await expect(resolveRunLink(agent, { check: 'lint' }, d)).rejects.toThrow('hive has no command configured for the check "lint", so nothing was run')
+    await expect(resolveRunLink(agent, { check: 'lint' }, d)).rejects.toThrow('alpha has no command configured for the check "lint", so nothing was run')
     await expect(resolveRunLink(agent, { check: 'npm run lint' }, d)).rejects.toThrow("check is the name of one of the project's checks")
     // A script's check is its card's project's; with no card, there's no project to ask.
     expect((await resolveRunLink(script, { check: 'test', card: '#40' }, d)).check).toEqual({ name: 'test', command: 'npm test' })
@@ -157,7 +157,7 @@ describe("a card's run through its platform adapter (#1233)", () => {
   /** deps whose card `num` is the harness's card, read through the adapter its ruleset names. */
   const through = (e: Env, num: number): RunLinkDeps =>
     deps({
-      cards: { [num]: { project: 'hive' } },
+      cards: { [num]: { project: 'alpha' } },
       cardRun: async (c, folder, named) => {
         const card = e.wf.store.card(c)
         return e.wf.platformOf(card).runRevision(card, e.wf.state(card), folder, named)
@@ -333,10 +333,10 @@ describe('runs keep what they ran for (#1220)', () => {
     setLanguage('en', {})
     const s = store()
     const run: ProgressRun = s.start(agent, { title: 'unit tests' }, { card: 1061, revision: id })
-    const rows = runDetails(run, 'hive', 2000, tr)
+    const rows = runDetails(run, 'alpha', 2000, tr)
     expect(rows).toContainEqual({ label: 'Card', text: '#1061' })
     expect(rows).toContainEqual({ label: 'Revision', text: id, code: true })
-    expect(runDetails(s.start(agent, { title: 'e2e' }), 'hive', 2000, tr).map((d) => d.label)).not.toContain('Card')
+    expect(runDetails(s.start(agent, { title: 'e2e' }), 'alpha', 2000, tr).map((d) => d.label)).not.toContain('Card')
   })
 
   // #1446: the folder it ran in is the run's own, kept as it ran, whatever its agent works in now.
@@ -346,8 +346,8 @@ describe('runs keep what they ran for (#1220)', () => {
     const slotB = join(PROJECT, '..', 'slot-b')
     const r: ProgressRun = s.start(agent, { title: 'unit tests' }, { card: 1061, folder: slotB })
     // Its agent moved on to another slot since: the run's record keeps where it ran.
-    expect(runDetails(r, 'hive', 2000, tr)).toContainEqual({ label: 'Folder', text: slotB, code: true })
-    expect(runDetails(s.start(agent, { title: 'e2e' }), 'hive', 2000, tr).map((d) => d.label)).not.toContain('Folder')
+    expect(runDetails(r, 'alpha', 2000, tr)).toContainEqual({ label: 'Folder', text: slotB, code: true })
+    expect(runDetails(s.start(agent, { title: 'e2e' }), 'alpha', 2000, tr).map((d) => d.label)).not.toContain('Folder')
   })
 
   // #1273: what it was tested on, beside the card's revision, only when they differ.
@@ -355,11 +355,11 @@ describe('runs keep what they ran for (#1220)', () => {
     setLanguage('en', {})
     const s = store()
     const run: ProgressRun = s.start(agent, { title: 'unit tests' }, { card: 1061 })
-    const same = runDetails({ ...run, revision: id, testedCheckout: id }, 'hive', 2000, tr)
+    const same = runDetails({ ...run, revision: id, testedCheckout: id }, 'alpha', 2000, tr)
     expect(same.map((d) => d.label)).not.toContain('Tested on')
     const other = 'c'.repeat(40)
     // With the folder it ran in (#1446) too: Tested on still follows the Revision it qualifies (#1554), the folder after it.
-    const rows = runDetails({ ...run, revision: id, testedCheckout: other, folder: 'D:\\work\\older' }, 'hive', 2000, tr)
+    const rows = runDetails({ ...run, revision: id, testedCheckout: other, folder: 'D:\\work\\older' }, 'alpha', 2000, tr)
     expect(rows).toContainEqual({ label: 'Revision', text: id, code: true })
     expect(rows).toContainEqual({ label: 'Tested on', text: other, code: true })
     const labels = rows.map((d) => d.label)

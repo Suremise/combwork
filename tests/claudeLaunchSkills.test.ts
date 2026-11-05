@@ -24,7 +24,7 @@ describe("Claude Code's launch: the skills' copies", () => {
   const project = join(base, 'project')
   mkdirSync(project, { recursive: true })
   const launch = (skills: { name: string; sourcePath: string }[]) =>
-    claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills, mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/hive/hook-auth/x.txt', privateDir: `${project}-private` } as never) as Promise<Record<string, Delivery>>
+    claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills, mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/profile/hook-auth/x.txt', privateDir: `${project}-private` } as never) as Promise<Record<string, Delivery>>
   const copy = (name: string): string => join(claudeCode.launchDir(project, 'a1'), 'plugin', 'skills', name)
   /** When a copy's file was made: a copy kept keeps it, a copy made again has a new one. */
   const born = (name: string): number => statSync(join(copy(name), 'SKILL.md')).birthtimeMs

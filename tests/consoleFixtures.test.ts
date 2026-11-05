@@ -164,7 +164,7 @@ describe('compareContract', () => {
 describe('recording names', () => {
   it('order by when each started, to the millisecond, then by their number within it, newest first', () => {
     const at = new Date(2026, 9, 12, 12, 0, 0, 5)
-    const names = [recordingName(at, 1, 'session'), recordingName(at, 2, 'hive'), recordingName(at, 10, 'session'), recordingName(new Date(at.getTime() + 1), 1, 'assistant'), recordingName(new Date(at.getTime() - 1000), 3, 'session'), 'notes.txt']
+    const names = [recordingName(at, 1, 'session'), recordingName(at, 2, 'combwork'), recordingName(at, 10, 'session'), recordingName(new Date(at.getTime() + 1), 1, 'assistant'), recordingName(new Date(at.getTime() - 1000), 3, 'session'), 'notes.txt']
     expect(names[0]).toBe('console-20261012-120000-005-session.jsonl')
     expect(names[2]).toBe('console-20261012-120000-005-10-session.jsonl')
     expect(newestRecordingsFirst(names)).toEqual([names[3], names[2], names[1], names[0], names[4]])

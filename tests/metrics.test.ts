@@ -56,7 +56,7 @@ const sumApi = (parts: MetricsPart[]) => parts.flatMap((p) => p.api).reduce((a, 
 
 describe('units', () => {
   it('UTF-8 bytes match what Node encodes, for ASCII, accents, CJK, emoji and a lone surrogate', () => {
-    for (const s of ['plain', 'Ünïcödé', '日本語', '🐝 hive', 'a\uD800b', JSON.stringify({ q: 'quote " and \\ and \n' })]) expect(utf8Bytes(s), s).toBe(Buffer.byteLength(s, 'utf8'))
+    for (const s of ['plain', 'Ünïcödé', '日本語', '🐝 combwork', 'a\uD800b', JSON.stringify({ q: 'quote " and \\ and \n' })]) expect(utf8Bytes(s), s).toBe(Buffer.byteLength(s, 'utf8'))
   })
 
   it('latency histogram: each time in its bucket, and percentiles from them', async () => {
@@ -212,7 +212,7 @@ describe('bounds', () => {
     }
     expect(metrics.recordMcp(metrics.metricsHandle(w), 'alpha', 'agent', { ...ok, tool: 'rm -rf /' })).toBe(true)
     // Well-formed, but not one of Combwork's tools: not recorded under its name.
-    expect(metrics.recordMcp(metrics.metricsHandle(w), 'alpha', 'agent', { ...ok, tool: 'hive_private_secret' })).toBe(true)
+    expect(metrics.recordMcp(metrics.metricsHandle(w), 'alpha', 'agent', { ...ok, tool: 'acme_private_secret' })).toBe(true)
     expect(metrics.recordCatalog(metrics.metricsHandle(w), 'alpha', 'agent', 'builder', { tools: 1.5, toolsBytes: 10 })).toBe(false)
     const part = metrics.queryMetrics(w, { scope: { kind: 'project', project: 'alpha' } }).projects.alpha
     expect(part.mcp.map((s) => [s.tool, s.count])).toEqual([['(other)', 2]])
@@ -424,7 +424,7 @@ describe('the saved file is untrusted', () => {
           projects: {
             alpha: {
               api: { a: good, b: { ...good, count: -1 }, c: { ...good, histogram: [1] }, d: { ...good, role: 'root' } },
-              mcp: { x: { tool: 'hive_private_secret', role: 'agent', mode: 'compact', outcome: 'ok', count: 1, totalMs: 1, maxMs: 1, histogram, chars: 5, bytes: 5 } }
+              mcp: { x: { tool: 'acme_private_secret', role: 'agent', mode: 'compact', outcome: 'ok', count: 1, totalMs: 1, maxMs: 1, histogram, chars: 5, bytes: 5 } }
             },
             '../escape': { api: { a: good } }
           },
@@ -493,7 +493,7 @@ describe('moved into the workspace database (#1019)', () => {
   const hourOf = (t: number) => Math.floor(t / HOUR) * HOUR
   const dirOf = (path: string) => join(path, '.combwork', 'metrics')
   const backups = (path: string) => readdirSync(dirOf(path)).filter((f) => f.startsWith('metrics.json.imported-'))
-  /** A workspace folder never opened, with its metrics folder (an older Hive's). */
+  /** A workspace folder never opened, with its metrics folder (an older version's). */
   const fresh = () => {
     const path = join(base, `ws-${++n}`)
     mkdirSync(dirOf(path), { recursive: true })
@@ -578,7 +578,7 @@ describe('moved into the workspace database (#1019)', () => {
     expect(whole(w)).toEqual(before)
     await w.close()
     await metrics.flushMetrics()
-    // An older Hive's metrics.json written after the move: kept as a backup too, never read.
+    // An older version's metrics.json written after the move: kept as a backup too, never read.
     const later = JSON.stringify({ version: 1, buckets: [{ start: hourOf(T0), span: 'hour', projects: { beta: { api: { 'GET /v1/tasks agent ok': series } } } }] })
     writeFileSync(join(dirOf(path), 'metrics.json'), later)
     await w.open(path)
@@ -622,7 +622,7 @@ describe('moved into the workspace database (#1019)', () => {
     expect(data.observed.length).toBeGreaterThan(1)
     await disposeWorkspaceService(src)
 
-    // An older Hive's workspace with that metrics.json: the reports the Overview and Performance show, the whole range
+    // An older version's workspace with that metrics.json: the reports the Overview and Performance show, the whole range
     // and the last two days (hourly), for the workspace and each project.
     // Recording off while it is opened and reopened: a reopen is a new stretch of observation otherwise (a close is a
     // gap), the one difference that isn't the move's.

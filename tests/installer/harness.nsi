@@ -33,7 +33,7 @@ Function .onInit
   !endif
   ; installer.nsh's request to a running Combwork to close (HI-1707), as the template inserts it after initMultiUser: here
   ; the stand-in install folder (C:\stand\Combwork), where run.ps1 starts a stand-in Combwork for its cases, or none.
-  StrCpy $INSTDIR "C:\stand\Hive"
+  StrCpy $INSTDIR "C:\stand\Combwork"
   !ifmacrodef customInit
     !insertmacro customInit
   !endif

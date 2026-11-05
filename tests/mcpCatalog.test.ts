@@ -35,8 +35,8 @@ const words = (kind: string, value: string): string => `${kind}:${value}`
 
 describe('catalog.json v1 (HI-545)', () => {
   it('reads a valid catalogue and ignores unknown fields', () => {
-    const c = readCatalog({ schemaVersion: 1, name: 'Suremise/hive-mcp', extra: true, servers: [{ ...entry(), future: 1 }] }, 'https://example.com/catalog.json')
-    expect(c).toMatchObject({ name: 'Suremise/hive-mcp', skipped: 0 })
+    const c = readCatalog({ schemaVersion: 1, name: 'Suremise/combwork-mcp', extra: true, servers: [{ ...entry(), future: 1 }] }, 'https://example.com/catalog.json')
+    expect(c).toMatchObject({ name: 'Suremise/combwork-mcp', skipped: 0 })
     expect(c.servers.map((s) => s.name)).toEqual(['demo'])
     expect('future' in c.servers[0]).toBe(false)
   })
@@ -165,10 +165,10 @@ describe('installing and updating (HI-545)', () => {
   const source = (): string => pathToFileURL(join(share, 'catalog.json')).href
 
   /** Publishes demo at `version` to the share: its zip (running `script`, with `env`) and the catalogue listing it. */
-  const publish = (version: string, script = 'server.js', env: Record<string, string> = { DEMO_TOKEN: '${DEMO_TOKEN}' }, o: { folder?: string; size?: number; sha?: string; old?: boolean } = {}): void => {
-    // Combwork's names (HI-2503); with old, those the catalogue used up to v1.1.1, which aren't read (HI-2594).
-    const def = { description: 'A demo server', command: 'node', args: [`\${${o.old ? 'HIVE' : 'CW'}_MCP_DIR}/demo/${script}`], env }
-    const zip = zipSync({ [`${o.folder ?? 'demo'}/${o.old ? 'hive' : 'combwork'}-mcp.json`]: strToU8(JSON.stringify(def)), [`${o.folder ?? 'demo'}/${script}`]: strToU8(`// demo ${version}`) })
+  const publish = (version: string, script = 'server.js', env: Record<string, string> = { DEMO_TOKEN: '${DEMO_TOKEN}' }, o: { folder?: string; size?: number; sha?: string; other?: boolean } = {}): void => {
+    // Combwork's names (HI-2503); with other, names Combwork doesn't read (HI-2594).
+    const def = { description: 'A demo server', command: 'node', args: [`\${${o.other ? 'OTHER' : 'CW'}_MCP_DIR}/demo/${script}`], env }
+    const zip = zipSync({ [`${o.folder ?? 'demo'}/${o.other ? 'other' : 'combwork'}-mcp.json`]: strToU8(JSON.stringify(def)), [`${o.folder ?? 'demo'}/${script}`]: strToU8(`// demo ${version}`) })
     writeFileSync(join(share, `demo-${version}.zip`), zip)
     const server = entry({ version, requires: { os: ['windows', 'macos', 'linux'] }, zip: { url: pathToFileURL(join(share, `demo-${version}.zip`)).href, sha256: o.sha ?? sha(zip), size: o.size ?? zip.length } })
     writeFileSync(join(share, 'catalog.json'), JSON.stringify({ schemaVersion: 1, name: 'Test catalogue', servers: [server, entry({ name: 'needs-mac', requires: { os: ['macos'] }, zip: server.zip })] }))
@@ -284,8 +284,8 @@ describe('installing and updating (HI-545)', () => {
     expect(JSON.parse(readFileSync(join(mcpDir(), 'demo.json'), 'utf8')).args).toEqual(['${CW_MCP_DIR}/demo/server2.js'])
     expect(readdirSync(join(mcpDir(), 'demo'))).toEqual(['server2.js'])
     expect((await launched(ambrosia)).demo?.args?.[0]).toBe(`${folder}/server2.js`)
-    // hive-mcp.json, the catalogue's name up to v1.1.1: refused, and nothing written.
-    publish('1.2.0', 'server3.js', undefined, { old: true })
+    // other-mcp.json, a name Combwork doesn't read: refused, and nothing written.
+    publish('1.2.0', 'server3.js', undefined, { other: true })
     await pages()
     await expect(run(() => catalog.prepareCatalogServer(source(), 'demo'))).rejects.toThrow('No combwork-mcp.json or combwork-mcp.example.json found')
     expect(readdirSync(join(mcpDir(), 'demo'))).toEqual(['server2.js'])
@@ -400,11 +400,11 @@ describe('installing and updating (HI-545)', () => {
     expect((await run(() => mcp.listMcp(true))).find((x) => x.name === 'demo-cat')?.def?.args?.[0]).toBe('${CW_MCP_DIR}/demo-cat/server2.js')
   })
 
-  it("knows ours by its current address only: the old one (Suremise/hive-mcp) isn't ours (HI-2594; the names upgrade converts the definitions stored with it)", () => {
-    const old = 'https://github.com/Suremise/hive-mcp/releases/latest/download/catalog.json'
+  it("knows ours by its current address only: another repository's under the same owner (Suremise/demo-mcp) isn't ours (HI-2594)", () => {
+    const other = 'https://github.com/Suremise/demo-mcp/releases/latest/download/catalog.json'
     expect(isOurCatalogUrl(OUR_CATALOG_URL)).toBe(true)
-    expect(isOurCatalogUrl(old)).toBe(false)
-    expect(sameCatalogSource(old, OUR_CATALOG_URL)).toBe(false)
+    expect(isOurCatalogUrl(other)).toBe(false)
+    expect(sameCatalogSource(other, OUR_CATALOG_URL)).toBe(false)
   })
 
   it("shows a requirement whose probe failed or timed out as not checkable, never as met", async () => {

@@ -1301,9 +1301,9 @@ describe("Slots and copies: one setting saved at a time (#1445, HR5's round 1)",
       await setSlotDefault(w, 'global', 'copy', null)
       expect(slotLevelForm(w, 'global')).toEqual({ own: {}, inherited: { copy: { value: '.env*', origin: 'default' } } })
       expect(await projectSlotCopy(w, repo)).toEqual({ value: '.env*', origin: 'default' })
-      await setSlotDefault(w, 'global', 'copy', 'hive.env')
-      expect(await projectSlotCopy(w, repo)).toEqual({ value: 'hive.env', origin: 'global' })
-      expect(slotLevelForm(w, 'workspace')).toEqual({ own: {}, inherited: { copy: { value: 'hive.env', origin: 'global' } } })
+      await setSlotDefault(w, 'global', 'copy', 'global.env')
+      expect(await projectSlotCopy(w, repo)).toEqual({ value: 'global.env', origin: 'global' })
+      expect(slotLevelForm(w, 'workspace')).toEqual({ own: {}, inherited: { copy: { value: 'global.env', origin: 'global' } } })
       // The workspace's none (an empty value) is kept over Combwork's, in workspace.json.
       await setSlotDefault(w, 'workspace', 'copy', '')
       expect(await projectSlotCopy(w, repo)).toEqual({ value: '', origin: 'workspace' })
@@ -1313,7 +1313,7 @@ describe("Slots and copies: one setting saved at a time (#1445, HR5's round 1)",
       expect(await projectSlotCopy(w, repo)).toEqual({ value: 'p.env', origin: 'project' })
       await setSlotSetting(w, repo, 'copy', null)
       await setSlotDefault(w, 'workspace', 'copy', null)
-      expect(await projectSlotCopy(w, repo)).toEqual({ value: 'hive.env', origin: 'global' })
+      expect(await projectSlotCopy(w, repo)).toEqual({ value: 'global.env', origin: 'global' })
       expect(slotLevelForm(w, 'workspace').own).toEqual({})
       // A level or key that isn't one is refused.
       await expect(setSlotDefault(w, 'project' as never, 'copy', 'x')).rejects.toThrow()

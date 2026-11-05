@@ -28,7 +28,7 @@ const iso = (m: number): string => new Date(t(m)).toISOString()
 const NOW = t(100)
 
 let seq = 0
-const fact = (kind: FactKind, m: number, data: Record<string, unknown> = {}, actor = 'hive'): Fact => ({ card: 1, seq: ++seq, kind, at: iso(m), actor, source: 'recorded', data }) as unknown as Fact
+const fact = (kind: FactKind, m: number, data: Record<string, unknown> = {}, actor = 'combwork'): Fact => ({ card: 1, seq: ++seq, kind, at: iso(m), actor, source: 'recorded', data }) as unknown as Fact
 const started = (m: number, kind: 'Started' | 'Adopted' = 'Started', adoptedFrom?: string): Fact => fact(kind, m, { folder: 'project', line: 'main', base: 'b0', target: 'main', builder: 'b1', cardKind: 'code', ...(adoptedFrom ? { adoptedFrom } : {}) })
 const submitted = (m: number, round: number): Fact => fact('Submitted', m, { revision: `r${round}`, base: 'b0', head: `r${round}`, key: null, files: [], round, generation: 0, sameRevision: false, summary: '' }, 'agent:b1')
 /** A verdict on the submission whose fact is `submission` (its seq); its own round is the runtime's count of failures, never read. */

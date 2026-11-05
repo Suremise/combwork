@@ -55,13 +55,13 @@ describe('what counts as a change', () => {
   })
 
   it('several changes in one line: each card with its verdict; comments, then cards, give way to the size (#224)', () => {
-    const h = (m: number, what: string, by = 'Codex (hive)') => ({ at: at(m), by, what })
+    const h = (m: number, what: string, by = 'Codex (alpha)') => ({ at: at(m), by, what })
     const change = (n: number, v: 'passed' | 'failed', comment = `Round 1: ${v.toUpperCase()}`) => {
-      const card = cardOf({ number: n, agent: 'a1', agentName: 'Claudette', column: 'review', history: [h(1, 'Moved to Review', 'Claudette (hive)'), h(2, `Review ${v}`)], comments: [{ at: at(2), by: 'Codex (hive)', text: comment }] })
+      const card = cardOf({ number: n, agent: 'a1', agentName: 'Claudette', column: 'review', history: [h(1, 'Moved to Review', 'Claudette (alpha)'), h(2, `Review ${v}`)], comments: [{ at: at(2), by: 'Codex (alpha)', text: comment }] })
       return { ...cardChange(n, card, ['verdict' as const]), about: wakeAbout(card, ['verdict'], 'a2') }
     }
     expect(wakeLines([change(217, 'passed'), change(119, 'failed')])).toBe(
-      `[CW] #217 (Claudette's card) is in Review: Codex (hive) passed it (latest comment by Codex (hive): "Round 1: PASSED"); #119 (Claudette's card) is in Review: Codex (hive) failed it (latest comment by Codex (hive): "Round 1: FAILED"). Your card watch has ended: carry on (cw_read_task with latestComment on each card for its comment in full).`
+      `[CW] #217 (Claudette's card) is in Review: Codex (alpha) passed it (latest comment by Codex (alpha): "Round 1: PASSED"); #119 (Claudette's card) is in Review: Codex (alpha) failed it (latest comment by Codex (alpha): "Round 1: FAILED"). Your card watch has ended: carry on (cw_read_task with latestComment on each card for its comment in full).`
     )
     // One change: the single line as before.
     expect(wakeLines([change(217, 'passed')])).toBe(wakeLine(change(217, 'passed')))
@@ -253,9 +253,9 @@ describe('what counts as a change', () => {
 
 
   it('a failed card returned for review comes back into Review; its round and wake line say so (#214)', () => {
-    const h = (m: number, what: string, by = 'Codex (hive)') => ({ at: at(m), by, what })
+    const h = (m: number, what: string, by = 'Codex (alpha)') => ({ at: at(m), by, what })
     const review = (history: TaskCard['history']) => cardOf({ column: 'review', agentName: 'Claudette', history })
-    const failed = [h(1, 'Moved to Review', 'Claudette (hive)'), h(2, 'Started reviewing'), h(3, 'Review failed')]
+    const failed = [h(1, 'Moved to Review', 'Claudette (alpha)'), h(2, 'Started reviewing'), h(3, 'Review failed')]
     // Returnable after a failed review, with nothing since; its round counts the failures since the last pass.
     expect(returnRound(review(failed))).toBe(2)
     expect(returnRound(review([h(0, 'Review failed'), h(0, 'Review passed'), ...failed]))).toBe(2)
@@ -265,7 +265,7 @@ describe('what counts as a change', () => {
     expect(returnRound({ ...review(failed), review: { agent: 'r', agentName: 'R', since: at(4) } })).toBeNull()
     expect(returnRound(cardOf({ column: 'doing', history: failed }))).toBeNull()
     // Returned counts as moving into Review (only Review), and starts a new round: the old failure isn't named.
-    const returned = review([...failed, h(4, 'Returned for review, round 2', 'Claudette (hive)')])
+    const returned = review([...failed, h(4, 'Returned for review, round 2', 'Claudette (alpha)')])
     expect(movedIntoSince(returned, 'review', at(3))).toBe(true)
     expect(movedIntoSince(returned, 'review', at(5))).toBe(false)
     expect(movedIntoSince({ ...returned, column: 'doing' }, 'doing', at(3))).toBe(false)
@@ -310,7 +310,7 @@ describe('what counts as a change', () => {
   })
 
   it("HI-2087: a card the merge queue returned: the line leads with the return and its reason, never the review's pass; alone or with others", () => {
-    const c = cardOf({ column: 'doing', comments: [{ at: at(5), by: 'HR1 (hive)', text: 'Round 2: PASSED — no findings' }] })
+    const c = cardOf({ column: 'doing', comments: [{ at: at(5), by: 'HR1 (alpha)', text: 'Round 2: PASSED — no findings' }] })
     const back = '#7 came back from the merge queue: a conflict with main in src/main/bundledHistory.json. Merge main into your worktree, resolve the conflict, commit and submit again (cw_submit).'
     const returned = { ...cardChange(7, c, ['column']), about: { owner: null, verdict: null, queueReturn: back } }
     const line = wakeLine(returned)
@@ -321,7 +321,7 @@ describe('what counts as a change', () => {
     const other = cardChange(8, cardOf({ column: 'review' }), ['column'])
     expect(wakeLines([returned, other])).toMatch(/^\[CW\] #7 came back from the merge queue: a conflict with main in src\/main\/bundledHistory\.json[.;]/)
     // The queue's own wake (a loop wake's note, HB2's on HI-2046): the return first too, not the column and the pass.
-    const passed = { ...cardChange(7, c, ['column']), about: { owner: null, verdict: { passed: true, by: 'HR1 (hive)' } } }
+    const passed = { ...cardChange(7, c, ['column']), about: { owner: null, verdict: { passed: true, by: 'HR1 (alpha)' } } }
     const note = loopWakeLine(passed, 'note', back)
     expect(note).toBe(`[CW] ${back.slice(0, -1)}. This is your card in its loop: carry on (cw_read_task with latestComment for the comment in full).`)
     // Within the wake's bytes (HR3's round 1 finding 2), whatever the return carries: output in another script (three
@@ -334,11 +334,11 @@ describe('what counts as a change', () => {
       expect(l).toMatch(/^\[CW\] HI-7 came back from the merge queue: the merge check typecheck failed on the merged result\. .*… Fix it in your worktree, commit and submit again \(cw_submit\)\. (Your card watch has ended|This is your card in its loop)/)
     }
     // Another note of Combwork's (a stale pass) is quoted after where the card is, as before.
-    expect(loopWakeLine(passed, 'note', '#7: its pass is stale')).toMatch(/^\[CW\] #7 is in Doing: HR1 \(hive\) passed it; latest comment by HR1 \(hive\): "Round 2: PASSED — no findings"\. Combwork: "#7: its pass is stale"/)
+    expect(loopWakeLine(passed, 'note', '#7: its pass is stale')).toMatch(/^\[CW\] #7 is in Doing: HR1 \(alpha\) passed it; latest comment by HR1 \(alpha\): "Round 2: PASSED — no findings"\. Combwork: "#7: its pass is stale"/)
   })
 
   it("HI-2143: a card submitted again after the merge queue returned it: its reviewer's line leads with the return and the files resolved, never its own pass", () => {
-    const c = cardOf({ column: 'review', agentName: 'HB1', comments: [{ at: at(5), by: 'HR2 (hive)', text: 'Pass: submission 38. No blocking findings.' }] })
+    const c = cardOf({ column: 'review', agentName: 'HB1', comments: [{ at: at(5), by: 'HR2 (alpha)', text: 'Pass: submission 38. No blocking findings.' }] })
     const hunk = (line: number) => ({ line, before: [], ours: ['a'], theirs: ['b'], after: [] })
     const conflict = { entry: 'HI-2122/e1', revision: 'a', target: '1.0.0', reason: 'conflict' as const, transient: false, files: ['src/main/projectAgents.ts', 'tests/providerDetect.test.ts'], conflicts: { oursIs: 'target' as const, files: [{ file: 'src/main/projectAgents.ts', hunks: [hunk(447)] }, { file: 'tests/providerDetect.test.ts', hunks: [hunk(78), hunk(89)] }] } }
     const again = resubmittedText('HI-2122', conflict as never, 'HB1')
@@ -358,10 +358,10 @@ describe('what counts as a change', () => {
   })
 
   it('the wake line is one short line with the card, its column and the latest comment; the reply is lean', () => {
-    const c = cardOf({ column: 'review', comments: [{ at: at(5), by: 'Codex (hive)', text: '\n  Review round 2: FAILED — two findings\n1. …' }] })
+    const c = cardOf({ column: 'review', comments: [{ at: at(5), by: 'Codex (alpha)', text: '\n  Review round 2: FAILED — two findings\n1. …' }] })
     const line = wakeLine(cardChange(7, c, ['column']), 1)
     expect(line).not.toMatch(/\n/)
-    expect(line).toMatch(/^\[CW\] #7 is in Review; latest comment by Codex \(hive\): "Review round 2: FAILED — two findings" \(and 1 more watched card changed\)/)
+    expect(line).toMatch(/^\[CW\] #7 is in Review; latest comment by Codex \(alpha\): "Review round 2: FAILED — two findings" \(and 1 more watched card changed\)/)
     expect(wakeLine(cardChange(7, null, 'gone'))).toMatch(/#7 is gone from your board \(archived, deleted or moved to another project\)/)
     // Archived (one card, or a batch, #351): said so, and that only the user brings it back.
     expect(wakeLine(cardChange(7, cardOf({ archived: true }), 'gone'))).toMatch(/^\[CW\] #7 was archived \(off the board: only the user brings it back\)\. Your card watch has ended/)
@@ -393,18 +393,18 @@ describe('what counts as a change', () => {
   })
 
   it("the wake line says whose card it is when it's another agent's, the reviewer's verdict, and that Passed isn't merged (#143; Passed since #170)", () => {
-    const passed = { at: at(6), by: 'Codex (hive)', what: 'Review passed' }
-    const comment = [{ at: at(6), by: 'Codex (hive)', text: 'Round 3: PASSED' }]
+    const passed = { at: at(6), by: 'Codex (alpha)', what: 'Review passed' }
+    const comment = [{ at: at(6), by: 'Codex (alpha)', text: 'Round 3: PASSED' }]
     const line = (card: TaskCard | null, changes: Parameters<typeof wakeAbout>[1], watcher: string) => wakeLine({ ...cardChange(7, card, changes), about: wakeAbout(card, changes, watcher) })
     // Another agent's card (a dependency) moved to Passed: whose it is, who passed it, and that Passed isn't merged (Done is).
-    const dep = cardOf({ agent: 'a1', agentName: 'Claude', column: 'passed', comments: comment, history: [{ at: at(1), by: 'Claude (hive)', what: 'Moved to Review' }, passed, { ...passed, what: 'Moved to Passed' }] })
-    expect(line(dep, ['column'], 'a2')).toMatch(/^\[CW\] #7 \(Claude's card\) is in Passed: Codex \(hive\) passed it \(Passed isn't merged\); latest comment by Codex \(hive\): "Round 3: PASSED"\. Your card watch has ended/)
+    const dep = cardOf({ agent: 'a1', agentName: 'Claude', column: 'passed', comments: comment, history: [{ at: at(1), by: 'Claude (alpha)', what: 'Moved to Review' }, passed, { ...passed, what: 'Moved to Passed' }] })
+    expect(line(dep, ['column'], 'a2')).toMatch(/^\[CW\] #7 \(Claude's card\) is in Passed: Codex \(alpha\) passed it \(Passed isn't merged\); latest comment by Codex \(alpha\): "Round 3: PASSED"\. Your card watch has ended/)
     // Moved to Passed by hand, with no review: no verdict to name, still not merged.
     expect(line(cardOf({ agent: 'a1', agentName: 'Claude', column: 'passed' }), ['column'], 'a2')).toMatch(/^\[CW\] #7 \(Claude's card\) is in Passed \(Passed isn't merged\)\. /)
     // The watcher's own card: short as before, with the verdict when that is what changed.
-    expect(line(dep, ['verdict', 'column'], 'a1')).toMatch(/^\[CW\] #7 is in Passed: Codex \(hive\) passed it; latest comment/)
-    const failed = cardOf({ agent: 'a1', column: 'review', history: [{ at: at(2), by: 'Codex (hive)', what: 'Review passed' }, { at: at(9), by: 'Codex (hive)', what: 'Review failed' }] })
-    expect(line(failed, ['verdict'], 'a1')).toMatch(/^\[CW\] #7 is in Review: Codex \(hive\) failed it\. /)
+    expect(line(dep, ['verdict', 'column'], 'a1')).toMatch(/^\[CW\] #7 is in Passed: Codex \(alpha\) passed it; latest comment/)
+    const failed = cardOf({ agent: 'a1', column: 'review', history: [{ at: at(2), by: 'Codex (alpha)', what: 'Review passed' }, { at: at(9), by: 'Codex (alpha)', what: 'Review failed' }] })
+    expect(line(failed, ['verdict'], 'a1')).toMatch(/^\[CW\] #7 is in Review: Codex \(alpha\) failed it\. /)
     // A move with no verdict among the changes names none; a reviewer waiting for the builder's card hears whose it is.
     expect(line(cardOf({ agent: 'a1', agentName: 'Claude', column: 'review' }), ['column'], 'r1')).toMatch(/^\[CW\] #7 \(Claude's card\) is in Review\. /)
     expect(line(failed, ['column'], 'a1')).toMatch(/^\[CW\] #7 is in Review\. /)
@@ -418,13 +418,13 @@ describe('what counts as a change', () => {
 
   it('a verdict is named only for the round it belongs to: not after the card went back to work, was reviewed again or reassigned', () => {
     const line = (card: TaskCard, changes: Parameters<typeof wakeAbout>[1], watcher = 'a2') => wakeLine({ ...cardChange(7, card, changes), about: wakeAbout(card, changes, watcher) })
-    const h = (m: number, what: string, by = 'Codex (hive)') => ({ at: at(m), by, what })
+    const h = (m: number, what: string, by = 'Codex (alpha)') => ({ at: at(m), by, what })
     const dep = (history: TaskCard['history']) => cardOf({ agent: 'a1', agentName: 'Claude', column: 'passed', history })
     // Passed, then moved to Passed in another call; and passed and moved in one call (same time): the pass is named.
-    expect(line(dep([h(1, 'Moved to Review', 'Claude (hive)'), h(2, 'Review passed'), h(3, 'Moved to Passed', 'You')]), ['column'])).toMatch(/#7 \(Claude's card\) is in Passed: Codex \(hive\) passed it \(Passed isn't merged\)/)
-    expect(line(dep([h(1, 'Moved to Review', 'Claude (hive)'), h(2, 'Review passed'), h(2, 'Moved to Passed')]), ['column'])).toMatch(/is in Passed: Codex \(hive\) passed it/)
+    expect(line(dep([h(1, 'Moved to Review', 'Claude (alpha)'), h(2, 'Review passed'), h(3, 'Moved to Passed', 'You')]), ['column'])).toMatch(/#7 \(Claude's card\) is in Passed: Codex \(alpha\) passed it \(Passed isn't merged\)/)
+    expect(line(dep([h(1, 'Moved to Review', 'Claude (alpha)'), h(2, 'Review passed'), h(2, 'Moved to Passed')]), ['column'])).toMatch(/is in Passed: Codex \(alpha\) passed it/)
     // Passed, reopened (back to Doing), more work, then moved to Passed by hand with no new review: no verdict is named.
-    const reopened = dep([h(1, 'Moved to Review', 'Claude (hive)'), h(2, 'Review passed', 'Old reviewer (hive)'), h(3, 'Moved to Passed'), h(4, 'Moved to Doing', 'You'), h(5, 'Moved to Passed', 'You')])
+    const reopened = dep([h(1, 'Moved to Review', 'Claude (alpha)'), h(2, 'Review passed', 'Old reviewer (alpha)'), h(3, 'Moved to Passed'), h(4, 'Moved to Doing', 'You'), h(5, 'Moved to Passed', 'You')])
     expect(line(reopened, ['column'])).toMatch(/^\[CW\] #7 \(Claude's card\) is in Passed \(Passed isn't merged\)\. /)
     expect(line(reopened, ['column'])).not.toMatch(/passed it/)
     // Reviewed again since (in Review once more), or given to another agent: the old verdict doesn't carry over.
@@ -432,15 +432,15 @@ describe('what counts as a change', () => {
     expect(line(dep([h(2, 'Review passed'), h(3, 'Given to Claude', 'You'), h(4, 'Moved to Passed', 'You')]), ['column'])).not.toMatch(/passed it/)
     // Passed and left in Review; another agent starts a new review (tasks.ts's "Started reviewing"), it stops, and the user
     // moves the card to Done: the old pass isn't named. A verdict from that new review is.
-    const second = [h(1, 'Moved to Review', 'Claude (hive)'), h(2, 'Started reviewing', 'Old reviewer (hive)'), h(3, 'Review passed', 'Old reviewer (hive)'), h(4, 'Started reviewing', 'New reviewer (hive)'), h(5, 'Review by New reviewer stopped', 'You'), h(5, 'Moved to Passed', 'You')]
+    const second = [h(1, 'Moved to Review', 'Claude (alpha)'), h(2, 'Started reviewing', 'Old reviewer (alpha)'), h(3, 'Review passed', 'Old reviewer (alpha)'), h(4, 'Started reviewing', 'New reviewer (alpha)'), h(5, 'Review by New reviewer stopped', 'You'), h(5, 'Moved to Passed', 'You')]
     expect(line(dep(second), ['column'])).toMatch(/is in Passed \(Passed isn't merged\)\. /)
     expect(line(dep(second), ['column'])).not.toMatch(/Old reviewer/)
-    const secondPassed = [...second.slice(0, 4), h(6, 'Review passed', 'New reviewer (hive)'), h(6, 'Moved to Passed', 'New reviewer (hive)')]
-    expect(line(dep(secondPassed), ['column'])).toMatch(/is in Passed: New reviewer \(hive\) passed it \(Passed isn't merged\)/)
+    const secondPassed = [...second.slice(0, 4), h(6, 'Review passed', 'New reviewer (alpha)'), h(6, 'Moved to Passed', 'New reviewer (alpha)')]
+    expect(line(dep(secondPassed), ['column'])).toMatch(/is in Passed: New reviewer \(alpha\) passed it \(Passed isn't merged\)/)
     // Failed, then moved to Passed by hand: Passed names no pass, nor the failure.
     expect(line(dep([h(2, 'Review failed'), h(3, 'Moved to Passed', 'You')]), ['column'])).toMatch(/is in Passed \(Passed isn't merged\)\. /)
     // A verdict that is what changed is always named, on the watcher's own card too.
-    expect(line(cardOf({ agent: 'a1', column: 'review', history: [h(2, 'Review failed')] }), ['verdict'], 'a1')).toMatch(/is in Review: Codex \(hive\) failed it/)
+    expect(line(cardOf({ agent: 'a1', column: 'review', history: [h(2, 'Review failed')] }), ['verdict'], 'a1')).toMatch(/is in Review: Codex \(alpha\) failed it/)
   })
 
   it('long or odd names never push out the card, its state or what to do: each name is cut, the comment gives way', () => {
@@ -463,8 +463,8 @@ describe('what counts as a change', () => {
     const spaced = cardOf({ agent: 'a1', agentName: '  Spaced\n\tout   name  ', column: 'review' })
     expect(wakeLine({ ...cardChange(7, spaced, ['column']), about: wakeAbout(spaced, ['column'], 'a2') })).toMatch(/^\[CW\] #7 \(Spaced out name's card\) is in Review\. /)
     // A short comment is kept whole.
-    const short = cardOf({ comments: [{ at: at(1), by: 'Codex (hive)', text: 'Round 1: PASSED' }] })
-    expect(wakeLine(cardChange(7, short, ['comment']))).toContain('latest comment by Codex (hive): "Round 1: PASSED". ')
+    const short = cardOf({ comments: [{ at: at(1), by: 'Codex (alpha)', text: 'Round 1: PASSED' }] })
+    expect(wakeLine(cardChange(7, short, ['comment']))).toContain('latest comment by Codex (alpha): "Round 1: PASSED". ')
   })
 
   it("tells whether a history entry is within a view's boundary by which entry it is, not its time (#578)", () => {
@@ -801,10 +801,10 @@ describe('watches (main/watches.ts)', async () => {
     await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'doing' }, user))
     await evaluated(w)
     expect(st.typed).toEqual([])
-    await inWorkspace(w, () => tasks.commentTask(c.number, 'Round 1: FAILED\nDetails', { kind: 'agent', name: 'Codex (hive)' }))
+    await inWorkspace(w, () => tasks.commentTask(c.number, 'Round 1: FAILED\nDetails', { kind: 'agent', name: 'Codex (alpha)' }))
     await evaluated(w)
     expect(st.typed).toHaveLength(1)
-    expect(st.told[0]).toMatch(new RegExp(`^\\[CW\\] #${c.number} is in Doing; latest comment by Codex \\(hive\\): "Round 1: FAILED"`))
+    expect(st.told[0]).toMatch(new RegExp(`^\\[CW\\] #${c.number} is in Doing; latest comment by Codex \\(alpha\\): "Round 1: FAILED"`))
     expect(watches.watchFor(alpha, 'a1')).toBeNull()
     // Once: another change wakes nothing.
     await inWorkspace(w, () => tasks.commentTask(c.number, 'again', user))

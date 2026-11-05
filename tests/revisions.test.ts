@@ -426,7 +426,7 @@ describe('limits', () => {
     const project = join(dir, 'claude-project')
     mkdirSync(project, { recursive: true })
     const before = readStats.bytes
-    const delivered = await claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills: [{ name: 'deep', sourcePath: deep }, { name: 'big', sourcePath: big }, { name: 'ok', sourcePath: ok }], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/hive/hook-auth/x.txt', privateDir: `${project}-private` } as never)
+    const delivered = await claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills: [{ name: 'deep', sourcePath: deep }, { name: 'big', sourcePath: big }, { name: 'ok', sourcePath: ok }], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/profile/hook-auth/x.txt', privateDir: `${project}-private` } as never)
     const skills = join(project, '.combwork', 'launch-a1', 'plugin', 'skills')
     expect(delivered.deep).toEqual({ revision: null, problem: 'it is too big for Combwork to check (it has folders more than 12 deep)', lasting: true })
     expect(delivered.big).toEqual({ revision: null, problem: 'it is too big for Combwork to check (it is over 1 MB)', lasting: true })

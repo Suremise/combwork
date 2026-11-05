@@ -330,7 +330,7 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
   it('is refused while another Combwork has the file open, the board still read-only; goes ahead once it has closed', async () => {
     const ws = await board09()
     const w = await open(ws)
-    // A 0.9 Hive: a connection to the file, as every open workspace holds one.
+    // A 0.9 build: a connection to the file, as every open workspace holds one.
     const other = new DatabaseSync(store.boardFile(ws))
     other.prepare('SELECT count(*) FROM cards').get()
     try {
@@ -353,18 +353,18 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     inWorkspace(w, () => store.boardState(w))
     const own = readdirSync(dir)
     expect(own).toHaveLength(1)
-    const other = join(dir, 'Hive-Dev-12345678.json')
+    const other = join(dir, 'Combwork-Dev-12345678.json')
     // Running (this process's pid) and recent: another Combwork.
-    writeFileSync(other, JSON.stringify({ pid: process.pid, profile: 'Hive-Dev', appVersion: '1.0.0', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() }))
+    writeFileSync(other, JSON.stringify({ pid: process.pid, profile: 'Combwork-Dev', appVersion: '1.0.0', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() }))
     await expect(inWorkspace(w, () => store.upgradeBoard(w))).rejects.toThrow('close it first')
     expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBe('upgrade')
     // Its heartbeat missed: a Combwork that stopped without removing it.
-    writeFileSync(other, JSON.stringify({ pid: process.pid, profile: 'Hive-Dev', appVersion: '1.0.0', startedAt: new Date().toISOString(), heartbeat: new Date(Date.now() - STALE_MS - 1000).toISOString() }))
+    writeFileSync(other, JSON.stringify({ pid: process.pid, profile: 'Combwork-Dev', appVersion: '1.0.0', startedAt: new Date().toISOString(), heartbeat: new Date(Date.now() - STALE_MS - 1000).toISOString() }))
     await inWorkspace(w, () => store.upgradeBoard(w))
     expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBeNull()
     await close(w)
     // Removed as the workspace closed; the other's left alone.
-    expect(readdirSync(dir)).toEqual(['Hive-Dev-12345678.json'])
+    expect(readdirSync(dir)).toEqual(['Combwork-Dev-12345678.json'])
   })
 
   it('a board an earlier 1.0 upgraded takes the group\'s later steps unasked: writable, its cards kept (HI-1718: rc.1–rc.4 boards at v22)', async () => {
@@ -542,7 +542,7 @@ describe('while the upgrade waits, nothing needing combwork.db starts or writes 
     const told: string[] = []
     const off = store.onBoardUpgraded((x) => told.push(x.path!))
     try {
-      // Nothing written, nothing thrown ("This board is from Hive 0.9…" was logged for each).
+      // Nothing written, nothing thrown (a warning that the board was from 0.9 was logged for each).
       expect(await inWorkspace(w, () => tasks.stampCardProjects(w))).toBe(0)
       expect(await inWorkspace(w, () => keyProjects(w))).toEqual([])
       expect(await inWorkspace(w, () => tasks.archiveOldDone(w))).toEqual([])
@@ -584,7 +584,7 @@ describe('while the upgrade waits, nothing needing combwork.db starts or writes 
       expect(store.boardWaits(w)).toBe(true)
       // The line updater (a pass came with every agent's change in another window) and a metrics save, on the 0.9 board.
       await inWorkspace(w, () => updateLines(w))
-      // The stage repair (HI-1674), which warned "This board is from Hive 0.9" at each open (HI-1714): it leaves the board alone.
+      // The stage repair (HI-1674), which warned that the board was from 0.9 at each open (HI-1714): it leaves the board alone.
       expect(await inWorkspace(w, () => repairStages(w))).toEqual({ unmarked: 0, repaired: [], failed: 0 })
       metrics.recordApi(metrics.metricsHandle(w), null, { route: '/v1/tasks', method: 'GET', role: 'agent', outcome: 'ok', requestBytes: 1, responseBytes: 1, ms: 1 })
       await metrics.metricsHandle(w)!.store.save()
@@ -648,7 +648,7 @@ describe('while the upgrade waits, nothing needing combwork.db starts or writes 
 })
 
 describe("what services read before the database was replaced is read again (#1207 round 2)", () => {
-  /** A delivery as a 0.9 Hive saves it, straight into the database (another process), with the host's next id. */
+  /** A delivery as a 0.9 build saves it, straight into the database (another process), with the host's next id. */
   function writtenBy09(ws: string, scope: string, id: string, next: number, body: string): void {
     const raw = new DatabaseSync(store.boardFile(ws), { timeout: 5000 })
     try {
@@ -675,7 +675,7 @@ describe("what services read before the database was replaced is read again (#12
       writtenBy09(ws, scope, 'm1', 2, 'Written by 0.9 while the upgrade waited')
       await inWorkspace(w, () => store.upgradeBoard(w))
       expect(bodies(await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1')))).toEqual(['m1 Written by 0.9 while the upgrade waited'])
-      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'combwork', name: 'Hive' }, body: 'The first in 1.0' }))
+      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'combwork', name: 'Combwork' }, body: 'The first in 1.0' }))
       expect(made.id).toBe('m2')
       const saved = await inWorkspace(w, () => delivery.savedForTests(host))
       expect(bodies(saved.deliveries)).toEqual(['m1 Written by 0.9 while the upgrade waited', 'm2 The first in 1.0'])
@@ -744,7 +744,7 @@ describe("what services read before the database was replaced is read again (#12
       const { scope } = await inWorkspace(w, () => w.sessionScope(host))
       writtenBy09(ws, scope, 'm1', 2, 'From 0.9')
       await inWorkspace(w, () => store.upgradeBoard(w))
-      await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'combwork', name: 'Hive' }, body: 'Only in 1.0' }))
+      await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'combwork', name: 'Combwork' }, body: 'Only in 1.0' }))
       expect(bodies(await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1')))).toEqual(['m1 From 0.9', 'm2 Only in 1.0'])
       // Back to the 0.9 board: what it has, not the 1.0 board's cache.
       await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
@@ -752,7 +752,7 @@ describe("what services read before the database was replaced is read again (#12
       // 0.9 adds one, then it is upgraded again: that one is kept, and the next id follows it.
       writtenBy09(ws, scope, 'm2', 3, 'From 0.9 after the restore')
       await inWorkspace(w, () => store.upgradeBoard(w))
-      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'combwork', name: 'Hive' }, body: 'In 1.0 again' }))
+      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'combwork', name: 'Combwork' }, body: 'In 1.0 again' }))
       expect(made.id).toBe('m3')
       expect(bodies((await inWorkspace(w, () => delivery.savedForTests(host))).deliveries)).toEqual(['m1 From 0.9', 'm2 From 0.9 after the restore', 'm3 In 1.0 again'])
     } finally {
@@ -854,7 +854,7 @@ describe('a workspace closed right after its database was replaced stays closed 
     try {
       await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1'))
       await inWorkspace(w, () => store.upgradeBoard(w))
-      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'combwork', name: 'Hive' }, body: 'After the upgrade' }))
+      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'combwork', name: 'Combwork' }, body: 'After the upgrade' }))
       expect((await inWorkspace(w, () => delivery.savedForTests(host))).deliveries.map((r) => r.id)).toEqual([made.id])
     } finally {
       await delivery.forgetDeliveriesForTests()

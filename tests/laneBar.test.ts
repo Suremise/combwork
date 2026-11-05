@@ -26,7 +26,7 @@ const card = (number: number, column: TaskColumn, history: string[] = [], extra:
   number,
   title: `Card ${number}`,
   description: '',
-  project: 'hive',
+  project: 'alpha',
   agent: null,
   column,
   order: 0,
@@ -423,7 +423,7 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     const o = { by: 'user' as const, move: 'active→done', rules: ['integrate.approved', 'done.contained'], reason: ' Merged by hand ', at: '' }
     expect(workNotes(badge({ revision: null, override: o }), 'done', null, short, tr, names)).toEqual(['You moved it past its rules: Review and approval before merging + done.contained. Reason: Merged by hand'])
     expect(workNotes(badge({ revision: null, override: { ...o, by: 'assistant', reason: '' } }), 'done', null, short, tr, names)).toEqual(['The Assistant moved it past its rules: Review and approval before merging + done.contained. No reason given.'])
-    // Without the window's names (hive-mcp): no line.
+    // Without the window's names (cw-mcp): no line.
     expect(workNotes(badge({ revision: null, override: o }), 'done', null, short, tr)).toEqual([])
   })
 

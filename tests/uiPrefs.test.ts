@@ -63,21 +63,21 @@ describe('projectPrefValue', () => {
 })
 
 describe("movedPrefKey (HI-2008: a moved workspace's view preferences)", () => {
-  const from = String.raw`C:\Work\Hive`
+  const from = String.raw`C:\Work\Demo`
   // With a trailing separator, as a folder can be given.
-  const to = 'D:\\New\\Hive\\'
+  const to = 'D:\\New\\Demo\\'
   it("puts a project's path, the Assistant's workspace|project and a pane's what:workspace at the new folder", () => {
-    expect(movedPrefKey(String.raw`c:\work\hive\alpha`, from, to)).toBe(String.raw`d:\new\hive\alpha`)
-    expect(movedPrefKey(String.raw`c:\work\hive|c:\work\hive\alpha`, from, to)).toBe(String.raw`d:\new\hive|d:\new\hive\alpha`)
-    expect(movedPrefKey(String.raw`assistant-open:c:\work\hive`, from, to)).toBe(String.raw`assistant-open:d:\new\hive`)
-    expect(movedPrefKey(String.raw`c:\work\hive`, from, to)).toBe(String.raw`d:\new\hive`)
+    expect(movedPrefKey(String.raw`c:\work\demo\alpha`, from, to)).toBe(String.raw`d:\new\demo\alpha`)
+    expect(movedPrefKey(String.raw`c:\work\demo|c:\work\demo\alpha`, from, to)).toBe(String.raw`d:\new\demo|d:\new\demo\alpha`)
+    expect(movedPrefKey(String.raw`assistant-open:c:\work\demo`, from, to)).toBe(String.raw`assistant-open:d:\new\demo`)
+    expect(movedPrefKey(String.raw`c:\work\demo`, from, to)).toBe(String.raw`d:\new\demo`)
   })
   it('a path counts only whole, and a key naming another folder or none is null', () => {
-    expect(movedPrefKey(String.raw`c:\work\hive-two\alpha`, from, to)).toBeNull()
-    expect(movedPrefKey(String.raw`assistant-open:c:\work\hiveb`, from, to)).toBeNull()
-    expect(movedPrefKey(String.raw`c:\other\c:\work\hive`, from, to)).toBeNull()
+    expect(movedPrefKey(String.raw`c:\work\demo-two\alpha`, from, to)).toBeNull()
+    expect(movedPrefKey(String.raw`assistant-open:c:\work\demob`, from, to)).toBeNull()
+    expect(movedPrefKey(String.raw`c:\other\c:\work\demo`, from, to)).toBeNull()
     expect(movedPrefKey('table-rows:board', from, to)).toBeNull()
     expect(movedPrefKey('assistantTop', from, to)).toBeNull()
-    expect(movedPrefKey(String.raw`c:\work\hive\alpha`, '', to)).toBeNull()
+    expect(movedPrefKey(String.raw`c:\work\demo\alpha`, '', to)).toBeNull()
   })
 })

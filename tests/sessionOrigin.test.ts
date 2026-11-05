@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { sessionOrigin } from '../src/shared/sessionOrigin'
 
 const P = 'C:\\ws\\alpha'
-const WT = 'C:\\ws\\.hive-worktrees\\alpha\\coder'
+const WT = 'C:\\ws\\.demo-worktrees\\alpha\\coder'
 
 describe('sessionOrigin', () => {
   it('labels the project folder and a worktree, with the agent as it is named now', () => {

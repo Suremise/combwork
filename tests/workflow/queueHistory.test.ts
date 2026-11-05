@@ -79,7 +79,7 @@ describe("the queue's time taken over an entry (HI-1924)", () => {
 /** Facts as a card's store gives them, in order, a second apart (`at` in seconds from T0). */
 const T0 = Date.parse('2026-10-28T09:00:00.000Z')
 function factsOf(list: [FactKind, number, Record<string, unknown>][]): Fact[] {
-  return list.map(([kind, s, data], i) => ({ seq: i + 1, card: 1, kind, at: new Date(T0 + s * 1000).toISOString(), actor: { kind: 'hive' }, source: 'recorded', data }) as unknown as Fact)
+  return list.map(([kind, s, data], i) => ({ seq: i + 1, card: 1, kind, at: new Date(T0 + s * 1000).toISOString(), actor: 'combwork', source: 'recorded', data }) as unknown as Fact)
 }
 const check = (entry: string | undefined, durationS: number) => ({ name: 'quick', command: 'q', revision: 'r', tested: 'r', result: 'passed', run: 'x', durationMs: durationS * 1000, by: CW_RUNS, counted: true, ...(entry ? { entry } : {}) })
 

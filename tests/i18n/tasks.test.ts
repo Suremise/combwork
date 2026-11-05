@@ -1,4 +1,4 @@
-// #846 (E10b): the `tasks` area, the board's service. Its refusals are CombworkErrors: agents (the Agent API, the hive
+// #846 (E10b): the `tasks` area, the board's service. Its refusals are CombworkErrors: agents (the Agent API, the cw_
 // tools) read them in English exactly as before, with the same status, and the window in its language. A card's
 // history keeps its English (`what`: agents read it, Combwork's code and the scenarios match it) and stores the line as
 // data beside it (`whatText`: a message id and values), which the card dialog shows in the window's language; entries

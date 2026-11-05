@@ -8,7 +8,7 @@ import { tempDir } from './tempDir'
 
 // Two real sessions from the #403 spike (Copilot CLI 1.0.93), scrubbed: paths under C:\work, the system prompt, hook
 // inputs and the CLI's utility-model calls trimmed. REAL ran on Copilot Free (Auto picked mai-code-1.1-flash): three
-// prompts, a hive MCP call and a file created, with credits. STUB ran offline against a scripted model (no credits): a
+// prompts, a call to Combwork's MCP server and a file created, with credits. STUB ran offline against a scripted model (no credits): a
 // command, a question, an exit and a resume, then a permission prompt cancelled by an interrupt.
 // When a new CLI version changes the format, add its sessions here.
 const HOME = join(__dirname, 'fixtures', 'copilot')

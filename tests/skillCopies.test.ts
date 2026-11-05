@@ -87,7 +87,7 @@ describe('safe clean-up (#1431)', () => {
     const book = memBook()
     await sync(w.slot, w.project, w.sources, book)
     // The user's own skills: one of their own name, one using Combwork's prefix.
-    for (const mine of ['mine', 'hive-theirs']) {
+    for (const mine of ['mine', 'cw-theirs']) {
       mkdirSync(join(w.slot, '.agents', 'skills', mine), { recursive: true })
       writeFileSync(join(w.slot, '.agents', 'skills', mine, 'SKILL.md'), `# ${mine}`)
     }
@@ -103,7 +103,7 @@ describe('safe clean-up (#1431)', () => {
     expect(existsSync(w.copy(w.slot, 'notes'))).toBe(false)
     expect(readFileSync(join(w.copy(w.slot, 'review'), 'SKILL.md'), 'utf8')).toBe('# review, edited')
     expect(readFileSync(join(w.slot, '.agents', 'skills', 'mine', 'SKILL.md'), 'utf8')).toBe('# mine')
-    expect(readFileSync(join(w.slot, '.agents', 'skills', 'hive-theirs', 'SKILL.md'), 'utf8')).toBe('# hive-theirs')
+    expect(readFileSync(join(w.slot, '.agents', 'skills', 'cw-theirs', 'SKILL.md'), 'utf8')).toBe('# cw-theirs')
     expect([...book.rows.values()].map((r) => r.skill)).toEqual(['review'])
     // Nothing of a swap is left beside them.
     expect(readdirSync(join(w.slot, '.agents', 'skills')).filter((f) => f.startsWith('.')).length).toBe(0)

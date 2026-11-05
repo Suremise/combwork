@@ -219,7 +219,7 @@ if (args[0] === 'app-server') {
     const env = withoutAccountEnv(codex, { ...baseEnv(), CODEX_HOME: conn, CODEX_ACCESS_TOKEN: 'made-up' })
     // And a token in Combwork's own, which none of them may get.
     const before = process.env.CODEX_ACCESS_TOKEN
-    process.env.CODEX_ACCESS_TOKEN = 'made-up-in-hive'
+    process.env.CODEX_ACCESS_TOKEN = 'made-up-in-combwork'
     try {
       await codex.prepareLaunch({ projectPath: cwd, agentId: 'a-1', executable: cmd, cwd, workspacePath: cwd, runId: 'r-pre', sessionId: '00000000-0000-4000-8000-000000000001', resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: join(cwd, 'auth.txt'), privateDir: cwd, guidance: 'Combwork guidance', env, allowBackgroundSessions: false, use200kContext: false, connectionHome: conn } as never)
     } finally {
@@ -477,7 +477,7 @@ describe('a Codex launch on a connection', () => {
   const conn = join(base, 'profile', 'accounts', 'a-launch')
   const ctx = {
     projectPath: base, agentId: 'a-1', executable: 'C:\\bin\\codex.exe', cwd: base, workspacePath: base, runId: 'r', sessionId: '00000000-0000-4000-8000-000000000000',
-    resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: 'C:/hive/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false
+    resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/demo/hook-auth/r.txt', privateDir: 'C:/demo/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false
   }
   beforeAll(() => {
     mkdirSync(conn, { recursive: true })

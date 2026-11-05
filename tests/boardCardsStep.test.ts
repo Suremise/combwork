@@ -55,7 +55,7 @@ function workspace(): string {
   return ws
 }
 
-/** Documents of every form a 0.9 board can hold: Combwork's own, an older Hive's, hand-edited ones. */
+/** Documents of every form a 0.9 board can hold: Combwork's own, an older version's, hand-edited ones. */
 const ODD: Record<number, Record<string, unknown>> = {
   // Another key order, a field Combwork doesn't know, and one named like Object.prototype's.
   901: { title: 'Out of order', number: 901, column: 'todo', project: 'p', agent: null, description: '', order: 3, labels: ['x'], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived: false, createdAt: '2026-01-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-01-01T00:00:00.000Z', custom: { deep: [1, 2] }, ['__proto__']: 'kept' },

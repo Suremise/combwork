@@ -6,8 +6,8 @@ import { needYou } from '../src/shared/needYou'
 import type { InboxItem } from '../src/shared/inbox'
 import type { ForYouItem } from '../src/shared/workflow/workView'
 
-const req = (card: number, request: string, since: string, asker: string | null = null, project = 'hive'): ForYouItem => ({ card, project, request, kind: 'decide', gate: 'ask', text: request, since, asker, for: 'user' })
-const agent = (agentId: string, over: Partial<InboxItem> = {}): InboxItem => ({ projectPath: 'D:\\ws\\hive', projectName: 'hive', agentId, agentName: agentId.toUpperCase(), assistant: false, kind: 'waiting', since: '', ...over })
+const req = (card: number, request: string, since: string, asker: string | null = null, project = 'alpha'): ForYouItem => ({ card, project, request, kind: 'decide', gate: 'ask', text: request, since, asker, for: 'user' })
+const agent = (agentId: string, over: Partial<InboxItem> = {}): InboxItem => ({ projectPath: 'D:\\ws\\alpha', projectName: 'alpha', agentId, agentName: agentId.toUpperCase(), assistant: false, kind: 'waiting', since: '', ...over })
 const none = (): number[] => []
 
 describe('what needs you, as things (HI-1931)', () => {

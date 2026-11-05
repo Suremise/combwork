@@ -462,7 +462,7 @@ $r.added = [CombworkJobs]::Add('t', $a.Id)
 $c = [CombworkJobs]::CreatedOf($a.Id)
 $r.id = "$($a.Id):$c"
 $r.paths = [CombworkJobs]::Paths("$($a.Id):$c,$($a.Id):1,99999991:$c")
-$r.running = [CombworkJobs]::Running('NODE.exe,hive-no-such-process-2304.exe')
+$r.running = [CombworkJobs]::Running('NODE.exe,cw-no-such-process-2304.exe')
 $r.ended = [CombworkJobs]::Kill('t') -and $a.WaitForExit(10000)
 if (-not $a.HasExited) { Stop-Process -Id $a.Id -Force }
 $r | ConvertTo-Json -Compress

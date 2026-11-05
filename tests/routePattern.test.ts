@@ -1,4 +1,4 @@
-// The Agent API's route templates as patterns (HI-2258): `:agent` may be empty, the call that names no agent (the hive
+// The Agent API's route templates as patterns (HI-2258): `:agent` may be empty, the call that names no agent (Combwork's
 // tools' optional `agent`), which its routes answer as the project's sole agent or refuse saying "agent" is missing;
 // before, `/agents//activity` found no route and the tool's caller got "No route for GET …". Other parameters still
 // need a segment. What the routes answer (the sole agent's activity, the refusal with several): e2e agentapislots.

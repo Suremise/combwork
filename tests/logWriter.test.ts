@@ -20,7 +20,7 @@ const logger = await import('../src/main/logger')
 const { BUSY, LOG_STATE_SLOTS, STOP, WRITTEN, writeBatch } = await import('../src/main/logWriter')
 const bundle = join(base, 'log-writer.cjs')
 const hooks = join(base, 'profile', 'logs', 'hooks.log')
-const hive = join(base, 'profile', 'logs', 'combwork.log')
+const appLog = join(base, 'profile', 'logs', 'combwork.log')
 const lines = (f: string): string[] => (existsSync(f) ? readFileSync(f, 'utf8').split('\n').filter(Boolean) : [])
 
 beforeAll(async () => {
@@ -62,9 +62,9 @@ describe("the log's writer thread (HI-1730)", () => {
     logger.logLimits.waitingBytes = 2000
     try {
       for (let i = 0; i < 100; i++) logger.hookJournal(`bound ${i} ${'x'.repeat(40)}`)
-      await vi.waitFor(() => expect(lines(hive).some((l) => /\[logger\] \d+ log line\(s\) weren't written/.test(l))).toBe(true), { timeout: HUNG_MS })
+      await vi.waitFor(() => expect(lines(appLog).some((l) => /\[logger\] \d+ log line\(s\) weren't written/.test(l))).toBe(true), { timeout: HUNG_MS })
       const kept = lines(hooks).filter((l) => l.includes(' bound ')).length
-      const said = Number(/(\d+) log line\(s\) weren't written/.exec(lines(hive).find((l) => l.includes("weren't written")) ?? '')?.[1])
+      const said = Number(/(\d+) log line\(s\) weren't written/.exec(lines(appLog).find((l) => l.includes("weren't written")) ?? '')?.[1])
       expect(kept + said).toBe(100)
       expect(kept).toBeLessThan(100)
     } finally {

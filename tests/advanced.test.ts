@@ -201,7 +201,7 @@ describe('advanced.json', () => {
     expect(parseAdvancedFile('[]')).toMatchObject({ error: expect.stringContaining('object') })
     expect(parseAdvancedFile('{"format":2,"values":{}}')).toMatchObject({ error: expect.stringContaining('newer Combwork') })
     expect(parseAdvancedFile('{"values":[]}')).toMatchObject({ error: expect.stringContaining('"values"') })
-    expect(parseAdvancedFile('{"values":{"hive.nope":1,"cw.mcp.replySeconds":400}}')).toMatchObject({ unknown: ['hive.nope'] })
+    expect(parseAdvancedFile('{"values":{"acme.nope":1,"cw.mcp.replySeconds":400}}')).toMatchObject({ unknown: ['acme.nope'] })
     // A record for a value no longer there is dropped.
     expect(parseAdvancedFile('{"values":{},"madeFor":{"claude-code.trust.prompt":{"version":"1","value":"x"}}}')).toMatchObject({ madeFor: {} })
   })
@@ -239,7 +239,7 @@ describe('the advanced store', () => {
     expect(s.pattern('claude-code.trust.prompt').test('Yes, I trust the folder')).toBe(true)
     expect(s.number('cw.mcp.replySeconds')).toBe(600)
     await expect(s.set('cw.mcp.replySeconds', 5)).rejects.toThrow('30 to 3600')
-    await expect(s.set('hive.nope', 5)).rejects.toThrow('No advanced setting')
+    await expect(s.set('acme.nope', 5)).rejects.toThrow('No advanced setting')
     await s.set('cw.mcp.replySeconds', 300)
     await s.set('claude-code.trust.prompt', null)
     expect(read(file)).toEqual({ format: 1, values: {}, madeFor: {} })
@@ -288,10 +288,10 @@ describe('the advanced store', () => {
 
   it("resets every override (keeping ids this Combwork doesn't know), and refuses while the file can't be read", async () => {
     const { s, dir, file } = store()
-    writeFileSync(file, JSON.stringify({ values: { 'cw.mcp.replySeconds': 600, 'hive.someday': 1 } }))
+    writeFileSync(file, JSON.stringify({ values: { 'cw.mcp.replySeconds': 600, 'acme.someday': 1 } }))
     s.load(dir)
     await s.resetAll()
-    expect(read(file).values).toEqual({ 'hive.someday': 1 })
+    expect(read(file).values).toEqual({ 'acme.someday': 1 })
     expect(s.number('cw.mcp.replySeconds')).toBe(300)
     writeFileSync(file, '{')
     await vi.waitFor(() => expect(s.state(null).fileError).toBeTruthy(), { timeout: 10_000 })
@@ -461,7 +461,7 @@ describe('the advanced store', () => {
       expect(apiOutcome({ finished: true, status: reply.status, waiting: false })).toBe('client-error')
     }
     // No setting by that id: 404.
-    expect(apiErrorReply(await s.set('hive.nope', 1).catch((e: unknown) => e)).status).toBe(404)
+    expect(apiErrorReply(await s.set('acme.nope', 1).catch((e: unknown) => e)).status).toBe(404)
     // The broken file is left for the user to fix.
     expect(readFileSync(file, 'utf8')).toBe('{ "values": { "cw.mcp.replySeconds": 9')
   })
@@ -492,7 +492,7 @@ describe('the advanced store', () => {
     expect(read(file).madeFor['copilot.trust.prompt'].version).toBe('1.0.99')
     expect(advancedRow(def('copilot.trust.prompt'), s.state(null)).madeForOther).toBeNull()
     expect(s.diagnostics([{ 'cw.progress.lanesShown': 6 }])).toEqual(['- Advanced settings: 1 override (copilot.trust.prompt); 1 workspace value'])
-    writeFileSync(file, JSON.stringify({ values: { 'cw.mcp.replySeconds': 'x', 'hive.other': 1 } }))
+    writeFileSync(file, JSON.stringify({ values: { 'cw.mcp.replySeconds': 'x', 'acme.other': 1 } }))
     await s.reload()
     expect(s.diagnostics([null])).toEqual(['- Advanced settings: 1 override (cw.mcp.replySeconds)', '  - not valid, so the default is used: cw.mcp.replySeconds', '  - unknown to this Combwork: 1'])
   })
@@ -513,7 +513,7 @@ describe('the advanced store', () => {
   })
 })
 
-describe('the adapters and the hive MCP server use them', () => {
+describe('the adapters and the combwork MCP server use them', () => {
   afterEach(async () => {
     await advanced.resetAll().catch(() => undefined)
     advanced.stop()
@@ -692,7 +692,7 @@ describe('the adapters and the hive MCP server use them', () => {
     const before = process.env.CODEX_HOME
     process.env.CODEX_HOME = home
     try {
-      const ctx = { projectPath: home, agentId: 'a-1', executable: 'C:\\bin\\codex.exe', cwd: home, workspacePath: home, runId: 'r', sessionId: '', resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: 'C:/hive/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false }
+      const ctx = { projectPath: home, agentId: 'a-1', executable: 'C:\\bin\\codex.exe', cwd: home, workspacePath: home, runId: 'r', sessionId: '', resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/demo/hook-auth/r.txt', privateDir: 'C:/demo/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false }
       const { args } = codex.buildCommand(ctx.executable, ctx)
       expect(args.find((a) => a.startsWith('tui.terminal_title='))).toBe('tui.terminal_title=["activity","spinner"]')
       const stop = args.find((a) => a.startsWith('hooks.Stop='))!
@@ -748,8 +748,8 @@ describe("the Assistant's settings catalog", () => {
     expect(checkSettingValue(lanes, 'inherit')).toEqual({ value: null })
     expect(settingPatch(lanes, 6)).toEqual({ advanced: { id: 'cw.progress.lanesShown', scope: 'workspace', value: 6 } })
     // Agents per project (#562) is Maximum agents, a workflow option, since HI-2001 (agentLimit.test.ts).
-    expect(settingEntry('workspace.advanced.hive.agents.perProject')).toBeUndefined()
-    expect(settingEntry('advanced.hive.agents.perProject')).toBeUndefined()
+    expect(settingEntry('workspace.advanced.cw.agents.perProject')).toBeUndefined()
+    expect(settingEntry('advanced.cw.agents.perProject')).toBeUndefined()
     // The developer features switch keeps its key and entry in Combwork's settings, with its advanced value's text.
     expect(settingEntry('advanced.showDeveloperFeatures')).toMatchObject({ hidden: true, type: 'boolean', title: def('cw.showDeveloperFeatures').title, desc: def('cw.showDeveloperFeatures').desc })
     expect(settingEntry('advanced.cw.showDeveloperFeatures')).toBeUndefined()

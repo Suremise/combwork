@@ -110,7 +110,7 @@ function world(o: { setup?: string; size?: number } = {}): World {
       },
       settle: async (job) => set.jobs.get(job) ?? true,
       holder,
-      profile: `hive-${pid}`,
+      profile: `profile-${pid}`,
       runIn: (f) => set.runIn.get(f.toLowerCase()) ?? null,
       holderBusy: (agent) => set.busy.get(agent) ?? null,
       leaseOver: (l) => (l.ref && set.over.has(l.ref) ? true : l.kind === 'check' ? false : null),
@@ -170,7 +170,7 @@ describe('copies: leasing at a revision (#1435)', { timeout: 60_000 }, () => {
     expect(head(l.folder)).toBe(r1)
     expect(existsSync(join(l.folder, 'b.txt'))).toBe(false)
     expect(w.store.copy('copy-1')).toMatchObject({ state: 'leased', revision: r1, op: null })
-    expect(l.lease).toMatchObject({ kind: 'check', card: 7, revision: r1, agent: 'a1', profile: 'hive-1', pid: 1, returned: null, freed: null })
+    expect(l.lease).toMatchObject({ kind: 'check', card: 7, revision: r1, agent: 'a1', profile: 'profile-1', pid: 1, returned: null, freed: null })
     expect(await w.pool.returnCopy(l.lease.id, 'runEnded')).toBe(true)
     expect(await w.pool.returnCopy(l.lease.id, 'runEnded')).toBe(false)
     expect(w.store.copy('copy-1')?.state).toBe('free')
@@ -378,7 +378,7 @@ describe('copies: operations and clean-up (#1435)', { timeout: 60_000 }, () => {
     // A reset's row as a dead Combwork leaves it: its operation, its lease not freed.
     await w.store.conn.write((db) => {
       db.prepare("UPDATE copies SET op = 'o-dead', op_kind = 'lease', op_pid = 9, op_started = 1009 WHERE name = 'copy-1'").run()
-      db.prepare("INSERT INTO copy_leases (id, project, copy, kind, card, revision, profile, pid, started, from_at) VALUES ('c-x', 'p-test', 'copy-1', 'check', 5, ?, 'hive-9', 9, 1009, 't')").run(l.lease.revision)
+      db.prepare("INSERT INTO copy_leases (id, project, copy, kind, card, revision, profile, pid, started, from_at) VALUES ('c-x', 'p-test', 'copy-1', 'check', 5, ?, 'profile-9', 9, 1009, 't')").run(l.lease.revision)
     })
     expect((await w.pool.leaseCopy({ kind: 'check', card: 2, revision: l.lease.revision })).ok).toBe(false)
     w.dead.add(9)
@@ -477,7 +477,7 @@ describe("copies: HR1's round 1", { timeout: 90_000 }, () => {
     await w.pool.returnCopy(l.lease.id, 'runEnded')
     await w.store.conn.write((db) => {
       db.prepare("UPDATE copies SET op = 'o-dead', op_kind = 'lease', op_pid = 9, op_started = 1009 WHERE name = 'copy-1'").run()
-      db.prepare("INSERT INTO copy_leases (id, project, copy, kind, card, revision, profile, pid, started, from_at) VALUES ('c-x', 'p-test', 'copy-1', 'check', 5, ?, 'hive-9', 9, 1009, 't')").run(l.lease.revision)
+      db.prepare("INSERT INTO copy_leases (id, project, copy, kind, card, revision, profile, pid, started, from_at) VALUES ('c-x', 'p-test', 'copy-1', 'check', 5, ?, 'profile-9', 9, 1009, 't')").run(l.lease.revision)
     })
     w.dead.add(9)
     // Combwork 2 takes it over, and dies right after its takeover commits.
@@ -560,7 +560,7 @@ describe('copies: isolated requests apart from the request (HR1 round 1)', () =>
     expect(new Set([a.ticket, b.ticket, c.ticket]).size).toBe(3)
   })
 
-  it('a copy nobody collects (hive-progress gone) is given back after ABANDON_MS; one still being set up is left', async () => {
+  it('a copy nobody collects (cw-progress gone) is given back after ABANDON_MS; one still being set up is left', async () => {
     let now = 1000
     const back: string[] = []
     const reqs = new IsolatedRequests<{ lease: CopyLease }>((_, l) => back.push(l.id), () => now, 10)

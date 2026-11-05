@@ -56,7 +56,7 @@ async function close(w: WS): Promise<void> {
 }
 
 /** A workspace folder with these projects (each with one agent). */
-function workspace(projects = ['hive', 'ambrosia']): string {
+function workspace(projects = ['hike', 'ambrosia']): string {
   const ws = join(base, `ws-${++n}`)
   for (const p of projects) {
     mkdirSync(join(ws, p, '.combwork'), { recursive: true })
@@ -69,9 +69,9 @@ const keyOf = (w: WS, project: string): Promise<string | null> => keys.projectKe
 describe('suggested keys and their rules', () => {
   const held = (...ks: [string, string][]): KeyHeld[] => ks.map(([key, projectId]) => ({ key, projectId }))
 
-  it("Darren's projects: HI, AM, AP, MC and WE", () => {
+  it("a workspace's projects: HI, AM, AP, MC and WE", () => {
     const got: KeyHeld[] = []
-    for (const [name, id] of [['hive', 'p1'], ['ambrosia', 'p2'], ['apiary', 'p3'], ['mcp', 'p4'], ['website', 'p5']]) got.push({ key: suggestKey(name, id, got), projectId: id })
+    for (const [name, id] of [['hike', 'p1'], ['ambrosia', 'p2'], ['apiary', 'p3'], ['mcp', 'p4'], ['website', 'p5']]) got.push({ key: suggestKey(name, id, got), projectId: id })
     expect(got.map((k) => k.key)).toEqual(['HI', 'AM', 'AP', 'MC', 'WE'])
   })
 
@@ -83,13 +83,13 @@ describe('suggested keys and their rules', () => {
     expect(suggestKey('2026', 'p1', [])).toBe('PA')
     expect(suggestKey('x', 'p1', [])).toBe('XA')
     // A project's own old key is free to it.
-    expect(suggestKey('hive', 'p1', held(['HI', 'p1']))).toBe('HI')
+    expect(suggestKey('hike', 'p1', held(['HI', 'p1']))).toBe('HI')
   })
 
   it('a key is 2–4 letters A–Z, not another project’s (now or before), and neither begins the other; case-insensitive', () => {
     const h = held(['HI', 'p1'], ['AMB', 'p2'])
     expect(keyProblem('H', 'p3', h)).toBe('form')
-    expect(keyProblem('HIVES', 'p3', h)).toBe('form')
+    expect(keyProblem('HIKES','p3', h)).toBe('form')
     expect(keyProblem('H1', 'p3', h)).toBe('form')
     expect(keyProblem('hi', 'p3', h)).toBe('taken')
     expect(keyProblem('AM', 'p3', h)).toBe('prefix')
@@ -109,11 +109,11 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
     const ws = workspace()
     const w = await open(ws)
     await keys.keyProjects(w)
-    expect([await keyOf(w, 'hive'), await keyOf(w, 'ambrosia')]).toEqual(['HI', 'AM'])
+    expect([await keyOf(w, 'hike'), await keyOf(w, 'ambrosia')]).toEqual(['HI', 'AM'])
     const made = await inWorkspace(w, async () => {
-      const a = await tasks.createTask({ title: 'A', project: 'hive' }, user)
+      const a = await tasks.createTask({ title: 'A', project: 'hike' }, user)
       const b = await tasks.createTask({ title: 'B', project: 'ambrosia' }, user)
-      const c = await tasks.createTask({ title: 'C', project: 'hive' }, user)
+      const c = await tasks.createTask({ title: 'C', project: 'hike' }, user)
       const d = await tasks.createTask({ title: 'Workspace', project: '' }, user)
       return [a, b, c, d]
     })
@@ -127,7 +127,7 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
   })
 
   it('New Project…: the key chosen, refused before the folder is made when it can’t be one, or the suggestion (#1221)', async () => {
-    const ws = workspace(['hive'])
+    const ws = workspace(['hike'])
     const w = await open(ws)
     await keys.keyProjects(w)
     await keys.createProjectWithKey(w, 'web-app', 'wb')
@@ -142,7 +142,7 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
   })
 
   it("New Project…'s reply lists the project it made, which the window opens, even when its project.json is written during the refresh (HI-1760)", async () => {
-    const ws = workspace(['hive'])
+    const ws = workspace(['hike'])
     const w = await open(ws)
     await keys.keyProjects(w)
     const info = await keys.createProjectWithKey(w, 'fresh', null)
@@ -166,7 +166,7 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
     }
     const again = await keys.createProjectWithKey(w, 'raced', 'RC')
     expect(wrote).toBe(true)
-    expect(again.projects.map((p) => p.name)).toEqual(expect.arrayContaining(['hive', 'fresh', 'raced']))
+    expect(again.projects.map((p) => p.name)).toEqual(expect.arrayContaining(['hike', 'fresh', 'raced']))
     await close(w)
   })
 
@@ -192,8 +192,8 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
       return { reached: at, release: () => release() }
     }
     // Held at its id; meanwhile the window opens B, which has a "fresh" of its own.
-    const a = workspace(['hive'])
-    const b = workspace(['hive', 'fresh'])
+    const a = workspace(['hike'])
+    const b = workspace(['hike', 'fresh'])
     const w = await open(a)
     const atIds = hold(w, 'projectIds', (args) => !!(args[0] as { fresh?: boolean } | undefined)?.fresh)
     const creating = w.createProject('fresh')
@@ -202,7 +202,7 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
     atIds.release()
     await expect(creating).rejects.toThrow(/closed/)
     // Held where it waits for the refresh a write meanwhile scheduled (its reply was the list from before).
-    const c = workspace(['hive'])
+    const c = workspace(['hike'])
     await w.open(c)
     const svc = w as unknown as Svc
     const read = svc.projectInfo.bind(w)
@@ -226,7 +226,7 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
   })
 
   it('a key chosen for a project being made is reserved: a key change or another new project meanwhile is refused it (round 1, finding 2)', async () => {
-    const ws = workspace(['hive'])
+    const ws = workspace(['hike'])
     const w = await open(ws)
     await keys.keyProjects(w)
     // web-app's folder is made only when the test says so.
@@ -238,21 +238,21 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
       return make(name)
     }
     const creating = keys.createProjectWithKey(w, 'web-app', 'ZZ')
-    await expect(keys.changeProjectKey(w, join(ws, 'hive'), 'ZZ')).rejects.toThrow(/ZZ is another project’s key/)
+    await expect(keys.changeProjectKey(w, join(ws, 'hike'), 'ZZ')).rejects.toThrow(/ZZ is another project’s key/)
     await expect(keys.createProjectWithKey(w, 'other', 'ZZ')).rejects.toThrow(/ZZ is another project’s key/)
-    await expect(keys.changeProjectKey(w, join(ws, 'hive'), 'ZZA')).rejects.toThrow(/begin alike/)
+    await expect(keys.changeProjectKey(w, join(ws, 'hike'), 'ZZA')).rejects.toThrow(/begin alike/)
     expect(existsSync(join(ws, 'other'))).toBe(false)
     release()
     await creating
-    expect([await keyOf(w, 'web-app'), await keyOf(w, 'hive')]).toEqual(['ZZ', 'HI'])
+    expect([await keyOf(w, 'web-app'), await keyOf(w, 'hike')]).toEqual(['ZZ', 'HI'])
     w.createProject = make
     // The reservation ends once it is made: the key is web-app's now.
-    await expect(keys.changeProjectKey(w, join(ws, 'hive'), 'ZZ')).rejects.toThrow(/ZZ is another project’s key/)
+    await expect(keys.changeProjectKey(w, join(ws, 'hike'), 'ZZ')).rejects.toThrow(/ZZ is another project’s key/)
     await close(w)
   })
 
   it('a reservation is its workspace’s own: another workspace changes a key to it, or makes a project with it, meanwhile (round 2, finding 1)', async () => {
-    const [wsA, wsB, wsC] = [workspace(['hive']), workspace(['hive']), workspace(['hive'])]
+    const [wsA, wsB, wsC] = [workspace(['hike']), workspace(['hike']), workspace(['hike'])]
     const [a, b, c] = [await open(wsA), await open(wsB), await open(wsC)]
     for (const w of [a, b, c]) await keys.keyProjects(w)
     const make = a.createProject.bind(a)
@@ -265,13 +265,13 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
     const creating = keys.createProjectWithKey(a, 'web-app', 'ZZ')
     // B's and C's keys are their own: ZZ is free there, for a new project and for a key change.
     await keys.createProjectWithKey(b, 'other', 'ZZ')
-    await keys.changeProjectKey(c, join(wsC, 'hive'), 'ZZ')
-    expect([await keyOf(b, 'other'), await keyOf(c, 'hive')]).toEqual(['ZZ', 'ZZ'])
+    await keys.changeProjectKey(c, join(wsC, 'hike'), 'ZZ')
+    expect([await keyOf(b, 'other'), await keyOf(c, 'hike')]).toEqual(['ZZ', 'ZZ'])
     // …and in A, the reservation still holds.
-    await expect(keys.changeProjectKey(a, join(wsA, 'hive'), 'ZZ')).rejects.toThrow(/ZZ is another project’s key/)
+    await expect(keys.changeProjectKey(a, join(wsA, 'hike'), 'ZZ')).rejects.toThrow(/ZZ is another project’s key/)
     release()
     await creating
-    expect([await keyOf(a, 'web-app'), await keyOf(a, 'hive')]).toEqual(['ZZ', 'HI'])
+    expect([await keyOf(a, 'web-app'), await keyOf(a, 'hike')]).toEqual(['ZZ', 'HI'])
     a.createProject = make
     for (const w of [a, b, c]) await close(w)
   })
@@ -280,19 +280,19 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
     const ws = workspace()
     const w = await open(ws)
     await keys.keyProjects(w)
-    const h = await inWorkspace(w, () => tasks.createTask({ title: 'H', project: 'hive' }, user))
+    const h = await inWorkspace(w, () => tasks.createTask({ title: 'H', project: 'hike' }, user))
     await inWorkspace(w, () => tasks.updateTask(h.number, { project: 'ambrosia' }, user))
     expect(store.movedNames(w)).toEqual({ 'HI-1': h.number })
-    await keys.changeProjectKey(w, join(ws, 'hive'), 'HX')
+    await keys.changeProjectKey(w, join(ws, 'hike'), 'HX')
     expect(store.movedNames(w)).toEqual({ 'HI-1': h.number, 'HX-1': h.number })
     await close(w)
   })
 
   it("a project added later gets a key no other has, and none begins another's", async () => {
-    const ws = workspace(['hive', 'history'])
+    const ws = workspace(['hike', 'hidden'])
     const w = await open(ws)
     await keys.keyProjects(w)
-    expect([await keyOf(w, 'history'), await keyOf(w, 'hive')]).toEqual(['HI', 'HV'])
+    expect([await keyOf(w, 'hidden'), await keyOf(w, 'hike')]).toEqual(['HI', 'HK'])
     await close(w)
   })
 })
@@ -307,9 +307,9 @@ describe('key changes, and cards moved between projects', () => {
     expect((await inWorkspace(w, () => tasks.getTask(c.number, w))).key).toBe('AMB-1')
     expect([keys.cardOfRef(w, 'AMB-1'), keys.cardOfRef(w, 'AM-1')]).toEqual([c.number, c.number])
     // Another project can't take AM (ambrosia's alias), nor anything that begins AMB or that AMB begins.
-    await expect(keys.changeProjectKey(w, join(ws, 'hive'), 'AM')).rejects.toThrow(/another project’s key/)
-    await expect(keys.changeProjectKey(w, join(ws, 'hive'), 'AMBE')).rejects.toThrow(/begin alike/)
-    await expect(keys.changeProjectKey(w, join(ws, 'hive'), 'H')).rejects.toThrow(/2 to 4 letters/)
+    await expect(keys.changeProjectKey(w, join(ws, 'hike'), 'AM')).rejects.toThrow(/another project’s key/)
+    await expect(keys.changeProjectKey(w, join(ws, 'hike'), 'AMBE')).rejects.toThrow(/begin alike/)
+    await expect(keys.changeProjectKey(w, join(ws, 'hike'), 'H')).rejects.toThrow(/2 to 4 letters/)
     // Its own old key is its key again.
     expect(await keys.changeProjectKey(w, join(ws, 'ambrosia'), 'AM')).toBe('AM')
     expect((await inWorkspace(w, () => tasks.getTask(c.number, w))).key).toBe('AM-1')
@@ -321,13 +321,13 @@ describe('key changes, and cards moved between projects', () => {
     const ws = workspace()
     const w = await open(ws)
     await keys.keyProjects(w)
-    const [a, b] = await inWorkspace(w, async () => [await tasks.createTask({ title: 'A', project: 'hive' }, user), await tasks.createTask({ title: 'B', project: 'ambrosia' }, user)])
+    const [a, b] = await inWorkspace(w, async () => [await tasks.createTask({ title: 'A', project: 'hike' }, user), await tasks.createTask({ title: 'B', project: 'ambrosia' }, user)])
     const moved = await inWorkspace(w, () => tasks.updateTask(a.number, { project: 'ambrosia' }, user))
     expect(moved.key).toBe('AM-2')
     expect([keys.cardOfRef(w, 'HI-1'), keys.cardOfRef(w, 'AM-2'), keys.cardOfRef(w, 'AM-1')]).toEqual([a.number, a.number, b.number])
-    // A new card of hive never takes HI-1 (its alias).
-    expect((await inWorkspace(w, () => tasks.createTask({ title: 'C', project: 'hive' }, user))).key).toBe('HI-2')
-    const back = await inWorkspace(w, () => tasks.updateTask(a.number, { project: 'hive' }, user))
+    // A new card of hike never takes HI-1 (its alias).
+    expect((await inWorkspace(w, () => tasks.createTask({ title: 'C', project: 'hike' }, user))).key).toBe('HI-2')
+    const back = await inWorkspace(w, () => tasks.updateTask(a.number, { project: 'hike' }, user))
     expect(back.key).toBe('HI-1')
     expect(keys.cardOfRef(w, 'AM-2')).toBe(a.number)
     await close(w)
@@ -337,11 +337,11 @@ describe('key changes, and cards moved between projects', () => {
     const ws = workspace()
     const w = await open(ws)
     await keys.keyProjects(w)
-    await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'hive' }, user))
+    await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'hike' }, user))
     store.boardTestHooks.failPut = () => true
-    await expect(inWorkspace(w, () => tasks.createTask({ title: 'Lost', project: 'hive' }, user))).rejects.toThrow()
+    await expect(inWorkspace(w, () => tasks.createTask({ title: 'Lost', project: 'hike' }, user))).rejects.toThrow()
     store.boardTestHooks.failPut = null
-    expect((await inWorkspace(w, () => tasks.createTask({ title: 'B', project: 'hive' }, user))).key).toBe('HI-2')
+    expect((await inWorkspace(w, () => tasks.createTask({ title: 'B', project: 'hike' }, user))).key).toBe('HI-2')
     await close(w)
   })
 })
@@ -358,7 +358,7 @@ describe("key writes stay in the workspace they began in (round 1, finding 1)", 
     const read = w.projectIds.bind(w)
     w.projectIds = (async () => (await held, idsOfA)) as typeof w.projectIds
     const giving = keys.keyProjects(w)
-    const changing = keys.changeProjectKey(w, join(a, 'hive'), 'HV')
+    const changing = keys.changeProjectKey(w, join(a, 'hike'), 'HV')
     // Both have asked (each reads the ids first); the window's own reads are as usual from here.
     w.projectIds = read
     await w.open(b)
@@ -379,17 +379,17 @@ describe("another project's card, for an agent confined to its own (round 1, fin
     const ws = workspace()
     const w = await open(ws)
     await keys.keyProjects(w)
-    const [h, a] = await inWorkspace(w, async () => [await tasks.createTask({ title: 'H', project: 'hive' }, user), await tasks.createTask({ title: 'A', project: 'ambrosia' }, user)])
-    const asCombwork = (ref: string): number | null => keys.cardOfRef(w, ref, 'hive')
+    const [h, a] = await inWorkspace(w, async () => [await tasks.createTask({ title: 'H', project: 'hike' }, user), await tasks.createTask({ title: 'A', project: 'ambrosia' }, user)])
+    const asCombwork = (ref: string): number | null => keys.cardOfRef(w, ref, 'hike')
     expect([asCombwork('HI-1'), asCombwork('AM-1'), asCombwork('AM-99')]).toEqual([h.number, null, null])
     await keys.changeProjectKey(w, join(ws, 'ambrosia'), 'AMB')
     expect([asCombwork('AM-1'), asCombwork('AMB-1')]).toEqual([null, null])
-    // Moved to hive: now its; its old keys find it for hive's agents, as they do for the Assistant.
-    await inWorkspace(w, () => tasks.updateTask(a.number, { project: 'hive' }, user))
+    // Moved to hike: now its; its old keys find it for hike's agents, as they do for the Assistant.
+    await inWorkspace(w, () => tasks.updateTask(a.number, { project: 'hike' }, user))
     expect([asCombwork('AMB-1'), asCombwork('HI-2'), keys.cardOfRef(w, 'AMB-1')]).toEqual([a.number, a.number, a.number])
     // Names: by key only within the scope.
     expect(keys.cardNamesOf(w, 'ambrosia')(h.number)).toBe(`#${h.number}`)
-    expect(keys.cardNamesOf(w, 'hive')(h.number)).toBe('HI-1')
+    expect(keys.cardNamesOf(w, 'hike')(h.number)).toBe('HI-1')
     expect(keys.cardNamesOf(w)(h.number)).toBe('HI-1')
     await close(w)
   })
@@ -398,22 +398,22 @@ describe("another project's card, for an agent confined to its own (round 1, fin
     const ws = workspace()
     const w = await open(ws)
     await keys.keyProjects(w)
-    const h = await inWorkspace(w, () => tasks.createTask({ title: 'H', project: 'hive' }, user))
-    // hive renamed hivemind (its id goes with it); a new project takes the folder hive.
-    renameSync(join(ws, 'hive'), join(ws, 'hivemind'))
-    mkdirSync(join(ws, 'hive', '.combwork'), { recursive: true })
-    writeFileSync(join(ws, 'hive', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+    const h = await inWorkspace(w, () => tasks.createTask({ title: 'H', project: 'hike' }, user))
+    // hike renamed hikers (its id goes with it); a new project takes the folder hike.
+    renameSync(join(ws, 'hike'), join(ws, 'hikers'))
+    mkdirSync(join(ws, 'hike', '.combwork'), { recursive: true })
+    writeFileSync(join(ws, 'hike', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
     await w.projectIds({ fresh: true })
-    // The card as saved still says hive: the board's readers follow its id, and so must keys.
-    expect(store.cardKeyOf(w, h.number)?.project).toBe('hive')
-    expect((await inWorkspace(w, () => tasks.getTask(h.number, w))).project).toBe('hivemind')
-    expect([keys.cardOfRef(w, 'HI-1', 'hivemind'), keys.cardOfRef(w, `#${h.number}`, 'hivemind')]).toEqual([h.number, h.number])
-    expect([keys.cardOfRef(w, 'HI-1', 'hive'), keys.cardOfRef(w, 'HI-1', 'ambrosia'), keys.cardOfRef(w, 'HI-9', 'hivemind')]).toEqual([null, null, null])
+    // The card as saved still says hike: the board's readers follow its id, and so must keys.
+    expect(store.cardKeyOf(w, h.number)?.project).toBe('hike')
+    expect((await inWorkspace(w, () => tasks.getTask(h.number, w))).project).toBe('hikers')
+    expect([keys.cardOfRef(w, 'HI-1', 'hikers'), keys.cardOfRef(w, `#${h.number}`, 'hikers')]).toEqual([h.number, h.number])
+    expect([keys.cardOfRef(w, 'HI-1', 'hike'), keys.cardOfRef(w, 'HI-1', 'ambrosia'), keys.cardOfRef(w, 'HI-9', 'hikers')]).toEqual([null, null, null])
     // Its old key after a key change too.
-    await keys.changeProjectKey(w, join(ws, 'hivemind'), 'HM')
-    expect([keys.cardOfRef(w, 'HI-1', 'hivemind'), keys.cardOfRef(w, 'HM-1', 'hivemind'), keys.cardOfRef(w, 'HM-1', 'hive'), keys.cardOfRef(w, 'HI-1', 'hive')]).toEqual([h.number, h.number, null, null])
-    expect(keys.cardNamesOf(w, 'hivemind')(h.number)).toBe('HM-1')
-    expect(keys.cardNamesOf(w, 'hive')(h.number)).toBe(`#${h.number}`)
+    await keys.changeProjectKey(w, join(ws, 'hikers'), 'HM')
+    expect([keys.cardOfRef(w, 'HI-1', 'hikers'), keys.cardOfRef(w, 'HM-1', 'hikers'), keys.cardOfRef(w, 'HM-1', 'hike'), keys.cardOfRef(w, 'HI-1', 'hike')]).toEqual([h.number, h.number, null, null])
+    expect(keys.cardNamesOf(w, 'hikers')(h.number)).toBe('HM-1')
+    expect(keys.cardNamesOf(w, 'hike')(h.number)).toBe(`#${h.number}`)
     await close(w)
   })
 })
@@ -423,7 +423,7 @@ describe('wakes, the inbox and replies name cards by key (round 1, finding 3)', 
     const ws = workspace()
     const w = await open(ws)
     await keys.keyProjects(w)
-    const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'hive' }, user))
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'hike' }, user))
     const name = 'HI-1'
     const named = <T>(fn: () => T): T => keys.withCardNames(w, fn)
     expect(named(() => wakeLine(cardChange(c.number, c, ['column'])))).toContain(`[CW] ${name} is in Todo`)
@@ -448,20 +448,20 @@ describe('wakes, the inbox and replies name cards by key (round 1, finding 3)', 
     const ws = workspace()
     const w = await open(ws)
     await keys.keyProjects(w)
-    // ambrosia's card takes #1, so hive's first card is HI-1 with the workspace number 2.
-    const [, h] = await inWorkspace(w, async () => [await tasks.createTask({ title: 'A', project: 'ambrosia' }, user), await tasks.createTask({ title: 'H', project: 'hive' }, user)])
+    // ambrosia's card takes #1, so hike's first card is HI-1 with the workspace number 2.
+    const [, h] = await inWorkspace(w, async () => [await tasks.createTask({ title: 'A', project: 'ambrosia' }, user), await tasks.createTask({ title: 'H', project: 'hike' }, user)])
     expect([h.key, h.number]).toEqual(['HI-1', 2])
     const { keptText } = await import('../src/main/unusedWorktrees')
     // Outside any workspace's work, as Unused worktrees asks.
-    expect(await keptText(join(ws, 'hive'), { why: 'inFlight', card: h.number } as never)).toBe('card HI-1, which it held, is still being merged')
+    expect(await keptText(join(ws, 'hike'), { why: 'inFlight', card: h.number } as never)).toBe('card HI-1, which it held, is still being merged')
     await close(w)
   })
 
   it("a crash notice's merges name their cards as each one's workspace does (HI-1661 round 1, finding 4)", async () => {
     // Two workspaces, each with its card #1, under different keys: one notice, told outside both.
-    const [w1, w2] = [await open(workspace(['hive'])), await open(workspace(['ambrosia']))]
+    const [w1, w2] = [await open(workspace(['hike'])), await open(workspace(['ambrosia']))]
     for (const w of [w1, w2]) await keys.keyProjects(w)
-    const [c1, c2] = [await inWorkspace(w1, () => tasks.createTask({ title: 'H', project: 'hive' }, user)), await inWorkspace(w2, () => tasks.createTask({ title: 'A', project: 'ambrosia' }, user))]
+    const [c1, c2] = [await inWorkspace(w1, () => tasks.createTask({ title: 'H', project: 'hike' }, user)), await inWorkspace(w2, () => tasks.createTask({ title: 'A', project: 'ambrosia' }, user))]
     expect([c1.number, c2.number]).toEqual([1, 1])
     const merge = (w: WS, name: string) => ({ agentName: name, branch: 'main', cards: [1], cardNames: [1].map(keys.cardNamesOf(w)), folder: w.path! })
     const text = unexpectedCloseText({ lastSeen: new Date().toISOString(), agents: [], dump: false, merges: [merge(w1, 'B1'), merge(w2, 'B2')] }, null)
@@ -471,7 +471,7 @@ describe('wakes, the inbox and replies name cards by key (round 1, finding 3)', 
     for (const w of [w1, w2]) await close(w)
   })
 
-  it("every card argument of the hive tools takes a key as well as a number (Darren, 20 Oct: tools take a key string)", () => {
+  it("every card argument of the Combwork tools takes a key as well as a number (Darren, 20 Oct: tools take a key string)", () => {
     const src = readFileSync(join(__dirname, '..', 'src', 'main', 'mcp', 'cw-mcp.ts'), 'utf8')
     // No card argument is a number alone: a card is cardArg or cardsArg, or a number-or-string `before`.
     for (const m of src.matchAll(/(\w+): \{ type: 'number'[^}]*\}/g)) expect({ arg: m[1], card: /card|before/i.test(m[1]) }).toEqual({ arg: m[1], card: false })
@@ -487,7 +487,7 @@ describe('the 1.0 step: keys for a 0.9 board', () => {
     let w = await open(ws)
     const made = await inWorkspace(w, async () => {
       const out: number[] = []
-      for (const [title, project] of [['One', 'hive'], ['Two', 'ambrosia'], ['Three', 'hive'], ['Four', '']]) out.push((await tasks.createTask({ title, project }, user)).number)
+      for (const [title, project] of [['One', 'hike'], ['Two', 'ambrosia'], ['Three', 'hike'], ['Four', '']]) out.push((await tasks.createTask({ title, project }, user)).number)
       return out
     })
     await close(w)
@@ -500,7 +500,7 @@ describe('the 1.0 step: keys for a 0.9 board', () => {
     for (const m of made) expect(keys.cardOfRef(w, `#${m}`)).toBe(m)
     expect(keys.cardOfRef(w, `HI-${made[2]}`)).toBe(made[2])
     // Each project's counter goes on from its highest.
-    const next = await inWorkspace(w, () => tasks.createTask({ title: 'Five', project: 'hive' }, user))
+    const next = await inWorkspace(w, () => tasks.createTask({ title: 'Five', project: 'hike' }, user))
     expect(next.key).toBe(`HI-${made[2] + 1}`)
     // Said once, quietly.
     expect(store.keysNoticeDue(w)).toBe(true)

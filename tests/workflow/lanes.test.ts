@@ -73,18 +73,18 @@ describe('lanes', () => {
     const e = (env = setup({ ...preset('git', 'pair'), finish: 'agentMerges', preChecks: [], mergeChecks: [] }))
     const [c1, c2] = [1, 2].map((n) => e.wf.createCard({ title: `Card ${n}` }))
     e.wf.startLane('L', [c1.id, c2.id], 'R1')
-    const hive: { start?: Awaited<ReturnType<typeof e.wf.start>> } = {}
+    const combwork: { start?: Awaited<ReturnType<typeof e.wf.start>> } = {}
     e.wf.cfg.hooks = {
       beforeWrite: async (move) => {
         if (move !== 'start') return
         e.wf.cfg.hooks = {}
-        hive.start = await e.wf.start(c1.key, 'combwork', { builder: 'B1' })
+        combwork.start = await e.wf.start(c1.key, 'combwork', { builder: 'B1' })
       }
     }
     const own = await e.wf.start(c1.key, B1)
-    moved(hive.start!)
+    moved(combwork.start!)
     moved(own)
-    expect(own.data).toEqual(hive.start!.data)
+    expect(own.data).toEqual(combwork.start!.data)
     expect(own.warnings).toEqual([`Combwork started ${c1.key} for you, as your lane's next card: carry on with it.`])
     expect(e.store.facts(c1.id).filter((f) => f.kind === 'Started')).toHaveLength(1)
   })

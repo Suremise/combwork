@@ -23,14 +23,14 @@ describe("the events stream's lines, as broadcast says them", async () => {
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { apiTextTestHooks } = await import('../src/main/servers')
   const { apiChainReady, forgetApiChain, inApiWorkspace, requestApiWorkspace } = await import('../src/main/dialects/apiChain')
-  const hive = (name: string, closed: string): string => {
+  const workspace = (name: string, closed: string): string => {
     const dir = join(base, name, '.combwork')
     mkdirSync(join(dir, 'dialects', 'api'), { recursive: true })
     writeFileSync(join(dir, 'dialects', 'api', 'cli.json'), JSON.stringify({ name: 'API', texts: { 'main.quit.closed': { text: closed, why: 'a test' } } }))
     return dir
   }
-  const A = hive('alpha', 'A CLOSED')
-  const B = hive('beta', 'B CLOSED')
+  const A = workspace('alpha', 'A CLOSED')
+  const B = workspace('beta', 'B CLOSED')
   await apiChainReady(A)
   await apiChainReady(B)
   afterAll(() => [A, B].forEach(forgetApiChain))
