@@ -125,7 +125,7 @@ const lines = (file) => {
     check('…its history says so, and never "Given to"', now.history.some((h) => h.whatText?.id === 'tasks.history.followUpSubmitted' && h.whatText.values?.revision === head.slice(0, 7)) && !now.history.some((h) => h.what.startsWith('Given to E1')), JSON.stringify(now.history.slice(-4)))
     const subs = (await facts(n)).filter((f) => f.kind === 'Submitted')
     check('…a second submission, at the head, in the same round', subs.length === 2 && subs[1].data.revision === head && subs[1].data.followUp === true && subs[1].data.round === subs[0].data.round, JSON.stringify(subs.map((f) => f.data)))
-    check('…pinned', !!(await until(() => { try { return gitIn(alpha, 'rev-parse', `refs/hive/cards/${key.toLowerCase()}/2`) === head } catch { return false } }, HUNG_MS)))
+    check('…pinned', !!(await until(() => { try { return gitIn(alpha, 'rev-parse', `refs/cw/cards/${key.toLowerCase()}/2`) === head } catch { return false } }, HUNG_MS)))
     check('…B1 watches it again', !!(await until(async () => (await live(b1.id))?.status === 'watching', HUNG_MS)), String((await live(b1.id))?.status))
     const woken = await until(() => lines(wakes).slice(wakesBefore).find((w) => w.agent === 'E1' && w.text.includes(`follow-up submitted for review at ${head.slice(0, 7)}`)), HUNG_MS)
     check('…and E1 is woken, with no column move, to start its review again', !!woken && /cw_start_review/.test(woken.text), JSON.stringify(lines(wakes).slice(wakesBefore)))

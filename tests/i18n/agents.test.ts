@@ -68,7 +68,7 @@ describe('the agents area', () => {
   it('in English, the functions agents and the window share read the same with or without tr', () => {
     expect(agentLimitText(tr)).toBe(agentLimitText())
     for (const s of STATUSES) expect(mergeBlocked('B1', s, tr), s).toBe(mergeBlocked('B1', s))
-    const branch = (ahead: number, dirty: number) => ({ ahead, dirty, base: 'main', branch: 'hive/b1' }) as never
+    const branch = (ahead: number, dirty: number) => ({ ahead, dirty, base: 'main', branch: 'cw/b1' }) as never
     for (const [a, d] of [[0, 0], [1, 0], [3, 1], [0, 2]]) expect(unmergedWork(branch(a, d), tr), `${a}/${d}`).toEqual(unmergedWork(branch(a, d)))
     expect(sessionLabel({ id: '3f9a1c2b-0000', name: null } as never, 'hive', tr)).toBe(sessionLabel({ id: '3f9a1c2b-0000', name: null } as never, 'hive'))
     const owner = { name: 'B1', project: 'ambrosia' } as never

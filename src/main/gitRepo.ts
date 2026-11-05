@@ -1164,7 +1164,7 @@ export async function deleteBranches(projectPath: string, items: BranchAt[], unm
 
 /**
  * Deletes branches on a remote (#1642, `git push --delete`, outward-facing: the window asks for each with its own tick):
- * each named as the window has it (nas/hive/hb1), only merged into the project's target, never the remote's default
+ * each named as the window has it (nas/cw/hb1), only merged into the project's target, never the remote's default
  * branch, the target or the default branch, nor one whose local branch is in use, and only at the commit the user was
  * shown (`--force-with-lease`: a branch that moved on the remote is refused there). The checks and the push are one hold
  * of the repository's lock (round 3), bounded by the network timeout: a slot, worktree or target change waits for it.

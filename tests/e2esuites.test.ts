@@ -744,11 +744,11 @@ describe('whether the dev build is from this source (build.mjs)', () => {
 })
 
 describe("the installer's suites check the packaged build they test (#274)", () => {
-  const info = { version: '0.3.1', code: 'abc123+def', head: 'abc123', branch: 'hive/claudio' }
+  const info = { version: '0.3.1', code: 'abc123+def', head: 'abc123', branch: 'cw/claudio' }
 
   it('dist/win-unpacked from this code is fine; from other code, or with no record of its own, is said', () => {
     expect(packagedStatus(info, 'abc123+def')).toBeNull()
-    expect(packagedStatus(info, 'abc123')).toMatch(/is from other code \(abc123\+def, hive\/claudio; this is abc123\)/)
+    expect(packagedStatus(info, 'abc123')).toMatch(/is from other code \(abc123\+def, cw\/claudio; this is abc123\)/)
     expect(packagedStatus(null, 'abc123')).toMatch(/has no record of what it was built from/)
   })
 

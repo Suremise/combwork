@@ -24,7 +24,7 @@ describe('installers built in a worktree (scripts/distCopy.mjs)', () => {
   writeFileSync(join(main, 'a.txt'), 'a\n')
   git(main, 'add', '.')
   git(main, 'commit', '-qm', 'one')
-  git(main, 'worktree', 'add', '-q', '-b', 'hive/agent', wt)
+  git(main, 'worktree', 'add', '-q', '-b', 'cw/agent', wt)
   const head = git(main, 'rev-parse', 'HEAD')
   // As places: git names the main checkout by its long path, the test may know it by a short (8.3) one, as on CI (#389).
   const same = (a: string, b: string) => realpathSync.native(resolve(a)).toLowerCase() === realpathSync.native(resolve(b)).toLowerCase()
@@ -34,7 +34,7 @@ describe('installers built in a worktree (scripts/distCopy.mjs)', () => {
     for (const f of installerFiles(info.version).filter((n: string) => n !== 'build-info.json')) writeFileSync(join(dir, 'dist', f), `${f} from ${info.code}`)
     writeFileSync(join(dir, 'dist', 'build-info.json'), JSON.stringify(info))
   }
-  const info = (code: string, branch = 'hive/agent'): Info => ({ version: '9.9.9', code, head, branch, builtAt: '2026-10-05T09:00:00Z' })
+  const info = (code: string, branch = 'cw/agent'): Info => ({ version: '9.9.9', code, head, branch, builtAt: '2026-10-05T09:00:00Z' })
 
   it('tells a linked worktree from the main checkout, and finds the main checkout from either', () => {
     const w = checkoutOf(wt)
@@ -61,9 +61,9 @@ describe('installers built in a worktree (scripts/distCopy.mjs)', () => {
   })
 
   it('never replaces an installer built from other code, or from code it can’t tell, unless --replace', () => {
-    build(wt, info('def', 'hive/other'))
-    const refused = copyToMain({ root: wt, version: '9.9.9', info: info('def', 'hive/other') })
-    expect(refused[0]).toMatch(/^Not copied to the main checkout: .*Combwork-Setup-9\.9\.9\.exe is already there, built from other code: abc \(hive\/agent\) .* where this one is def \(hive\/other\)\.$/)
+    build(wt, info('def', 'cw/other'))
+    const refused = copyToMain({ root: wt, version: '9.9.9', info: info('def', 'cw/other') })
+    expect(refused[0]).toMatch(/^Not copied to the main checkout: .*Combwork-Setup-9\.9\.9\.exe is already there, built from other code: abc \(cw\/agent\) .* where this one is def \(cw\/other\)\.$/)
     expect(refused[1]).toMatch(/--replace/)
     expect(readFileSync(join(main, 'dist', 'Combwork-Setup-9.9.9.exe'), 'utf8')).toBe('Combwork-Setup-9.9.9.exe from abc')
     // No build-info.json beside it (built before #150): can't tell, so not replaced either.
@@ -96,7 +96,7 @@ describe('installers built in a worktree (scripts/distCopy.mjs)', () => {
   // --- Review round 1: several worktrees at once, and failures part-way.
   const more = ['wt2', 'wt3'].map((n) => {
     const dir = join(base, n)
-    git(main, 'worktree', 'add', '-q', '-b', `hive/${n}`, dir)
+    git(main, 'worktree', 'add', '-q', '-b', `cw/${n}`, dir)
     return dir
   })
   /** copyToMain in a process of its own (another worktree's npm run dist), resolving with the lines it printed. */
@@ -175,7 +175,7 @@ console.log(copyToMain({ root: ${JSON.stringify(root)}, version: '9.9.9', info: 
 
   it('code that changed while it was built: no build-info.json, nothing copied; unchanged: labelled and copied', () => {
     rmSync(join(main, 'dist'), { recursive: true, force: true })
-    const ident = (code: string, h = head) => ({ version: '9.9.9', code, head: h, branch: 'hive/wt2' })
+    const ident = (code: string, h = head) => ({ version: '9.9.9', code, head: h, branch: 'cw/wt2' })
     expect(provenanceProblem(ident('a'), ident('a'))).toBeNull()
     expect(provenanceProblem(ident('a'), ident('a+1'))).toMatch(/the code changed while it was built \(a → a\+1\)/)
     expect(provenanceProblem(ident('a'), ident('a', 'f'.repeat(40)))).toMatch(/head changed/)
@@ -190,14 +190,14 @@ console.log(copyToMain({ root: ${JSON.stringify(root)}, version: '9.9.9', info: 
     // Unchanged: labelled with what it was built from, and copied.
     const ok = finishDist({ root: more[0], before: ident('b'), after: ident('b'), builtAt: '2026-10-05T10:00:00Z' })
     expect(ok[0]).toMatch(/copied from this worktree/)
-    expect(JSON.parse(readFileSync(join(more[0], 'dist', 'build-info.json'), 'utf8'))).toMatchObject({ version: '9.9.9', code: 'b', head, branch: 'hive/wt2', builtAt: '2026-10-05T10:00:00Z' })
+    expect(JSON.parse(readFileSync(join(more[0], 'dist', 'build-info.json'), 'utf8'))).toMatchObject({ version: '9.9.9', code: 'b', head, branch: 'cw/wt2', builtAt: '2026-10-05T10:00:00Z' })
     expect(JSON.parse(readFileSync(join(main, 'dist', 'build-info.json'), 'utf8')).code).toBe('b')
   })
 
   it("win-unpacked keeps its own record, which a copied installer set never changes: the packaged checks test what is there (#274)", () => {
     rmSync(join(main, 'dist'), { recursive: true, force: true })
     rmSync(join(wt, 'dist'), { recursive: true, force: true })
-    const ident = (code: string) => ({ version: '9.9.9', code, head, branch: 'hive/agent' })
+    const ident = (code: string) => ({ version: '9.9.9', code, head, branch: 'cw/agent' })
     /** A dist built in a checkout from `code`: the installer set and an unpacked app, then finished as dist.mjs does. */
     const dist = (dir: string, code: string, replace = false) => {
       build(dir, info(code))
@@ -213,7 +213,7 @@ console.log(copyToMain({ root: ${JSON.stringify(root)}, version: '9.9.9', info: 
     // The main checkout later at B: its win-unpacked is still A's, and the packaged checks say so.
     expect(readFileSync(join(main, 'dist', 'win-unpacked', 'artifact-code.txt'), 'utf8')).toBe('A')
     expect(readUnpackedInfo(join(main, 'dist')).code).toBe('A')
-    expect(packagedStatus(readUnpackedInfo(join(main, 'dist')), 'B')).toMatch(/is from other code \(A, hive\/agent; this is B\)/)
+    expect(packagedStatus(readUnpackedInfo(join(main, 'dist')), 'B')).toMatch(/is from other code \(A, cw\/agent; this is B\)/)
     // In the worktree that built B, they pass.
     expect(packagedStatus(readUnpackedInfo(join(wt, 'dist')), 'B')).toBeNull()
     // Code that changed while it was built leaves no record of either; nor does a dist that starts (clearDistInfo).
@@ -343,10 +343,10 @@ describe('a release build in dist (makeRelease)', () => {
     writeFileSync(join(main, 'a.txt'), 'a\n')
     git(main, 'add', '.')
     git(main, 'commit', '-qm', 'one')
-    git(main, 'worktree', 'add', '-q', '-b', 'hive/agent', wt)
+    git(main, 'worktree', 'add', '-q', '-b', 'cw/agent', wt)
     mkdirSync(join(wt, 'dist'))
     for (const f of installerFiles('9.9.9').filter((x: string) => x !== 'build-info.json')) writeFileSync(join(wt, 'dist', f), `${f} from wt`)
-    const wtInfo = { ...ident('wt'), branch: 'hive/agent', builtAt: '2026-11-03T03:00:00Z' }
+    const wtInfo = { ...ident('wt'), branch: 'cw/agent', builtAt: '2026-11-03T03:00:00Z' }
     writeFileSync(join(wt, 'dist', 'build-info.json'), JSON.stringify(wtInfo))
     const copies: string[][] = []
     const { made } = release(main, { during: () => copies.push(copyToMain({ root: wt, version: '9.9.9', info: wtInfo }), copyToMain({ root: wt, version: '9.9.9', info: wtInfo, replace: true })) })
@@ -405,10 +405,10 @@ describe('a release build in dist (makeRelease)', () => {
     writeFileSync(join(main, 'a.txt'), 'a\n')
     git(main, 'add', '.')
     git(main, 'commit', '-qm', 'one')
-    git(main, 'worktree', 'add', '-q', '-b', 'hive/agent', wt)
+    git(main, 'worktree', 'add', '-q', '-b', 'cw/agent', wt)
     mkdirSync(join(wt, 'dist'))
     for (const f of installerFiles('9.9.9').filter((x: string) => x !== 'build-info.json')) writeFileSync(join(wt, 'dist', f), `${f} from wt`)
-    const wtInfo = { ...ident('wt'), branch: 'hive/agent', builtAt: '2026-11-03T03:00:00Z' }
+    const wtInfo = { ...ident('wt'), branch: 'cw/agent', builtAt: '2026-11-03T03:00:00Z' }
     writeFileSync(join(wt, 'dist', 'build-info.json'), JSON.stringify(wtInfo))
     const seen: { release?: ReturnType<typeof release>; again?: ReturnType<typeof localDist>; copy?: string[] } = {}
     const { made } = localDist(main, {

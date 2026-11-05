@@ -147,7 +147,7 @@ A workspace's Assistant is listed in `liveSessions` with `"project": null` and `
   "statusMessage": "Claude needs your permission to use Bash",
   "restartNeeded": false,
   "agents": [
-    { "id": "a-3f9c01d2", "name": "Agent 1", "provider": "claude-code", "workflowRole": "builder", "folder": "slot-b", "slot": "slot-b", "branch": "hive/AP/AP-12-retry-uploads", "status": "waiting", "sessionId": "6f1c…", "statusMessage": "Claude needs your permission to use Bash", "reviewing": null, "backgroundTasks": 0, "mcpServers": ["github"], "mcpChoice": "all", "launched": { "guidance": "3f2a9c41d07be512", "skills": { "work-on-card": "9b1c…" } } },
+    { "id": "a-3f9c01d2", "name": "Agent 1", "provider": "claude-code", "workflowRole": "builder", "folder": "slot-b", "slot": "slot-b", "branch": "cw/AP/AP-12-retry-uploads", "status": "waiting", "sessionId": "6f1c…", "statusMessage": "Claude needs your permission to use Bash", "reviewing": null, "backgroundTasks": 0, "mcpServers": ["github"], "mcpChoice": "all", "launched": { "guidance": "3f2a9c41d07be512", "skills": { "work-on-card": "9b1c…" } } },
     { "id": "a-7b21e4aa", "name": "Reviewer", "provider": "codex", "workflowRole": "reviewer", "folder": "project", "branch": null, "status": "stopped", "sessionId": null, "statusMessage": null, "reviewing": null, "backgroundTasks": 0, "mcpServers": [], "mcpChoice": "only", "launched": null }
   ],
   "pairs": [{ "builder": "Agent 1", "reviewer": "Reviewer", "lane": "lane-3f2a9c", "state": "active, on AL-12" }],

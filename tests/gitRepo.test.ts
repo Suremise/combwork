@@ -565,7 +565,7 @@ describe('switching branch', () => {
     expect(git(proj, 'symbolic-ref', '--short', 'HEAD')).toBe('main')
     // An agent working in its own folder (its session there: a 0.9 worktree here, a slot alike) doesn't hold the folder.
     slots = []
-    agents = [{ id: 'a3', name: 'B3', worktree: { path: join(outer, 'wt'), branch: 'hive/b3', base: 'main' } }]
+    agents = [{ id: 'a3', name: 'B3', worktree: { path: join(outer, 'wt'), branch: 'cw/b3', base: 'main' } }]
     live = { a3: 'working' }
     expect(await repo.switchBranch(proj, 'other')).toBe('Switched to other.')
   })
@@ -644,11 +644,11 @@ describe('switching branch', () => {
 
   it('never switches to a branch another worktree has, and takes no worktree for the project folder', async () => {
     const wt = join(outer, 'agentwt')
-    git(proj, 'worktree', 'add', '-q', '-b', 'hive/b4', wt, 'main')
+    git(proj, 'worktree', 'add', '-q', '-b', 'cw/b4', wt, 'main')
     const info = await repo.repoInfo(proj)
-    expect(info.worktrees.map((w) => w.branch)).toContain('hive/b4')
-    expect(info.branches.find((b) => b.name === 'hive/b4')?.worktree).toBeTruthy()
-    await expect(repo.switchBranch(proj, 'hive/b4')).rejects.toThrow(/checked out in another worktree/)
+    expect(info.worktrees.map((w) => w.branch)).toContain('cw/b4')
+    expect(info.branches.find((b) => b.name === 'cw/b4')?.worktree).toBeTruthy()
+    await expect(repo.switchBranch(proj, 'cw/b4')).rejects.toThrow(/checked out in another worktree/)
     // Agents' worktrees are read-only here: no action takes one.
     await expect(repo.createTag(wt, 'v0', '')).rejects.toThrow(/Not a project/)
     await expect(repo.switchBranch(wt, 'main')).rejects.toThrow(/Not a project/)
@@ -845,26 +845,26 @@ describe('what the window says', () => {
 
 describe('branches by state, and cleaning up the merged ones (#1642)', () => {
   /**
-   * The project's work merges into 1.0.0 (ahead of main): hive/hb1 and hive/hb2 merged into it and unused, hive/slot
-   * merged but checked out in a worktree (a slot's), hive/card merged but an open card's line, spike/x with a commit of
+   * The project's work merges into 1.0.0 (ahead of main): cw/hb1 and cw/hb2 merged into it and unused, cw/slot
+   * merged but checked out in a worktree (a slot's), cw/card merged but an open card's line, spike/x with a commit of
    * its own. All pushed to origin.
    */
   const setUp = (): Record<string, string> => {
     workTarget = '1.0.0'
     git(proj, 'checkout', '-q', '-b', '1.0.0')
     commit(proj, 'release.txt')
-    for (const b of ['hive/hb1', 'hive/hb2', 'hive/slot', 'hive/card']) git(proj, 'branch', b)
+    for (const b of ['cw/hb1', 'cw/hb2', 'cw/slot', 'cw/card']) git(proj, 'branch', b)
     git(proj, 'checkout', '-q', '-b', 'spike/x')
     commit(proj, 'spike.txt')
     git(proj, 'checkout', '-q', 'main')
-    git(proj, 'worktree', 'add', '-q', join(proj, '..', 'slot-a'), 'hive/slot')
-    git(proj, 'push', '-q', 'origin', '1.0.0', 'hive/hb1', 'hive/hb2', 'hive/slot', 'hive/card', 'spike/x')
+    git(proj, 'worktree', 'add', '-q', join(proj, '..', 'slot-a'), 'cw/slot')
+    git(proj, 'push', '-q', 'origin', '1.0.0', 'cw/hb1', 'cw/hb2', 'cw/slot', 'cw/card', 'spike/x')
     // No origin/HEAD, on any git: 2.48 and later make it on fetch (remote.<name>.followRemoteHEAD), and origin/main would
     // then be kept as the remote's default branch, not as the project's (HI-2401). Older git ignores the setting.
     git(proj, 'config', 'remote.origin.followRemoteHEAD', 'never')
     git(proj, 'fetch', '-q', 'origin')
-    cardLines = [{ line: 'hive/card', stage: 'review' }]
-    return Object.fromEntries(['hive/hb1', 'hive/hb2', 'hive/slot', 'hive/card', 'spike/x', 'main', '1.0.0'].map((b) => [b, git(proj, 'rev-parse', b)]))
+    cardLines = [{ line: 'cw/card', stage: 'review' }]
+    return Object.fromEntries(['cw/hb1', 'cw/hb2', 'cw/slot', 'cw/card', 'spike/x', 'main', '1.0.0'].map((b) => [b, git(proj, 'rev-parse', b)]))
   }
   const branchNames = (cwd: string): string[] => git(cwd, 'for-each-ref', '--format=%(refname:short)', 'refs/heads').split('\n').filter(Boolean).sort()
 
@@ -873,24 +873,24 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     const info = await repo.repoInfo(proj, workTarget)
     expect([info.target, info.defaultBranch]).toEqual(['1.0.0', 'main'])
     const to = Object.fromEntries(info.branches.map((b) => [b.name, b.toTarget]))
-    expect(to).toEqual({ '1.0.0': 0, main: 0, 'hive/hb1': 0, 'hive/hb2': 0, 'hive/slot': 0, 'hive/card': 0, 'spike/x': 1 })
+    expect(to).toEqual({ '1.0.0': 0, main: 0, 'cw/hb1': 0, 'cw/hb2': 0, 'cw/slot': 0, 'cw/card': 0, 'spike/x': 1 })
     expect(info.remoteRows?.find((r) => r.name === 'origin/spike/x')).toMatchObject({ remote: 'origin', branch: 'spike/x', toTarget: 1 })
     const { busyLines, cleanupOffer, leftoverBranches, localGroup } = await import('../src/shared/branchCleanup')
-    const busy = busyLines(new Map([['hive/card', [{ stage: 'review' as const }]]]))
+    const busy = busyLines(new Map([['cw/card', [{ stage: 'review' as const }]]]))
     const groups = Object.fromEntries(info.branches.map((b) => [b.name, localGroup(b, info, busy)]))
-    expect(groups).toEqual({ '1.0.0': 'inUse', main: 'inUse', 'hive/slot': 'inUse', 'hive/card': 'inUse', 'hive/hb1': 'merged', 'hive/hb2': 'merged', 'spike/x': 'unmerged' })
+    expect(groups).toEqual({ '1.0.0': 'inUse', main: 'inUse', 'cw/slot': 'inUse', 'cw/card': 'inUse', 'cw/hb1': 'merged', 'cw/hb2': 'merged', 'spike/x': 'unmerged' })
     const offer = cleanupOffer(info, busy)
-    expect(offer.local.map((b) => b.name)).toEqual(['hive/hb1', 'hive/hb2'])
+    expect(offer.local.map((b) => b.name)).toEqual(['cw/hb1', 'cw/hb2'])
     // Never the target, the default branch, a slot's or an open card's branch on the remote either; unmerged never.
     expect(offer.remote.map((r) => [r.name, r.withLocal])).toEqual([
-      ['origin/hive/hb1', true],
-      ['origin/hive/hb2', true]
+      ['origin/cw/hb1', true],
+      ['origin/cw/hb2', true]
     ])
     // The Changes tab's leftover branches (HI-1823): the same free branches, merged and not, never one in use.
     const left = leftoverBranches(info, busy)
-    expect([left.merged.map((b) => b.name), left.unmerged.map((b) => [b.name, b.toTarget])]).toEqual([['hive/hb1', 'hive/hb2'], [['spike/x', 1]]])
+    expect([left.merged.map((b) => b.name), left.unmerged.map((b) => [b.name, b.toTarget])]).toEqual([['cw/hb1', 'cw/hb2'], [['spike/x', 1]]])
     // With the card Done, its branch is a leftover too; with no target, none is.
-    expect(leftoverBranches(info, busyLines(new Map([['hive/card', [{ stage: 'done' as const }]]]))).merged.map((b) => b.name)).toEqual(['hive/card', 'hive/hb1', 'hive/hb2'])
+    expect(leftoverBranches(info, busyLines(new Map([['cw/card', [{ stage: 'done' as const }]]]))).merged.map((b) => b.name)).toEqual(['cw/card', 'cw/hb1', 'cw/hb2'])
     expect(leftoverBranches({ ...info, target: null }, busy)).toEqual({ merged: [], unmerged: [] })
     // Without a target asked for (an action reading the branches), nothing is counted.
     expect((await repo.repoInfo(proj)).branches.every((b) => b.toTarget === undefined)).toBe(true)
@@ -907,72 +907,72 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     const all = await repo.leftoverInfo(proj, workTarget)
     expect(all.branches).toHaveLength(7 + 205 + 1)
     expect(all.branches.find((b) => b.name === 'zz/leftover')).toMatchObject({ toTarget: 0, worktree: null })
-    expect(all.branches.find((b) => b.name === 'hive/slot')?.worktree).toBeTruthy()
+    expect(all.branches.find((b) => b.name === 'cw/slot')?.worktree).toBeTruthy()
     // Counted: merged by git's word, spike/x's one commit; nothing unknown here.
     expect([all.branches.find((b) => b.name === 'spike/x')?.toTarget, all.uncounted]).toEqual([1, 0])
     const { busyLines, leftoverBranches } = await import('../src/shared/branchCleanup')
-    const left = leftoverBranches(all, busyLines(new Map([['hive/card', [{ stage: 'review' as const }]]])))
+    const left = leftoverBranches(all, busyLines(new Map([['cw/card', [{ stage: 'review' as const }]]])))
     expect(left.merged.map((b) => b.name)).toContain('zz/leftover')
     expect([left.merged.length, left.unmerged.map((b) => b.name)]).toEqual([2 + 205 + 1, ['spike/x']])
   })
 
   it("never deletes an open card's earlier line: one back from Done that started again elsewhere (HI-1823)", async () => {
     const at = setUp()
-    // Card 2 started on hive/hb1, went to Done, and is open again, started this time in the project folder (on main).
-    cardLines = [{ line: 'hive/card', stage: 'review' }, { line: 'main', stage: 'active', lines: ['hive/hb1', 'main'] }]
-    const said = await repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: at['hive/hb1'] }, { name: 'hive/hb2', sha: at['hive/hb2'] }])
-    expect(said).toContain('An open card works on hive/hb1')
-    expect(branchNames(proj)).toContain('hive/hb1')
-    expect(branchNames(proj)).not.toContain('hive/hb2')
+    // Card 2 started on cw/hb1, went to Done, and is open again, started this time in the project folder (on main).
+    cardLines = [{ line: 'cw/card', stage: 'review' }, { line: 'main', stage: 'active', lines: ['cw/hb1', 'main'] }]
+    const said = await repo.deleteBranches(proj, [{ name: 'cw/hb1', sha: at['cw/hb1'] }, { name: 'cw/hb2', sha: at['cw/hb2'] }])
+    expect(said).toContain('An open card works on cw/hb1')
+    expect(branchNames(proj)).toContain('cw/hb1')
+    expect(branchNames(proj)).not.toContain('cw/hb2')
     // Done again: its lines are leftovers, deleted as any other.
-    cardLines = [{ line: 'hive/card', stage: 'review' }, { line: 'main', stage: 'done', lines: ['hive/hb1', 'main'] }]
-    expect(await repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: at['hive/hb1'] }])).toMatch(/Deleted hive\/hb1\./)
+    cardLines = [{ line: 'cw/card', stage: 'review' }, { line: 'main', stage: 'done', lines: ['cw/hb1', 'main'] }]
+    expect(await repo.deleteBranches(proj, [{ name: 'cw/hb1', sha: at['cw/hb1'] }])).toMatch(/Deleted cw\/hb1\./)
   })
 
   it('names each branch by its whole ref, though a tag has its name (HR1, HI-1823 round 1)', async () => {
     setUp()
     // Tags called as the target, the folder's branch, a worktree's, an open card's and two free ones (git's short names
     // would turn each into heads/…).
-    for (const t of ['1.0.0', 'main', 'hive/slot', 'hive/card', 'hive/hb1', 'spike/x']) git(proj, 'tag', t, 'main')
+    for (const t of ['1.0.0', 'main', 'cw/slot', 'cw/card', 'cw/hb1', 'spike/x']) git(proj, 'tag', t, 'main')
     const all = await repo.leftoverInfo(proj, workTarget)
-    expect(all.branches.map((b) => b.name).sort()).toEqual(['1.0.0', 'hive/card', 'hive/hb1', 'hive/hb2', 'hive/slot', 'main', 'spike/x'])
+    expect(all.branches.map((b) => b.name).sort()).toEqual(['1.0.0', 'cw/card', 'cw/hb1', 'cw/hb2', 'cw/slot', 'main', 'spike/x'])
     expect(all.branches.find((b) => b.name === 'main')?.current).toBe(true)
-    expect(all.branches.find((b) => b.name === 'hive/slot')?.worktree).toBeTruthy()
-    expect(Object.fromEntries(all.branches.map((b) => [b.name, b.toTarget]))).toMatchObject({ '1.0.0': 0, 'hive/hb1': 0, 'spike/x': 1 })
+    expect(all.branches.find((b) => b.name === 'cw/slot')?.worktree).toBeTruthy()
+    expect(Object.fromEntries(all.branches.map((b) => [b.name, b.toTarget]))).toMatchObject({ '1.0.0': 0, 'cw/hb1': 0, 'spike/x': 1 })
     const { busyLines, leftoverBranches } = await import('../src/shared/branchCleanup')
-    const left = leftoverBranches(all, busyLines(new Map([['hive/card', [{ stage: 'review' as const }]]])))
+    const left = leftoverBranches(all, busyLines(new Map([['cw/card', [{ stage: 'review' as const }]]])))
     // The target, the folder's, the worktree's and the open card's stay protected; the free ones are offered by name.
-    expect([left.merged.map((b) => b.name), left.unmerged.map((b) => b.name)]).toEqual([['hive/hb1', 'hive/hb2'], ['spike/x']])
+    expect([left.merged.map((b) => b.name), left.unmerged.map((b) => b.name)]).toEqual([['cw/hb1', 'cw/hb2'], ['spike/x']])
     // And deleted by that name, the tag of the same name kept.
-    const said = await repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: git(proj, 'rev-parse', 'refs/heads/hive/hb1') }])
-    expect(said).toMatch(/Deleted hive\/hb1\./)
-    expect(git(proj, 'tag', '--list', 'hive/hb1')).toBe('hive/hb1')
+    const said = await repo.deleteBranches(proj, [{ name: 'cw/hb1', sha: git(proj, 'rev-parse', 'refs/heads/cw/hb1') }])
+    expect(said).toMatch(/Deleted cw\/hb1\./)
+    expect(git(proj, 'tag', '--list', 'cw/hb1')).toBe('cw/hb1')
   })
 
   it('keeps the branch checked out in the project folder, here and on the remote, though a tag has its name (HI-2426)', async () => {
     const at = setUp()
-    git(proj, 'checkout', '-q', 'hive/hb1')
-    git(proj, 'tag', 'hive/hb1', 'main')
+    git(proj, 'checkout', '-q', 'cw/hb1')
+    git(proj, 'tag', 'cw/hb1', 'main')
     // With a free branch beside it, so each says what it did rather than refusing the whole request.
-    expect(await repo.deleteRemoteBranches(proj, 'origin', [{ name: 'origin/hive/hb1', sha: at['hive/hb1'] }, { name: 'origin/hive/hb2', sha: at['hive/hb2'] }])).toContain('origin/hive/hb1 is checked out in the project folder')
-    expect(await repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: at['hive/hb1'] }, { name: 'hive/hb2', sha: at['hive/hb2'] }])).toContain('hive/hb1 is checked out in the project folder')
+    expect(await repo.deleteRemoteBranches(proj, 'origin', [{ name: 'origin/cw/hb1', sha: at['cw/hb1'] }, { name: 'origin/cw/hb2', sha: at['cw/hb2'] }])).toContain('origin/cw/hb1 is checked out in the project folder')
+    expect(await repo.deleteBranches(proj, [{ name: 'cw/hb1', sha: at['cw/hb1'] }, { name: 'cw/hb2', sha: at['cw/hb2'] }])).toContain('cw/hb1 is checked out in the project folder')
     const has = (cwd: string, b: string): boolean => git(cwd, 'for-each-ref', '--format=%(refname)', `refs/heads/${b}`) !== ''
-    expect([has(proj, 'hive/hb1'), has(remote, 'hive/hb1'), has(proj, 'hive/hb2')]).toEqual([true, true, false])
+    expect([has(proj, 'cw/hb1'), has(remote, 'cw/hb1'), has(proj, 'cw/hb2')]).toEqual([true, true, false])
   }, 120_000)
 
   it('deletes only what it was shown, merged and unused, and says why each other one is kept', async () => {
     const at = setUp()
-    git(proj, 'config', 'branch.hive/hb1.description', 'gone with it')
-    // hive/hb2 moves on after the dialog showed it.
-    git(proj, 'checkout', '-q', 'hive/hb2')
+    git(proj, 'config', 'branch.cw/hb1.description', 'gone with it')
+    // cw/hb2 moves on after the dialog showed it.
+    git(proj, 'checkout', '-q', 'cw/hb2')
     commit(proj, 'later.txt')
     git(proj, 'checkout', '-q', 'main')
-    const items = ['hive/hb1', 'hive/hb2', 'hive/slot', 'hive/card', 'spike/x', 'main', '1.0.0'].map((name) => ({ name, sha: at[name] }))
+    const items = ['cw/hb1', 'cw/hb2', 'cw/slot', 'cw/card', 'spike/x', 'main', '1.0.0'].map((name) => ({ name, sha: at[name] }))
     const said = await repo.deleteBranches(proj, [...items, { name: '--force', sha: at.main }, { name: 'nope', sha: at.main }])
-    expect(branchNames(proj)).toEqual(['1.0.0', 'hive/card', 'hive/hb2', 'hive/slot', 'main', 'spike/x'])
-    expect(readFileSync(join(proj, '.git', 'config'), 'utf8')).not.toContain('hive/hb1')
-    expect(said).toMatch(/Deleted hive\/hb1\./)
-    for (const why of ['hive/hb2 has moved since you were shown it', 'hive/slot is checked out in a worktree or slot', 'An open card works on hive/card', "spike/x has commits that aren't in 1.0.0", 'main is the default branch', '1.0.0 is the branch work merges into', "--force isn't a valid branch name", "There's no branch nope"]) expect(said).toContain(why)
+    expect(branchNames(proj)).toEqual(['1.0.0', 'cw/card', 'cw/hb2', 'cw/slot', 'main', 'spike/x'])
+    expect(readFileSync(join(proj, '.git', 'config'), 'utf8')).not.toContain('cw/hb1')
+    expect(said).toMatch(/Deleted cw\/hb1\./)
+    for (const why of ['cw/hb2 has moved since you were shown it', 'cw/slot is checked out in a worktree or slot', 'An open card works on cw/card', "spike/x has commits that aren't in 1.0.0", 'main is the default branch', '1.0.0 is the branch work merges into', "--force isn't a valid branch name", "There's no branch nope"]) expect(said).toContain(why)
     // Nothing to delete: refused, saying why.
     await expect(repo.deleteBranches(proj, [{ name: 'spike/x', sha: at['spike/x'] }])).rejects.toThrow(/spike\/x has commits that aren't in 1\.0\.0/)
   }, 120_000)
@@ -987,31 +987,31 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
 
   it('reads what a branch is to the project when it deletes it, not when the request was queued (round 2)', async () => {
     const at = setUp()
-    // The target becomes hive/hb1 while the deletion waits for the repository's lock.
+    // The target becomes cw/hb1 while the deletion waits for the repository's lock.
     const d = door()
     lockDoor = d.door
-    const queued = repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: at['hive/hb1'] }])
+    const queued = repo.deleteBranches(proj, [{ name: 'cw/hb1', sha: at['cw/hb1'] }])
     await d.at
-    workTarget = 'hive/hb1'
+    workTarget = 'cw/hb1'
     d.open()
-    await expect(queued).rejects.toThrow(/hive\/hb1 is the branch work merges into/)
+    await expect(queued).rejects.toThrow(/cw\/hb1 is the branch work merges into/)
     lockDoor = null
-    expect(branchNames(proj)).toContain('hive/hb1')
+    expect(branchNames(proj)).toContain('cw/hb1')
     // An open card takes a later branch of the batch while an earlier one is being deleted.
     workTarget = '1.0.0'
     const r = door()
     refDoor = r.door
     const batch = repo.deleteBranches(proj, [
-      { name: 'hive/hb1', sha: at['hive/hb1'] },
-      { name: 'hive/hb2', sha: at['hive/hb2'] }
+      { name: 'cw/hb1', sha: at['cw/hb1'] },
+      { name: 'cw/hb2', sha: at['cw/hb2'] }
     ])
     await r.at
-    cardLines = [...cardLines, { line: 'hive/hb2', stage: 'doing' }]
+    cardLines = [...cardLines, { line: 'cw/hb2', stage: 'doing' }]
     r.open()
     const said = await batch
-    expect(said).toContain('An open card works on hive/hb2')
-    expect(branchNames(proj)).toEqual(expect.arrayContaining(['hive/hb2']))
-    expect(branchNames(proj)).not.toContain('hive/hb1')
+    expect(said).toContain('An open card works on cw/hb2')
+    expect(branchNames(proj)).toEqual(expect.arrayContaining(['cw/hb2']))
+    expect(branchNames(proj)).not.toContain('cw/hb1')
   }, 120_000)
 
   /** A slot taking `branch` as slot preparation does: under the repository's lock. Says whether it got it. */
@@ -1034,19 +1034,19 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     const { workflowWrite } = await import('../src/main/workflow/writes')
     const d = door()
     refDoor = d.door
-    const deleting = repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: at['hive/hb1'] }])
+    const deleting = repo.deleteBranches(proj, [{ name: 'cw/hb1', sha: at['cw/hb1'] }])
     await d.at
     // Checked and about to go: a slot claims it, and the target moves to it, each as Combwork does (lock, workflow write).
     let claim = ''
-    const claimed = slotTakes('hive/hb1', join(proj, '..', 'slot-b')).then((r) => (claim = r))
+    const claimed = slotTakes('cw/hb1', join(proj, '..', 'slot-b')).then((r) => (claim = r))
     let retargeted = false
     const retarget = workflowWrite(async () => {
-      workTarget = 'hive/hb1'
+      workTarget = 'cw/hb1'
       retargeted = true
     })
     expect([claim, retargeted]).toEqual(['', false])
     d.open()
-    expect(await deleting).toMatch(/Deleted hive\/hb1\./)
+    expect(await deleting).toMatch(/Deleted cw\/hb1\./)
     // Each went after it: the slot found no branch to take; the target changed once nothing could be deleted against it.
     expect(await claimed).toBe('no such branch')
     await retarget
@@ -1057,31 +1057,31 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     const at = setUp()
     const d = door()
     refDoor = d.door
-    const deleting = repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: at['hive/hb1'] }, { name: 'hive/hb2', sha: at['hive/hb2'] }])
+    const deleting = repo.deleteBranches(proj, [{ name: 'cw/hb1', sha: at['cw/hb1'] }, { name: 'cw/hb2', sha: at['cw/hb2'] }])
     await d.at
-    // A plain git, which knows nothing of Combwork's lock, moves hive/hb1 to a commit only it has.
-    const unseen = git(proj, 'commit-tree', '-p', at['hive/hb1'], '-m', 'unseen work', `${at['hive/hb1']}^{tree}`)
-    git(proj, 'update-ref', 'refs/heads/hive/hb1', unseen)
+    // A plain git, which knows nothing of Combwork's lock, moves cw/hb1 to a commit only it has.
+    const unseen = git(proj, 'commit-tree', '-p', at['cw/hb1'], '-m', 'unseen work', `${at['cw/hb1']}^{tree}`)
+    git(proj, 'update-ref', 'refs/heads/cw/hb1', unseen)
     d.open()
     const said = await deleting
-    expect(said).toContain('hive/hb1 has moved since you were shown it: kept.')
-    expect(said).toMatch(/Deleted hive\/hb2\./)
-    expect(git(proj, 'rev-parse', 'hive/hb1')).toBe(unseen)
+    expect(said).toContain('cw/hb1 has moved since you were shown it: kept.')
+    expect(said).toMatch(/Deleted cw\/hb2\./)
+    expect(git(proj, 'rev-parse', 'cw/hb1')).toBe(unseen)
   }, 120_000)
 
   it('leaves no checked-out branch deleted: one checked out at the last moment is put back and kept, said in use (round 3)', async () => {
     const at = setUp()
     const d = door()
     refDoor = d.door
-    const deleting = repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: at['hive/hb1'] }, { name: 'hive/hb2', sha: at['hive/hb2'] }])
+    const deleting = repo.deleteBranches(proj, [{ name: 'cw/hb1', sha: at['cw/hb1'] }, { name: 'cw/hb2', sha: at['cw/hb2'] }])
     await d.at
-    // Something outside Combwork's discipline checks hive/hb1 out after the check: git refuses to delete it.
-    git(proj, 'worktree', 'add', '-q', join(proj, '..', 'outside'), 'hive/hb1')
+    // Something outside Combwork's discipline checks cw/hb1 out after the check: git refuses to delete it.
+    git(proj, 'worktree', 'add', '-q', join(proj, '..', 'outside'), 'cw/hb1')
     d.open()
     const said = await deleting
-    expect(said).toContain('hive/hb1 is checked out in a worktree or slot: kept.')
-    expect(said).toMatch(/Deleted hive\/hb2\./)
-    expect(branchNames(proj)).toContain('hive/hb1')
+    expect(said).toContain('cw/hb1 is checked out in a worktree or slot: kept.')
+    expect(said).toMatch(/Deleted cw\/hb2\./)
+    expect(branchNames(proj)).toContain('cw/hb1')
   }, 120_000)
 
   it('a second Combwork changing the target, with a turn of workflow writes of its own, waits for the delete on the shared repository lock (round 5)', async () => {
@@ -1093,19 +1093,19 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(otherHive.workflowWrite).not.toBe(ours.workflowWrite)
     const d = door()
     refDoor = d.door
-    const deleting = repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: at['hive/hb1'] }])
+    const deleting = repo.deleteBranches(proj, [{ name: 'cw/hb1', sha: at['cw/hb1'] }])
     await d.at
     // Its target change as Combwork writes one: the project's repository lock first, then its own turn.
     let retargeted = false
     const retarget = withRepoLocks([proj], () =>
       otherHive.workflowWrite(async () => {
-        workTarget = 'hive/hb1'
+        workTarget = 'cw/hb1'
         retargeted = true
       })
     )
     expect(retargeted).toBe(false)
     d.open()
-    expect(await deleting).toMatch(/Deleted hive\/hb1\./)
+    expect(await deleting).toMatch(/Deleted cw\/hb1\./)
     await retarget
     expect(retargeted).toBe(true)
   }, 120_000)
@@ -1114,14 +1114,14 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     const at = setUp()
     const d = door()
     refDoor = d.door
-    const deleting = repo.deleteRemoteBranches(proj, 'origin', [{ name: 'origin/hive/hb1', sha: at['hive/hb1'] }])
+    const deleting = repo.deleteRemoteBranches(proj, 'origin', [{ name: 'origin/cw/hb1', sha: at['cw/hb1'] }])
     await d.at
     let claim = ''
-    const claimed = slotTakes('hive/hb1', join(proj, '..', 'slot-c')).then((r) => (claim = r))
+    const claimed = slotTakes('cw/hb1', join(proj, '..', 'slot-c')).then((r) => (claim = r))
     expect(claim).toBe('')
     d.open()
-    expect(await deleting).toMatch(/Deleted hive\/hb1 on origin\./)
-    expect(branchNames(remote)).not.toContain('hive/hb1')
+    expect(await deleting).toMatch(/Deleted cw\/hb1 on origin\./)
+    expect(branchNames(remote)).not.toContain('cw/hb1')
     // The local branch was never the remote's to delete: the slot takes it once the push is done.
     expect(await claimed).toBe('took it')
   }, 120_000)
@@ -1130,22 +1130,22 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     const at = setUp()
     const d = door()
     lockDoor = d.door
-    const queued = repo.deleteRemoteBranches(proj, 'origin', [{ name: 'origin/hive/hb1', sha: at['hive/hb1'] }])
+    const queued = repo.deleteRemoteBranches(proj, 'origin', [{ name: 'origin/cw/hb1', sha: at['cw/hb1'] }])
     await d.at
-    cardLines = [{ line: 'hive/hb1', stage: 'doing' }]
+    cardLines = [{ line: 'cw/hb1', stage: 'doing' }]
     d.open()
-    await expect(queued).rejects.toThrow(/An open card works on origin\/hive\/hb1/)
+    await expect(queued).rejects.toThrow(/An open card works on origin\/cw\/hb1/)
     lockDoor = null
-    expect(branchNames(remote)).toContain('hive/hb1')
+    expect(branchNames(remote)).toContain('cw/hb1')
   }, 120_000)
 
   it('deletes an unmerged branch only alone, at the commit shown, after listing the commits it drops', async () => {
     const at = setUp()
     const drops = await repo.branchDrops(proj, 'spike/x')
     expect(drops).toMatchObject({ target: '1.0.0', total: 1, commits: [{ short: git(proj, 'rev-parse', '--short', 'spike/x'), subject: 'add spike.txt' }] })
-    await expect(repo.deleteBranches(proj, [{ name: 'spike/x', sha: at['spike/x'] }, { name: 'hive/hb1', sha: at['hive/hb1'] }], true)).rejects.toThrow()
+    await expect(repo.deleteBranches(proj, [{ name: 'spike/x', sha: at['spike/x'] }, { name: 'cw/hb1', sha: at['cw/hb1'] }], true)).rejects.toThrow()
     await expect(repo.deleteBranches(proj, [{ name: 'spike/x', sha: at.main }], true)).rejects.toThrow(/moved since you were shown it/)
-    await expect(repo.deleteBranches(proj, [{ name: 'hive/card', sha: at['hive/card'] }], true)).rejects.toThrow(/An open card works on hive\/card/)
+    await expect(repo.deleteBranches(proj, [{ name: 'cw/card', sha: at['cw/card'] }], true)).rejects.toThrow(/An open card works on cw\/card/)
     expect(await repo.deleteBranches(proj, [{ name: 'spike/x', sha: at['spike/x'] }], true)).toMatch(/Deleted spike\/x/)
     expect(branchNames(proj)).not.toContain('spike/x')
   }, 120_000)
@@ -1153,18 +1153,18 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
   it('deletes merged branches on the remote only at the commit shown, never one in use or unmerged', async () => {
     const at = setUp()
     const r = (name: string): { name: string; sha: string } => ({ name: `origin/${name}`, sha: at[name] })
-    const said = await repo.deleteRemoteBranches(proj, 'origin', [r('hive/hb1'), r('hive/slot'), r('hive/card'), r('spike/x'), r('main'), r('1.0.0'), { name: 'origin/hive/hb2', sha: at.main }])
-    expect(branchNames(remote)).toEqual(['1.0.0', 'hive/card', 'hive/hb2', 'hive/slot', 'main', 'spike/x'])
-    expect(said).toMatch(/Deleted hive\/hb1 on origin\./)
-    for (const why of ['origin/hive/slot is checked out in a worktree or slot', 'An open card works on origin/hive/card', "origin/spike/x has commits that aren't in 1.0.0", 'origin/main is the default branch', 'origin/1.0.0 is the branch work merges into', 'origin/hive/hb2 has moved since you were shown it']) expect(said).toContain(why)
+    const said = await repo.deleteRemoteBranches(proj, 'origin', [r('cw/hb1'), r('cw/slot'), r('cw/card'), r('spike/x'), r('main'), r('1.0.0'), { name: 'origin/cw/hb2', sha: at.main }])
+    expect(branchNames(remote)).toEqual(['1.0.0', 'cw/card', 'cw/hb2', 'cw/slot', 'main', 'spike/x'])
+    expect(said).toMatch(/Deleted cw\/hb1 on origin\./)
+    for (const why of ['origin/cw/slot is checked out in a worktree or slot', 'An open card works on origin/cw/card', "origin/spike/x has commits that aren't in 1.0.0", 'origin/main is the default branch', 'origin/1.0.0 is the branch work merges into', 'origin/cw/hb2 has moved since you were shown it']) expect(said).toContain(why)
     // The local branch stays: only the remote's went, and its remote-tracking branch with it.
-    expect(branchNames(proj)).toContain('hive/hb1')
-    expect(git(proj, 'for-each-ref', 'refs/remotes/origin/hive/hb1')).toBe('')
+    expect(branchNames(proj)).toContain('cw/hb1')
+    expect(git(proj, 'for-each-ref', 'refs/remotes/origin/cw/hb1')).toBe('')
     // Moved on the remote since the last fetch: refused there, never forced.
     commit(other, 'x.txt')
-    git(other, 'push', '-q', '-f', 'origin', 'HEAD:refs/heads/hive/hb2')
-    await expect(repo.deleteRemoteBranches(proj, 'origin', [r('hive/hb2')])).rejects.toThrow(/origin refused to delete hive\/hb2/)
-    expect(branchNames(remote)).toContain('hive/hb2')
+    git(other, 'push', '-q', '-f', 'origin', 'HEAD:refs/heads/cw/hb2')
+    await expect(repo.deleteRemoteBranches(proj, 'origin', [r('cw/hb2')])).rejects.toThrow(/origin refused to delete cw\/hb2/)
+    expect(branchNames(remote)).toContain('cw/hb2')
   }, 120_000)
 })
 

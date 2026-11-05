@@ -124,7 +124,7 @@ let projectId = 'p1'
 
 /** The project's agent b1 (a builder), with its own worktree when given (`needsSetup`: its first setup still owed). */
 function writeProject(o: { worktree?: string; setup?: string } = {}): void {
-  const agent = { id: 'b1', name: 'B1', provider: 'claude-code', workflowRole: 'builder', ...(o.worktree ? { worktree: { path: o.worktree, branch: 'hive/b1', base: 'main' }, needsSetup: true } : {}) }
+  const agent = { id: 'b1', name: 'B1', provider: 'claude-code', workflowRole: 'builder', ...(o.worktree ? { worktree: { path: o.worktree, branch: 'cw/b1', base: 'main' }, needsSetup: true } : {}) }
   writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id: projectId, worktreeSetup: o.setup ?? '', agents: [agent] }))
 }
 const writer = () => store.slot('slot-a')?.writer ?? null

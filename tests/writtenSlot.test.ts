@@ -187,7 +187,7 @@ describe("B1's next start takes over the slot its own run still writes in (HI-17
     expect(r && 'lease' in r ? r.lease : r).toBe(pre.lease.id)
     expect(slotOf().target).toBe('1.0.0')
     // Its card's line from 1.0.0, then the lane's lease released: the pool's settle detaches it at 1.0.0's head.
-    sh(pre.slot.folder, 'switch', '-q', '-c', 'hive/AM-1-lane-card', '1.0.0')
+    sh(pre.slot.folder, 'switch', '-q', '-c', 'cw/AM-1-lane-card', '1.0.0')
     commit(pre.slot.folder, { 'work.txt': 'work\n' }, 'work')
     running.delete('lane-w')
     expect(await t.pool.release(pre.lease.id, 'laneEnded')).toBe(true)

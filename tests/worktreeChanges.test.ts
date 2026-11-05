@@ -231,10 +231,10 @@ describe("another git's half-made entry: the change runs again once it's written
     const h = withHalfEntry()
     const ran = tries(() => rmSync(h.entry, { recursive: true }))
     const folder = join(h.dir, 'wt')
-    const r = await git(h.repo, ['worktree', 'add', '-b', 'hive/feature', folder, h.rev])
+    const r = await git(h.repo, ['worktree', 'add', '-b', 'cw/feature', folder, h.rev])
     expect(r.ok, r.err).toBe(true)
-    expect(ran).toEqual([['worktree', 'add', '-b', 'hive/feature', folder, h.rev], ['worktree', 'add', folder, 'hive/feature']])
-    expect(sh(folder, 'symbolic-ref', 'HEAD')).toBe('refs/heads/hive/feature')
+    expect(ran).toEqual([['worktree', 'add', '-b', 'cw/feature', folder, h.rev], ['worktree', 'add', folder, 'cw/feature']])
+    expect(sh(folder, 'symbolic-ref', 'HEAD')).toBe('refs/heads/cw/feature')
     expect(sh(folder, 'rev-parse', 'HEAD')).toBe(h.rev)
   })
 

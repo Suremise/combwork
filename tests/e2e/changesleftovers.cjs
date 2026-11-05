@@ -1,6 +1,6 @@
 // The Changes tab's leftover branches (HI-1823), on real cards (queueFixture.cjs's project, its work merging into
 // `integration`; fake Claude Code builders starting cards by their own tokens, the Assistant off):
-// - leftovers: hive/hb3 (an agent's branch from before slots, merged), card A's line (2 commits of its own; moved to Done
+// - leftovers: cw/hb3 (an agent's branch from before slots, merged), card A's line (2 commits of its own; moved to Done
 //   by the user, superseded, and archived), card B's line (Done, then merged into integration by hand: its card chip
 //   shows Done), card E's line (Done, 1 commit of its own). Combwork keeps a Done card's line only while it has commits of
 //   its own (one with none is deleted at Done), so B's and E's have one. Tags named as integration and as B's line
@@ -33,8 +33,8 @@ const heads = () => git(fx.alpha, 'for-each-ref', '--format=%(refname)', 'refs/h
 
 ;(async () => {
   q.prepare(fx)
-  // hive/hb3: an agent's branch from before slots, at integration's commit (merged). A tag named as integration.
-  git(fx.alpha, 'branch', 'hive/hb3', 'integration')
+  // cw/hb3: an agent's branch from before slots, at integration's commit (merged). A tag named as integration.
+  git(fx.alpha, 'branch', 'cw/hb3', 'integration')
   git(fx.alpha, 'tag', 'integration', 'main')
   const h = await q.startHive(fx, { port: PORT })
   const { page, inv } = h
@@ -107,7 +107,7 @@ const heads = () => git(fx.alpha, 'for-each-ref', '--format=%(refname)', 'refs/h
     const pageEl = page.locator('[data-leftovers-page]')
     const rows = (merged) => pageEl.locator(`[data-leftover][data-merged="${merged}"]`)
     const names = async (merged) => rows(merged).evaluateAll((els) => els.map((e) => e.getAttribute('data-leftover')))
-    check('merged into integration: hive/hb3 and B’s line, by their names', !!(await lib.until(async () => JSON.stringify((await names('yes')).sort()) === JSON.stringify(['hive/hb3', B.line].sort()), HUNG_MS)), JSON.stringify(await names('yes')))
+    check('merged into integration: cw/hb3 and B’s line, by their names', !!(await lib.until(async () => JSON.stringify((await names('yes')).sort()) === JSON.stringify(['cw/hb3', B.line].sort()), HUNG_MS)), JSON.stringify(await names('yes')))
     check('not in integration: A’s line (Done, archived) with its 2 commits, E’s with 1', JSON.stringify(await names('no')) === JSON.stringify([A.line, E.line]) && JSON.stringify(await rows('no').locator('.leftover-ahead').allInnerTexts()) === JSON.stringify(['2 commits not in integration', '1 commit not in integration']), await text(pageEl))
     const all = [...(await names('yes')), ...(await names('no'))]
     check('never main, integration, the open card’s line or the blocked card’s', !['main', 'integration', C.line, D.line].some((b) => all.includes(b)) && !all.some((b) => b.startsWith('heads/')), JSON.stringify(all))
@@ -135,24 +135,24 @@ const heads = () => git(fx.alpha, 'for-each-ref', '--format=%(refname)', 'refs/h
     check('…and leaves the list, in use now', !!(await lib.until(async () => (await pageEl.locator(`[data-leftover="${E.line}"]`).count()) === 0, HUNG_MS)))
 
     // --- A branch checked out in a worktree while its dialog was open: kept.
-    await pageEl.locator('[data-leftover="hive/hb3"] [data-action="delete-leftover"]').click()
-    const hbDialog = page.locator('.dialog', { hasText: 'Delete hive/hb3?' })
+    await pageEl.locator('[data-leftover="cw/hb3"] [data-action="delete-leftover"]').click()
+    const hbDialog = page.locator('.dialog', { hasText: 'Delete cw/hb3?' })
     await lib.until(async () => (await hbDialog.count()) === 1, HUNG_MS)
     const wt = path.join(lib.probeDir('changesleftovers'), 'wt')
-    git(fx.alpha, 'worktree', 'add', '-q', wt, 'hive/hb3')
+    git(fx.alpha, 'worktree', 'add', '-q', wt, 'cw/hb3')
     await hbDialog.getByRole('button', { name: 'Delete Branch', exact: true }).click()
-    check('a branch checked out in a worktree meanwhile is kept, saying so', !!(await lib.until(async () => /checked out in a worktree or slot/.test(await text(hbDialog.locator('.dialog-error'))), HUNG_MS)) && heads().includes('hive/hb3'), await text(hbDialog))
+    check('a branch checked out in a worktree meanwhile is kept, saying so', !!(await lib.until(async () => /checked out in a worktree or slot/.test(await text(hbDialog.locator('.dialog-error'))), HUNG_MS)) && heads().includes('cw/hb3'), await text(hbDialog))
     await hbDialog.getByRole('button', { name: 'Cancel', exact: true }).click()
     await lib.until(async () => (await hbDialog.count()) === 0, HUNG_MS)
     // Free again: merged, deleted on one confirm.
     git(fx.alpha, 'worktree', 'remove', '--force', wt)
     // Changed outside Combwork: read again.
     await pageEl.locator('[data-action="refresh-leftovers"]').click()
-    check('…free again once its worktree is gone, read again', !!(await lib.until(async () => (await pageEl.locator('[data-leftover="hive/hb3"]').count()) === 1, HUNG_MS)))
-    await pageEl.locator('[data-leftover="hive/hb3"] [data-action="delete-leftover"]').click()
+    check('…free again once its worktree is gone, read again', !!(await lib.until(async () => (await pageEl.locator('[data-leftover="cw/hb3"]').count()) === 1, HUNG_MS)))
+    await pageEl.locator('[data-leftover="cw/hb3"] [data-action="delete-leftover"]').click()
     await lib.until(async () => (await hbDialog.count()) === 1, HUNG_MS)
     await hbDialog.getByRole('button', { name: 'Delete Branch', exact: true }).click()
-    check('a merged one goes on one confirm, and leaves the list; the tag of integration untouched', !!(await lib.until(async () => !heads().includes('hive/hb3') && (await pageEl.locator('[data-leftover="hive/hb3"]').count()) === 0, HUNG_MS)) && git(fx.alpha, 'tag', '--list', 'integration') === 'integration', JSON.stringify(heads()))
+    check('a merged one goes on one confirm, and leaves the list; the tag of integration untouched', !!(await lib.until(async () => !heads().includes('cw/hb3') && (await pageEl.locator('[data-leftover="cw/hb3"]').count()) === 0, HUNG_MS)) && git(fx.alpha, 'tag', '--list', 'integration') === 'integration', JSON.stringify(heads()))
 
     // --- A's line: its 2 commits listed first; one that moves while the dialog is open is kept; then Cancel, then Delete.
     const aDialog = page.locator('.dialog', { hasText: `Delete ${A.line} and the 2 commits only it has?` })

@@ -107,14 +107,14 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     const c1 = await create('Switch one')
     const c2 = await create('Switch two')
     const key = (await card(c1)).key.split('-')[0]
-    const line = (n, slug) => `hive/${key}/${key}-${n}-${slug}`
+    const line = (n, slug) => `cw/${key}/${key}-${n}-${slug}`
 
     // --- A lane of two cards in slot-a.
     const started = await inv('lanes:start', alpha, { builder: b1.id, reviewer: r1.id, cards: [c1, c2] })
     check('the lane is lent slot-a, and both agents start', started.slot === 'slot-a' && started.started.every((s) => s.how !== 'failed'), JSON.stringify(started))
     check("slot-a's setup ran as it was made", !!(await until(() => installs().length === 1, HUNG_MS)) && installs()[0] === 'slot-a {"v":1}', JSON.stringify(installs()))
     // An adopted worktree (as the upgrade carries an agent's own), free from here on.
-    lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hb2', hb2, 'integration'])
+    lib.git(alpha, ['worktree', 'add', '-q', '-b', 'cw/hb2', hb2, 'integration'])
     const carried = await inv('slots:test', alpha, { op: 'carry', agent: 'someone', slot: 'hb2', folder: hb2 })
     check('hb2 is adopted as a slot', !!carried?.id && (await inv('slots:test', alpha, { op: 'release', lease: carried.id, why: 'done' })) === true, JSON.stringify(carried))
     check('…and free, ready, under its own name', !!(await until(async () => (await slots()).some((s) => s.name === 'hb2' && s.state === 'ready' && !s.lease), HUNG_MS)), JSON.stringify(await slots()))

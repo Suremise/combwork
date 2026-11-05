@@ -577,7 +577,7 @@ function LaneSlotTip({ lane: l }: { lane: Lane }) {
         <strong>{s.name}</strong>{' '}
         {tr(msg({ id: 'board.lanes.slotTip', defaultMessage: '{state, select, preparing {being prepared} other {ready}} · {carried, select, yes {its builder’s own since {since}} other {lent to the lane since {since}}}', description: "A lane's slot in its hover (Progress panel, #1446), after the slot's name (slot-b): whether it is ready or being prepared (its setup or a dependency install), then since when it was lent to the lane, or, for a builder's own worktree kept from before 1.0 (carried), since when it has had it. {since} is a date and time. Keep the select keys." }), { state: s.state, carried: s.carried ? 'yes' : 'no', since: formatDateTime(s.since) })}
       </div>
-      {s.line && <div className="faint">{tr(msg({ id: 'board.lanes.slotLine', defaultMessage: 'On {line}', description: "A lane's slot in its hover (Progress panel, #1446): the branch its current card is built on there follows ({line}, such as hive/HI/HI-12-fix-login: keep it as it is)." }), { line: s.line })}</div>}
+      {s.line && <div className="faint">{tr(msg({ id: 'board.lanes.slotLine', defaultMessage: 'On {line}', description: "A lane's slot in its hover (Progress panel, #1446): the branch its current card is built on there follows ({line}, such as cw/HI/HI-12-fix-login: keep it as it is)." }), { line: s.line })}</div>}
     </div>
   )
 }

@@ -55,7 +55,7 @@ const v2 = (t: Record<string, unknown> & { agents: Record<string, unknown>[] }):
 
 describe('the template format', () => {
   const agents: StoredAgent[] = [
-    { id: 'a1', name: 'Builder', role: 'UI work', workflowRole: 'builder', pairedWith: 'Reviewer', provider: 'claude-code', model: 'opus', effort: 'high', permissionMode: 'acceptEdits', use200kContext: true, lastSessionId: 's1', worktree: { path: 'C:/w/b', branch: 'hive/builder', base: 'main' }, needsSetup: true },
+    { id: 'a1', name: 'Builder', role: 'UI work', workflowRole: 'builder', pairedWith: 'Reviewer', provider: 'claude-code', model: 'opus', effort: 'high', permissionMode: 'acceptEdits', use200kContext: true, lastSessionId: 's1', worktree: { path: 'C:/w/b', branch: 'cw/builder', base: 'main' }, needsSetup: true },
     { id: 'a2', name: 'Reviewer', mode: 'x' } as StoredAgent
   ]
   it("saves each agent's role in the workflow, note, MCP servers and suggested CLI, its pairs, the layout and the project's preset; never sessions, paths, setup state, modes or launch settings (HI-2109)", () => {
@@ -74,7 +74,7 @@ describe('the template format', () => {
       suggestedPreset: 'pair',
       pairs: [{ builder: 'Builder', reviewer: 'Reviewer' }]
     })
-    expect(JSON.stringify(t)).not.toMatch(/s1|C:\/w\/b|hive\/builder|needsSetup|"mode"|"id"|worktree|opus|"effort"|permissionMode|200k|connection/)
+    expect(JSON.stringify(t)).not.toMatch(/s1|C:\/w\/b|cw\/builder|needsSetup|"mode"|"id"|worktree|opus|"effort"|permissionMode|200k|connection/)
     expect(readAny(JSON.parse(JSON.stringify(t)))).toEqual(t)
   })
 
@@ -337,7 +337,7 @@ describe('saving and loading templates', () => {
    * In the worktrees folder beside the workspace, where 0.9 made them (HI-2142): one in the workspace folder is taken for
    * a project, so each refresh its root watch starts writes Combwork's files into it while the test works there.
    */
-  const legacyAgent = (p: string, name: string, branch = `hive/legacy-${++legacyNo}`): StoredAgent => {
+  const legacyAgent = (p: string, name: string, branch = `cw/legacy-${++legacyNo}`): StoredAgent => {
     const path = join(worktreesRoot(wsPath), basename(p), `wt-${legacyNo}-${name.replace(/\W+/g, '-').toLowerCase()}`)
     git(p, 'worktree', 'add', '-q', '-b', branch, path, 'main')
     const cfg = cfgOf(p)
@@ -529,9 +529,9 @@ describe('saving and loading templates', () => {
     expect(ids()).toHaveLength(2)
     // A worktree agent with uncommitted work.
     const wtPath = join(base, 'beta-wt')
-    git(beta, 'worktree', 'add', '-q', '-b', 'hive/wt', wtPath, 'main')
+    git(beta, 'worktree', 'add', '-q', '-b', 'cw/wt', wtPath, 'main')
     writeFileSync(join(wtPath, 'b.txt'), 'uncommitted')
-    await w.mutateProjectConfig(beta, (c) => ({ agents: [...c.agents, { id: 'wt1', name: 'Tree', provider: 'claude-code', worktree: { path: wtPath, branch: 'hive/wt', base: 'main' } }] }))
+    await w.mutateProjectConfig(beta, (c) => ({ agents: [...c.agents, { id: 'wt1', name: 'Tree', provider: 'claude-code', worktree: { path: wtPath, branch: 'cw/wt', base: 'main' } }] }))
     const dirty = await run(() => templates.templatePlan(beta, 'workspace', 'pair.json'))
     expect(dirty.blocked).toEqual([expect.stringMatching(/Tree has uncommitted work in its worktree/)])
   })
@@ -547,7 +547,7 @@ describe('saving and loading templates', () => {
     renameSync(join(wtPath, '.git'), join(wtPath, '.git-aside'))
     writeFileSync(join(wtPath, '.git'), 'gitdir: C:/nowhere/at/all')
     const failed = await run(() => templates.templatePlan(beta, 'workspace', 'pair.json'))
-    expect(failed.blocked).toEqual([expect.stringMatching(/couldn't check Tree's worktree .*Git couldn't check hive\/wt/)])
+    expect(failed.blocked).toEqual([expect.stringMatching(/couldn't check Tree's worktree .*Git couldn't check cw\/wt/)])
     await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair.json', failed.remove.map((a) => a.id)))).rejects.toThrow(/can't be loaded yet/)
     rmSync(join(wtPath, '.git'))
     renameSync(join(wtPath, '.git-aside'), join(wtPath, '.git'))
@@ -776,7 +776,7 @@ describe('saving and loading templates', () => {
 
   gitIt("a project's template loads into another project (from the Templates view), every agent in that project's folder (#268, #1436)", async () => {
     // alpha has a worktree agent of its own (from 0.9); beta has a setup command (which a load no longer runs: no worktrees).
-    const source = legacyAgent(alpha, 'Alpha tree', 'hive/tree-a')
+    const source = legacyAgent(alpha, 'Alpha tree', 'cw/tree-a')
     writeFileSync(join(beta, '.combwork', 'project.json'), JSON.stringify({ ...cfgOf(beta), worktreeSetup: 'npm install' }))
     const ids = cfgOf(beta).agents.map((a: StoredAgent) => a.id)
     const branches = git(beta, 'branch', '--list').toString()

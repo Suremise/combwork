@@ -33,7 +33,7 @@ async function makeProject(main = 'main'): Promise<{ project: string; tree: (nam
   return {
     project,
     tree: async (name) => {
-      const wt = { path: join(root, 'wt', name), branch: `hive/${name}`, base: main }
+      const wt = { path: join(root, 'wt', name), branch: `cw/${name}`, base: main }
       await createWorktree(project, wt.path, wt.branch, main)
       return wt
     }
@@ -119,9 +119,9 @@ describe('worktreeCheck', () => {
     expect((await worktreeCheck(p, { path: p, branch: 'main', base: 'main' })).removable).toBe(false)
     const plain = join(root, 'plain')
     mkdirSync(plain)
-    expect(await worktreeCheck(p, { path: plain, branch: 'hive/plain', base: 'main' })).toMatchObject({ removable: false, reason: "git doesn't list it as a worktree on hive/plain" })
+    expect(await worktreeCheck(p, { path: plain, branch: 'cw/plain', base: 'main' })).toMatchObject({ removable: false, reason: "git doesn't list it as a worktree on cw/plain" })
     const wt = await tree('other')
-    expect((await worktreeCheck(p, { ...wt, branch: 'hive/elsewhere' })).removable).toBe(false)
+    expect((await worktreeCheck(p, { ...wt, branch: 'cw/elsewhere' })).removable).toBe(false)
   })
 })
 
@@ -152,7 +152,7 @@ describe('removeCheckedWorktree', () => {
     const wt = await tree('moved')
     const check = await worktreeCheck(p, wt)
     commit(wt.path, 'new.txt')
-    expect(await removeCheckedWorktree(p, wt, check, 'main')).toEqual({ deleted: false, reason: 'hive/moved changed since it was checked' })
+    expect(await removeCheckedWorktree(p, wt, check, 'main')).toEqual({ deleted: false, reason: 'cw/moved changed since it was checked' })
     expect(existsSync(join(wt.path, 'new.txt'))).toBe(true)
     expect(hasBranch(p, wt.branch)).toBe(true)
   })
@@ -194,7 +194,7 @@ describe('removeCheckedWorktree', () => {
     // The branch moved instead.
     run(p, 'reset', '-q', '--hard', check.intoTip!)
     commit(wt.path, 'more.txt')
-    expect(await deleteCheckedBranch(p, wt, 'main', check.tip!, check.intoTip!)).toBe('hive/race changed since it was checked')
+    expect(await deleteCheckedBranch(p, wt, 'main', check.tip!, check.intoTip!)).toBe('cw/race changed since it was checked')
     expect(hasBranch(p, wt.branch)).toBe(true)
   })
 
@@ -239,8 +239,8 @@ describe('paths by another name: an 8.3 short name or a junction (#389)', () => 
       // Still only what git lists, on its branch: not the project folder by its other name, a plain folder or a wrong branch.
       expect((await worktreeCheck(p, { path: proj, branch: 'main', base: 'main' })).removable).toBe(false)
       mkdirSync(join(root, 'wt', 'plain'))
-      expect(await worktreeCheck(proj, { path: join(wts, 'plain'), branch: 'hive/plain', base: 'main' })).toMatchObject({ removable: false, reason: "git doesn't list it as a worktree on hive/plain" })
-      expect((await worktreeCheck(proj, { ...named, branch: 'hive/elsewhere' })).removable).toBe(false)
+      expect(await worktreeCheck(proj, { path: join(wts, 'plain'), branch: 'cw/plain', base: 'main' })).toMatchObject({ removable: false, reason: "git doesn't list it as a worktree on cw/plain" })
+      expect((await worktreeCheck(proj, { ...named, branch: 'cw/elsewhere' })).removable).toBe(false)
       // Unmerged work still keeps it.
       commit(wt.path, 'w.txt')
       expect(await worktreeCheck(proj, named)).toMatchObject({ removable: false, reason: '1 commit not merged into main' })

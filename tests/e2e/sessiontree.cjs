@@ -120,7 +120,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
     // A guardian review adopted before Combwork told sub-sessions apart: its record doesn't say so.
     rec(C.adopted, 'Adopted review', 5, { agent: 'codex', transcriptPath: rolloutFile(C.adopted, 5) }),
     // A session in a worktree, with a guardian review there.
-    rec(C.wt, 'Worktree work', 1, { agent: 'codex', agentId: codexette.id, agentName: 'Codexette', cwd: wtDir, branch: 'hive/spike', transcriptPath: rolloutFile(C.wt, 1) })
+    rec(C.wt, 'Worktree work', 1, { agent: 'codex', agentId: codexette.id, agentName: 'Codexette', cwd: wtDir, branch: 'cw/spike', transcriptPath: rolloutFile(C.wt, 1) })
   )
   putSessions(alpha, file)
   write(backup(C.tray), claudeLines(C.tray, 10, 'Fix the tray icon'))

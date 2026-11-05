@@ -215,7 +215,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 
     // --- 6. A builder with a dirty carried slot and a card in another: the card's slot wins, the old one waits.
     const hb1 = path.join(root, 'hb1')
-    lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hb1', hb1])
+    lib.git(alpha, ['worktree', 'add', '-q', '-b', 'cw/hb1', hb1])
     const carried = await op({ op: 'carry', agent: b1.id, slot: 'hb1', folder: hb1 })
     check("B1's own worktree hb1 is adopted as its carried slot", carried?.kind === 'carried' && carried.agent === b1.id, JSON.stringify(carried))
     await inv('session:start', alpha, { agentId: b1.id })

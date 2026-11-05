@@ -6,7 +6,7 @@
 // removed worktree kept, + Add ▾ → Add Agent from Template (a taken name numbered), with the mouse, the keyboard and the
 // palette, and the toolbar's controls at narrow widths in both themes,
 // every one reachable, in the order Panes | Tiles, the summary chip, pages, layouts, + Add ▾ (#292), with one page and two. #702: agent names unique across the
-// workspace: Add Agent refuses another project's agent's name, offering one, and shows what hive/ in a branch means; a
+// workspace: Add Agent refuses another project's agent's name, offering one, and shows what cw/ in a branch means; a
 // template's load shows each name in the template beside a box for the agent's new name: a name another project's
 // agent has (or one used twice) is marked and Load template greyed out until it is changed; nothing is filled in. Agents run the fake Claude Code (fake-claude/). Dev build, throwaway profile,
 // workspace and CLAUDE_CONFIG_DIR; a quiet test copy.
@@ -206,7 +206,7 @@ const check = (name, ok, extra = '') => {
         })
       )
   const created = (d) => d.locator('.template-plan-table tbody tr[data-agent]:not([data-state="removed"])').evaluateAll((rows) => rows.map((r) => r.dataset.agent))
-  check('the warning lists who goes and who comes, in one table: the template\'s agents, then those removed', (await warn.locator('.template-plan-table tbody tr[data-state="removed"]').evaluateAll((l) => l.map((x) => x.dataset.agent))).join() === 'Old,Tree' && (await warn.locator('.template-plan-table tbody tr[data-agent]').evaluateAll((l) => l.map((x) => x.dataset.agent))).join() === 'Builder,Reviewer,Old,Tree' && (await warn.locator('.template-plan-removed, .template-plan h4').count()) === 0 && /^removed\b/.test(await removedLine(warn, 'Old')) && /its worktree and branch hive\/templates-ws\/beta\/tree stay/i.test(await removedLine(warn, 'Tree')) && (await created(warn)).join() === 'Builder,Reviewer' && /^Builder builder$/.test((await cells(warn, 'Builder'))[0]), JSON.stringify([await removedLine(warn, 'Tree'), await created(warn), await cells(warn, 'Builder')]))
+  check('the warning lists who goes and who comes, in one table: the template\'s agents, then those removed', (await warn.locator('.template-plan-table tbody tr[data-state="removed"]').evaluateAll((l) => l.map((x) => x.dataset.agent))).join() === 'Old,Tree' && (await warn.locator('.template-plan-table tbody tr[data-agent]').evaluateAll((l) => l.map((x) => x.dataset.agent))).join() === 'Builder,Reviewer,Old,Tree' && (await warn.locator('.template-plan-removed, .template-plan h4').count()) === 0 && /^removed\b/.test(await removedLine(warn, 'Old')) && /its worktree and branch cw\/templates-ws\/beta\/tree stay/i.test(await removedLine(warn, 'Tree')) && (await created(warn)).join() === 'Builder,Reviewer' && /^Builder builder$/.test((await cells(warn, 'Builder'))[0]), JSON.stringify([await removedLine(warn, 'Tree'), await created(warn), await cells(warn, 'Builder')]))
   // Shown in both themes, each screenshot once the window shows it (a condition, never a fixed wait).
   const themed = async (theme) => {
     await inv('settings:update', { appearance: { theme } })
@@ -449,7 +449,7 @@ const check = (name, ok, extra = '') => {
   await dialog.locator('input.input').fill('Alpha trees')
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()
   const alphaTrees = path.join(alpha, '.combwork', 'templates', 'alpha-trees.json')
-  check("alpha's own template saved, its agents' roles and no worktree, path or branch", !!(await lib.until(async () => fs.existsSync(alphaTrees), 5000)) && /"name": "Tree",\s*"role": "builder"/.test(fs.readFileSync(alphaTrees, 'utf8')) && !/worktree|hive\/templates-ws/.test(fs.readFileSync(alphaTrees, 'utf8')))
+  check("alpha's own template saved, its agents' roles and no worktree, path or branch", !!(await lib.until(async () => fs.existsSync(alphaTrees), 5000)) && /"name": "Tree",\s*"role": "builder"/.test(fs.readFileSync(alphaTrees, 'utf8')) && !/worktree|cw\/templates-ws/.test(fs.readFileSync(alphaTrees, 'utf8')))
   // alpha's Tree renamed after saving (its worktree stays), so the template's Tree is free in beta; its other two aren't.
   await inv('agents:update', alpha, srcTree.id, { name: 'Alpha tree' })
   const srcCfg = JSON.stringify(projectCfg(alpha).agents.find((a) => a.id === srcTree.id).worktree)

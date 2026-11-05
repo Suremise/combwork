@@ -95,7 +95,7 @@ const who = ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.ident
     check('…the update contains the moved target, and the merge brought it in, naming both revisions', ancestor(one.moved, up?.data?.to ?? one.revision) && lib.git(fx.alpha, ['log', '-1', '--format=%B', 'integration']).includes(`Hive-Updated: ${up?.data?.to}`) && lib.git(fx.alpha, ['log', '-1', '--format=%B', 'integration']).includes(`Hive-Revision: ${one.revision}`))
     check("…the card's slot untouched: its HEAD and status as they were, its branch at the reviewed revision", untouched(one) && lib.git(fx.alpha, ['rev-parse', `refs/heads/${(await h.facts(one.n)).find((x) => x.kind === 'Started')?.data?.line}`]).trim() === one.revision)
     const key1 = (await h.card(one.n)).key
-    check("…its entry's update ref dropped with the outcome", !!(await waitHung(() => !lib.git(fx.alpha, ['for-each-ref', '--format=%(refname)', 'refs/hive/queue/']).includes(`${key1}-e`))))
+    check("…its entry's update ref dropped with the outcome", !!(await waitHung(() => !lib.git(fx.alpha, ['for-each-ref', '--format=%(refname)', 'refs/cw/queue/']).includes(`${key1}-e`))))
 
     // --- A conflict with the moved target: returned (notUpToDate) with the file; the builder resumes in its slot.
     const two = await build('Two', { 'a.txt': 'one\ntwo by the builder\nthree\n' }, () => q.commitOn(fx, 'integration', { 'a.txt': 'one\nTWO by someone\nthree\n' }, 'someone changes a.txt'))

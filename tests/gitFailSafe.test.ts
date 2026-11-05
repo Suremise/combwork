@@ -42,7 +42,7 @@ const commit = (cwd: string, file: string): void => {
   run(cwd, 'commit', '-qm', file)
 }
 
-/** A repository on main, a worktree hive/wt merged into main, and the project folder on `dest` (which lacks hive/wt's commit). */
+/** A repository on main, a worktree cw/wt merged into main, and the project folder on `dest` (which lacks cw/wt's commit). */
 async function project(): Promise<{ p: string; wt: { path: string; branch: string; base: string } }> {
   root = tempDir('hive-failsafe-')
   const p = join(root, 'project')
@@ -50,10 +50,10 @@ async function project(): Promise<{ p: string; wt: { path: string; branch: strin
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) run(p, 'config', k, v)
   commit(p, 'a.txt')
   run(p, 'branch', 'dest')
-  const wt = { path: join(root, 'wt'), branch: 'hive/wt', base: 'main' }
+  const wt = { path: join(root, 'wt'), branch: 'cw/wt', base: 'main' }
   await createWorktree(p, wt.path, wt.branch, 'main')
   commit(wt.path, 'w.txt')
-  run(p, 'merge', '-q', '--ff-only', 'hive/wt')
+  run(p, 'merge', '-q', '--ff-only', 'cw/wt')
   run(p, 'checkout', '-q', 'dest')
   return { p, wt }
 }
@@ -75,7 +75,7 @@ describe('the checked-out branch', () => {
   it('a failed read is not a detached HEAD: no "nothing to merge", and no merge', async () => {
     const { p, wt } = await project()
     failing = (cwd, args) => cwd === p && readsHead(args)
-    await expect(branchStatus(p, wt)).rejects.toThrow(/Git couldn't check hive\/wt: git couldn't read the branch checked out .*injected failure/)
+    await expect(branchStatus(p, wt)).rejects.toThrow(/Git couldn't check cw\/wt: git couldn't read the branch checked out .*injected failure/)
     const merged = await mergeWorktree(p, wt, { squash: false, message: 'm' })
     expect(merged.ok).toBe(false)
     expect(merged.error).toMatch(/Nothing was merged: .*injected failure/)
@@ -84,7 +84,7 @@ describe('the checked-out branch', () => {
   it("the worktree's status failing alone is not clean", async () => {
     const { p, wt } = await project()
     failing = (cwd, args) => cwd === wt.path && args.includes('status')
-    await expect(branchStatus(p, wt)).rejects.toThrow(/Git couldn't check hive\/wt/)
+    await expect(branchStatus(p, wt)).rejects.toThrow(/Git couldn't check cw\/wt/)
   })
 })
 
@@ -150,7 +150,7 @@ describe("one operation's worktree listing", () => {
     expect(lists).toBe(2)
     // A worktree made meanwhile: the kept listing stands until the operation says it changed something.
     const made = join(dirname(wt.path), 'made')
-    await createWorktree(p, made, 'hive/made', 'main')
+    await createWorktree(p, made, 'cw/made', 'main')
     expect(places(await reads.worktrees())).toEqual([placeKey(p), placeKey(wt.path)].sort())
     reads.changed()
     expect(places(await reads.worktrees())).toEqual([placeKey(p), placeKey(wt.path), placeKey(made)].sort())

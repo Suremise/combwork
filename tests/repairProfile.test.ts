@@ -342,7 +342,7 @@ describe('what the profile keeps by the workspace folder follows a move (HI-2007
     // An agent's worktree recorded and not there: Repair has work left, so its lastPath stays A.
     const cfgFile = join(a, 'alpha', '.combwork', 'project.json')
     const cfg = JSON.parse(readFileSync(cfgFile, 'utf8'))
-    cfg.agents = [{ id: 'b1', name: 'B1', provider: 'claude-code', worktree: { path: join(base, 'hop-gone', 'hb1'), branch: 'hive/hb1', base: 'main' } }]
+    cfg.agents = [{ id: 'b1', name: 'B1', provider: 'claude-code', worktree: { path: join(base, 'hop-gone', 'hb1'), branch: 'cw/hb1', base: 'main' } }]
     writeFileSync(cfgFile, JSON.stringify(cfg))
     const b = emptyWorkspace(join(base, 'hop-b'))
     const c = emptyWorkspace(join(base, 'hop-c'))

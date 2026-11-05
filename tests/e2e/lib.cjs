@@ -1549,7 +1549,7 @@ function pathWithoutStoreAliases(parent = process.env) {
  * Text agents read with its cards named by number, as before keys (#1219): "AL-1" becomes "#1", so a suite's checks of
  * card numbers stay as they were; each suite checks the keyed form itself (KEYED). Only for a suite whose cards are all
  * one project's, made in order, so a key's digits are its card's number (HI-1661: texts name cards by key alone); a
- * suite where they differ fails its checks, never passes them wrongly. A branch's key (hive/AL/AL-1-…) stays as it is.
+ * suite where they differ fails its checks, never passes them wrongly. A branch's key (cw/AL/AL-1-…) stays as it is.
  */
 const unkey = (text) => (typeof text === 'string' ? text.replace(/(?<![\w/-])[A-Z]{2,4}-(\d+)\b(?!-)/g, '#$1') : text)
 /** A card as the window names it (#1221): its key, else #n (a workspace card, or one the board doesn't have). */

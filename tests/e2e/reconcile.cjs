@@ -51,7 +51,7 @@ const git = (cwd, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'u
     const facts = () => inv('tasks:facts', n)
     const started = (await facts()).find((f) => f.kind === 'Started')
     // P7 (#1441): Builder's 0.9 worktree is its carried slot; the card's own line is made there by the slot's preparation.
-    check('started in its worktree (its carried slot), on a line of its own, toward main', started?.data.folder.toLowerCase() === wt.toLowerCase() && !!started.data.slot && /^hive\/AL\/AL-\d+-/.test(started.data.line) && started.data.target === 'main', JSON.stringify(started?.data))
+    check('started in its worktree (its carried slot), on a line of its own, toward main', started?.data.folder.toLowerCase() === wt.toLowerCase() && !!started.data.slot && /^cw\/AL\/AL-\d+-/.test(started.data.line) && started.data.target === 'main', JSON.stringify(started?.data))
     const prepared = await lib.until(async () => (await facts()).find((f) => f.kind === 'SlotPrepared'), HUNG_MS)
     const branch = () => git(wt, 'branch', '--show-current')
     check('…its slot prepared: the worktree on the card\'s line', !!prepared && !!(await lib.until(() => branch() === started.data.line, HUNG_MS)), JSON.stringify({ prepared: prepared?.data, branch: branch() }))

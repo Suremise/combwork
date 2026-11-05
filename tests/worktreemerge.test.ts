@@ -29,8 +29,8 @@ async function twoBranches(): Promise<{ project: string; a: { path: string; bran
   writeFileSync(join(project, 'CHANGELOG.md'), CHANGELOG)
   run(project, 'add', '-A')
   run(project, 'commit', '-qm', 'base')
-  const a = { path: join(root, 'wt', 'a'), branch: 'hive/a', base: 'main' }
-  const b = { path: join(root, 'wt', 'b'), branch: 'hive/b', base: 'main' }
+  const a = { path: join(root, 'wt', 'a'), branch: 'cw/a', base: 'main' }
+  const b = { path: join(root, 'wt', 'b'), branch: 'cw/b', base: 'main' }
   for (const [wt, entry] of [[a, '- Entry from A.'], [b, '- Entry from B.']] as const) {
     await createWorktree(project, wt.path, wt.branch, 'main')
     writeFileSync(join(wt.path, 'CHANGELOG.md'), CHANGELOG.replace('- Earlier entry.', `${entry}\n- Earlier entry.`))

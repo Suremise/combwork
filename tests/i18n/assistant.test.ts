@@ -129,12 +129,12 @@ describe('what Combwork works out in shared code is in the language when it is w
 
   it("the Load template plan, as before in English", () => {
     const plan = {
-      remove: [{ id: 'a', name: 'Dev', running: false, dirty: 0, worktree: { path: 'D:/x/site/dev', branch: 'hive/dev' } }],
+      remove: [{ id: 'a', name: 'Dev', running: false, dirty: 0, worktree: { path: 'D:/x/site/dev', branch: 'cw/dev' } }],
       create: [{ name: 'Dev', role: 'builder' as const, provider: 'claude-code' as const }]
     }
     const high: ConnectionOption = { id: 'c-1', name: 'Claude · High', account: 'a-1', accountName: 'Personal', cli: 'claude-code', model: 'opus', effort: 'high' }
     const text = templateLoadDetail(plan, () => high, settings)
-    expect(text).toContain('Removed:\n• Dev (its worktree and branch hive/dev stay): replaced by a new agent with the same name\n')
+    expect(text).toContain('Removed:\n• Dev (its worktree and branch cw/dev stay): replaced by a new agent with the same name\n')
     expect(text).toContain('• Dev — Builder (new): Claude · High (opus · High)')
     expect(text).toMatch(/\n\nTheir conversations stay in the Sessions tab, and their open cards go back \(Active ones to Todo\)\. The layout becomes the template's\.$/)
   })
