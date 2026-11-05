@@ -7,7 +7,7 @@ import { writeTextAtomic } from './fsutil'
 import { CombworkError, errorText, combworkError } from './combworkError'
 import { createLogger } from './logger'
 import { present } from './fsPresence'
-import { upgradeWorkspaceFiles } from './nameUpgradeFiles'
+import { retireRenamedSkills, upgradeWorkspaceFiles } from './nameUpgradeFiles'
 import { upgradeProject } from './nameUpgradeProjects'
 import { upgradeProjectValues, upgradeWorkspaceValues } from './nameUpgradeValues'
 
@@ -109,6 +109,8 @@ export async function upgradeWorkspace(ws: string, o: UpgradeOptions): Promise<v
   await step('files', o.stop, async () => {
     const cards = await upgradeWorkspaceFiles(dir, (await import('./workspace')).WORKSPACE_README)
     if (cards) await o.setAside?.(cards)
+    // A bundled skill Hive shipped under its old name (HI-2463), before the workspace's sync adds the new one.
+    if (!(await retireRenamedSkills(dir))) settled = false
     // workspace.json's and the templates' stored values (HI-2598, nameUpgradeValues.ts), before its load reads them.
     if (!(await upgradeWorkspaceValues(ws))) settled = false
   })

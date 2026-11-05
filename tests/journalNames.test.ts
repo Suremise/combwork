@@ -37,8 +37,10 @@ function journalAtV2(h: string): { fact: number; mine: number; both: number } {
   db.exec('PRAGMA foreign_keys = ON')
   db.function('journal_text', { deterministic: true, varargs: true }, (detail) => (typeof detail === 'string' ? detail : ''))
   db.exec('CREATE TABLE schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL, app_version TEXT NOT NULL) STRICT')
+  // Version 1 as 1.0 ran it: its source under Hive's name (a new journal's is Combwork's, HI-2611).
+  const as10 = { exec: (sql: string) => db.exec(sql.replace("CHECK (source IN ('combwork', 'assistant'))", "CHECK (source IN ('hive', 'assistant'))")) } as unknown as DatabaseSync
   for (const step of j.JOURNAL_MIGRATIONS.filter((m) => m.version <= 2)) {
-    step.up(db)
+    step.up(step.version === 1 ? as10 : db)
     db.prepare('INSERT INTO schema_version VALUES (?, ?, ?, ?)').run(step.version, step.name, new Date().toISOString(), '1.0.0')
   }
   const add = db.prepare("INSERT INTO entries (at, kind, summary, detail, why, source, importance, superseded_by, summary_text) VALUES (?, 'event', ?, ?, ?, ?, 1, ?, ?)")
@@ -112,6 +114,8 @@ describe('the names step (version 3)', () => {
     try {
       expect((db.prepare('SELECT max(version) AS v FROM schema_version').get() as { v: number }).v).toBe(3)
       expect(db.prepare('PRAGMA integrity_check').all()).toEqual([{ integrity_check: 'ok' }])
+      // Nothing of a new journal names Hive, its schema included (HI-2611).
+      expect(JSON.stringify(db.prepare('SELECT sql FROM sqlite_master').all())).not.toMatch(/'hive'/)
     } finally {
       db.close()
     }

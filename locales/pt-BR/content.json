@@ -84,6 +84,7 @@
   "content.templates.fenced": "Um modelo está sendo carregado neste projeto",
   "content.templates.gone": "Esse modelo não está mais lá.",
   "content.templates.combworkOnly": "Os modelos do próprio Combwork não podem ser alterados: duplique um para o espaço de trabalho ou um projeto para alterá-lo.",
+  "content.templates.importFrom10": "É um modelo de agentes exportado do Hive 1.0, cujas configurações de fluxo de trabalho o Combwork não importa. Crie o modelo novamente no Combwork.",
   "content.templates.importNotJson": "Não é um modelo de agentes do Combwork (não é JSON).",
   "content.templates.importTooLarge": "Não é um modelo de agentes do Combwork (mais de {kb} KB).",
   "content.templates.loading": "Já há um modelo sendo carregado neste projeto.",

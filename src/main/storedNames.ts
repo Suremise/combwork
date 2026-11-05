@@ -54,9 +54,12 @@ export const OLD_NOTICE_PREFIX = '[Hive] '
 
 const RENAMED = agentMsg({
   id: 'inbox.renamedNote',
-  text: '(Combwork has renamed what agents use: a hive_<tool> named here is now cw_<tool>, mcp__hive__ is mcp__{server}__, and hive-progress is cw-progress.)',
-  note: "HI-2463, HI-2598: added once, by the names upgrade, after a stored line or message from Combwork that names an old tool or command outside what it quotes (one written before the rename). Its words are kept as written (they may be a person's or an agent's): this says how the old names map. server: Combwork's MCP server's name."
+  text: "(Combwork has renamed the tools and commands agents use since this was written: its tools are cw_<tool> (mcp__{server}__cw_<tool> in full), and its progress command is cw-progress.)",
+  note: "HI-2463, HI-2598, HI-2611: added once, by the names upgrade, after a stored line or message from Combwork that names an old tool or command outside what it quotes (one written before the rename). Its words are kept as written (they may be a person's or an agent's): this points at the current names, without listing the old ones. server: Combwork's MCP server's name."
 })
+
+/** The note as the 1.1 release candidates appended it (HI-2598, before HI-2611): one at a text's end is replaced by today's. */
+const RC_NOTE = `(Combwork has renamed what agents use: a hive_<tool> named here is now cw_<tool>, mcp__hive__ is mcp__${TOOLS_SERVER}__, and hive-progress is cw-progress.)` // i18n-ignore: the upgrade's input, a stored note
 
 /** What a person or an agent wrote, as Combwork's text quotes it: whole between <<< >>> (a relayed answer), or in quotes. */
 const QUOTED = /<<<[\s\S]*?>>>|"[^"\n]*"|“[^”]*”/g
@@ -78,14 +81,16 @@ export const renamedNote = (): string => inDefaultDialect(() => say(RENAMED, { s
 /**
  * A stored line or message of Combwork's own, upgraded once: every word kept as written, since its text may quote a
  * person's or an agent's (a relayed answer, a card's latest comment, a lane's brief). A leading "[Hive] " becomes
- * "[CW] ", and one that names an old tool or command outside its quotes gets the note after it, unless it has it.
- * Null when nothing changes, so a step run again changes nothing. `fits`: whether a text is within what its store keeps
- * (a fired watch's line has a cap, and one over it isn't read): a note that wouldn't fit is left out.
+ * "[CW] ", and one that names an old tool or command outside its quotes gets the note after it, unless it has it (a
+ * release candidate's note there is replaced by today's). Null when nothing changes, so a step run again changes nothing.
+ * `fits`: whether a text is within what its store keeps (a fired watch's line has a cap, and one over it isn't read): a
+ * note that wouldn't fit is left out.
  */
 export function upgradedOwnText(text: string, fits: (s: string) => boolean = () => true): string | null {
   const head = text.startsWith(OLD_NOTICE_PREFIX) ? NOTICE_PREFIX + text.slice(OLD_NOTICE_PREFIX.length) : text
   const note = renamedNote()
-  const noted = namesOldProtocol(text) && !head.endsWith(note) ? `${head} ${note}` : head
+  const body = head.endsWith(` ${RC_NOTE}`) ? head.slice(0, -(RC_NOTE.length + 1)) : head
+  const noted = namesOldProtocol(body) && !body.endsWith(note) ? `${body} ${note}` : body
   const out = fits(noted) ? noted : head
   return out === text ? null : out
 }

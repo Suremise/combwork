@@ -69,6 +69,7 @@
   "performance.compare.error.benchmarkOnProject": "场景基准测试属于它自己的测试工作区，而不是你的某个项目：请在“性能”视图（活动栏）中选中整个工作区再比较。",
   "performance.compare.error.exportIsOwn": "它是工作区自身的工作：请选中“工作区自身的工作”再比较。",
   "performance.compare.error.exportIsWhole": "它属于整个工作区：请选中整个工作区再比较。",
+  "performance.compare.error.from10": "它是 Hive 1.0 的性能导出文件，Combwork 不会导入。请从 Combwork 重新导出后再比较。",
   "performance.compare.error.holdsOther": "它声称属于 {project}，但其中还包含{other, select, projects {其他项目的} other {工作区自身的}}数据：未导入。",
   "performance.compare.error.invalidBenchmark": "它不是有效的场景基准测试（没有运行、fixtures 版本或场景）。",
   "performance.compare.error.invalidExport": "它不是有效的性能导出文件（没有报告、范围或项目）。",

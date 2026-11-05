@@ -308,7 +308,7 @@ describe('a workspace', () => {
     }
   })
 
-  it('retires a skill shipped under a new name (HI-2463: use-hive-api is use-cw-api): a copy Combwork shipped goes, an edited one stays', async () => {
+  it('a skill shipped under a new name (HI-2463: use-hive-api is use-cw-api) goes as the names upgrade opens the workspace (HI-2611): a copy Combwork shipped goes, an edited one stays', async () => {
     const make = (ws: string, text: string) => {
       const dir = join(ws, '.combwork', 'skills', 'use-hive-api')
       mkdirSync(dir, { recursive: true })

@@ -86,6 +86,7 @@
   "content.templates.fenced": "A template is being loaded into this project",
   "content.templates.gone": "That template is no longer there.",
   "content.templates.combworkOnly": "Combwork's own templates can't be changed: duplicate one into the workspace or a project to change it.",
+  "content.templates.importFrom10": "It is an agent template exported from Hive 1.0, whose workflow settings Combwork doesn't import. Make the template again in Combwork.",
   "content.templates.importNotJson": "It isn't a Combwork agent template (not JSON).",
   "content.templates.importTooLarge": "It isn't a Combwork agent template (over {kb} KB).",
   "content.templates.loading": "A template is already being loaded into this project.",

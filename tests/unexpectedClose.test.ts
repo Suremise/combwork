@@ -92,23 +92,25 @@ describe('the notice (#984)', () => {
   })
 })
 
-describe('a hive-progress run left running is one item, named by its title (#1008)', () => {
-  const wrapper = String.raw`"C:\Program Files\Hive\Hive.exe" "C:\Program Files\Hive\resources\app.asar.unpacked\out\main\hive-progress.js" --title "e2e: 196 suites in hb2" -- npm run e2e -- --all`
+describe('a cw-progress run left running is one item, named by its title (#1008)', () => {
+  const wrapper = String.raw`"C:\Program Files\Hive\Hive.exe" "C:\Program Files\Hive\resources\app.asar.unpacked\out\main\cw-progress.js" --title "e2e: 196 suites in hb2" -- npm run e2e -- --all`
 
-  it('reads the title from the hive-progress command line, else the command; any other process has none', () => {
+  it('reads the title from the cw-progress command line, else the command; any other process has none', () => {
     expect(progressRunTitle(wrapper)).toBe('e2e: 196 suites in hb2')
-    expect(progressRunTitle('"C:/Hive/Hive.exe" "C:/x/hive-progress.js" -- npx vitest run')).toBe('npx vitest run')
-    expect(progressRunTitle(String.raw`"C:/Hive/Hive.exe" C:\x\hive-progress.js --title "  " -- node "C:\wt\tests\e2e\run.mjs"`)).toBe('node run.mjs')
+    expect(progressRunTitle('"C:/Hive/Hive.exe" "C:/x/cw-progress.js" -- npx vitest run')).toBe('npx vitest run')
+    expect(progressRunTitle(String.raw`"C:/Hive/Hive.exe" C:\x\cw-progress.js --title "  " -- node "C:\wt\tests\e2e\run.mjs"`)).toBe('node run.mjs')
     // A --title after the command's -- is the command's own.
-    expect(progressRunTitle('Hive.exe hive-progress.js -- tool --title nope')).toBe('tool --title nope')
+    expect(progressRunTitle('Hive.exe cw-progress.js -- tool --title nope')).toBe('tool --title nope')
     expect(progressRunTitle('node C:/wt/tests/e2e/run.mjs --title x')).toBeUndefined()
-    expect(progressRunTitle('node not-hive-progress.js.bak')).toBeUndefined()
+    expect(progressRunTitle('node not-cw-progress.js.bak')).toBeUndefined()
+    // Its name before HI-2463 is no run of Combwork's (HI-2611).
+    expect(progressRunTitle('"C:/x/Hive.exe" "C:/x/hive-progress.js" -- npx vitest run')).toBeUndefined()
   })
 
   // cw-progress (10) → cmd (11) → runner (12) → a test copy (13); a node of its own (20); 14 names 10 as parent but
   // started before it (a later process took a dead parent's id): not the run's.
   const p = (pid: number, parent: number, created: string, label: string, run?: string): AgentProcess => ({ pid, parent, created, name: 'x.exe', label, ...(run ? { run } : {}) })
-  const tree = [p(10, 1, '100', 'Combwork hive-progress.js', 'e2e: 196 suites in hb2'), p(11, 10, '101', 'cmd /c npm run e2e'), p(12, 11, '102', 'node run.mjs'), p(13, 12, '103', 'electron .'), p(20, 1, '100', 'node serve.js'), p(14, 10, '99', 'node older.js')]
+  const tree = [p(10, 1, '100', 'Combwork cw-progress.js', 'e2e: 196 suites in hb2'), p(11, 10, '101', 'cmd /c npm run e2e'), p(12, 11, '102', 'node run.mjs'), p(13, 12, '103', 'electron .'), p(20, 1, '100', 'node serve.js'), p(14, 10, '99', 'node older.js')]
 
   it('groups a run with everything below it, by parent and start time', () => {
     const { runs, rest } = groupProgressRuns(tree)
@@ -116,8 +118,8 @@ describe('a hive-progress run left running is one item, named by its title (#100
     expect(rest.map((x) => x.pid)).toEqual([20, 14])
   })
 
-  it('…with the shell that ran the hive-progress command above it, which is its tree’s top; not a shell that ran something else', () => {
-    const shell = p(5, 2, '90', 'cmd /d /s /c "hive-progress --title e2e -- npm run e2e"')
+  it('…with the shell that ran the cw-progress command above it, which is its tree’s top; not a shell that ran something else', () => {
+    const shell = p(5, 2, '90', 'cmd /d /s /c "cw-progress --title e2e -- npm run e2e"')
     const agentShell = p(2, 1, '80', 'bash -c "npm run dev"')
     const { runs, rest } = groupProgressRuns([agentShell, shell, ...tree.map((x) => (x.pid === 10 ? { ...x, parent: 5 } : x))])
     expect(runs.map((g) => [g.root.pid, g.top.pid, g.processes.map((x) => x.pid).sort((a, b) => a - b)])).toEqual([[10, 5, [5, 10, 11, 12, 13]]])
@@ -243,10 +245,10 @@ describe('a hive-progress run left running is one item, named by its title (#100
   })
 
   it("the marker keeps each process's parent and run title; bad ones are left out", () => {
-    const procs = [{ pid: 10, created: '100', name: 'Hive.exe', label: 'Hive hive-progress.js', parent: 1, run: 'e2e: 196 suites in hb2' }, { pid: 12, created: '102', name: 'node.exe', label: 'node run.mjs', parent: -3, run: 7 }]
+    const procs = [{ pid: 10, created: '100', name: 'Hive.exe', label: 'Hive cw-progress.js', parent: 1, run: 'e2e: 196 suites in hb2' }, { pid: 12, created: '102', name: 'node.exe', label: 'node run.mjs', parent: -3, run: 7 }]
     const m = parseRunMarker(marker({ processes: [{ projectPath: 'D:/ws/hive', agentId: 'b1', agentName: 'B1', processes: procs }] }))
     expect(m?.processes[0].processes).toEqual([
-      { pid: 10, created: '100', name: 'Hive.exe', label: 'Hive hive-progress.js', parent: 1, run: 'e2e: 196 suites in hb2' },
+      { pid: 10, created: '100', name: 'Hive.exe', label: 'Hive cw-progress.js', parent: 1, run: 'e2e: 196 suites in hb2' },
       { pid: 12, created: '102', name: 'node.exe', label: 'node run.mjs' }
     ])
   })

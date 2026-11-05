@@ -71,6 +71,7 @@ interface CombworkMessageValues {
   'performance.compare.error.benchmarkOnProject': undefined
   'performance.compare.error.exportIsOwn': undefined
   'performance.compare.error.exportIsWhole': undefined
+  'performance.compare.error.from10': undefined
   'performance.compare.error.holdsOther': { project: string | number; other: string }
   'performance.compare.error.invalidBenchmark': undefined
   'performance.compare.error.invalidExport': undefined

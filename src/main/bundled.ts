@@ -8,7 +8,7 @@ import { resourcesDir } from './paths'
 import { revisionOf } from './revisions'
 import { workspace } from './workspace'
 import HISTORY from './bundledHistory.json'
-import { RETIRED_PERSONAS, RETIRED_SKILLS, projectAgents } from '../shared/defaults'
+import { RETIRED_PERSONAS, projectAgents } from '../shared/defaults'
 import { ASSISTANT_AGENT_ID, LEGACY_MODES_DIR, MODES_DIR } from '../shared/assistant'
 import { toast } from './events'
 import { atMost } from '../shared/atMost'
@@ -239,7 +239,6 @@ export async function syncBundled(opts: { fresh?: boolean } = {}): Promise<void>
       await atMost(ITEMS_AT_ONCE, ids[kind], syncItem)
     }
     await retirePersonas(m)
-    await retireSkills(m)
     // Written only when it changes what the file holds (HI-1705: every open wrote it).
     if (JSON.stringify(m) !== JSON.stringify(file)) await writeJsonAtomic(manifestPath(), m)
   })
@@ -263,31 +262,6 @@ async function moveLegacyModes(): Promise<void> {
     log.info("Moved the Assistant's modes from .combwork/personas to .combwork/modes")
   } catch (e) {
     log.warn('Could not move .combwork/personas to .combwork/modes: its modes are used where they are until the next time', e)
-  }
-}
-
-/**
- * Skills shipped under a new name (RETIRED_SKILLS, HI-2463): the old name's workspace copy goes while it is a version
- * Combwork shipped, never changed (the new one was added above, so agents get the skill once); one the user changed is
- * theirs and stays. Afterwards there is no copy, so this happens once.
- */
-async function retireSkills(m: Manifest): Promise<void> {
-  for (const id of Object.keys(RETIRED_SKILLS)) {
-    const dest = itemPath(folderOf('skills'), 'skills', id)
-    if (await lstat(dest).then(() => true, () => false)) {
-      const copy = await contentHash(dest).catch(() => 'unreadable')
-      if (!(history.skills[id] ?? []).includes(copy)) continue
-      try {
-        // Only while it is still that copy: an edit of the user's meanwhile stays (swapOut).
-        await swapOut(dest, copy)
-        log.info(`Removed the bundled skill ${userText(id)}: it ships as ${userText(RETIRED_SKILLS[id])} now`)
-      } catch (e) {
-        if (e instanceof SwapAbandoned) log.info(`Kept the skill ${userText(id)}: it changed while Combwork was removing it, so it is the user's`)
-        else log.warn(`Could not remove the renamed skill ${userText(id)}; trying again next time`, e)
-        continue
-      }
-    }
-    delete m.skills[id]
   }
 }
 

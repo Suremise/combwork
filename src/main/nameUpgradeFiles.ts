@@ -1,7 +1,11 @@
 import { lstat, mkdir, readdir, readFile, rm, rmdir } from 'original-fs/promises'
 import { join } from 'path'
-import { writeTextAtomic } from './fsutil'
+import { contentHash, readJson, SwapAbandoned, swapOut, withFileLock, writeJsonAtomic, writeTextAtomic } from './fsutil'
 import { ifAbsent } from './fsPresence'
+import { createLogger, userText } from './logger'
+import HISTORY from './bundledHistory.json'
+
+const log = createLogger('nameUpgrade')
 
 /**
  * The names upgrade's rewrites of files Combwork keeps in a workspace (HI-2587, nameUpgrade.ts): text Hive wrote under
@@ -154,4 +158,49 @@ export async function upgradeWorkspaceFiles(dir: string, readme: string): Promis
   await rewrite(join(dir, 'README.md'), (t) => upgradedReadme(t, readme))
   for (const f of await mcpFiles(dir)) await rewrite(f, upgradedMcpDefinition)
   return moveOldStub(dir)
+}
+
+/** Bundled skills Hive shipped under the name Combwork's now replaces (HI-2463): the old name, and the new one. */
+export const RENAMED_SKILLS: Readonly<Record<string, string>> = { 'use-hive-api': 'use-cw-api' }
+
+/**
+ * The workspace's copy of a skill Hive shipped under its old name (RENAMED_SKILLS) goes while it is a version Hive
+ * shipped, never changed: the workspace's sync adds the new name's as it opens, so agents get the skill once. One the
+ * user changed is theirs and stays. Its entry in `bundled.json` goes too. Afterwards there is nothing old, so this
+ * happens once. `dir`: the workspace's `.combwork`. False: a copy couldn't be removed now (a file in it open), left for
+ * the next open.
+ */
+export async function retireRenamedSkills(dir: string): Promise<boolean> {
+  const history = HISTORY as Record<string, Record<string, string[]>>
+  const manifest = join(dir, 'bundled.json')
+  const gone: string[] = []
+  let settled = true
+  for (const id of Object.keys(RENAMED_SKILLS)) {
+    const dest = join(dir, 'skills', id)
+    if (await lstat(dest).then(() => true, () => false)) {
+      const copy = await contentHash(dest).catch(() => 'unreadable')
+      if (!(history.skills[id] ?? []).includes(copy)) continue
+      try {
+        // Only while it is still that copy: an edit of the user's meanwhile stays (swapOut).
+        await swapOut(dest, copy)
+        log.info(`Removed the bundled skill ${userText(id)}: it ships as ${userText(RENAMED_SKILLS[id])} now`)
+      } catch (e) {
+        if (e instanceof SwapAbandoned) log.info(`Kept the skill ${userText(id)}: it changed while Combwork was removing it, so it is the user's`)
+        else {
+          log.warn(`Could not remove the renamed skill ${userText(id)}; trying again at the next open`, e)
+          settled = false
+        }
+        continue
+      }
+    }
+    gone.push(id)
+  }
+  if (!gone.length) return settled
+  await withFileLock(manifest, async () => {
+    const m = await readJson<{ skills?: Record<string, unknown> } | null>(manifest, null)
+    if (!m?.skills || !gone.some((id) => id in m.skills!)) return
+    for (const id of gone) delete m.skills[id]
+    await writeJsonAtomic(manifest, m)
+  })
+  return settled
 }

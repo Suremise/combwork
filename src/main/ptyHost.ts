@@ -171,9 +171,15 @@ export function withTerminalType(env: Record<string, string>, on = advanced.get<
   return rest
 }
 
-/** An argument as logged: bearer tokens hidden (Codex's hooks carry one), long values shortened. */
+/**
+ * A secret's name set to a value (`CW_API_TOKEN=…`, `--api-key=…`, `ANY_SECRET=…`): any name, any case, that has token,
+ * secret, password, an api, access or private key, or credentials in it. Its value (quoted whole, else up to a space) is masked.
+ */
+const SECRET_SETTING = /(?<![\w-])((?:--?)?(?:[A-Za-z_][\w-]*?)?(?:token|secret|passw(?:or)?d|api[_-]?key|access[_-]?key|private[_-]?key|credentials?)[\w-]*=)(?:"[^"]*"|'[^']*'|\S+)/gi
+
+/** An argument as logged: bearer tokens and secret settings hidden (Codex's hooks carry one), long values shortened. */
 export function forLog(arg: string): string {
-  const safe = arg.replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]{8,}/gi, '$1***').replace(/((?:HIVE|CW)_[A-Z_]*TOKEN=)\S+/g, '$1***')
+  const safe = arg.replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]{8,}/gi, '$1***').replace(SECRET_SETTING, '$1***')
   return safe.length > 300 ? `${safe.slice(0, 300)}… (${safe.length} characters)` : safe
 }
 
