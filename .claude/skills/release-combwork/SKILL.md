@@ -56,7 +56,7 @@ RELEASING.md's **The user's OK** lists the decisions that are the user's. Do eac
 
 ## After building
 
-- Check the packaged app: `npm run e2e -- packaged-mcp packaged-transcript` (the `hive` MCP server and transcripts outside the asar), then `--packaged` for the rest when the change warrants it.
+- Check the packaged app: `npm run e2e -- packaged-mcp packaged-transcript` (the `combwork` MCP server and transcripts outside the asar), then `--packaged` for the rest when the change warrants it.
 - The draft has three files: the installer, `latest.yml` and the `.blockmap`. Its version must match `package.json`.
 - After the user publishes: Help → Check for Updates from an installed copy shows the new version.
 - **Verify your report against git** before you tell the user a step is done: the commit you name exists (`git rev-parse <commit>`); the branch and the tags are what you say (`git branch --show-current`, `git tag --list`, `git ls-remote --tags origin`); the commit you say is on `main` is on the remote: `git fetch origin main`, then `git ls-remote origin refs/heads/main` returns that commit (a local `origin/main` can be stale, so refresh it first); and the draft's version matches `package.json`. The 0.4.0 release report once named a placeholder commit id.

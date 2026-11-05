@@ -16,7 +16,7 @@ Combwork works with providers through two pieces and never names one outside the
 ## Checklist
 
 1. **Descriptor**: modes (with danger flags), efforts, models, capabilities, and the instructions file. Register it, add its icon, and add a price table in `src/shared/prices.ts`, from the vendor's current published prices.
-2. **Launch**: per-agent launch folder or copies (skills by audience, the `hive` MCP server, hooks), the environment Combwork adds, and the provider's own session variables stripped (`envToStrip`). Combwork's guidance reaches the model: MCP instructions where the CLI shows them, developer instructions where it doesn't.
+2. **Launch**: per-agent launch folder or copies (skills by audience, the `combwork` MCP server, `TOOLS_SERVER`, hooks), the environment Combwork adds, and the provider's own session variables stripped (`envToStrip`). Combwork's guidance reaches the model: MCP instructions where the CLI shows them, developer instructions where it doesn't.
 3. **Status**: hooks normalised to start, prompt, tool, permission, stop and end. Know which events the CLI actually sends and when (Codex sends SessionStart only with the first prompt).
 4. **Transcripts and usage**: the parser, the conversation reader, images and export, tested against **fixtures** in `tests/fixtures` made from real transcripts with personal text removed.
 5. **Readiness**: installed, signed in, sandbox. Never automate a login screen; tell the user what to do.
