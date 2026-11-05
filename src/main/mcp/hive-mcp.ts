@@ -105,7 +105,7 @@ const T = {
   'askAssistant.arg.text': agentMsg({ id: 'tool.askAssistant.arg.text', text: 'What you ask, whole: the cards, what to do, on whose decision.' }),
   'handOver.description': agentMsg({ id: 'tool.handOver.description', text: "Hand one agent's work to another in its project: `from` (idle) writes a handover, and `to` starts on it. `to` the same as `from`: a new conversation. Returns at once; follow with cw_wait_for_agents." }),
   'listTasks.arg.project': agentMsg({ id: 'tool.listTasks.arg.project', text: "Only this project's cards." }),
-  'listTasks.arg.details': agentMsg({ id: 'tool.listTasks.arg.details', text: 'Every card in full, without its history.' }),
+  'listTasks.arg.details': agentMsg({ id: 'tool.listTasks.arg.details', text: 'Every card, no history.' }),
   'listTasks.arg.offset': agentMsg({ id: 'tool.listTasks.arg.offset', text: 'Skip this many cards.' }),
   'waitForTasks.arg.changes': agentMsg({ id: 'tool.waitForTasks.arg.changes', text: 'What counts (default: any).' }),
   'waitForTasks.arg.fresh': agentMsg({ id: 'tool.waitForTasks.arg.fresh', text: "Only the next move into column (a failed card's next round)." }),
