@@ -554,6 +554,19 @@ const backedUp = new Set<string>()
  * KeptFileUnreadable, nothing written over it or its .bak, until the holder's own read gives it the file's settings.
  */
 export async function writeKeptJson(path: string, data: unknown, opts: { compact?: boolean; bakOncePerRun?: boolean; existing?: boolean; holder?: object } = {}): Promise<void> {
+  await saveKept(path, data, opts)
+}
+
+/**
+ * A kept file made only if there is none (HI-2542), never replacing one written meanwhile (a default whose absence was
+ * checked before an await): false when one was there, and nothing (its .bak neither) was written. Options as
+ * writeKeptJson's.
+ */
+export async function createKeptJson(path: string, data: unknown, opts: { compact?: boolean; existing?: boolean } = {}): Promise<boolean> {
+  return saveKept(path, data, { ...opts, onlyNew: true })
+}
+
+async function saveKept(path: string, data: unknown, opts: { compact?: boolean; bakOncePerRun?: boolean; existing?: boolean; holder?: object; onlyNew?: boolean }): Promise<boolean> {
   const k = path.toLowerCase()
   if (opts.holder && staleHolders.get(k)?.has(opts.holder)) {
     if (!(await keptGone(path))) {
@@ -565,12 +578,45 @@ export async function writeKeptJson(path: string, data: unknown, opts: { compact
   const text = (opts.compact ? JSON.stringify(data) : JSON.stringify(data, null, 2)) + '\n'
   const write = { mkdir: !opts.existing }
   forgetKeptStat(path)
-  await writeTextAtomic(path, text, write).finally(() => forgetKeptStat(path))
-  if (opts.bakOncePerRun && backedUp.has(k)) return
+  if (opts.onlyNew) {
+    if (!(await writeTextNew(path, text, write).finally(() => forgetKeptStat(path)))) return false
+  } else await writeTextAtomic(path, text, write).finally(() => forgetKeptStat(path))
+  if (opts.bakOncePerRun && backedUp.has(k)) return true
   await writeTextAtomic(`${path}.bak`, text, write).then(
     () => void backedUp.add(k),
     () => undefined
   )
+  return true
+}
+
+/**
+ * Makes a file only where there is none (HI-2542), complete as it appears: a temp file hard-linked into place, which
+ * fails if one is there (a rename would replace it). Where hard links aren't supported (FAT, some shares), an exclusive
+ * create. False when a file was there already.
+ */
+export async function writeTextNew(path: string, text: string, opts: { mkdir?: boolean } = {}): Promise<boolean> {
+  if (opts.mkdir !== false) await mkdir(dirname(path), { recursive: true })
+  const tmp = `${path}.${process.pid}-${++tmpCounter}.tmp`
+  const exists = (e: unknown): boolean => (e as NodeJS.ErrnoException).code === 'EEXIST'
+  try {
+    await writeFile(tmp, text, 'utf8')
+    try {
+      await link(tmp, path)
+      return true
+    } catch (e) {
+      if (exists(e)) return false
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') throw e
+    }
+    return await writeFile(path, text, { encoding: 'utf8', flag: 'wx' }).then(
+      () => true,
+      (e) => {
+        if (exists(e)) return false
+        throw e
+      }
+    )
+  } finally {
+    await rm(tmp, { force: true }).catch(() => undefined)
+  }
 }
 
 /** Writes via a temp file + rename so a crash never leaves a half-written file. */
