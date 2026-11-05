@@ -16,7 +16,7 @@ import { createLogger, userText } from './logger'
 import { othersPresentByProcess } from './presence'
 import { dataFolder, ours, type HostKind } from './hiveFolder'
 import { withNamedLock } from './repoLock'
-import { projectNamesDone, recordIfNothingOld, upgradeWorkspace, workspaceNeeds } from './nameUpgrade'
+import { projectNamesDone, record as recordNames, upgradeWorkspace, workspaceNeeds } from './nameUpgrade'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 import type { CardsAnswer, CardsRewrite, Checkpoint, CheckpointAnswer, CopyFolders, CopyFoldersAnswer } from './hiveMoveWorker'
 
@@ -363,13 +363,12 @@ async function moveNow(ws: string, o: MoveOptions & { only?: string }): Promise<
   // Nothing to rename, nothing under an old name (HI-2587), and the rewrites finished for the map as it is: no lock,
   // nothing written.
   // A single project (one that came later): its own steps by its own record, whatever the workspace's (HR2's round 1).
-  let namesDue = o.only ? !(await projectNamesDone(o.only)) : await workspaceNeeds(ws)
+  // Only read here (HR2's rounds 2 and 3): whether anything is due. Every write, the names upgrade's records included, is
+  // under the lock, after the other processes' refusal.
+  const namesDue = o.only ? !(await projectNamesDone(o.only)) : await workspaceNeeds(ws)
   const stop = (): void => {
     if (o.signal?.aborted || (o.stillOurs && !o.stillOurs())) throw hiveError(M.closed, undefined, { kind: 'conflict' })
   }
-  // A single project with nothing old (a new one, say): recorded done with no lock, as nothing changes. One with
-  // something old has its steps under the lock, after the other processes' refusal, as every move does (HR2's round 2).
-  if (o.only && !planned && namesDue && (await recordIfNothingOld(o.only))) namesDue = false
   if (!planned && !namesDue) {
     const moves = await movesOf(ws, all)
     if (!moves.length || (await doneHash(ws)) === mapHash(moves)) {
@@ -379,6 +378,25 @@ async function moveNow(ws: string, o: MoveOptions & { only?: string }): Promise<
   }
   await moveTestHooks.looked?.()
   return withNamedLock(ws, MOVE_LOCK_FILE, () => movedUnderLock(ws, o, stop), { waitMs: 0, busy: lockBusy })
+}
+
+/**
+ * A workspace just made (its `.combwork` new, nothing of Hive's in it): its names upgrade recorded done, under the move's
+ * lock and only with no other process present, as every write of the upgrade is (HR2's round 3). Not recorded (another
+ * process there, the lock held): its next open looks again, under the lock. Never throws.
+ */
+export function recordNewWorkspace(ws: string): Promise<void> {
+  return inTurn(ws, () =>
+    withNamedLock(
+      ws,
+      MOVE_LOCK_FILE,
+      async () => {
+        for (const dir of [legacy(ws), current(ws)]) if (othersPresentByProcess(dir).length) return
+        await recordNames(ws)
+      },
+      { waitMs: 0, busy: lockBusy }
+    )
+  ).catch((e) => log.warn("recording a new workspace's names upgrade done", e))
 }
 
 /**
@@ -405,12 +423,13 @@ export async function excludeMoveLock(ws: string): Promise<void> {
 
 async function movedUnderLock(ws: string, o: MoveOptions & { only?: string }, stop: () => void): Promise<MoveOutcome> {
   stop()
-  await excludeMoveLock(ws)
-  // Inside the lock, everything is looked at again: another process may have moved it meanwhile.
+  // Inside the lock, everything is looked at again: another process may have moved it meanwhile. Another process's
+  // presence refuses it before anything is written (HR2's round 3: the lock file's exclude line too).
   for (const dir of [legacy(ws), current(ws)]) {
     const others = othersPresentByProcess(dir)
     if (others.length) throw hiveError(M.otherOpen, { profile: others[0].profile }, { kind: 'conflict' })
   }
+  await excludeMoveLock(ws)
   const id = randomUUID()
   // The workspace first: a Hive with its board open fails it here, before any project is touched; then its Assistant's
   // home (inside the workspace's folder, so looked at after it moved), then the projects.

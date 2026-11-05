@@ -18,7 +18,7 @@ import { advanced } from './advanced'
 import { fmt, msg, tr } from '../shared/i18n'
 import { MIGRATED_CLOSE, migrateWorkspaceCommands } from '../shared/commands'
 import { OpenGate } from './openGate'
-import { HiveError, hiveError } from './hiveError'
+import { HiveError, englishError, hiveError } from './hiveError'
 import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSessionState, ProjectConfig, ProjectInfo, RemovedData, SessionRecord, WorkspaceConfig, WorkspaceInfo, WorkspaceMoved } from '../shared/types'
 import { config } from './config'
 import { changesConfig, viewOf, withoutView } from '../shared/projectView'
@@ -40,8 +40,8 @@ import { gitProblem } from './gitTool'
 import { duplicateAgentNames, suggestAgentName } from '../shared/agentNames'
 import { NO_PROJECT_IDS, isProjectId, settleProjectIds, type ProjectIdEntry, type ProjectIdIndex } from '../shared/projectIds'
 import { migrateProjectPreferences } from '../shared/workflow/preferences'
-import { classify, finishMove, moveFolders, type MoveOptions, type MoveOutcome } from './combworkMove'
-import { NAMES_DONE_FILE, projectNamesDone } from './nameUpgrade'
+import { classify, finishMove, moveFolders, recordNewWorkspace, type MoveOptions, type MoveOutcome } from './combworkMove'
+import { projectNamesDone } from './nameUpgrade'
 import { NAMES_IGNORE } from './nameUpgradeFiles'
 import { movedPathOf } from '../shared/hiveFolderMove'
 
@@ -707,8 +707,8 @@ export class WorkspaceService {
     await whenAll([join(h, 'shared', 'handovers'), join(h, 'skills'), join(h, 'mcp'), join(h, 'tasks')].map((d) => mkdir(d, { recursive: true })))
     const hr = join(h, 'shared', 'handovers', 'README.md')
     await whenAll([
-      // A new workspace has nothing under Hive's names: the names upgrade is done for it (HI-2587).
-      existsSync(join(h, 'workspace.json')) ? undefined : newWorkspaceConfig().then((c) => writeKeptJson(join(h, 'workspace.json'), c)).then(() => writeFile(join(h, NAMES_DONE_FILE), JSON.stringify({ version: 1, at: new Date().toISOString() }) + '\n')),
+      // A new workspace has nothing of Hive's: its names upgrade recorded done, under the move's lock (HI-2587).
+      existsSync(join(h, 'workspace.json')) ? undefined : newWorkspaceConfig().then((c) => writeKeptJson(join(h, 'workspace.json'), c)).then(() => (this.path ? recordNewWorkspace(this.path) : undefined)),
       existsSync(join(h, 'README.md')) ? undefined : writeFile(join(h, 'README.md'), WORKSPACE_README),
       // The board's database and what its move from files left (#1017) are this machine's: kept out of git if the workspace is a repository.
       existsSync(join(h, '.gitignore')) ? addUsageIgnore(join(h, '.gitignore')) : writeFile(join(h, '.gitignore'), BOARD_GITIGNORE),
@@ -1416,9 +1416,16 @@ export class WorkspaceService {
     ])
     // Its own names upgrade (HI-2587, HR2's round 1), by its own record: a project that came into an upgraded workspace
     // with a `.combwork` of an RC's (its skill copies' old markers, git's old comments and refs), or a new one, once.
+    // Under the move's lock, refused while another process has the workspace open (HR2's round 3): then nothing is
+    // written, the project is used as it is, and the next time it is set up (or the workspace opens) tries again.
     if (this.path && !this.isAssistantHome(projectPath) && !(await projectNamesDone(projectPath))) {
-      const moved = await moveFolders(this.path, { only: projectPath })
-      if (moved.late) await this.finishFolderMove()
+      try {
+        const moved = await moveFolders(this.path, { only: projectPath })
+        if (moved.late) await this.finishFolderMove()
+      } catch (e) {
+        if (!(e instanceof HiveError) || e.kind !== 'conflict') throw e
+        log.warn(`${userText(basename(projectPath))}: its names upgrade waits: ${userText(englishError(e))}`)
+      }
     }
     if (!this.isAssistantHome(projectPath) && existsSync(join(h, 'project.json'))) this.markSetUp(projectPath, gen, ticket)
   }

@@ -16,7 +16,7 @@ vi.mock('../src/main/events', async (orig) => ({ ...(await orig<object>()), toas
 
 const base = tempDir('nameupgrade-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
-const { MOVE_LOCK_FILE, finishMove, moveFolders } = await import('../src/main/combworkMove')
+const { MOVE_LOCK_FILE, finishMove, moveFolders, recordNewWorkspace } = await import('../src/main/combworkMove')
 const { NAMES_DONE_FILE, projectNamesDone } = await import('../src/main/nameUpgrade')
 const { boardMoveTestHooks } = await import('../src/main/boardFileMove')
 const { WORKSPACE_README, BOARD_GITIGNORE } = await import('../src/main/workspace')
@@ -211,22 +211,75 @@ describe('the names upgrade at the open', () => {
     expect(await projectNamesDone(beta)).toBe(true)
   })
 
-  it('a new project with nothing old is recorded with no lock, even while another Combwork has the workspace open', async () => {
-    const w = workspace('rc2')
-    await open(w.ws)
-    const gamma = join(w.ws, 'gamma')
-    write(join(gamma, '.combwork', 'project.json'), '{}')
-    git(w.ws, 'init', '-q', gamma)
-    const other = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore', windowsHide: true })
-    try {
-      write(join(w.ws, '.combwork', 'open', 'Combwork-other.json'), JSON.stringify({ pid: other.pid, profile: 'Combwork', appVersion: '1.1.0', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() }))
-      const lock = join(w.ws, MOVE_LOCK_FILE)
-      const before = readFileSync(lock)
-      await moveFolders(w.ws, { only: gamma })
-      expect(await projectNamesDone(gamma)).toBe(true)
-      expect(readFileSync(lock).equals(before)).toBe(true)
-    } finally {
-      other.kill()
+  it('every entry point, with another Combwork present: nothing written, refused (or put off); once it exits, the retry completes (HR2 rounds 2 and 3)', async () => {
+    // A live process with an RC's presence marker in the workspace's .combwork.
+    const present = (ws: string) => {
+      const other = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore', windowsHide: true })
+      write(join(ws, '.combwork', 'open', 'Combwork-other.json'), JSON.stringify({ pid: other.pid, profile: 'Combwork', hiveVersion: '1.1.0-rc.2', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() }))
+      return async () => {
+        other.kill()
+        await new Promise((r) => (other.exitCode !== null ? r(undefined) : other.once('exit', () => r(undefined))))
+      }
+    }
+    // Every file under the workspace (git's objects aside, and the lock's own file, which a lock writes), with its bytes,
+    // and every ref: what "nothing written" is checked against.
+    const snapshot = (ws: string): string => {
+      const out: string[] = []
+      const walk = (d: string): void => {
+        for (const e of readdirSync(d, { withFileTypes: true })) {
+          const f = join(d, e.name)
+          if (e.isDirectory()) {
+            if (e.name !== 'objects' && e.name !== 'logs') walk(f)
+          } else if (e.name !== MOVE_LOCK_FILE && e.name !== 'Combwork-other.json') out.push(`${f} ${readFileSync(f).toString('base64')}`)
+        }
+      }
+      walk(ws)
+      return out.sort().join('\n')
+    }
+    const refs = (repo: string): string => git(repo, 'for-each-ref', '--format=%(refname) %(objectname)')
+
+    // 1. A workspace's open (an RC2's, its names not upgraded).
+    {
+      const w = workspace('rc2')
+      const gone = present(w.ws)
+      const before = snapshot(w.ws)
+      const beforeRefs = refs(w.alpha)
+      await expect(open(w.ws)).rejects.toThrow(/open in another Combwork or Hive \(Combwork\)/)
+      expect(snapshot(w.ws)).toBe(before)
+      expect(refs(w.alpha)).toBe(beforeRefs)
+      await gone()
+      await open(w.ws)
+      expectUpgraded(w)
+    }
+    // 2. A project that comes later, with something old, and 3. one with nothing old.
+    {
+      const w = workspace('rc2')
+      await open(w.ws)
+      const beta = join(w.ws, 'beta')
+      write(join(beta, '.combwork', 'project.json'), '{}')
+      write(join(beta, '.agents', 'skills', 'cw-handover', '.hive-copy'), '{"source":"s","hash":"b1"}')
+      const gamma = join(w.ws, 'gamma')
+      write(join(gamma, '.combwork', 'project.json'), '{}')
+      const gone = present(w.ws)
+      const before = snapshot(w.ws)
+      for (const p of [beta, gamma]) await expect(moveFolders(w.ws, { only: p })).rejects.toThrow(/open in another Combwork or Hive/)
+      expect(snapshot(w.ws)).toBe(before)
+      expect([await projectNamesDone(beta), await projectNamesDone(gamma)]).toEqual([false, false])
+      await gone()
+      for (const p of [beta, gamma]) await moveFolders(w.ws, { only: p })
+      expect([await projectNamesDone(beta), await projectNamesDone(gamma)]).toEqual([true, true])
+      expect(existsSync(join(beta, '.agents', 'skills', 'cw-handover', '.combwork-copy'))).toBe(true)
+    }
+    // 4. A workspace just made: its record written only with no other process there.
+    {
+      const ws = join(base, `made${++n}`)
+      write(join(ws, '.combwork', 'workspace.json'), '{}')
+      const gone = present(ws)
+      await recordNewWorkspace(ws)
+      expect(existsSync(join(ws, '.combwork', NAMES_DONE_FILE))).toBe(false)
+      await gone()
+      await recordNewWorkspace(ws)
+      expect(existsSync(join(ws, '.combwork', NAMES_DONE_FILE))).toBe(true)
     }
   })
 

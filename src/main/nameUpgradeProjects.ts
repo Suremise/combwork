@@ -31,13 +31,6 @@ const log = createLogger('nameUpgrade')
 
 const OLD_REFS = ['refs/hive/cards/', 'refs/hive/queue/']
 
-/** The old refs of a repository (the list moveRefs moves). Throws when git can't list them. */
-async function oldRefs(root: string): Promise<string[]> {
-  const listed = await git(root, ['for-each-ref', '--format=%(refname)', ...OLD_REFS.map((r) => r.slice(0, -1))])
-  if (!listed.ok) throw new Error(listed.err || 'git for-each-ref failed') // i18n-ignore: the error's detail, for the step's message
-  return listed.out.split(/\r?\n/).filter((l) => OLD_REFS.some((p) => l.startsWith(p)))
-}
-
 async function moveRefs(root: string): Promise<void> {
   const listed = await git(root, ['for-each-ref', '--format=%(refname) %(objectname)', ...OLD_REFS.map((r) => r.slice(0, -1))])
   if (!listed.ok) throw new Error(listed.err || 'git for-each-ref failed') // i18n-ignore: the error's detail, for the step's message
@@ -107,20 +100,6 @@ async function excludeFile(host: string): Promise<string | null> {
  * A project's steps: the markers in it and in `folders` (folders its agents work in), then its repository's exclude
  * comments. `host` null: the markers in `folders` only.
  */
-/**
- * Whether a project has anything of these still old (looked at only, nothing changed): a marker, a comment or a ref. A
- * project with nothing old needs no lock to be recorded done (a new one, say); one with something old has its steps
- * under the move's lock (HR2's round 2). What can't be read throws, as the steps do.
- */
-export async function projectHasOld(host: string): Promise<boolean> {
-  if ((await oldMarkers(host)).length) return true
-  const ex = await excludeFile(host)
-  const text = ex ? await readFile(ex, 'utf8').catch(ifAbsent(null)) : null
-  if (text !== null && upgradedExclude(text) !== null) return true
-  const found = vcsOf(host)
-  return found?.kind === 'git' && (await oldRefs(found.root)).length > 0
-}
-
 export async function upgradeProject(host: string | null, folders: readonly string[]): Promise<void> {
   for (const f of host ? [host, ...folders] : folders) for (const d of await oldMarkers(f)) await rename(join(d, OLD_COPY_MARKER), join(d, COPY_MARKER)).catch((e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? undefined : Promise.reject(e)))
   if (!host) return
