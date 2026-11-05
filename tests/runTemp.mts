@@ -1,4 +1,4 @@
-// A test run's own temp folder (#995, HI-2102), in the test area, %LOCALAPPDATA%\hive-test\tmp (#992), not %TEMP%:
+// A test run's own temp folder (#995, HI-2102), in the test area, %LOCALAPPDATA%\combwork-test\tmp (#992), not %TEMP%:
 // Combwork's Antivirus scanning setting covers the test area, and what tests make and remove in %TEMP% kept Defender busy.
 // Each run has its own folder there, run-<pid>-<random>, made as it starts and made its temp folder (TEMP, TMP and
 // TMPDIR), which what it starts inherits: the unit run (vitest.config.ts, before the workers start; tests/tempRun.ts
@@ -11,11 +11,12 @@
 // The runners' as well as the unit tests' (tests/tempDir.ts gives its exports to the tests), so it is a .mts the
 // runners load as they do tests/progressReport.mts.
 import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, statSync } from 'fs'
+import { createRequire } from 'module'
 import { tmpdir } from 'os'
 import { basename, dirname, join } from 'path'
 
-/** The test area's temp folder, hive-test\tmp: the runs' folders are in it. */
-export const tempArea = join(process.env.LOCALAPPDATA || tmpdir(), 'hive-test', 'tmp')
+/** The test area's temp folder, combwork-test\tmp: the runs' folders are in it. */
+export const tempArea = join(process.env.LOCALAPPDATA || tmpdir(), 'combwork-test', 'tmp')
 /** A run's folder older than this whose run has ended was left by a stopped run: the next run's start removes it. */
 const STALE_MS = 24 * 60 * 60_000
 let root: string | undefined
@@ -35,6 +36,8 @@ export type Protects = (path: string) => string | null | undefined
  */
 export function startRunTemp(protects?: Protects): string {
   if (!process.env.CW_TEST_RUN_TMP) {
+    // A run refuses while the test area's move (HI-2590) is still to do or unfinished (tests/testArea.cjs).
+    createRequire(import.meta.url)('./testArea.cjs').assertReady()
     mkdirSync(tempArea, { recursive: true })
     if (protects) pruneRunTemps(protects)
     process.env.CW_TEST_RUN_TMP = realpathSync.native(mkdtempSync(join(tempArea, `run-${process.pid}-`)))
@@ -98,7 +101,7 @@ export function endRunTemp(): string | undefined {
   }
 }
 
-/** The tests' temp folder by its real, long path, made if it isn't there: the run's own, or hive-test\tmp outside a run. */
+/** The tests' temp folder by its real, long path, made if it isn't there: the run's own, or combwork-test\tmp outside a run. */
 export function tempRoot(): string {
   if (root) return root
   const dir = process.env.CW_TEST_RUN_TMP || tempArea

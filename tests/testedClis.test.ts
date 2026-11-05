@@ -64,8 +64,8 @@ describe('the run record says which real CLIs ran, as Combwork selected them (#3
 describe("the run record names each real suite's CLI home, and none may be the user's own (#368)", () => {
   const profile = join('C:', 'Users', 't')
   it("lists the home of each real suite's own CLI, not the other CLI its Combwork found", () => {
-    const own = join(profile, 'AppData', 'Local', 'hive-test', 'e2e', 'lanes', '0', 'mode', 'mode-claude-home')
-    const codexHome = join(profile, 'AppData', 'Local', 'hive-test', 'codex')
+    const own = join(profile, 'AppData', 'Local', 'combwork-test', 'e2e', 'lanes', '0', 'mode', 'mode-claude-home')
+    const codexHome = join(profile, 'AppData', 'Local', 'combwork-test', 'codex')
     const claudeSuite = alone('claude')[0]
     const codexSuite = alone('codex')[0]
     const results = [pass('about', [{ ...CLAUDE, home: join(profile, '.claude') }] as Cli[]), pass(claudeSuite, [{ ...CLAUDE, home: own }, { ...CODEX, home: join(profile, '.codex') }] as Cli[]), pass(codexSuite, [{ ...CODEX, home: codexHome }] as Cli[])]
@@ -285,7 +285,7 @@ describe('the installed version against the tested one (#365)', () => {
 })
 
 describe('the run record\'s versions are what Combwork selected, not the first copy on PATH (#365)', () => {
-  const dir = tempDir('hive-tested-clis-')
+  const dir = tempDir('combwork-tested-clis-')
   afterAll(() => rmSync(dir, { recursive: true, force: true }))
   /** Puts an environment variable back as it was. */
   const restore = (k: string, v: string | undefined): void => {

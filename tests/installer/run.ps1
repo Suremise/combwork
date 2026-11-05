@@ -4,7 +4,7 @@
 # ticks). PASS or FAIL a line each; exit 1 on any FAIL.
 param([string]$Dir = 'C:\build')
 $ErrorActionPreference = 'Stop'
-$mutex = 'hive-test-1647-installer-mutex'
+$mutex = 'combwork-test-1647-installer-mutex'
 $out = 'C:\out\results.txt'
 $fails = 0
 function Say($ok, $what, $detail) {

@@ -202,15 +202,15 @@ its Combwork tool does, so a model trial gets the same fixture as a fake (#1545)
   Copilot's. It needs the Copilot CLI installed (the run is skipped without it) and no sign-in.
 - **Model trials** cost tokens, and run only in the providers' **test homes**: never the user's own `~/.claude` or
   `~/.codex`, and never a copy of their credentials (refreshing a copy could sign the user out).
-  - **Claude Code** uses `%LOCALAPPDATA%\hive-test\claude` (`CW_TEST_CLAUDE_HOME` overrides it). Sign in to it once, by
+  - **Claude Code** uses `%LOCALAPPDATA%\combwork-test\claude` (`CW_TEST_CLAUDE_HOME` overrides it). Sign in to it once, by
     hand, with the account the trials may use:
     ```powershell
-    New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\hive-test\claude" | Out-Null; $env:CLAUDE_CONFIG_DIR="$env:LOCALAPPDATA\hive-test\claude"; claude
+    New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\combwork-test\claude" | Out-Null; $env:CLAUDE_CONFIG_DIR="$env:LOCALAPPDATA\combwork-test\claude"; claude
     ```
     Then `/login` in it. It runs in Accept edits, with `mcp__combwork`, `Bash`, `PowerShell`, `Skill` and `Monitor` (a
     shell command whose output it follows, #613) allowed on the command line, so it never asks and never needs bypass
     mode.
-  - **Codex** uses its test home (`%LOCALAPPDATA%\hive-test\codex`, signed in once as tests/e2e/README.md says), in
+  - **Codex** uses its test home (`%LOCALAPPDATA%\combwork-test\codex`, signed in once as tests/e2e/README.md says), in
     Full access.
   - **Without a sign-in**, a trial prints `SKIP all scenarios: … isn't signed in to its test home` and does nothing. It
     never opens a login.
@@ -239,14 +239,14 @@ its Combwork tool does, so a model trial gets the same fixture as a fake (#1545)
   - Models vary from run to run: a trial reports, it doesn't fail the run.
 - **Several runs at once** (from different worktrees, or the same one) don't touch each other: each run claims a
   **lane** from the e2e runner's pool (`tests/e2e/lanes.mjs`), and its scenarios' profiles and workspaces go in
-  `%LOCALAPPDATA%\hive-test\scenarios\lanes\<k>\<scenario>-<provider>` (where `--keep` leaves them), with the lane's
+  `%LOCALAPPDATA%\combwork-test\scenarios\lanes\<k>\<scenario>-<provider>` (where `--keep` leaves them), with the lane's
   first port as the test Combwork's Agent API port. The run prints its lane when it starts. Ten runs at once (scenario and
   e2e runs together) is the most: an eleventh waits for a lane, saying who holds them (#707; `--no-wait` fails at
   once instead), and builds once it has one, so it tests the source as it is then (#735). A run of more than five
   scenarios, or with
   `--repeat`, is a heavy run: it waits for one of the machine's test slots, as heavy e2e runs do, saying who holds them
   (`--no-wait` fails at once instead; tests/e2e/README.md, "Heavy runs queue").
-- **Results** go to `%LOCALAPPDATA%\hive-test\scenarios\results\<time>-<provider>`: `results.json` (each scenario's
+- **Results** go to `%LOCALAPPDATA%\combwork-test\scenarios\results\<time>-<provider>`: `results.json` (each scenario's
   checks, skills read, executed Combwork calls and mentions, the final reply whole up to 6,000 characters, so a check that
   judged it can be audited (HI-2230; `finalReplyLength` when longer), versions, guidance and source, usage) and `summary.md` (a
   table). `results.json` is written as each trial ends (`meta.incomplete` says how many of how many until the run

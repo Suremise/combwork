@@ -34,11 +34,12 @@ function code(d: string): string[] {
  * exactly as written: anywhere else, the same text is refused.
  */
 const ALLOWED: Record<string, string[]> = {
-  // The hive-test root is %LOCALAPPDATA%\hive-test, in the temp folder only where LOCALAPPDATA is unset.
+  // The combwork-test root is %LOCALAPPDATA%\combwork-test, in the temp folder only where LOCALAPPDATA is unset.
   // and the temp folder's variables a child gets from the run (the run's own folder, HI-2102).
   'e2e/runContext.cjs': ['const LOCAL = process.env.LOCALAPPDATA || os.tmpdir()', "'PATH', 'PATHEXT', 'SYSTEMROOT', 'SYSTEMDRIVE', 'WINDIR', 'COMSPEC', 'TEMP', 'TMP', 'TMPDIR', 'OS',"],
-  'e2e/build.mjs': ["import { tmpdir } from 'os'", "export const BUILD_LOCKS = join(process.env.LOCALAPPDATA || tmpdir(), 'hive-test', 'build-locks')"],
-  'progressReport.mts': ["import { tmpdir } from 'node:os'", "const timings = (): string => process.env.CW_TEST_PROGRESS_TIMINGS || join(process.env.LOCALAPPDATA || tmpdir(), 'hive-test', 'progress-timings.json')"],
+  'testArea.cjs': ['const local = env.LOCALAPPDATA || os.tmpdir()'],
+  'e2e/build.mjs': ["import { tmpdir } from 'os'", "export const BUILD_LOCKS = join(process.env.LOCALAPPDATA || tmpdir(), 'combwork-test', 'build-locks')"],
+  'progressReport.mts': ["import { tmpdir } from 'node:os'", "const timings = (): string => process.env.CW_TEST_PROGRESS_TIMINGS || join(process.env.LOCALAPPDATA || tmpdir(), 'combwork-test', 'progress-timings.json')"],
   // npm run e2e -- --clear-dir: a folder the user names may be in the temp folder (one nothing here made).
   // The focused tests' picker's check (HI-1367) reads a binding naming the temp folder as not the repository's.
   'focusedPick.test.ts': ['if (bound.has(name) || !exprs.every((e) => !/tempDir|tmpdir|mkdtemp/.test(e) && names(e))) continue'],
@@ -95,7 +96,7 @@ describe('temp folders for tests (#448)', () => {
     expect(rawTempUses([{ name: 'e2e/runContext.cjs', text: `${fallback}\nconst x = os.tmpdir()\n// os.tmpdir() in a comment` }])).toEqual(['e2e/runContext.cjs:2'])
   })
 
-  it("tempDir makes a new, empty folder by its real path; tempRoot is the run's own folder in hive-test\\tmp (#992, #995)", () => {
+  it("tempDir makes a new, empty folder by its real path; tempRoot is the run's own folder in combwork-test\\tmp (#992, #995)", () => {
     const a = dir('hive-tempdir-')
     const b = dir('hive-tempdir-')
     expect(a).not.toBe(b)
@@ -103,7 +104,7 @@ describe('temp folders for tests (#448)', () => {
     expect(realpathSync.native(a)).toBe(a)
     expect(a.startsWith(tempRoot() + sep)).toBe(true)
     // In the test area, which Combwork's Antivirus scanning setting covers, not in %TEMP%; the temp folder only off Windows.
-    const area = join(process.env.LOCALAPPDATA || tmpdir(), 'hive-test', 'tmp')
+    const area = join(process.env.LOCALAPPDATA || tmpdir(), 'combwork-test', 'tmp')
     expect(tempArea).toBe(area)
     expect(dirname(tempRoot())).toBe(realpathSync.native(area))
     expect(basename(tempRoot())).toMatch(/^run-/)

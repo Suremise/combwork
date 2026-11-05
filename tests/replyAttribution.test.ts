@@ -21,7 +21,7 @@ const { sessions } = await import('../src/main/sessions')
 const { claudeCode } = await import('../src/main/providers/claude/adapter')
 const { hookStep } = await import('../src/main/hookStatus')
 
-const project = 'C:/hive-test/reply-attribution'
+const project = 'C:/combwork-test/reply-attribution'
 const id = 'r1'
 const key = `${project.toLowerCase()}#${id}`
 /** Its terminal's key (agentPtyKey), as the user's typing is noted by. */

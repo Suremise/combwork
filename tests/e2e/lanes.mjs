@@ -1,6 +1,6 @@
 // Runners started at the same time from different worktrees (two agents each checking their card) must not share
 // Agent API ports or suite folders. Each runner claims a lane: a range of ports and a work folder for its suites, no
-// other runner on this machine uses while it runs. Claims are files in a folder under %LOCALAPPDATA%\hive-test, one
+// other runner on this machine uses while it runs. Claims are files in a folder under %LOCALAPPDATA%\combwork-test, one
 // per lane (`lane-<k>.json`, with the runner's process id), taken under a short lock and released when the runner
 // ends. A crashed runner's claim expires (its process is gone, or the claim is a day old, like `.active` in logs.mjs).
 // A lane is only taken when its ports are free, so something else holding them (an older runner without lanes, another

@@ -1,6 +1,6 @@
 // Combwork's own test runners show in the Progress panel of the Combwork that launched the agent running them (#137): the e2e
 // runner (tests/e2e/run.mjs) one step per suite, the scenarios runner (tests/scenarios/run.mjs) one per trial, the unit tests (a Vitest reporter, vitest.config.ts) one per file, each
-// with an estimate from how long they took before (kept under %LOCALAPPDATA%\hive-test, never in the repo). Only when the
+// with an estimate from how long they took before (kept under %LOCALAPPDATA%\combwork-test, never in the repo). Only when the
 // Combwork variables are set and Combwork answers; never changes a result. Run under hive-progress, they print step lines for its
 // run instead of reporting their own (one row). Off with --no-progress (e2e) or CW_PROGRESS=0. To remove it: delete this
 // file and its two hooks.
@@ -19,7 +19,7 @@ interface TestSpecification {
 }
 
 // Where the runners' timings are kept (CW_TEST_PROGRESS_TIMINGS: another file, for this module's own tests).
-const timings = (): string => process.env.CW_TEST_PROGRESS_TIMINGS || join(process.env.LOCALAPPDATA || tmpdir(), 'hive-test', 'progress-timings.json')
+const timings = (): string => process.env.CW_TEST_PROGRESS_TIMINGS || join(process.env.LOCALAPPDATA || tmpdir(), 'combwork-test', 'progress-timings.json')
 
 /** Whether to report: the Combwork variables are set (or it runs under hive-progress), and it isn't turned off. */
 export function progressWanted(argv: string[] = process.argv): boolean {

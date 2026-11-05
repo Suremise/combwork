@@ -31,10 +31,10 @@ const { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, filetimeMs
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
 
 describe("a scenario's leftover processes (#542, #402)", () => {
-  const dir = 'C:\\hive-test\\scenarios\\lanes\\1\\scenario'
+  const dir = 'C:\\combwork-test\\scenarios\\lanes\\1\\scenario'
   it('the folder itself or inside it, in any spelling: backslashes, slashes, case, quoted', () => {
     expect(namesFolder(`cmd.exe /c "${dir}\\profile\\bin\\hive-progress.cmd" --title x`, dir)).toBe(true)
-    expect(namesFolder('node C:/HIVE-TEST/scenarios/lanes/1/scenario/run.js', dir)).toBe(true)
+    expect(namesFolder('node C:/COMBWORK-TEST/scenarios/lanes/1/scenario/run.js', dir)).toBe(true)
     expect(namesFolder(`node -e x "${dir}"`, dir)).toBe(true)
     expect(namesFolder(`node -e x ${dir}`, dir + '\\')).toBe(true)
   })
@@ -42,7 +42,7 @@ describe("a scenario's leftover processes (#542, #402)", () => {
     expect(namesFolder(`node x ${dir}-2\\run.js`, dir)).toBe(false)
     expect(namesFolder(`node x "${dir}-2"`, dir)).toBe(false)
     expect(namesFolder(`node x ${dir}s`, dir)).toBe(false)
-    expect(namesFolder('node x C:\\hive-test\\scenarios\\lanes\\1', dir)).toBe(false)
+    expect(namesFolder('node x C:\\combwork-test\\scenarios\\lanes\\1', dir)).toBe(false)
   })
   it("a command naming the run's own file, as a whole name: another suite's file never counts (#658)", () => {
     const own = 'bg-done-4242-mfx1.txt'
@@ -326,7 +326,7 @@ describe("a suite's test copies of Combwork (HI-1453)", () => {
     lookLikeCopies: (list: Proc[], folders: string[]) => Proc[]
     launchedCopy: (list: Proc[], launcher: number, from: number) => Proc | null
   }
-  const lane = 'C:\\t\\hive-test\\e2e\\lanes\\1'
+  const lane = 'C:\\t\\combwork-test\\e2e\\lanes\\1'
 
   it('are read back from the folder and its own (a nested runner), a line cut short or without a start time skipped', () => {
     const dir = tempDir('hive-copies-')
@@ -451,9 +451,9 @@ describe("a suite's test copies of Combwork (HI-1453)", () => {
 
   it('what only looks like a copy in a folder (for the report, never ended) has a profile flag and names the folder', () => {
     const list: Proc[] = [
-      { pid: 1, commandLine: `"electron.exe" "--hive-test-profile=${lane}\\a\\profile"`, started: 1 },
+      { pid: 1, commandLine: `"electron.exe" "--combwork-test-profile=${lane}\\a\\profile"`, started: 1 },
       { pid: 2, commandLine: `photos.exe ${lane}\\x\\shot.png`, started: 1 },
-      { pid: 3, commandLine: `electron.exe --hive-test-profile=${lane}0\\x\\profile`, started: 1 }
+      { pid: 3, commandLine: `electron.exe --combwork-test-profile=${lane}0\\x\\profile`, started: 1 }
     ]
     expect(lookLikeCopies(list, [lane]).map((p) => p.pid)).toEqual([1])
   })

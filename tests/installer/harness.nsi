@@ -4,7 +4,7 @@
 ; exits. Its "install" writes when it started and ended to C:\out\<name>.log, five seconds apart. A test mutex name, so
 ; it can't meet a real Combwork installer.
 Unicode true
-!define /ifndef APP_GUID "hive-test-1647-installer-mutex"
+!define /ifndef APP_GUID "combwork-test-1647-installer-mutex"
 !addincludedir "${__FILEDIR__}\..\..\node_modules\app-builder-lib\templates\nsis\include"
 !addplugindir /x86-unicode "${PLUGINS}"
 !include "MUI2.nsh"

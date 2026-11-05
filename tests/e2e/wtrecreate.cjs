@@ -106,7 +106,7 @@ const check = (name, ok, extra = '') => {
   if (noDrive) {
     fs.rmSync(mover.worktree.path, { recursive: true, force: true })
     git(proj, ['worktree', 'prune'])
-    const away = path.join(noDrive, 'hive-test-missing', 'mover')
+    const away = path.join(noDrive, 'combwork-test-missing', 'mover')
     const cfgFile = path.join(proj, '.combwork', 'project.json')
     const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
     cfg.agents.find((a) => a.id === mover.id).worktree.path = away

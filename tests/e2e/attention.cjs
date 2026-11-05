@@ -116,7 +116,7 @@ const check = (name, ok, extra = '') => {
     const shown = await until(async () => mark.isVisible().catch(() => false), HUNG_MS)
     const text = await header.innerText().catch(() => '')
     check(`${width}px ${theme}: the long request is under review`, !!shown && (await status()) === 'Working…', await status())
-    check(`${width}px ${theme}: none of it in the header`, !/\$env|npm\.cmd|hive-test|Codex asks/.test(text), text.replace(/\s+/g, ' '))
+    check(`${width}px ${theme}: none of it in the header`, !/\$env|npm\.cmd|combwork-test|Codex asks/.test(text), text.replace(/\s+/g, ' '))
     check(`${width}px ${theme}: the header fits, its buttons inside it`, await header.evaluate((h) => h.scrollWidth <= h.clientWidth + 1 && [...h.querySelectorAll('button')].every((b) => b.getBoundingClientRect().right <= h.getBoundingClientRect().right + 1)))
     const tip = page.locator('.tip', { hasText: 'npm.cmd run e2e' })
     const hovered = await until(async () => {

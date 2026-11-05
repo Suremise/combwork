@@ -1,7 +1,7 @@
 /**
  * Runs inside the Sandbox, as the user, with the host's Node, Combwork's own playwright-core and Combwork's tests folder (this
  * file's, tests\sandbox\inside, is in it) mapped read-only by the Sandbox checks (tests\sandbox\checks.cjs):
- *   C:\tools\node\node.exe C:\tools\hive-tests\sandbox\inside\drive.cjs <step> <prefix>
+ *   C:\tools\node\node.exe C:\tools\combwork-tests\sandbox\inside\drive.cjs <step> <prefix>
  * Drives the installed app (Combwork, or Hive Desktop before an upgrade, and its real profile: see CW_EXE and PROFILE below) with Playwright's
  * _electron, as Combwork's e2e suites do, and writes C:\out\<prefix>.json ({ step, checks: [{ id, scenario, name, ok, detail }],
  * facts, shots, completed }) and window PNGs C:\out\<prefix>-<name>.png. completed is true only once the whole step ran
@@ -219,7 +219,7 @@ const steps = {
     await shot('missing-dark')
 
     // The stand-in installer: the e2e fake Claude Code copied into the user's programs, on the user PATH (registry).
-    res.facts.install = ps('& C:\\tools\\hive-tests\\sandbox\\inside\\fake-claude-install.ps1')
+    res.facts.install = ps('& C:\\tools\\combwork-tests\\sandbox\\inside\\fake-claude-install.ps1')
     const hivePath = await app.evaluate(() => process.env.PATH || process.env.Path || '')
     check('3.user-path', 'The new folder is on the user PATH, not on Combwork\'s own PATH yet', !hivePath.toLowerCase().includes('fakeclaude'), hivePath.slice(0, 300))
     if (dialog) await dialog.locator('button', { hasText: 'Check again' }).click()
@@ -364,7 +364,7 @@ const steps = {
     // Git (this machine's, mapped at C:\tools\git) and the fake Claude Code, as a user installs them: on the user PATH.
     const gitCmd = 'C:\\tools\\git\\cmd'
     ps(`$p = [Environment]::GetEnvironmentVariable('Path', 'User'); if (-not (($p -split ';') -contains '${gitCmd}')) { [Environment]::SetEnvironmentVariable('Path', ((@($p, '${gitCmd}') | Where-Object { $_ }) -join ';'), 'User') }`)
-    res.facts.fakeClaude = ps('& C:\\tools\\hive-tests\\sandbox\\inside\\fake-claude-install.ps1')
+    res.facts.fakeClaude = ps('& C:\\tools\\combwork-tests\\sandbox\\inside\\fake-claude-install.ps1')
     const fakeBin = path.join(process.env.LOCALAPPDATA, 'FakeClaude', 'bin')
     // Combwork starts with a user's environment: this script's, less what the checks themselves put in it (the mapped
     // tests folder's path), which no user has. What was left out is recorded.

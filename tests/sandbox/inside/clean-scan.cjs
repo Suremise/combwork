@@ -1,7 +1,7 @@
 /**
  * Runs inside the Sandbox, as the user, with the host's Node (HI-2592, the clean-install check, scenario 9):
- *   C:\tools\node\node.exe C:\tools\hive-tests\sandbox\inside\clean-scan.cjs baseline <prefix>   before the install
- *   C:\tools\node\node.exe C:\tools\hive-tests\sandbox\inside\clean-scan.cjs scan <prefix>       after drive.cjs clean
+ *   C:\tools\node\node.exe C:\tools\combwork-tests\sandbox\inside\clean-scan.cjs baseline <prefix>   before the install
+ *   C:\tools\node\node.exe C:\tools\combwork-tests\sandbox\inside\clean-scan.cjs scan <prefix>       after drive.cjs clean
  * baseline keeps what HKCU says of "hive" before anything is installed (C:\out\<prefix>-reg-before.txt), so the scan
  * counts only what the install and the app added. scan searches every place of ../clean.cjs CATEGORIES for "hive" and
  * writes C:\out\<prefix>-scan.json ({ places: { <id>: { scanned, count, hits, unread, why? } }, asar, skipped, at }; skipped: what couldn't be read, which fails its place), which

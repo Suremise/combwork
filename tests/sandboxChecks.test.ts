@@ -129,7 +129,7 @@ test('inSandbox: the server\'s stops failing but the fallback succeeding → cle
 })
 
 // As a real Sandbox wrote it (RC2), but wrapped mid-word: PowerShell wraps at the console width wherever that falls.
-const BLOCKED_ERR = 'Start-Process : This command cannot be run due to the error: An Applic \r\nation Control policy has blocked this file.\r\nAt C:\\tools\\hive-tests\\sandbox\\inside\\install.ps1:17 char:6'
+const BLOCKED_ERR = 'Start-Process : This command cannot be run due to the error: An Applic \r\nation Control policy has blocked this file.\r\nAt C:\\tools\\combwork-tests\\sandbox\\inside\\install.ps1:17 char:6'
 const SAC_ON = '\r\nHKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\CI\\Policy\r\n    VerifiedAndReputablePolicyState    REG_DWORD    0x1\r\n'
 
 /** Runs the checks on the fakes with these guest commands scripted: two installers in one build folder. */
@@ -163,23 +163,23 @@ function oneNotRunLine({ r, log }: { r: { stdout: string }; log: string }) {
   }
 }
 
-test('what the server gets: hive\'s own scripts and fakes mapped from this checkout, its run folders in hive-test\\sandbox, nothing else of the shell', () => {
+test('what the server gets: hive\'s own scripts and fakes mapped from this checkout, its run folders in combwork-test\\sandbox, nothing else of the shell', () => {
   const run = runChecks('server-env', [], [], { CW_SANDBOX_CHECKS_ROOT: undefined, CW_API_TOKEN: 'from-the-shell' })
   assert.strictEqual(run.r.status, 1, run.r.stdout + run.r.stderr) // the fake drivers write no results: checks fail
   const repo = path.resolve(__dirname, '..')
   const env = run.calls.find((c) => c[0] === 'env')?.[1]
   assert.deepStrictEqual(env, {
-    WSB_SANDBOX_ROOT: path.join(process.env.LOCALAPPDATA ?? '', 'hive-test', 'sandbox'),
-    WSB_TOOL_DIRS: [`node=${path.dirname(process.execPath)}`, `playwright=${path.join(repo, 'node_modules', 'playwright-core')}`, `hive-tests=${path.join(repo, 'tests')}`, `git=${run.git}`].join(';'),
+    WSB_SANDBOX_ROOT: path.join(process.env.LOCALAPPDATA ?? '', 'combwork-test', 'sandbox'),
+    WSB_TOOL_DIRS: [`node=${path.dirname(process.execPath)}`, `playwright=${path.join(repo, 'node_modules', 'playwright-core')}`, `combwork-tests=${path.join(repo, 'tests')}`, `git=${run.git}`].join(';'),
     WSB_MCP_ENABLED: '1',
     WSB_ALLOWED_ROOTS: '',
     CW_API_TOKEN: null
   })
   const build = path.join(run.s.dir, 'builds', 'hive')
   // Git only in the clean install's Sandbox (HI-2592), for its git project; the profile move's (HI-2602) is the fourth.
-  assert.deepStrictEqual(run.starts.map((a) => [a.build, a.network, a.tools]), [[build, false, ['node', 'playwright', 'hive-tests']], [build, false, ['node', 'playwright', 'hive-tests']], [build, false, ['node', 'playwright', 'hive-tests', 'git']], [build, false, ['node', 'playwright', 'hive-tests']]])
+  assert.deepStrictEqual(run.starts.map((a) => [a.build, a.network, a.tools]), [[build, false, ['node', 'playwright', 'combwork-tests']], [build, false, ['node', 'playwright', 'combwork-tests']], [build, false, ['node', 'playwright', 'combwork-tests', 'git']], [build, false, ['node', 'playwright', 'combwork-tests']]])
   // Every script the runner runs inside is here, at the path the Sandbox maps it to.
-  const inside = run.guests.flatMap((g) => [...g.matchAll(/C:\\tools\\hive-tests\\([^\s"]+)/g)].map((m) => m[1]))
+  const inside = run.guests.flatMap((g) => [...g.matchAll(/C:\\tools\\combwork-tests\\([^\s"]+)/g)].map((m) => m[1]))
   assert.deepStrictEqual([...new Set(inside)].sort(), ['sandbox\\inside\\clean-scan.cjs', 'sandbox\\inside\\drive.cjs', 'sandbox\\inside\\install.ps1', 'sandbox\\inside\\profile-move.ps1', 'sandbox\\inside\\start-app.ps1'])
   for (const f of inside) assert.ok(fs.existsSync(path.join(__dirname, ...f.split('\\'))), f)
   assert.ok(!run.guests.some((g) => /wsb-mcp/i.test(g)), 'a script from the server\'s own folder')

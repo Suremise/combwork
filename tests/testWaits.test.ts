@@ -124,7 +124,7 @@ describe('test waits (#524)', () => {
   it('the command fails on a wait with no bound, whatever is around it, and passes once each states one', () => {
     const W = ['vi.wait', 'For'].join('')
     // A repository of its own with the script and a test file (new files count as changed, so only the bounds decide).
-    const repo = tempDir('hive-testwaits-')
+    const repo = tempDir('combwork-testwaits-')
     mkdirSync(join(repo, 'scripts'))
     mkdirSync(join(repo, 'tests'))
     copyFileSync(join(import.meta.dirname, '..', 'scripts', 'testWaits.mjs'), join(repo, 'scripts', 'testWaits.mjs'))

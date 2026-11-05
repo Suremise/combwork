@@ -257,7 +257,7 @@ function offlineEnv(api) {
  * user's ~/.copilot, and no token variable (hiveEnv's allowlist passes none).
  * `above`, the profile folder, is a folder above every folder this Copilot works in (its workspace, projects,
  * worktrees, the Assistant's home): outside a git repository Copilot takes skills from every folder above its working
- * folder up to its profile folder, so one under the user's profile (hive-test is) would otherwise reach the user's own
+ * folder up to its profile folder, so one under the user's profile (combwork-test is) would otherwise reach the user's own
  * ~\.claude\skills (#1308, tests/e2e/README.md).
  */
 function copilotTestEnv(api, dir, { above } = {}) {

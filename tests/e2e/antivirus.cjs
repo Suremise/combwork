@@ -47,7 +47,7 @@ const check = (name, ok, extra = '') => {
 
 ;(async () => {
   const root = fs.realpathSync.native((fs.mkdirSync(ws, { recursive: true }), ws))
-  const tests = fs.realpathSync.native(path.join(process.env.LOCALAPPDATA, 'hive-test'))
+  const tests = fs.realpathSync.native(path.join(process.env.LOCALAPPDATA, 'combwork-test'))
   // The user had already excluded the workspace itself (as administrator rights see Defender's list).
   setFixture({ probe: probe(), elevated: { exclusions: [root] } })
   const { app, page, inv } = await lib.launch({ userData, env: { CW_TEST_ANTIVIRUS: fixture, CW_TEST_ANTIVIRUS_LOG: callLog, ...claude }, viewport: { width: 1400, height: 950 } })

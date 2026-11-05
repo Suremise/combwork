@@ -4,15 +4,15 @@
 // would replace is a stand-in installed copy (CW_TEST_RESOURCES, fakeInstall.cjs): an older one is replaced, a local
 // build of the same version never (Restart and Update says so), a local build is offered a release of its own version
 // (Open Release Page) and Settings → Updates names it, and the install on quit comes only from a quit that goes ahead.
-// Throwaway profiles; the download cache is %LOCALAPPDATA%\hive-test-updater (deleted before/after), or
-// hive-test-updater-<k> for a runner in e2e lane k (lanes.mjs), so runners at once don't share it.
+// Throwaway profiles; the download cache is %LOCALAPPDATA%\combwork-test-updater (deleted before/after), or
+// combwork-test-updater-<k> for a runner in e2e lane k (lanes.mjs), so runners at once don't share it.
 const lib = require('./lib.cjs')
 const { fakeInstall } = require('./fakeInstall.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs'), path = require('path'), http = require('http'), crypto = require('crypto')
 const scratch = lib.WORK
 const lane = /[\\/]lanes[\\/](\d+)[\\/]update(?:-\d+)?$/.exec(scratch)?.[1]
-const cacheName = lane ? `hive-test-updater-${lane}` : 'hive-test-updater'
+const cacheName = lane ? `combwork-test-updater-${lane}` : 'combwork-test-updater'
 const cache = path.join(process.env.LOCALAPPDATA, cacheName)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -264,7 +264,7 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   check('#1647, HI-2427: the quit that goes ahead installs it over the older copy, on quit only (test mode: no install)', /Test mode: would install 9.1.1 \(on quit\)/.test(log('upd-g')) && !/would install 9.1.1 and restart/.test(log('upd-g')), log('upd-g').split('\n').filter((l) => /updates\]|exit\]/.test(l)).slice(-5).join(' | '))
 
   server.close()
-  // The download cache is outside hive-test (no housekeeping there), so it goes, but never at the cost of a suite whose
+  // The download cache is outside combwork-test (no housekeeping there), so it goes, but never at the cost of a suite whose
   // checks passed (#324): lib.tidyUp retries a held file a few times, then leaves it for the next run's clear.
   lib.tidyUp(cache)
   console.log(`\n${pass} passed, ${fail} failed`)

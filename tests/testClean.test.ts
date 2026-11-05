@@ -1,4 +1,4 @@
-// Test housekeeping (#253, tests/e2e/clean.mjs and evidence.cjs): what goes from %LOCALAPPDATA%\hive-test and what
+// Test housekeeping (#253, tests/e2e/clean.mjs and evidence.cjs): what goes from %LOCALAPPDATA%\combwork-test and what
 // always stays, whichever deletes it: the clean-up, the e2e runner (suite folders, log pruning) or the scenario runner.
 import { createRequire } from 'module'
 import { DatabaseSync } from 'node:sqlite'
@@ -37,7 +37,7 @@ afterAll(() => {
 
 const DAY = 24 * 60 * 60_000
 const card = (number: number, text: string): Card => ({ number, text: text.toLowerCase().replace(/\\+/g, '/') })
-/** The evidence rules for a hive-test at root, with these cards (or none readable: null). */
+/** The evidence rules for a combwork-test at root, with these cards (or none readable: null). */
 const rules = (root: string, cards: Card[] | null): Ev => (cards ? evidence({ cards, testRoot: root }) : evidence({ tasksDir: null, testRoot: root }))
 
 /** Makes each path (a folder when it ends in /, else a file) and dates everything under root `days` old. */
@@ -69,8 +69,8 @@ function tree(root: string, paths: Record<string, number>): void {
 describe('what cards cite (they keep it)', () => {
   it('a path ending with its folder and name cites it, in either slash and any case, a full stop after it too', () => {
     expect(citedBy('e2e/review158-live-left-dark.png', [card(227, 'See `e2e\\review158-live-left-dark.png`.')])).toBe(227)
-    expect(citedBy('e2e/lanes/0/board', [card(9, 'C:\\Users\\X\\AppData\\Local\\hive-test\\e2e\\lanes\\0\\board\\board.png')])).toBe(9)
-    expect(citedBy('evidence', [card(3, 'In %LOCALAPPDATA%\\hive-test\\evidence.')])).toBe(3)
+    expect(citedBy('e2e/lanes/0/board', [card(9, 'C:\\Users\\X\\AppData\\Local\\combwork-test\\e2e\\lanes\\0\\board\\board.png')])).toBe(9)
+    expect(citedBy('evidence', [card(3, 'In %LOCALAPPDATA%\\combwork-test\\evidence.')])).toBe(3)
   })
 
   it('a path inside a folder keeps the folder', () => {
@@ -80,34 +80,34 @@ describe('what cards cite (they keep it)', () => {
 
   it('a folder cited as a whole keeps everything in it: a suite folder, a scenario folder', () => {
     expect(citedBy('e2e/lanes/0/board/board-ws', [card(7, 'see lanes\\0\\board\\ for the run')])).toBe(7)
-    expect(citedBy('e2e/lanes/0/board/board-ws', [card(7, '%LOCALAPPDATA%\\hive-test\\e2e\\lanes\\0\\board')])).toBe(7)
+    expect(citedBy('e2e/lanes/0/board/board-ws', [card(7, '%LOCALAPPDATA%\\combwork-test\\e2e\\lanes\\0\\board')])).toBe(7)
     expect(citedBy('scenarios/lanes/2/review-card-fake/ws', [card(8, 'scenarios\\lanes\\2\\review-card-fake: kept with --keep')])).toBe(8)
   })
 
   it('…but a lane is a place, not evidence: naming one keeps nothing in it (#285)', () => {
     // #285's own description named lane 0, as #253's comments did: every folder every later run made there was kept.
-    const lane0 = [card(285, '`e2e\\lanes\\0` = 23 GB, 2,078 entries'), card(7, 'everything in hive-test\\e2e\\lanes\\0 is the evidence')]
+    const lane0 = [card(285, '`e2e\\lanes\\0` = 23 GB, 2,078 entries'), card(7, 'everything in combwork-test\\e2e\\lanes\\0 is the evidence')]
     for (const rel of ['e2e/lanes/0/board', 'e2e/lanes/0/about-10', 'e2e/lanes/0/codex-setup-14/codex-setup-ws']) expect(citedBy(rel, lane0), rel).toBe(null)
-    expect(citedBy('scenarios/lanes/2/review-card-fake', [card(8, '%LOCALAPPDATA%\\hive-test\\scenarios\\lanes\\2')])).toBe(null)
+    expect(citedBy('scenarios/lanes/2/review-card-fake', [card(8, '%LOCALAPPDATA%\\combwork-test\\scenarios\\lanes\\2')])).toBe(null)
     // A suite folder or a file in it named in the same text still is.
     expect(citedBy('e2e/lanes/0/board', [card(9, 'lanes\\0 has it: e2e\\lanes\\0\\board\\board.png')])).toBe(9)
   })
 
-  it("…nor the unit tests' temp folder: naming hive-test\\tmp keeps nothing in it (#992's own text did)", () => {
-    const tmp = [card(992, 'make the root a folder in the test area (for example `%LOCALAPPDATA%\\hive-test\\tmp\\<run or worker>`)')]
+  it("…nor the unit tests' temp folder: naming combwork-test\\tmp keeps nothing in it (#992's own text did)", () => {
+    const tmp = [card(992, 'make the root a folder in the test area (for example `%LOCALAPPDATA%\\combwork-test\\tmp\\<run or worker>`)')]
     for (const rel of ['tmp/hive-git-x1y2z3', 'tmp/bfWnGRfHtqeLL_lF45dTU', 'tmp/config.json']) expect(citedBy(rel, tmp), rel).toBe(null)
-    expect(citedBy('tmp/hive-git-x1y2z3', [card(10, 'the repo it left: hive-test\\tmp\\hive-git-x1y2z3')])).toBe(10)
+    expect(citedBy('tmp/hive-git-x1y2z3', [card(10, 'the repo it left: combwork-test\\tmp\\hive-git-x1y2z3')])).toBe(10)
   })
 
   it('…but a path through a folder keeps only what it names, and a name only with its boundary', () => {
     // lanes\0\board\board.png keeps the board suite's folder, not the rest of lane 0.
     expect(citedBy('e2e/lanes/0/about', [card(9, 'lanes\\0\\board\\board.png')])).toBe(null)
     // lanes\0 doesn't keep lanes\01.
-    expect(citedBy('e2e/lanes/01/board', [card(9, 'hive-test\\e2e\\lanes\\0')])).toBe(null)
-    expect(citedBy('e2e/lanes/0/board', [card(9, 'hive-test\\e2e\\lanes\\01')])).toBe(null)
+    expect(citedBy('e2e/lanes/01/board', [card(9, 'combwork-test\\e2e\\lanes\\0')])).toBe(null)
+    expect(citedBy('e2e/lanes/0/board', [card(9, 'combwork-test\\e2e\\lanes\\01')])).toBe(null)
     // The areas themselves, named when cards talk about the tests, keep nothing.
-    expect(citedBy('e2e/review12-probe', [card(9, 'Everything goes in %LOCALAPPDATA%\\hive-test\\e2e.')])).toBe(null)
-    expect(citedBy('scratch/claudio-2026-10-01', [card(9, 'probes go in hive-test\\scratch\\<agent>-<date>')])).toBe(null)
+    expect(citedBy('e2e/review12-probe', [card(9, 'Everything goes in %LOCALAPPDATA%\\combwork-test\\e2e.')])).toBe(null)
+    expect(citedBy('scratch/claudio-2026-10-01', [card(9, 'probes go in combwork-test\\scratch\\<agent>-<date>')])).toBe(null)
   })
 
   it("a name alone isn't a citation, nor a longer name, nor the same word in another path", () => {
@@ -120,9 +120,9 @@ describe('what cards cite (they keep it)', () => {
   it("reads the cards that aren't Done or archived; a card it can't read means nothing may go", () => {
     const dir = temp('hive-clean-board-')
     const write = (n: number, c: object) => writeFileSync(join(dir, `${n}.json`), JSON.stringify({ number: n, title: 't', description: '', comments: [], column: 'todo', ...c }))
-    write(1, { description: 'hive-test\\e2e\\a.png' })
-    write(2, { column: 'done', description: 'hive-test\\e2e\\b.png' })
-    write(3, { archived: true, description: 'hive-test\\e2e\\c.png' })
+    write(1, { description: 'combwork-test\\e2e\\a.png' })
+    write(2, { column: 'done', description: 'combwork-test\\e2e\\b.png' })
+    write(3, { archived: true, description: 'combwork-test\\e2e\\c.png' })
     write(4, { column: 'passed', comments: [{ text: 'e2e\\D.png' }] })
     writeFileSync(join(dir, 'board.json'), '{"next":6}')
     const read = readCards(dir)
@@ -134,8 +134,8 @@ describe('what cards cite (they keep it)', () => {
     const damaged = readCards(dir)
     expect(damaged.ok).toBe(false)
     expect(damaged.why).toMatch(/card 5\.json .* can't be read/)
-    const ev = evidence({ tasksDir: dir, testRoot: 'C:\\hive-test' })
-    expect(ev.protects('C:\\hive-test\\e2e\\anything')).toMatch(/can't be read/)
+    const ev = evidence({ tasksDir: dir, testRoot: 'C:\\combwork-test' })
+    expect(ev.protects('C:\\combwork-test\\e2e\\anything')).toMatch(/can't be read/)
   })
 
   it("reads a board in its database (#1017) as it reads card files; one it can't open means nothing may go", () => {
@@ -145,9 +145,9 @@ describe('what cards cite (they keep it)', () => {
     db.exec('CREATE TABLE cards (number INTEGER PRIMARY KEY, doc TEXT NOT NULL)')
     const put = db.prepare('INSERT INTO cards (number, doc) VALUES (?, ?)')
     const add = (n: number, c: object): void => void put.run(n, JSON.stringify({ number: n, title: 't', description: '', comments: [], column: 'todo', ...c }))
-    add(1, { description: 'hive-test\\e2e\\a.png' })
-    add(2, { column: 'done', description: 'hive-test\\e2e\\b.png' })
-    add(3, { archived: true, description: 'hive-test\\e2e\\c.png' })
+    add(1, { description: 'combwork-test\\e2e\\a.png' })
+    add(2, { column: 'done', description: 'combwork-test\\e2e\\b.png' })
+    add(3, { archived: true, description: 'combwork-test\\e2e\\c.png' })
     add(4, { column: 'passed', comments: [{ text: 'e2e\\D.png' }] })
     db.close()
     const read = readCards(file)
@@ -156,7 +156,7 @@ describe('what cards cite (they keep it)', () => {
     expect(citedBy('e2e/d.png', read.cards)).toBe(4)
     const missing = readCards(join(dir, 'gone.db'))
     expect(missing.ok).toBe(false)
-    expect(evidence({ tasksDir: join(dir, 'gone.db'), testRoot: 'C:\\hive-test' }).protects('C:\\hive-test\\e2e\\anything')).toMatch(/can't be read/)
+    expect(evidence({ tasksDir: join(dir, 'gone.db'), testRoot: 'C:\\combwork-test' }).protects('C:\\combwork-test\\e2e\\anything')).toMatch(/can't be read/)
   })
 
   it("reads a 1.0 board's cards from its tables (#1209) as it reads a 0.9 board's documents", () => {
@@ -165,12 +165,12 @@ describe('what cards cite (they keep it)', () => {
     const db = new DatabaseSync(file)
     for (const sql of CARDS_STEP.ddl) db.exec(sql)
     const add = (n: number, c: object): void => writeCardRows(db, decomposeCard(n, { number: n, title: 't', description: '', comments: [], column: 'todo', ...c }))
-    add(1, { description: 'hive-test\\e2e\\a.png' })
-    add(2, { column: 'done', description: 'hive-test\\e2e\\b.png' })
-    add(3, { archived: true, description: 'hive-test\\e2e\\c.png' })
+    add(1, { description: 'combwork-test\\e2e\\a.png' })
+    add(2, { column: 'done', description: 'combwork-test\\e2e\\b.png' })
+    add(3, { archived: true, description: 'combwork-test\\e2e\\c.png' })
     add(4, { column: 'passed', comments: [{ at: '2026-10-20T00:00:00.000Z', by: 'You', text: 'e2e\\D.png' }] })
     // Only the cards that may cite are read, and of their rows only the comments (HI-2364): a card's history cites nothing.
-    add(5, { column: 'review', history: [{ at: '2026-10-20T00:00:00.000Z', from: 'doing', to: 'review', note: 'hive-test\\e2e\\e.png' }] })
+    add(5, { column: 'review', history: [{ at: '2026-10-20T00:00:00.000Z', from: 'doing', to: 'review', note: 'combwork-test\\e2e\\e.png' }] })
     db.close()
     const read = readCards(file)
     expect(read.ok).toBe(true)
@@ -191,7 +191,7 @@ describe('what cards cite (they keep it)', () => {
 })
 
 describe('the clean-up (clean.mjs)', () => {
-  /** A hive-test with something of each kind; lane 1 held by a runner (pid 4242). */
+  /** A combwork-test with something of each kind; lane 1 held by a runner (pid 4242). */
   function machine() {
     const root = temp('hive-clean-root-')
     const lanesDir = join(root, 'e2e-lanes')
@@ -238,10 +238,10 @@ describe('the clean-up (clean.mjs)', () => {
     // A failed run in the logs keeps its suite's folder (about-2) until KEEP_RUNS prunes the run (#285).
     writeFileSync(join(root, 'e2e', 'logs', 'run-20260101-000000', '.kept-folders.json'), JSON.stringify([join(root, 'e2e', 'lanes', '0', 'about-2')]))
     const cards = [
-      card(300, 'kept: hive-test\\e2e\\review13-cited\\shot.png'),
+      card(300, 'kept: combwork-test\\e2e\\review13-cited\\shot.png'),
       card(301, 'see evidence\\246-before.png'),
-      card(302, 'the whole lane: %LOCALAPPDATA%\\hive-test\\e2e\\lanes\\3'),
-      card(303, 'kept with --keep: hive-test\\scenarios\\lanes\\2\\kept-scenario'),
+      card(302, 'the whole lane: %LOCALAPPDATA%\\combwork-test\\e2e\\lanes\\3'),
+      card(303, 'kept with --keep: combwork-test\\scenarios\\lanes\\2\\kept-scenario'),
       card(304, 'the failure: e2e\\lanes\\3\\plan\\plan.png')
     ]
     const alive = (pid: number) => pid === 4242
@@ -439,8 +439,8 @@ describe('the Codex test home (#404): old rollouts, package copies and unfinishe
     // A card naming the home and its folders, as cards about Codex do, keeps nothing (they're places, like a lane);
     // one citing a rollout keeps it.
     const cards = [
-      card(404, 'the rollout: hive-test\\codex\\sessions\\2026\\10\\05\\rollout-2026-10-05T00-00-00-c.jsonl'),
-      card(405, 'the home %LOCALAPPDATA%\\hive-test\\codex, its codex\\sessions and codex\\sessions\\2026, codex\\packages\\app-server-daemon\\releases and codex\\cache\\remote_plugin_catalog')
+      card(404, 'the rollout: combwork-test\\codex\\sessions\\2026\\10\\05\\rollout-2026-10-05T00-00-00-c.jsonl'),
+      card(405, 'the home %LOCALAPPDATA%\\combwork-test\\codex, its codex\\sessions and codex\\sessions\\2026, codex\\packages\\app-server-daemon\\releases and codex\\cache\\remote_plugin_catalog')
     ]
     const cited = await run(m, { ev: rules(m.root, cards) })
     expect(there(m.root, 'sessions/2026/10/05/rollout-2026-10-05T00-00-00-c.jsonl')).toBe(true)
@@ -553,7 +553,7 @@ describe("the runners' own deletions keep evidence too", () => {
     const root = temp('hive-clean-suite-')
     const lane = join(root, 'e2e', 'lanes', '0')
     tree(lane, { 'board/board.png': 0, 'board/board-profile/x': 0, 'about/about.png': 0, 'about/about-ws/a.ts': 0 })
-    const ev = rules(root, [card(400, 'failed: hive-test\\e2e\\lanes\\0\\board\\board.png')])
+    const ev = rules(root, [card(400, 'failed: combwork-test\\e2e\\lanes\\0\\board\\board.png')])
     // Cited: kept as it was, the run gets board-2.
     expect(freshFolder(join(lane, 'board'), ev)).toBe(join(lane, 'board-2'))
     expect(readFileSync(join(lane, 'board', 'board.png'), 'utf8')).toHaveLength(100)
@@ -772,7 +772,7 @@ describe("the runners' own deletions keep evidence too", () => {
     // Looked at while nothing cited it…
     expect(ev.protects(profile)).toBe(null)
     // …then a card in Review cites a file in it, and the suite passes at once.
-    b.write(2, { column: 'review', comments: [{ text: 'see hive-test/e2e/lanes/0/board/board-profile/evidence.txt' }] })
+    b.write(2, { column: 'review', comments: [{ text: 'see combwork-test/e2e/lanes/0/board/board-profile/evidence.txt' }] })
     expect(finishSuiteDir(dir, ev, true)).toEqual({ removed: false, kept: 'cited by #2' })
     expect(readFileSync(join(profile, 'evidence.txt'), 'utf8')).toHaveLength(100)
     // The same for a folder the next run would take over, and for the clean-up's removals.
@@ -788,7 +788,7 @@ describe("the runners' own deletions keep evidence too", () => {
     const dir = freshFolder(join(lane, 'about'), ev)
     expect(dir).toBe(join(lane, 'about'))
     tree(dir, { 'evidence/shot.png': 0, 'about-profile/x': 0, 'about.png': 0 })
-    b.write(3, { description: 'hive-test\\e2e\\lanes\\0\\about\\evidence\\shot.png' })
+    b.write(3, { description: 'combwork-test\\e2e\\lanes\\0\\about\\evidence\\shot.png' })
     // A card being saved badly (or the board gone) when the suite passes: everything stays.
     writeFileSync(join(b.dir, '4.json'), '{ half-written')
     const r = finishSuiteDir(dir, ev, true)
@@ -811,7 +811,7 @@ describe("the runners' own deletions keep evidence too", () => {
     const real = ev.snapshot
     ev.snapshot = () => {
       const s = real()
-      b.write(5, { description: 'hive-test\\evidence-old\\b.png' })
+      b.write(5, { description: 'combwork-test\\evidence-old\\b.png' })
       return s
     }
     const r = await clean({ root, lanesDir: join(root, 'e2e-lanes'), ev, owner: 778 })
@@ -825,7 +825,7 @@ describe("the runners' own deletions keep evidence too", () => {
     const logs = join(root, 'e2e', 'logs')
     const names = Array.from({ length: 6 }, (_, k) => `run-20261005-23000${k}`)
     for (const n of names) tree(logs, { [`${n}/board.log`]: 0 })
-    const ev = rules(root, [card(256, 'C:\\Users\\X\\AppData\\Local\\hive-test\\e2e\\logs\\run-20261005-230000 has the failure')])
+    const ev = rules(root, [card(256, 'C:\\Users\\X\\AppData\\Local\\combwork-test\\e2e\\logs\\run-20261005-230000 has the failure')])
     const gone = pruneRunDirs(logs, 2, [], () => false, (p: string) => ev.protects(p))
     expect(gone).toEqual(names.slice(1, 4))
     expect(readdirSync(logs).sort()).toEqual([names[0], names[4], names[5]])
@@ -840,7 +840,7 @@ describe("the runners' own deletions keep evidence too", () => {
     // The list's look: no card cites anything. Since then, a card cites the second oldest run.
     const listed: string[] = []
     const asked: string[] = []
-    const fresh = rules(root, [card(2364, `hive-test\\e2e\\logs\\${names[1]} kept it alive`)])
+    const fresh = rules(root, [card(2364, `combwork-test\\e2e\\logs\\${names[1]} kept it alive`)])
     const released: string[] = []
     const gone = await pruneRunDirsReleasing(logs, 2, [], () => false, (p: string) => (asked.push(basename(p)), fresh.protects(p)), {
       listSpare: (p: string) => (listed.push(basename(p)), null),
@@ -868,7 +868,7 @@ describe("the runners' own deletions keep evidence too", () => {
       release: async (d: string) => {
         released.push(basename(d))
         // While the first run's release waits, a card cites it.
-        if (basename(d) === names[0]) cards = [card(2364, `hive-test\\e2e\\logs\\${names[0]}`)]
+        if (basename(d) === names[0]) cards = [card(2364, `combwork-test\\e2e\\logs\\${names[0]}`)]
       }
     })
     expect(released).toEqual(names.slice(0, 2))
@@ -887,13 +887,13 @@ describe("the runners' own deletions keep evidence too", () => {
     const root = temp('hive-clean-sc-')
     const results = join(root, 'scenarios', 'results')
     for (const n of ['2026-10-01T00-00-00-fake', '2026-10-02T00-00-00-fake', '2026-10-03T00-00-00-fake']) tree(results, { [`${n}/results.json`]: 0 })
-    const ev = rules(root, [card(272, 'hive-test/scenarios/results/2026-10-01T00-00-00-fake/summary.md')])
+    const ev = rules(root, [card(272, 'combwork-test/scenarios/results/2026-10-01T00-00-00-fake/summary.md')])
     pruneResults(results, 1, (p: string) => ev.protects(p))
     expect(readdirSync(results).sort()).toEqual(['2026-10-01T00-00-00-fake', '2026-10-03T00-00-00-fake'])
     // Older copies of a baseline: one cited stays when the newest few are kept.
     const baselines = join(root, 'scenarios', 'baselines')
     const file = join(root, 'b.json')
-    const cited = rules(root, [card(272, 'hive-test\\scenarios\\baselines\\x.2026-01-01T00-00-00.json')])
+    const cited = rules(root, [card(272, 'combwork-test\\scenarios\\baselines\\x.2026-01-01T00-00-00.json')])
     mkdirSync(baselines, { recursive: true })
     for (let k = 0; k < 7; k++) {
       writeFileSync(file, JSON.stringify({ createdAt: `2026-01-0${k + 1}T00:00:00.000Z` }))
@@ -904,11 +904,11 @@ describe("the runners' own deletions keep evidence too", () => {
 })
 
 describe('no shell deletes before a rerun (#304): a new folder each run, or clearDir from Node', () => {
-  /** A temp folder and a hive-test of their own, with a scratchpad, a CLI test home and some evidence. */
+  /** A temp folder and a combwork-test of their own, with a scratchpad, a CLI test home and some evidence. */
   function roots() {
     const top = temp('hive-cleardir-')
     const tmp = join(top, 'Temp')
-    const testRoot = join(top, 'hive-test')
+    const testRoot = join(top, 'combwork-test')
     const pad = join(tmp, 'claude', 'D--proj', 'session', 'scratchpad')
     tree(top, {
       'Temp/claude/D--proj/session/scratchpad/shots/a.png': 0,
@@ -916,12 +916,12 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
       'Temp/cw-r2-291-x/c.png': 0,
       'Temp/hive-r2-291-x/c.png': 0,
       'Temp/other-app/d.txt': 0,
-      'hive-test/scratch/probe-1/e.png': 0,
-      'hive-test/e2e/startall-ws/f.ts': 0,
-      'hive-test/e2e/lanes/0/board/g.png': 0,
-      'hive-test/e2e/logs/run-1/h.log': 0,
-      'hive-test/codex/auth.json': 0,
-      'hive-test/claude/.credentials.json': 0
+      'combwork-test/scratch/probe-1/e.png': 0,
+      'combwork-test/e2e/startall-ws/f.ts': 0,
+      'combwork-test/e2e/lanes/0/board/g.png': 0,
+      'combwork-test/e2e/logs/run-1/h.log': 0,
+      'combwork-test/codex/auth.json': 0,
+      'combwork-test/claude/.credentials.json': 0
     })
     const homes = [join(testRoot, 'codex'), join(testRoot, 'claude')]
     const board = { cards: [card(401, `evidence: ${join(pad, 'kept', 'b.png')}`)] }
@@ -929,7 +929,7 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
     return { top, tmp, testRoot, pad, homes, clear }
   }
 
-  it('empties (or makes) a probe’s folder in a scratchpad, a cw… temp folder, hive-test\\scratch or a suite’s own e2e folder', () => {
+  it('empties (or makes) a probe’s folder in a scratchpad, a cw… temp folder, combwork-test\\scratch or a suite’s own e2e folder', () => {
     const { tmp, testRoot, pad, clear } = roots()
     for (const p of [join(pad, 'shots'), join(tmp, 'cw-r2-291-x'), join(testRoot, 'scratch', 'probe-1'), join(testRoot, 'e2e', 'startall-ws')]) {
       expect(clear(p)).toBe(p)
@@ -939,14 +939,14 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
     expect(readdirSync(clear(join(pad, 'new', 'deeper')))).toEqual([])
   })
 
-  it('refuses anything outside the temp folder and hive-test, the areas themselves and other apps’ temp folders', () => {
+  it('refuses anything outside the temp folder and combwork-test, the areas themselves and other apps’ temp folders', () => {
     const { top, tmp, testRoot, pad, clear } = roots()
     const refused = [
       // Holding the test homes: refused for that first.
       [top, /CLI test home/],
       [testRoot, /CLI test home/],
-      [tmp, /outside the temp folder and hive-test/],
-      [join(top, 'elsewhere'), /outside the temp folder and hive-test/],
+      [tmp, /outside the temp folder and combwork-test/],
+      [join(top, 'elsewhere'), /outside the temp folder and combwork-test/],
       [join(tmp, 'other-app'), /isn't a probe's folder/],
       // One-way rename (HI-2600): a hive… temp folder is no longer a probe's.
       [join(tmp, 'hive-r2-291-x'), /isn't a probe's folder: .*cw… folders/],
@@ -992,8 +992,8 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
     const top = temp('hive-cleardir-rootlink-')
     const outside = join(top, 'outside')
     tree(top, { 'outside/scratch/probe/sentinel.txt': 0, 'outside/scratch/probe/auth.json': 0, 'outside/Temp/cw-x/sentinel.txt': 0, 'realtmp/cw-y/keep.txt': 0 })
-    // hive-test itself is a junction to the outside folder; and the configured home is that outside place.
-    const testRoot = join(top, 'hive-test')
+    // combwork-test itself is a junction to the outside folder; and the configured home is that outside place.
+    const testRoot = join(top, 'combwork-test')
     symlinkSync(outside, testRoot, 'junction')
     const home = join(outside, 'scratch', 'probe')
     expect(() => clearDir(join(testRoot, 'scratch', 'probe'), { board: { cards: [] }, temp: join(top, 'realtmp'), testRoot, homes: [home] })).toThrow(/reached through a link/)
@@ -1008,11 +1008,11 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
 
   it('a test home is recognised as it really is: one reached through a link elsewhere still protects its folder', () => {
     const top = temp('hive-cleardir-homelink-')
-    tree(top, { 'hive-test/scratch/probe/auth.json': 0, 'Temp/x.txt': 0 })
-    const real = join(top, 'hive-test', 'scratch', 'probe')
+    tree(top, { 'combwork-test/scratch/probe/auth.json': 0, 'Temp/x.txt': 0 })
+    const real = join(top, 'combwork-test', 'scratch', 'probe')
     const alias = join(top, 'codex-home-link')
     symlinkSync(real, alias, 'junction')
-    expect(() => clearDir(real, { board: { cards: [] }, temp: join(top, 'Temp'), testRoot: join(top, 'hive-test'), homes: [alias] })).toThrow(/CLI test home/)
+    expect(() => clearDir(real, { board: { cards: [] }, temp: join(top, 'Temp'), testRoot: join(top, 'combwork-test'), homes: [alias] })).toThrow(/CLI test home/)
     expect(existsSync(join(real, 'auth.json'))).toBe(true)
   })
 
@@ -1021,12 +1021,12 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
     expect(() => clear(join(pad, 'kept'))).toThrow(/must stay: cited by #401/)
     expect(readdirSync(join(pad, 'kept'))).toEqual(['b.png'])
     expect(() => clear(join(tmp, 'cw-r2-291-x'), { tasksDir: null })).toThrow(/must stay: no board was found/)
-    // Paths in the temp folder are matched as `Temp\\…`: a card naming hive-test's own claude home doesn't keep a
-    // scratchpad under `Temp\\claude` (it did, read as `hive-test\\claude`); nor does one naming the scratchpads' folders
-    // as a pattern (areas, like hive-test's lanes).
+    // Paths in the temp folder are matched as `Temp\\…`: a card naming combwork-test's own claude home doesn't keep a
+    // scratchpad under `Temp\\claude` (it did, read as `combwork-test\\claude`); nor does one naming the scratchpads' folders
+    // as a pattern (areas, like combwork-test's lanes).
     const others = {
       cards: [
-        card(186, 'the Claude test home is C:\\Users\\X\\AppData\\Local\\hive-test\\claude, beside hive-test\\codex'),
+        card(186, 'the Claude test home is C:\\Users\\X\\AppData\\Local\\combwork-test\\claude, beside combwork-test\\codex'),
         card(304, 'only inside a Claude Code scratchpad (`Temp\\claude\\…\\scratchpad\\<x>`)'),
         card(305, `the session's folder ${join(pad, '..')}\\…`)
       ]
@@ -1038,7 +1038,7 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
     expect(readdirSync(join(tmp, 'cw-r2-291-x'))).toEqual(['c.png'])
   })
 
-  it('probeDir gives a new folder every call, in hive-test\\scratch, named for the probe', () => {
+  it('probeDir gives a new folder every call, in combwork-test\\scratch, named for the probe', () => {
     const root = temp('hive-probedir-')
     const a = probeDir('R2 #291 probe!', root)
     const b = probeDir('R2 #291 probe!', root)

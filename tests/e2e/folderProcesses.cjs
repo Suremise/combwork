@@ -402,7 +402,7 @@ const copiesIn = (list, copies) => list.filter((p) => copies.some((c) => c.pid =
  * one of `folders` (a profile flag on their command line, and the folder named on it). Command lines can't be read
  * reliably (each program splits its own), so such a process is listed for a person to look at.
  */
-const lookLikeCopies = (list, folders) => list.filter((p) => p.pid !== process.pid && /--(hive-test-profile|user-data-dir)=/i.test(p.commandLine ?? '') && folders.some((f) => namesFolder(p.commandLine, f)))
+const lookLikeCopies = (list, folders) => list.filter((p) => p.pid !== process.pid && /--(combwork-test-profile|user-data-dir)=/i.test(p.commandLine ?? '') && folders.some((f) => namesFolder(p.commandLine, f)))
 
 /**
  * Ends the test copies of Combwork recorded in `folders` (recordCopy) that still run as the process recorded (its pid and

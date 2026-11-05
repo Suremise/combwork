@@ -28,7 +28,7 @@ describe('the lanes a run sweeps at its start (HI-1453)', () => {
     const dir = tempDir('hive-left-copies-')
     const work = join(dir, 'e2e')
     const calls: { folders: string[]; before: number }[] = []
-    const unrecorded = [{ pid: 7, commandLine: 'electron.exe --hive-test-profile=x' }]
+    const unrecorded = [{ pid: 7, commandLine: 'electron.exe --combwork-test-profile=x' }]
     const end = (folders: string[], o: { before: number }) => (calls.push({ folders, before: o.before }), { ended: 3, unrecorded })
     const runner = await claimLane(dir, { owner: 100, alive: () => true, free: async () => true })
     expect(runner.lane).toBe(0)
