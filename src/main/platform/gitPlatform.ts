@@ -347,8 +347,9 @@ export class GitPlatform implements PlatformAdapter {
       if (args.predicted) return { ok: false, refusal: { rule: 'submit.empty', values: { card: card.key } } }
       // HI-2562: nothing of its own, but a commit naming no card since it started, with another card's agent in the
       // folder: most likely its own work without the trailer, so the trailer's refusal (the commit, and the amend that
-      // fixes it), not "nothing committed".
-      if (commits && args.guards.includes('submit.trailer')) {
+      // fixes it), not "nothing committed". Whatever the rules hold: the submit is refused either way, and with every
+      // rule off (no submit.trailer) the amend is still what lets it through.
+      if (commits) {
         const u = await this.untrailered(card, s)
         if (isUnknown(u)) return { ok: false, refusal: unknownRefusal(card, u, 'submit') }
         if (u) return { ok: false, refusal: trailerRefusal(card.key, u) }

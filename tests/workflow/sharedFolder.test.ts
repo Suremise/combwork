@@ -88,6 +88,18 @@ describe('workflow scenarios, several agents in one folder', () => {
     expect(e.wf.state(b).latest).toMatchObject({ revision: amended, commits: [amended] })
   })
 
+  it("HI-2562: every rule off (no submit.trailer), two cards in the folder, the card's commit names none → submit.trailer, not submit.empty; amended, it submits", async () => {
+    const e = (env = setup({ platform: 'git' }))
+    const [a, b] = ['A', 'B'].map((t) => e.wf.createCard({ title: t }))
+    moved(await e.wf.start(a.key, B1))
+    moved(await e.wf.start(b.key, B2))
+    expect(e.wf.rulesetOf(b, e.wf.state(b)).guards.submit).not.toContain('submit.trailer')
+    const b1 = commit(e.project, { 'README.md': 'usage\n' }, 'docs: add usage')
+    expect(refusedBy(await e.wf.submit(b.key, B2, { summary: 'B' }), 'submit.trailer').values).toMatchObject({ card: b.key, commit: b1.slice(0, 7) })
+    sh(e.project, 'commit', '-q', '--amend', '--no-edit', '--trailer', `Hive-Card: ${b.key}`)
+    moved(await e.wf.submit(b.key, B2, { summary: 'B' }))
+  })
+
   it("HI-2562: nothing committed since it started, only an older commit naming no card → still submit.empty", async () => {
     const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', slotsUpToDate: false, preChecks: [], mergeChecks: [], target: '' }))
     const [a, b] = ['A', 'B'].map((t) => e.wf.createCard({ title: t }))
