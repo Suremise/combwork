@@ -58,7 +58,7 @@ const legacyBytes = () => Object.fromEntries(stored().map((a) => [a.id, JSON.str
 
   let h = null
   try {
-    h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 850 } })
+    h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 850 } })
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     const { inv, page } = h
     const until = (fn, ms) => lib.until(fn, ms, 250)

@@ -4,7 +4,7 @@
 // why; the quick add (Ctrl+Alt+Shift+N) adds the agent on Claude Code's. With no account on (HI-2127), Start a session
 // now is unticked and off with its reason beside it, the agent is still added (no session), and the choice's link opens
 // Settings → Accounts & Connections (screenshots in both themes). Then (round 2) both installed, Codex's detection
-// held (HIVE_TEST_SLOW_DETECT): while it is still looked for, Add Agent chooses nothing and Add waits, saying why; an
+// held (CW_TEST_SLOW_DETECT): while it is still looked for, Add Agent chooses nothing and Add waits, saying why; an
 // Add with no connection (the window's call) waits for detection in main; once Codex is found, Codex's connection is
 // chosen and the agent added there. No session is started. The test seam off so the real rule applies.
 const lib = require('./lib.cjs')
@@ -60,7 +60,7 @@ async function settled(env) {
   // Codex isn't on PATH, and its usual places are an empty throwaway user folder.
   const { app, page } = await lib.launch({
     userData,
-    env: { ...env, APPDATA: path.join(fakeUser, 'AppData', 'Roaming'), LOCALAPPDATA: path.join(fakeUser, 'AppData', 'Local'), USERPROFILE: fakeUser, HOME: fakeUser, CODEX_HOME: path.join(fakeUser, 'codex-home'), PATH: [path.dirname(process.execPath), 'C:\\Windows\\System32'].join(';'), HIVE_TEST_CLI_HOME_CONNECTION: '0' },
+    env: { ...env, APPDATA: path.join(fakeUser, 'AppData', 'Roaming'), LOCALAPPDATA: path.join(fakeUser, 'AppData', 'Local'), USERPROFILE: fakeUser, HOME: fakeUser, CODEX_HOME: path.join(fakeUser, 'codex-home'), PATH: [path.dirname(process.execPath), 'C:\\Windows\\System32'].join(';'), CW_TEST_CLI_HOME_CONNECTION: '0' },
     viewport: { width: 1400, height: 900 }
   })
   try {
@@ -143,7 +143,7 @@ async function duringDetection(env) {
   fs.mkdirSync(path.join(fakeUser, 'codex-home'), { recursive: true })
   // Held long enough to act while it is pending, and let go by itself: the suite waits for its end, never a time.
   // Launched as providerdetect does, not with lib.launch (which waits for detection to finish).
-  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData2, ...env, CODEX_HOME: path.join(fakeUser, 'codex-home'), HIVE_TEST_SLOW_DETECT: 'codex=20000', HIVE_TEST_CLI_HOME_CONNECTION: '0' }) })
+  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ CW_USER_DATA: userData2, ...env, CODEX_HOME: path.join(fakeUser, 'codex-home'), CW_TEST_SLOW_DETECT: 'codex=20000', CW_TEST_CLI_HOME_CONNECTION: '0' }) })
   const page = await app.firstWindow()
   await lib.fitWindow(app, page, { width: 1400, height: 900 })
   await lib.until(() => page.evaluate(() => !!document.querySelector('.app .workbench')).catch(() => false), HUNG_MS)

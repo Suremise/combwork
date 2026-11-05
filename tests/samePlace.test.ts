@@ -149,8 +149,8 @@ describe('places by real path (#455)', () => {
 
     it('Delete moves the project and its own worktree to the trash, never a folder those guards protect', async () => {
       const trashDir = join(base, 'trash')
-      const was = process.env.HIVE_TEST_TRASH_DIR
-      process.env.HIVE_TEST_TRASH_DIR = trashDir
+      const was = process.env.CW_TEST_TRASH_DIR
+      process.env.CW_TEST_TRASH_DIR = trashDir
       try {
         const agents = [agent('z', alias(q, 'q-delete')), agent('y', alias(outer, 'outer-delete')), agent('x', alias(q2, 'q2-delete')), agent('s', alias(spare, 'spare-delete'))]
         // Under project.json's lock, as Combwork writes it (#1238): written beside it, a write the opened workspace began
@@ -163,8 +163,8 @@ describe('places by real path (#455)', () => {
         expect(gone.map((p) => p.toLowerCase())).toEqual([q, join(aliases, 'spare-delete')].map((p) => p.toLowerCase()))
         for (const kept of [outer, ws2, q2, join(outer, 'a.txt'), join(aliases, 'outer-delete'), join(aliases, 'q2-delete')]) expect(existsSync(kept)).toBe(true)
       } finally {
-        if (was === undefined) delete process.env.HIVE_TEST_TRASH_DIR
-        else process.env.HIVE_TEST_TRASH_DIR = was
+        if (was === undefined) delete process.env.CW_TEST_TRASH_DIR
+        else process.env.CW_TEST_TRASH_DIR = was
       }
     })
   })

@@ -2,7 +2,7 @@ import { existsSync } from 'original-fs'
 import { mkdir, readFile, stat } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
 import type { MoveBranch, MoveCards, MoveHostPlan, MoveOptions, MoveOwner, MovePlan, MoveReport, MoveReportRow, MoveWorktree, PathDataCopy, ProfileMove, ProjectConfig, WorkspaceMoved } from '../shared/types'
-import { HIVE_DIR, projectAgents } from '../shared/defaults'
+import { CW_DIR, projectAgents } from '../shared/defaults'
 import { fmt, msg, tr } from '../shared/i18n'
 import { moveHasWork, rebase, rebaseAny, samePath, worktreeCandidates, type PathMove } from '../shared/movePaths'
 import { moveCardFolders, PruneBlocked, recreateWorktree } from './agentWorktree'
@@ -47,7 +47,7 @@ import { emitTo } from './events'
 const log = createLogger('move')
 
 const assistantName = (): string => tr(msg({ id: 'main.move.assistant', defaultMessage: 'Assistant', description: "The Hive Assistant's name, where Repair (after a workspace moved) lists what it repairs and the agents still running." }))
-const PROJECT_FILE = join(HIVE_DIR, 'project.json')
+const PROJECT_FILE = join(CW_DIR, 'project.json')
 
 /** Whether p is inside root (or is it). */
 const under = (p: string, root: string): boolean => rebase(p, root, root) !== null
@@ -685,7 +685,7 @@ async function carryProfile(ws: WorkspaceService, report?: MoveReport): Promise<
   const life = ws.lifetime
   if (!here) return
   const current = (): boolean => !life.aborted && ws.path === here
-  const gone = (p: string): boolean => !existsSync(join(p, HIVE_DIR)) && !workspaceFor(p)
+  const gone = (p: string): boolean => !existsSync(join(p, CW_DIR)) && !workspaceFor(p)
   const ofFrom = (from: string) => (m: ProfileMove): boolean => samePath(m.from, from)
   // Where it was last opened (lastPath, as Repair goes by), and where its records were last brought (profileAt): moved
   // again before a Repair, lastPath is still the first old folder while the records went on with it (HR2's round 3).

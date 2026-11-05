@@ -45,9 +45,9 @@ interface Loop {
 const loops = new Map<string, Loop>()
 const keyOf = (projectPath: string, agentId: string): string => `${projectPath.toLowerCase()}#${agentId}`
 
-/** Unpackaged test builds can shorten the grace (HIVE_TEST_LOOP_GRACE_MS). */
+/** Unpackaged test builds can shorten the grace (CW_TEST_LOOP_GRACE_MS). */
 function graceMs(): number {
-  const v = !app.isPackaged ? Number(process.env.HIVE_TEST_LOOP_GRACE_MS) : NaN
+  const v = !app.isPackaged ? Number(process.env.CW_TEST_LOOP_GRACE_MS) : NaN
   return Number.isFinite(v) && v >= 0 ? v : GRACE_MS
 }
 

@@ -61,7 +61,7 @@ const check = (name, ok, extra = '') => {
   const main = g(alpha, 'rev-parse', 'main')
   const clashWas = g(alpha, 'rev-parse', 'clash')
   const claude = lib.fakeClaude(userData, claudeHome, [alpha])
-  const env = { ...claude, HIVE_API_PORT: lib.port(47813), GIT_CONFIG_GLOBAL: globalConfig }
+  const env = { ...claude, CW_API_PORT: lib.port(47813), GIT_CONFIG_GLOBAL: globalConfig }
 
   const { app, page, inv } = await lib.launch({ userData, env, viewport: { width: 1300, height: 900 } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))

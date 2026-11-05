@@ -43,7 +43,7 @@ const until = async (fn, ms = 10000) => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, allowSessionInput: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -89,7 +89,7 @@ const until = async (fn, ms = 10000) => {
   const agentToken = JSON.parse(fs.readFileSync(mcpEnv.CW_API_TOKEN_FILE, 'utf8')).token
   const workspaceToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
   check('the agent has a token of its own', !!agentToken && agentToken !== workspaceToken)
-  check("its environment names its token's file, not the token (HI-2262)", launch.token === agentToken && !('HIVE_API_TOKEN' in launch.env) && launch.env.CW_API_TOKEN_FILE === mcpEnv.CW_API_TOKEN_FILE, JSON.stringify(launch.env))
+  check("its environment names its token's file, not the token (HI-2262)", launch.token === agentToken && !('CW_API_TOKEN' in launch.env) && launch.env.CW_API_TOKEN_FILE === mcpEnv.CW_API_TOKEN_FILE, JSON.stringify(launch.env))
   const call = async (token, method, p, body) => {
     const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
     return { status: res.status, body: await res.json().catch(() => null) }

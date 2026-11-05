@@ -41,7 +41,7 @@ const check = (name, ok, extra = '') => {
   fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }, { id: 'a-two', name: 'Two' }, { id: 'a-three', name: 'Three' }] }))
 
-  const { app, page, inv } = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_CLI_HOME_CONNECTION: '0', HIVE_TEST_NOTIFY_LOG: notifyLog }, viewport: { width: 1400, height: 900 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_CLI_HOME_CONNECTION: '0', CW_TEST_NOTIFY_LOG: notifyLog }, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)

@@ -92,7 +92,7 @@ export type TaskActor = { kind: 'user' } | { kind: 'assistant' } | { kind: 'agen
 
 /** Hive itself starting a lane's next card on its builder (HI-1990, laneStarts.ts): its start goes through the card's rules. */
 // agent-protocol: who did it, as cards' history stores it: Combwork's own name (HI-2463)
-export const HIVE_LANE_START: TaskActor = { kind: 'agent', name: 'Combwork' } // i18n-ignore: who did it, as cards' history and agents name Hive
+export const CW_LANE_START: TaskActor = { kind: 'agent', name: 'Combwork' } // i18n-ignore: who did it, as cards' history and agents name Hive
 
 /** The project an actor is confined to on the board (a project agent's own), or null for the whole workspace. */
 export const scopeOf = (a: TaskActor): string | null => (a.kind === 'agent' && a.scope !== undefined ? a.scope : null)
@@ -1542,7 +1542,7 @@ interface AgentGate {
 async function agentGateOf(ws: WorkspaceService, n: number, patch: TaskPatch, actor: TaskActor): Promise<AgentGate | null> {
   // Hive starting a lane's next card on its builder (HI-1990, laneStarts.ts): its start for that agent, as an agent's move
   // giving a card to another is, and the put back undoing it; nothing else of Hive's.
-  const laneStart = actor === HIVE_LANE_START
+  const laneStart = actor === CW_LANE_START
   if (actor.kind !== 'agent' || (!actor.self && !laneStart)) return null
   if (laneStart && (patch.review !== undefined || (patch.column === 'doing' ? !patch.agent : patch.column !== 'todo'))) return null
   const review = patch.review === 'start' || patch.review === 'passed' || patch.review === 'failed' ? patch.review : undefined

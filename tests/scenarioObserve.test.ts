@@ -1702,10 +1702,10 @@ describe('the fixtures fail when nothing was done', () => {
     const known = [{ kind: 'workspace', token: ws }, { kind: 'agent', token: agent }]
     // The trial's Bash call: `env | grep -i hive`, the token far into its result.
     const hook = '9'.repeat(24) + 'abcdef'.repeat(4)
-    const env = `${'x'.repeat(500)}\nCW_HOOK_TOKEN=${hook}\nCW_API_URL=http://127.0.0.1:47822\nHIVE_API_TOKEN=${agent}\nCW_RUN_ID=afec06a7b1c2d3e4f5a6b7c8\nCW_API_TOKEN_FILE=C:\\t.json\n`
+    const env = `${'x'.repeat(500)}\nCW_HOOK_TOKEN=${hook}\nCW_API_URL=http://127.0.0.1:47822\nCW_API_TOKEN=${agent}\nCW_RUN_ID=afec06a7b1c2d3e4f5a6b7c8\nCW_API_TOKEN_FILE=C:\\t.json\n`
     const seen = tokenSightings(known, { tools: [{ name: 'Skill', result: 'Launching skill' }, { name: 'Bash', result: env }], scripts: [{ name: 'Script', result: `got ${ws}` }], replies: ['done', `the token is ${agent} and ${ws}`] })
     expect(seen.map((s) => [s.kind, s.in, s.at, s.name])).toEqual([['agent', 'tool', 1, 'Bash'], ['workspace', 'script', 0, 'Script'], ['workspace', 'reply', 1, undefined], ['agent', 'reply', 1, undefined]])
-    expect(seen[0].excerpt).toContain('HIVE_API_TOKEN=<agent token>')
+    expect(seen[0].excerpt).toContain('CW_API_TOKEN=<agent token>')
     // The hook token beside it, unknown to the check, is masked too (HR2's round 1); a run id isn't.
     expect(seen[0].excerpt).toContain('CW_HOOK_TOKEN=<hex>')
     expect(seen[0].excerpt).not.toContain('abcdefabcdef')
@@ -1717,7 +1717,7 @@ describe('the fixtures fail when nothing was done', () => {
     // The check fails saying where, masked.
     const check = scenario('raw-api').expect({ ...base, tokenLeak: true, tokenSeen: seen.slice(0, 1) }, { read: () => null }).find(([n]) => n === 'no token was printed or said')
     expect(check?.[1]).toBe(false)
-    expect(check?.[2]).toMatch(/^agent token in tool 1 \(Bash\): ….*HIVE_API_TOKEN=<agent token>/)
+    expect(check?.[2]).toMatch(/^agent token in tool 1 \(Bash\): ….*CW_API_TOKEN=<agent token>/)
     expect(check?.[2]).not.toContain(agent)
   })
 
@@ -1728,7 +1728,7 @@ describe('the fixtures fail when nothing was done', () => {
     const named = (script: string) => scenario('raw-api').expect({ ...base, skillsRead: ['use-cw-api'] }, { read: (f: string) => (f === 'scripts/cards.ps1' ? script : null) }).find(([n]) => n === "the script takes the agent's own token from CW_API_TOKEN_FILE")?.[1]
     expect(named('$t = (Get-Content $env:CW_API_TOKEN_FILE | ConvertFrom-Json).token')).toBe(true)
     // The variable sessions no longer get: fails.
-    expect(named('$h = @{ Authorization = "Bearer $env:HIVE_API_TOKEN" }')).toBe(false)
+    expect(named('$h = @{ Authorization = "Bearer $env:CW_API_TOKEN" }')).toBe(false)
   })
 
   it('assistant-dispatch: names alone, failed calls, or a wait before the start, and a card never finished, all fail', () => {

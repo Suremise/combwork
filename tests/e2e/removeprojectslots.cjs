@@ -45,7 +45,7 @@ const identity = ['-c', 'user.name=Hive Slot Test', '-c', 'user.email=slots@exam
       ]
     }, null, 2)
   )
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 900 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 900 } })
   const until = (fn, ms) => lib.until(fn, ms, 250)
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))

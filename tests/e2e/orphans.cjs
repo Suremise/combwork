@@ -1,7 +1,7 @@
 // What an agent's command leaves running while the agent keeps running (HI-2111). A fake Claude Code agent, HB2, runs
 // "linger 1": a short-lived node starts a detached, hidden node and exits, so the one left (fake-claude's linger.cjs)
 // has no living parent, as a server started with `&` from a shell that has ended has. Shortened for the test
-// (HIVE_TEST_ORPHAN_MS, HIVE_TEST_ORPHAN_POLL_MS), its ten minutes are seconds: Activity marks it as left running, with
+// (CW_TEST_ORPHAN_MS, CW_TEST_ORPHAN_POLL_MS), its ten minutes are seconds: Activity marks it as left running, with
 // its CPU time and End It; one notice says so, clicking to HB2; HB2 is told once, at its next tool call; Pause the team
 // names it as not parked; End It, behind Activity's question, ends exactly it. A second window, showing another workspace
 // and opened last (so the window focused last), gets no notice of it: the notice goes to the orphan's own window. Screenshots of the row and the notice,
@@ -46,7 +46,7 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
   cfg.settings.sessions = { ...cfg.settings.sessions, confirmStop: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const h = await lib.launch({ userData, env: { ...env, HIVE_TEST_TIPS: 'off', HIVE_TEST_ORPHAN_MS: '4000', HIVE_TEST_ORPHAN_POLL_MS: '1000' }, viewport: { width: 1400, height: 850 } })
+  const h = await lib.launch({ userData, env: { ...env, CW_TEST_TIPS: 'off', CW_TEST_ORPHAN_MS: '4000', CW_TEST_ORPHAN_POLL_MS: '1000' }, viewport: { width: 1400, height: 850 } })
   const { app, page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))

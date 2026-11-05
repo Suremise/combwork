@@ -1,4 +1,4 @@
-// Slow actions and unsaved cards. With slow IPC (HIVE_TEST_SLOW_IPC, unpackaged builds only): Start, Delete, Comment
+// Slow actions and unsaved cards. With slow IPC (CW_TEST_SLOW_IPC, unpackaged builds only): Start, Delete, Comment
 // and Remove Project show a spinner, can't be closed part-way and run once however often they're clicked. The card
 // dialog asks before closing with unsaved edits or a comment draft (Escape, ×, outside, Cancel), and Start… saves the
 // edits first so the agent gets the card as shown; a failed save starts nothing. The agent is the fake Claude Code
@@ -39,10 +39,10 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   const env = lib.hiveEnv({
-    HIVE_USER_DATA: userData,
-    HIVE_API_PORT: lib.port(47894),
+    CW_USER_DATA: userData,
+    CW_API_PORT: lib.port(47894),
     CLAUDE_CONFIG_DIR: claudeHome,
-    HIVE_TEST_SLOW_IPC: SLOW_IPC
+    CW_TEST_SLOW_IPC: SLOW_IPC
   })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
@@ -178,7 +178,7 @@ const check = (name, ok, extra = '') => {
   const first = (await live())?.sessionId
   // Its usage is now slow to read: a new conversation shows a placeholder, never the old one's numbers.
   await app.evaluate(() => {
-    process.env.HIVE_TEST_SLOW_IPC = 'session:usage=4000'
+    process.env.CW_TEST_SLOW_IPC = 'session:usage=4000'
   })
   await inv('session:stop', alpha, agent.id)
   await until(async () => !(await live()), 10000)
@@ -192,7 +192,7 @@ const check = (name, ok, extra = '') => {
   await page.screenshot({ path: path.join(lib.WORK, 'busy-3-usage.png') })
   // Back to the suite's own slow calls (#717: '' here left removing a project fast, and its checks below raced it).
   await app.evaluate((_electronModule, v) => {
-    process.env.HIVE_TEST_SLOW_IPC = v
+    process.env.CW_TEST_SLOW_IPC = v
   }, SLOW_IPC)
   await inv('session:stop', alpha, agent.id)
   await until(async () => !(await live()), 10000)

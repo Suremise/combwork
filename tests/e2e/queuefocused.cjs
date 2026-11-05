@@ -43,11 +43,11 @@ function tools() {
   fs.writeFileSync(run, [
     "const fs = require('fs')",
     `const c = JSON.parse(fs.readFileSync(${JSON.stringify(focused)}, 'utf8'))`,
-    "const ids = JSON.parse(fs.readFileSync(process.env.HIVE_FOCUSED_TESTS, 'utf8'))",
-    `fs.writeFileSync(${JSON.stringify(seen)}, JSON.stringify({ ids, jobs: process.env.HIVE_FOCUSED_JOBS }))`,
+    "const ids = JSON.parse(fs.readFileSync(process.env.CW_FOCUSED_TESTS, 'utf8'))",
+    `fs.writeFileSync(${JSON.stringify(seen)}, JSON.stringify({ ids, jobs: process.env.CW_FOCUSED_JOBS }))`,
     "const out = ids.map((t) => ({ test: t, result: (c.results || {})[t] || 'passed', ...((c.results || {})[t] === 'skipped' ? { why: 'usage limit' } : {}) }))",
     "for (const r of out) if (r.result === 'failed') console.error(r.test + ': 2 failing')",
-    'fs.writeFileSync(process.env.HIVE_FOCUSED_RESULTS, JSON.stringify(out))',
+    'fs.writeFileSync(process.env.CW_FOCUSED_RESULTS, JSON.stringify(out))',
     "process.exit(out.some((r) => r.result === 'failed') ? 1 : 0)",
     ''
   ].join('\n'))

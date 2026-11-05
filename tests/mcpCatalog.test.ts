@@ -17,8 +17,8 @@ import { tempDir } from './tempDir'
 const base = tempDir('hive-mcp-catalog-')
 const profile = join(base, 'profile')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => profile
-process.env.HIVE_USER_DATA = profile
-process.env.HIVE_TEST_CLI_HOME_CONNECTION = '1'
+process.env.CW_USER_DATA = profile
+process.env.CW_TEST_CLI_HOME_CONNECTION = '1'
 process.env.CODEX_HOME = join(base, 'codex-home')
 process.env.COPILOT_HOME = join(base, 'copilot-home')
 
@@ -151,7 +151,7 @@ describe('downloads (HI-545/s17)', () => {
 
 describe('installing and updating (HI-545)', () => {
   const trashDir = join(base, 'trash')
-  const wasTrash = process.env.HIVE_TEST_TRASH_DIR
+  const wasTrash = process.env.CW_TEST_TRASH_DIR
   let wsPath: string
   let ambrosia: string
   let apiary: string
@@ -191,11 +191,11 @@ describe('installing and updating (HI-545)', () => {
   }
 
   beforeAll(() => {
-    process.env.HIVE_TEST_TRASH_DIR = trashDir
+    process.env.CW_TEST_TRASH_DIR = trashDir
   })
   afterAll(() => {
-    if (wasTrash === undefined) delete process.env.HIVE_TEST_TRASH_DIR
-    else process.env.HIVE_TEST_TRASH_DIR = wasTrash
+    if (wasTrash === undefined) delete process.env.CW_TEST_TRASH_DIR
+    else process.env.CW_TEST_TRASH_DIR = wasTrash
   })
   beforeEach(async () => {
     wsPath = tempDir('hive-mcp-catalog-ws-')

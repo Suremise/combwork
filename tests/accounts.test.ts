@@ -33,7 +33,7 @@ vi.mock('../src/main/ptyHost', async (importOriginal) => {
 
 const base = tempDir('hive-accounts-')
 const home = join(base, 'claude-home')
-process.env.HIVE_USER_DATA = join(base, 'profile')
+process.env.CW_USER_DATA = join(base, 'profile')
 process.env.CLAUDE_CONFIG_DIR = home
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 

@@ -10,7 +10,7 @@
 //   history says so); R1's verdict returns copy-1, which E1 is then leased and told of (its inbox);
 // - R2's session ending gives its review up: copy-2 is returned and freed; with review copies off, R2 started again has
 //   no --add-dir and its start review leases nothing.
-// Dev build (or HIVE_EXE), throwaway profile, workspace, CLAUDE_CONFIG_DIR and CODEX_HOME.
+// Dev build (or CW_EXE), throwaway profile, workspace, CLAUDE_CONFIG_DIR and CODEX_HOME.
 const lib = require('./lib.cjs')
 const { execFileSync } = require('child_process')
 const fs = require('fs')
@@ -66,8 +66,8 @@ const starts = () => lines(started)
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  // Through lib.launch, so HIVE_EXE runs it on a packaged build (#1591: the packaged checks' review in a review copy, #1539).
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, HIVE_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 850 } })
+  // Through lib.launch, so CW_EXE runs it on a packaged build (#1591: the packaged checks' review in a review copy, #1539).
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 850 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(inv, 'codex')

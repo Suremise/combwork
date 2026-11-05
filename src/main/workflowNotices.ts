@@ -27,7 +27,7 @@ import { openWorkspaces, type WorkspaceService } from './workspace'
  * the user (the runtime's `notify` action: For you, a "couldn't within the rules"), and what the Assistant's lane watch
  * reports of each running lane (a failed review, a card blocked or stalled, every card passed so the merge is due, the
  * merge stalled). Each is a notice, a pop-up in the window the user is using or a Windows notification, as the user's
- * notification settings say (Settings → Notifications); a quiet test copy records it to HIVE_TEST_NOTIFY_LOG. A lane's
+ * notification settings say (Settings → Notifications); a quiet test copy records it to CW_TEST_NOTIFY_LOG. A lane's
  * events found together are one notice, per lane. Like the loop's wakes, none for a project whose Project Settings →
  * Card loops → Wake reviewers and builders is off (`loopWakes`).
  *

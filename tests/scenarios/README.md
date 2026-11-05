@@ -15,7 +15,7 @@ scenario's prompt, waits for its turn to end (and for any agent the Assistant st
 ran:
 
 - **Combwork tool calls** come from the hive MCP server itself. In development builds it logs each call it ran, with
-  whether it worked, to the file named by `HIVE_TEST_MCP_LOG`. Tool names in a transcript, or in a Codex script that
+  whether it worked, to the file named by `CW_TEST_MCP_LOG`. Tool names in a transcript, or in a Codex script that
   may never have run, are kept apart as *mentions* and are never counted as calls.
 - **Codex's calls in code mode** (HI-2235, HI-2246): Codex runs its tools from a script (its `exec` tool), which Combwork's
   transcript shows as one tool, `Script`. Codex's rollout records each call a script made as it ends (MCP calls, commands,
@@ -29,7 +29,7 @@ ran:
   `observed.codeMode.unknown`). The fake Codex works in code mode in the scenarios too (`fake-code-mode.txt` in its home).
 - **The merge slot** comes from Combwork's own record: development builds write each change to the slots (who holds one,
   told so or not, and who waits in line) and each claim or release as Combwork resolved it (the branch, and what it did:
-  held or in line; released, left the line or nothing), with its time, to the file named by `HIVE_TEST_MERGE_SLOT_LOG`.
+  held or in line; released, left the line or nothing), with its time, to the file named by `CW_TEST_MERGE_SLOT_LOG`.
   The merge scenarios (#374) set that beside the checks' own runs (check.js records each run's start, with the commit,
   the base, any merge in progress and the tree it checked, and its end with the result) and the merge's moment (a reference-transaction hook
   in the scenario's repository times each branch update to the millisecond). They check that the agent's claim of the
@@ -202,7 +202,7 @@ its hive tool does, so a model trial gets the same fixture as a fake (#1545).
   Copilot's. It needs the Copilot CLI installed (the run is skipped without it) and no sign-in.
 - **Model trials** cost tokens, and run only in the providers' **test homes**: never the user's own `~/.claude` or
   `~/.codex`, and never a copy of their credentials (refreshing a copy could sign the user out).
-  - **Claude Code** uses `%LOCALAPPDATA%\hive-test\claude` (`HIVE_TEST_CLAUDE_HOME` overrides it). Sign in to it once, by
+  - **Claude Code** uses `%LOCALAPPDATA%\hive-test\claude` (`CW_TEST_CLAUDE_HOME` overrides it). Sign in to it once, by
     hand, with the account the trials may use:
     ```powershell
     New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\hive-test\claude" | Out-Null; $env:CLAUDE_CONFIG_DIR="$env:LOCALAPPDATA\hive-test\claude"; claude
@@ -281,7 +281,7 @@ the subject (`measures.subject`: the Assistant, or the agent the scenario tests)
 measured on its own, and each agent's hive calls in the measured window (`measures.agents`, by its fixture name):
 - The Assistant as subject: Combwork's metrics by caller role (the Assistant's, project agents'), every measure, only when
   the coverage is whole (else `split: 'partial'` and neither part).
-- An agent as subject: its tool calls, replies and tool lists from the hive servers' test log (`HIVE_TEST_MCP_LOG`: each
+- An agent as subject: its tool calls, replies and tool lists from the hive servers' test log (`CW_TEST_MCP_LOG`: each
   call with its reply's size, and a `kind: 'list'` line per server's tool list); its API and launch measures are unknown
   (Combwork's metrics don't say which agent a request or launch was).
 - Which calls the window holds is told call by call, not by counting: each call and list line has an id, and the

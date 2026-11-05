@@ -63,7 +63,7 @@ let claudeEnv = null
 
 /** Starts a copy of Combwork on the profile, with its workspace restored. */
 async function start(extra = {}) {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, ...claudeEnv, ...extra })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, ...claudeEnv, ...extra })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   identities.push(...lib.identify([app.process().pid]))
   const page = await app.firstWindow()
@@ -135,7 +135,7 @@ const liveAgent = async (inv, agentId) => (await inv('session:live')).find((l) =
       // The merge slot recovery is held (as on a slow start, many projects) until the window is up and the notice waits.
       const release = path.join(lib.WORK, 'unexpectedclose-release-recovery')
       fs.rmSync(release, { force: true })
-      current = await start({ HIVE_TEST_HOLD_MERGE_RECOVERY: release })
+      current = await start({ CW_TEST_HOLD_MERGE_RECOVERY: release })
       const { page, inv } = current
       check('with the recovery held, the notice waits for it (the window is up)', !!(await lib.until(() => /The notice waits for \d+ startup step/.test(thisRun()) && /Merge slot recovery held/.test(thisRun()), HUNG_MS)), why())
       check('…and is not shown meanwhile',(await notice(page)) === '')

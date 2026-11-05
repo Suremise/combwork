@@ -20,7 +20,7 @@ const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${
     if (fs.existsSync(path.join(lib.CODEX_HOME, f))) fs.copyFileSync(path.join(lib.CODEX_HOME, f), path.join(home, f))
   }
   fs.writeFileSync(path.join(home, 'config.toml'), '')
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47890), CODEX_HOME: home, PATH: lib.pathWithoutStoreAliases() })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47890), CODEX_HOME: home, PATH: lib.pathWithoutStoreAliases() })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], env })
   const page = await app.firstWindow()
   await lib.fitWindow(app, page, { width: 1400, height: 850 })

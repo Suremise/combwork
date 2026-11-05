@@ -10,10 +10,10 @@
 //   anything staged pauses it naming the files; once put right, Resume merges.
 // - S34b: the folder on another branch: main is checked out nowhere then, and merged by compare-and-swap, the folder's
 //   files untouched.
-// - S34a: main moved by another client just before the swap (HIVE_TEST_QUEUE_RACE): rolled back, tested again, merged once.
+// - S34a: main moved by another client just before the swap (CW_TEST_QUEUE_RACE): rolled back, tested again, merged once.
 // Crashes at each point of the journal and the terminal state are mergequeuecrash's (S34d), in a suite of their own.
 // Dev build, throwaway profiles, workspace and CLAUDE_CONFIG_DIR.
-// S34a's race is a test seam (HIVE_TEST_QUEUE_RACE): NOT RUN on a packaged build (HIVE_EXE), where the rest runs
+// S34a's race is a test seam (CW_TEST_QUEUE_RACE): NOT RUN on a packaged build (CW_EXE), where the rest runs
 // (#1578).
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -128,10 +128,10 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
   }
 
   // --- S34a: main moved by another client just before the swap (no crash): rolled back, tested again, merged once.
-  // The race is a test seam of unpackaged builds: a packaged one (HIVE_EXE, the Sandbox checks) skips it, saying so.
-  if (process.env.HIVE_EXE) console.log('NOT RUN S34a (main moved just before the swap) needs an unpackaged build: not run with HIVE_EXE')
+  // The race is a test seam of unpackaged builds: a packaged one (CW_EXE, the Sandbox checks) skips it, saying so.
+  if (process.env.CW_EXE) console.log('NOT RUN S34a (main moved just before the swap) needs an unpackaged build: not run with CW_EXE')
   else try {
-    h = await q.startHive(fx, { port: PORT, env: { HIVE_TEST_QUEUE_RACE: 'beforeRef' }, keepOptions: true })
+    h = await q.startHive(fx, { port: PORT, env: { CW_TEST_QUEUE_RACE: 'beforeRef' }, keepOptions: true })
     const r = await q.rejoin(fx, h, reviewer)
     const atRace = main()
     q.steer(fx, 'pass')

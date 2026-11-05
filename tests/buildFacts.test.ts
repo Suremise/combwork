@@ -126,7 +126,7 @@ describe('the scripts tell Combwork of a build', () => {
   const repo = join(ws, 'hive')
   const markers = (): string[] => (existsSync(join(ws, '.combwork', 'builds')) ? readdirSync(join(ws, '.combwork', 'builds')) : [])
   const env = { CW_WORKSPACE: ws }
-  // The session's token in its file (HI-2262: never HIVE_API_TOKEN).
+  // The session's token in its file (HI-2262: never CW_API_TOKEN).
   const tokenFile = join(base, 'agent-token.json')
   writeFileSync(tokenFile, JSON.stringify({ token: 't' }))
   beforeAll(() => {
@@ -147,11 +147,11 @@ describe('the scripts tell Combwork of a build', () => {
     expect(markers()).toEqual([])
   })
 
-  it('never with HIVE_API_TOKEN alone (HI-2262: sessions get only its file): nothing is posted', async () => {
+  it('never with CW_API_TOKEN alone (HI-2262: sessions get only its file): nothing is posted', async () => {
     const sent: unknown[] = []
     const post = async (f: unknown, to: unknown) => (sent.push({ f, to }), { recorded: true })
     const was = new Set(markers())
-    expect(await script.recordBuild(input, { env: { ...env, CW_API_URL: 'http://127.0.0.1:1', HIVE_API_TOKEN: 't' }, post })).toMatch(/^Build left for Combwork's journal/)
+    expect(await script.recordBuild(input, { env: { ...env, CW_API_URL: 'http://127.0.0.1:1', CW_API_TOKEN: 't' }, post })).toMatch(/^Build left for Combwork's journal/)
     expect(sent).toEqual([])
     // Left as a marker, as with no API named; taken away again so the next test counts its own.
     const left = markers().filter((m) => !was.has(m))

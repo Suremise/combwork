@@ -36,7 +36,7 @@ const stamp = (d, name) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(path.join(ws, 'api'), { recursive: true })
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47927), CLAUDE_CONFIG_DIR: path.join(lib.WORK, 'assistantimages-claude-home') })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47927), CLAUDE_CONFIG_DIR: path.join(lib.WORK, 'assistantimages-claude-home') })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

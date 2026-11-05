@@ -55,7 +55,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitrem
   g(alpha, 'branch', 'feature/x')
   g(alpha, 'tag', 'v1')
   const claude = lib.fakeClaude(userData, claudeHome, [alpha])
-  const env = { ...claude, HIVE_API_PORT: lib.port(47848), GIT_CONFIG_GLOBAL: globalConfig }
+  const env = { ...claude, CW_API_PORT: lib.port(47848), GIT_CONFIG_GLOBAL: globalConfig }
 
   {
     const { app, page, inv } = await lib.launch({ userData, env, viewport: { width: 1500, height: 900 } })
@@ -209,7 +209,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitrem
 
   // Push to… in German, looked at only.
   {
-    const { app, page, inv } = await lib.launch({ userData, env: { ...env, HIVE_LANG: 'de' }, viewport: { width: 1500, height: 900 } })
+    const { app, page, inv } = await lib.launch({ userData, env: { ...env, CW_LANG: 'de' }, viewport: { width: 1500, height: 900 } })
     try {
       await lib.openWorkspace(inv, page, ws)
       g(alpha, 'remote', 'add', 'backup', backup)

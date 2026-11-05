@@ -11,7 +11,7 @@
 // commit made past its approval: card 5 starts on its own line, and card 4's line, holding work that isn't in main, is
 // kept (looked at once card 5, merged, has its line deleted after card 6 starts: a pass that deleted it had looked at
 // card 4's first). Each check's run through hive-progress --check is counted. A screenshot at each stage, once the window shows
-// it. Dev build (or HIVE_EXE), throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// it. Dev build (or CW_EXE), throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -52,8 +52,8 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   // The Assistant off (S54): a test copy never starts it.
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  // The dev build, or the packaged Combwork HIVE_EXE names (S54 on the upgraded build in the Sandbox checks, #1337).
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' } })
+  // The dev build, or the packaged Combwork CW_EXE names (S54 on the upgraded build in the Sandbox checks, #1337).
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)

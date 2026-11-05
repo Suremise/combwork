@@ -1,7 +1,7 @@
 /**
  * The language Hive shows (#767). Chosen before Electron is ready, because Chromium takes its language (--lang: the
  * window's navigator.language and Intl defaults, Accept-Language, its own dialogs) only at start: the --lang start
- * option or HIVE_LANG (tests, screenshots, translators checking their work), else Settings → General → Language, else
+ * option or CW_LANG (tests, screenshots, translators checking their work), else Settings → General → Language, else
  * the first of Windows' display languages Hive has translations for, else English. Main loads the language's
  * translations once and gives them to each window (app:info, language-changed). A later change of the setting switches
  * Hive's own text at once; Chromium's own parts follow at the next start.
@@ -16,7 +16,7 @@ import { createLogger } from './logger'
 
 const log = createLogger('i18n')
 
-/** The start option (--lang=pl) or HIVE_LANG: wins over the setting, for this run only. */
+/** The start option (--lang=pl) or CW_LANG: wins over the setting, for this run only. */
 let forced: string | null = null
 /** The language Chromium was started in. */
 let started: ChosenLanguage = { code: SOURCE_LANGUAGE, locale: SOURCE_LANGUAGE }
@@ -32,9 +32,9 @@ const choose = (setting: LanguageSetting | undefined): ChosenLanguage => resolve
  * isn't loaded yet).
  */
 export function chooseStartLanguage(saved: LanguageSetting | undefined): void {
-  // Read before Hive sets Chromium's --lang itself, which getSwitchValue would then return. HIVE_LANG pins tests'
+  // Read before Hive sets Chromium's --lang itself, which getSwitchValue would then return. CW_LANG pins tests'
   // language (unpackaged builds only, like Hive's other test switches).
-  forced = app.commandLine.getSwitchValue('lang') || (!app.isPackaged && process.env.HIVE_LANG) || null
+  forced = app.commandLine.getSwitchValue('lang') || (!app.isPackaged && process.env.CW_LANG) || null
   started = shown = choose(saved)
   // The pseudo-locale is English to Chromium.
   app.commandLine.appendSwitch('lang', started.code === PSEUDO_LANGUAGE ? 'en-US' : started.locale)

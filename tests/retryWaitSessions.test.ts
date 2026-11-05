@@ -92,7 +92,7 @@ describe("a CLI's retry wait in a session (HI-1972)", () => {
     s.notify = () => {}
   })
   afterEach(() => {
-    delete process.env.HIVE_TEST_SILENT_MS
+    delete process.env.CW_TEST_SILENT_MS
   })
   afterAll(async () => {
     s.live.clear()
@@ -174,7 +174,7 @@ describe("a CLI's retry wait in a session (HI-1972)", () => {
   it('turns an unknown turn back to running while the wait is current, and an expired one lets silence go on', async () => {
     const { st, l, reads } = agent('unknown')
     await hook(st, prompt('t1'))
-    process.env.HIVE_TEST_SILENT_MS = '1000'
+    process.env.CW_TEST_SILENT_MS = '1000'
     l.ledger.heard = Date.now() - 5000
     s.checkSilence(p, st.agentId)
     await settled(st)

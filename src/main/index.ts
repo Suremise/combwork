@@ -41,7 +41,7 @@ import { chooseProfile, choiceLine, setProfileChoices } from './profileFolders'
 import { syncLoginItemAtStart } from './loginItem'
 import { startProfileNotices } from './profileNotices'
 import { PROVIDERS, dangerModes, labelList, projectProviderConfig, providerSettings } from '../shared/providers'
-import { HIVE_DIR, projectAgents } from '../shared/defaults'
+import { CW_DIR, projectAgents } from '../shared/defaults'
 import { setDateStyle } from '../shared/dates'
 import { SERVABLE_EXT, servableType, unwatchAll } from './files'
 import { movedAttachment } from './attachmentsFolder'
@@ -54,7 +54,7 @@ import { agentCardText } from '../shared/agentTable'
 import { emit, emitTo, onHiveEvent, toast } from './events'
 import { advanced, bindAdvancedSettings, mcpAdvancedEnv } from './advanced'
 import { GPU_SWITCH, advancedAtStart, relaunchArgs, startGpu } from './gpu'
-import { HARDWARE_ACCELERATION_OFF, HEAP_SNAPSHOT_NEAR_LIMIT, HIVE_GUIDANCE } from '../shared/advanced'
+import { HARDWARE_ACCELERATION_OFF, HEAP_SNAPSHOT_NEAR_LIMIT, CW_GUIDANCE } from '../shared/advanced'
 import { startHeapSnapshots, startMemoryLog } from './memory'
 import { recordLiveCardsSoon } from './cardSessions'
 import { closeAllBoards, onBoardNotice } from './boardStore'
@@ -141,7 +141,7 @@ let quitting = false
 
 // Development builds use their own profile (and Agent API port, see servers.ts) so they can run
 // alongside the installed Hive — e.g. while developing Hive from a session inside Hive.
-// HIVE_USER_DATA overrides the profile folder for tests. The installed app's is set too: Electron would name it after
+// CW_USER_DATA overrides the profile folder for tests. The installed app's is set too: Electron would name it after
 // productName. The profile folders are Combwork's (HI-2461), which the installer moves Hive's to (HI-2460); while
 // Combwork's isn't there, Hive's is used (profileFolders.ts: it only looks, never moves or deletes), and a notice says so.
 const profileLines: string[] = []
@@ -155,12 +155,12 @@ const chooseProfiles = (roamingParent: string, localParent: string, packaged: bo
   }
   app.setPath('userData', roaming.use)
 }
-// A test copy of the choice (unpackaged only): made in HIVE_TEST_PROFILE_CHOOSE's appdata and localappdata folders,
+// A test copy of the choice (unpackaged only): made in CW_TEST_PROFILE_CHOOSE's appdata and localappdata folders,
 // never the real ones, with a dev build's names.
-if (process.env.HIVE_USER_DATA && !app.isPackaged && process.env.HIVE_TEST_PROFILE_CHOOSE) {
-  const base = resolve(process.env.HIVE_TEST_PROFILE_CHOOSE)
+if (process.env.CW_USER_DATA && !app.isPackaged && process.env.CW_TEST_PROFILE_CHOOSE) {
+  const base = resolve(process.env.CW_TEST_PROFILE_CHOOSE)
   chooseProfiles(join(base, 'appdata'), join(base, 'localappdata'), false)
-} else if (process.env.HIVE_USER_DATA) app.setPath('userData', process.env.HIVE_USER_DATA)
+} else if (process.env.CW_USER_DATA) app.setPath('userData', process.env.CW_USER_DATA)
 else chooseProfiles(app.getPath('appData'), process.env.LOCALAPPDATA || join(app.getPath('home'), 'AppData', 'Local'), app.isPackaged)
 // Key masking as the profile's files say, before the first line is logged (HI-1855): strict only where a key may be.
 startCoverageEarly()
@@ -182,7 +182,7 @@ if (process.platform === 'win32') checkInstallDir()
 // A quiet test copy's windows are off screen (testQuiet): Chromium mustn't take them for covered and stop drawing them.
 if (testQuiet()) app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
 
-// Chromium takes its language only at start (#767): --lang or HIVE_LANG, the setting, or Windows' languages.
+// Chromium takes its language only at start (#767): --lang or CW_LANG, the setting, or Windows' languages.
 chooseStartLanguage(config.savedLanguage())
 
 if (!app.requestSingleInstanceLock()) {
@@ -770,7 +770,7 @@ async function closeCommandsOnQuit(reason: CloseReason): Promise<void> {
 function relaunch(): void {
   const args = relaunchArgs(process.argv)
   // A test copy records it instead: a copy of Hive its suite didn't start would outlive the run.
-  const record = !app.isPackaged ? process.env.HIVE_TEST_RELAUNCH_LOG : undefined
+  const record = !app.isPackaged ? process.env.CW_TEST_RELAUNCH_LOG : undefined
   if (record) appendFileSync(record, `${JSON.stringify({ args })}
 `)
   else exitBy('app.relaunch', 'restarting once this copy has quit', () => app.relaunch({ args }))
@@ -780,7 +780,7 @@ function relaunch(): void {
  * Hive quitting: what agents left running (#507), the sessions just stopped included, is ended as Settings → Agents
  * says, or after asking in a window still shown; otherwise (a quit with no window shown, or to install an update) it
  * keeps running, and stays listed in Hive's profile for the next start to offer again (#614). Test copies ask only with
- * HIVE_TEST_ASK_LEFTOVERS=1.
+ * CW_TEST_ASK_LEFTOVERS=1.
  */
 async function quitLeftovers(): Promise<void> {
   await Promise.race([leftoversSettled(), new Promise((r) => setTimeout(r, 5000))])
@@ -788,7 +788,7 @@ async function quitLeftovers(): Promise<void> {
   if (left.length) {
     let end = config.settings.agents.leftoverProcesses === 'end'
     // A quiet test copy asks only when its suite says so: a native dialog no suite answers would hold its quit.
-    const shown = !testQuiet() || process.env.HIVE_TEST_ASK_LEFTOVERS === '1' ? hiveWindows().find((e) => e.win.isVisible()) : undefined
+    const shown = !testQuiet() || process.env.CW_TEST_ASK_LEFTOVERS === '1' ? hiveWindows().find((e) => e.win.isVisible()) : undefined
     const asking = !end && !!shown && !installOnQuit
     if (asking && shown) {
       const n = left.reduce((sum, l) => sum + l.processes.length + l.more, 0)
@@ -943,9 +943,9 @@ function showCorrupt(file: string, aside: string, restored: boolean): void {
 onBoardNotice((path, n) => {
   if (n.kind === 'imported') {
     if (!n.damaged.length) return
-    toast('warning', tr(msg({ id: 'main.board.damagedTitle', defaultMessage: "{n, plural, one {# card file couldn't be read} other {# card files couldn't be read}}", description: "A notice as Hive moved the board's cards into its database: some card files weren't valid. {n} is how many." }), { n: n.damaged.length }), tr(msg({ id: 'main.board.damagedBody', defaultMessage: '{files} stayed out of the board. They are kept in {folder}.', description: "The notice about card files Hive couldn't read as it moved the board into its database: {files} lists them, {folder} is where they are kept." }), { files: fmt.list(n.damaged.slice(0, 5), 'unit'), folder: join(path, HIVE_DIR, n.folder) }), undefined, 'board')
+    toast('warning', tr(msg({ id: 'main.board.damagedTitle', defaultMessage: "{n, plural, one {# card file couldn't be read} other {# card files couldn't be read}}", description: "A notice as Hive moved the board's cards into its database: some card files weren't valid. {n} is how many." }), { n: n.damaged.length }), tr(msg({ id: 'main.board.damagedBody', defaultMessage: '{files} stayed out of the board. They are kept in {folder}.', description: "The notice about card files Hive couldn't read as it moved the board into its database: {files} lists them, {folder} is where they are kept." }), { files: fmt.list(n.damaged.slice(0, 5), 'unit'), folder: join(path, CW_DIR, n.folder) }), undefined, 'board')
   } else {
-    toast('warning', tr(msg({ id: 'main.board.foundTitle', defaultMessage: '{n, plural, one {# card made by an older Combwork was found: review it} other {# cards made by an older Combwork were found: review them}}', description: "A notice: this workspace was opened in an older Hive meanwhile, and it saved cards; they weren't added to the board, but kept for the user to review. {n} is how many." }), { n: n.cards }), tr(msg({ id: 'main.board.foundBody', defaultMessage: 'They are kept, unchanged, in {folder}. Nothing on the board was changed for them: Review… adds each to the board or discards it.', description: 'The notice about cards an older Hive saved: {folder} is the folder where they are kept.' }), { folder: join(path, HIVE_DIR, n.folder) }), [{ label: tr(msg({ id: 'main.board.review', defaultMessage: 'Review…', description: "A button on the notice about cards an older Hive saved: opens a dialog listing them, to add each to the board or discard it." })), command: 'task.reviewSetAside' }], 'board')
+    toast('warning', tr(msg({ id: 'main.board.foundTitle', defaultMessage: '{n, plural, one {# card made by an older Combwork was found: review it} other {# cards made by an older Combwork were found: review them}}', description: "A notice: this workspace was opened in an older Hive meanwhile, and it saved cards; they weren't added to the board, but kept for the user to review. {n} is how many." }), { n: n.cards }), tr(msg({ id: 'main.board.foundBody', defaultMessage: 'They are kept, unchanged, in {folder}. Nothing on the board was changed for them: Review… adds each to the board or discards it.', description: 'The notice about cards an older Hive saved: {folder} is the folder where they are kept.' }), { folder: join(path, CW_DIR, n.folder) }), [{ label: tr(msg({ id: 'main.board.review', defaultMessage: 'Review…', description: "A button on the notice about cards an older Hive saved: opens a dialog listing them, to add each to the board or discard it." })), command: 'task.reviewSetAside' }], 'board')
   }
 })
 
@@ -1038,7 +1038,7 @@ app.whenReady().then(async () => {
     if (!dir) log.warn("Couldn't write the cw-progress command into Combwork's bin folder; sessions start without it")
   })
   /** Tests only (development builds): where the hive MCP servers log the calls they ran (tests/scenarios). */
-  const testMcpLog = (): Record<string, string> => (!app.isPackaged && process.env.HIVE_TEST_MCP_LOG ? { HIVE_TEST_MCP_LOG: process.env.HIVE_TEST_MCP_LOG } : {})
+  const testMcpLog = (): Record<string, string> => (!app.isPackaged && process.env.CW_TEST_MCP_LOG ? { CW_TEST_MCP_LOG: process.env.CW_TEST_MCP_LOG } : {})
   sessions.hiveMcp = (projectPath, agentId): McpServerDef | null => {
     const s = config.settings.agentApi
     // The Hive Assistant always has Hive's tools, with its own token and its control level (Settings → Assistant).
@@ -1055,16 +1055,16 @@ app.whenReady().then(async () => {
           CW_API_TOKEN_FILE: assistantTokenFile(ws),
           CW_PROJECT: '',
           CW_WORKSPACE: ws,
-          HIVE_ROLE: 'assistant',
-          HIVE_ASSISTANT_CONTROL: config.settings.assistant?.control ?? 'projects',
+          CW_ROLE: 'assistant',
+          CW_ASSISTANT_CONTROL: config.settings.assistant?.control ?? 'projects',
           // Its settings tool (cw_update_setting) is offered only with Change settings on: a change restarts it.
-          HIVE_ASSISTANT_SETTINGS: config.settings.assistant?.changeSettings === true ? '1' : '0',
+          CW_ASSISTANT_SETTINGS: config.settings.assistant?.changeSettings === true ? '1' : '0',
           // Its journal's tools (#1031) only while the journal is on: a change is told to it, and applies at its next start.
-          HIVE_JOURNAL: journalSettingsOf(workspaceOf(projectPath)).enabled ? '1' : '0',
+          CW_JOURNAL: journalSettingsOf(workspaceOf(projectPath)).enabled ? '1' : '0',
           // What it may store, for its session contract's journal rule (#1032).
-          HIVE_JOURNAL_SCOPE: journalSettingsOf(workspaceOf(projectPath)).scope.join(','),
+          CW_JOURNAL_SCOPE: journalSettingsOf(workspaceOf(projectPath)).scope.join(','),
           // The developer console's tool (cw_console) is offered only while Settings → Agent API lets agents read it.
-          HIVE_DEV_CONSOLE: config.settings.agentApi.devConsole === true ? '1' : '0',
+          CW_DEV_CONSOLE: config.settings.agentApi.devConsole === true ? '1' : '0',
           ...mcpAdvancedEnv(),
           ...testMcpLog()
         }
@@ -1085,12 +1085,12 @@ app.whenReady().then(async () => {
         // With several windows, the API answers the session's tools for its own workspace.
         CW_WORKSPACE: workspaceOf(projectPath).path ?? '',
         // Which agent's tools these are: Hive names it as the author of the handovers it writes.
-        ...(agentId ? { HIVE_AGENT_ID: agentId } : {}),
+        ...(agentId ? { CW_AGENT_ID: agentId } : {}),
         // Whether its instructions tell it to run long commands through cw-progress unasked.
-        HIVE_PROGRESS_COMMANDS: wrapsLongCommands(config.settings.general) ? '1' : '0',
+        CW_PROGRESS_COMMANDS: wrapsLongCommands(config.settings.general) ? '1' : '0',
         // Whether it gives Hive's guidance as its instructions (#1285: Settings → Advanced, Hive's guidance for agents).
-        HIVE_GUIDANCE: advanced.get<boolean>(HIVE_GUIDANCE) ? '1' : '0',
-        HIVE_DEV_CONSOLE: s.devConsole === true ? '1' : '0',
+        CW_GUIDANCE: advanced.get<boolean>(CW_GUIDANCE) ? '1' : '0',
+        CW_DEV_CONSOLE: s.devConsole === true ? '1' : '0',
         // Its reply timeout and wait caps (#367: Settings → Advanced).
         ...mcpAdvancedEnv(),
         ...testMcpLog()
@@ -1122,7 +1122,7 @@ app.whenReady().then(async () => {
         return hiveInstructions('', 'assistant', true, undefined, journal.enabled ? journal.scope : null)
       }
       // Hive's tools without its guidance (#1285, #966 row 13): the Assistant above always has its own.
-      if (!advanced.get<boolean>(HIVE_GUIDANCE)) return ''
+      if (!advanced.get<boolean>(CW_GUIDANCE)) return ''
       const project = basename(projectPath)
       const latest = (await handoversFor(workspace, project))[0]
       // Naming only the skills its agents get (#1431).
@@ -1134,7 +1134,7 @@ app.whenReady().then(async () => {
     if (!workspace.isAssistantHome(state.projectPath)) return null
     const view = await assistantStartView(workspaceOf(state.projectPath), sessions.liveStates(), source)
     // Tests only (development builds): each view Hive gave, whatever the CLI does with it (tests/scenarios).
-    if (view && !app.isPackaged && process.env.HIVE_TEST_START_VIEW_LOG) await appendFile(process.env.HIVE_TEST_START_VIEW_LOG, JSON.stringify({ at: new Date().toISOString(), provider: state.provider, source, text: view }) + '\n').catch(() => undefined)
+    if (view && !app.isPackaged && process.env.CW_TEST_START_VIEW_LOG) await appendFile(process.env.CW_TEST_START_VIEW_LOG, JSON.stringify({ at: new Date().toISOString(), provider: state.provider, source, text: view }) + '\n').catch(() => undefined)
     return view
   }
   sessions.recentHandovers = (projectPath, count) =>
@@ -1300,8 +1300,8 @@ app.whenReady().then(async () => {
   startLaneStarts()
   startHandOverCheck()
   // Test builds can record the taskbar's progress calls, which the page can't see.
-  if (!app.isPackaged && process.env.HIVE_TEST_TASKBAR_LOG) {
-    const file = process.env.HIVE_TEST_TASKBAR_LOG
+  if (!app.isPackaged && process.env.CW_TEST_TASKBAR_LOG) {
+    const file = process.env.CW_TEST_TASKBAR_LOG
     setTaskbarTestHook((ws, bar) => appendFileSync(file, `${JSON.stringify({ ws, ...bar })}\n`))
   }
   const hidden = config.settings.general.startMinimized || process.argv.includes('--hidden')

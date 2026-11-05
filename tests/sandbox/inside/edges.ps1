@@ -1,7 +1,7 @@
 # Runs inside the Sandbox as the user (HI-2460, scenario 8): the Combwork installer's edge cases over Hive Desktop 1.0,
 # with real installers, in order on one machine:
 #   8.1 Hive Desktop's installer mutex held: the new installer waits, changing nothing; released, it goes on and installs.
-#   8.2 held past a test-shortened bound (-Short: an installer built with HIVE_TEST_SHORT_LEGACY_WAIT=1, 20 s): exit 4,
+#   8.2 held past a test-shortened bound (-Short: an installer built with CW_TEST_SHORT_LEGACY_WAIT=1, 20 s): exit 4,
 #       nothing changed.
 #   8.3 Hive Desktop running and not closing (a stand-in at its exact Hive.exe that ignores the request): exit 5, Hive
 #       Desktop and the profile folders untouched.

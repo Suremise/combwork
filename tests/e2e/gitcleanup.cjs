@@ -61,7 +61,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitcle
   g(alpha, 'push', '-q', 'other', 'main', 'hive/hb2')
   g(alpha, 'fetch', '-q', 'other')
   const claude = lib.fakeClaude(userData, claudeHome, [alpha])
-  const env = { ...claude, HIVE_API_PORT: lib.port(47798), GIT_CONFIG_GLOBAL: globalConfig }
+  const env = { ...claude, CW_API_PORT: lib.port(47798), GIT_CONFIG_GLOBAL: globalConfig }
 
   const { app, page, inv } = await lib.launch({ userData, env, viewport: { width: 1300, height: 900 } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))

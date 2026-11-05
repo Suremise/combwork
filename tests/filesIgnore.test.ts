@@ -142,11 +142,11 @@ describe('Files tab: a failed git check-ignore (#222)', () => {
         listings++
       }
     }
-    // At least the stress's time (HIVE_STRESS_MS, 4 s), and on until enough listings ran beside enough adds, however
+    // At least the stress's time (CW_STRESS_MS, 4 s), and on until enough listings ran beside enough adds, however
     // long load makes that (#1480: a fixed 4 s did 13 listings in a loaded full run, failing a count, not the behaviour).
     const loops = [writer(), writer(), writer(), reader(), reader(), reader()]
     const began = Date.now()
-    const atLeastMs = Number(process.env.HIVE_STRESS_MS) || 4000
+    const atLeastMs = Number(process.env.CW_STRESS_MS) || 4000
     try {
       await vi.waitFor(() => expect({ listings: listings >= ENOUGH, adds: adds >= ENOUGH, time: Date.now() - began >= atLeastMs }).toEqual({ listings: true, adds: true, time: true }), { timeout: atLeastMs + STRESS_HUNG_MS, interval: 50 })
     } finally {

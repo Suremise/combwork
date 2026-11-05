@@ -4,7 +4,7 @@
 // - a tool's PostToolUse that reaches Combwork after its turn's Stop leaves it finished (one way #642's agent stayed working);
 // - a turn another Stop hook carries on works again at its next tool, and ends at its next Stop;
 // - a Stop that never comes: Codex's own record of the turn's end ends it; Claude Code idle at its prompt on screen
-//   (after a silence, HIVE_TEST_SILENT_MS here) ends it;
+//   (after a silence, CW_TEST_SILENT_MS here) ends it;
 // - with no sign of the end at all, the state is unknown (never idle): the pane says how long it has been silent, with
 //   Mark idle, and it takes a task once marked;
 // - Codex waiting to retry after a 429, recorded only in its log database (HI-1972): its pane says so and when it
@@ -50,7 +50,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: API_PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, HIVE_TEST_SILENT_MS: String(SILENT_MS) })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: API_PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CW_TEST_SILENT_MS: String(SILENT_MS) })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

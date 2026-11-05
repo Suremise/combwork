@@ -4,7 +4,7 @@
 // position setting places them (bottom right by default); Show pop-ups about agents for This project and None (only in
 // the bell); with Combwork in the background, a Windows notification and a quiet bell row, never a pop-up; and a profile from
 // before (config 5) gets the 1.0 settings. The test copy runs quiet and records the
-// Windows notifications it would show (HIVE_TEST_NOTIFY_LOG); the window's focus is stubbed (Windows won't give a
+// Windows notifications it would show (CW_TEST_NOTIFY_LOG); the window's focus is stubbed (Windows won't give a
 // background app the focus). Fake Claude Code; throwaway profile and workspace.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.notifications = { onlyWhenUnfocused: false, chimeEnabled: false, desktopNotifications: true, notifyOnFinished: true, notifyOnWaiting: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47927), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_QUIET: '1', HIVE_TEST_NOTIFY_LOG: notifyLog })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47927), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_QUIET: '1', CW_TEST_NOTIFY_LOG: notifyLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

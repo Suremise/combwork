@@ -45,7 +45,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off', HIVE_TEST_NOTIFY_LOG: notifyLog })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off', CW_TEST_NOTIFY_LOG: notifyLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -135,13 +135,13 @@ const check = (name, ok, extra = '') => {
     await until(() => idle(agent.id))
 
     // ---- A line Combwork typed that its CLI didn't take, then taken off its input (as the question took HB4's wake).
-    await app.evaluate((_, v) => void (process.env.HIVE_TEST_WAKE_TAKE_MS = v), '1500')
+    await app.evaluate((_, v) => void (process.env.CW_TEST_WAKE_TAKE_MS = v), '1500')
     fs.writeFileSync(path.join(claudeHome, 'fake-drop-enters-Builder.txt'), '2')
     const second = await api('POST', '/v1/projects/alpha/agents/Builder/message', { text: 'Darren pushed the tag: carry on with the release.' })
     const marked = await until(async () => (await live(agent.id))?.untakenLine)
     check('both Enters dropped: the line is held as not taken', second.status === 200 && !!marked, JSON.stringify(marked))
     const before = doorbells().length
-    await app.evaluate((_, v) => void (process.env.HIVE_TEST_WAKE_TAKE_MS = v), String(HUNG_MS))
+    await app.evaluate((_, v) => void (process.env.CW_TEST_WAKE_TAKE_MS = v), String(HUNG_MS))
     fs.writeFileSync(path.join(claudeHome, 'fake-clear-line-Builder'), '')
     check('its input empty at its prompt, the hold goes', !!(await until(async () => !(await live(agent.id))?.untakenLine)))
     check('…the log says why', /gone from its input, nothing taken: what it rang for is offered again/.test(hiveLog()))

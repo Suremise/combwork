@@ -702,7 +702,7 @@ export function changedFiles(base = 'main', cwd = process.cwd()) {
 // --- The focused-test picker (HI-1367): which unit tests and e2e suites a change needs.
 //
 // Combwork's merge queue calls the project's `focused.pick` command in a clean checkout of the revision, with the base
-// commit in HIVE_FOCUSED_BASE and the changed paths on stdin, and reads one JSON line per test (or {"every":true}).
+// commit in CW_FOCUSED_BASE and the changed paths on stdin, and reads one JSON line per test (or {"every":true}).
 // The unit tests come from three places: a changed test file itself; Vitest's import graph (`vitest list --changed`,
 // which the CLI runs, so a change to code a test imports selects it); and UNIT_SCANS, for the tests that read the
 // repository by `git ls-files`, folder scans or file reads rather than imports, which the import graph can't see.
@@ -720,7 +720,7 @@ export const UNIT_SCANS = [
   // the suites' own sources are read for their rules (headers, waits, ports, CLI steps); the seams src reads.
   { test: 'tests/e2esuites.test.ts', adds: true },
   { test: 'tests/e2esuites.test.ts', paths: ['tests/e2e/'] },
-  { test: 'tests/e2esuites.test.ts', paths: ['src/'], lines: ['HIVE_TEST_'] },
+  { test: 'tests/e2esuites.test.ts', paths: ['src/'], lines: ['CW_TEST_'] },
   // No suite or scenario loads a unit test's helper (tests/*.ts).
   { test: 'tests/e2esuites.test.ts', paths: ['tests/scenarios/'], lines: ['require\\(', '\\bimport\\b', '\\bfrom\\s+[\'"`]'] },
   // Every source file: no control character (#1040), no mixed line endings (#149).
@@ -733,7 +733,7 @@ export const UNIT_SCANS = [
   // Tests name the temp folder only through tests/tempDir.ts (#448).
   { test: 'tests/tempDir.test.ts', paths: ['tests/'], lines: ['\\btmpdir\\b', '\\benv\\s*(\\.\\s*|\\[\\s*[\'"`])(temp|tmp)\\b'] },
   // Every e2e suite and scenario starts Combwork with a test profile, quiet.
-  { test: 'tests/testQuiet.test.ts', paths: ['tests/e2e/', 'tests/scenarios/'], lines: ['_electron\\.launch\\(', 'HIVE_USER_DATA', 'HIVE_TEST_QUIET'] },
+  { test: 'tests/testQuiet.test.ts', paths: ['tests/e2e/', 'tests/scenarios/'], lines: ['_electron\\.launch\\(', 'CW_USER_DATA', 'CW_TEST_QUIET'] },
   // The tools-connected log line (HI-2584): sessions.ts writes it, and suites read it only through lib.hiveToolsConnected.
   { test: 'tests/toolsConnectedLine.test.ts', paths: ['src/main/sessions.ts', 'tests/e2e/', 'tests/scenarios/', 'scripts/'], lines: ['tools connected'] },
   // Every caller of copilotTestEnv gives it `above` (#1308).
@@ -927,8 +927,8 @@ const git = (cwd, args) => execFileSync('git', ['-c', 'core.quotepath=false', ..
 /** The CLI: gathers pickTests' inputs in the checkout (cwd) and prints its lines. Diagnostics go to stderr. */
 async function pickCli() {
   const cwd = process.cwd()
-  const base = process.env.HIVE_FOCUSED_BASE
-  if (!base) throw new Error('HIVE_FOCUSED_BASE (the base commit) is not set')
+  const base = process.env.CW_FOCUSED_BASE
+  if (!base) throw new Error('CW_FOCUSED_BASE (the base commit) is not set')
   git(cwd, ['rev-parse', '--verify', '--quiet', `${base}^{commit}`])
   const paths = [...new Set(readFileSync(0, 'utf8').split(/\r?\n/).map((l) => slashes(l.trim())).filter(Boolean))]
   if (!paths.length) return

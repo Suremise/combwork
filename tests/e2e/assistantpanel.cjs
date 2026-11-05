@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
   // Setting changes among what it does.
   cfg.settings.assistant = { ...cfg.settings.assistant, changeSettings: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47920), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47920), CLAUDE_CONFIG_DIR: claudeHome })
 
   let app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   let page = await app.firstWindow()
@@ -317,7 +317,7 @@ const check = (name, ok, extra = '') => {
   // hive-progress would), the Workspace Overview's running row, and the hidden panel's strip.
   const tokens = path.join(userData, 'assistant-api')
   const token = JSON.parse(fs.readFileSync(path.join(tokens, fs.readdirSync(tokens)[0]), 'utf8')).token
-  const started = await fetch(`http://127.0.0.1:${env.HIVE_API_PORT}/v1/progress`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Checking the panel' }) })
+  const started = await fetch(`http://127.0.0.1:${env.CW_API_PORT}/v1/progress`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Checking the panel' }) })
   check('the Assistant reports a run', started.status === 200, String(started.status))
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Alt+P')

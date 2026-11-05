@@ -36,7 +36,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -187,7 +187,7 @@ const check = (name, ok, extra = '') => {
   const race = await make('Taken meanwhile', 'todo')
   await until(async () => (await page.locator(`.task-card[data-task="${race}"]`).count()) === 1, 5000)
   await app.evaluate(() => {
-    process.env.HIVE_TEST_SLOW_IPC = 'tasks:archiveBatch=2500*1'
+    process.env.CW_TEST_SLOW_IPC = 'tasks:archiveBatch=2500*1'
   })
   const todoCount = (await order('todo')).length
   await openColumnMenu('todo', 'Todo')
@@ -201,7 +201,7 @@ const check = (name, ok, extra = '') => {
   check('the card an agent took meanwhile stays on the board', !!(await until(async () => (await order('todo')).length === 0, 8000)) && (await archivedNow(race)) === false)
   check('…and the toast says why', !!(await until(async () => (await raced.count()) === 1, 5000)) && (await raced.innerText()).includes(`One card was left on the board: ${await lib.cardLabel(inv, race)} moved to Active`), await raced.innerText().catch(() => ''))
   await app.evaluate(() => {
-    delete process.env.HIVE_TEST_SLOW_IPC
+    delete process.env.CW_TEST_SLOW_IPC
   })
 
   // 8. Every card it would archive leaves while the dialog is open (#1463): it says none is left, with Archive

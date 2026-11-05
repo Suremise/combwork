@@ -13,7 +13,7 @@ import { samePath } from './movePaths'
 import { legacyWorktree } from './agentFolders'
 import { migrateGlobalFileLocks, migrateProjectPreferences } from './workflow/preferences'
 
-export const HIVE_DIR = '.combwork'
+export const CW_DIR = '.combwork'
 
 /** Session ids are UUIDs (Claude Code, Codex); this also accepts other plain ids but never anything that could be a path. */
 export const isSessionId = (id: unknown): id is string => typeof id === 'string' && /^[\w-]{1,100}$/.test(id)

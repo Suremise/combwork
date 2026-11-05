@@ -1,7 +1,7 @@
 // Combwork's updater against a local fake release feed (generic provider): automatic check + download,
 // status bar states, update dialog, manual download, skip, auto-check off, errors, dev-build
 // disabled state, Restart and Update through the quit flow (test mode never installs anything). #1647: what an install
-// would replace is a stand-in installed copy (HIVE_TEST_RESOURCES, fakeInstall.cjs): an older one is replaced, a local
+// would replace is a stand-in installed copy (CW_TEST_RESOURCES, fakeInstall.cjs): an older one is replaced, a local
 // build of the same version never (Restart and Update says so), a local build is offered a release of its own version
 // (Open Release Page) and Settings → Updates names it, and the install on quit comes only from a quit that goes ahead.
 // Throwaway profiles; the download cache is %LOCALAPPDATA%\hive-test-updater (deleted before/after), or
@@ -57,7 +57,7 @@ const server = http.createServer(async (req, res) => {
 })
 
 async function launch(profile, extraEnv = {}) {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: path.join(scratch, profile), HIVE_UPDATE_CACHE: cacheName, ...extraEnv })
+  const env = lib.hiveEnv({ CW_USER_DATA: path.join(scratch, profile), CW_UPDATE_CACHE: cacheName, ...extraEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
@@ -87,7 +87,7 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
 
   // 1. Defaults: automatic check finds 9.1.1 and downloads it, held half way until its progress has been seen.
   holdDownload = deferred()
-  let { app, page, inv } = await launch('upd-a', { HIVE_UPDATE_FEED: feed, HIVE_UPDATE_DELAY: '1500', HIVE_TEST_RESOURCES: older })
+  let { app, page, inv } = await launch('upd-a', { CW_UPDATE_FEED: feed, CW_UPDATE_DELAY: '1500', CW_TEST_RESOURCES: older })
   const sawDownloading = await waitFor(async () => /Downloading Combwork 9.1.1/.test(await statusText(page)), HUNG_MS)
   check('status bar shows the download', sawDownloading)
   await page.screenshot({ path: path.join(scratch, 'upd-1-downloading.png') })
@@ -123,7 +123,7 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   fs.mkdirSync(path.join(scratch, 'upd-b'), { recursive: true })
   fs.writeFileSync(path.join(scratch, 'upd-b', 'config.json'), JSON.stringify({ version: 1, settings: { updates: { downloadAutomatically: false, install: 'manual' } } }))
   fs.rmSync(cache, { recursive: true, force: true }); downloads = 0
-  ;({ app, page, inv } = await launch('upd-b', { HIVE_UPDATE_FEED: feed, HIVE_UPDATE_DELAY: '1500' }))
+  ;({ app, page, inv } = await launch('upd-b', { CW_UPDATE_FEED: feed, CW_UPDATE_DELAY: '1500' }))
   await waitFor(async () => (await inv('update:state')).status === 'available')
   await lib.sleep(1500) // A fixed wait on purpose: this checks that nothing downloads by itself (the feed answers after 1.5 s), which no condition can show.
   check('not downloaded automatically', (await inv('update:state')).status === 'available' && downloads === 0)
@@ -137,7 +137,7 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   // Skip: a newer version, found by a manual check, skipped; the next automatic check ignores it.
   release = { ...release, version: '9.1.2', notes: '- Even more' }
   await app.close()
-  ;({ app, page, inv } = await launch('upd-b', { HIVE_UPDATE_FEED: feed, HIVE_UPDATE_DELAY: '600000' }))
+  ;({ app, page, inv } = await launch('upd-b', { CW_UPDATE_FEED: feed, CW_UPDATE_DELAY: '600000' }))
   await page.keyboard.press('Escape')
   await page.evaluate(() => window.hive.invoke('update:check'))
   let st = await inv('update:state')
@@ -146,7 +146,7 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   st = await inv('update:state')
   check('skip hides it', st.status === 'up-to-date' && st.skipped === true)
   await app.close()
-  ;({ app, page, inv } = await launch('upd-b', { HIVE_UPDATE_FEED: feed, HIVE_UPDATE_DELAY: '1000' }))
+  ;({ app, page, inv } = await launch('upd-b', { CW_UPDATE_FEED: feed, CW_UPDATE_DELAY: '1000' }))
   await waitFor(async () => ['up-to-date', 'available'].includes((await inv('update:state')).status))
   st = await inv('update:state')
   check('automatic check ignores the skipped version', st.status === 'up-to-date' && st.skipped === true, st.status)
@@ -159,7 +159,7 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   // 3. Automatic checks off: nothing happens at startup; manual check works.
   fs.mkdirSync(path.join(scratch, 'upd-c'), { recursive: true })
   fs.writeFileSync(path.join(scratch, 'upd-c', 'config.json'), JSON.stringify({ version: 1, settings: { updates: { checkAutomatically: false } } }))
-  ;({ app, page, inv } = await launch('upd-c', { HIVE_UPDATE_FEED: feed, HIVE_UPDATE_DELAY: '1000' }))
+  ;({ app, page, inv } = await launch('upd-c', { CW_UPDATE_FEED: feed, CW_UPDATE_DELAY: '1000' }))
   await lib.sleep(3000) // A fixed wait on purpose: this checks that no check starts by itself, which no condition can show.
   check('no automatic check when off', (await inv('update:state')).status === 'idle')
   // Settings → Updates renders
@@ -190,7 +190,7 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   // 6. #1647: the installed copy a local build of 9.1.1: the downloaded 9.1.1 is never installed over it.
   release = { version: '9.1.1', file: crypto.randomBytes(2 * 1024 * 1024), notes: 'Same version' }
   const sameLocal = fakeInstall(path.join(scratch, 'res-local'), { version: '9.1.1', identity: { version: '9.1.1', commit: 'abc1234def', local: true } })
-  ;({ app, page, inv } = await launch('upd-e', { HIVE_UPDATE_FEED: feed, HIVE_UPDATE_DELAY: '1000', HIVE_TEST_RESOURCES: sameLocal }))
+  ;({ app, page, inv } = await launch('upd-e', { CW_UPDATE_FEED: feed, CW_UPDATE_DELAY: '1000', CW_TEST_RESOURCES: sameLocal }))
   check('#1647: the release is downloaded', await waitFor(async () => (await inv('update:state')).status === 'ready', HUNG_MS))
   await inv('update:install')
   check('#1647: Restart and Update over a local build of its version: not installed, and said so', await waitFor(async () => (await page.locator('.toast', { hasText: "Combwork 9.1.1 wasn't installed" }).count()) === 1, HUNG_MS) && (await inv('update:state')).notInstalled === 'notNewer')
@@ -206,7 +206,7 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   release = { version: own, file: crypto.randomBytes(1024 * 1024), notes: 'Same as the local build' }
   const sameRunning = fakeInstall(path.join(scratch, 'res-same'), { version: own, identity: { version: own, commit: 'abc1234def', local: true } })
   const downloadsBefore = downloads
-  ;({ app, page, inv } = await launch('upd-f', { HIVE_UPDATE_FEED: feed, HIVE_UPDATE_DELAY: '1000', HIVE_TEST_RESOURCES: sameRunning }))
+  ;({ app, page, inv } = await launch('upd-f', { CW_UPDATE_FEED: feed, CW_UPDATE_DELAY: '1000', CW_TEST_RESOURCES: sameRunning }))
   check(`#1647: a published ${own} offered to the local ${own}, never downloaded`, await waitFor(async () => (await inv('update:state')).published === own, HUNG_MS) && downloads === downloadsBefore)
   const offer = page.locator('.toast', { hasText: `A published Combwork ${own} is available` })
   check('#1647: …by a notice whose button opens its release page', await waitFor(async () => (await offer.count()) === 1, HUNG_MS) && (await offer.locator('button', { hasText: 'Open Release Page' }).count()) === 1)
@@ -226,7 +226,7 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   fs.mkdirSync(gProfile, { recursive: true })
   fs.writeFileSync(path.join(gProfile, 'config.json'), JSON.stringify({ version: 1, settings: { general: { confirmOnQuit: 'always' } } }))
   const claude = lib.fakeClaude(gProfile, path.join(scratch, 'upd-g-claude'), [path.join(gWs, 'alpha')])
-  ;({ app, page, inv } = await launch('upd-g', { HIVE_UPDATE_FEED: feed, HIVE_UPDATE_DELAY: '1000', HIVE_TEST_RESOURCES: older, ...claude }))
+  ;({ app, page, inv } = await launch('upd-g', { CW_UPDATE_FEED: feed, CW_UPDATE_DELAY: '1000', CW_TEST_RESOURCES: older, ...claude }))
   await lib.openWorkspace(inv, page, gWs)
   await lib.waitForProvider(inv)
   const agent = await lib.addAgent(inv, path.join(gWs, 'alpha'))

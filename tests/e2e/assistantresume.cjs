@@ -57,7 +57,7 @@ const mode = ({ name, word: w }) =>
   fs.mkdirSync(path.join(ws, '.combwork', 'modes'), { recursive: true })
   for (const [id, m] of Object.entries(modes)) fs.writeFileSync(path.join(ws, '.combwork', 'modes', `codeword-${id}.md`), mode(m))
   lib.enableProviders(userData)
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47926), CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47926), CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

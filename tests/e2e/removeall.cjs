@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   // Removals take a moment, so the spinners can be seen.
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47887), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_SLOW_IPC: 'agents:remove=1200' })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47887), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_SLOW_IPC: 'agents:remove=1200' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -183,7 +183,7 @@ const check = (name, ok, extra = '') => {
   // removal fails and is reported, the others still go.
   const b = await setUp(beta)
   await app.evaluate(() => {
-    process.env.HIVE_TEST_FAIL_IPC = 'agents:remove*1'
+    process.env.CW_TEST_FAIL_IPC = 'agents:remove*1'
   })
   const betaDialog = page.locator('.dialog', { hasText: 'Remove all 4 agents?' })
   await lib.agentsMenuRun(page, 'Remove All (4)…')
@@ -202,7 +202,7 @@ const check = (name, ok, extra = '') => {
   check('the stopped agent that failed was stopped', !(await live(beta, b.worker.id)))
 
   await app.evaluate(() => {
-    delete process.env.HIVE_TEST_FAIL_IPC
+    delete process.env.CW_TEST_FAIL_IPC
   })
   await inv('session:stop', alpha)
   await inv('session:stop', beta)

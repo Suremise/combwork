@@ -11,8 +11,8 @@
 // - workflow rules turned off during its check: no advance (paused); on again, it is merged;
 // - Combwork ended right after the target moved, before `Integrated` (S33c): the next start records it, once.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
-// Builders on slots (#1578). S33c ends Combwork at a crash seam (HIVE_TEST_QUEUE_CRASH): NOT RUN on a packaged build
-// (HIVE_EXE), where the rest runs.
+// Builders on slots (#1578). S33c ends Combwork at a crash seam (CW_TEST_QUEUE_CRASH): NOT RUN on a packaged build
+// (CW_EXE), where the rest runs.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const q = require('./queueFixture.cjs')
@@ -172,11 +172,11 @@ ${JSON.stringify(await h.kinds(five.n))}`)
     await h.app.close().catch(() => {})
   }
 
-  if (q.devSeam('S33c (Combwork ended right after the advance, HIVE_TEST_QUEUE_CRASH)')) {
+  if (q.devSeam('S33c (Combwork ended right after the advance, CW_TEST_QUEUE_CRASH)')) {
     // --- S33c: Combwork ends right after the target moved, before Integrated; the next start records it, once.
     let crashed = null
     try {
-      h = await q.startHive(fx, { port: PORT, env: { HIVE_TEST_QUEUE_CRASH: 'afterAdvance' }, keepOptions: true })
+      h = await q.startHive(fx, { port: PORT, env: { CW_TEST_QUEUE_CRASH: 'afterAdvance' }, keepOptions: true })
       // Its process's end, seen as it happens (the page goes with it).
       const proc = h.app.process()
       let ended = false

@@ -1,7 +1,7 @@
 import { watch, existsSync, type FSWatcher } from 'original-fs'
 import { cp, lstat, mkdir, readdir, readFile, rename, rmdir, stat, writeFile } from 'original-fs/promises'
 import { basename, dirname, extname, join, relative, resolve, sep } from 'path'
-import { HIVE_DIR, assertSessionId } from '../shared/defaults'
+import { CW_DIR, assertSessionId } from '../shared/defaults'
 import type { AttachmentContent, FileContent, FileEntry, SessionAttachment, SessionAttachmentGroup } from '../shared/types'
 import { attachmentKind, isSessionFolder } from '../shared/attachments'
 import { attachmentsDir, movedAttachment } from './attachmentsFolder'
@@ -165,7 +165,7 @@ export async function listDir(projectPath: string, rel: string): Promise<FileEnt
     ignored = lastIgnored.get(key) ?? new Set()
     relistLater(projectPath, toRel(projectPath, dir), key)
   }
-  for (const f of out) f.ignored = ignored.has(f.relPath) || f.relPath === HIVE_DIR || f.relPath.startsWith(`${HIVE_DIR}/`)
+  for (const f of out) f.ignored = ignored.has(f.relPath) || f.relPath === CW_DIR || f.relPath.startsWith(`${CW_DIR}/`)
   return out.sort((a, b) => (a.isDir === b.isDir ? a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }) : a.isDir ? -1 : 1))
 }
 
@@ -376,7 +376,7 @@ export async function find(projectPath: string, query: string, limit = 500): Pro
   for (const p of paths) {
     const lower = p.toLowerCase()
     if (!words.every((w) => lower.includes(w))) continue
-    if (p.startsWith(`${HIVE_DIR}/`)) continue
+    if (p.startsWith(`${CW_DIR}/`)) continue
     out.push({ name: p.split('/').pop()!, relPath: p, isDir: false, size: 0, modified: '', ignored: false })
     if (out.length >= limit) break
   }

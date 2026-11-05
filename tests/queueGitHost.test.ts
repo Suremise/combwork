@@ -136,7 +136,7 @@ describe('a git host (HI-2079)', { timeout: 60_000 }, () => {
   it("a command ended by a signal (HI-2042): its name, never code 1; a real exit 1 stays one", async () => {
     // The fixture, in the host only (its environment, not the requests'), ends its first command by SIGTERM.
     const preload = join(__dirname, 'fixtures', 'gitHostSignal.cjs').replace(/\\/g, '/')
-    const { host } = own({ ...baseEnv(), NODE_OPTIONS: `--require "${preload}"`, HIVE_GIT_HOST_TEST_SIGNAL: '1' })
+    const { host } = own({ ...baseEnv(), NODE_OPTIONS: `--require "${preload}"`, CW_GIT_HOST_TEST_SIGNAL: '1' })
     expect(await host.request(node(tempDir('gh-'), 'setInterval(() => {}, 1000)'))).toMatchObject({ code: null, signal: 'SIGTERM' })
     const plain = await host.request(node(tempDir('gh-'), `process.stderr.write('said'); process.exit(1)`))
     expect(plain).toMatchObject({ out: '', err: 'said', code: 1 })

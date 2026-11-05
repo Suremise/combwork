@@ -2,7 +2,7 @@
  * Runs inside the Sandbox, as the user, with the host's Node, Combwork's own playwright-core and Combwork's tests folder (this
  * file's, tests\sandbox\inside, is in it) mapped read-only by the Sandbox checks (tests\sandbox\checks.cjs):
  *   C:\tools\node\node.exe C:\tools\hive-tests\sandbox\inside\drive.cjs <step> <prefix>
- * Drives the installed app (Combwork, or Hive Desktop before an upgrade, and its real profile: see HIVE_EXE and PROFILE below) with Playwright's
+ * Drives the installed app (Combwork, or Hive Desktop before an upgrade, and its real profile: see CW_EXE and PROFILE below) with Playwright's
  * _electron, as Combwork's e2e suites do, and writes C:\out\<prefix>.json ({ step, checks: [{ id, scenario, name, ok, detail }],
  * facts, shots, completed }) and window PNGs C:\out\<prefix>-<name>.png. completed is true only once the whole step ran
  * (the file is saved as it goes, so an interrupted step leaves a record without it). Network off, fake CLIs only.
@@ -27,8 +27,8 @@ const OUT = 'C:\\out'
 // profile: Combwork's folder when it is there, else Hive's (HI-2461's fallback, and 1.0's own).
 const COMBWORK_EXE = path.join(process.env.LOCALAPPDATA, 'Programs', 'Combwork', 'Combwork.exe')
 const HIVE1_EXE = path.join(process.env.LOCALAPPDATA, 'Programs', 'Hive', 'Hive.exe')
-const HIVE_EXE = fs.existsSync(COMBWORK_EXE) ? COMBWORK_EXE : HIVE1_EXE
-const PROFILE = [path.join(process.env.APPDATA, 'Combwork'), path.join(process.env.APPDATA, 'Hive')].find((p) => fs.existsSync(p)) ?? path.join(process.env.APPDATA, HIVE_EXE === COMBWORK_EXE ? 'Combwork' : 'Hive')
+const CW_EXE = fs.existsSync(COMBWORK_EXE) ? COMBWORK_EXE : HIVE1_EXE
+const PROFILE = [path.join(process.env.APPDATA, 'Combwork'), path.join(process.env.APPDATA, 'Hive')].find((p) => fs.existsSync(p)) ?? path.join(process.env.APPDATA, CW_EXE === COMBWORK_EXE ? 'Combwork' : 'Hive')
 // A file the upgrade must carry across in the local profile folder (accounts live there), written before it.
 const LOCAL_MARK = 'sandbox-mark.txt'
 // A connection's Claude Code home in the local folder (HI-2520): its folder trust must arrive as it was, nothing more
@@ -57,13 +57,13 @@ const inv = (channel, ...args) => page.evaluate(([c, a]) => window.hive.invoke(c
 
 /** Combwork instances already running from the install folder (the installer's --force-run starts one): closed by PID. */
 function closeRunningHive() {
-  const out = ps(`$p = Get-CimInstance Win32_Process -Filter "Name='${path.basename(HIVE_EXE)}'" | Where-Object { $_.ExecutablePath -eq '${HIVE_EXE.replace(/'/g, "''")}' }; foreach ($x in $p) { $g = Get-Process -Id $x.ProcessId -ErrorAction SilentlyContinue; if ($g -and $g.MainWindowHandle -ne 0) { [void]$g.CloseMainWindow() } }; Start-Sleep -Seconds 3; $p = Get-CimInstance Win32_Process -Filter "Name='${path.basename(HIVE_EXE)}'" | Where-Object { $_.ExecutablePath -eq '${HIVE_EXE.replace(/'/g, "''")}' }; foreach ($x in $p) { Stop-Process -Id $x.ProcessId -Force -ErrorAction SilentlyContinue }; @($p).Count`)
+  const out = ps(`$p = Get-CimInstance Win32_Process -Filter "Name='${path.basename(CW_EXE)}'" | Where-Object { $_.ExecutablePath -eq '${CW_EXE.replace(/'/g, "''")}' }; foreach ($x in $p) { $g = Get-Process -Id $x.ProcessId -ErrorAction SilentlyContinue; if ($g -and $g.MainWindowHandle -ne 0) { [void]$g.CloseMainWindow() } }; Start-Sleep -Seconds 3; $p = Get-CimInstance Win32_Process -Filter "Name='${path.basename(CW_EXE)}'" | Where-Object { $_.ExecutablePath -eq '${CW_EXE.replace(/'/g, "''")}' }; foreach ($x in $p) { Stop-Process -Id $x.ProcessId -Force -ErrorAction SilentlyContinue }; @($p).Count`)
   return Number(out) || 0
 }
 
 async function launch() {
   const t0 = Date.now()
-  app = await _electron.launch({ executablePath: HIVE_EXE, args: [], timeout: 90_000 })
+  app = await _electron.launch({ executablePath: CW_EXE, args: [], timeout: 90_000 })
   page = await app.firstWindow({ timeout: 90_000 })
   page.on('pageerror', e => { (res.facts.pageErrors ||= []).push(String(e.message).slice(0, 300)) })
   await page.waitForSelector('.app .workbench', { timeout: 90_000 })
@@ -291,7 +291,7 @@ const steps = {
   async notify() {
     await launch()
     const aumid = 'it.surmise.combwork'
-    res.facts.exe = HIVE_EXE
+    res.facts.exe = CW_EXE
     res.facts.shown = await app.evaluate(({ Notification }) => {
       if (!Notification.isSupported()) return false
       // Kept on screen until dismissed, for the desktop screenshot the host takes next (its banner shows the app's name).
@@ -315,9 +315,9 @@ const steps = {
     check('4.settings-kept', 'Settings kept: user name and theme', res.facts.settings.userName === MARK.userName && res.facts.settings.theme === MARK.theme, JSON.stringify(res.facts.settings))
     check('4.theme-applied', 'The window is in the kept theme', (await page.evaluate(() => document.documentElement.dataset.theme)) === MARK.theme, 'theme not applied')
     // HI-2460: the app that runs is Combwork's, from its moved profile folders, with the local data and the installer's record.
-    res.facts.exe = HIVE_EXE
+    res.facts.exe = CW_EXE
     res.facts.profile = PROFILE
-    check('4.combwork-runs', 'Combwork.exe runs after the upgrade, from %APPDATA%\\Combwork', HIVE_EXE === COMBWORK_EXE && PROFILE === path.join(process.env.APPDATA, 'Combwork'), `${HIVE_EXE}, ${PROFILE}`)
+    check('4.combwork-runs', 'Combwork.exe runs after the upgrade, from %APPDATA%\\Combwork', CW_EXE === COMBWORK_EXE && PROFILE === path.join(process.env.APPDATA, 'Combwork'), `${CW_EXE}, ${PROFILE}`)
     const localNew = path.join(process.env.LOCALAPPDATA, 'Combwork')
     check('4.local-moved', 'The local folder moved with its data: %LOCALAPPDATA%\\Combwork, no %LOCALAPPDATA%\\Hive', fs.existsSync(path.join(localNew, LOCAL_MARK)) && !fs.existsSync(path.join(process.env.LOCALAPPDATA, 'Hive')), fs.readdirSync(process.env.LOCALAPPDATA).filter((n) => /hive|combwork/i.test(n)).join(', '))
     let trustAfter = null

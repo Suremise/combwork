@@ -64,7 +64,7 @@ function codexCommandLine(runId) {
   prepare()
   // The fake Claude Code for part 3 (its folder trusted, so it asks nothing).
   const claudeEnv = lib.fakeClaude(userData, path.join(scratch, 'cxover-claude-home'), [proj])
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47839), CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases(), ...claudeEnv })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47839), CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases(), ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], env })
   let page
   let inv

@@ -1,6 +1,6 @@
 import { join, relative } from 'path'
 import { lstat, readdir, rm } from 'original-fs/promises'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { createLogger, userText } from './logger'
 import { trash } from './trash'
 import type { WorkspaceService } from './workspace'
@@ -154,7 +154,7 @@ export async function sweepWorkspaceLeftovers(ws: WorkspaceService): Promise<Swe
   if (!still()) return null
   const hidden = await ws.listProjectPaths({ hidden: true })
   if (!still()) return null
-  const roots = [{ hive: join(path, HIVE_DIR), stores: WORKSPACE_STORES }, ...[...shown, ...hidden].map((p) => ({ hive: join(p, HIVE_DIR), stores: PROJECT_STORES }))]
+  const roots = [{ hive: join(path, CW_DIR), stores: WORKSPACE_STORES }, ...[...shown, ...hidden].map((p) => ({ hive: join(p, CW_DIR), stores: PROJECT_STORES }))]
   const swept = await sweepLeftovers(roots, { signal: life })
   if (swept.temp || swept.bak || swept.imported) {
     const where = swept.removed.map((r) => `${userText(relative(path, r.dir))} (${[r.bak ? `${r.bak} .before-ids.bak` : '', r.temp ? `${r.temp} .tmp` : '', r.imported ? `${r.imported} .imported to the Recycle Bin` : ''].filter(Boolean).join(', ')})`).join('; ')

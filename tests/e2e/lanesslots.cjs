@@ -67,7 +67,7 @@ const lines = (file) => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' } })
+  const h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' } })
   const { app, page, inv } = h
   // For the Japanese screenshots, taken in a second start of the same profile (tests run in English, #767).
   let laneId = null
@@ -232,13 +232,13 @@ const lines = (file) => {
     await app.close().catch(() => undefined)
   }
 
-  // --- The same in Japanese: the profile started again with HIVE_LANG=ja; the lane's hover and the copy's run.
+  // --- The same in Japanese: the profile started again with CW_LANG=ja; the lane's hover and the copy's run.
   if (laneId && runId && !failed) {
     // B1 was in a running lane as the first start quit, so the quit recorded it to resume (restart.json in the profile)
     // and this start would offer it: that toast, shown or not depending on the reload, covered the lane row (HI-1955).
     // Resuming isn't this pass's subject: it starts with nothing to resume.
     fs.rmSync(path.join(userData, 'restart.json'), { force: true })
-    const ja = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', HIVE_LANG: 'ja' } })
+    const ja = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', CW_LANG: 'ja' } })
     try {
       ja.page.on('pageerror', (e) => check('no page errors (ja)', false, e.message))
       await lib.openWorkspace(ja.inv, ja.page, ws)

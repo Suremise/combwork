@@ -25,7 +25,7 @@ fs.mkdirSync(shots, { recursive: true })
 
 ;(async () => {
   const claude = lib.fakeClaude(userData, path.join(scratch, 'image-claude-home'), [path.join(ws, 'demo')])
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, ...claude })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, ...claude })
   const app = await _electron.launch({
     executablePath: lib.ELECTRON,
     args: [lib.ROOT],

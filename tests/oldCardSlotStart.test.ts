@@ -128,7 +128,7 @@ describe("a card from before 1.0 started by the board, in a project that builds 
   // HI-2395: a no-code card takes no slot (HI-2335), so its start, a direct one (the window's Start, with no reason, as
   // the Assistant's cw_start_task) as a lane's, is never taken for one that got none: it starts where its agent is
   // (here the project folder), the agent launched.
-  for (const [who, actor] of [["the window's Start", user], ['a lane', tasks.HIVE_LANE_START]] as const) {
+  for (const [who, actor] of [["the window's Start", user], ['a lane', tasks.CW_LANE_START]] as const) {
     it(`a no-code card started by ${who} takes no slot and starts, its agent launched where it is (HI-2395)`, async () => {
       const w = await workspace()
       const card = await inWorkspace(w, async () => (await tasks.createTask({ title: 'A decision to write up', project: 'p' }, user)).number)

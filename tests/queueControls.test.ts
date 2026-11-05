@@ -63,7 +63,7 @@ const git = (cwd: string, ...args: string[]): string => execFileSync('git', args
 let n = 0
 
 /** "Combwork merges" into main, a reviewer agent, one merge check. */
-const HIVE_MERGES = { ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', mergeChecks: ['quick'], commands: { quick: 'quick' } } as const
+const CW_MERGES = { ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', mergeChecks: ['quick'], commands: { quick: 'quick' } } as const
 
 async function workspace(at?: string): Promise<{ w: WS; repo: string; wt: string; ws: string }> {
   const ws = at ?? join(base, `ws-${++n}`)
@@ -79,7 +79,7 @@ async function workspace(at?: string): Promise<{ w: WS; repo: string; wt: string
     git(repo, 'commit', '-qm', 'initial')
     git(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
     const agents = [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }]
-    writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options: HIVE_MERGES } }))
+    writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options: CW_MERGES } }))
   }
   const w = createWorkspaceService()
   await w.open(ws)
@@ -302,7 +302,7 @@ describe("the window's listing (#1356: which queues the panel can show)", () => 
     expect(await inWorkspace(w, () => queueViews(w, repo, undefined, true))).toMatchObject([{ target: 'main', hiveMerges: true, inFlight: [card], queued: [{ card }] }])
     // The next cards go to the agent: the queue isn't the current options' any more, but its card is still in flight under them.
     host.changed.length = 0
-    await inWorkspace(w, () => setWorkflowOptions(w, repo, { preset: null, options: { ...HIVE_MERGES, finish: 'agentMerges', mergeChecks: [] } }))
+    await inWorkspace(w, () => setWorkflowOptions(w, repo, { preset: null, options: { ...CW_MERGES, finish: 'agentMerges', mergeChecks: [] } }))
     // The windows are told (which queues show follows the options), whoever saved them.
     expect(host.changed).toEqual(['main'])
     expect(await inWorkspace(w, () => queueViews(w, repo, undefined, true))).toMatchObject([{ target: 'main', hiveMerges: false, inFlight: [card], queued: [{ card }] }])
@@ -339,7 +339,7 @@ describe("the window's listing (#1356: which queues the panel can show)", () => 
 describe("the returns policy (#1356, HR3's rounds 1 to 4): every unseen return reachable, a return seen usable for its 10 s, the read bounded", () => {
   afterEach(() => {
     vi.useRealTimers()
-    delete process.env.HIVE_TEST_QUEUE_RETURNS
+    delete process.env.CW_TEST_QUEUE_RETURNS
   })
 
   /** A project with a real red-check return (`card`), then `count` newer returns of other cards (o0 oldest), each with its log. */
@@ -395,7 +395,7 @@ describe("the returns policy (#1356, HR3's rounds 1 to 4): every unseen return r
 
   it('more than two full pages on an idle queue: each page stays whole until it folds, then the next comes; the original is reached', async () => {
     vi.useFakeTimers({ toFake: ['Date'], now: Date.now(), shouldAdvanceTime: true })
-    process.env.HIVE_TEST_QUEUE_RETURNS = '20'
+    process.env.CW_TEST_QUEUE_RETURNS = '20'
     const { card, view, see } = await returned(51)
     let v = await view()
     // 52 returns: pages of 20, 20 and 12.
@@ -422,7 +422,7 @@ describe("the returns policy (#1356, HR3's rounds 1 to 4): every unseen return r
 
   it('new returns while a page is kept, a burst bigger than the bound included: the kept rows stay, the rest counted exactly', async () => {
     vi.useFakeTimers({ toFake: ['Date'], now: Date.now(), shouldAdvanceTime: true })
-    process.env.HIVE_TEST_QUEUE_RETURNS = '5'
+    process.env.CW_TEST_QUEUE_RETURNS = '5'
     const { w, wf, view, see } = await returned(4)
     const v = await view()
     expect([v.returns.length, v.returnsMore]).toEqual([5, 0])
@@ -443,7 +443,7 @@ describe("the returns policy (#1356, HR3's rounds 1 to 4): every unseen return r
 
   it("two windows mark disjoint snapshots with a burst between (HR3's round 5 probe): main keeps its bound, each window keeps the rows it showed for their 10 s, nothing unseen is lost", async () => {
     vi.useFakeTimers({ toFake: ['Date'], now: Date.now(), shouldAdvanceTime: true })
-    process.env.HIVE_TEST_QUEUE_RETURNS = '5'
+    process.env.CW_TEST_QUEUE_RETURNS = '5'
     const { w, wf, view, see } = await returned(4)
     // Window A reads and shows the 5 returns; its mark hasn't reached main yet.
     const a = await view()
@@ -506,7 +506,7 @@ describe("the returns policy (#1356, HR3's rounds 1 to 4): every unseen return r
 
   it("cards in the queue again (one testing) are left out before anything is filled or counted, never marked; paging goes on while paused", async () => {
     vi.useFakeTimers({ toFake: ['Date'], now: Date.now(), shouldAdvanceTime: true })
-    process.env.HIVE_TEST_QUEUE_RETURNS = '5'
+    process.env.CW_TEST_QUEUE_RETURNS = '5'
     const { w, repo, wf, card, others, view, see } = await returned(71)
     await inWorkspace(w, () => pauseQueue(w, repo, 'main', 'user'))
     await wf.locked(() =>
@@ -551,7 +551,7 @@ describe('the queue on the card, in the Git tab and in the Merge dialog (#1357)'
     await act(w, card, reviewer, { kind: 'verdict', pass: true, comment: 'ok' })
     expect(await inWorkspace(w, () => branchQueueCard(w, repo, 'card'))).toMatchObject({ card, where: 'queued', position: 1 })
     // The next cards go to the agent: this one keeps its ruleset, so Combwork still merges it.
-    await inWorkspace(w, () => setWorkflowOptions(w, repo, { preset: null, options: { ...HIVE_MERGES, finish: 'agentMerges', mergeChecks: [] } }))
+    await inWorkspace(w, () => setWorkflowOptions(w, repo, { preset: null, options: { ...CW_MERGES, finish: 'agentMerges', mergeChecks: [] } }))
     expect(await inWorkspace(w, () => branchQueueCard(w, repo, 'card'))).toMatchObject({ card, where: 'queued' })
     // Another branch, or the rules off: none.
     expect(await inWorkspace(w, () => branchQueueCard(w, repo, 'other'))).toBeNull()

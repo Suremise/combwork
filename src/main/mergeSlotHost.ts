@@ -20,7 +20,7 @@ import { addLeftMerge } from './lastRun'
 import { cardNamesOf } from './projectKeys'
 import { fmt, msg, tr } from '../shared/i18n'
 import { cardRef } from '../shared/projectKeys'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { LEGACY_HIVE_DIR } from '../shared/hiveFolderMove'
 import { movedPath } from './combworkMove'
 
@@ -45,8 +45,8 @@ export const mergeSlots = new MergeSlots({
   changed: (projectPath) => changed(projectPath),
   note: (a, text, about) => sessions.setMergeSlotNote(a.projectPath, a.agentId, a.runId, text, about),
   warn: (projectPath, title, message) => toast('warning', title, message, undefined, projectPath),
-  // Test builds can shorten a hold, to see one run out (HIVE_TEST_MERGE_HOLD_MS; never in an installed Hive).
-  ...(!app.isPackaged && Number(process.env.HIVE_TEST_MERGE_HOLD_MS) > 0 ? { holdMs: Number(process.env.HIVE_TEST_MERGE_HOLD_MS) } : {})
+  // Test builds can shorten a hold, to see one run out (CW_TEST_MERGE_HOLD_MS; never in an installed Hive).
+  ...(!app.isPackaged && Number(process.env.CW_TEST_MERGE_HOLD_MS) > 0 ? { holdMs: Number(process.env.CW_TEST_MERGE_HOLD_MS) } : {})
 })
 
 /** A workspace's record of its agents' holds. */
@@ -82,7 +82,7 @@ function changed(projectPath: string): void {
 }
 
 /**
- * Test builds only (HIVE_TEST_MERGE_SLOT_LOG, never in an installed Hive): each change to a workspace's slots, a JSON
+ * Test builds only (CW_TEST_MERGE_SLOT_LOG, never in an installed Hive): each change to a workspace's slots, a JSON
  * line with its time, so a scenario sees who held a slot and who waited when, not only the claims made (#374).
  */
 function testLog(workspacePath: string): void {
@@ -105,7 +105,7 @@ export function slotTestEvent(agent: SlotAgent, projectPath: string, branch: str
 }
 
 function writeTestLog(line: object): void {
-  const file = !app.isPackaged ? process.env.HIVE_TEST_MERGE_SLOT_LOG : undefined
+  const file = !app.isPackaged ? process.env.CW_TEST_MERGE_SLOT_LOG : undefined
   if (!file) return
   try {
     appendFileSync(file, JSON.stringify(line) + '\n')
@@ -186,11 +186,11 @@ async function orphansIn(file: string, workspacePath: string | null, place: (h: 
 }
 
 /**
- * Tests only (unpackaged builds): HIVE_TEST_HOLD_MERGE_RECOVERY=<file> holds the recovery until that file exists, so a
+ * Tests only (unpackaged builds): CW_TEST_HOLD_MERGE_RECOVERY=<file> holds the recovery until that file exists, so a
  * suite can show what waits for it (#984: the notice that Hive closed unexpectedly).
  */
 async function testHold(): Promise<void> {
-  const file = !app.isPackaged ? process.env.HIVE_TEST_HOLD_MERGE_RECOVERY : undefined
+  const file = !app.isPackaged ? process.env.CW_TEST_HOLD_MERGE_RECOVERY : undefined
   if (!file) return
   log.info('Merge slot recovery held until the test releases it')
   while (!existsSync(file)) await new Promise((r) => setTimeout(r, 100))
@@ -207,7 +207,7 @@ export async function recoverMergeSlots(workspacePath: string): Promise<void> {
   const ws = workspaceFor(workspacePath)
   const ids = (await ws?.projectIds({ fresh: true })) ?? NO_PROJECT_IDS
   const last = ws?.movedFrom
-  const from = last && !existsSync(join(last, HIVE_DIR)) && !existsSync(join(last, LEGACY_HIVE_DIR)) && !workspaceFor(last) ? last : null
+  const from = last && !existsSync(join(last, CW_DIR)) && !existsSync(join(last, LEGACY_HIVE_DIR)) && !workspaceFor(last) ? last : null
   const place = (h: SlotRecord): Promise<string | null> => (ws ? placeHold(ws, ids, from, h) : Promise.resolve(h.projectPath))
   const gone = [...(await orphansIn(recordFile(workspacePath), workspacePath, place)), ...(from ? await orphansIn(recordFile(from), null, place) : [])]
   // Each hold's cards as this workspace names them (HI-1661: by key); this runs outside any workspace's work.

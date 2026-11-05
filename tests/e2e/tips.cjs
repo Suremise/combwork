@@ -27,7 +27,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, showTips: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -126,7 +126,7 @@ const check = (name, ok, extra = '') => {
   // it. Its startup is held on a slowed call, and the change comes meanwhile (as R5's probe for #266 did).
   await inv('ui:changeTips', { shownOn: '2000-01-01' })
   await app.evaluate(() => {
-    process.env.HIVE_TEST_SLOW_IPC = 'provider:info=2500*1'
+    process.env.CW_TEST_SLOW_IPC = 'provider:info=2500*1'
   })
   await page.reload()
   await page.waitForLoadState('domcontentloaded')

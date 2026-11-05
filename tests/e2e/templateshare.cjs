@@ -48,7 +48,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47921), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47921), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -66,7 +66,7 @@ const check = (name, ok, extra = '') => {
   // The templates kept in the workspace and its projects (Combwork's own, #1436, aside), and one of them by name.
   const rowNames = async (where) => (await where.locator('.template-row:not([data-scope="hive"]) .label').allInnerTexts()).map((t) => t.split('\n')[0].trim())
   const userRow = (where, name) => where.locator(`.template-row:not([data-scope="hive"])[aria-label="${name}"]`)
-  const HIVE_NAMES = ['Solo', 'Pair', 'Pair: one provider', 'Team 3×3', 'Team 6×6', 'Team 6 + pool']
+  const CW_NAMES = ['Solo', 'Pair', 'Pair: one provider', 'Team 3×3', 'Team 6×6', 'Team 6 + pool']
   // (Their headers are upper-case by CSS.)
   const groups = async () => (await sidebar.locator('.template-group .skill-group').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim().toLowerCase())
   const templatesOf = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')) : [])
@@ -90,7 +90,7 @@ const check = (name, ok, extra = '') => {
   const bar = await page.locator('.activitybar .activity-btn').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))
   check('the Templates icon follows Skills and Dialects on the activity bar', bar.indexOf('Dialects') === bar.indexOf('Skills') + 1 && bar.indexOf('Templates') === bar.indexOf('Dialects') + 1, JSON.stringify(bar))
   await page.locator('.activitybar [aria-label="Templates"]').click()
-  check("the view lists Combwork's own, the workspace's templates, then each project's under its name", !!(await lib.until(async () => JSON.stringify(await groups()) === '["combwork 6","workspace 1","alpha 1"]', 5000)) && JSON.stringify(await rowNames(sidebar)) === '["Pair","Solo"]' && JSON.stringify(await sidebar.locator('.template-row[data-scope="hive"]').evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))) === JSON.stringify(HIVE_NAMES), JSON.stringify([await groups(), await rowNames(sidebar)]))
+  check("the view lists Combwork's own, the workspace's templates, then each project's under its name", !!(await lib.until(async () => JSON.stringify(await groups()) === '["combwork 6","workspace 1","alpha 1"]', 5000)) && JSON.stringify(await rowNames(sidebar)) === '["Pair","Solo"]' && JSON.stringify(await sidebar.locator('.template-row[data-scope="hive"]').evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))) === JSON.stringify(CW_NAMES), JSON.stringify([await groups(), await rowNames(sidebar)]))
   await sidebar.locator('select[aria-label="Show templates of"]').selectOption({ label: 'alpha' })
   check('the filter shows one project\'s', !!(await lib.until(async () => JSON.stringify(await rowNames(sidebar)) === '["Solo"]', HUNG_MS)))
   await sidebar.locator('select[aria-label="Show templates of"]').selectOption({ label: 'All templates' })
@@ -183,7 +183,7 @@ const check = (name, ok, extra = '') => {
   await tab.waitFor({ timeout: 5000 })
   // Each row's name and the badge saying where it is kept.
   const tabRows = async () => tab.locator('.template-row .label').evaluateAll((els) => els.map((el) => `${el.firstChild.textContent.trim()}: ${el.querySelector('.badge')?.textContent.trim() ?? ''}`))
-  check("the project's tab lists its own, the workspace's and Combwork's, each with its scope", !!(await lib.until(async () => JSON.stringify(await tabRows()) === JSON.stringify(['Solo: alpha', 'Team: alpha', 'Team: Workspace', ...HIVE_NAMES.map((n) => `${n}: Combwork`)]), 5000)), JSON.stringify(await tabRows()))
+  check("the project's tab lists its own, the workspace's and Combwork's, each with its scope", !!(await lib.until(async () => JSON.stringify(await tabRows()) === JSON.stringify(['Solo: alpha', 'Team: alpha', 'Team: Workspace', ...CW_NAMES.map((n) => `${n}: Combwork`)]), 5000)), JSON.stringify(await tabRows()))
   await userRow(tab, 'Solo').click()
   const tabDetail = page.locator('.split-main .template-detail')
   const ids = JSON.stringify(projectCfg(alpha).agents.map((a) => a.id))
@@ -358,7 +358,7 @@ const check = (name, ok, extra = '') => {
 
   // --- #510 round 2: a slow save. While it runs nothing in the editor can change (so no edit is lost when it ends, and
   // no agent's Save is accepted that isn't saved); then Reload Window and quitting ask about a draft not saved.
-  const slow = (v) => app.evaluate((_e, x) => void (process.env.HIVE_TEST_SLOW_IPC = x), v)
+  const slow = (v) => app.evaluate((_e, x) => void (process.env.CW_TEST_SLOW_IPC = x), v)
   const disabledNow = async () => ({
     name: await editor.locator('#template-name').isDisabled(),
     edit: await editor.locator('[aria-label="Edit Tester…"]').isDisabled(),

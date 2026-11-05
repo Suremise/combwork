@@ -80,7 +80,7 @@ describe('the turn ledger in a session', () => {
   })
   afterEach(() => {
     sessions.inboxNotice = null
-    delete process.env.HIVE_TEST_SILENT_MS
+    delete process.env.CW_TEST_SILENT_MS
   })
   afterAll(async () => {
     // What the tests' hooks began ends before their folder goes: a transcript backup still running then failed and logged
@@ -136,7 +136,7 @@ describe('the turn ledger in a session', () => {
   it("after silence with no sign of the turn's end, the state is unknown, not idle, until the user marks it idle", async () => {
     const { st, l } = agent('silent')
     await hook(st, { hook_event_name: 'UserPromptSubmit', turn_id: 't1', prompt: 'go' })
-    process.env.HIVE_TEST_SILENT_MS = '1000'
+    process.env.CW_TEST_SILENT_MS = '1000'
     l.ledger.heard = Date.now() - 5000
     l.turnScreen = codexTurnScreen
     // Its screen visibly at work (a long reply): heard, so not silent.
@@ -168,7 +168,7 @@ describe('the turn ledger in a session', () => {
   it('after silence, a CLI idle at its prompt on screen has ended its turn', async () => {
     const { st, l } = agent('screen')
     await hook(st, { hook_event_name: 'UserPromptSubmit', turn_id: 't1', prompt: 'go' })
-    process.env.HIVE_TEST_SILENT_MS = '1000'
+    process.env.CW_TEST_SILENT_MS = '1000'
     l.ledger.heard = Date.now() - 5000
     l.turnScreen = codexTurnScreen
     l.screen = { text: () => '• Done.\n\n  Worked for 5s • 02:29\n\n› Ask Codex to do anything\n\n  ? for shortcuts' }
@@ -179,7 +179,7 @@ describe('the turn ledger in a session', () => {
   })
 
   it('a tool end and the Stop both lost: the screen decides (idle: over; working: running); unreadable, unknown only after the longer silence an open call allows', async () => {
-    process.env.HIVE_TEST_SILENT_MS = '1000'
+    process.env.CW_TEST_SILENT_MS = '1000'
     const lost = async (name: string, screen: string | null): Promise<{ st: State; l: Launch }> => {
       const { st, l } = agent(name)
       await hook(st, { hook_event_name: 'UserPromptSubmit', turn_id: 't1', prompt: 'go' })
@@ -276,7 +276,7 @@ describe('the turn ledger in a session', () => {
   })
 
   it("a late tool start after the turn's Stop (nothing goes on): working only until a look after the silence finds its screen idle", async () => {
-    process.env.HIVE_TEST_SILENT_MS = '1000'
+    process.env.CW_TEST_SILENT_MS = '1000'
     const { st, l } = agent('latestart')
     l.turnScreen = codexTurnScreen
     l.screen = { text: () => '• Done.\n\n› Ask Codex to do anything' }
@@ -326,7 +326,7 @@ describe('the turn ledger in a session', () => {
   })
 
   it('Mark idle after a tool call and a mid-turn compaction whose ends were lost too: no open call or compaction is left behind', async () => {
-    process.env.HIVE_TEST_SILENT_MS = '1000'
+    process.env.CW_TEST_SILENT_MS = '1000'
     const { st, l } = agent('markcompact')
     await hook(st, { hook_event_name: 'UserPromptSubmit', turn_id: 't1', prompt: 'go' })
     await hook(st, pre('t1', 'exec-1'))
@@ -422,7 +422,7 @@ describe('the turn ledger in a session', () => {
   it('never ends a turn on silence alone: a short silence is left as it is', async () => {
     const { st, l } = agent('short')
     await hook(st, { hook_event_name: 'UserPromptSubmit', turn_id: 't1', prompt: 'go' })
-    process.env.HIVE_TEST_SILENT_MS = '60000'
+    process.env.CW_TEST_SILENT_MS = '60000'
     l.ledger.heard = Date.now() - 5000
     l.turnScreen = codexTurnScreen
     l.screen = { text: () => '› Ask Codex to do anything' }

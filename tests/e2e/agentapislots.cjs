@@ -49,7 +49,7 @@ const NOTE = (where) => `# Note\n\nThe ${where} copy.\n`
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' } })
+  const h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' } })
   const { app, page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -162,7 +162,7 @@ const NOTE = (where) => `# Note\n\nThe ${where} copy.\n`
     const started = await api('POST', `/v1/tasks/${encodeURIComponent(`#${n}`)}/start`, { worktree: true })
     check("a card's start on a new agent with worktree: true is refused", started.status === 400 && /pinned to worktrees/.test(JSON.stringify(started.body)), JSON.stringify(started))
     // The hive tools as the Assistant calls them, given 0.9's worktree arguments anyway: passed on, so refused.
-    const mcp = (method, params) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) + '\n', env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${PORT}`, CW_WORKSPACE: ws, HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', CW_PROJECT: '' }), timeout: 60000 }).toString().split('\n')[0]).result
+    const mcp = (method, params) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) + '\n', env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${PORT}`, CW_WORKSPACE: ws, CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' }), timeout: 60000 }).toString().split('\n')[0]).result
     const call = (name, args) => {
       const r = mcp('tools/call', { name, arguments: args })
       return { text: r.content[0].text, isError: !!r.isError }

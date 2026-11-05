@@ -5,7 +5,7 @@
 // go. Opened again: Skip it and continue runs Seed; Stop here runs none of the rest; Don't wait while a command runs
 // lets the agents go and the rest run by themselves. A command run by hand from the palette's IPC shows the same
 // dialog, its reason manual. A long command is cut to two lines, whole in its tooltip (HI-2031). Screenshots of the dialog, running and failed, in both themes. Dev build, throwaway profile
-// and workspaces; test copies run the user's commands only with HIVE_TEST_RUN_ON_CLOSE=1 (unpackaged builds).
+// and workspaces; test copies run the user's commands only with CW_TEST_RUN_ON_CLOSE=1 (unpackaged builds).
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -77,7 +77,7 @@ async function shots(inv, page, name) {
   cfg.settings.appearance = { ...cfg.settings.appearance, theme: 'dark' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47705), HIVE_TEST_RUN_ON_CLOSE: '1' } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47705), CW_TEST_RUN_ON_CLOSE: '1' } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, other)
   const agent = await lib.addAgent(inv, path.join(ws, 'alpha'), { name: 'Builder' }).catch(() => null)

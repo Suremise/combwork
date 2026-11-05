@@ -5,7 +5,7 @@
 // pop-up in the window, its clock paused. A focus change while finishes are being collected decides where their group
 // goes. A waiting agent's entry says Answered once it no longer asks, and a newer ask is its own entry, untouched by the
 // older one's answer. The test copy runs quiet and records each entry it tells and each Windows notification it would
-// show (HIVE_TEST_NOTIFY_LOG); the window's focus is stubbed. Fake Claude Code; throwaway profile and workspace.
+// show (CW_TEST_NOTIFY_LOG); the window's focus is stubbed. Fake Claude Code; throwaway profile and workspace.
 // Kinds routed by main alone (plan usage, a lane's notice, a long conversation, an update, Combwork closing) are covered by
 // tests/notify.test.ts, which runs the same table and tell().
 const lib = require('./lib.cjs')
@@ -41,7 +41,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_QUIET: '1', HIVE_TEST_NOTIFY_LOG: notifyLog, HIVE_TEST_TIPS: 'off' })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_QUIET: '1', CW_TEST_NOTIFY_LOG: notifyLog, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()

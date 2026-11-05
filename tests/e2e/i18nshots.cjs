@@ -14,7 +14,7 @@
 // in order, so a screen leaves the window as it found it (or as its close() does).
 //
 // Languages: E2E_I18N_LANGS (comma-separated; the runner's --lang sets it), else en-XA. Each starts its own test copy
-// with HIVE_LANG set to it (the run context pins every other suite to English) and checks Combwork shows that language.
+// with CW_LANG set to it (the run context pins every other suite to English) and checks Combwork shows that language.
 // Written to the suite folder's i18nshots-shots: <lang>/<area>-<screen>-<theme>.png, a language's notify.log when it
 // would have shown a Windows notification, and reached.json (per language and screen: its screenshots, or why it wasn't
 // reached). The runner keeps them after a pass with --keep-files, which --lang implies.
@@ -113,7 +113,7 @@ if (require.main === module) {
     fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
     const port = lib.port(47834)
-    const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: port, ...cenv, HIVE_LANG: lang, HIVE_TEST_NOTIFY_LOG: path.join(dir, 'notify.log') })
+    const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: port, ...cenv, CW_LANG: lang, CW_TEST_NOTIFY_LOG: path.join(dir, 'notify.log') })
     const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
     try {
       const page = await app.firstWindow()

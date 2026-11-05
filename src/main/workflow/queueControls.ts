@@ -106,7 +106,7 @@ onHiveEvent((e) => {
 function viewsStamp(ws: WorkspaceService, projectPath: string): string | null {
   if (!ws.path) return null
   try {
-    return [boardRevision(ws), queueHostsStamp(ws, projectPath), optionsWritten, workflowEnforced(), process.env.HIVE_TEST_QUEUE_RETURNS ?? ''].join('\n')
+    return [boardRevision(ws), queueHostsStamp(ws, projectPath), optionsWritten, workflowEnforced(), process.env.CW_TEST_QUEUE_RETURNS ?? ''].join('\n')
   } catch {
     return null
   }
@@ -155,7 +155,7 @@ export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: strin
   const lease = store.queueLease(target)
   // The cards in the queue again (queued or testing): their older returns aren't the panel's to show (HR3's #1356 round 3).
   const again = new Set([...open.map((o) => o.card.id), ...(testing ? [testing.card] : [])])
-  const outcomes = recentOutcomes(wf, target, entries, cards, (id) => store.card(id), store.queueSeen(), again, scope ? testSize('HIVE_TEST_QUEUE_RETURNS', RETURNS_MAX) : RETURNS_MAX)
+  const outcomes = recentOutcomes(wf, target, entries, cards, (id) => store.card(id), store.queueSeen(), again, scope ? testSize('CW_TEST_QUEUE_RETURNS', RETURNS_MAX) : RETURNS_MAX)
   const { returns, returnsMore } = outcomes
   const recent = historyOf(wf, target, outcomes.recent)
   const p = store.queuePause(target)
@@ -252,7 +252,7 @@ function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, card
 }
 
 /**
- * A test seam (unpackaged builds only, as HIVE_TEST_SLOW_IPC): the window model's bound on returns made smaller, so an
+ * A test seam (unpackaged builds only, as CW_TEST_SLOW_IPC): the window model's bound on returns made smaller, so an
  * e2e reaches it with a few cards. Read at each listing (a suite sets it in main as it goes); a packaged build, or no
  * value, has the real bound.
  */

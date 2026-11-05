@@ -431,9 +431,9 @@ async function settleLocked(ws: WorkspaceService, project: { path: string; name:
  */
 export const saveSeams: { beforeBoard?: () => Promise<void>; recorded?: () => Promise<void>; beforeFile?: () => Promise<void> } = {}
 
-// A test copy (an unpackaged build) crashes at one of them when HIVE_TEST_MERGE_CHOICE_CRASH names it (HI-1697's crash
+// A test copy (an unpackaged build) crashes at one of them when CW_TEST_MERGE_CHOICE_CRASH names it (HI-1697's crash
 // boundaries, tests/e2e/queueupgrade.cjs): Hive gone part way, as a crash leaves it.
-const crashAt = app?.isPackaged ? undefined : process.env.HIVE_TEST_MERGE_CHOICE_CRASH
+const crashAt = app?.isPackaged ? undefined : process.env.CW_TEST_MERGE_CHOICE_CRASH
 if (crashAt === 'recorded' || crashAt === 'beforeFile') saveSeams[crashAt] = () => (exitBy('app.exit', `a test crash at the merge choice's ${crashAt}`, () => app.exit(1)), new Promise<void>(() => undefined))
 
 /** What a save makes of the project's options: its workflow, the options it changes, whether it chooses (HI-1697). */

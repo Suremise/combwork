@@ -1,6 +1,6 @@
 import { existsSync } from 'original-fs'
 import { basename, dirname, join, resolve } from 'path'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { isProjectId } from '../shared/projectIds'
 import { readKeptJson, retryWhileSaving, withFileLock, writeKeptJson } from './fsutil'
 import { msg } from '../shared/i18n'
@@ -44,7 +44,7 @@ const MAX_RENAMES = 500
 const MAX_FORMER = 50
 const MAX_PROJECTS = 1000
 
-const fileOf = (wsPath: string): string => join(wsPath, HIVE_DIR, 'project-names.json')
+const fileOf = (wsPath: string): string => join(wsPath, CW_DIR, 'project-names.json')
 const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
 const empty = (): NameJournal => ({ version: 1, seq: 0, projects: {}, renames: [] })
 const name = (v: unknown): v is string => typeof v === 'string' && !!v && v.length <= 255 && !/[\\/\0]/.test(v)
@@ -120,7 +120,7 @@ export async function noteNames(ws: WorkspaceService, seen: ProjectSeen[]): Prom
       const had = j.projects[s.id]
       if (!had) {
         const last = !s.copy && s.lastPath && same(resolve(dirname(s.lastPath)), resolve(dirname(s.path))) ? basename(s.lastPath) : null
-        const moved = !!last && !same(last, folder) && !existsSync(join(dirname(s.path), last, HIVE_DIR, 'project.json'))
+        const moved = !!last && !same(last, folder) && !existsSync(join(dirname(s.path), last, CW_DIR, 'project.json'))
         j.projects[s.id] = { name: folder, former: moved ? [last!] : [] }
         if (moved) added.push({ seq: ++j.seq, batch, id: s.id, from: last!, to: folder, at })
         changed = true

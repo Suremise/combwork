@@ -19,8 +19,8 @@ import { currentWorkspace, type WorkspaceService } from './workspace'
  * the exact operation (the workspace, its lifetime, the action and the resolved folders) for the user to confirm, and
  * `apply` runs exactly that one, after checking nothing changed meanwhile, in one elevated PowerShell (one UAC prompt).
  *
- * Test copies (an unpackaged build with a test profile) never ask Defender: HIVE_TEST_ANTIVIRUS names a fixture (the
- * probe's answer and what elevated changes do) and HIVE_TEST_ANTIVIRUS_LOG records every call; without a fixture the
+ * Test copies (an unpackaged build with a test profile) never ask Defender: CW_TEST_ANTIVIRUS names a fixture (the
+ * probe's answer and what elevated changes do) and CW_TEST_ANTIVIRUS_LOG records every call; without a fixture the
  * status is "test copy" and changes are refused. So no test can change the machine's Defender settings.
  */
 
@@ -37,8 +37,8 @@ const ELEVATED_TIMEOUT_MS = 5 * 60_000
 const PREPARED_MS = 10 * 60_000
 const PREPARED_MAX = 8
 
-const isTestCopy = (): boolean => !app.isPackaged && !!process.env.HIVE_USER_DATA
-const fixtureFile = (): string | null => (!app.isPackaged ? process.env.HIVE_TEST_ANTIVIRUS || null : null)
+const isTestCopy = (): boolean => !app.isPackaged && !!process.env.CW_USER_DATA
+const fixtureFile = (): string | null => (!app.isPackaged ? process.env.CW_TEST_ANTIVIRUS || null : null)
 
 const POWERSHELL = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
 
@@ -160,7 +160,7 @@ async function readFixture(): Promise<Fixture | null> {
 }
 
 function testLog(entry: Record<string, unknown>): void {
-  const file = !app.isPackaged ? process.env.HIVE_TEST_ANTIVIRUS_LOG : undefined
+  const file = !app.isPackaged ? process.env.CW_TEST_ANTIVIRUS_LOG : undefined
   if (!file) return
   try {
     appendFileSync(file, `${JSON.stringify({ at: Date.now(), ...entry })}\n`)

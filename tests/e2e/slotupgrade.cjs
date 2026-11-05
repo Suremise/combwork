@@ -1,7 +1,7 @@
 // S56, agents' worktrees become slots at the upgrade (#1441, SPEC §16.10.8), on fake Claude Code agents, the Assistant
 // off; alpha is a 6×6 team (#1448: B1–B6 each in a worktree of its own, R2 too, the other reviewers in the folder).
 // The workspace is made as 0.9 left it: each builder's own worktree in project.json, the slots' migration held off
-// for the first start (HIVE_TEST_SLOT_MIGRATION=off, unpackaged only), so the dev build runs it as 0.9 did:
+// for the first start (CW_TEST_SLOT_MIGRATION=off, unpackaged only), so the dev build runs it as 0.9 did:
 // 1. "0.9 day": alpha (Pair with Combwork merges into integration, cards in slots) runs a lane of two cards on B1, whose
 //    worktree hb1 is where it works and where card 1 starts; the solo project's agent Me works in its worktree, no cards.
 // 2. The upgrade (the next start, migrated): hb1 is a slot carried by B1 for the lane, me one carried by Me for nothing.
@@ -96,7 +96,7 @@ const isIn = (dir, rev, ref) => {
 
   let h = null
   const start = async (extra = {}) => {
-    h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', ...extra } })
+    h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', ...extra } })
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(h.inv)
     await lib.openWorkspace(h.inv, h.page, ws)
@@ -142,7 +142,7 @@ const isIn = (dir, rev, ref) => {
 
   try {
     // --- 1. "0.9 day": the dev build with the slots' migration held off.
-    await start({ HIVE_TEST_SLOT_MIGRATION: 'off' })
+    await start({ CW_TEST_SLOT_MIGRATION: 'off' })
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
     await inv('workflow:setOptions', solo, { preset: null, options: { review: 'none', finish: 'notChecked', folder: 'slots' } })
     const create = async (title, project) => (await inv('tasks:create', { title, project })).number

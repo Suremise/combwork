@@ -4,7 +4,7 @@ import { app } from 'electron'
 import { watch, type FSWatcher } from 'original-fs'
 import { lstat, mkdir, readdir, readlink, realpath, rename, rmdir, symlink, unlink } from 'original-fs/promises'
 import type { AgentDef, AgentInfo, AppConfig, Account, Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, LaunchValues, ProjectConfig, ProjectInfo, ProviderId, ServerConnection, ServerModel, UsageMoveRule, WorkspaceConfig, WorkspaceConnections } from '../shared/types'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { readKeptJson, withFileLock } from './fsutil'
 import { baseValues, cliDefaults, connectionFor, COPILOT_ACCOUNT, homeAccount, seamAccountId, type AccountStore } from '../shared/connectionDefaults'
 import { acceptable, accountState, baseConnection, cleanTag, connectionsOn, TAG_MAX, launchValues, movedInGroup, resolveAgentConnection, type AgentConnection, type ConnectionPatch, type ConnectionRow, type ConnectionTrust, type ConnectionUser, movedConnection, topOfOrder, valuesOf, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
@@ -68,14 +68,14 @@ const CONFIRM_ROUNDS = 3
 
 /**
  * The accounts folder: the installed app's `%LOCALAPPDATA%\Combwork\accounts`, a dev build's `Combwork-Dev`'s, and a
- * test profile's own (under HIVE_USER_DATA), so no test reaches the user's. The local profile folder is the one this run
+ * test profile's own (under CW_USER_DATA), so no test reaches the user's. The local profile folder is the one this run
  * uses (HI-2461: the old `Hive` folder while the installer hasn't moved it).
  */
 export function accountsRoot(): string {
-  // The local folder this run chose first: a test copy's (HIVE_TEST_PROFILE_CHOOSE) too.
+  // The local folder this run chose first: a test copy's (CW_TEST_PROFILE_CHOOSE) too.
   const inUse = localProfileInUse()
   if (inUse) return join(inUse, 'accounts')
-  if (process.env.HIVE_USER_DATA) return join(process.env.HIVE_USER_DATA, 'accounts')
+  if (process.env.CW_USER_DATA) return join(process.env.CW_USER_DATA, 'accounts')
   const local = process.env.LOCALAPPDATA || join(app.getPath('home'), 'AppData', 'Local')
   return join(local, profileFolder(app.isPackaged), 'accounts')
 }
@@ -707,7 +707,7 @@ async function savedUsers(id: string): Promise<ConnectionUser[]> {
     for (const h of homes) {
       if (seen.has(h.path.toLowerCase())) continue
       seen.add(h.path.toLowerCase())
-      const file = join(h.path, HIVE_DIR, 'project.json')
+      const file = join(h.path, CW_DIR, 'project.json')
       const cfg = await withFileLock(file, () => readKeptJson<Partial<ProjectConfig>>(file, {}))
       for (const a of cfg.agents ?? []) if (a.connection === id) out.push({ projectPath: h.path, project: h.name, agentId: a.id, agent: h.assistant ? ASSISTANT_NAME : (a.name ?? a.id), ...(h.assistant ? { assistant: true as const } : {}) })
     }
@@ -1054,11 +1054,11 @@ async function runTrust(key: string, id: string, st: TrustState): Promise<void> 
 }
 
 /**
- * Tests only (unpackaged builds): HIVE_TEST_HOLD_TRUST=<file> holds each trust read until that file exists, so a suite
+ * Tests only (unpackaged builds): CW_TEST_HOLD_TRUST=<file> holds each trust read until that file exists, so a suite
  * can show Checking… (HI-1870 round 3).
  */
 async function trustTestHold(): Promise<void> {
-  const file = !app.isPackaged ? process.env.HIVE_TEST_HOLD_TRUST : undefined
+  const file = !app.isPackaged ? process.env.CW_TEST_HOLD_TRUST : undefined
   if (!file) return
   while (!(await lstat(file).then(() => true, () => false))) await new Promise((r) => setTimeout(r, 100))
 }

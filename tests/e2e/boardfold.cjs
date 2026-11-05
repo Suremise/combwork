@@ -30,7 +30,7 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-coder', name: 'Coder' }] }))
   lib.enableProviders(userData)
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT) })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT) })
   let app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   let page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

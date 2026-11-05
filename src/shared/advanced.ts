@@ -241,7 +241,7 @@ export const QUEUE_NETWORK_CODES = 'cw.queue.networkCodes'
 
 /** The longest the merge queue's signed merge commit takes before its signer is ended (#1350): read by main's queueHost. */
 export const QUEUE_SIGN_SECONDS = 'cw.queue.signSeconds'
-/** G20 (HI-1367): the parallel jobs the merge queue gives a project's focused-tests runner (HIVE_FOCUSED_JOBS). */
+/** G20 (HI-1367): the parallel jobs the merge queue gives a project's focused-tests runner (CW_FOCUSED_JOBS). */
 export const QUEUE_FOCUSED_JOBS = 'cw.queue.focusedJobs'
 /** G20 (HI-1367): the longest a project's focused-tests picker runs, at a submit or at the merge. */
 export const FOCUSED_PICK_SECONDS = 'cw.focused.pickSeconds'
@@ -356,7 +356,7 @@ export const RAW_CARD_START = 'cw.prompt.rawCardStart'
 export const ASSISTANT_OTHER_MCP = 'hive.assistant.otherMcpServers'
 
 /** Project agents get Hive's guidance with Hive's tools (#1285, #966 row 13): index.ts's hiveGuidance and the hive MCP server. */
-export const HIVE_GUIDANCE = 'cw.guidance'
+export const CW_GUIDANCE = 'cw.guidance'
 
 /** Hive delivers the Workspace notes note at each launch (#1433, #873): main's workspaceNotes.ts. */
 export const DELIVER_WORKSPACE_NOTES = 'cw.notes.deliverWorkspaceNotes'
@@ -1327,7 +1327,7 @@ const SOURCES: readonly AdvancedSource[] = [
   // Hive's guidance for project agents (#1285, #966 row 13), separate from giving them Hive's tools. The Assistant's role
   // and its own guidance have no switch (row 14): without them it is no Assistant, only an agent.
   {
-    id: HIVE_GUIDANCE,
+    id: CW_GUIDANCE,
     group: 'cw',
     title: msg({ id: 'settings.advanced.hive.guidance.title', defaultMessage: "Combwork's guidance for agents", description: "An advanced setting's title (Settings → Advanced), listed under Combwork: the instructions Hive gives project agents on how to work with it." }),
     desc: msg({

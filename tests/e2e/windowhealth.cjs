@@ -22,7 +22,7 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(path.join(ws, 'alpha'), { recursive: true })
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47902) } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47902) } })
   try {
     await lib.openWorkspace(inv, page, ws)
     const logged = (since, test) => lib.hiveLogLines(userData).slice(since).find(test)

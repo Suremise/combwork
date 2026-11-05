@@ -24,7 +24,7 @@ Sessions started from Combwork receive these environment variables, so an agent 
 | Variable | Value |
 |---|---|
 | `CW_API_URL` | Base URL of the API |
-| `CW_API_TOKEN_FILE` | Path of a JSON file whose `token` is the agent's own bearer token for this launch (not the workspace token in `agent-api.json`): the API knows from it which project's agent is calling, and it stops working when the agent stops. Combwork writes a new one at each launch. The token itself is never in the environment (HI-2262: until 1.0, also `HIVE_API_TOKEN`), so read the file in the command that uses it |
+| `CW_API_TOKEN_FILE` | Path of a JSON file whose `token` is the agent's own bearer token for this launch (not the workspace token in `agent-api.json`): the API knows from it which project's agent is calling, and it stops working when the agent stops. Combwork writes a new one at each launch. The token itself is never in the environment (HI-2262: until 1.0, also `CW_API_TOKEN`), so read the file in the command that uses it |
 | `CW_PROJECT` | Name of the project the session belongs to |
 | `CW_AGENT` | Name of the agent running the session (e.g. `Agent 1`) |
 | `CW_PROJECT_PATH` | Full path of the project |
@@ -33,7 +33,7 @@ Sessions started from Combwork receive these environment variables, so an agent 
 | `CW_SESSION_ID` | The session ID, when it is known at launch (Claude Code; Codex chooses its own ID with the first prompt, so its sessions don't get this) |
 | `CW_RUN_ID` | An ID for this launch of the agent, unique even before the session ID is known |
 
-Before 1.1 (HI-2463) these were named `HIVE_*` (`HIVE_API_URL`, `HIVE_PROJECT`…), as were `HIVE_HOOK_TOKEN`, `HIVE_SLOT`, `HIVE_SLOT_PORT_BASE`, `HIVE_DIALECT`, `HIVE_DIALECT_FILE`, `HIVE_PROGRESS` and `HIVE_PROGRESS_WRAPPED`, now `CW_*`. Sessions get only the new names: a script of your own that reads an old one needs the new name. The MCP server is `combwork` (`hive` before), its tools `cw_*` (`hive_*`), the progress command `cw-progress` (`hive-progress`, which still works as a command), and Combwork's lines in a session begin `[CW]` (`[Hive]`).
+Before 1.1 (HI-2463) these were named `HIVE_*` (`HIVE_API_URL`, `HIVE_PROJECT`…), as were `HIVE_HOOK_TOKEN`, `HIVE_SLOT`, `HIVE_SLOT_PORT_BASE`, `HIVE_DIALECT`, `HIVE_DIALECT_FILE`, `HIVE_PROGRESS` and `HIVE_PROGRESS_WRAPPED`, now `CW_*`. Sessions get only the new names: a script of your own that reads an old one needs the new name. The other `HIVE_*` variables went with them in 1.1 (HI-2586): the merge queue's focused-test picker and runner get `CW_FOCUSED_BASE`, `CW_FOCUSED_TESTS`, `CW_FOCUSED_RESULTS` and `CW_FOCUSED_JOBS`, and a test or development copy reads `CW_USER_DATA`, `CW_API_PORT`, `CW_LANG` and `CW_TEST_*`. Combwork neither sets nor reads a `HIVE_*` name. The MCP server is `combwork` (`hive` before), its tools `cw_*` (`hive_*`), the progress command `cw-progress` (`hive-progress`, which still works as a command), and Combwork's lines in a session begin `[CW]` (`[Hive]`).
 
 ### Viewer tokens and the discovery file
 

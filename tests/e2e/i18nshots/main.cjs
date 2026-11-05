@@ -2,7 +2,7 @@
 // (tests/e2e/i18nshots.cjs has the case format) with locale-independent means only: IPC, command ids, the notify log,
 // stand-ins for native dialogs and structural hooks, never English text. What Windows or Electron draws (a
 // notification, a message box) can't be photographed in the window, so its text, as Combwork recorded it, is drawn on the
-// page and photographed there; the install-folder message, drawn by Combwork itself to a picture (HIVE_TEST_DIALOG_SNAPSHOT)
+// page and photographed there; the install-folder message, drawn by Combwork itself to a picture (CW_TEST_DIALOG_SNAPSHOT)
 // by a start of its own in the language, is shown the same way.
 const fs = require('fs')
 const path = require('path')
@@ -84,7 +84,7 @@ const liveOf = async (ctx) => {
 
 /** The notify log's entries (the route's, as its test copy writes it). */
 async function notes(ctx) {
-  const file = await ctx.app.evaluate(() => process.env.HIVE_TEST_NOTIFY_LOG)
+  const file = await ctx.app.evaluate(() => process.env.CW_TEST_NOTIFY_LOG)
   if (!file || !fs.existsSync(file)) return []
   return fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
 }
@@ -158,7 +158,7 @@ async function installFolder(ctx) {
   fs.mkdirSync(locked, { recursive: true })
   icacls(locked, '/grant:r', '*S-1-3-4:(OI)(CI)(RX)', `*${PACKAGE}:(OI)(CI)(RX)`, '/inheritance:r')
   icacls(locked, '/grant', FOLDER_ENTRY)
-  const env = lib.hiveEnv({ HIVE_USER_DATA: path.join(base, 'profile'), HIVE_API_PORT: lib.port(47883), HIVE_LANG: lang, HIVE_TEST_INSTALL_DIR: locked, HIVE_TEST_NOTIFY_LOG: log, HIVE_TEST_DIALOG_SNAPSHOT: snapshot })
+  const env = lib.hiveEnv({ CW_USER_DATA: path.join(base, 'profile'), CW_API_PORT: lib.port(47883), CW_LANG: lang, CW_TEST_INSTALL_DIR: locked, CW_TEST_NOTIFY_LOG: log, CW_TEST_DIALOG_SNAPSHOT: snapshot })
   const child = spawn(lib.ELECTRON, [lib.ROOT], { cwd: lib.ROOT, env, stdio: 'ignore' })
   let code = null
   child.on('exit', (c) => (code = c ?? -1))

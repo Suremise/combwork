@@ -31,7 +31,7 @@ describe('the journal in a workspace', () => {
   const wsPath = join(base, 'ws')
   const trashDir = join(base, 'trash')
   beforeAll(async () => {
-    process.env.HIVE_TEST_TRASH_DIR = trashDir
+    process.env.CW_TEST_TRASH_DIR = trashDir
     // The Assistant reads an inbox (its CLI would say so as it starts).
     deliveries.setReadsInboxForTests(() => true)
     const p = join(wsPath, 'alpha')
@@ -41,7 +41,7 @@ describe('the journal in a workspace', () => {
     await w.open(wsPath)
   })
   afterAll(async () => {
-    delete process.env.HIVE_TEST_TRASH_DIR
+    delete process.env.CW_TEST_TRASH_DIR
     deliveries.setReadsInboxForTests(null)
     await disposeWorkspaceService(w)
   })

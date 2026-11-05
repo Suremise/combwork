@@ -14,7 +14,7 @@ import { assistantMcpAdded, MCP_ADDED_MODEL, mcpAdded, mcpNames } from '../share
 import { randomUUID } from 'crypto'
 import { currentWorkspace, inWorkspace, workspace, type WorkspaceService } from './workspace'
 import { trash } from './trash'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 
 export { findSecretWarnings }
 
@@ -144,7 +144,7 @@ async function changeProjectNow(projectPath: string, change: (added: string[]) =
 /** One of this workspace's projects as it is now (not hidden, its folder there): its path. */
 function projectHere(p: string): string {
   const path = workspace.assertProject(p)
-  if (!existsSync(join(path, HIVE_DIR, 'project.json'))) throw hiveError(msg({ id: 'mcp.error.noProject', defaultMessage: '{project} is no longer a project in this workspace.', description: 'An error adding an MCP server to a project, or removing it (HI-2059): the project was removed or moved meanwhile. {project} is its folder name.' }), { project: basename(path) }, { kind: 'notFound' })
+  if (!existsSync(join(path, CW_DIR, 'project.json'))) throw hiveError(msg({ id: 'mcp.error.noProject', defaultMessage: '{project} is no longer a project in this workspace.', description: 'An error adding an MCP server to a project, or removing it (HI-2059): the project was removed or moved meanwhile. {project} is its folder name.' }), { project: basename(path) }, { kind: 'notFound' })
   return path
 }
 
@@ -275,7 +275,7 @@ async function allProjectPaths(): Promise<string[]> {
  * kept-file reader's last good copy or default, which stands in for a file still being saved.
  */
 async function membershipOf(projectPath: string, name: string): Promise<ProjectConfig['mcp'] | null> {
-  const file = join(projectPath, HIVE_DIR, 'project.json')
+  const file = join(projectPath, CW_DIR, 'project.json')
   const unreadable = (e: unknown): Error => hiveError(msg({ id: 'mcp.error.cannotClear', defaultMessage: "Couldn't read the settings of {project}, so {name} wasn't changed: it may still be added there. Try again once the project can be read.", description: 'An error replacing, creating or deleting an MCP server (HI-2059): a project\'s settings file could not be read, so Hive could not make sure the server is removed there, and changed nothing. {project} is the project\'s folder name, {name} the server.' }), { project: basename(projectPath), name }, { kind: 'conflict', cause: e })
   const exists = await stat(file).then(
     () => true,

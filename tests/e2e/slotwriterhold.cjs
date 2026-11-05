@@ -42,7 +42,7 @@ const identity = (stat) => `${stat.dev}:${stat.ino}`
   let h = null
   let fd = null
   try {
-    h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT) } })
+    h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT) } })
     const { inv, page } = h
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(inv)

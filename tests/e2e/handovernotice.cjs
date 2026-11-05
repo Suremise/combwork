@@ -37,7 +37,7 @@ const check = (name, ok, extra = '') => {
   lib.gitProject(alpha)
   const hdir = path.join(ws, '.combwork', 'shared', 'handovers')
   fs.mkdirSync(hdir, { recursive: true })
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', ...lib.fakeClaude(userData, claudeHome, [alpha]) })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', ...lib.fakeClaude(userData, claudeHome, [alpha]) })
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }

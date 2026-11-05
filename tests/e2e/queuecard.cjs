@@ -14,7 +14,7 @@
 //   For you request's "Show the files and commands" brings it into view.
 // Screenshots of each, both themes. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 // Dev build only (#1578): BD is a 0.9 worktree agent on purpose (the Merge dialog on an agent's branch), and the slow
-// and failing reads and the crash are test seams (HIVE_TEST_SLOW_IPC, _FAIL_IPC, _QUEUE_CRASH); the other cards'
+// and failing reads and the crash are test seams (CW_TEST_SLOW_IPC, _FAIL_IPC, _QUEUE_CRASH); the other cards'
 // builders are on slots, as 1.0 has them.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -246,7 +246,7 @@ const f = q.folderHelpers(fx)
       await until(async () => (await merge.count()) === 1, HUNG_MS)
     }
     // While the card's queue is still being read (HR3's round 1 finding 1): Merge stays off, nothing says Combwork merges.
-    await h.app.evaluate(() => (process.env.HIVE_TEST_SLOW_IPC = 'worktrees:branchCards=4000*1'))
+    await h.app.evaluate(() => (process.env.CW_TEST_SLOW_IPC = 'worktrees:branchCards=4000*1'))
     await openMerge()
     const branchRead = async () => !!(await merge.locator('code').count()) && /Merges 1 commit/.test(await text(merge))
     check('Merge dialog, its card still being read: the branch read, Merge off, no note yet', !!(await until(branchRead, HUNG_MS)) && (await primary.isDisabled()) && (await note.count()) === 0 && (await anyway.count()) === 0, await text(merge))
@@ -255,13 +255,13 @@ const f = q.folderHelpers(fx)
     await until(async () => (await merge.count()) === 0, HUNG_MS)
     // Its read failing: said, Merge off, Retry reads it again.
     await h.app.evaluate(() => {
-      delete process.env.HIVE_TEST_SLOW_IPC
-      process.env.HIVE_TEST_FAIL_IPC = 'worktrees:branchCards*1'
+      delete process.env.CW_TEST_SLOW_IPC
+      process.env.CW_TEST_FAIL_IPC = 'worktrees:branchCards*1'
     })
     await openMerge()
     const failedNote = merge.locator('[data-queue-lookup="failed"]')
     check('…its card unread (the read failed): said, Merge off, no Merge anyway', !!(await until(async () => (await failedNote.count()) === 1 && (await branchRead()), HUNG_MS)) && (await primary.isDisabled()) && (await anyway.count()) === 0, await text(merge))
-    await h.app.evaluate(() => delete process.env.HIVE_TEST_FAIL_IPC)
+    await h.app.evaluate(() => delete process.env.CW_TEST_FAIL_IPC)
     await failedNote.getByRole('button', { name: 'Retry' }).click()
     // A plain merge of it is refused by main too, whatever a dialog thinks (a stale or pending state).
     const plain = await inv('agents:merge', fx.alpha, dee.id, { squash: false, message: 'plain', cleanup: false }).then(() => 'merged', (e) => String(e?.message ?? e))
@@ -291,7 +291,7 @@ const f = q.folderHelpers(fx)
   // listed file edited after; the Work section shows the state, and For you's request brings it into view.
   if (crew) {
     try {
-      h = await q.startHive(fx, { port: PORT, keepOptions: true, env: { HIVE_TEST_QUEUE_CRASH: 'afterFiles' } })
+      h = await q.startHive(fx, { port: PORT, keepOptions: true, env: { CW_TEST_QUEUE_CRASH: 'afterFiles' } })
       await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: f.options() })
       await h.inv('advanced:set', 'cw.queue.checkedOutTarget', 'auto')
       crew = { builder: await q.rejoin(fx, h, crew.builder), reviewer: await q.rejoin(fx, h, crew.reviewer) }
@@ -349,7 +349,7 @@ const f = q.folderHelpers(fx)
       // touched the files; the merge then put into the folder by hand (its files as merged, main where it was). The
       // journal says nothing was touched, the files say otherwise: §16.9.2's terminal state, with the command that
       // finishes it (main moved to the merge) and the one that undoes it (the files put back). Neither is run.
-      h = await q.startHive(fx, { port: PORT, keepOptions: true, env: { HIVE_TEST_QUEUE_CRASH: 'afterStarted' } })
+      h = await q.startHive(fx, { port: PORT, keepOptions: true, env: { CW_TEST_QUEUE_CRASH: 'afterStarted' } })
       crew = { builder: await q.rejoin(fx, h, crew.builder), reviewer: await q.rejoin(fx, h, crew.reviewer) }
       let ended2 = false
       h.app.process().once('exit', () => (ended2 = true))

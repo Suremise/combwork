@@ -231,19 +231,19 @@ const check = (name, ok, extra = '') => {
     await inv('slots:setLevelDefault', 'workspace', 'copy', 'ws.env')
     check('…and its own set elsewhere', !!(await lib.until(async () => { const c = await copyOf(wsCopy); return c.origin === 'here' && c.field === 'ws.env' }, HUNG_MS)), JSON.stringify(await copyOf(wsCopy)))
     // Focused but untouched (HR5's round 2): it takes a value changed elsewhere, and leaving it saves nothing. The next save
-    // is made to fail (HIVE_TEST_FAIL_IPC, once): a save of the field's on leaving would take that; the probe's save after
+    // is made to fail (CW_TEST_FAIL_IPC, once): a save of the field's on leaving would take that; the probe's save after
     // it, from the same window, then fails only if the field sent none.
     const wsField = wsCopy.locator('textarea')
     await wsField.focus()
     await inv('slots:setLevelDefault', 'workspace', 'copy', 'ext.env')
     check('a focused, untouched field takes a value changed elsewhere', !!(await lib.until(async () => (await wsField.inputValue()) === 'ext.env', HUNG_MS)), await wsField.inputValue())
     await app.evaluate(() => {
-      process.env.HIVE_TEST_FAIL_IPC = 'slots:setLevelDefault*1'
+      process.env.CW_TEST_FAIL_IPC = 'slots:setLevelDefault*1'
     })
     await wsCopy.locator('.s-title').click()
     const probe = await page.evaluate(() => window.hive.invoke('slots:setLevelDefault', 'workspace', 'copy', 'ext.env').then(() => 'saved', () => 'failed'))
     await app.evaluate(() => {
-      delete process.env.HIVE_TEST_FAIL_IPC
+      delete process.env.CW_TEST_FAIL_IPC
     })
     check('…and leaving it saves nothing', probe === 'failed' && wsJson().slotDefaults?.copy === 'ext.env', `${probe} ${JSON.stringify(wsJson().slotDefaults)}`)
     // Typed in, then changed elsewhere: the typed text stays, and leaving saves it.

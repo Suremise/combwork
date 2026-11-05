@@ -17,8 +17,8 @@ import type { CardAttachment } from '@shared/cardAttachments'
 import { TabPanel, Tabs } from '../components/Tabs'
 import { useScopedLoad } from '../scopedLoad'
 import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace'
-import { cx, formatBytes, formatKeybinding, HIVE_FILES_MIME, IMAGE_EXT, imageUrl, quotePath, timeAgo } from '../util'
-import { HIVE_DIR } from '@shared/defaults'
+import { cx, formatBytes, formatKeybinding, CW_FILES_MIME, IMAGE_EXT, imageUrl, quotePath, timeAgo } from '../util'
+import { CW_DIR } from '@shared/defaults'
 
 const parentOf = (rel: string): string => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '')
 const absOf = (project: ProjectInfo, rel: string): string => (rel ? `${project.path}\\${rel.replace(/\//g, '\\')}` : project.path)
@@ -652,14 +652,14 @@ function FilesBrowser({ project, selector, jump }: { project: ProjectInfo; selec
     const items = selected.includes(e.relPath) ? selEntries : [e]
     if (!selected.includes(e.relPath)) setSelected([e.relPath])
     const paths = items.map((i) => absOf(project, i.relPath))
-    ev.dataTransfer.setData(HIVE_FILES_MIME, JSON.stringify({ project: project.path, rels: items.map((i) => i.relPath), paths }))
+    ev.dataTransfer.setData(CW_FILES_MIME, JSON.stringify({ project: project.path, rels: items.map((i) => i.relPath), paths }))
     ev.dataTransfer.setData('text/plain', paths.map(quotePath).join(' '))
     ev.dataTransfer.effectAllowed = 'copyMove'
   }
 
   const dragOverDir = (ev: React.DragEvent, dir: string): void => {
     const dt = ev.dataTransfer
-    const internal = dt.types.includes(HIVE_FILES_MIME)
+    const internal = dt.types.includes(CW_FILES_MIME)
     if (!internal && !dt.types.includes('Files')) return
     ev.preventDefault()
     ev.stopPropagation()
@@ -678,7 +678,7 @@ function FilesBrowser({ project, selector, jump }: { project: ProjectInfo; selec
     setDropTarget(null)
     window.clearTimeout(hoverTimer.current)
     const unchanged = unchangedSelection()
-    const internal = ev.dataTransfer.getData(HIVE_FILES_MIME)
+    const internal = ev.dataTransfer.getData(CW_FILES_MIME)
     let out: string[] | undefined
     if (internal) {
       const data = JSON.parse(internal) as { project: string; rels?: string[]; paths: string[] }
@@ -1058,7 +1058,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
   }, [project.path, loadScoped])
   useEffect(load, [load])
   useFileEvents(project.path, (dirs) => {
-    if (dirs.some((d) => d === HIVE_DIR || d.startsWith('.combwork/attachments'))) load()
+    if (dirs.some((d) => d === CW_DIR || d.startsWith('.combwork/attachments'))) load()
   })
 
   // How many of each kind the tab shown has: a filter is offered for each kind present, counting only its own files.
@@ -1227,7 +1227,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
                   onClick={() => setViewing(a)}
                   onContextMenu={(e) => menu.open(e, menuFor(a, { x: e.clientX, y: e.clientY }))}
                   onDragStart={(e) => {
-                    e.dataTransfer.setData(HIVE_FILES_MIME, JSON.stringify({ project: project.path, paths: [a.path] }))
+                    e.dataTransfer.setData(CW_FILES_MIME, JSON.stringify({ project: project.path, paths: [a.path] }))
                     e.dataTransfer.setData('text/plain', quotePath(a.path))
                     e.dataTransfer.effectAllowed = 'copy'
                   }}

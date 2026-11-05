@@ -17,7 +17,7 @@ import type { ProviderId } from '@shared/types'
 import { ALL_KEYS_TO_CLI, CTRL_CV_TO_CLI, OSC52_POLICY } from '@shared/advanced'
 import { clipboardPreview, osc52, osc52Decision, OSC52_INPUT_MS, type Osc52Refusal } from '@shared/osc52'
 import { copyPasteKey } from '@shared/terminalInput'
-import { carriesFiles, cx, HIVE_FILES_MIME, quotePath } from '../util'
+import { carriesFiles, cx, CW_FILES_MIME, quotePath } from '../util'
 import { addChips, attachFiles, clearChips } from '../attach'
 import { AttachmentChips } from './AttachmentChips'
 import { deferHiddenSelectionRedraws } from '../hiddenTerminalRedraws'
@@ -569,7 +569,7 @@ export function TerminalView({
       const dt = e.dataTransfer
       if (!carriesFiles(dt)) return
       e.preventDefault()
-      const internal = dt!.getData(HIVE_FILES_MIME)
+      const internal = dt!.getData(CW_FILES_MIME)
       const sources = internal ? (JSON.parse(internal) as { paths: string[] }).paths : [...dt!.files].map((f) => window.hive.pathForFile(f))
       void (async () => {
         const files = sources.filter(Boolean)

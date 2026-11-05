@@ -48,15 +48,15 @@ const MAX_PLANS = 8
 
 const pause = (): Promise<void> => new Promise((r) => setTimeout(r, PAUSE_MS))
 
-/** A day's length: unpackaged test builds can shorten it (HIVE_TEST_DAY_MS), so a suite sees a card come due. */
+/** A day's length: unpackaged test builds can shorten it (CW_TEST_DAY_MS), so a suite sees a card come due. */
 function dayMs(): number {
-  const v = !app.isPackaged ? Number(process.env.HIVE_TEST_DAY_MS) : NaN
+  const v = !app.isPackaged ? Number(process.env.CW_TEST_DAY_MS) : NaN
   return Number.isFinite(v) && v > 0 ? v : DAY_MS
 }
 
-/** Whether the PC is idle now: no input for IDLE_SECONDS (unpackaged test builds: HIVE_TEST_IDLE, 1 idle, 0 busy). */
+/** Whether the PC is idle now: no input for IDLE_SECONDS (unpackaged test builds: CW_TEST_IDLE, 1 idle, 0 busy). */
 export function pcIdle(): boolean {
-  const own = !app.isPackaged ? process.env.HIVE_TEST_IDLE : undefined
+  const own = !app.isPackaged ? process.env.CW_TEST_IDLE : undefined
   if (own === '1' || own === '0') return own === '1'
   try {
     return powerMonitor.getSystemIdleTime() >= IDLE_SECONDS

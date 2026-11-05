@@ -28,10 +28,10 @@ advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
 beforeAll(() => {
-  process.env.HIVE_TEST_TRASH_DIR = trashDir
+  process.env.CW_TEST_TRASH_DIR = trashDir
 })
 afterAll(async () => {
-  delete process.env.HIVE_TEST_TRASH_DIR
+  delete process.env.CW_TEST_TRASH_DIR
   advanced.stop()
   for (const w of opened) await disposeWorkspaceService(w)
   store.closeAllBoards()
@@ -343,7 +343,7 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
     const agent = { kind: 'agent', project: 'p' } as const
     const script = { kind: 'workspace' } as const
     // Everything a test makes is in the run's temp folder: the temp folder is one of its own here, so the rest is outside it.
-    const was = process.env.HIVE_EVIDENCE
+    const was = process.env.CW_EVIDENCE
     const temp = tempDir('hive-temp-')
     att.attachTestHooks.temp = temp
     const evidence = tempDir('hive-evidence-')
@@ -357,8 +357,8 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
       expect(await att.attachableSource(w, agent, file(temp, 'shot.png', 's'))).toBeTruthy()
 
       // Combwork's own list, with a variable at its start: the agent's and the script's file attaches; elsewhere is still refused.
-      process.env.HIVE_EVIDENCE = evidence
-      await advanced.set(CARD_ATTACHMENT_FOLDERS_ID, '%hive_evidence%; Q:\\not\\there')
+      process.env.CW_EVIDENCE = evidence
+      await advanced.set(CARD_ATTACHMENT_FOLDERS_ID, '%cw_evidence%; Q:\\not\\there')
       expect(att.extraFolders(w)).toEqual([evidence, 'Q:\\not\\there'])
       expect(await att.attachableSource(w, agent, zip)).toBe(zip)
       expect(await att.attachableSource(w, script, zip)).toBe(zip)
@@ -376,7 +376,7 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
       // The workspace's own list over Combwork's; unset, Combwork's again. A variable that isn't set leaves its folder out.
       await w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, [evidence])
       expect(att.extraFolders(w)).toEqual([evidence])
-      await w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, '%HIVE_NOT_SET_2480%\\x')
+      await w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, '%CW_NOT_SET_2480%\\x')
       expect(att.extraFolders(w)).toEqual([])
       await expect(att.attachableSource(w, agent, zip)).rejects.toThrow(/not a file that can be attached/)
       // A workspace's [] (written by hand or the API) is Combwork's list, as its emptied box in Settings is.
@@ -387,8 +387,8 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
     } finally {
       await advanced.set(CARD_ATTACHMENT_FOLDERS_ID, null)
       att.attachTestHooks.temp = null
-      if (was === undefined) delete process.env.HIVE_EVIDENCE
-      else process.env.HIVE_EVIDENCE = was
+      if (was === undefined) delete process.env.CW_EVIDENCE
+      else process.env.CW_EVIDENCE = was
     }
   })
 

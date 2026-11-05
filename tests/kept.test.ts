@@ -269,7 +269,7 @@ describe('spawn log lines', () => {
   it('hide bearer tokens and shorten long arguments', async () => {
     const { forLog } = await import('../src/main/ptyHost')
     expect(forLog('hooks.Stop=[{command="curl.exe -H \\"Authorization: Bearer 0123456789abcdef0123456789abcdef\\" x"}]')).not.toContain('0123456789abcdef')
-    expect(forLog('HIVE_API_TOKEN=abcdef123456')).toBe('HIVE_API_TOKEN=***')
+    expect(forLog('CW_API_TOKEN=abcdef123456')).toBe('CW_API_TOKEN=***')
     expect(forLog('x'.repeat(1000)).length).toBeLessThan(340)
     expect(forLog('--model')).toBe('--model')
   })

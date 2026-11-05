@@ -136,10 +136,10 @@ export const isReservedServerName = (name: string): boolean => [TOOLS_SERVER, LE
  * A tool's current name for a name read back from stored data (HI-2463): metrics and ledgers written before the rename
  * recorded `hive_<tool>`. A read-time projection only: what is stored stays as it was written.
  */
-export const currentToolName = (name: string): string => (name.startsWith('hive_') && HIVE_TOOLS.includes(`cw_${name.slice(5)}`) ? `cw_${name.slice(5)}` : name)
+export const currentToolName = (name: string): string => (name.startsWith('hive_') && CW_TOOLS.includes(`cw_${name.slice(5)}`) ? `cw_${name.slice(5)}` : name)
 
 /** Every tool the combwork MCP server has (a test checks it against hive-mcp.ts): the only tool names metrics record. */
-export const HIVE_TOOLS: readonly string[] = [
+export const CW_TOOLS: readonly string[] = [
   'cw_list_projects', 'cw_project_status', 'cw_session_usage', 'cw_list_shared_notes', 'cw_read_shared_note', 'cw_write_shared_note', 'cw_doc_outline', 'cw_read_section',
   'cw_read_latest_handover', 'cw_create_handover', 'cw_notify', 'cw_list_providers', 'cw_agent_activity', 'cw_wait_for_agents',
   'cw_create_project', 'cw_activate_project', 'cw_add_agent', 'cw_update_agent', 'cw_start_agent', 'cw_stop_agent', 'cw_prompt_agent',

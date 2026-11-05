@@ -156,7 +156,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   await cpu.send('Emulation.setCPUThrottlingRate', { rate: 4 })
   const placedAt = []
   for (let ms = 6; ms <= 50; ms += 4) {
-    await app.evaluate((_e, v) => { process.env.HIVE_TEST_SLOW_IPC = v }, `transcript:compactions=${ms}`)
+    await app.evaluate((_e, v) => { process.env.CW_TEST_SLOW_IPC = v }, `transcript:compactions=${ms}`)
     await rows.first().focus()
     await page.keyboard.press('Enter')
     const inView = async () => (await divider.count()) === 1 && (await divider.evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight }))
@@ -164,7 +164,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
     await page.locator('.tab', { hasText: 'Overview' }).click()
     await head.waitFor({ timeout: 10000 })
   }
-  await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
+  await app.evaluate(() => { delete process.env.CW_TEST_SLOW_IPC })
   await cpu.send('Emulation.setCPUThrottlingRate', { rate: 1 })
   await cpu.detach().catch(() => undefined)
   check('…also when its place arrives just after the transcript opened at its end', placedAt.every((p) => p.ok), JSON.stringify(placedAt))

@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -150,7 +150,7 @@ const check = (name, ok, extra = '') => {
   await discard.getByRole('button', { name: 'Keep Editing' }).click()
   // Saving it slowly: the card can't close until it is saved.
   await app.evaluate(() => {
-    process.env.HIVE_TEST_SLOW_IPC = 'tasks:editDecision=2500*1'
+    process.env.CW_TEST_SLOW_IPC = 'tasks:editDecision=2500*1'
   })
   await changing.getByRole('button', { name: 'Save' }).click()
   await lib.sleep(300)
@@ -159,7 +159,7 @@ const check = (name, ok, extra = '') => {
   check('closing waits while a decision is being saved', (await dialog.count()) === 1 && (await discard.count()) === 0)
   check('…which then saves it', !!(await until(async () => (await card(n)).decisions[0].text === 'Show each error under its field, in red.', 8000)))
   await app.evaluate(() => {
-    delete process.env.HIVE_TEST_SLOW_IPC
+    delete process.env.CW_TEST_SLOW_IPC
   })
   await until(async () => (await changing.getByLabel('Decision').count()) === 0, 5000)
   await page.keyboard.press('Escape')
@@ -211,13 +211,13 @@ const check = (name, ok, extra = '') => {
   await open()
   await mDialog.getByLabel('New decision').fill('Expired links say so.')
   await app.evaluate(() => {
-    process.env.HIVE_TEST_FAIL_IPC = 'tasks:update*1'
+    process.env.CW_TEST_FAIL_IPC = 'tasks:update*1'
   })
   await mDialog.locator('.dialog-footer').getByRole('button', { name: 'Save', exact: true }).click()
   await until(async () => (await mDialog.locator('.dialog-error, .field-error, .error').count()) > 0, 5000)
   check('a failed save leaves the dialog open, the decision still typed, nothing recorded', (await mDialog.count()) === 1 && (await mDialog.getByLabel('New decision').inputValue()) === 'Expired links say so.' && (await card(m)).decisions.length === 2)
   await app.evaluate(() => {
-    delete process.env.HIVE_TEST_FAIL_IPC
+    delete process.env.CW_TEST_FAIL_IPC
   })
   check('…and Save again records it, once', (await saveAndClose()) && (await card(m)).decisions.filter((d) => d.text === 'Expired links say so.').length === 1)
 
@@ -250,13 +250,13 @@ const check = (name, ok, extra = '') => {
     }
     // The function gets Electron's module first, then the argument.
     await app.evaluate((_e, f) => {
-      process.env.HIVE_TEST_FAIL_IPC = f
+      process.env.CW_TEST_FAIL_IPC = f
     }, fail)
     await moveDialog.locator('.dialog-footer .btn.primary').click()
     const refused = !!(await until(async () => (await moveDialog.locator('.dialog-footer .btn.primary').innerText({ timeout: 1000 }).catch(() => '')).includes('Try Again'), 8000))
     if (!refused) await page.screenshot({ path: path.join(lib.WORK, 'decisions-move-nofail.png') })
     await app.evaluate(() => {
-      delete process.env.HIVE_TEST_FAIL_IPC
+      delete process.env.CW_TEST_FAIL_IPC
     })
     await moveDialog.locator('.dialog-footer .btn.primary').click()
     return refused && !!(await until(async () => (await moveDialog.count()) === 0 && (await mDialog.count()) === 0 && (await card(m)).column === 'doing', 8000))
@@ -286,7 +286,7 @@ const check = (name, ok, extra = '') => {
   const launch = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).at(-1)
   const coderToken = launch.token
   // HI-2262: its session has the token's file, never the token in its environment (an `env` listing printed it).
-  check("Coder's session has CW_API_TOKEN_FILE and its token, never HIVE_API_TOKEN", !!launch.env?.CW_API_TOKEN_FILE && /^[0-9a-f]{64}$/.test(coderToken ?? '') && !('HIVE_API_TOKEN' in (launch.env ?? {})), JSON.stringify(Object.keys(launch.env ?? {})))
+  check("Coder's session has CW_API_TOKEN_FILE and its token, never CW_API_TOKEN", !!launch.env?.CW_API_TOKEN_FILE && /^[0-9a-f]{64}$/.test(coderToken ?? '') && !('CW_API_TOKEN' in (launch.env ?? {})), JSON.stringify(Object.keys(launch.env ?? {})))
   const asCoder = async (p, method = 'GET', body) => {
     const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${coderToken}`, 'X-Hive-Workspace': encodeURIComponent(ws), 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
     const notice = res.headers.get('x-hive-notice')
@@ -305,7 +305,7 @@ const check = (name, ok, extra = '') => {
   const viaMcp = JSON.parse(
     execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_project_status', arguments: {} } }) + '\n',
-      env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${PORT}`, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: lib.tokenFile(coderToken), CW_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }),
+      env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${PORT}`, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: lib.tokenFile(coderToken), CW_PROJECT: 'alpha', CW_AGENT_ID: coder.id }),
       timeout: 60000
     })
       .toString()

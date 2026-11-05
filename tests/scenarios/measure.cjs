@@ -85,7 +85,7 @@ const tomlString = (v) => (v.startsWith('"') ? JSON.parse(v) : v)
       cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
       cfg.settings.assistant = { ...cfg.settings.assistant, provider: assistantProvider }
       fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-      const { app, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: '47931', CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, HIVE_TEST_TIPS: 'off' } })
+      const { app, inv } = await lib.launch({ userData, env: { CW_API_PORT: '47931', CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off' } })
       try {
         await lib.waitForProvider(inv, 'codex', 60000)
         await inv('workspace:open', ws)
@@ -132,7 +132,7 @@ const tomlString = (v) => (v.startsWith('"') ? JSON.parse(v) : v)
           const developer = tomlString(arg('developer_instructions='))
           // The hive server's environment from its -c mcp_servers.combwork table.
           const table = arg('mcp_servers.combwork=')
-          const env = Object.fromEntries([...table.matchAll(/(HIVE_\w+|ELECTRON_RUN_AS_NODE)="((?:[^"\\]|\\.)*)"/g)].map((m) => [m[1], JSON.parse(`"${m[2]}"`)]))
+          const env = Object.fromEntries([...table.matchAll(/(CW_\w+|ELECTRON_RUN_AS_NODE)="((?:[^"\\]|\\.)*)"/g)].map((m) => [m[1], JSON.parse(`"${m[2]}"`)]))
           const server = await hiveServer(env)
           const skills = skillMetadata(path.join(cwd, '.agents', 'skills'))
           // Codex doesn't show MCP instructions to the model: the developer instructions carry the same text.

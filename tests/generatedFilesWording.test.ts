@@ -11,7 +11,7 @@ import { COPIES_EXCLUDE_COMMENT, excludeCopies } from '../src/main/providers/com
 import { LAUNCH_README } from '../src/main/providers/claude/adapter'
 
 /** Hive's .combwork/.gitignore before #1106 added the usage history's lines. */
-const HIVE_GITIGNORE = "# The task board's database and what moving it from files left (added by Hive, #1017)\nhive.db\nhive.db-*\nbackups/\n"
+const OLD_GITIGNORE = "# The task board's database and what moving it from files left (added by Hive, #1017)\nhive.db\nhive.db-*\nbackups/\n"
 
 describe('the wording of the files Combwork writes (HI-2580)', () => {
   it('says Combwork, never Hive, and links the repository', () => {
@@ -29,15 +29,15 @@ describe("the .combwork folder's .gitignore", () => {
   it("adds the usage history's lines to Combwork's own, and to Hive's", () => {
     const head = BOARD_GITIGNORE.split('\n')[0]
     expect(withUsageIgnore(`${head}\nhive.db\n`)).toBe(`${head}\nhive.db\n# What each session used: the usage history (#1106)\nusage.db\nusage.db-*\n`)
-    expect(withUsageIgnore(HIVE_GITIGNORE)).toBe(`${HIVE_GITIGNORE}# What each session used: the usage history (#1106)\nusage.db\nusage.db-*\n`)
+    expect(withUsageIgnore(OLD_GITIGNORE)).toBe(`${OLD_GITIGNORE}# What each session used: the usage history (#1106)\nusage.db\nusage.db-*\n`)
     // CRLF kept, and a last line without its newline ended first.
-    expect(withUsageIgnore(HIVE_GITIGNORE.replace(/\n/g, '\r\n').replace(/\r\n$/, ''))).toBe(`${HIVE_GITIGNORE.replace(/\n/g, '\r\n')}# What each session used: the usage history (#1106)\r\nusage.db\r\nusage.db-*\r\n`)
+    expect(withUsageIgnore(OLD_GITIGNORE.replace(/\n/g, '\r\n').replace(/\r\n$/, ''))).toBe(`${OLD_GITIGNORE.replace(/\n/g, '\r\n')}# What each session used: the usage history (#1106)\r\nusage.db\r\nusage.db-*\r\n`)
   })
 
   it("leaves the user's own, and one that has them already", () => {
     expect(withUsageIgnore('# mine\nhive.db\n')).toBeNull()
     expect(withUsageIgnore(BOARD_GITIGNORE)).toBeNull()
-    expect(withUsageIgnore(`${HIVE_GITIGNORE}usage.db\n`)).toBeNull()
+    expect(withUsageIgnore(`${OLD_GITIGNORE}usage.db\n`)).toBeNull()
   })
 })
 

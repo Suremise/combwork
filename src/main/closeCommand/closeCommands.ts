@@ -395,11 +395,11 @@ async function savingStep(win: BrowserWindow | null, path: string, place: string
 }
 
 /**
- * For the onclose suite (unpackaged builds only): the saving step waits while HIVE_TEST_HOLD_DRAIN's file exists, as a
+ * For the onclose suite (unpackaged builds only): the saving step waits while CW_TEST_HOLD_DRAIN's file exists, as a
  * slow save would keep it, until the user skips the command.
  */
 async function heldForTest(signal: AbortSignal): Promise<void> {
-  const file = app.isPackaged ? undefined : process.env.HIVE_TEST_HOLD_DRAIN
+  const file = app.isPackaged ? undefined : process.env.CW_TEST_HOLD_DRAIN
   if (!file) return
   while (existsSync(file) && !signal.aborted) await new Promise((r) => setTimeout(r, 100))
 }

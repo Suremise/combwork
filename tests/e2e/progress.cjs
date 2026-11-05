@@ -6,7 +6,7 @@
 // stops leaves its run "stopped reporting", and the setting turns it all off; another tells agents to run long commands
 // through hive-progress, which reaches a new session's guidance (#167). The agents are the fake Claude Code;
 // dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR. The taskbar calls are recorded through
-// HIVE_TEST_TASKBAR_LOG (the page can't see them).
+// CW_TEST_TASKBAR_LOG (the page can't see them).
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -75,7 +75,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TASKBAR_LOG: taskbarLog })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TASKBAR_LOG: taskbarLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

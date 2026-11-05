@@ -1,7 +1,7 @@
 import { existsSync } from 'original-fs'
 import { mkdir, readFile, readdir, stat } from 'original-fs/promises'
 import { basename, join, resolve } from 'path'
-import { AGENT_LIMIT_MAX, HIVE_DIR, agentLimitText, projectAgents } from '../shared/defaults'
+import { AGENT_LIMIT_MAX, CW_DIR, agentLimitText, projectAgents } from '../shared/defaults'
 import { agentProvider, isKnownProvider, isProviderEnabled, PROVIDERS } from '../shared/providers'
 import {
   exportable,
@@ -31,7 +31,7 @@ import {
   type TemplateAgent,
   type TemplateScope
 } from '../shared/templates'
-import { HIVE_TEMPLATES, hiveTemplate, type HiveTemplate } from '../shared/templateDefaults'
+import { CW_TEMPLATES, hiveTemplate, type HiveTemplate } from '../shared/templateDefaults'
 import type { AgentBranchStatus, AgentDef, PageLayout, ProjectConfig, ProviderId, TemplateLoadPlan, TemplateLoadWorkflow } from '../shared/types'
 import { answerFor, badAnswers, loadFallback, optionNamed, optionOf, type ConnectionAnswers, type ConnectionOption, type ConnectionsApplied, type ConnectionsPlan, type PickedAgent } from '../shared/templateConnections'
 import { accountOnIn, connectionsOn } from '../shared/accounts'
@@ -113,10 +113,10 @@ const checkScope = (scope: unknown): TemplateScope => {
 function folder(d: TemplateDest): string {
   const scope = checkScope(d.scope)
   if (scope === 'hive') throw refusal(M.hiveOnly, undefined, 'invalid')
-  if (scope === 'project') return join(workspace.assertProject(String(d.project ?? '')), HIVE_DIR, 'templates')
+  if (scope === 'project') return join(workspace.assertProject(String(d.project ?? '')), CW_DIR, 'templates')
   const ws = d.project ? workspaceOf(d.project).path : workspace.path
   if (!ws) throw refusal(msg({ id: 'content.templates.noWorkspace', defaultMessage: 'Open a workspace first.', description: "An error: the workspace's templates need a workspace open." }))
-  return join(ws, HIVE_DIR, 'templates')
+  return join(ws, CW_DIR, 'templates')
 }
 
 /** The place a template is kept, as listed (a project's path only for a project's templates). */
@@ -168,7 +168,7 @@ async function readOne(d: TemplateDest, file: string): Promise<TemplateEntry | n
 
 /** The templates kept in one place, by file name (Hive's own in their order). */
 async function listIn(d: TemplateDest): Promise<TemplateEntry[]> {
-  if (d.scope === 'hive') return HIVE_TEMPLATES.map(hiveEntry)
+  if (d.scope === 'hive') return CW_TEMPLATES.map(hiveEntry)
   const files = (await readdir(folder(d)).catch(() => [] as string[])).filter(isTemplateFile).sort()
   const out: TemplateEntry[] = []
   for (const f of files) {

@@ -7,7 +7,7 @@
 // window's command and then When Combwork quits, after them; a chatty command left running (Don't wait) outlives Combwork's
 // exit and finishes, its output kept to the last 64 KB. Screenshots of the panel, running and failed, in both themes,
 // and of the settings rows. Dev build, throwaway profile and workspaces; test copies run close commands only with
-// HIVE_TEST_RUN_ON_CLOSE=1 (unpackaged builds).
+// CW_TEST_RUN_ON_CLOSE=1 (unpackaged builds).
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -69,9 +69,9 @@ async function shots(page, name) {
 
   // The settings rows' first two saves each slowed (HR6's round 1, finding 5): a tick right after typing must not save
   // the old command over the new one.
-  // The saving step held while this file exists (HIVE_TEST_HOLD_DRAIN), as a slow save would keep it.
+  // The saving step held while this file exists (CW_TEST_HOLD_DRAIN), as a slow save would keep it.
   const holdDrain = path.join(marks, 'hold-drain')
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47792), HIVE_TEST_RUN_ON_CLOSE: '1', HIVE_TEST_SLOW_IPC: 'commands:setWorkspace=1500*2,commands:setHive=1500*2', HIVE_TEST_HOLD_DRAIN: holdDrain } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47792), CW_TEST_RUN_ON_CLOSE: '1', CW_TEST_SLOW_IPC: 'commands:setWorkspace=1500*2,commands:setHive=1500*2', CW_TEST_HOLD_DRAIN: holdDrain } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, wsA)
 

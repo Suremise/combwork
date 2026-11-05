@@ -138,12 +138,12 @@ describe('which folder', () => {
   afterEach(() => vi.unstubAllEnvs())
 
   it("a development or test copy checks node_modules' Electron and never changes it", () => {
-    vi.stubEnv('HIVE_TEST_INSTALL_DIR', '')
+    vi.stubEnv('CW_TEST_INSTALL_DIR', '')
     expect(installDirTarget()).toEqual({ dir: dirname(process.execPath), mayChange: false })
   })
 
   it('a test folder of its own may be changed', () => {
-    vi.stubEnv('HIVE_TEST_INSTALL_DIR', 'C:\\test\\folder')
+    vi.stubEnv('CW_TEST_INSTALL_DIR', 'C:\\test\\folder')
     expect(installDirTarget()).toEqual({ dir: 'C:\\test\\folder', mayChange: true })
   })
 })
@@ -181,11 +181,11 @@ describe("telling the user Combwork can't start", () => {
   })
 
   it('a quiet test copy shows nothing: it records it, and draws the window only to a picture asked for', () => {
-    vi.stubEnv('HIVE_TEST_DIALOG_SNAPSHOT', '')
+    vi.stubEnv('CW_TEST_DIALOG_SNAPSHOT', '')
     const t = ui(true, false)
     tellCantStart(DIR, undefined, t)
     expect(t.calls).toEqual(["record Combwork can't start"])
-    vi.stubEnv('HIVE_TEST_DIALOG_SNAPSHOT', 'C:\\shot.png')
+    vi.stubEnv('CW_TEST_DIALOG_SNAPSHOT', 'C:\\shot.png')
     const u = ui(true, false)
     tellCantStart(DIR, undefined, u)
     expect(u.calls).toEqual(["record Combwork can't start", "window Combwork can't start to C:\\shot.png"])

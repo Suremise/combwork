@@ -18,13 +18,13 @@ export interface MergeMessageInputs {
 }
 
 /** A `Hive-…:` trailer line, as Hive writes them (and a builder may have copied into a commit of the branch). */
-const HIVE_TRAILER = /^Hive-[A-Za-z-]+:/
+const CW_TRAILER = /^Hive-[A-Za-z-]+:/
 
 /** A message without Hive's trailer lines, its runs of blank lines (where they were) made one, trimmed. */
 function withoutHiveTrailers(m: string): string {
   return m
     .split(/\r?\n/)
-    .filter((l) => !HIVE_TRAILER.test(l.trim()))
+    .filter((l) => !CW_TRAILER.test(l.trim()))
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim()

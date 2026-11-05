@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { allOff, contradictions, FOCUSED_RUN, OPTION_TAKES, preset, type OptionKey, type WorkflowOptions } from '../src/shared/workflow/options'
 import { carriedFor, overlayTemplateWorkflow, readTemplateWorkflow, readTemplateWorkflows, TEMPLATE_CARRIED, TEMPLATE_NOT_CARRIED, templateWorkflowOf, type WorkflowBase } from '../src/shared/workflow/templateOptions'
 import { exportable, readTemplate, TEMPLATE_VERSION, isAgentTemplate } from '../src/shared/templates'
-import { HIVE_TEMPLATES } from '../src/shared/templateDefaults'
+import { CW_TEMPLATES } from '../src/shared/templateDefaults'
 
 /** A Git project's options: its own target, commands, identity and folders, and some rules. */
 const projectA: WorkflowOptions = {
@@ -203,12 +203,12 @@ describe("laid over another project's options", () => {
 
 describe("Combwork's own templates' sections", () => {
   it('each carries its preset for None and Git, each usable as a file’s would be; Team 6 + pool its pool', () => {
-    for (const h of HIVE_TEMPLATES) {
+    for (const h of CW_TEMPLATES) {
       const w = h.template.workflow!
       expect(w.none?.preset).toBe(h.template.suggestedPreset)
       expect(w.git?.preset).toBe(h.template.suggestedPreset)
       expect(readTemplateWorkflows(JSON.parse(JSON.stringify(w))).dropped).toEqual([])
     }
-    expect(HIVE_TEMPLATES.find((h) => h.file === 'team-6-pool.json')!.template.workflow!.git!.options.reviewerMode).toBe('pool')
+    expect(CW_TEMPLATES.find((h) => h.file === 'team-6-pool.json')!.template.workflow!.git!.options.reviewerMode).toBe('pool')
   })
 })

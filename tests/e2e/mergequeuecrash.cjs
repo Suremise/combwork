@@ -2,15 +2,15 @@
 // table; S34d): `main` checked out in the project folder, Merge into a checked-out branch set to Automatically, fake
 // Claude Code agents (one builder, building each card on the slot its start lends, and one reviewer, rejoined in each
 // run of Combwork), the Assistant off.
-// - Combwork ended (HIVE_TEST_QUEUE_CRASH) after IntegrationStarted, before and after read-tree, before and after update-ref,
-//   and in and after a rollback (the target moved by another client just before the swap: HIVE_TEST_QUEUE_RACE): each
+// - Combwork ended (CW_TEST_QUEUE_CRASH) after IntegrationStarted, before and after read-tree, before and after update-ref,
+//   and in and after a rollback (the target moved by another client just before the swap: CW_TEST_QUEUE_RACE): each
 //   next start recovers per the table, the card merged exactly once, the folder clean on main, the queue not paused.
 //   Where a point's recovery can't reach the next run's seam (no rollback), that next run is the restart too.
 // - The terminal state: a listed file edited after a crash past read-tree; the restart pauses the queue (needs you) with
 //   the state (branch, ref, the file's side, no command), changes nothing more, and asks in For you (screenshots of the
 //   card dialog's request, both themes); put back and answered, the queue looks again and recovery finishes the swap.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
-// Dev build only (#1578): every part ends Combwork at a crash seam (HIVE_TEST_QUEUE_CRASH, _QUEUE_RACE), which a packaged
+// Dev build only (#1578): every part ends Combwork at a crash seam (CW_TEST_QUEUE_CRASH, _QUEUE_RACE), which a packaged
 // build ignores.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -74,7 +74,7 @@ const main = () => q.head(fx, 'main')
     ]
     let prev = null
     for (const r of runs) {
-      h = await start({ HIVE_TEST_QUEUE_CRASH: r.point, ...(r.race ? { HIVE_TEST_QUEUE_RACE: 'beforeRef' } : {}) })
+      h = await start({ CW_TEST_QUEUE_CRASH: r.point, ...(r.race ? { CW_TEST_QUEUE_RACE: 'beforeRef' } : {}) })
       if (prev) await recovered(h, prev)
       await crashes(h, r.point)
       prev = r.point
@@ -86,7 +86,7 @@ const main = () => q.head(fx, 'main')
     }
 
     // --- The terminal state: a listed file edited after a crash past read-tree.
-    h = await start({ HIVE_TEST_QUEUE_CRASH: 'afterFiles' })
+    h = await start({ CW_TEST_QUEUE_CRASH: 'afterFiles' })
     await crashes(h, 'stuck')
     fs.writeFileSync(path.join(fx.alpha, 'stuck.txt'), 'edited after the crash\n')
     h = await start()

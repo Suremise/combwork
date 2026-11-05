@@ -6,7 +6,7 @@ import { readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { fmt, setLanguage, tr } from '../src/shared/i18n'
 import { BUSY_MERGE_MS, ESTIMATE_OF, HISTORY_SHOWN, allProjectsQueues, queueBusy, JUST_MERGED_MS, historyOutcome, historyRows, pauseWhyShort, pushStateText, RETURN_SEEN_SHOWN_MS, justMerged, keptLive, nextFold, queueKey, withKept, type KeptReturn, mergedText, onPulseLine, pauseText, pulseLine, queueEstimate, queueNews, queueShown, queuedCount, queuedText, returnCheck, returnedText, returnRun, returnWhy, runCheckName, shownQueues, shownReturns, stepText, testingText, unseenReturns } from '../src/shared/progressQueue'
-import { copiesRunsKey, HIVE_RUNS, NO_RUNS_FILTER, runAgentKey, runMatches, runThing, slotRunsKey, tabBadges } from '../src/shared/progressTabs'
+import { copiesRunsKey, CW_RUNS, NO_RUNS_FILTER, runAgentKey, runMatches, runThing, slotRunsKey, tabBadges } from '../src/shared/progressTabs'
 import type { ProgressRun } from '../src/shared/types'
 import { RECENT_MAX, type QueuePauseLogged, type QueueRecent, type QueueView } from '../src/shared/workflow/queue'
 
@@ -332,26 +332,26 @@ describe('announced politely (#1356 item 8)', () => {
 describe("Combwork's runs in the Runs tab (#1356 item 5)", () => {
   it('the Agent filter has Combwork (merge queue) for them', () => {
     const r = run()
-    expect(runAgentKey(r)).toBe(HIVE_RUNS)
+    expect(runAgentKey(r)).toBe(CW_RUNS)
     expect(runAgentKey(run({ source: 'agent', agentId: 'b1' }))).toBe('b1')
     expect(runAgentKey(run({ source: 'api' }))).toBeNull()
     const words = (x: ProgressRun): string => x.title
-    expect(runMatches(r, { ...NO_RUNS_FILTER, agent: HIVE_RUNS }, words)).toBe(true)
-    expect(runMatches(run({ source: 'agent', agentId: 'b1' }), { ...NO_RUNS_FILTER, agent: HIVE_RUNS }, words)).toBe(false)
+    expect(runMatches(r, { ...NO_RUNS_FILTER, agent: CW_RUNS }, words)).toBe(true)
+    expect(runMatches(run({ source: 'agent', agentId: 'b1' }), { ...NO_RUNS_FILTER, agent: CW_RUNS }, words)).toBe(false)
   })
 
   it("each slot's and copy's set-up runs are an Agent filter entry of their own (#1446), apart from the merge queue's", () => {
     const words = (x: ProgressRun): string => x.title
     const slotB = run({ defaultName: 'slot', slot: 'slot-b', agentName: 'Combwork (slot slot-b)' })
     const copy1 = run({ defaultName: 'copy', copy: 'copy-1', agentName: 'Combwork (review copies)' })
-    expect([runAgentKey(slotB), runAgentKey(copy1), runAgentKey(run())]).toEqual([slotRunsKey('slot-b'), copiesRunsKey, HIVE_RUNS])
-    expect(new Set([slotRunsKey('slot-b'), slotRunsKey('slot-c'), copiesRunsKey, HIVE_RUNS]).size).toBe(4)
+    expect([runAgentKey(slotB), runAgentKey(copy1), runAgentKey(run())]).toEqual([slotRunsKey('slot-b'), copiesRunsKey, CW_RUNS])
+    expect(new Set([slotRunsKey('slot-b'), slotRunsKey('slot-c'), copiesRunsKey, CW_RUNS]).size).toBe(4)
     // HI-1710: the copies' runs no lease credits are one entry, whichever copy; one a lease credits is its agent's.
     expect(runAgentKey(run({ defaultName: 'copy', copy: 'copy-2', agentName: 'Combwork (review copies)' }))).toBe(copiesRunsKey)
     expect(runAgentKey(run({ copy: 'copy-1', agentId: 'r1', agentName: 'R1' }))).toBe('r1')
     expect(runMatches(slotB, { ...NO_RUNS_FILTER, agent: slotRunsKey('slot-b') }, words)).toBe(true)
     expect(runMatches(run(), { ...NO_RUNS_FILTER, agent: slotRunsKey('slot-b') }, words)).toBe(false)
-    expect(runMatches(slotB, { ...NO_RUNS_FILTER, agent: HIVE_RUNS }, words)).toBe(false)
+    expect(runMatches(slotB, { ...NO_RUNS_FILTER, agent: CW_RUNS }, words)).toBe(false)
     // An agent's isolated check in a copy is its agent's, never Combwork's.
     expect(runAgentKey(run({ source: 'agent', agentId: 'r1', copy: 'copy-1' }))).toBe('r1')
   })

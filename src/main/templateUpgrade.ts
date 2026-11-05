@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'crypto'
 import { constants } from 'original-fs'
 import { copyFile, link, mkdir, readFile, readdir, unlink, writeFile } from 'original-fs/promises'
 import { join, resolve } from 'path'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { isTemplateFile, TEMPLATE_VERSION } from '../shared/templates'
 import { msg, tr } from '../shared/i18n'
 import { boardValue, boardWrite, setBoardValue, upgradeWaiting } from './boardStore'
@@ -37,17 +37,17 @@ export const V09_TEMPLATES = 'templates-0.9'
 /** Seams for unit tests: a failure where a run reads or writes, and the moment a copy is written but not yet published. */
 export const testHooks: { fail?: (op: 'scan' | 'read' | 'write', path: string) => void; beforePublish?: (part: string) => Promise<void> } = {}
 
-const backupDir = (workspacePath: string): string => join(workspacePath, HIVE_DIR, 'backups', V09_TEMPLATES)
+const backupDir = (workspacePath: string): string => join(workspacePath, CW_DIR, 'backups', V09_TEMPLATES)
 const code = (e: unknown): string | undefined => (e as NodeJS.ErrnoException)?.code
 
 /** The template folders to look in, each with where its copies go in the backup: the workspace's and each project's. */
 async function places(ws: WorkspaceService, workspacePath: string): Promise<{ from: string; to: string }[]> {
   const dir = backupDir(workspacePath)
-  const out = [{ from: join(workspacePath, HIVE_DIR, 'templates'), to: join(dir, 'workspace') }]
+  const out = [{ from: join(workspacePath, CW_DIR, 'templates'), to: join(dir, 'workspace') }]
   const ids = await ws.projectIds()
   for (const p of await ws.listProjectPaths()) {
     const id = ids.byPath.get(resolve(p).toLowerCase())
-    if (id) out.push({ from: join(p, HIVE_DIR, 'templates'), to: join(dir, 'projects', id) })
+    if (id) out.push({ from: join(p, CW_DIR, 'templates'), to: join(dir, 'projects', id) })
   }
   return out
 }

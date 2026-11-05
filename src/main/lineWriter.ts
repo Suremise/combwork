@@ -21,9 +21,9 @@ const log = createLogger('watches')
 const TAKE_MS = 10_000
 /** For unit tests: how long a typed line has to be taken (TAKE_MS). */
 export const testHooks: { takeMs?: number } = {}
-/** TAKE_MS, or a unit test's, or an unpackaged test build's (HIVE_TEST_WAKE_TAKE_MS). */
+/** TAKE_MS, or a unit test's, or an unpackaged test build's (CW_TEST_WAKE_TAKE_MS). */
 function takeMs(): number {
-  const v = !app.isPackaged ? Number(process.env.HIVE_TEST_WAKE_TAKE_MS) : NaN
+  const v = !app.isPackaged ? Number(process.env.CW_TEST_WAKE_TAKE_MS) : NaN
   return testHooks.takeMs ?? (Number.isFinite(v) && v >= 0 ? v : TAKE_MS)
 }
 

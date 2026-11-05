@@ -3,7 +3,7 @@
 // the project's Overview and the Progress panel show the holder and the line; a holder whose session ends frees the
 // slot; a hold that runs out passes on and is reported; the user releases a holder from the Overview; the Merge dialog
 // waits while the slot is taken; another project's agent can't reach the slot. Dev build, throwaway profile, workspace
-// and CLAUDE_CONFIG_DIR; holds last 20 s here (HIVE_TEST_MERGE_HOLD_MS).
+// and CLAUDE_CONFIG_DIR; holds last 20 s here (CW_TEST_MERGE_HOLD_MS).
 // Dev build only (#1580): it starts this checkout's Electron itself, and Wes is a 0.9 worktree agent
 // (agents:testLegacy, refused by a packaged build), with a branch for the Merge dialog.
 const lib = require('./lib.cjs')
@@ -44,7 +44,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off', HIVE_TEST_MERGE_HOLD_MS: String(HOLD_MS) })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off', CW_TEST_MERGE_HOLD_MS: String(HOLD_MS) })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))

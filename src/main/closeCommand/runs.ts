@@ -31,13 +31,13 @@ export type Skip = 'none' | 'test' | 'update'
 
 /**
  * Whether this Hive runs close commands: never a test copy, whether quiet or shown (HR6's s8 point 3: a test profile is
- * HIVE_USER_DATA, or HIVE_TEST_QUIET=1 for a packaged one), but for an unpackaged build's HIVE_TEST_RUN_ON_CLOSE=1, the
+ * CW_USER_DATA, or CW_TEST_QUIET=1 for a packaged one), but for an unpackaged build's CW_TEST_RUN_ON_CLOSE=1, the
  * e2e suite's seam.
  */
 export function runsCloseCommands(env: NodeJS.ProcessEnv, packaged: boolean): boolean {
-  const testProfile = !!env.HIVE_USER_DATA || env.HIVE_TEST_QUIET === '1'
+  const testProfile = !!env.CW_USER_DATA || env.CW_TEST_QUIET === '1'
   if (!testProfile) return true
-  return !packaged && env.HIVE_TEST_RUN_ON_CLOSE === '1'
+  return !packaged && env.CW_TEST_RUN_ON_CLOSE === '1'
 }
 
 /**

@@ -7,7 +7,7 @@ import { insideReal, realPath } from './fsutil'
 import { parseDocRef } from '../shared/docRefs'
 import { docOutline, findHeading, sectionText } from '../shared/docSections'
 import type { ContextProblem } from '../shared/types'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 
 /** A shared note's reference starts with this: `shared:plans/i18n.md`. */
 export const SHARED_PREFIX = 'shared:'
@@ -21,7 +21,7 @@ export type DocRead = { ok: true; text: string } | { ok: false; code: 'outside' 
 const MARKDOWN = /\.(md|markdown|mdx)$/i
 
 /** Whether a path inside the folder goes into Hive's own `.combwork` or git's `.git`. */
-const hidden = (inside: string): boolean => inside.split(/[\\/]/).some((part) => part.toLowerCase() === HIVE_DIR || part.toLowerCase() === '.git')
+const hidden = (inside: string): boolean => inside.split(/[\\/]/).some((part) => part.toLowerCase() === CW_DIR || part.toLowerCase() === '.git')
 
 /**
  * Reads a document: `path` relative to `root` (a project's folder, or the shared notes' folder for `shared:` paths).

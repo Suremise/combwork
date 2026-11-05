@@ -9,7 +9,7 @@ import { AsyncLocalStorage } from 'async_hooks'
 import type { BrowserWindow } from 'electron'
 import chokidar, { type FSWatcher } from 'chokidar'
 import { ASSISTANT_DIR, ASSISTANT_NAME, LEGACY_MODES_DIR, MODES_DIR, assistantProjectConfig } from '../shared/assistant'
-import { DEFAULT_PROJECT_CONFIG, DEFAULT_WORKSPACE_CONFIG, HIVE_DIR, mergeDefaults, migrateProjectConfig, projectAgents, withLegacyProjectFields, withoutSkillSwitches } from '../shared/defaults'
+import { DEFAULT_PROJECT_CONFIG, DEFAULT_WORKSPACE_CONFIG, CW_DIR, mergeDefaults, migrateProjectConfig, projectAgents, withLegacyProjectFields, withoutSkillSwitches } from '../shared/defaults'
 import { migrateWorkspacePreferences } from '../shared/workflow/preferences'
 import { settlePlacements } from '../shared/paneCells'
 import { assistantMcpAdded, MCP_ADDED_MODEL, mcpAdded, mcpNames, migratedProjectMcp, migratedWorkspaceMcp } from '../shared/agentMcp'
@@ -363,7 +363,7 @@ export class WorkspaceService {
 
   get hiveDir(): string {
     if (!this.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
-    return join(this.path, HIVE_DIR)
+    return join(this.path, CW_DIR)
   }
 
   get skillsDir(): string {
@@ -502,7 +502,7 @@ export class WorkspaceService {
     // The folder move's late phases (below) stop with this open.
     const openGen = this.generation
     const moveOpts = { signal: this.life.signal, stillOurs: () => this.generation === openGen && this.path === abs }
-    const fresh = !existsSync(join(abs, HIVE_DIR))
+    const fresh = !existsSync(join(abs, CW_DIR))
     await this.ensureWorkspaceStructure()
     this.wsConfig = loadedConfig(await readKeptJson(join(this.hiveDir, 'workspace.json'), {}, { holder: this }))
     // Its open point's commands hold its agents back until they are done (HI-1954): reserved here, before anything hears
@@ -669,7 +669,7 @@ export class WorkspaceService {
     // new one is scheduled from the abort on (scheduleRefresh).
     while (this.scheduledRuns.size) await Promise.allSettled([...this.scheduledRuns])
     if (closing) closeBoard(closing, place)
-    if (closing) closeJournal(join(closing, HIVE_DIR, ASSISTANT_DIR), place)
+    if (closing) closeJournal(join(closing, CW_DIR, ASSISTANT_DIR), place)
     this.hiveTop?.close()
     this.hiveTop = null
     await this.watcher?.close()
@@ -790,16 +790,16 @@ export class WorkspaceService {
       }
     )
     const told = (rel: string): void => {
-      if (rel.startsWith(`${HIVE_DIR}/shared`)) this.emit({ type: 'notes-changed' })
-      else if (rel.startsWith(`${HIVE_DIR}/skills`) || rel.startsWith(`${HIVE_DIR}/mcp`)) {
+      if (rel.startsWith(`${CW_DIR}/shared`)) this.emit({ type: 'notes-changed' })
+      else if (rel.startsWith(`${CW_DIR}/skills`) || rel.startsWith(`${CW_DIR}/mcp`)) {
         this.emit({ type: 'skills-changed' })
         // HI-2268: running agents' "restart to apply" is worked out by the refresh (sessions' liveInfo), as a change made
         // in the window asks for one: a skill edited, added or removed anywhere (the Skills view, an editor, an agent,
         // a git pull) shows it. Unchanged skills cost a stat each there (revisionOf), and the refresh is debounced.
         this.scheduleRefresh()
       }
-      else if (rel.startsWith(`${HIVE_DIR}/${MODES_DIR}`) || rel.startsWith(`${HIVE_DIR}/${LEGACY_MODES_DIR}`)) this.emit({ type: 'modes-changed' })
-      else if (rel.startsWith(`${HIVE_DIR}/${DIALECTS_DIR}`)) {
+      else if (rel.startsWith(`${CW_DIR}/${MODES_DIR}`) || rel.startsWith(`${CW_DIR}/${LEGACY_MODES_DIR}`)) this.emit({ type: 'modes-changed' })
+      else if (rel.startsWith(`${CW_DIR}/${DIALECTS_DIR}`)) {
         // HI-2443: callers with no session follow the files; running agents whose chain they change show "restart to
         // apply", worked out by the refresh (sessions' liveInfo) as for skills.
         for (const l of WorkspaceService.dialectsListeners) {
@@ -813,7 +813,7 @@ export class WorkspaceService {
         this.emit({ type: 'dialects-changed' })
         this.scheduleRefresh()
       }
-      else if (rel === `${HIVE_DIR}/workspace.json`) void this.reloadConfig()
+      else if (rel === `${CW_DIR}/workspace.json`) void this.reloadConfig()
     }
     const chokidarWatcher = this.watcher
     chokidarWatcher.on('all', (evt, p) => told(this.path ? p.slice(this.path.length + 1).replace(/\\/g, '/') : ''))
@@ -830,7 +830,7 @@ export class WorkspaceService {
         if (!f || watched.has(f) || !existsSync(join(this.hiveDir, f))) return
         watched.add(f)
         chokidarWatcher.add(join(this.hiveDir, f))
-        told(`${HIVE_DIR}/${f}`)
+        told(`${CW_DIR}/${f}`)
       })
       top.on('error', (e) => log.warn('watcher error (.combwork)', e))
       this.hiveTop = top
@@ -1088,7 +1088,7 @@ export class WorkspaceService {
     const key = (
       await Promise.all(
         paths.map(async (p) => {
-          const st = await stat(join(p, HIVE_DIR, 'project.json')).catch(() => null)
+          const st = await stat(join(p, CW_DIR, 'project.json')).catch(() => null)
           return `${p.toLowerCase()}:${st ? `${st.ino}:${st.mtimeMs}` : '-'}`
         })
       )
@@ -1122,7 +1122,7 @@ export class WorkspaceService {
     const entries: ProjectIdEntry[] = []
     const cfgs = new Map<string, ProjectConfig>()
     // Read all at once (HI-1705), kept in the listing's order.
-    const read = await whenAll(paths.map((p) => (existsSync(join(p, HIVE_DIR, 'project.json')) ? this.projectConfig(p).catch(() => null) : null)))
+    const read = await whenAll(paths.map((p) => (existsSync(join(p, CW_DIR, 'project.json')) ? this.projectConfig(p).catch(() => null) : null)))
     paths.forEach((p, i) => {
       const cfg = read[i]
       if (!cfg) return
@@ -1329,7 +1329,7 @@ export class WorkspaceService {
    * connection (HI-1755), so a save under way is either in it or not yet begun.
    */
   async savedAgent(projectPath: string, agentId: string): Promise<AgentDef | undefined> {
-    return withFileLock(join(projectPath, HIVE_DIR, 'project.json'), async () => projectAgents(await this.projectConfig(projectPath)).find((a) => a.id === agentId))
+    return withFileLock(join(projectPath, CW_DIR, 'project.json'), async () => projectAgents(await this.projectConfig(projectPath)).find((a) => a.id === agentId))
   }
 
   /** Changes one agent's definition. */
@@ -1382,7 +1382,7 @@ export class WorkspaceService {
       const moved = await moveFolders(this.path, { only: projectPath })
       if (moved.late) await this.finishFolderMove()
     }
-    const h = join(projectPath, HIVE_DIR)
+    const h = join(projectPath, CW_DIR)
     // Never the project's own folder (HI-2045): each folder and file is made only inside one that is there, so a project
     // deleted or moved out meanwhile, at any step (as when a refresh that listed it before reads it after), fails with
     // ENOENT rather than coming back as a bare `.combwork`. The Assistant's home is Hive's, made with its parents.
@@ -1450,7 +1450,7 @@ export class WorkspaceService {
   /** A project's config; `opts` for a read that is written back (mutateProjectConfig, #1600). */
   async projectConfig(projectPath: string, opts?: KeptReadOptions): Promise<ProjectConfig> {
     // By its stat (HI-1814): read, migrated and merged with the defaults again only once it changed.
-    const file = await readKeptJsonByStat(join(projectPath, HIVE_DIR, 'project.json'), {} as Record<string, unknown>, projectFileConfig, opts)
+    const file = await readKeptJsonByStat(join(projectPath, CW_DIR, 'project.json'), {} as Record<string, unknown>, projectFileConfig, opts)
     const cfg = this.withView(projectPath, file.cfg, file.viewKeys)
     // The Assistant's "project" settings are Settings → Assistant; its file keeps the workspace's own choices.
     return this.isAssistantHome(projectPath) ? assistantProjectConfig(cfg, config.settings) : cfg
@@ -1516,7 +1516,7 @@ export class WorkspaceService {
     // `existing`: a change to a project.json that is there, never one making the project (HI-1817: a project moved out
     // meanwhile fails with ENOENT, its folder not made again).
     if (!opts.existing) await this.ensureProject(projectPath)
-    const file = join(projectPath, HIVE_DIR, 'project.json')
+    const file = join(projectPath, CW_DIR, 'project.json')
     let ticket = 0
     // The board an agent leaving publishes under: this workspace's, for one of its projects (the Assistant's home has none).
     const board = this.path && !this.isAssistantHome(projectPath) ? this.path : null
@@ -1591,11 +1591,11 @@ export class WorkspaceService {
    */
   private async sessionsPlace(projectPath: string): Promise<SessionsPlace> {
     const h = resolve(projectPath)
-    const file = join(h, HIVE_DIR, 'sessions.json')
+    const file = join(h, CW_DIR, 'sessions.json')
     const parent = dirname(h)
-    if (basename(h).toLowerCase() === ASSISTANT_DIR.toLowerCase() && basename(parent).toLowerCase() === HIVE_DIR) return { workspace: dirname(parent), scope: 'assistant', file }
+    if (basename(h).toLowerCase() === ASSISTANT_DIR.toLowerCase() && basename(parent).toLowerCase() === CW_DIR) return { workspace: dirname(parent), scope: 'assistant', file }
     const known = this.path ? (await this.projectIds().catch(() => null))?.byPath.get(h.toLowerCase()) : undefined
-    const saved = known ?? (await readJson<{ id?: unknown } | null>(join(h, HIVE_DIR, 'project.json'), null).catch(() => null))?.id
+    const saved = known ?? (await readJson<{ id?: unknown } | null>(join(h, CW_DIR, 'project.json'), null).catch(() => null))?.id
     // Asked when a file would be moved in (#1161), not now: a change may wait for its turn meanwhile, and land after its
     // workspace closed. Fails closed: present only while this service has that workspace open and its live config doesn't
     // list the project as removed; closed or replaced since, removed as far as a move in goes (the file stays).
@@ -1730,7 +1730,7 @@ export class WorkspaceService {
     let gone = false
     if (!this.isAssistantHome(projectPath)) {
       const key = projectPath.toLowerCase()
-      if (existsSync(join(projectPath, HIVE_DIR, 'project.json'))) {
+      if (existsSync(join(projectPath, CW_DIR, 'project.json'))) {
         await configTestHooks.afterConfigSeen?.(projectPath)
         this.markSetUp(projectPath, gen, ticket)
       } else if (this.setUpAt.has(key)) {
@@ -1753,7 +1753,7 @@ export class WorkspaceService {
       took('removed data', removedData(projectPath)), // i18n-ignore: a part of a log line's timing
       // Ensured at each refresh, so a repository made later (git init) gets it too (#345). Not for one gone (HI-2564),
       // asked again as each write is made: its project.json may go while this read runs (HR2's round 1).
-      this.isAssistantHome(projectPath) ? undefined : took('.combwork in git', hiveVcs(projectPath, { readOnly: () => gone || (this.setUpAt.has(projectPath.toLowerCase()) && !existsSync(join(projectPath, HIVE_DIR, 'project.json'))) }).catch(() => undefined)) // i18n-ignore: a part of a log line's timing
+      this.isAssistantHome(projectPath) ? undefined : took('.combwork in git', hiveVcs(projectPath, { readOnly: () => gone || (this.setUpAt.has(projectPath.toLowerCase()) && !existsSync(join(projectPath, CW_DIR, 'project.json'))) }).catch(() => undefined)) // i18n-ignore: a part of a log line's timing
     ])
     const info: ProjectInfo = {
       name: basename(projectPath),
@@ -1965,7 +1965,7 @@ export const REMOVED_DIR = 'removed'
 
 /** What Remove from Hive packed into a project folder, if anything (its manifest). */
 async function removedData(projectPath: string): Promise<RemovedData | null> {
-  const file = join(projectPath, HIVE_DIR, REMOVED_DIR, 'manifest.json')
+  const file = join(projectPath, CW_DIR, REMOVED_DIR, 'manifest.json')
   if (!existsSync(file)) return null
   const m = await readJson<Partial<RemovedData> | null>(file, null)
   if (!m || typeof m.at !== 'string') return null

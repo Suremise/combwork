@@ -13,7 +13,7 @@ import type { StartHint } from '../../../shared/startFailure'
 import { CODEX, CODEX_DESCRIPTOR, CODEX_MODE_FLAGS, CODEX_PERMISSION_MODES } from '../../../shared/codex'
 import { providerSettings } from '../../../shared/providers'
 import type { TypedNewline } from '../../../shared/terminalInput'
-import { HIVE_TOOLS, LEGACY_TOOLS_SERVER, TOOLS_SERVER } from '../../../shared/assistantTools'
+import { CW_TOOLS, LEGACY_TOOLS_SERVER, TOOLS_SERVER } from '../../../shared/assistantTools'
 import { config } from '../../config'
 import { isFile, placeMatcher } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
@@ -489,7 +489,7 @@ export function outrankNativeHive(files: string[], table: Record<string, unknown
       log.warn(`Codex has an HTTP MCP server named ${TOOLS_SERVER} in ${userText(file)} (${http.join(', ')}): Codex agents can't start beside Combwork's own.`)
       throw hiveError(NATIVE_HIVE, { file })
     }
-    if ('enabled_tools' in n) out.enabled_tools = [...HIVE_TOOLS]
+    if ('enabled_tools' in n) out.enabled_tools = [...CW_TOOLS]
     if ('disabled_tools' in n) out.disabled_tools = []
     if ('default_tools_approval_mode' in n && !('default_tools_approval_mode' in table)) out.default_tools_approval_mode = approved === 'all' ? 'approve' : 'auto'
     const tools = n.tools && typeof n.tools === 'object' ? Object.keys(n.tools as Record<string, unknown>) : []

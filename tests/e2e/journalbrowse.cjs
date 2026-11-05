@@ -214,13 +214,13 @@ function seed(cards, secondKey) {
     // HR6's round 1: a new filter's results are still being read (slow), the old ones only shown: Forget waits for them,
     // and asks with the count of the filter as it is.
     await app.evaluate(() => {
-      process.env.HIVE_TEST_SLOW_IPC = 'journal:browse=3000*1'
+      process.env.CW_TEST_SLOW_IPC = 'journal:browse=3000*1'
     })
     await view.locator('.journal-source').selectOption('hive')
     check('while a new filter is read, the old rows are dimmed and Forget waits', !!(await lib.until(async () => (await view.locator('.journal-scroll.pending').count()) === 1 && (await view.locator('.journal-forget').isDisabled()) && (await rows.count()) === 4, HUNG_MS)), String(await rows.count()))
     check('…then its own rows, and Forget', !!(await lib.until(async () => (await rows.count()) === 1 && (await view.locator('.journal-scroll.pending').count()) === 0 && !(await view.locator('.journal-forget').isDisabled()), HUNG_MS)))
     await app.evaluate(() => {
-      delete process.env.HIVE_TEST_SLOW_IPC
+      delete process.env.CW_TEST_SLOW_IPC
     })
     await view.locator('.journal-forget').click()
     const askHive = page.locator('.dialog', { hasText: 'Forget 1 entry?' })

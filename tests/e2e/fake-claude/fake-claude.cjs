@@ -700,7 +700,7 @@ async function runPrompt(text, enter = null) {
     if (call) await hiveCall(call.tool, call.args)
     if (/\bcheckpoint\b/i.test(step)) await checkpoint()
     if (/\bratelimited\b/i.test(step)) await rateLimited()
-    // "shell: <command line>": runs it in cmd with the session's environment (PATH, HIVE_*), as an agent's shell
+    // "shell: <command line>": runs it in cmd with the session's environment (PATH, CW_*), as an agent's shell
     // would; the agent, command, exit code and output go to fake-shell.jsonl in its home.
     const sh = /\bshell:\s*(.+)$/i.exec(step)
     if (sh) await shell(sh[1].trim())
@@ -914,7 +914,7 @@ async function boardPatch(n, change) {
   // no hive server ran it, so none reports it to Combwork's metrics.
   try {
     const env = cwEnv(ownServer().env)
-    if (env.HIVE_TEST_MCP_LOG) fs.appendFileSync(env.HIVE_TEST_MCP_LOG, JSON.stringify({ at: new Date().toISOString(), tool: 'cw_update_task', role: env.HIVE_ROLE === 'assistant' ? 'assistant' : 'agent', project: env.CW_PROJECT, agent: env.HIVE_AGENT_ID ?? null, ok: record.status === 200, args: JSON.stringify({ number: n, ...change }), direct: true }) + '\n')
+    if (env.CW_TEST_MCP_LOG) fs.appendFileSync(env.CW_TEST_MCP_LOG, JSON.stringify({ at: new Date().toISOString(), tool: 'cw_update_task', role: env.CW_ROLE === 'assistant' ? 'assistant' : 'agent', project: env.CW_PROJECT, agent: env.CW_AGENT_ID ?? null, ok: record.status === 200, args: JSON.stringify({ number: n, ...change }), direct: true }) + '\n')
   } catch {
     // No log.
   }

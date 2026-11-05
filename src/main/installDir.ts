@@ -98,23 +98,23 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 [System.Windows.Forms.Application]::EnableVisualStyles()
 # A test's picture of it is drawn off screen from a form that never takes the focus.
-if ($env:HIVE_DIALOG_SNAPSHOT) {
+if ($env:CW_DIALOG_SNAPSHOT) {
   Add-Type -WarningAction SilentlyContinue -ReferencedAssemblies System.Windows.Forms -TypeDefinition 'public class QuietForm : System.Windows.Forms.Form { protected override bool ShowWithoutActivation { get { return true; } } }'
   $f = New-Object QuietForm
 } else { $f = New-Object System.Windows.Forms.Form }
-$f.Text = $env:HIVE_DIALOG_TITLE
-try { $f.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($env:HIVE_DIALOG_ICON) } catch { }
-$f.Font = New-Object System.Drawing.Font($(if ($env:HIVE_DIALOG_FONT) { $env:HIVE_DIALOG_FONT } else { 'Segoe UI' }), 9)
+$f.Text = $env:CW_DIALOG_TITLE
+try { $f.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($env:CW_DIALOG_ICON) } catch { }
+$f.Font = New-Object System.Drawing.Font($(if ($env:CW_DIALOG_FONT) { $env:CW_DIALOG_FONT } else { 'Segoe UI' }), 9)
 $f.FormBorderStyle = 'FixedDialog'; $f.MaximizeBox = $false; $f.MinimizeBox = $false
 $f.StartPosition = 'CenterScreen'; $f.TopMost = $true
 $f.AutoSize = $true; $f.AutoSizeMode = 'GrowAndShrink'
 $t = New-Object System.Windows.Forms.TableLayoutPanel
 $t.AutoSize = $true; $t.ColumnCount = 1; $t.Padding = New-Object System.Windows.Forms.Padding(12)
 $l = New-Object System.Windows.Forms.Label
-$l.Text = $env:HIVE_DIALOG_TEXT; $l.UseMnemonic = $false; $l.AutoSize = $true
+$l.Text = $env:CW_DIALOG_TEXT; $l.UseMnemonic = $false; $l.AutoSize = $true
 $l.MaximumSize = New-Object System.Drawing.Size(560, 0); $l.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 10)
 $c = New-Object System.Windows.Forms.TextBox
-$c.Text = $env:HIVE_DIALOG_COMMAND; $c.ReadOnly = $true; $c.Width = 560; $c.Multiline = $true; $c.WordWrap = $true
+$c.Text = $env:CW_DIALOG_COMMAND; $c.ReadOnly = $true; $c.Width = 560; $c.Multiline = $true; $c.WordWrap = $true
 $c.Font = New-Object System.Drawing.Font('Consolas', 9)
 # As many lines as the command wraps to, so all of it shows.
 $null = $c.Handle
@@ -122,21 +122,21 @@ $c.Height = ($c.GetLineFromCharIndex($c.TextLength) + 1) * $c.Font.Height + 8
 $b = New-Object System.Windows.Forms.FlowLayoutPanel
 $b.FlowDirection = 'RightToLeft'; $b.AutoSize = $true; $b.Dock = 'Fill'; $b.Margin = New-Object System.Windows.Forms.Padding(0, 12, 0, 0)
 $close = New-Object System.Windows.Forms.Button
-$close.Text = $env:HIVE_DIALOG_CLOSE; $close.AutoSize = $true; $close.DialogResult = 'Cancel'
+$close.Text = $env:CW_DIALOG_CLOSE; $close.AutoSize = $true; $close.DialogResult = 'Cancel'
 $copy = New-Object System.Windows.Forms.Button
-$copy.Text = $env:HIVE_DIALOG_COPY; $copy.AutoSize = $true
-$copy.add_Click({ [System.Windows.Forms.Clipboard]::SetText($c.Text); $copy.Text = $env:HIVE_DIALOG_COPIED })
+$copy.Text = $env:CW_DIALOG_COPY; $copy.AutoSize = $true
+$copy.add_Click({ [System.Windows.Forms.Clipboard]::SetText($c.Text); $copy.Text = $env:CW_DIALOG_COPIED })
 $b.Controls.AddRange(@($close, $copy))
 $t.Controls.AddRange(@($l, $c, $b))
 $f.Controls.Add($t)
 $f.AcceptButton = $copy; $f.CancelButton = $close
 $f.add_Shown({ $copy.Focus() })
-if ($env:HIVE_DIALOG_SNAPSHOT) {
+if ($env:CW_DIALOG_SNAPSHOT) {
   $f.StartPosition = 'Manual'; $f.Location = New-Object System.Drawing.Point(-32000, -32000); $f.TopMost = $false; $f.ShowInTaskbar = $false
   $f.Show(); [System.Windows.Forms.Application]::DoEvents()
   $bmp = New-Object System.Drawing.Bitmap($f.Width, $f.Height)
   $f.DrawToBitmap($bmp, (New-Object System.Drawing.Rectangle(0, 0, $f.Width, $f.Height)))
-  $bmp.Save($env:HIVE_DIALOG_SNAPSHOT)
+  $bmp.Save($env:CW_DIALOG_SNAPSHOT)
   exit 0
 }
 [void]$f.ShowDialog()
@@ -180,7 +180,7 @@ export interface MessageTools {
 function powershellWindow(message: ReturnType<typeof cantStartMessage>, snapshot?: string): boolean {
   const r = spawnSync(system32('WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-Sta', '-EncodedCommand', Buffer.from(DIALOG_SCRIPT, 'utf16le').toString('base64')], {
     windowsHide: true,
-    env: { ...process.env, HIVE_DIALOG_TITLE: message.title, HIVE_DIALOG_TEXT: message.text, HIVE_DIALOG_COMMAND: message.command, HIVE_DIALOG_COPY: message.buttons.copy, HIVE_DIALOG_COPIED: message.buttons.copied, HIVE_DIALOG_CLOSE: message.buttons.close, HIVE_DIALOG_ICON: process.execPath, HIVE_DIALOG_FONT: languageOf(language())?.uiFont ?? '', HIVE_DIALOG_SNAPSHOT: snapshot ?? '' }
+    env: { ...process.env, CW_DIALOG_TITLE: message.title, CW_DIALOG_TEXT: message.text, CW_DIALOG_COMMAND: message.command, CW_DIALOG_COPY: message.buttons.copy, CW_DIALOG_COPIED: message.buttons.copied, CW_DIALOG_CLOSE: message.buttons.close, CW_DIALOG_ICON: process.execPath, CW_DIALOG_FONT: languageOf(language())?.uiFont ?? '', CW_DIALOG_SNAPSHOT: snapshot ?? '' }
   })
   if (r.status === 0) return true
   log.error(`Couldn't show the message window (PowerShell exited with ${r.status ?? r.error?.message})`)
@@ -198,13 +198,13 @@ const windowsMessages = (): MessageTools => ({
  * Tells the user Hive can't start, with the command that fixes it: a window with a Copy Command button, or if that
  * can't be shown (PowerShell missing or locked down), Electron's error box (Ctrl+C copies its text). Electron's other
  * dialogs only work once it is ready, which is too late. A quiet test copy only records it, and draws the window to
- * HIVE_TEST_DIALOG_SNAPSHOT, if set, without showing it.
+ * CW_TEST_DIALOG_SNAPSHOT, if set, without showing it.
  */
 export function tellCantStart(dir: string, file?: string, tools: MessageTools = windowsMessages()): void {
   const message = cantStartMessage(dir, file)
   tools.record(message.title, `${message.text}\n${message.command}`)
   if (tools.quiet) {
-    const snapshot = process.env.HIVE_TEST_DIALOG_SNAPSHOT
+    const snapshot = process.env.CW_TEST_DIALOG_SNAPSHOT
     if (snapshot) tools.window(message, snapshot)
     return
   }
@@ -236,10 +236,10 @@ const MAIN_TEXT = import.meta.glob<Catalogue>(['../../locales/*/main.json', '!..
 
 /**
  * The language Hive would start in, before it has chosen it (chooseStartLanguage) or loaded its translations: --lang
- * (HIVE_LANG in an unpackaged build), else the setting in config.json, else Windows' display languages.
+ * (CW_LANG in an unpackaged build), else the setting in config.json, else Windows' display languages.
  */
 export function setLanguageBeforeReady(): void {
-  const forced = app.commandLine.getSwitchValue('lang') || (!app.isPackaged && process.env.HIVE_LANG) || null
+  const forced = app.commandLine.getSwitchValue('lang') || (!app.isPackaged && process.env.CW_LANG) || null
   const codeOf = (path: string): string => path.split('/').at(-2) ?? ''
   const available = Object.keys(MAIN_TEXT).map(codeOf)
   const chosen = resolveLanguage(config.savedLanguage() as LanguageSetting | undefined, app.getPreferredSystemLanguages(), available, forced)
@@ -259,11 +259,11 @@ const windowsTools: InstallDirTools = {
 
 /**
  * The folder Hive runs from, and whether Hive may change its permissions: only its own installed folder. A development
- * or test copy runs from node_modules' Electron, which it never changes; HIVE_TEST_INSTALL_DIR gives it a test folder
+ * or test copy runs from node_modules' Electron, which it never changes; CW_TEST_INSTALL_DIR gives it a test folder
  * of its own to check and change instead (unpackaged builds only).
  */
 export function installDirTarget(): { dir: string; mayChange: boolean } {
-  const test = !app.isPackaged ? process.env.HIVE_TEST_INSTALL_DIR : undefined
+  const test = !app.isPackaged ? process.env.CW_TEST_INSTALL_DIR : undefined
   if (test) return { dir: test, mayChange: true }
   return { dir: dirname(process.execPath), mayChange: app.isPackaged }
 }

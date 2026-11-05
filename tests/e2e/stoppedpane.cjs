@@ -26,7 +26,7 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(proj)
   const claude = lib.fakeClaude(userData, path.join(scratch, 'stoppedpane-claude-home'), [proj])
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, ...claude })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -108,11 +108,11 @@ const check = (name, ok, extra = '') => {
     await lib.until(async () => (await bar.count()) === 1, HUNG_MS)
 
     // --- Resume: the stopped look goes from the accepted click, before the session runs (its start held a moment).
-    await app.evaluate(() => { process.env.HIVE_TEST_SLOW_IPC = 'session:start=2500*1,session:resume=2500*1' })
+    await app.evaluate(() => { process.env.CW_TEST_SLOW_IPC = 'session:start=2500*1,session:resume=2500*1' })
     await bar.getByRole('button', { name: /Resume/ }).click()
     const notStopped = async () => (await host.evaluate((h) => h.classList.contains('dimmed'))) === false && !/Stopped/.test(await text(status)) && (await page.locator('.agent-pane .session-ended.stopped').count()) === 0 && (await header.locator('.state-mark.stopped').count()) === 0
     check('Resume: at once, no dimming, no Stopped label or bar, while it starts', !!(await lib.until(async () => !(await live()) && (await notStopped()), HUNG_MS)), JSON.stringify([await text(status), await text(bar)]))
-    await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
+    await app.evaluate(() => { delete process.env.CW_TEST_SLOW_IPC })
     await lib.acceptClaudeTrust(inv, proj, agent.id).catch(() => {})
     check('…then it runs, still not stopped', !!(await lib.until(async () => (await live())?.status === 'ready' && (await notStopped()), HUNG_MS)))
     check('…the chip no longer says stopped, its mark not grey', !!(await lib.until(async () => !/stopped/.test(await text(chip)) && (await chip.locator('.state-mark.stopped').count()) === 0, HUNG_MS)), await text(chip))
@@ -128,10 +128,10 @@ const check = (name, ok, extra = '') => {
     await shots('crashed')
 
     // --- A start refused by Combwork: the starting look ends with it, and the stopped one is back as it was.
-    await app.evaluate(() => { process.env.HIVE_TEST_FAIL_IPC = 'session:start*1' })
+    await app.evaluate(() => { process.env.CW_TEST_FAIL_IPC = 'session:start*1' })
     await bar.getByRole('button', { name: 'New Session' }).click()
     check('a refused start: stopped again, its bar and dimming back', !!(await lib.until(async () => (await text(bar.locator('.grow'))).endsWith('· its CLI exited with code 1') && (await host.evaluate((h) => h.classList.contains('dimmed'))) && (await bar.getByRole('button', { name: 'New Session' }).isEnabled()), HUNG_MS)), await text(bar))
-    await app.evaluate(() => { delete process.env.HIVE_TEST_FAIL_IPC })
+    await app.evaluate(() => { delete process.env.CW_TEST_FAIL_IPC })
 
     // --- A launch that fails (the fake's --model fail-start): its failed bar, never Stopped, not dimmed.
     await lib.setLaunch(inv, proj, agent.id, { model: 'fail-start' })

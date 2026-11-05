@@ -22,7 +22,7 @@ import { formatDateTime } from '../shared/dates'
 import { formatSize } from '../shared/units'
 import { backgroundTaskMinutes } from '../shared/tasks'
 import { assistantTools, isReservedServerName, TOOLS_SERVER } from '../shared/assistantTools'
-import { HIVE_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, launchedWithOf, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
+import { CW_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, launchedWithOf, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
 import { defaultPurpose, legacySetupPending, legacyWorktree, namedFolders, type StoredAgent, resumeHold, resumeHome, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { holdText } from '../shared/sessionResume'
 import { coalesced, joined } from '../shared/coalesce'
@@ -287,9 +287,9 @@ const MAX_SCREEN_STOPS = 200
 /**
  * How long a turn may run with nothing heard of it (no hook, no transcript growth, no tool call under way) before Hive
  * looks for its end on the CLI's screen, and failing that says its state is unknown (#648). Never an end in itself.
- * Unpackaged test builds can shorten it (HIVE_TEST_SILENT_MS).
+ * Unpackaged test builds can shorten it (CW_TEST_SILENT_MS).
  */
-const silentMs = (): number => (!app.isPackaged && Number(process.env.HIVE_TEST_SILENT_MS) > 0 ? Number(process.env.HIVE_TEST_SILENT_MS) : 5 * 60_000)
+const silentMs = (): number => (!app.isPackaged && Number(process.env.CW_TEST_SILENT_MS) > 0 ? Number(process.env.CW_TEST_SILENT_MS) : 5 * 60_000)
 /** HI-1972: a running turn with no hook this long has its CLI's records looked at for a retry wait (an adapter may say otherwise)… */
 const DEFAULT_RETRY_LOOK_AFTER_MS = 20_000
 /** …then again at most this often while it stays quiet. */
@@ -881,10 +881,10 @@ export function backspaceKeys(written: string | readonly number[]): number {
 
 /**
  * For the wakeputoff suite (unpackaged builds only, HI-1974): a line Hive has typed waits before its Enter while
- * HIVE_TEST_HOLD_TYPED's file exists, checked as it waits, so what stops a line part-way can stop it there.
+ * CW_TEST_HOLD_TYPED's file exists, checked as it waits, so what stops a line part-way can stop it there.
  */
 async function heldTyped(label: string, check: () => void): Promise<void> {
-  const file = app.isPackaged ? undefined : process.env.HIVE_TEST_HOLD_TYPED
+  const file = app.isPackaged ? undefined : process.env.CW_TEST_HOLD_TYPED
   if (!file || !existsSync(file)) return
   log.info(`${userText(label)}: the line Combwork typed is held before its Enter (a test's)`)
   while (existsSync(file)) {
@@ -1229,7 +1229,7 @@ const SIGNED_IN_AGAIN = msg({ id: 'session.status.signedInAgain', defaultMessage
 /** What Resume (n) types into such an agent. */
 /** Hive's own deliveries come from it (#649). */
 // agent-protocol: the app's name, as a delivery's sender
-const HIVE_SENDER = { kind: 'hive', name: 'Combwork' } as const // i18n-ignore: the sender's name in deliveries, which agents read
+const CW_SENDER = { kind: 'hive', name: 'Combwork' } as const // i18n-ignore: the sender's name in deliveries, which agents read
 const CARRY_ON_PROMPT = SESSION.carryOn
 
 class SessionManager {
@@ -1706,7 +1706,7 @@ class SessionManager {
     }
     const hive = this.hiveMcp(projectPath, agent?.id)
     // Its instructions name only the skills the session gets (#1431).
-    if (hive) mcpServers[TOOLS_SERVER] = skillsOff.length ? { ...hive, env: { ...hive.env, HIVE_SKILLS_OFF: skillsOff.sort().join(',') } } : hive
+    if (hive) mcpServers[TOOLS_SERVER] = skillsOff.length ? { ...hive, env: { ...hive.env, CW_SKILLS_OFF: skillsOff.sort().join(',') } } : hive
 
     // Its connection (HI-2106; the Assistant's too): what it launches with, and the account it launches on, its own or
     // (decision H) its CLI's first usable here. A change of account asks for a restart; `connection` is null for an
@@ -1789,7 +1789,7 @@ class SessionManager {
   }
 
   private backupDir(projectPath: string, archived = false): string {
-    return join(projectPath, HIVE_DIR, archived ? 'archive' : 'sessions')
+    return join(projectPath, CW_DIR, archived ? 'archive' : 'sessions')
   }
 
   /** Works out usage again (e.g. after price changes, so estimates are recomputed); what was read is kept. */
@@ -3716,7 +3716,7 @@ class SessionManager {
       const st = l.state
       if (this.live.get(id) !== l || !w || st.hooksMissing || st.runtime?.lifecycle === 'stopped' || st.runtime?.lifecycle === 'signin') return
       // Tests hold the check while a file is there (#1371), to let a turn finish before any check looks (unpackaged only).
-      const hold = !app.isPackaged ? process.env.HIVE_TEST_HOOKS_HOLD : undefined
+      const hold = !app.isPackaged ? process.env.CW_TEST_HOOKS_HOLD : undefined
       if (hold && existsSync(hold)) return
       // A question at its start (its folder's trust) waits for the user while it is on its screen.
       const text = l.screen?.text() ?? null
@@ -4336,7 +4336,7 @@ class SessionManager {
         agentName: from.name,
         conversation: source.sessionId || null,
         kind: 'handover',
-        from: HIVE_SENDER,
+        from: CW_SENDER,
         // A delivery's body is stored: said in the Default until stored records are said when read (5b, 6b).
         body: inDefaultDialect(() => say(SESSION.handover.ask, { self: self ? 'yes' : 'no', to: to.name })),
         need: 'free'
@@ -4393,7 +4393,7 @@ class SessionManager {
     // The caller's authority, after every await above (the handover's read, a conversation's end), before the target is given it.
     allowed?.()
     // A delivery's body is stored: said in the Default until stored records are said when read (5b, 6b).
-    const nd: NewDelivery = { agentId: toAgentId, agentName: to.name, kind: 'handover', from: HIVE_SENDER, body: inDefaultDialect(() => say(SESSION.handover.read, { handover, self: self ? 'yes' : 'no', from: from.name })) }
+    const nd: NewDelivery = { agentId: toAgentId, agentName: to.name, kind: 'handover', from: CW_SENDER, body: inDefaultDialect(() => say(SESSION.handover.read, { handover, self: self ? 'yes' : 'no', from: from.name })) }
     // The sessions are linked with the launch's conversation as it is recorded (#782: Codex names it only with its first
     // prompt, which a question at start can hold off for minutes), never by a wait here that could give up first.
     if (target) {
@@ -5707,7 +5707,7 @@ class SessionManager {
     const st = stalled()
     if (!st) throw hiveError(msg({ id: 'session.carryOn.already', defaultMessage: 'It has already carried on.', description: 'Resume is refused for an agent whose turn a refused sign-in stopped: it carried on by itself meanwhile.' }), undefined, { kind: 'conflict' })
     // A control notice for this launch (#649), given now or not at all: never once it has carried on by itself.
-    await this.delivery().now(projectPath, { agentId, kind: 'control', from: HIVE_SENDER, body: inDefaultDialect(() => say(CARRY_ON_PROMPT)), source: 'carry-on', ref: st.runId, need: 'stalled', forRun: st.runId }, () => !!stalled())
+    await this.delivery().now(projectPath, { agentId, kind: 'control', from: CW_SENDER, body: inDefaultDialect(() => say(CARRY_ON_PROMPT)), source: 'carry-on', ref: st.runId, need: 'stalled', forRun: st.runId }, () => !!stalled())
   }
 
   /**
@@ -6130,7 +6130,7 @@ class SessionManager {
     // (dropGoAheads, editAccepted) cancels it, even part-way; so does one changed since (claimsEnded).
     const current = (): boolean => this.live.get(id) === l && keys.every((k, i) => this.lockGoAhead.get(k) === given[i])
     this.delivery()
-      .give(projectPath, { agentId, kind: 'control', from: HIVE_SENDER, body: goAheadPrompt(l.state.cwd, given), source: 'go-ahead', ref: runId, replace: true, need: 'free', forRun: runId }, {
+      .give(projectPath, { agentId, kind: 'control', from: CW_SENDER, body: goAheadPrompt(l.state.cwd, given), source: 'go-ahead', ref: runId, replace: true, need: 'free', forRun: runId }, {
         holds: current,
         received: () => keys.forEach((k, i) => this.lockGoAhead.get(k) === given[i] && this.lockGoAhead.delete(k))
       })
@@ -8410,4 +8410,4 @@ onLanguageChange(() => sessions.relabel())
 // the files (servers.ts binds it: inApiWorkspace).
 setChainResolver((scope) => (scope.kind === 'session' ? sessions.pinnedChain(scope.session.projectPath, scope.session.agentId) : requestApiChain()))
 WorkspaceService.dialectsListeners.add((ws) => apiChainChanged(ws.hiveDir))
-WorkspaceService.closingListeners.add((path) => forgetApiChain(join(path, HIVE_DIR)))
+WorkspaceService.closingListeners.add((path) => forgetApiChain(join(path, CW_DIR)))

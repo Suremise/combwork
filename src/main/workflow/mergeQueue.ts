@@ -43,7 +43,7 @@ import { mergeMessage, updateMessage } from './mergeMessage'
 const namesOf = (out: string | undefined): string[] => (out ?? '').split('\0').filter(Boolean)
 import type { ConflictsRecord } from '../../shared/workflow/conflicts'
 import { bracketEnd, bracketStart } from './queueChecks'
-import { HIVE_RUNS } from '../progress'
+import { CW_RUNS } from '../progress'
 import type { Workflow, Write } from './runtime'
 import type { RunCheck } from '../../shared/types'
 import { shellLine, type QueueCommand, type QueueFileSide, type QueueStep, type QueueStuck } from '../../shared/workflow/queue'
@@ -76,7 +76,7 @@ export interface CheckContext {
   /** Nothing was installed before the checks (no setup command and no lock file): this check's run says so. */
   noInstall?: boolean
   /**
-   * Variables Hive gives this check itself, past `checkEnv` (which takes every HIVE_* out of the base): G20's runner
+   * Variables Hive gives this check itself, past `checkEnv` (which takes every CW_* out of the base): G20's runner
    * reads its tests, results file and jobs from them (HI-1367).
    */
   env?: Record<string, string>
@@ -1431,7 +1431,7 @@ export class MergeQueue {
         result: r.ok ? 'passed' : 'failed',
         run: r.run ?? randomUUID(),
         durationMs: Math.max(0, Date.now() - start.t0),
-        by: HIVE_RUNS,
+        by: CW_RUNS,
         counted: b.counted,
         ...(b.whyNot ? { whyNot: b.whyNot } : {}),
         entry: entry.id
@@ -1510,7 +1510,7 @@ export class MergeQueue {
     const resultsFile = join(dir, 'results.json')
     try {
       writeFileSync(testsFile, JSON.stringify(ids))
-      const env = { HIVE_FOCUSED_TESTS: testsFile, HIVE_FOCUSED_RESULTS: resultsFile, HIVE_FOCUSED_JOBS: String(Math.max(1, this.cfg.focused?.jobs() ?? 2)) }
+      const env = { CW_FOCUSED_TESTS: testsFile, CW_FOCUSED_RESULTS: resultsFile, CW_FOCUSED_JOBS: String(Math.max(1, this.cfg.focused?.jobs() ?? 2)) }
       const start = await bracketStart(f)
       const r = await this.cfg.runCheck(FOCUSED_CHECK, run, f, { ...ctx, env, label: `${FOCUSED_CHECK} (${ids.length})` }) // i18n-ignore: a run's title, no words beyond the check's name
       const b = await bracketEnd(f, result, start)
@@ -1518,7 +1518,7 @@ export class MergeQueue {
       const read = raw === null ? { bad: 'it wrote no results file' } : raw === false ? { bad: `its results file is over ${FOCUSED_MAX_RESULTS_BYTES} bytes` } : readResults(raw, ids) // i18n-ignore: a check's output, agent-facing
       // A runner that didn't exit 0 failed, whatever its results say (finding 6): skips are reported with exit 0.
       const failed = !r.ok || 'bad' in read || read.failed.length > 0
-      const data: FactData['CheckRan'] = { name: FOCUSED_CHECK, command: r.command ?? run, revision: result, tested: b.tested, result: failed ? 'failed' : 'passed', run: r.run ?? randomUUID(), durationMs: Math.max(0, Date.now() - start.t0), by: HIVE_RUNS, counted: b.counted, ...(b.whyNot ? { whyNot: b.whyNot } : {}), entry: entry.id }
+      const data: FactData['CheckRan'] = { name: FOCUSED_CHECK, command: r.command ?? run, revision: result, tested: b.tested, result: failed ? 'failed' : 'passed', run: r.run ?? randomUUID(), durationMs: Math.max(0, Date.now() - start.t0), by: CW_RUNS, counted: b.counted, ...(b.whyNot ? { whyNot: b.whyNot } : {}), entry: entry.id }
       await this.write(card, (w) => w.fact('CheckRan', data))
       r.note?.({ name: FOCUSED_CHECK, counted: b.counted, ...(b.whyNot ? { whyNot: b.whyNot } : {}) })
       if (failed) {

@@ -20,7 +20,7 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, wsA, wsB]) fs.rmSync(d, { recursive: true, force: true })
   for (const w of [wsA, wsB]) fs.mkdirSync(path.join(w, 'app'), { recursive: true })
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47797) } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47797) } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   try {
     // A folder picker that answers when the suite says, and the open of A held at its first folder made in A.

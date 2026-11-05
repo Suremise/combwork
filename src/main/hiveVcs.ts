@@ -1,7 +1,7 @@
 import { dirname, join, relative, resolve } from 'path'
 import { appendFile, mkdir, readFile } from 'original-fs/promises'
 import { existsSync, readFileSync, statSync } from 'original-fs'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { EXCLUDE_COMMENT } from '../shared/hiveFolderMove'
 import { git, gitReading } from './git'
 import { gitTool } from './gitTool'
@@ -83,12 +83,12 @@ export function literalPattern(part: string): string {
 /** The exclude line for a project's .combwork in a repository whose working folder is `root`: anchored at the project. */
 export function excludeLine(root: string, projectPath: string): string {
   const rel = relative(root, projectPath).split(/[\\/]/).filter(Boolean).map(literalPattern).join('/')
-  return rel ? `/${rel}/${HIVE_DIR}/` : `/${HIVE_DIR}/`
+  return rel ? `/${rel}/${CW_DIR}/` : `/${CW_DIR}/`
 }
 
 /** Whether exclude-file text has the line (or, for a repository's own .combwork, the unanchored form). */
 export function hasExcludeLine(text: string, line: string): boolean {
-  return text.split(/\r?\n/).some((l) => l.trim() === line || (line === `/${HIVE_DIR}/` && l.trim() === `${HIVE_DIR}/`))
+  return text.split(/\r?\n/).some((l) => l.trim() === line || (line === `/${CW_DIR}/` && l.trim() === `${CW_DIR}/`))
 }
 
 /** What git said of whether it ignores a project's .combwork, kept until its exclude file changes or for a minute. */
@@ -109,7 +109,7 @@ async function gitIgnores(projectPath: string, excludeFile: string): Promise<boo
   }
   const kept = ignoredCache.get(key)
   if (kept && kept.stamp === stamp && Date.now() - kept.at < 60_000) return kept.ignored
-  const r = await git(projectPath, ['check-ignore', '-q', '--no-index', '--', `${HIVE_DIR}/`])
+  const r = await git(projectPath, ['check-ignore', '-q', '--no-index', '--', `${CW_DIR}/`])
   // 0: ignored; 1: not; anything else (128, git missing: -1): couldn't say.
   if (r.code !== 0 && r.code !== 1) return null
   ignoredCache.set(key, { at: Date.now(), stamp, ignored: r.code === 0 })
@@ -195,7 +195,7 @@ export async function trackedHiveFiles(projectPath: string, root: string, opts: 
   }
   const kept = trackedCache.get(key)
   if (!opts.fresh && kept && kept.stamp === stamp) return kept.files
-  const r = await gitReading(projectPath, ['ls-files', '-z', '--', HIVE_DIR])
+  const r = await gitReading(projectPath, ['ls-files', '-z', '--', CW_DIR])
   trackedCache.delete(key)
   // Only git's answer is kept: a failed read is asked again next time, never remembered as "nothing tracked".
   if (!r.ok) return null

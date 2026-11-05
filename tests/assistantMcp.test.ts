@@ -12,9 +12,9 @@ import { tempDir } from './tempDir'
 const base = tempDir('hive-assistantmcp-')
 const profile = join(base, 'profile')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => profile
-process.env.HIVE_USER_DATA = profile
+process.env.CW_USER_DATA = profile
 // A test copy on its CLI test home: its agents start with no connection (the seam, HI-1755).
-process.env.HIVE_TEST_CLI_HOME_CONNECTION = '1'
+process.env.CW_TEST_CLI_HOME_CONNECTION = '1'
 // Never the user's own CLI homes: the Codex and Copilot adapters read their config.
 process.env.CODEX_HOME = join(base, 'codex-home')
 process.env.COPILOT_HOME = join(base, 'copilot-home')
@@ -61,13 +61,13 @@ const gets = async (path: string, agent: object): Promise<string[]> => Object.ke
 const assistantGets = (w: Service) => gets(w.assistantHome, ASSISTANT)
 const saved = (ws: string): unknown => json(join(ws, '.combwork', 'workspace.json')).mcp.assistant
 
-const was = process.env.HIVE_TEST_TRASH_DIR
+const was = process.env.CW_TEST_TRASH_DIR
 beforeAll(() => {
-  process.env.HIVE_TEST_TRASH_DIR = join(base, 'trash')
+  process.env.CW_TEST_TRASH_DIR = join(base, 'trash')
 })
 afterAll(() => {
-  if (was === undefined) delete process.env.HIVE_TEST_TRASH_DIR
-  else process.env.HIVE_TEST_TRASH_DIR = was
+  if (was === undefined) delete process.env.CW_TEST_TRASH_DIR
+  else process.env.CW_TEST_TRASH_DIR = was
   advanced.stop()
 })
 

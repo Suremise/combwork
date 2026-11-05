@@ -59,7 +59,7 @@ describe('Copilot sign-in detection', () => {
   })
 
   it('checks with the environment agents get: no GH_TOKEN or GITHUB_TOKEN, no auto-update, nothing of Combwork’s', () => {
-    const env = copilotCheckEnv({ PATH: 'C:\\bin', GH_TOKEN: 'a', GITHUB_TOKEN: 'b', HIVE_SESSION: 'x', ELECTRON_RUN_AS_NODE: '1', CHROME_CRASHPAD_PIPE_NAME: 'p', GH_CONFIG_DIR: 'D:\\gh' })
+    const env = copilotCheckEnv({ PATH: 'C:\\bin', GH_TOKEN: 'a', GITHUB_TOKEN: 'b', CW_SESSION: 'x', ELECTRON_RUN_AS_NODE: '1', CHROME_CRASHPAD_PIPE_NAME: 'p', GH_CONFIG_DIR: 'D:\\gh' })
     expect(env).toEqual({ PATH: 'C:\\bin', GH_CONFIG_DIR: 'D:\\gh', COPILOT_AUTO_UPDATE: 'false' })
     expect(copilotSignIn(env, null, null).loggedIn).toBe(false)
     expect(ignoredTokens({ GH_TOKEN: 'a', GITHUB_TOKEN: '', PATH: 'x' })).toEqual(['GH_TOKEN'])

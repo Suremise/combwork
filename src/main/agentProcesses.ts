@@ -43,10 +43,10 @@ const log = createLogger('processes')
 const SETTLE_MS = 2000
 /**
  * How long the helper gets to say it is ready (Add-Type compiles its C#, which antivirus may scan), and then to answer
- * each request. Test copies (unpackaged) can shorten it: HIVE_TEST_TRACKER_WAIT_MS.
+ * each request. Test copies (unpackaged) can shorten it: CW_TEST_TRACKER_WAIT_MS.
  */
 const WAIT_MS = 60_000
-const waitMs = (): number => (!app.isPackaged && Number(process.env.HIVE_TEST_TRACKER_WAIT_MS) > 0 ? Number(process.env.HIVE_TEST_TRACKER_WAIT_MS) : WAIT_MS)
+const waitMs = (): number => (!app.isPackaged && Number(process.env.CW_TEST_TRACKER_WAIT_MS) > 0 ? Number(process.env.CW_TEST_TRACKER_WAIT_MS) : WAIT_MS)
 /** How often the leftovers are looked at again while there are any (they end by themselves too). */
 const POLL_MS = 10_000
 /** Launches whose leftovers are kept per agent (an agent restarted and stopped over and over), and in all. */
@@ -60,7 +60,7 @@ export { HOST_SOURCE } from './processSupervisor'
 function failureText(f: HostFailure): TextPart {
   switch (f.kind) {
     case 'test':
-      return 'PowerShell refused to run its helper (HIVE_TEST_PROCESS_TRACKER)' // i18n-ignore: test copies only
+      return 'PowerShell refused to run its helper (CW_TEST_PROCESS_TRACKER)' // i18n-ignore: test copies only
     case 'noPowerShell':
       return withValues(TRACKER.noPowerShell, { error: f.error })
     case 'slowHelper':
@@ -75,8 +75,8 @@ function failureText(f: HostFailure): TextPart {
 /** Hive's process supervisor (shared with the merge queue's runners, #1360): agents' launches' jobs. */
 const host = new JobHost({
   waitMs,
-  // Test copies (unpackaged): HIVE_TEST_PROCESS_TRACKER=fail, silent or mute.
-  testMode: () => (app.isPackaged ? '' : (process.env.HIVE_TEST_PROCESS_TRACKER ?? '')),
+  // Test copies (unpackaged): CW_TEST_PROCESS_TRACKER=fail, silent or mute.
+  testMode: () => (app.isPackaged ? '' : (process.env.CW_TEST_PROCESS_TRACKER ?? '')),
   log,
   onJoined: () => processJoined(),
   onLost: (why) => jobsLost(why),
@@ -817,18 +817,18 @@ async function runningNamed(names: readonly string[]): Promise<readonly string[]
   const r = await host.request('running', names.join(','))
   const now = Array.isArray(r) && r.every((x) => typeof x === 'string') ? (r as string[]) : null
   // A test copy's own names stand in only for a real answer (HR1's round 1): the request itself is always made.
-  const test = now && testBrokers() ? testLines(process.env.HIVE_TEST_SYSTEM_BROKER_ACTIVE).map((l) => l.toLowerCase()) : null
+  const test = now && testBrokers() ? testLines(process.env.CW_TEST_SYSTEM_BROKER_ACTIVE).map((l) => l.toLowerCase()) : null
   return test !== null ? names.filter((n) => test.includes(n)) : now
 }
 
 /**
- * Test copies (unpackaged): HIVE_TEST_SYSTEM_BROKER is a file of process ids, one per line, each taken as Windows
+ * Test copies (unpackaged): CW_TEST_SYSTEM_BROKER is a file of process ids, one per line, each taken as Windows
  * Sandbox's broker (no test can put one in WindowsApps), its path asked of the helper all the same; and
- * HIVE_TEST_SYSTEM_BROKER_ACTIVE a file of the executable names running now, one per line (while it is missing, none).
+ * CW_TEST_SYSTEM_BROKER_ACTIVE a file of the executable names running now, one per line (while it is missing, none).
  */
 function testBrokers(): Set<number> | null {
-  if (app.isPackaged || !process.env.HIVE_TEST_SYSTEM_BROKER) return null
-  return new Set(testLines(process.env.HIVE_TEST_SYSTEM_BROKER).map(Number).filter((n) => n > 0))
+  if (app.isPackaged || !process.env.CW_TEST_SYSTEM_BROKER) return null
+  return new Set(testLines(process.env.CW_TEST_SYSTEM_BROKER).map(Number).filter((n) => n > 0))
 }
 const testLines = (file: string | undefined): string[] => {
   try {
@@ -1128,8 +1128,8 @@ export async function settleAllLeftovers(how: 'end' | 'keep'): Promise<number> {
   return n
 }
 
-/** Test copies (unpackaged): HIVE_TEST_JOB_KILL_FAILS=1 makes ending a launch's processes fail, as Windows refusing would. */
-const killFailsForTests = (): boolean => !app.isPackaged && process.env.HIVE_TEST_JOB_KILL_FAILS === '1'
+/** Test copies (unpackaged): CW_TEST_JOB_KILL_FAILS=1 makes ending a launch's processes fail, as Windows refusing would. */
+const killFailsForTests = (): boolean => !app.isPackaged && process.env.CW_TEST_JOB_KILL_FAILS === '1'
 
 /** Why launches can't be tracked (the host couldn't start), or why the latest one wasn't; null while all is well. */
 let problem: TextPart | null = null

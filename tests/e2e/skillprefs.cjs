@@ -36,7 +36,7 @@ const skillsTab = async (page, name) => {
   // Codex is listed from an empty home of the suite's own: never the user's ~/.codex, nor the shared test home.
   const codexHome = path.join(lib.WORK, 'skillprefs-codex-home')
   fs.mkdirSync(codexHome, { recursive: true })
-  const env = { CODEX_HOME: codexHome, HIVE_API_PORT: lib.port(47934) }
+  const env = { CODEX_HOME: codexHome, CW_API_PORT: lib.port(47934) }
   let { app, page, inv } = await lib.launch({ userData, env, viewport: { width: 1400, height: 900 } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, wsA)

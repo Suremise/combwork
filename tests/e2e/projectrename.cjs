@@ -69,7 +69,7 @@ const oldCard = (n, proj, agent) =>
   fs.mkdirSync(path.join(ws, '.combwork', 'shared', 'handovers'), { recursive: true })
   fs.writeFileSync(path.join(ws, '.combwork', 'shared', 'handovers', '2026-10-01-alpha-plan.md'), '# Plan\n\n- **Project:** alpha\n- **Date:** 2026-10-01 10:00 (2026-10-01T10:00:00Z)\n\nWhere it stands.\n')
   lib.enableProviders(userData)
-  const env = { HIVE_API_PORT: lib.port(47866) }
+  const env = { CW_API_PORT: lib.port(47866) }
 
   // --- First run: alpha's cards, each saved with alpha's id.
   let r = await lib.launch({ userData, env, viewport: { width: 1400, height: 850 } })
@@ -101,7 +101,7 @@ const oldCard = (n, proj, agent) =>
   check('none is left under the old name', !(await cards()).some((c) => c.project === 'alpha'))
   // #514: its handover from before the rename is still its latest (what cw_read_latest_handover reads).
   const apiToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
-  const handovers = async (name) => (await (await fetch(`http://127.0.0.1:${env.HIVE_API_PORT}/v1/shared/handovers?project=${name}`, { headers: { Authorization: `Bearer ${apiToken}` } })).json())
+  const handovers = async (name) => (await (await fetch(`http://127.0.0.1:${env.CW_API_PORT}/v1/shared/handovers?project=${name}`, { headers: { Authorization: `Bearer ${apiToken}` } })).json())
   check("the renamed project's latest handover is the one from before its rename", !!(await lib.until(async () => (await handovers('gamma'))[0]?.path === 'handovers/2026-10-01-alpha-plan.md', 10000)), JSON.stringify(await handovers('gamma')))
   check("…and the workspace's record of names has its rename, by its id", !!(await lib.until(() => {
     const j = fs.existsSync(path.join(ws, '.combwork', 'project-names.json')) ? readJson(path.join(ws, '.combwork', 'project-names.json')) : null

@@ -15,7 +15,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import * as electron from 'electron'
 import { TEMPLATE_VERSION, expandName, exportFileName, exportable, isAgentTemplate, namePatterns, namesFollowKey, pairIndex, readTemplate as readAny, templateAgentNames, templateFile, templateFrom, templatePairs, uniqueName, uniqueTemplateName, unknownProviders, type AgentTemplate } from '../src/shared/templates'
 import { suggestTemplateAgentName } from '../src/shared/agentNames'
-import { HIVE_TEMPLATES, templateTitle } from '../src/shared/templateDefaults'
+import { CW_TEMPLATES, templateTitle } from '../src/shared/templateDefaults'
 import { agentWorkflowRole, buildsWork, reviewsWork } from '../src/shared/workflow/roles'
 import { AGENT_LIMIT_DEFAULT } from '../src/shared/defaults'
 import { englishText } from '../src/shared/advanced'
@@ -219,7 +219,7 @@ describe('the template format', () => {
   })
 
   it("Combwork's own templates (#1436): each valid as a file is, its names a pattern each role reads as, paired builders with reviewers, a layout that fits within the cap", () => {
-    expect(HIVE_TEMPLATES.map((h) => [h.file, h.template.name])).toEqual([
+    expect(CW_TEMPLATES.map((h) => [h.file, h.template.name])).toEqual([
       ['solo.json', 'Solo'],
       ['pair.json', 'Pair'],
       ['pair-one-provider.json', 'Pair: one provider'],
@@ -235,7 +235,7 @@ describe('the template format', () => {
       'team-6x6.json': { builders: 6, reviewers: 6, reviewer: 'codex', preset: 'team', layout: 'grid6', pairs: 6 },
       'team-6-pool.json': { builders: 6, reviewers: 2, reviewer: 'codex', preset: 'team', layout: 'grid6', pairs: 0, mode: 'pool' }
     }
-    for (const h of HIVE_TEMPLATES) {
+    for (const h of CW_TEMPLATES) {
       const t = h.template
       // A file of it reads back as itself: what an import or a duplicate checks.
       expect(readAny(JSON.parse(JSON.stringify(exportable(t)))), h.file).toEqual(exportable(t))
@@ -385,7 +385,7 @@ describe('saving and loading templates', () => {
     await run(() => templates.saveTemplate(alpha, 'project', 'pair'))
     const listed = await run(() => templates.listTemplates(alpha))
     // Combwork's own first (#1436), in their order; then the workspace's and the project's.
-    expect(listed.map((t) => `${t.scope}:${t.file}`).slice(0, 6)).toEqual(HIVE_TEMPLATES.map((h) => `hive:${h.file}`))
+    expect(listed.map((t) => `${t.scope}:${t.file}`).slice(0, 6)).toEqual(CW_TEMPLATES.map((h) => `hive:${h.file}`))
     expect(userTemplates(listed).map((t) => `${t.scope}:${t.name}`)).toEqual(['workspace:Pair', 'project:pair'])
     // The project's are its own: beta sees only the workspace's.
     expect(userTemplates(await run(() => templates.listTemplates(beta))).map((t) => t.name)).toEqual(['Pair'])
@@ -637,9 +637,9 @@ describe('saving and loading templates', () => {
     expect(ws.length).toBeGreaterThan(0)
     expect(ws.every((t) => t.project === undefined)).toBe(true)
     // Combwork's own first (#1436), then the workspace's, then each project's.
-    expect(all.slice(0, HIVE_TEMPLATES.length).map((t) => [t.scope, t.file, t.project])).toEqual(HIVE_TEMPLATES.map((h) => ['hive', h.file, undefined]))
-    expect(all.findIndex((t) => t.scope === 'workspace')).toBe(HIVE_TEMPLATES.length)
-    expect(all.findIndex((t) => t.scope === 'project')).toBe(HIVE_TEMPLATES.length + ws.length)
+    expect(all.slice(0, CW_TEMPLATES.length).map((t) => [t.scope, t.file, t.project])).toEqual(CW_TEMPLATES.map((h) => ['hive', h.file, undefined]))
+    expect(all.findIndex((t) => t.scope === 'workspace')).toBe(CW_TEMPLATES.length)
+    expect(all.findIndex((t) => t.scope === 'project')).toBe(CW_TEMPLATES.length + ws.length)
     expect(all.filter((t) => t.scope === 'project').map((t) => [t.project, t.file])).toEqual([[alpha, 'pair.json'], [alpha, 'trees.json']])
     // A project's tab lists its own with their project too.
     expect((await run(() => templates.listTemplates(alpha))).find((t) => t.scope === 'project')?.project).toBe(alpha)

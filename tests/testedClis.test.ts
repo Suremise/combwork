@@ -313,17 +313,17 @@ describe('the run record\'s versions are what Combwork selected, not the first c
       expect({ path: info.path, version: info.version, rejected: info.rejected }).toEqual({ path: standalone, version: '2.1.292', rejected: [extension] })
       // A test copy of Combwork notes what it selected for the run record.
       const log = join(dir, 'hive-clis.jsonl')
-      const env = { user: process.env.HIVE_USER_DATA, log: process.env.HIVE_TEST_CLI_LOG }
-      process.env.HIVE_USER_DATA = join(dir, 'profile')
-      process.env.HIVE_TEST_CLI_LOG = log
+      const env = { user: process.env.CW_USER_DATA, log: process.env.CW_TEST_CLI_LOG }
+      process.env.CW_USER_DATA = join(dir, 'profile')
+      process.env.CW_TEST_CLI_LOG = log
       // With the home the adapter says its sessions get (#368): CLAUDE_CONFIG_DIR, here a test home.
       const configDir = process.env.CLAUDE_CONFIG_DIR
       process.env.CLAUDE_CONFIG_DIR = join(dir, 'claude-home')
       try {
         await noteSelectedCli(info, claudeCode.configHome?.() ?? null)
       } finally {
-        restore('HIVE_USER_DATA', env.user)
-        restore('HIVE_TEST_CLI_LOG', env.log)
+        restore('CW_USER_DATA', env.user)
+        restore('CW_TEST_CLI_LOG', env.log)
         restore('CLAUDE_CONFIG_DIR', configDir)
       }
       expect(readCliLog(readFileSync(log, 'utf8'))).toEqual([{ provider: 'claude-code', version: '2.1.292', path: standalone, home: join(dir, 'claude-home') }])
@@ -335,17 +335,17 @@ describe('the run record\'s versions are what Combwork selected, not the first c
   it('notes nothing outside a test copy, or for a CLI not found', async () => {
     const log = join(dir, 'none.jsonl')
     const info = { provider: 'claude-code', found: true, path: 'x', version: '1.0.0' } as never
-    const was = process.env.HIVE_TEST_CLI_LOG
-    process.env.HIVE_TEST_CLI_LOG = log
-    const user = process.env.HIVE_USER_DATA
-    delete process.env.HIVE_USER_DATA
+    const was = process.env.CW_TEST_CLI_LOG
+    process.env.CW_TEST_CLI_LOG = log
+    const user = process.env.CW_USER_DATA
+    delete process.env.CW_USER_DATA
     try {
       await noteSelectedCli(info)
-      process.env.HIVE_USER_DATA = join(dir, 'profile')
+      process.env.CW_USER_DATA = join(dir, 'profile')
       await noteSelectedCli({ provider: 'claude-code', found: false, path: null, version: null } as never)
     } finally {
-      restore('HIVE_TEST_CLI_LOG', was)
-      restore('HIVE_USER_DATA', user)
+      restore('CW_TEST_CLI_LOG', was)
+      restore('CW_USER_DATA', user)
     }
     expect(() => readFileSync(log, 'utf8')).toThrow()
   })

@@ -18,7 +18,7 @@ export interface ProgressTarget {
  * The Hive this process can report to, or null: outside Hive, without the Agent API, turned off with CW_PROGRESS=0,
  * or inside a command hive-progress runs (CW_PROGRESS_WRAPPED=1), whose run is the wrapper's: a report of its own
  * would be a second row (it prints step lines instead, `wrappedLines`). The token is the agent's own, from the file Hive
- * keeps it in (CW_API_TOKEN_FILE), never from HIVE_API_TOKEN (HI-2262: sessions no longer get it).
+ * keeps it in (CW_API_TOKEN_FILE), never from a token variable (HI-2262: sessions no longer get it).
  */
 export function progressTarget(env: Record<string, string | undefined> = process.env): ProgressTarget | null {
   if (env.CW_PROGRESS === '0' || env.CW_PROGRESS_WRAPPED === '1') return null

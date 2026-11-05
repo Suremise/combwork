@@ -53,7 +53,7 @@ let claudeEnv = null
 
 /** Starts a copy of Combwork on the profile, with its workspace restored. */
 async function start() {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(API_PORT), ...claudeEnv })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(API_PORT), ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   identities.push(...lib.identify([app.process().pid]))
   const page = await app.firstWindow()

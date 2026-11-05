@@ -1,5 +1,5 @@
 // A wake put off part-way (HI-1974), on a fake Claude Code and a fake Codex agent: a doorbell typed into an idle agent
-// whose terminal is 40 columns wide, so the line wraps onto several rows, is held before its Enter (HIVE_TEST_HOLD_TYPED),
+// whose terminal is 40 columns wide, so the line wraps onto several rows, is held before its Enter (CW_TEST_HOLD_TYPED),
 // and idle wakes are turned off meanwhile, so it is no longer wanted. What Combwork typed is taken back whole: the input is
 // empty again (the fake Claude Code's Ctrl+U deletes one wrapped row, as Claude Code 2.1.312's does; LB1 kept a stopped
 // wake's first rows, and the next wake was sent after them). Idle wakes on again, the next wake is typed and sent alone.
@@ -58,7 +58,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
   fs.writeFileSync(path.join(claudeHome, 'fake-follow-notices.txt'), '')
   fs.writeFileSync(path.join(codexHome, 'fake-follow-notices.txt'), '')
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, HIVE_TEST_TIPS: 'off', HIVE_TEST_HOLD_TYPED: hold })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off', CW_TEST_HOLD_TYPED: hold })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -109,7 +109,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     // Not synchronous: leaving a message replies once its doorbell is typed, which the test holds meanwhile.
     const tool = (name, args) =>
       new Promise((resolve, reject) => {
-        const child = execFile(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', CW_PROJECT: '' }), timeout: 60000 }, (e, out) => (e ? reject(e) : resolve(JSON.parse(String(out).split('\n')[0]).result.content[0].text)))
+        const child = execFile(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' }), timeout: 60000 }, (e, out) => (e ? reject(e) : resolve(JSON.parse(String(out).split('\n')[0]).result.content[0].text)))
         child.stdin.end(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n')
       })
     const leave = async (a, text) => /\((m\d+)/.exec(await tool('cw_message_agent', { project: 'alpha', agent: a.name, text }))?.[1] ?? null

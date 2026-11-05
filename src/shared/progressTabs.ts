@@ -106,7 +106,7 @@ export function runGroupLabel(g: RunGroup, name: string | null, tr: Tr, title: s
 }
 
 /** A run of Hive's merge queue (a merge check or install on a card's merged result), not a slot's or a copy's setup. */
-const isQueueRun = (r: ProgressRun): boolean => r.source === 'hive' && runAgentKey(r) === HIVE_RUNS
+const isQueueRun = (r: ProgressRun): boolean => r.source === 'hive' && runAgentKey(r) === CW_RUNS
 
 /**
  * A card's runs on a day (HI-1701): its runs and their retries folded as before, the merge queue's checks folded into
@@ -242,13 +242,13 @@ export function runMatches(r: ProgressRun, f: RunsFilter, words: (r: ProgressRun
  * filter has "Hive (merge queue)"; #1446: "Hive (slot slot-b)", one each; HI-1710: a copy's, its lease's agent, else "Hive (review copies)"); null for the
  * Assistant and scripts, which the filter doesn't offer.
  */
-export const HIVE_RUNS = ':hive'
+export const CW_RUNS = ':hive'
 /** The Agent filter's value for a slot's warming runs, "Hive (slot <name>)" (#1446). */
-export const slotRunsKey = (slot: string): string => `${HIVE_RUNS}:slot:${slot.toLowerCase()}`
+export const slotRunsKey = (slot: string): string => `${CW_RUNS}:slot:${slot.toLowerCase()}`
 /** The Agent filter's value for review and check copies' setup runs no lease credits to an agent, "Hive (review copies)" (HI-1710). */
-export const copiesRunsKey = `${HIVE_RUNS}:copies`
+export const copiesRunsKey = `${CW_RUNS}:copies`
 export const runAgentKey = (r: Pick<ProgressRun, 'agentId' | 'source' | 'defaultName' | 'slot' | 'copy'>): string | null =>
-  r.agentId ?? (r.source !== 'hive' ? null : r.defaultName === 'slot' && r.slot ? slotRunsKey(r.slot) : r.defaultName === 'copy' ? copiesRunsKey : HIVE_RUNS)
+  r.agentId ?? (r.source !== 'hive' ? null : r.defaultName === 'slot' && r.slot ? slotRunsKey(r.slot) : r.defaultName === 'copy' ? copiesRunsKey : CW_RUNS)
 
 /**
  * The tabs' badges (#1309): merges waiting (agents waiting for a merge slot, and cards queued in the merge queues shown,

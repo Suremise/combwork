@@ -69,7 +69,7 @@ const OWN = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown 
   const copilotEnv = api ? copilotTestEnv(api, copilotDir, { above: lib.WORK }) : {}
   if (api) fs.writeFileSync(path.join(copilotEnv.COPILOT_HOME, 'config.json'), JSON.stringify({ trustedFolders: [alpha, ...['slot-a', 'slot-b', 'slot-c'].map((s) => path.join(root, s))] }, null, 2))
 
-  const h = await lib.launch({ userData, env: { ...claudeEnv, CODEX_HOME: codexHome, ...copilotEnv, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' } })
+  const h = await lib.launch({ userData, env: { ...claudeEnv, CODEX_HOME: codexHome, ...copilotEnv, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' } })
   const { app, page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))

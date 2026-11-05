@@ -19,7 +19,7 @@ import { trash } from './trash'
 const log = createLogger('skills')
 
 /** Hive's copies of workspace skills in a project folder (Codex's .agents/skills) carry this marker file. */
-const HIVE_COPY_MARKER = COPY_MARKER
+const CW_COPY_MARKER = COPY_MARKER
 
 /** What a SKILL.md's header says: its name, description and (Hive skills) audience, or why it can't be read. */
 export interface SkillHeader {
@@ -350,7 +350,7 @@ export async function localSkills(projectPath: string): Promise<SkillInfo[]> {
       seen.add(dir.toLowerCase())
       if (!(await isDir(dir))) continue
       for (const s of await findSkills(dir, 'local', 2)) {
-        if (existsSync(join(s.path, HIVE_COPY_MARKER))) continue
+        if (existsSync(join(s.path, CW_COPY_MARKER))) continue
         out.push({ ...s, provider: p.id })
       }
     }
@@ -511,7 +511,7 @@ async function deletableSkill(dir: string): Promise<boolean> {
 /** Moves a Hive or local skill folder to the Recycle Bin. */
 export async function deleteSkill(dir: string): Promise<void> {
   if (!(await deletableSkill(dir)) || !existsSync(join(dir, 'SKILL.md'))) throw hiveError(msg({ id: 'content.skill.cantDelete', defaultMessage: "Only Combwork skills and a project's local skills can be deleted in Combwork.", description: "An error deleting a skill Hive doesn't manage (a CLI's own, from the user's profile or a plugin)." }), undefined, { kind: 'forbidden' })
-  if (existsSync(join(dir, HIVE_COPY_MARKER))) throw hiveError(msg({ id: 'content.skill.isCopy', defaultMessage: "That's Combwork's own copy of a workspace skill; delete the skill in the workspace instead.", description: "An error deleting a skill in a project's folder that is Hive's copy of a workspace skill (Hive puts it there for a coding agent)." }), undefined, { kind: 'forbidden' })
+  if (existsSync(join(dir, CW_COPY_MARKER))) throw hiveError(msg({ id: 'content.skill.isCopy', defaultMessage: "That's Combwork's own copy of a workspace skill; delete the skill in the workspace instead.", description: "An error deleting a skill in a project's folder that is Hive's copy of a workspace skill (Hive puts it there for a coding agent)." }), undefined, { kind: 'forbidden' })
   await trash(dir)
 }
 

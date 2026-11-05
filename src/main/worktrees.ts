@@ -18,7 +18,7 @@ import { gitTool } from './gitTool'
 import { errorText, hiveError, shownError } from './hiveError'
 import { createLogger, userText } from './logger'
 import { unwatchedWhile } from './platform/observe'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 
 const log = createLogger('worktrees')
 
@@ -247,7 +247,7 @@ export async function copyIgnored(projectPath: string, dest: string, patterns: s
   const copied: string[] = []
   for (const raw of r.out.split('\0').filter(Boolean)) {
     const rel = raw.replace(/\/$/, '')
-    if (rel === HIVE_DIR || rel.startsWith('.combwork/') || !rx.some((x) => x.test(rel))) continue
+    if (rel === CW_DIR || rel.startsWith('.combwork/') || !rx.some((x) => x.test(rel))) continue
     const src = join(projectPath, rel)
     const target = join(dest, rel)
     try {

@@ -125,8 +125,8 @@ const PID_POLL_MS = 10
 const carried = new Map<string, string[]>()
 
 /**
- * HIVE_ variables a session keeps on purpose when Hive's others are dropped: none today. Only named ones, for a setting
- * of the user's that what runs in sessions needs (#567); the HIVE_TEST_ variables configure a test copy of Hive itself
+ * CW_ variables a session keeps on purpose when Combwork's others are dropped: none today. Only named ones, for a setting
+ * of the user's that what runs in sessions needs (#567); the CW_TEST_ variables configure a test copy of Combwork itself
  * and would reach the copies its agents start. The heavy test-slot count lives in the test folder's config.json (#589).
  */
 export const SESSION_SETTINGS = new Set<string>([])
@@ -144,10 +144,9 @@ export function childEnv(extra: Record<string, string> = {}): Record<string, str
   for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v
   for (const k of CHILD_ENV_STRIP) delete env[k]
   // If Hive itself was started from inside an agent's session, don't leak that session's identity
-  // (each provider lists its variables), nor Hive's own HIVE_ variables. User configuration is kept.
+  // (each provider lists its variables), nor Combwork's own CW_ variables. User configuration is kept.
   const sessionVars = new Set(allProviders().flatMap((p) => p.envToStrip))
-  // Both prefixes (HI-2463): a copy started from inside an older or newer one's session never passes its names on.
-  for (const k of Object.keys(env)) if (sessionVars.has(k) || ((k.startsWith('HIVE_') || k.startsWith('CW_')) && !SESSION_SETTINGS.has(k))) delete env[k]
+  for (const k of Object.keys(env)) if (sessionVars.has(k) || (k.startsWith('CW_') && !SESSION_SETTINGS.has(k))) delete env[k]
   env.TERM_PROGRAM = 'Combwork' // i18n-ignore: an environment variable's value, which programs in the terminal read
   env.COLORTERM = 'truecolor'
   // The folders of the CLIs Hive found and its PATH lacks (#1103), so what it starts runs them by name.

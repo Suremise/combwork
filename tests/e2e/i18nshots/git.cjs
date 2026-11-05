@@ -2,7 +2,7 @@
 // (commits and tags), Branches & remotes (upstream, branches, remotes, worktrees, commit identity), its forms (each
 // checked to follow a change of language while it is open), the failed-load and failed-refresh notes, the status
 // bar's tooltip and the .combwork notice with its Untrack dialog, reached for the i18nshots route (#756's design, section
-// 4) with locale-independent means only: git run on the project, IPC failures (HIVE_TEST_FAIL_IPC), the
+// 4) with locale-independent means only: git run on the project, IPC failures (CW_TEST_FAIL_IPC), the
 // language-changed event, command ids and structural hooks (data-section, data-action, data-git-*, classes), never
 // English text. See tests/e2e/i18nshots.cjs for ctx.
 const fs = require('fs')
@@ -29,7 +29,7 @@ async function cancelDialog(ctx) {
 
 /** Makes calls on an IPC channel fail: the next one (`*1`), or all until failing(ctx, ''): tests/e2e/README.md. */
 const failing = (ctx, calls) => ctx.app.evaluate((_, c) => {
-  process.env.HIVE_TEST_FAIL_IPC = c
+  process.env.CW_TEST_FAIL_IPC = c
 }, calls)
 
 /** git in the project, with an identity of its own for the commits these cases make (never the machine's config). */

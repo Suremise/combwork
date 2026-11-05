@@ -12,7 +12,7 @@
 // rebase: Same change carries the pass over, Exact revision only makes it stale (S9). Screenshots in both themes, in
 // German and in Polish. Dev build, throwaway profiles and workspaces; the fake Claude Code for G4's agents.
 // Dev build only (#1578): it starts this checkout's Electron itself, writes the board's tables, and holds a read with a
-// test seam (HIVE_TEST_SLOW_IPC); its queue's builders are on slots, as 1.0 has them.
+// test seam (CW_TEST_SLOW_IPC); its queue's builders are on slots, as 1.0 has them.
 const lib = require('./lib.cjs')
 const q = require('./queueFixture.cjs')
 const { _electron } = require('playwright-core')
@@ -112,7 +112,7 @@ async function theForm(page, app, inv) {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_TEST_TIPS: 'off' })
+  const env = lib.hiveEnv({ CW_USER_DATA: userData, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
@@ -162,7 +162,7 @@ async function theForm(page, app, inv) {
     check('agents changing state don’t read the presets notice again, and it stays', twoShown && noneShown && presetsCalls === 0 && (await notice.count()) === 1, `two running shown: ${twoShown}, then none: ${noneShown}, calls: ${presetsCalls}`)
     // The answer's board write held a while, and the workspace changed meanwhile (#1464): the notice's reload then reads
     // the board before the answer is on it, and must not show it again.
-    await app.evaluate(() => { process.env.HIVE_TEST_SLOW_IPC = 'workflow:presetsNoticeSaid=3000*1' })
+    await app.evaluate(() => { process.env.CW_TEST_SLOW_IPC = 'workflow:presetsNoticeSaid=3000*1' })
     await notice.getByRole('button', { name: 'Choose…' }).click()
     await inv('workspace:refresh')
     const workflowTab = page.locator('.git-sections [data-section="workflow"]')
@@ -181,7 +181,7 @@ async function theForm(page, app, inv) {
     check('…ArrowLeft back to Workflow, its form shown again', !!(await lib.until(async () => (await workflowTab.getAttribute('aria-selected')) === 'true' && (await focusedSection()) === 'workflow' && (await panelFor()) === 'workflow' && (await section.locator('.workflow-group[data-group="review"]').isVisible().catch(() => false)), HUNG_MS)))
     await themes('section-tabs', page.locator('.git-head'))
     check('the notice is gone, and answered for good',!!(await lib.until(async () => (await notice.count()) === 0 && (await inv('workflow:presetsNotice')) === null, HUNG_MS)), `notice shown: ${await notice.count()}, presetsNotice: ${JSON.stringify(await inv('workflow:presetsNotice'))}`)
-    await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
+    await app.evaluate(() => { delete process.env.CW_TEST_SLOW_IPC })
 
     // --- The form as the upgrade left it: in groups, no preset, each option worded as an outcome with its origin.
     check('Git’s groups, in order', JSON.stringify(await groups()) === JSON.stringify(['presets', 'team', 'review', 'checks', 'merging', 'where', 'slots', 'loops', 'stages']), JSON.stringify(await groups()))

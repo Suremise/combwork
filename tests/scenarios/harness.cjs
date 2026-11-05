@@ -1,7 +1,7 @@
 // Runs one scenario (scenarios.cjs) through Combwork's dev build: a throwaway profile and workspace, a CLI home that is
 // never the user's own, the scenario's cards, notes, handovers and skill changes; the agent or the Assistant started
 // with its prompt; then what it actually did:
-// - the hive tool calls the hive MCP server ran (its test log, HIVE_TEST_MCP_LOG: executed, with whether each worked);
+// - the hive tool calls the hive MCP server ran (its test log, CW_TEST_MCP_LOG: executed, with whether each worked);
 // - the Combwork skills it read (a successful Skill call, or a read whose result is that skill's own text);
 // - every tool call in its transcript (Combwork's parser), names of hive tools it only mentions kept apart;
 // - the board, notes and files afterwards (the Agent API and the disk), its usage, and whether any API token showed up
@@ -127,7 +127,7 @@ function tokenSightings(known, { tools = [], scripts = [], replies = [] }) {
 
 /**
  * Every token a scenario's Combwork issued, for scoring and masking (HI-2262, HR1's rounds 1 and 2): the workspace's
- * (`apiToken`), then each line of its issuance record (`file`, HIVE_TEST_TOKEN_LOG: Combwork appends each hook, agent and
+ * (`apiToken`), then each line of its issuance record (`file`, CW_TEST_TOKEN_LOG: Combwork appends each hook, agent and
  * Assistant token as it makes it, before any session can hold it), so a token whose launch ended and whose files went
  * long before the scoring is known. The record is evidence the result needs: missing, unreadable or with a line that
  * isn't `{ kind, token }` it throws, and the scenario fails rather than scoring with tokens left out.
@@ -137,7 +137,7 @@ function knownTokens(file, apiToken) {
   try {
     text = fs.readFileSync(file, 'utf8')
   } catch (e) {
-    throw new Error(`the token record (HIVE_TEST_TOKEN_LOG) can't be read (${e?.code ?? 'error'}): the leak check can't be scored`, { cause: e })
+    throw new Error(`the token record (CW_TEST_TOKEN_LOG) can't be read (${e?.code ?? 'error'}): the leak check can't be scored`, { cause: e })
   }
   const issued = text.split(/\r?\n/).filter((l) => l.trim()).map((line, i) => {
     let t = null
@@ -146,7 +146,7 @@ function knownTokens(file, apiToken) {
     } catch {
       // not JSON: said below
     }
-    if (!t || !['hook', 'agent', 'assistant'].includes(t.kind) || typeof t.token !== 'string' || !/^[0-9a-f]{32,}$/.test(t.token)) throw new Error(`the token record (HIVE_TEST_TOKEN_LOG) has a malformed line ${i + 1}: the leak check can't be scored`)
+    if (!t || !['hook', 'agent', 'assistant'].includes(t.kind) || typeof t.token !== 'string' || !/^[0-9a-f]{32,}$/.test(t.token)) throw new Error(`the token record (CW_TEST_TOKEN_LOG) has a malformed line ${i + 1}: the leak check can't be scored`)
     return { kind: t.kind, token: t.token }
   })
   if (typeof apiToken !== 'string' || apiToken.length < 16) throw new Error("no workspace token: the leak check can't be scored")
@@ -466,9 +466,9 @@ async function runScenario(sc, providerKey, opts = {}) {
   const fakeHome = path.join(root, 'claude-home')
   const fakeCodexHome = path.join(root, 'codex-home')
   const mcpLog = path.join(root, 'mcp-calls.jsonl')
-  // Every token its Combwork issues (HIVE_TEST_TOKEN_LOG, HI-2262): in the scenario's own folder, gone with it.
+  // Every token its Combwork issues (CW_TEST_TOKEN_LOG, HI-2262): in the scenario's own folder, gone with it.
   const tokenLog = path.join(root, 'tokens.jsonl')
-  // Each change to the merge slots, with its time (HIVE_TEST_MERGE_SLOT_LOG, #374): who held one and who waited, when.
+  // Each change to the merge slots, with its time (CW_TEST_MERGE_SLOT_LOG, #374): who held one and who waited, when.
   const slotLog = path.join(root, 'merge-slots.jsonl')
   // Each state view Combwork gave the Assistant at a session start (#1032), as Combwork's development builds record them.
   const startViewLog = path.join(root, 'start-views.jsonl')
@@ -542,12 +542,12 @@ async function runScenario(sc, providerKey, opts = {}) {
   try {
     // Each CLI's home is a test one: the fake's per run, the real Claude Code's and Codex's signed-in test homes.
     env = {
-      HIVE_API_PORT: String(port),
-      HIVE_TEST_TIPS: 'off',
-      HIVE_TEST_MCP_LOG: mcpLog,
-      HIVE_TEST_TOKEN_LOG: tokenLog,
-      HIVE_TEST_MERGE_SLOT_LOG: slotLog,
-      HIVE_TEST_START_VIEW_LOG: startViewLog,
+      CW_API_PORT: String(port),
+      CW_TEST_TIPS: 'off',
+      CW_TEST_MCP_LOG: mcpLog,
+      CW_TEST_TOKEN_LOG: tokenLog,
+      CW_TEST_MERGE_SLOT_LOG: slotLog,
+      CW_TEST_START_VIEW_LOG: startViewLog,
       CLAUDE_CONFIG_DIR: providerKey === 'claude-code' ? CLAUDE_TEST_HOME : fakeHome,
       CODEX_HOME: providerKey === 'fake-codex' ? fakeCodexHome : lib.CODEX_HOME,
       // The real Codex runs its commands in Windows PowerShell, not the Store's PowerShell 7 (#584, lib.cjs).
@@ -699,7 +699,7 @@ async function runScenario(sc, providerKey, opts = {}) {
         const tokenFile = path.join(userData, 'assistant-api', `${require('crypto').createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`)
         const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
           input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
-          env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${port}`, CW_WORKSPACE: ws, HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'agents', HIVE_JOURNAL: '1', CW_API_TOKEN_FILE: tokenFile, HIVE_API_TOKEN: '', CW_PROJECT: '' }),
+          env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${port}`, CW_WORKSPACE: ws, CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'agents', CW_JOURNAL: '1', CW_API_TOKEN_FILE: tokenFile, CW_API_TOKEN: '', CW_PROJECT: '' }),
           timeout: 60000
         }).toString()
         return JSON.parse(out.split('\n')[0]).result?.content?.[0]?.text ?? ''
