@@ -38,7 +38,7 @@ const B = {
     text: 'Checks that pass before review: {checks}. Run each as `cw-progress --check <name> --card "<key>"` before submitting.',
     note: 'The checks the project runs before review, by name, joined ("typecheck and lint").'
   }),
-  finishHive: agentMsg({ id: 'brief.rule.finish.hiveMerges', text: 'Combwork merges each approved card.', note: 'Finish: Combwork merges.' }),
+  finishHive: agentMsg({ id: 'brief.rule.finish.combworkMerges', text: 'Combwork merges each approved card.', note: 'Finish: Combwork merges.' }),
   finishAgent: agentMsg({ id: 'brief.rule.finish.agentMerges', text: 'The builder merges each approved card (merge-ready), then reports it with cw_report_merge; Combwork checks it is in.', note: 'Finish: the builder merges.' }),
   finishCommitted: agentMsg({ id: 'brief.rule.finish.committed', text: 'A card is done once its work is committed.', note: 'Finish: committed is done.' }),
   finishNotChecked: agentMsg({ id: 'brief.rule.finish.notChecked', text: 'Combwork does not check merges: report each one with cw_report_merge.', note: "Finish: merges aren't checked." }),

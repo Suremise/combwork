@@ -169,9 +169,9 @@ describe('the sentences once built by hand read as before, in English', () => {
     expect(hiveVcsText({ state: 'not-excluded', tracked: 3 })?.detail).toBe(
       "Excluding .combwork keeps new files out of git, but these were committed before, so git still tracks them and commits their changes. Run `git rm -r --cached .combwork` in the project folder, then commit: the files stay on disk. Combwork couldn't exclude .combwork either: a rule in a .gitignore may bring it back."
     )
-    expect(tr(m('git.hiveVcs.titleSentence'), { title: 'X' })).toBe('X.')
-    expect(tr(m('git.hiveVcs.untrackTitle'), { count: 1 })).toBe('Untrack this file?')
-    expect(tr(m('git.hiveVcs.untrackTitle'), { count: 4 })).toBe('Untrack these 4 files?')
+    expect(tr(m('git.combworkVcs.titleSentence'), { title: 'X' })).toBe('X.')
+    expect(tr(m('git.combworkVcs.untrackTitle'), { count: 1 })).toBe('Untrack this file?')
+    expect(tr(m('git.combworkVcs.untrackTitle'), { count: 4 })).toBe('Untrack these 4 files?')
     expect(tr(m('git.init.commitsAs'), { name: 'A', email: 'a@b' })).toBe('Commits as A <a@b>.')
   })
 

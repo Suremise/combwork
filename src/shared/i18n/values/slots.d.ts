@@ -7,7 +7,7 @@ interface HiveMessageValues {
   'slots.release.changed': { slot: string | number }
   'slots.release.live': { slot: string | number }
   'slots.release.notEnded': { slot: string | number }
-  'slots.release.otherHive': { slot: string | number; pid: string | number }
+  'slots.release.otherCombwork': { slot: string | number; pid: string | number }
   'slots.setting.bad': undefined
   'slots.setting.badSize': { min: number; max: number }
   'slots.setting.badText': { max: number }

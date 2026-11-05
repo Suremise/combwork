@@ -111,7 +111,7 @@ const M = {
   skillFromFile: msg({ id: 'assistant.sidebar.skillFromFile', defaultMessage: 'Add Skill from File (.md or .zip)…', description: 'The Skills sidebar: a button. Keep .md and .zip as they are.' }),
   openSkillsFolder: msg({ id: 'assistant.sidebar.openSkillsFolder', defaultMessage: 'Open Combwork Skills Folder', description: 'The Skills sidebar: a button that opens .combwork/skills in Explorer.' }),
   filterSkills: msg({ id: 'assistant.sidebar.filterSkills', defaultMessage: 'Filter skills', description: "The Skills sidebar's filter box, empty." }),
-  hiveGroup: msg({ id: 'assistant.sidebar.hiveGroup', defaultMessage: 'Combwork', description: "The Skills sidebar: the section of the workspace's Combwork skills. Usually kept as Combwork." }),
+  hiveGroup: msg({ id: 'assistant.sidebar.combworkGroup', defaultMessage: 'Combwork', description: "The Skills sidebar: the section of the workspace's Combwork skills. Usually kept as Combwork." }),
   noWorkspaceSkills: msg({ id: 'assistant.sidebar.noWorkspaceSkills', defaultMessage: 'Open a workspace to manage Combwork skills.', description: 'The Skills sidebar with no workspace open.' }),
   skillsLoadTarget: msg({ id: 'assistant.sidebar.skillsLoadTarget', defaultMessage: 'the skills', description: 'What could not be loaded when the Combwork skills were first read: shown in "Could not load {what}: {error}", with Retry.' }),
   skillsRefreshTarget: msg({ id: 'assistant.sidebar.skillsRefreshTarget', defaultMessage: 'the skills', description: 'What could not be refreshed while the skills shown stay on screen: shown in "Could not refresh {what}; last updated …", with Retry.' }),
@@ -136,8 +136,8 @@ const M = {
   noServers: msg({ id: 'assistant.sidebar.noServers', defaultMessage: 'No MCP servers yet. Create one with +, or add one from a .json definition or a .zip of a server folder.', description: 'The MCP sidebar with no servers. + is the add button.' }),
   deleteServer: msg({ id: 'assistant.sidebar.deleteServer', defaultMessage: 'Delete server', description: "A trash button beside an MCP server of the workspace: deletes it." }),
   builtIn: msg({ id: 'assistant.sidebar.builtIn', defaultMessage: 'Built-in', description: "The MCP sidebar: the section of Combwork's own server." }),
-  hiveServerDesc: msg({ id: 'assistant.sidebar.hiveServerDesc', defaultMessage: 'Combwork tools for agents: projects, shared notes, handovers, notifications', description: "Under the built-in combwork server: what it gives agents." }),
-  hiveServerTip: msg({ id: 'assistant.sidebar.hiveServerTip', defaultMessage: 'Controlled in Settings → Agent API', description: "Tooltip on the built-in server's On or Off." }),
+  hiveServerDesc: msg({ id: 'assistant.sidebar.combworkServerDesc', defaultMessage: 'Combwork tools for agents: projects, shared notes, handovers, notifications', description: "Under the built-in combwork server: what it gives agents." }),
+  hiveServerTip: msg({ id: 'assistant.sidebar.combworkServerTip', defaultMessage: 'Controlled in Settings → Agent API', description: "Tooltip on the built-in server's On or Off." }),
   on: msg({ id: 'assistant.sidebar.on', defaultMessage: 'On', description: 'A badge: the built-in combwork server is on.' }),
   off: msg({ id: 'assistant.sidebar.off', defaultMessage: 'Off', description: 'A badge: the built-in combwork server is off.' })
 }

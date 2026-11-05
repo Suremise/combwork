@@ -398,9 +398,9 @@ const APP_ROWS: Row[] = [
   {
     section: 'workflow',
     key: 'defaults',
-    title: msg({ id: 'settings.workflow.hiveDefaults.title', defaultMessage: 'Combwork defaults', description: "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768)." }),
-    desc: msg({ id: 'settings.workflow.hiveDefaults.desc', defaultMessage: 'For every workspace: what each project starts from unless its workspace or the project sets its own. Pick a preset, or set each option, for None or for Git.', description: 'What the setting "Combwork defaults" is, under its title (Settings → Version Control). None and Git: glossary 2.1.' }),
-    tip: msg({ id: 'settings.workflow.hiveDefaults.tip', defaultMessage: 'Until 1.0’s settings tidy, Settings → Workflow defaults: nothing set there changed.', description: 'The info tip of "Combwork defaults" (Settings → Version Control): its old place, so a search for its old name finds it. Workflow defaults was the old section’s name: translate it as that section was.' }),
+    title: msg({ id: 'settings.workflow.combworkDefaults.title', defaultMessage: 'Combwork defaults', description: "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768)." }),
+    desc: msg({ id: 'settings.workflow.combworkDefaults.desc', defaultMessage: 'For every workspace: what each project starts from unless its workspace or the project sets its own. Pick a preset, or set each option, for None or for Git.', description: 'What the setting "Combwork defaults" is, under its title (Settings → Version Control). None and Git: glossary 2.1.' }),
+    tip: msg({ id: 'settings.workflow.combworkDefaults.tip', defaultMessage: 'Until 1.0’s settings tidy, Settings → Workflow defaults: nothing set there changed.', description: 'The info tip of "Combwork defaults" (Settings → Version Control): its old place, so a search for its old name finds it. Workflow defaults was the old section’s name: translate it as that section was.' }),
     type: 'custom',
     wide: true
   },
@@ -487,7 +487,7 @@ const APP_ROWS: Row[] = [
   { section: 'agentApi', key: 'status', title: msg({ id: 'settings.agentApi.status.title', defaultMessage: 'Status', description: "A setting's title (Settings → Agent API)." }), tip: msg({ id: 'settings.agentApi.status.tip', defaultMessage: 'Whether the Agent API is listening.', description: 'The info tip of the setting "Status" (Settings → Agent API): more on what it does and when it applies.' }), type: 'custom' },
   { section: 'agentApi', key: 'enabled', title: msg({ id: 'settings.agentApi.enabled.title', defaultMessage: 'Enable Agent API', description: "A setting's title (Settings → Agent API)." }), desc: msg({ id: 'settings.agentApi.enabled.desc', defaultMessage: 'Run a local HTTP API that agents and scripts can use to talk to Combwork.', description: 'What the setting "Enable Agent API" does, under its title (Settings → Agent API).' }), tip: msg({ id: 'settings.agentApi.enabled.tip', defaultMessage: 'Listens on 127.0.0.1 only and requires the bearer token below. See Help → Agent API Reference. Turned off, the port still answers the Assistant alone (it has its own token, and Settings → Assistant → Control decides what it may do).', description: 'The info tip of the setting "Enable Agent API" (Settings → Agent API): more on what it does and when it applies.' }), type: 'boolean' },
   { section: 'agentApi', key: 'port', title: msg({ id: 'settings.agentApi.port.title', defaultMessage: 'Port', description: "A setting's title (Settings → Agent API)." }), desc: msg({ id: 'settings.agentApi.port.desc', defaultMessage: 'Local port for the Agent API.', description: 'What the setting "Port" does, under its title (Settings → Agent API).' }), tip: msg({ id: 'settings.agentApi.port.tip', defaultMessage: 'Change this if the port is used by another program.', description: 'The info tip of the setting "Port" (Settings → Agent API): more on what it does and when it applies.' }), type: 'number', min: 1024, max: 65535 },
-  { section: 'agentApi', key: 'provideHiveMcp', title: msg({ id: 'settings.agentApi.provideHiveMcp.title', defaultMessage: 'Provide Combwork tools to sessions', description: "A setting's title (Settings → Agent API)." }), desc: msg({ id: 'settings.agentApi.provideHiveMcp.desc', defaultMessage: 'Add the built-in "combwork" MCP server to every session.', description: 'What the setting "Provide Combwork tools to sessions" does, under its title (Settings → Agent API).' }), tip: msg({ id: 'settings.agentApi.provideHiveMcp.tip', defaultMessage: 'Gives agents tools for shared notes, handovers, project status and notifications.', description: 'The info tip of the setting "Provide Combwork tools to sessions" (Settings → Agent API): more on what it does and when it applies.' }), type: 'boolean' },
+  { section: 'agentApi', key: 'provideHiveMcp', title: msg({ id: 'settings.agentApi.provideCombworkMcp.title', defaultMessage: 'Provide Combwork tools to sessions', description: "A setting's title (Settings → Agent API)." }), desc: msg({ id: 'settings.agentApi.provideCombworkMcp.desc', defaultMessage: 'Add the built-in "combwork" MCP server to every session.', description: 'What the setting "Provide Combwork tools to sessions" does, under its title (Settings → Agent API).' }), tip: msg({ id: 'settings.agentApi.provideCombworkMcp.tip', defaultMessage: 'Gives agents tools for shared notes, handovers, project status and notifications.', description: 'The info tip of the setting "Provide Combwork tools to sessions" (Settings → Agent API): more on what it does and when it applies.' }), type: 'boolean' },
   {
     section: 'agentApi',
     key: 'allowSessionInput',
@@ -1010,7 +1010,7 @@ function settingPathOf(e: Pick<SettingEntry, 'section' | 'text' | 'workflowLevel
 
 /** Settings → Version Control's two parts (HI-1768), as a level default's path names them. */
 const LEVEL_PART = {
-  global: msg({ id: 'settings.workflow.hiveDefaults.title', defaultMessage: 'Combwork defaults', description: "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768)." }),
+  global: msg({ id: 'settings.workflow.combworkDefaults.title', defaultMessage: 'Combwork defaults', description: "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768)." }),
   workspace: msg({ id: 'settings.workflow.workspaceDefaults.title', defaultMessage: 'Workspace defaults', description: "A setting's title (Settings → Version Control): the workflow options the open workspace's projects start from, over Combwork defaults (HI-1768). The window shows the workspace's name beside it." })
 }
 
@@ -1214,10 +1214,10 @@ const AGENT = {
   offValue: agentMsg({ id: 'settings.agent.value.off', text: '0 ({off})', note: 'A number setting at 0, which turns it off. {off} is what 0 stands for (Never).' }),
   empty: agentMsg({ id: 'settings.agent.value.empty', text: '(empty)', note: 'A text setting with no text.' }),
   size: agentMsg({ id: 'settings.agent.value.size', text: '({n} {kind, select, list {entries} other {keys}})', note: "A table's size in a listing: {n} is a number as written (the word stays plural, as the tools always said it); kind is list or object." }),
-  hiveList: agentMsg({ id: 'settings.agent.value.hiveList', text: "(Combwork's list)", note: "A fallback list left empty: Combwork's own list applies." }),
+  hiveList: agentMsg({ id: 'settings.agent.value.combworkList', text: "(Combwork's list)", note: "A fallback list left empty: Combwork's own list applies." }),
   none: agentMsg({ id: 'settings.agent.value.none', text: '(none)', note: 'A table with nothing in it, or an entry one side of a change has not got.' }),
   removed: agentMsg({ id: 'settings.agent.value.removed', text: 'removed', note: "A change to a provider's prices: a shipped model removed from its table." }),
-  hivePrice: agentMsg({ id: 'settings.agent.value.hivePrice', text: "Combwork's price", note: "A change to a provider's prices: a shipped model at Combwork's own price (not removed)." }),
+  hivePrice: agentMsg({ id: 'settings.agent.value.combworkPrice', text: "Combwork's price", note: "A change to a provider's prices: a shipped model at Combwork's own price (not removed)." }),
   older: agentMsg({ id: 'settings.agent.value.older', text: '{label} (older)', note: "A model fallback list's entry marked older, in a change: {label} is its label." })
 }
 

@@ -44,6 +44,15 @@ interface HiveMessageValues {
   'main.branchMerge.cardWork': { branch: string | number; card: string | number }
   'main.branchMerge.notBranch': { branch: string | number }
   'main.branchMerge.same': { branch: string | number }
+  'main.combworkMove.bothBody': undefined
+  'main.combworkMove.bothTitle': { folder: string | number }
+  'main.combworkMove.linkBody': undefined
+  'main.combworkMove.linkTitle': { folder: string | number }
+  'main.combworkMove.what.cards': undefined
+  'main.combworkMove.what.excludes': undefined
+  'main.combworkMove.what.folders': undefined
+  'main.combworkMove.what.notes': undefined
+  'main.combworkMove.what.worktrees': undefined
   'main.connections.badMode': { cli: string | number; mode: string | number }
   'main.connections.beingRemoved': { name: string | number }
   'main.connections.choice.missing': { agent: string | number }
@@ -107,15 +116,6 @@ interface HiveMessageValues {
   'main.gitInit.stopped': { what: string | number; why: string | number }
   'main.gitInit.stoppedAfter': { done: string | number; what: string | number; why: string | number }
   'main.gitInit.unreadable': { why: string | number }
-  'main.hiveMove.bothBody': undefined
-  'main.hiveMove.bothTitle': { folder: string | number }
-  'main.hiveMove.linkBody': undefined
-  'main.hiveMove.linkTitle': { folder: string | number }
-  'main.hiveMove.what.cards': undefined
-  'main.hiveMove.what.excludes': undefined
-  'main.hiveMove.what.folders': undefined
-  'main.hiveMove.what.notes': undefined
-  'main.hiveMove.what.worktrees': undefined
   'main.installDir.close': undefined
   'main.installDir.copied': undefined
   'main.installDir.copy': undefined
@@ -285,9 +285,9 @@ interface HiveMessageValues {
   'main.removal.folder.deleting': undefined
   'main.removal.folder.heldNow': undefined
   'main.removal.folder.home': undefined
+  'main.removal.folder.notCombwork': undefined
   'main.removal.folder.notForgotten': { why: string | number }
   'main.removal.folder.notHeld': { n: number }
-  'main.removal.folder.notHives': undefined
   'main.removal.folder.notTrashed': { path: string | number; why: string | number }
   'main.removal.folder.outsideDelete': undefined
   'main.removal.folderGone': { folder: string | number }

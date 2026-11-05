@@ -15,7 +15,7 @@
       "length": "number"
     }
   },
-  "providers.codex.nativeHive": {
+  "providers.codex.nativeCombwork": {
     "placeholders": {
       "file": "plain"
     }

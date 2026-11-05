@@ -49,7 +49,7 @@ describe('the canary dialect over hive-progress (card 5)', () => {
     for (const { text, values } of out) expect(canaryProblems(text, ids, values), text).toEqual([])
     // The lines runWrapped writes itself (the outside-Combwork refusal, the wait, the isolated launcher's, a command not
     // found, a failed run's stored detail) are said in its I/O: the e2e progressreport suite runs them. They are listed.
-    const inRun = ['progress.check.outsideHive', 'progress.check.waiting', 'progress.run.exitCode', 'progress.run.commandNotFound', 'progress.isolated.launcherDidntStart', 'progress.isolated.notRun', 'progress.isolated.notRunStatus', 'progress.isolated.notRunUnreachable']
+    const inRun = ['progress.check.outsideCombwork', 'progress.check.waiting', 'progress.run.exitCode', 'progress.run.commandNotFound', 'progress.isolated.launcherDidntStart', 'progress.isolated.notRun', 'progress.isolated.notRunStatus', 'progress.isolated.notRunUnreachable']
     const seen = seenIn(out.map((o) => o.text))
     expect([...ids].filter((id) => id.startsWith('progress.') && !seen.has(id) && !inRun.includes(id))).toEqual([])
     expect(inRun.filter((id) => !ids.has(id))).toEqual([])

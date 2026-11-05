@@ -60,7 +60,7 @@ const T = {
   // When a change applies.
   restartSessions: agentMsg({ id: 'settings.agent.tool.restart.sessions', text: 'to sessions started afterwards (running agents show Restart session)', note: 'When a change applies: to new sessions (#676). Restart session is the name of the button: keep it as the window shows it.' }),
   restartAssistant: agentMsg({ id: 'settings.agent.tool.restart.assistant', text: 'to the Assistant after it restarts', note: 'When a change applies: to the Assistant once it restarts (#676).' }),
-  restartHive: agentMsg({ id: 'settings.agent.tool.restart.hive', text: 'when Combwork restarts (Settings → Advanced offers Restart Combwork)', note: 'When a change applies: once Combwork restarts (#676). Restart Combwork is the name of the button.' }),
+  restartHive: agentMsg({ id: 'settings.agent.tool.restart.cw', text: 'when Combwork restarts (Settings → Advanced offers Restart Combwork)', note: 'When a change applies: once Combwork restarts (#676). Restart Combwork is the name of the button.' }),
   // The rows a plain listing sums up.
   workflowMoreTitle: agentMsg({ id: 'settings.agent.tool.more.workflowTitle', text: 'query "workflow" lists them', note: "cw_list_settings: the row that stands for the workflow defaults left out of a plain listing (#1422). query is the tool's argument." }),
   workflowMoreDesc: agentMsg({ id: 'settings.agent.tool.more.workflowDesc', text: "Combwork defaults and the workspace's (Settings → Version Control), per version control (inherit).", note: 'cw_list_settings: what the workflow defaults left out are (#1422).' }),

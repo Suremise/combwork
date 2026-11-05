@@ -322,7 +322,7 @@
       "links": "plain"
     }
   },
-  "reply.journal.mark.byHive": {
+  "reply.journal.mark.byCombwork": {
     "placeholders": {}
   },
   "reply.journal.mark.detail": {
@@ -851,7 +851,7 @@
       "audience": "select"
     }
   },
-  "reply.skill.level.hive": {
+  "reply.skill.level.cw": {
     "placeholders": {}
   },
   "reply.skill.level.local": {
@@ -950,7 +950,7 @@
       "slots": "plain"
     }
   },
-  "reply.team.hive": {
+  "reply.team.cw": {
     "placeholders": {}
   },
   "reply.team.more": {

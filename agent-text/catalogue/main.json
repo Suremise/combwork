@@ -94,6 +94,31 @@
     "note": "An error merging from the Merge dialog: the branch picked and the target are the same ({branch}).",
     "audience": "both"
   },
+  "main.combworkMove.what.cards": {
+    "text": "the paths in cards",
+    "note": "What the folder move was updating when it failed (service.combworkMove.phaseFailed): links and paths in cards' descriptions and comments.",
+    "audience": "both"
+  },
+  "main.combworkMove.what.excludes": {
+    "text": "git's exclude lines",
+    "note": "What the folder move was updating when it failed (service.combworkMove.phaseFailed): the lines that keep the folder out of git.",
+    "audience": "both"
+  },
+  "main.combworkMove.what.folders": {
+    "text": "the agents' folders inside it",
+    "note": "What the folder move was updating when it failed (service.combworkMove.phaseFailed): slots and other agents' folders kept inside the moved folder.",
+    "audience": "both"
+  },
+  "main.combworkMove.what.notes": {
+    "text": "the paths in shared notes and handovers",
+    "note": "What the folder move was updating when it failed (service.combworkMove.phaseFailed).",
+    "audience": "both"
+  },
+  "main.combworkMove.what.worktrees": {
+    "text": "the worktrees inside it",
+    "note": "What the folder move was updating when it failed (service.combworkMove.phaseFailed): git worktrees kept inside the moved folder.",
+    "audience": "both"
+  },
   "main.connections.badMode": {
     "text": "{cli} has no permission mode {mode}.",
     "note": "An error saving a connection (HI-2107): the permission mode asked for ({mode}, as given) is not one of the coding agent CLI's ({cli}: \"Codex\").",
@@ -307,31 +332,6 @@
   "main.gitInit.unreadable": {
     "text": "Git couldn't read this repository: {why}",
     "note": "Why a folder can't be made a git repository. {why} is git's own message.",
-    "audience": "both"
-  },
-  "main.hiveMove.what.cards": {
-    "text": "the paths in cards",
-    "note": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): links and paths in cards' descriptions and comments.",
-    "audience": "both"
-  },
-  "main.hiveMove.what.excludes": {
-    "text": "git's exclude lines",
-    "note": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): the lines that keep the folder out of git.",
-    "audience": "both"
-  },
-  "main.hiveMove.what.folders": {
-    "text": "the agents' folders inside it",
-    "note": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): slots and other agents' folders kept inside the moved folder.",
-    "audience": "both"
-  },
-  "main.hiveMove.what.notes": {
-    "text": "the paths in shared notes and handovers",
-    "note": "What the folder move was updating when it failed (service.hiveMove.phaseFailed).",
-    "audience": "both"
-  },
-  "main.hiveMove.what.worktrees": {
-    "text": "the worktrees inside it",
-    "note": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): git worktrees kept inside the moved folder.",
     "audience": "both"
   },
   "main.keys.maskingFull": {

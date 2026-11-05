@@ -83,7 +83,7 @@
   "content.templates.failed": "Rien n’a été modifié : {error}",
   "content.templates.fenced": "Un modèle est en cours de chargement dans ce projet",
   "content.templates.gone": "Ce modèle n’existe plus.",
-  "content.templates.hiveOnly": "Les modèles de Combwork ne peuvent pas être modifiés : duplique-en un dans l’espace de travail ou un projet pour le modifier.",
+  "content.templates.combworkOnly": "Les modèles de Combwork ne peuvent pas être modifiés : duplique-en un dans l’espace de travail ou un projet pour le modifier.",
   "content.templates.importNotJson": "Ce n’est pas un modèle d’agents Combwork (pas du JSON).",
   "content.templates.importTooLarge": "Ce n’est pas un modèle d’agents Combwork (plus de {kb} Ko).",
   "content.templates.loading": "Un modèle est déjà en cours de chargement dans ce projet.",

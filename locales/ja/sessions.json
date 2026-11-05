@@ -72,7 +72,7 @@
   "sessions.compaction.tokens": "{before} → {after}{next, select, none {} other {（指示を含めて{next}）}} · {freed}を解放 · {when}",
   "sessions.delete.button": "削除",
   "sessions.delete.detailExternal": "Combworkの一覧に表示されなくなります。{cli}はトランスクリプトを保持するため、{cli}自身の再開一覧には残ります。",
-  "sessions.delete.detailHive": "Combworkが持つトランスクリプトのコピーはごみ箱に移動し、ここには表示されなくなります。使用量は合計に残ります。{cli}は自身のトランスクリプトを保持するため、{cli}自身の再開一覧には残ります。",
+  "sessions.delete.detailCombwork": "Combworkが持つトランスクリプトのコピーはごみ箱に移動し、ここには表示されなくなります。使用量は合計に残ります。{cli}は自身のトランスクリプトを保持するため、{cli}自身の再開一覧には残ります。",
   "sessions.delete.failed": "{kind, select, conversation {会話を削除できませんでした} other {セッションを削除できませんでした}}",
   "sessions.delete.message": "「{name}」をCombworkから削除しますか？",
   "sessions.delete.title": "{kind, select, conversation {会話を削除しますか？} other {セッションを削除しますか？}}",

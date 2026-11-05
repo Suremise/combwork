@@ -39,7 +39,7 @@
     "text": "Your lane's brief (lane {lane}, from {from}):\n{text}",
     "note": "A lane's brief as its builder reads it (with each card in slots, or delivered): who started the lane (from: the lane's startedBy), then the brief as it was written (text)."
   },
-  "brief.record.byHive": {
+  "brief.record.byCombwork": {
     "text": "{agent} is running, so Combwork left it as it is: Combwork gives it the lane's first card itself once it is free, so don't prompt it.",
     "note": "HI-2029: a running builder, the rules on: Combwork gives it the lane's first card once it is free, so the caller is told not to prompt it (that would race Combwork's start)."
   },
@@ -91,13 +91,13 @@
     "text": "The builder merges each approved card (merge-ready), then reports it with cw_report_merge; Combwork checks it is in.",
     "note": "Finish: the builder merges."
   },
+  "brief.rule.finish.combworkMerges": {
+    "text": "Combwork merges each approved card.",
+    "note": "Finish: Combwork merges."
+  },
   "brief.rule.finish.committed": {
     "text": "A card is done once its work is committed.",
     "note": "Finish: committed is done."
-  },
-  "brief.rule.finish.hiveMerges": {
-    "text": "Combwork merges each approved card.",
-    "note": "Finish: Combwork merges."
   },
   "brief.rule.finish.notChecked": {
     "text": "Combwork does not check merges: report each one with cw_report_merge.",

@@ -963,6 +963,10 @@
     "defaultMessage": "Built-in",
     "description": "Heading in a project's MCP tab: Combwork's own server."
   },
+  "project.mcp.combworkDesc": {
+    "defaultMessage": "Lets agents see other projects, read and write shared notes, create handovers and notify you.",
+    "description": "What Combwork's own MCP server (combwork) does."
+  },
   "project.mcp.copy": {
     "defaultMessage": "Copy to workspace",
     "description": "Button: copies the project's own MCP server to the workspace."
@@ -986,10 +990,6 @@
   "project.mcp.headingAdded": {
     "defaultMessage": "Added servers",
     "description": "Heading in a project's MCP tab (HI-2059): the workspace's MCP servers added to this project."
-  },
-  "project.mcp.hiveDesc": {
-    "defaultMessage": "Lets agents see other projects, read and write shared notes, create handovers and notify you.",
-    "description": "What Combwork's own MCP server (combwork) does."
   },
   "project.mcp.invalid": {
     "defaultMessage": "invalid",
@@ -1331,7 +1331,7 @@
     "defaultMessage": "on",
     "description": "A global setting that is on, shown in \"Inherit (on)\"."
   },
-  "project.settings.openHive": {
+  "project.settings.openCombwork": {
     "defaultMessage": "Open .combwork folder",
     "description": "Button: opens the project's .combwork folder. Keep .combwork."
   },
@@ -1375,6 +1375,10 @@
     "defaultMessage": "{count, plural, one {# Combwork skill is for the Assistant only, so it isn't listed: this project's agents don't get it.} other {# Combwork skills are for the Assistant only, so they aren't listed: this project's agents don't get them.}}",
     "description": "Under the Combwork skills, when some are for the Combwork Assistant alone."
   },
+  "project.skills.cw": {
+    "defaultMessage": "Combwork",
+    "description": "The group of Combwork's own skills (the workspace's). Usually kept as Combwork."
+  },
   "project.skills.delete": {
     "defaultMessage": "Delete skill",
     "description": "Tooltip on the delete button beside a local skill."
@@ -1391,10 +1395,6 @@
     "defaultMessage": "Skills available to agents",
     "description": "Heading of the project's Skills tab list."
   },
-  "project.skills.hive": {
-    "defaultMessage": "Combwork",
-    "description": "The group of Combwork's own skills (the workspace's). Usually kept as Combwork."
-  },
   "project.skills.local": {
     "defaultMessage": "Local (User Managed)",
     "description": "A group of a provider's skills: this project's own."
@@ -1403,7 +1403,7 @@
     "defaultMessage": "New local skill for {provider}…",
     "description": "Tooltip on the + of the Local group."
   },
-  "project.skills.noHive": {
+  "project.skills.noCombwork": {
     "defaultMessage": "No Combwork skills in this workspace.",
     "description": "Under the Combwork group when it is empty."
   },

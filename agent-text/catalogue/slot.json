@@ -279,7 +279,7 @@
     "text": "isn't ready ({state})",
     "note": "As slot.takeover.gone: the slot isn't lent. {state} is its state's id (ready, dirty…)."
   },
-  "slot.takeover.otherHive": {
+  "slot.takeover.otherCombwork": {
     "text": "is held by another Combwork's run",
     "note": "As slot.takeover.gone: a run of another Combwork (another profile) holds it."
   },

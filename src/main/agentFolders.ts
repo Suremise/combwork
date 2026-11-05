@@ -674,7 +674,7 @@ export async function releaseHeldWriter(projectPath: string, slot: string, run: 
   const w = await heldWriter(projectPath, slot)
   if (!w || w.run !== run) throw changed()
   if (w.live) throw hiveError(msg({ id: 'slots.release.live', defaultMessage: "{slot}'s writer is still running in this Combwork: stop the agent, or end or keep what it left running, first.", description: "Release Slot… refused: the session writing in the slot ({slot}) still runs in this Combwork, or Combwork still follows the processes it left running (End or Keep Running in the agent's ⋯ menu settles them)." }), { slot }, { kind: 'conflict' })
-  if (!w.hive.self && w.hive.alive !== false) throw hiveError(msg({ id: 'slots.release.otherHive', defaultMessage: '{slot} is held by another Combwork that is still running (process {pid}): release it there, or quit that Combwork first.', description: 'Release Slot… refused: another running copy of Combwork (its process id {pid}) holds the slot ({slot}).' }), { slot, pid: w.hive.pid }, { kind: 'conflict' })
+  if (!w.hive.self && w.hive.alive !== false) throw hiveError(msg({ id: 'slots.release.otherCombwork', defaultMessage: '{slot} is held by another Combwork that is still running (process {pid}): release it there, or quit that Combwork first.', description: 'Release Slot… refused: another running copy of Combwork (its process id {pid}) holds the slot ({slot}).' }), { slot, pid: w.hive.pid }, { kind: 'conflict' })
   if (o.end && w.processes) o.guard?.()
   if (o.end && w.processes?.from === 'leftovers') await settleLeftovers(projectPath, w.agent, 'end', run)
   if (o.end && w.processes?.from === 'restart' && !(await endProcessesExactly(w.processes.list))) {

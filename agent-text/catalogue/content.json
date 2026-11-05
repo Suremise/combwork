@@ -324,6 +324,11 @@
     "note": "Why a template can't be loaded: git couldn't tell whether the worktree {folder} of the agent {agent} it would remove has uncommitted work; {error} is why (often git's own words).",
     "audience": "both"
   },
+  "content.templates.combworkOnly": {
+    "text": "Combwork's own templates can't be changed: duplicate one into the workspace or a project to change it.",
+    "note": "An error: saving, renaming, editing, importing into or deleting one of Combwork's own templates (the Combwork scope, read-only). Duplicate is a button: as Combwork names it.",
+    "audience": "both"
+  },
   "content.templates.connectionAmbiguous": {
     "text": "Several connections are called \"{ref}\": name one by its id ({ids}).",
     "note": "An error loading a template or choosing connections (HI-2109): the name given ({ref}) is several connections' names; {ids} lists their ids.",
@@ -357,11 +362,6 @@
   "content.templates.gone": {
     "text": "That template is no longer there.",
     "note": "An error: the template was deleted or renamed meanwhile.",
-    "audience": "both"
-  },
-  "content.templates.hiveOnly": {
-    "text": "Combwork's own templates can't be changed: duplicate one into the workspace or a project to change it.",
-    "note": "An error: saving, renaming, editing, importing into or deleting one of Combwork's own templates (the Combwork scope, read-only). Duplicate is a button: as Combwork names it.",
     "audience": "both"
   },
   "content.templates.importNotJson": {

@@ -83,7 +83,7 @@
   "content.templates.failed": "Es wurde nichts geändert: {error}",
   "content.templates.fenced": "Eine Vorlage wird in dieses Projekt geladen",
   "content.templates.gone": "Diese Vorlage gibt es nicht mehr.",
-  "content.templates.hiveOnly": "Combworks eigene Vorlagen können nicht geändert werden: Dupliziere eine in den Arbeitsbereich oder ein Projekt, um sie zu ändern.",
+  "content.templates.combworkOnly": "Combworks eigene Vorlagen können nicht geändert werden: Dupliziere eine in den Arbeitsbereich oder ein Projekt, um sie zu ändern.",
   "content.templates.importNotJson": "Das ist keine Combwork-Agentenvorlage (kein JSON).",
   "content.templates.importTooLarge": "Das ist keine Combwork-Agentenvorlage (über {kb} KB).",
   "content.templates.loading": "In dieses Projekt wird bereits eine Vorlage geladen.",

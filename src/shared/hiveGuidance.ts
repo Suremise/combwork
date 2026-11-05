@@ -112,7 +112,7 @@ const A = {
   otherWorkspaceNote: agentMsg({ id: 'contract.board.other.workspaceNote', text: 'shared notes', note: 'What the workspace-note skill covers, in the list of the other skills.' }),
   otherMergeReady: agentMsg({ id: 'contract.board.other.mergeReady', text: 'merging', note: 'What the merge-ready skill covers, in the list of the other skills.' }),
   otherSplitWork: agentMsg({ id: 'contract.board.other.splitWork', text: 'splitting work', note: 'What the split-work skill covers, in the list of the other skills.' }),
-  otherUseHiveApi: agentMsg({ id: 'contract.board.other.useHiveApi', text: 'its HTTP API', note: 'What the use-cw-api skill covers, in the list of the other skills.' }),
+  otherUseHiveApi: agentMsg({ id: 'contract.board.other.useCombworkApi', text: 'its HTTP API', note: 'What the use-cw-api skill covers, in the list of the other skills.' }),
   otherSkills: agentMsg({
     id: 'contract.board.skills',
     text: "{afterRoutes, select, yes {Combwork's other skills cover {list}.} other {Combwork's skills cover {list}.}}",

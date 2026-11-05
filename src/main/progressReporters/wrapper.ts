@@ -137,7 +137,7 @@ CW_PROGRESS=0 turns reporting off.`,
   changeReflog: agentMsg({ id: 'progress.change.reflog', text: 'a commit or checkout', note: "What a write log's :reflog mark records, in the list of what changed while a check ran." }),
   changeEdit: agentMsg({ id: 'progress.change.edit', text: "an agent's edit", note: "What a write log's :edit mark records, in the list of what changed while a check ran." }),
   checkOutsideHive: agentMsg({
-    id: 'progress.check.outsideHive',
+    id: 'progress.check.outsideCombwork',
     text: "--check runs the project's command for {check}, which only Combwork knows: run it in a session Combwork started, with reporting on.",
     note: '#1220.'
   }),

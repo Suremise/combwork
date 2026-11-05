@@ -43,7 +43,7 @@ export const M = {
 
 /** One thing still running, worded. */
 function itemText(i: ParkedItem): string {
-  return tr(M.item, { kind: i.kind, agent: i.agent || tr(msg({ id: 'board.team.hive', defaultMessage: 'Combwork', description: "Who runs something while the team is paused when no agent does (HI-2081): Combwork itself (a slot's setup, a merge). Combwork is the product's name." })), label: i.label ?? '', pid: i.process?.pid ?? 0 }) // i18n-ignore: select keys, never shown
+  return tr(M.item, { kind: i.kind, agent: i.agent || tr(msg({ id: 'board.team.cw', defaultMessage: 'Combwork', description: "Who runs something while the team is paused when no agent does (HI-2081): Combwork itself (a slot's setup, a merge). Combwork is the product's name." })), label: i.label ?? '', pid: i.process?.pid ?? 0 }) // i18n-ignore: select keys, never shown
 }
 
 /** End It (the window's own workspace only): after the question, the process and what it started, found again in main by its recorded identity. */

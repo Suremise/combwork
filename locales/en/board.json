@@ -2411,6 +2411,10 @@
     "defaultMessage": "Can't show {agent}",
     "description": "A notification's title: the agent ({agent}) that ran a Progress panel run can't be shown. Its message says why."
   },
+  "board.progress.combworkRun": {
+    "defaultMessage": "Combwork’s merge queue ran it, not an agent: there is no agent to show.",
+    "description": "Why a Progress panel run's agent can't be shown: Combwork's merge queue ran the run itself (a merge check on a card's merged result; glossary 2.5: merge queue)."
+  },
   "board.progress.copied": {
     "defaultMessage": "{what, select, command {Command copied} other {Details copied}}",
     "description": "A notification after copying a run's command or its details from the Progress panel."
@@ -2462,10 +2466,6 @@
   "board.progress.hideDetails": {
     "defaultMessage": "Hide details for {run}",
     "description": "Tooltip of the button closing a run's details in the Progress panel ({run}: the run's title)."
-  },
-  "board.progress.hiveRun": {
-    "defaultMessage": "Combwork’s merge queue ran it, not an agent: there is no agent to show.",
-    "description": "Why a Progress panel run's agent can't be shown: Combwork's merge queue ran the run itself (a merge check on a card's merged result; glossary 2.5: merge queue)."
   },
   "board.progress.inCopy": {
     "defaultMessage": "in {copy}",
@@ -3539,6 +3539,10 @@
     "defaultMessage": "{n, plural, one {# run} other {# runs}}: {states}",
     "description": "The folded Progress strip's name: how many runs, then how many are in each state (\"8 runs: 5 running, 2 failed\"). {states} is that list."
   },
+  "board.team.cw": {
+    "defaultMessage": "Combwork",
+    "description": "Who runs something while the team is paused when no agent does (HI-2081): Combwork itself (a slot's setup, a merge). Combwork is the product's name."
+  },
   "board.team.endDetail": {
     "defaultMessage": "Only that process and what it started end, and only while they are still the ones listed. Work they had not saved is lost.",
     "description": "Detail of the question before ending a process from the paused team's band (HI-2081)."
@@ -3558,10 +3562,6 @@
   "board.team.endTitle": {
     "defaultMessage": "End this process?",
     "description": "Title of the question before ending a process the paused team's band names (HI-2081)."
-  },
-  "board.team.hive": {
-    "defaultMessage": "Combwork",
-    "description": "Who runs something while the team is paused when no agent does (HI-2081): Combwork itself (a slot's setup, a merge). Combwork is the product's name."
   },
   "board.team.install": {
     "defaultMessage": "Install Now",
@@ -3795,7 +3795,7 @@
     "defaultMessage": "Open {path} in Files",
     "description": "Tooltip of a file a revision changed (card dialog's Work section): opens it in the project's Files tab. {path} is the file's path."
   },
-  "board.work.outsideHive": {
+  "board.work.outsideCombwork": {
     "defaultMessage": "Merged outside Combwork.",
     "description": "The card dialog's Work section, under how the card was merged: the merge was made outside Combwork (in a terminal or another tool). Glossary: outside Combwork."
   },

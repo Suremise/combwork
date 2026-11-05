@@ -9,27 +9,27 @@ import { openGuideAt } from '../tips'
 import { BusyButton, Icon, IconButton, sentences } from './ui'
 
 const M = {
-  titleSentence: msg({ id: 'git.hiveVcs.titleSentence', defaultMessage: '{title}.', description: "The .combwork notice's title as the first sentence of the notice, in bold: {title} with the full stop your language ends a sentence with." }),
-  excluded: msg({ id: 'git.hiveVcs.excludedDone', defaultMessage: '{project}: .combwork excluded from git', description: "Notification after Exclude in the .combwork notice. {project} is the project's name." }),
-  excludeFailed: msg({ id: 'git.hiveVcs.excludeFailed', defaultMessage: "Couldn't exclude .combwork", description: 'Title of an error notification: Exclude in the .combwork notice failed.' }),
-  untrackTitle: msg({ id: 'git.hiveVcs.untrackTitle', defaultMessage: '{count, plural, one {Untrack this file?} other {Untrack these # files?}}', description: "Title of the confirmation before Combwork stops git tracking files in the project's .combwork." }),
+  titleSentence: msg({ id: 'git.combworkVcs.titleSentence', defaultMessage: '{title}.', description: "The .combwork notice's title as the first sentence of the notice, in bold: {title} with the full stop your language ends a sentence with." }),
+  excluded: msg({ id: 'git.combworkVcs.excludedDone', defaultMessage: '{project}: .combwork excluded from git', description: "Notification after Exclude in the .combwork notice. {project} is the project's name." }),
+  excludeFailed: msg({ id: 'git.combworkVcs.excludeFailed', defaultMessage: "Couldn't exclude .combwork", description: 'Title of an error notification: Exclude in the .combwork notice failed.' }),
+  untrackTitle: msg({ id: 'git.combworkVcs.untrackTitle', defaultMessage: '{count, plural, one {Untrack this file?} other {Untrack these # files?}}', description: "Title of the confirmation before Combwork stops git tracking files in the project's .combwork." }),
   untrackMessage: msg({
-    id: 'git.hiveVcs.untrackMessage',
+    id: 'git.combworkVcs.untrackMessage',
     defaultMessage: '{count, plural, one {Combwork runs git rm --cached on it in {project}, and nothing else: git stops tracking it and stages its removal from the repository. The file stays on disk. Commit afterwards to finish.} other {Combwork runs git rm --cached on them in {project}, and nothing else: git stops tracking them and stages their removal from the repository. The files stay on disk. Commit afterwards to finish.}}',
     description: "The confirmation before untracking .combwork's files, above the list of them. {project} is the project's name. Keep git rm --cached as it is."
   }),
-  more: msg({ id: 'git.hiveVcs.more', defaultMessage: '… and {count, plural, one {# more} other {# more}}', description: 'Last line of a long list of files: how many more are not listed.' }),
-  untrack: msg({ id: 'git.hiveVcs.untrack', defaultMessage: 'Untrack', description: "Button in the confirmation: stops git tracking .combwork's files." }),
-  untracking: msg({ id: 'git.hiveVcs.untracking', defaultMessage: 'Untracking…', description: 'The Untrack button while it runs.' }),
-  untracked: msg({ id: 'git.hiveVcs.untracked', defaultMessage: '{project}: .combwork untracked', description: "Notification after untracking .combwork's files. {project} is the project's name." }),
-  untrackedDetail: msg({ id: 'git.hiveVcs.untrackedDetail', defaultMessage: 'Commit the change to finish (git commit). The files are still on disk.', description: 'Under "{project}: .combwork untracked". Keep git commit as it is.' }),
-  untrackFailed: msg({ id: 'git.hiveVcs.untrackFailed', defaultMessage: "Couldn't untrack .combwork", description: 'Title of an error notification.' }),
-  checking: msg({ id: 'git.hiveVcs.checking', defaultMessage: 'Checking…', description: 'The Untrack… button while Combwork lists the files git tracks in .combwork.' }),
-  untrackButton: msg({ id: 'git.hiveVcs.untrackButton', defaultMessage: 'Untrack…', description: "Button in the .combwork notice: stops git tracking .combwork's files, after a confirmation." }),
-  excluding: msg({ id: 'git.hiveVcs.excluding', defaultMessage: 'Excluding…', description: 'The Exclude button while it runs.' }),
-  exclude: msg({ id: 'git.hiveVcs.exclude', defaultMessage: 'Exclude', description: "Button in the .combwork notice: adds .combwork to the git repository's exclude file." }),
+  more: msg({ id: 'git.combworkVcs.more', defaultMessage: '… and {count, plural, one {# more} other {# more}}', description: 'Last line of a long list of files: how many more are not listed.' }),
+  untrack: msg({ id: 'git.combworkVcs.untrack', defaultMessage: 'Untrack', description: "Button in the confirmation: stops git tracking .combwork's files." }),
+  untracking: msg({ id: 'git.combworkVcs.untracking', defaultMessage: 'Untracking…', description: 'The Untrack button while it runs.' }),
+  untracked: msg({ id: 'git.combworkVcs.untracked', defaultMessage: '{project}: .combwork untracked', description: "Notification after untracking .combwork's files. {project} is the project's name." }),
+  untrackedDetail: msg({ id: 'git.combworkVcs.untrackedDetail', defaultMessage: 'Commit the change to finish (git commit). The files are still on disk.', description: 'Under "{project}: .combwork untracked". Keep git commit as it is.' }),
+  untrackFailed: msg({ id: 'git.combworkVcs.untrackFailed', defaultMessage: "Couldn't untrack .combwork", description: 'Title of an error notification.' }),
+  checking: msg({ id: 'git.combworkVcs.checking', defaultMessage: 'Checking…', description: 'The Untrack… button while Combwork lists the files git tracks in .combwork.' }),
+  untrackButton: msg({ id: 'git.combworkVcs.untrackButton', defaultMessage: 'Untrack…', description: "Button in the .combwork notice: stops git tracking .combwork's files, after a confirmation." }),
+  excluding: msg({ id: 'git.combworkVcs.excluding', defaultMessage: 'Excluding…', description: 'The Exclude button while it runs.' }),
+  exclude: msg({ id: 'git.combworkVcs.exclude', defaultMessage: 'Exclude', description: "Button in the .combwork notice: adds .combwork to the git repository's exclude file." }),
   learnMore: msg({ id: 'git.learnMore', defaultMessage: 'Learn more', description: "Link or button that opens the user guide's section about this." }),
-  dismiss: msg({ id: 'git.hiveVcs.dismiss', defaultMessage: "Don't show this here again (Project Settings still says so)", description: 'Tooltip on the × of the .combwork notice in the Overview.' })
+  dismiss: msg({ id: 'git.combworkVcs.dismiss', defaultMessage: "Don't show this here again (Project Settings still says so)", description: 'Tooltip on the × of the .combwork notice in the Overview.' })
 }
 
 /**

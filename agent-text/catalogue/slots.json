@@ -14,7 +14,7 @@
     "note": "Release Slot… with \"End these processes first\": ending the listed processes failed (Windows refused), so the slot ({slot}) was left as it was.",
     "audience": "both"
   },
-  "slots.release.otherHive": {
+  "slots.release.otherCombwork": {
     "text": "{slot} is held by another Combwork that is still running (process {pid}): release it there, or quit that Combwork first.",
     "note": "Release Slot… refused: another running copy of Combwork (its process id {pid}) holds the slot ({slot}).",
     "audience": "both"

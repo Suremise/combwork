@@ -148,10 +148,10 @@
   "settings.advanced.claude-code.override.mcpIsolation.title": {
     "placeholders": {}
   },
-  "settings.advanced.claude-code.override.preApproveHiveTools.desc": {
+  "settings.advanced.claude-code.override.preApproveCombworkTools.desc": {
     "placeholders": {}
   },
-  "settings.advanced.claude-code.override.preApproveHiveTools.title": {
+  "settings.advanced.claude-code.override.preApproveCombworkTools.title": {
     "placeholders": {}
   },
   "settings.advanced.claude-code.override.promptSnapshotOff.desc": {
@@ -475,10 +475,10 @@
   "settings.advanced.codex.override.mcpIsolation.title": {
     "placeholders": {}
   },
-  "settings.advanced.codex.override.preApproveHiveTools.desc": {
+  "settings.advanced.codex.override.preApproveCombworkTools.desc": {
     "placeholders": {}
   },
-  "settings.advanced.codex.override.preApproveHiveTools.title": {
+  "settings.advanced.codex.override.preApproveCombworkTools.title": {
     "placeholders": {}
   },
   "settings.advanced.codex.override.terminalTitle.desc": {
@@ -722,10 +722,10 @@
   "settings.advanced.copilot.override.noAutoUpdate.title": {
     "placeholders": {}
   },
-  "settings.advanced.copilot.override.preApproveHiveTools.desc": {
+  "settings.advanced.copilot.override.preApproveCombworkTools.desc": {
     "placeholders": {}
   },
-  "settings.advanced.copilot.override.preApproveHiveTools.title": {
+  "settings.advanced.copilot.override.preApproveCombworkTools.title": {
     "placeholders": {}
   },
   "settings.advanced.copilot.override.stripGitHubTokens.desc": {
@@ -806,6 +806,510 @@
       "mode": "plain"
     }
   },
+  "settings.advanced.cw.accounts.usageMoves.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.accounts.usageMoves.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.agents.tempFolder.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.agents.tempFolder.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.assistant.startView.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.assistant.startView.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.cards.attachmentFolders.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.cards.attachmentFolders.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.cards.attachmentMax.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.cards.attachmentMax.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.cards.titleNudgeChars.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.cards.titleNudgeChars.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.console.showText.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.console.showText.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.copies.quietWaitMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.copies.quietWaitMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.copies.review.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.copies.review.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.disableHardwareAcceleration.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.disableHardwareAcceleration.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.focused.pickSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.focused.pickSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.guidance.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.guidance.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.heapSnapshotNearLimit.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.heapSnapshotNearLimit.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.hooks.missingSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.hooks.missingSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.inbox.checkpoints.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.inbox.checkpoints.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.inbox.idleWakes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.inbox.idleWakes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.inbox.stopContinuation.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.inbox.stopContinuation.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.journal.builds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.journal.builds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.lanes.endWaitMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.lanes.endWaitMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.lanes.freshStartWaitMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.lanes.freshStartWaitMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.lanes.gentleEnd.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.lanes.gentleEnd.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.lanes.unwatchedNotice.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.lanes.unwatchedNotice.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.lanes.waitReviewerMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.lanes.waitReviewerMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.lanes.waitYouMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.lanes.waitYouMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.lostLine.steadySeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.lostLine.steadySeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.mcp.connectSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.mcp.connectSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.mcp.replySeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.mcp.replySeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.mcpCatalog.downloadSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.mcpCatalog.downloadSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.mcpCatalog.fetchSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.mcpCatalog.fetchSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.mcpCatalog.probeSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.mcpCatalog.probeSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.merge.lockWaitSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.merge.lockWaitSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.none.baselineSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.none.baselineSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.notes.deliverWorkspaceNotes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.notes.deliverWorkspaceNotes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.notes.workspaceNotesMax.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.notes.workspaceNotesMax.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.outage.checkFirstSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.outage.checkFirstSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.outage.checkMostSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.outage.checkMostSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.outage.checkUrl.claude-code.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.outage.checkUrl.claude-code.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.outage.checkUrl.codex.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.outage.checkUrl.codex.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.outage.checkUrl.copilot.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.outage.checkUrl.copilot.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.outage.notConnection.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.outage.notConnection.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.outage.resume.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.outage.resume.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.outage.resumesPerHour.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.outage.resumesPerHour.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.outage.waitMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.outage.waitMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.processes.orphanNotice.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.processes.orphanNotice.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.progress.lanesShown.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.progress.lanesShown.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.progress.replySeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.progress.replySeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.prompt.asTyped.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.prompt.asTyped.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.prompt.clearDraft.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.prompt.clearDraft.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.prompt.rawCardStart.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.prompt.rawCardStart.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.queue.checkMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.queue.checkMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.queue.checkedOutTarget.ask": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.queue.checkedOutTarget.auto": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.queue.checkedOutTarget.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.queue.checkedOutTarget.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.queue.focusedJobs.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.queue.focusedJobs.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.queue.networkCodes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.queue.networkCodes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.queue.signSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.queue.signSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.recorder.afterSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.recorder.afterSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.recorder.keep.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.recorder.keep.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.recorder.minutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.recorder.minutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.recorder.pattern.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.recorder.pattern.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.recorder.safeguard.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.recorder.safeguard.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.recorder.stalled.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.recorder.stalled.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.recorder.unknown.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.recorder.unknown.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.recorder.version.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.recorder.version.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.restart.resumeAfterUpdate.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.restart.resumeAfterUpdate.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.restart.resumeReadySeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.restart.resumeReadySeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.retry.tellAssistantAfterSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.retry.tellAssistantAfterSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.sessions.terminalType.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.sessions.terminalType.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.showDeveloperFeatures.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.showDeveloperFeatures.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.skills.removeIdleCopies.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.skills.removeIdleCopies.everywhere": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.skills.removeIdleCopies.never": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.skills.removeIdleCopies.slots": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.skills.removeIdleCopies.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.slots.deleteMergedLines.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.slots.deleteMergedLines.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.slots.removeIdle.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.slots.removeIdle.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.slots.renameAdopted.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.slots.renameAdopted.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.slots.setupMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.slots.setupMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.terminal.allKeysToCli.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.terminal.allKeysToCli.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.terminal.ctrlCVToCli.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.terminal.ctrlCVToCli.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.terminal.osc52.allow": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.terminal.osc52.ask": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.terminal.osc52.block": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.terminal.osc52.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.terminal.osc52.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.usage.timelineDetailDays.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.usage.timelineDetailDays.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.wait.agentsMaxSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.wait.agentsMaxSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.wait.cardMaxSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.wait.cardMaxSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.workflow.enforce.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.workflow.enforce.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.workflow.updateAgentBranch.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.workflow.updateAgentBranch.title": {
+    "placeholders": {}
+  },
   "settings.advanced.data.desc": {
     "placeholders": {}
   },
@@ -880,510 +1384,6 @@
     "placeholders": {
       "title": "plain"
     }
-  },
-  "settings.advanced.hive.accounts.usageMoves.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.accounts.usageMoves.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.agents.tempFolder.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.agents.tempFolder.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.assistant.startView.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.assistant.startView.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.cards.attachmentFolders.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.cards.attachmentFolders.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.cards.attachmentMax.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.cards.attachmentMax.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.cards.titleNudgeChars.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.cards.titleNudgeChars.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.console.showText.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.console.showText.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.copies.quietWaitMinutes.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.copies.quietWaitMinutes.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.copies.review.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.copies.review.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.disableHardwareAcceleration.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.disableHardwareAcceleration.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.focused.pickSeconds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.focused.pickSeconds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.guidance.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.guidance.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.heapSnapshotNearLimit.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.heapSnapshotNearLimit.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.hooks.missingSeconds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.hooks.missingSeconds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.inbox.checkpoints.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.inbox.checkpoints.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.inbox.idleWakes.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.inbox.idleWakes.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.inbox.stopContinuation.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.inbox.stopContinuation.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.journal.builds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.journal.builds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.lanes.endWaitMinutes.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.lanes.endWaitMinutes.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.lanes.freshStartWaitMinutes.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.lanes.freshStartWaitMinutes.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.lanes.gentleEnd.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.lanes.gentleEnd.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.lanes.unwatchedNotice.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.lanes.unwatchedNotice.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.lanes.waitReviewerMinutes.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.lanes.waitReviewerMinutes.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.lanes.waitYouMinutes.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.lanes.waitYouMinutes.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.lostLine.steadySeconds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.lostLine.steadySeconds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.mcp.connectSeconds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.mcp.connectSeconds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.mcp.replySeconds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.mcp.replySeconds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.mcpCatalog.downloadSeconds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.mcpCatalog.downloadSeconds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.mcpCatalog.fetchSeconds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.mcpCatalog.fetchSeconds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.mcpCatalog.probeSeconds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.mcpCatalog.probeSeconds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.merge.lockWaitSeconds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.merge.lockWaitSeconds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.none.baselineSeconds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.none.baselineSeconds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.notes.deliverWorkspaceNotes.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.notes.deliverWorkspaceNotes.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.notes.workspaceNotesMax.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.notes.workspaceNotesMax.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.outage.checkFirstSeconds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.outage.checkFirstSeconds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.outage.checkMostSeconds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.outage.checkMostSeconds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.outage.checkUrl.claude-code.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.outage.checkUrl.claude-code.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.outage.checkUrl.codex.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.outage.checkUrl.codex.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.outage.checkUrl.copilot.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.outage.checkUrl.copilot.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.outage.notConnection.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.outage.notConnection.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.outage.resume.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.outage.resume.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.outage.resumesPerHour.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.outage.resumesPerHour.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.outage.waitMinutes.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.outage.waitMinutes.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.processes.orphanNotice.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.processes.orphanNotice.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.progress.lanesShown.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.progress.lanesShown.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.progress.replySeconds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.progress.replySeconds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.prompt.asTyped.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.prompt.asTyped.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.prompt.clearDraft.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.prompt.clearDraft.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.prompt.rawCardStart.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.prompt.rawCardStart.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.queue.checkMinutes.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.queue.checkMinutes.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.queue.checkedOutTarget.ask": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.queue.checkedOutTarget.auto": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.queue.checkedOutTarget.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.queue.checkedOutTarget.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.queue.focusedJobs.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.queue.focusedJobs.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.queue.networkCodes.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.queue.networkCodes.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.queue.signSeconds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.queue.signSeconds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.recorder.afterSeconds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.recorder.afterSeconds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.recorder.keep.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.recorder.keep.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.recorder.minutes.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.recorder.minutes.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.recorder.pattern.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.recorder.pattern.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.recorder.safeguard.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.recorder.safeguard.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.recorder.stalled.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.recorder.stalled.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.recorder.unknown.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.recorder.unknown.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.recorder.version.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.recorder.version.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.restart.resumeAfterUpdate.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.restart.resumeAfterUpdate.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.restart.resumeReadySeconds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.restart.resumeReadySeconds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.retry.tellAssistantAfterSeconds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.retry.tellAssistantAfterSeconds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.sessions.terminalType.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.sessions.terminalType.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.showDeveloperFeatures.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.showDeveloperFeatures.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.skills.removeIdleCopies.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.skills.removeIdleCopies.everywhere": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.skills.removeIdleCopies.never": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.skills.removeIdleCopies.slots": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.skills.removeIdleCopies.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.slots.deleteMergedLines.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.slots.deleteMergedLines.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.slots.removeIdle.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.slots.removeIdle.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.slots.renameAdopted.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.slots.renameAdopted.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.slots.setupMinutes.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.slots.setupMinutes.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.terminal.allKeysToCli.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.terminal.allKeysToCli.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.terminal.ctrlCVToCli.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.terminal.ctrlCVToCli.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.terminal.osc52.allow": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.terminal.osc52.ask": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.terminal.osc52.block": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.terminal.osc52.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.terminal.osc52.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.usage.timelineDetailDays.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.usage.timelineDetailDays.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.wait.agentsMaxSeconds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.wait.agentsMaxSeconds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.wait.cardMaxSeconds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.wait.cardMaxSeconds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.workflow.enforce.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.workflow.enforce.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.workflow.updateAgentBranch.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.hive.workflow.updateAgentBranch.title": {
-    "placeholders": {}
   },
   "settings.advanced.logs.desc": {
     "placeholders": {}
@@ -1909,7 +1909,7 @@
   "settings.agent.tool.restart.assistant": {
     "placeholders": {}
   },
-  "settings.agent.tool.restart.hive": {
+  "settings.agent.tool.restart.cw": {
     "placeholders": {}
   },
   "settings.agent.tool.restart.sessions": {
@@ -1975,13 +1975,13 @@
       "path": "plain"
     }
   },
+  "settings.agent.value.combworkList": {
+    "placeholders": {}
+  },
+  "settings.agent.value.combworkPrice": {
+    "placeholders": {}
+  },
   "settings.agent.value.empty": {
-    "placeholders": {}
-  },
-  "settings.agent.value.hiveList": {
-    "placeholders": {}
-  },
-  "settings.agent.value.hivePrice": {
     "placeholders": {}
   },
   "settings.agent.value.none": {
@@ -2048,13 +2048,13 @@
   "settings.agentApi.port.title": {
     "placeholders": {}
   },
-  "settings.agentApi.provideHiveMcp.desc": {
+  "settings.agentApi.provideCombworkMcp.desc": {
     "placeholders": {}
   },
-  "settings.agentApi.provideHiveMcp.tip": {
+  "settings.agentApi.provideCombworkMcp.tip": {
     "placeholders": {}
   },
-  "settings.agentApi.provideHiveMcp.title": {
+  "settings.agentApi.provideCombworkMcp.title": {
     "placeholders": {}
   },
   "settings.agentApi.status.tip": {
@@ -3394,13 +3394,13 @@
   "settings.updates.status.title": {
     "placeholders": {}
   },
-  "settings.workflow.hiveDefaults.desc": {
+  "settings.workflow.combworkDefaults.desc": {
     "placeholders": {}
   },
-  "settings.workflow.hiveDefaults.tip": {
+  "settings.workflow.combworkDefaults.tip": {
     "placeholders": {}
   },
-  "settings.workflow.hiveDefaults.title": {
+  "settings.workflow.combworkDefaults.title": {
     "placeholders": {}
   },
   "settings.workflow.workspaceDefaults.desc": {

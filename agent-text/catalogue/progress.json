@@ -37,7 +37,7 @@
     "text": "a commit or checkout",
     "note": "What a write log's :reflog mark records, in the list of what changed while a check ran."
   },
-  "progress.check.outsideHive": {
+  "progress.check.outsideCombwork": {
     "text": "--check runs the project's command for {check}, which only Combwork knows: run it in a session Combwork started, with reporting on.",
     "note": "#1220."
   },

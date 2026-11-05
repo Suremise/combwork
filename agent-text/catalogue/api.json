@@ -1073,7 +1073,7 @@
   "api.slot.heldGone": {
     "text": "gone (process {pid})"
   },
-  "api.slot.heldThisHive": {
+  "api.slot.heldThisCombwork": {
     "text": "this Combwork"
   },
   "api.slot.kindArg": {

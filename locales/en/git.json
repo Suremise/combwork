@@ -183,6 +183,110 @@
     "defaultMessage": "its local branch is ticked above",
     "description": "Beside a remote branch in the Clean Up Merged Branches dialog: the local branch of the same name is ticked to be deleted, so this one is suggested too (it still needs its own tick)."
   },
+  "git.combworkVcs.checking": {
+    "defaultMessage": "Checking…",
+    "description": "The Untrack… button while Combwork lists the files git tracks in .combwork."
+  },
+  "git.combworkVcs.dismiss": {
+    "defaultMessage": "Don't show this here again (Project Settings still says so)",
+    "description": "Tooltip on the × of the .combwork notice in the Overview."
+  },
+  "git.combworkVcs.exclude": {
+    "defaultMessage": "Exclude",
+    "description": "Button in the .combwork notice: adds .combwork to the git repository's exclude file."
+  },
+  "git.combworkVcs.excludeFailed": {
+    "defaultMessage": "Couldn't exclude .combwork",
+    "description": "Title of an error notification: Exclude in the .combwork notice failed."
+  },
+  "git.combworkVcs.excludedDone": {
+    "defaultMessage": "{project}: .combwork excluded from git",
+    "description": "Notification after Exclude in the .combwork notice. {project} is the project's name."
+  },
+  "git.combworkVcs.excluding": {
+    "defaultMessage": "Excluding…",
+    "description": "The Exclude button while it runs."
+  },
+  "git.combworkVcs.ignoredBut": {
+    "defaultMessage": "Git ignores this project's .combwork, but {synced} {why}",
+    "description": "The notice when git ignores .combwork but a sync service copies it. {synced} and {why} are the sentences about the service and about what .combwork holds."
+  },
+  "git.combworkVcs.more": {
+    "defaultMessage": "… and {count, plural, one {# more} other {# more}}",
+    "description": "Last line of a long list of files: how many more are not listed."
+  },
+  "git.combworkVcs.noVcs": {
+    "defaultMessage": "No git repository holds this project; if you make one, Combwork excludes .combwork there by itself. With another version control system, add .combwork to its ignore list.",
+    "description": "The notice for a project in no git repository."
+  },
+  "git.combworkVcs.notExcluded": {
+    "defaultMessage": "Combwork adds it to the git repository's .git/info/exclude, but git doesn't ignore it: Combwork couldn't write that file, or a .gitignore rule brings .combwork back.",
+    "description": "The notice when git does not ignore .combwork. Followed by why it matters."
+  },
+  "git.combworkVcs.notExcludedTitle": {
+    "defaultMessage": ".combwork isn't excluded from version control",
+    "description": "Title of the notice when the project's .combwork isn't kept out of version control. No full stop: the notice adds it."
+  },
+  "git.combworkVcs.otherVcs": {
+    "defaultMessage": "This project is in a {vcs} working copy, which Combwork doesn't set up: add .combwork to its ignore list.",
+    "description": "The notice for a project kept in another version control system. {vcs} is its name (Subversion, Mercurial…)."
+  },
+  "git.combworkVcs.synced": {
+    "defaultMessage": "{service} copies the project folder, .combwork included: exclude .combwork in {service} if it lets you, or keep the project in a folder it doesn't sync.",
+    "description": "When the project is in a sync service's folder. {service} is its name (OneDrive, Dropbox…)."
+  },
+  "git.combworkVcs.syncedTitle": {
+    "defaultMessage": ".combwork is synced by {service}",
+    "description": "Title of the notice when the project's .combwork is in a sync service's folder. {service} is its name (OneDrive, Dropbox…). No full stop: the notice adds it."
+  },
+  "git.combworkVcs.titleSentence": {
+    "defaultMessage": "{title}.",
+    "description": "The .combwork notice's title as the first sentence of the notice, in bold: {title} with the full stop your language ends a sentence with."
+  },
+  "git.combworkVcs.trackedDetail": {
+    "defaultMessage": "Excluding .combwork keeps new files out of git, but {count, plural, one {this one was committed before, so git still tracks it and commits its changes} other {these were committed before, so git still tracks them and commits their changes}}. Run `git rm -r --cached .combwork` in the project folder, then commit: the files stay on disk.{notExcluded, select, yes { Combwork couldn't exclude .combwork either: a rule in a .gitignore may bring it back.} other {}}",
+    "description": "Under \"n files in .combwork are committed to git\". Keep the git command as it is."
+  },
+  "git.combworkVcs.trackedTitle": {
+    "defaultMessage": "{count, plural, one {# file in .combwork is committed to git} other {# files in .combwork are committed to git}}",
+    "description": "Title of the notice in a project's Overview and Project Settings: files in the project's .combwork folder were committed to git. Keep .combwork. No full stop: the notice adds it."
+  },
+  "git.combworkVcs.untrack": {
+    "defaultMessage": "Untrack",
+    "description": "Button in the confirmation: stops git tracking .combwork's files."
+  },
+  "git.combworkVcs.untrackButton": {
+    "defaultMessage": "Untrack…",
+    "description": "Button in the .combwork notice: stops git tracking .combwork's files, after a confirmation."
+  },
+  "git.combworkVcs.untrackFailed": {
+    "defaultMessage": "Couldn't untrack .combwork",
+    "description": "Title of an error notification."
+  },
+  "git.combworkVcs.untrackMessage": {
+    "defaultMessage": "{count, plural, one {Combwork runs git rm --cached on it in {project}, and nothing else: git stops tracking it and stages its removal from the repository. The file stays on disk. Commit afterwards to finish.} other {Combwork runs git rm --cached on them in {project}, and nothing else: git stops tracking them and stages their removal from the repository. The files stay on disk. Commit afterwards to finish.}}",
+    "description": "The confirmation before untracking .combwork's files, above the list of them. {project} is the project's name. Keep git rm --cached as it is."
+  },
+  "git.combworkVcs.untrackTitle": {
+    "defaultMessage": "{count, plural, one {Untrack this file?} other {Untrack these # files?}}",
+    "description": "Title of the confirmation before Combwork stops git tracking files in the project's .combwork."
+  },
+  "git.combworkVcs.untracked": {
+    "defaultMessage": "{project}: .combwork untracked",
+    "description": "Notification after untracking .combwork's files. {project} is the project's name."
+  },
+  "git.combworkVcs.untrackedDetail": {
+    "defaultMessage": "Commit the change to finish (git commit). The files are still on disk.",
+    "description": "Under \"{project}: .combwork untracked\". Keep git commit as it is."
+  },
+  "git.combworkVcs.untracking": {
+    "defaultMessage": "Untracking…",
+    "description": "The Untrack button while it runs."
+  },
+  "git.combworkVcs.why": {
+    "defaultMessage": "It holds this computer's sessions, transcript backups and launch settings, which don't belong in commits or shared copies.",
+    "description": "Why .combwork should be kept out of version control and sync services: what Combwork keeps there. Follows the notice's first sentence."
+  },
   "git.fetch.at": {
     "defaultMessage": "As of the last fetch, {when}. Combwork never fetches by itself.",
     "description": "In Git → Branches & remotes, beside Fetch. {when} is how long ago, such as \"5m ago\"."
@@ -250,110 +354,6 @@
   "git.history.remote": {
     "defaultMessage": "Remote branches",
     "description": "A group in Git → History's branch picker: the remotes' branches (origin/x)."
-  },
-  "git.hiveVcs.checking": {
-    "defaultMessage": "Checking…",
-    "description": "The Untrack… button while Combwork lists the files git tracks in .combwork."
-  },
-  "git.hiveVcs.dismiss": {
-    "defaultMessage": "Don't show this here again (Project Settings still says so)",
-    "description": "Tooltip on the × of the .combwork notice in the Overview."
-  },
-  "git.hiveVcs.exclude": {
-    "defaultMessage": "Exclude",
-    "description": "Button in the .combwork notice: adds .combwork to the git repository's exclude file."
-  },
-  "git.hiveVcs.excludeFailed": {
-    "defaultMessage": "Couldn't exclude .combwork",
-    "description": "Title of an error notification: Exclude in the .combwork notice failed."
-  },
-  "git.hiveVcs.excludedDone": {
-    "defaultMessage": "{project}: .combwork excluded from git",
-    "description": "Notification after Exclude in the .combwork notice. {project} is the project's name."
-  },
-  "git.hiveVcs.excluding": {
-    "defaultMessage": "Excluding…",
-    "description": "The Exclude button while it runs."
-  },
-  "git.hiveVcs.ignoredBut": {
-    "defaultMessage": "Git ignores this project's .combwork, but {synced} {why}",
-    "description": "The notice when git ignores .combwork but a sync service copies it. {synced} and {why} are the sentences about the service and about what .combwork holds."
-  },
-  "git.hiveVcs.more": {
-    "defaultMessage": "… and {count, plural, one {# more} other {# more}}",
-    "description": "Last line of a long list of files: how many more are not listed."
-  },
-  "git.hiveVcs.noVcs": {
-    "defaultMessage": "No git repository holds this project; if you make one, Combwork excludes .combwork there by itself. With another version control system, add .combwork to its ignore list.",
-    "description": "The notice for a project in no git repository."
-  },
-  "git.hiveVcs.notExcluded": {
-    "defaultMessage": "Combwork adds it to the git repository's .git/info/exclude, but git doesn't ignore it: Combwork couldn't write that file, or a .gitignore rule brings .combwork back.",
-    "description": "The notice when git does not ignore .combwork. Followed by why it matters."
-  },
-  "git.hiveVcs.notExcludedTitle": {
-    "defaultMessage": ".combwork isn't excluded from version control",
-    "description": "Title of the notice when the project's .combwork isn't kept out of version control. No full stop: the notice adds it."
-  },
-  "git.hiveVcs.otherVcs": {
-    "defaultMessage": "This project is in a {vcs} working copy, which Combwork doesn't set up: add .combwork to its ignore list.",
-    "description": "The notice for a project kept in another version control system. {vcs} is its name (Subversion, Mercurial…)."
-  },
-  "git.hiveVcs.synced": {
-    "defaultMessage": "{service} copies the project folder, .combwork included: exclude .combwork in {service} if it lets you, or keep the project in a folder it doesn't sync.",
-    "description": "When the project is in a sync service's folder. {service} is its name (OneDrive, Dropbox…)."
-  },
-  "git.hiveVcs.syncedTitle": {
-    "defaultMessage": ".combwork is synced by {service}",
-    "description": "Title of the notice when the project's .combwork is in a sync service's folder. {service} is its name (OneDrive, Dropbox…). No full stop: the notice adds it."
-  },
-  "git.hiveVcs.titleSentence": {
-    "defaultMessage": "{title}.",
-    "description": "The .combwork notice's title as the first sentence of the notice, in bold: {title} with the full stop your language ends a sentence with."
-  },
-  "git.hiveVcs.trackedDetail": {
-    "defaultMessage": "Excluding .combwork keeps new files out of git, but {count, plural, one {this one was committed before, so git still tracks it and commits its changes} other {these were committed before, so git still tracks them and commits their changes}}. Run `git rm -r --cached .combwork` in the project folder, then commit: the files stay on disk.{notExcluded, select, yes { Combwork couldn't exclude .combwork either: a rule in a .gitignore may bring it back.} other {}}",
-    "description": "Under \"n files in .combwork are committed to git\". Keep the git command as it is."
-  },
-  "git.hiveVcs.trackedTitle": {
-    "defaultMessage": "{count, plural, one {# file in .combwork is committed to git} other {# files in .combwork are committed to git}}",
-    "description": "Title of the notice in a project's Overview and Project Settings: files in the project's .combwork folder were committed to git. Keep .combwork. No full stop: the notice adds it."
-  },
-  "git.hiveVcs.untrack": {
-    "defaultMessage": "Untrack",
-    "description": "Button in the confirmation: stops git tracking .combwork's files."
-  },
-  "git.hiveVcs.untrackButton": {
-    "defaultMessage": "Untrack…",
-    "description": "Button in the .combwork notice: stops git tracking .combwork's files, after a confirmation."
-  },
-  "git.hiveVcs.untrackFailed": {
-    "defaultMessage": "Couldn't untrack .combwork",
-    "description": "Title of an error notification."
-  },
-  "git.hiveVcs.untrackMessage": {
-    "defaultMessage": "{count, plural, one {Combwork runs git rm --cached on it in {project}, and nothing else: git stops tracking it and stages its removal from the repository. The file stays on disk. Commit afterwards to finish.} other {Combwork runs git rm --cached on them in {project}, and nothing else: git stops tracking them and stages their removal from the repository. The files stay on disk. Commit afterwards to finish.}}",
-    "description": "The confirmation before untracking .combwork's files, above the list of them. {project} is the project's name. Keep git rm --cached as it is."
-  },
-  "git.hiveVcs.untrackTitle": {
-    "defaultMessage": "{count, plural, one {Untrack this file?} other {Untrack these # files?}}",
-    "description": "Title of the confirmation before Combwork stops git tracking files in the project's .combwork."
-  },
-  "git.hiveVcs.untracked": {
-    "defaultMessage": "{project}: .combwork untracked",
-    "description": "Notification after untracking .combwork's files. {project} is the project's name."
-  },
-  "git.hiveVcs.untrackedDetail": {
-    "defaultMessage": "Commit the change to finish (git commit). The files are still on disk.",
-    "description": "Under \"{project}: .combwork untracked\". Keep git commit as it is."
-  },
-  "git.hiveVcs.untracking": {
-    "defaultMessage": "Untracking…",
-    "description": "The Untrack button while it runs."
-  },
-  "git.hiveVcs.why": {
-    "defaultMessage": "It holds this computer's sessions, transcript backups and launch settings, which don't belong in commits or shared copies.",
-    "description": "Why .combwork should be kept out of version control and sync services: what Combwork keeps there. Follows the notice's first sentence."
   },
   "git.identity.about": {
     "defaultMessage": "{hasGlobal, select, yes {Who {project}'s commits are made as, agents' too (git config --local). Leave both empty to use your global identity ({global}). On GitHub, its no-reply address keeps your email private.} other {Who {project}'s commits are made as, agents' too (git config --local). Leave both empty to use your global identity. On GitHub, its no-reply address keeps your email private.}}",

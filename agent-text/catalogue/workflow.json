@@ -1,4 +1,9 @@
 {
+  "workflow.contradiction.combworkMergesNeedsGit": {
+    "text": "Merging needs Git: without version control, work is accepted where it is.",
+    "note": "Why workflow options cannot be saved: a merge option was set for a project with no version control.",
+    "audience": "both"
+  },
   "workflow.contradiction.committedNeedsFolder": {
     "text": "“Committed is done” needs everyone in the project folder.",
     "note": "Why workflow options cannot be saved: “Committed is done” was chosen while each card has its own folder.",
@@ -7,11 +12,6 @@
   "workflow.contradiction.focusedNeedsRunner": {
     "text": "Each card’s focused tests need the command that runs them.",
     "note": "Why workflow options cannot be saved (G20): “Each card’s focused tests” is on but the project has no command to run them (its runner, focused.run).",
-    "audience": "both"
-  },
-  "workflow.contradiction.hiveMergesNeedsGit": {
-    "text": "Merging needs Git: without version control, work is accepted where it is.",
-    "note": "Why workflow options cannot be saved: a merge option was set for a project with no version control.",
     "audience": "both"
   },
   "workflow.contradiction.mergeNeedsSlots": {
@@ -752,17 +752,17 @@
     "note": "The next step after going ahead with a design too early (#1382).",
     "audience": "both"
   },
-  "workflow.refused.merge.hiveMerges.change": {
+  "workflow.refused.merge.combworkMerges.change": {
     "text": "This rule is set in Version Control → Who merges. A card keeps the rules it started with.",
     "note": "Where the rule that Combwork merges cards is changed; a card keeps the rules it started under unless the change is applied to it.",
     "audience": "both"
   },
-  "workflow.refused.merge.hiveMerges.message": {
+  "workflow.refused.merge.combworkMerges.message": {
     "text": "Combwork merges {card}: agents don't merge it or report its merge.",
     "note": "A refused report of a merge, or a claim of the merge slot, for a card whose rules say Combwork merges it (the merge queue). {card} is a card key like AM-12.",
     "audience": "both"
   },
-  "workflow.refused.merge.hiveMerges.next": {
+  "workflow.refused.merge.combworkMerges.next": {
     "text": "Once it is approved, the merge queue merges it and moves it to Done: wait for that, or for it to come back.",
     "note": "The next step after a refused merge of a card Combwork merges, when it isn't in the merge queue yet.",
     "audience": "both"
@@ -1512,7 +1512,7 @@
     "note": "A value of the workflow option “Commit message” (glossary 2.6, G19): the commit takes the message the branch’s commits have (with several, the first one’s subject and each one’s message), never the card’s key or Combwork’s trailers. Trailers: git’s “Key: value” lines at a message’s end.",
     "audience": "both"
   },
-  "workflow.value.commitMessage.hive": {
+  "workflow.value.commitMessage.cw": {
     "text": "Combwork’s: the card’s key and title, with trailers",
     "note": "A value of the workflow option “Commit message” (glossary 2.6, G19): the commit is titled with the card’s key and title (HI-12: Fix the login) and ends with Combwork’s trailers (Combwork-Card: HI-12 and others). Trailers: git’s “Key: value” lines at a message’s end.",
     "audience": "both"
@@ -1522,13 +1522,13 @@
     "note": "A value of the workflow option “Who merges” (glossary 2.6, G5).",
     "audience": "both"
   },
-  "workflow.value.finish.committed": {
-    "text": "Committed is done",
+  "workflow.value.finish.combworkMerges": {
+    "text": "Combwork merges",
     "note": "A value of the workflow option “Who merges” (glossary 2.6, G5).",
     "audience": "both"
   },
-  "workflow.value.finish.hiveMerges": {
-    "text": "Combwork merges",
+  "workflow.value.finish.committed": {
+    "text": "Committed is done",
     "note": "A value of the workflow option “Who merges” (glossary 2.6, G5).",
     "audience": "both"
   },

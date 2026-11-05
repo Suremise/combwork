@@ -631,6 +631,30 @@
     "defaultMessage": "See what a Codex script did",
     "description": "A tip's title (HI-2240). Codex is a product name; a script is the code Codex runs to call its tools."
   },
+  "tips.combworkFolder.text": {
+    "defaultMessage": "Combwork keeps each project's .combwork folder (sessions, backups, launch settings) out of git by itself. Where it can't, say with no git, another version control system, or a folder OneDrive or Dropbox syncs, the project's Overview tells you.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+  },
+  "tips.combworkFolder.title": {
+    "defaultMessage": "A project's .combwork stays on this computer",
+    "description": "A tip's title."
+  },
+  "tips.combworkMerges.text": {
+    "defaultMessage": "In Version Control → Workflow, choose Pair, or set Who merges to Combwork merges: Combwork’s merge queue merges each approved card once its checks pass on the merged result, so red work never reaches the target branch.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (glossary 2.1: merge queue)."
+  },
+  "tips.combworkMerges.title": {
+    "defaultMessage": "Let Combwork merge approved cards",
+    "description": "A tip's title."
+  },
+  "tips.combworkSkills.text": {
+    "defaultMessage": "Agents and the Assistant get Combwork's own skills: work-on-card, review-agent-work, handover and more. Combwork keeps them up to date; ones you edit stay yours.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+  },
+  "tips.combworkSkills.title": {
+    "defaultMessage": "Skills for working with Combwork",
+    "description": "A tip's title."
+  },
   "tips.commandName": {
     "defaultMessage": "“{command}”",
     "description": "A command's name in a tip's text, where its shortcut would be when it has none. Use your language's quotation marks."
@@ -977,30 +1001,6 @@
   },
   "tips.hardwareAcceleration.title": {
     "defaultMessage": "A blank or flickering window?",
-    "description": "A tip's title."
-  },
-  "tips.hiveFolder.text": {
-    "defaultMessage": "Combwork keeps each project's .combwork folder (sessions, backups, launch settings) out of git by itself. Where it can't, say with no git, another version control system, or a folder OneDrive or Dropbox syncs, the project's Overview tells you.",
-    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
-  },
-  "tips.hiveFolder.title": {
-    "defaultMessage": "A project's .combwork stays on this computer",
-    "description": "A tip's title."
-  },
-  "tips.hiveMerges.text": {
-    "defaultMessage": "In Version Control → Workflow, choose Pair, or set Who merges to Combwork merges: Combwork’s merge queue merges each approved card once its checks pass on the merged result, so red work never reaches the target branch.",
-    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (glossary 2.1: merge queue)."
-  },
-  "tips.hiveMerges.title": {
-    "defaultMessage": "Let Combwork merge approved cards",
-    "description": "A tip's title."
-  },
-  "tips.hiveSkills.text": {
-    "defaultMessage": "Agents and the Assistant get Combwork's own skills: work-on-card, review-agent-work, handover and more. Combwork keeps them up to date; ones you edit stay yours.",
-    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
-  },
-  "tips.hiveSkills.title": {
-    "defaultMessage": "Skills for working with Combwork",
     "description": "A tip's title."
   },
   "tips.hooksMissing.text": {

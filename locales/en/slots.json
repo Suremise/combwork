@@ -23,7 +23,7 @@
     "defaultMessage": "Some of the processes listed still run: Windows didn't let Combwork end them, so {slot} wasn't released. Try again, or release it without ending them.",
     "description": "Release Slot… with \"End these processes first\": ending the listed processes failed (Windows refused), so the slot ({slot}) was left as it was."
   },
-  "slots.release.otherHive": {
+  "slots.release.otherCombwork": {
     "defaultMessage": "{slot} is held by another Combwork that is still running (process {pid}): release it there, or quit that Combwork first.",
     "description": "Release Slot… refused: another running copy of Combwork (its process id {pid}) holds the slot ({slot})."
   },

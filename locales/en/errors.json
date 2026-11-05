@@ -31,6 +31,18 @@
     "defaultMessage": "The sources to watch must be a list.",
     "description": "The developer console asked to watch sources in a form Combwork doesn't take (a programming error, rarely seen)."
   },
+  "errors.cw.cantList": {
+    "defaultMessage": "Git couldn't list the files it tracks in .combwork.",
+    "description": "Listing the files of .combwork that git tracks failed. Keep \".combwork\" as it is."
+  },
+  "errors.cw.noRepo": {
+    "defaultMessage": "No git repository holds this project: exclude .combwork in the version control or sync service you use.",
+    "description": "Exclude .combwork from git: the project isn't in a git repository. Keep \".combwork\" as it is."
+  },
+  "errors.cw.notIgnored": {
+    "defaultMessage": "Git still doesn't ignore .combwork here: a rule in a .gitignore (a line starting with !) may bring it back. Combwork doesn't edit .gitignore files.",
+    "description": "Exclude .combwork from git: after excluding it, git still sees it. Keep \".combwork\", \".gitignore\" and \"!\" as they are."
+  },
   "errors.dialects.notDialect": {
     "defaultMessage": "{path} isn't a dialect file Combwork can change.",
     "description": "An error in the Dialects view (HI-2444): the file asked for isn't one of the workspace's dialect files (or can't be reverted: it isn't shipped). {path} is its path in the dialects folder. Glossary: dialect."
@@ -130,18 +142,6 @@
   "errors.file.outsideWorkspace": {
     "defaultMessage": "Combwork can only read and write files inside the workspace, and the agents' instruction, memory and skill files.",
     "description": "Refusal to open or save a file outside what Combwork may touch."
-  },
-  "errors.hive.cantList": {
-    "defaultMessage": "Git couldn't list the files it tracks in .combwork.",
-    "description": "Listing the files of .combwork that git tracks failed. Keep \".combwork\" as it is."
-  },
-  "errors.hive.noRepo": {
-    "defaultMessage": "No git repository holds this project: exclude .combwork in the version control or sync service you use.",
-    "description": "Exclude .combwork from git: the project isn't in a git repository. Keep \".combwork\" as it is."
-  },
-  "errors.hive.notIgnored": {
-    "defaultMessage": "Git still doesn't ignore .combwork here: a rule in a .gitignore (a line starting with !) may bring it back. Combwork doesn't edit .gitignore files.",
-    "description": "Exclude .combwork from git: after excluding it, git still sees it. Keep \".combwork\", \".gitignore\" and \"!\" as they are."
   },
   "errors.image.not": {
     "defaultMessage": "Not an image",

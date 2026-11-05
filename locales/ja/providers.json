@@ -37,7 +37,7 @@
   "providers.codex.hint.model": "Codexはこのモデルを認識できません。「エージェント設定」で別のモデルを選んでください。",
   "providers.codex.hint.settings": "Codexが設定を受け付けませんでした。「エージェント設定」と「設定」→「Codex」の「追加の引数」、およびconfig.tomlを確認してください。",
   "providers.codex.hint.signIn": "Codexにサインインしていません。「プロバイダーのセットアップ」でサインインしてから、もう一度起動してください。",
-  "providers.codex.nativeHive": "Codexの設定に、HTTPで接続するcombworkという名前のMCPサーバーがあります（{file}）。CodexはこれをCombwork自身のcombworkサーバーに統合するため、両方があると起動できません。Codexエージェントを起動するには、そこで自分のサーバーの名前を変更してください。",
+  "providers.codex.nativeCombwork": "Codexの設定に、HTTPで接続するcombworkという名前のMCPサーバーがあります（{file}）。CodexはこれをCombwork自身のcombworkサーバーに統合するため、両方があると起動できません。Codexエージェントを起動するには、そこで自分のサーバーの名前を変更してください。",
   "providers.codex.sandbox.default": "**Set up default sandbox**（推奨）：Codexが作成する2つのローカルWindowsアカウント（`CodexSandboxOffline`と`CodexSandboxOnline`）でコマンドを実行します。許可しない限り、ファイアウォールのルールでオフラインに保たれます。コマンドを最もよく隔離できます。Windowsが一度だけ管理者権限を求めます。",
   "providers.codex.sandbox.needed": "CodexのWindowsサンドボックスを一度セットアップする必要があります。それまでは、コマンドのたびに確認を求めます。",
   "providers.codex.sandbox.nonAdmin": "**Use non-admin sandbox**：管理者権限は不要です。コマンドは制限付きの権限で自分のアカウントで実行されます。ほとんどの場合ファイルを保護し、インターネットへのアクセスを遮断しますが、エージェントが読んだファイルやWebページに隠された指示にだまされた場合（プロンプトインジェクション）のリスクは高くなる、とCodexは警告しています。後でここから既定のサンドボックスにアップグレードできます。",

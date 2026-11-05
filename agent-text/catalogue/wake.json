@@ -307,7 +307,7 @@
     "text": "{card} is in {column}",
     "note": "A lane watch wake's event: a lane's card moved. card: \"HI-12\"; column: the board column's name (\"Review\")."
   },
-  "wake.lane.nextHiveStarts": {
+  "wake.lane.nextCombworkStarts": {
     "text": "Your lane's next card is {card} (\"{title}\"): Combwork starts it for you once your turn ends, so end your turn now",
     "note": "HI-1990: a builder's Done wake, its lane's rules on: Combwork starts the next card."
   },

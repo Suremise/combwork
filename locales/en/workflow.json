@@ -3,6 +3,10 @@
     "defaultMessage": "{becomes, select, decision {Note (optional): also recorded as your decision} reason {Note (optional): the reason for what the agent asked} other {Note (optional): added as your comment}}",
     "description": "The label and placeholder of an optional text box beside Approve (For you, the card dialog's merge queue): a note sent with the approval. It says what the note becomes: on an agent's question (decision), one of the card's decisions as well as the user's comment; on a question that offers one action (reason), the reason for that action; on Combwork's own requests (other), the user's comment on the card. Keep the select keys as they are; translate each choice. Glossary: decision."
   },
+  "workflow.contradiction.combworkMergesNeedsGit": {
+    "defaultMessage": "Merging needs Git: without version control, work is accepted where it is.",
+    "description": "Why workflow options cannot be saved: a merge option was set for a project with no version control."
+  },
   "workflow.contradiction.committedNeedsFolder": {
     "defaultMessage": "“Committed is done” needs everyone in the project folder.",
     "description": "Why workflow options cannot be saved: “Committed is done” was chosen while each card has its own folder."
@@ -10,10 +14,6 @@
   "workflow.contradiction.focusedNeedsRunner": {
     "defaultMessage": "Each card’s focused tests need the command that runs them.",
     "description": "Why workflow options cannot be saved (G20): “Each card’s focused tests” is on but the project has no command to run them (its runner, focused.run)."
-  },
-  "workflow.contradiction.hiveMergesNeedsGit": {
-    "defaultMessage": "Merging needs Git: without version control, work is accepted where it is.",
-    "description": "Why workflow options cannot be saved: a merge option was set for a project with no version control."
   },
   "workflow.contradiction.mergeNeedsSlots": {
     "defaultMessage": "When Combwork or the agent merges, each card needs its own folder.",
@@ -1063,55 +1063,55 @@
     "defaultMessage": "Wait for the answer; with none by then, go ahead as posted.",
     "description": "The next step after going ahead with a design too early (#1382)."
   },
-  "workflow.refused.merge.hiveMerges.change": {
+  "workflow.refused.merge.combworkMerges.change": {
     "defaultMessage": "This rule is set in Version Control → Who merges. A card keeps the rules it started with.",
     "description": "Where the rule that Combwork merges cards is changed; a card keeps the rules it started under unless the change is applied to it."
   },
-  "workflow.refused.merge.hiveMerges.message": {
+  "workflow.refused.merge.combworkMerges.message": {
     "defaultMessage": "Combwork merges {card}: agents don't merge it or report its merge.",
     "description": "A refused report of a merge, or a claim of the merge slot, for a card whose rules say Combwork merges it (the merge queue). {card} is a card key like AM-12."
   },
-  "workflow.refused.merge.hiveMerges.next": {
+  "workflow.refused.merge.combworkMerges.next": {
     "defaultMessage": "Once it is approved, the merge queue merges it and moves it to Done: wait for that, or for it to come back.",
     "description": "The next step after a refused merge of a card Combwork merges, when it isn't in the merge queue yet."
   },
-  "workflow.refused.merge.hiveMerges.nextMerged": {
+  "workflow.refused.merge.combworkMerges.nextMerged": {
     "defaultMessage": "The merge queue has merged it already: nothing is left to do.",
     "description": "The next step after a refused merge of a card Combwork has already merged."
   },
-  "workflow.refused.merge.hiveMerges.nextPaused": {
+  "workflow.refused.merge.combworkMerges.nextPaused": {
     "defaultMessage": "{reader, select, you {It is in the merge queue for {target}, which is paused until you resume it; it moves to Done once merged, or comes back.} other {It is in the merge queue for {target}, which is paused until it is resumed: wait for Done, or for it to come back.}}",
     "description": "The next step after a refused merge of a card in a paused merge queue. {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
-  "workflow.refused.merge.hiveMerges.nextPausedAnswer": {
+  "workflow.refused.merge.combworkMerges.nextPausedAnswer": {
     "defaultMessage": "{reader, select, you {It is in the merge queue for {target}, which is paused until you answer in For you; it moves to Done once merged, or comes back.} other {It is in the merge queue for {target}, which is paused until the user answers in For you: wait for Done, or for it to come back.}}",
     "description": "The next step after a refused merge of a card in a merge queue paused for the user's answer (in For you: whether to update the branch now, or how to settle a merge Combwork couldn't finish). {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
-  "workflow.refused.merge.hiveMerges.nextPausedFix": {
+  "workflow.refused.merge.combworkMerges.nextPausedFix": {
     "defaultMessage": "{reader, select, you {It is in the merge queue for {target}, which is paused until you fix what stopped it and resume it; it moves to Done once merged, or comes back.} other {It is in the merge queue for {target}, which is paused until the user fixes what stopped it and resumes it: wait for Done, or for it to come back.}}",
     "description": "The next step after a refused merge of a card in a merge queue paused by something only the user can fix (an error from git, say), then Resume. {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
-  "workflow.refused.merge.hiveMerges.nextPausedFolder": {
+  "workflow.refused.merge.combworkMerges.nextPausedFolder": {
     "defaultMessage": "{reader, select, you {It is in the merge queue for {target}, which is paused until you put right the folder {target} is checked out in and resume it; it moves to Done once merged, or comes back.} other {It is in the merge queue for {target}, which is paused until the user puts right the folder {target} is checked out in and resumes it: wait for Done, or for it to come back.}}",
     "description": "The next step after a refused merge of a card in a merge queue paused for the folder its branch is checked out in (on another branch, files staged or changed, agents at work there). {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
-  "workflow.refused.merge.hiveMerges.nextPausedRules": {
+  "workflow.refused.merge.combworkMerges.nextPausedRules": {
     "defaultMessage": "{reader, select, you {It is in the merge queue for {target}, which paused while workflow rules were off and moves on once they are enforced again (if they already are, once you resume it); it moves to Done once merged, or comes back.} other {It is in the merge queue for {target}, which paused while workflow rules were off and moves on once they are enforced again (if they already are, once the user resumes it): wait for Done, or for it to come back.}}",
     "description": "The next step after a refused merge of a card in a merge queue that paused while the workflow rules were turned off: Combwork resumes it when they are turned on again. {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
-  "workflow.refused.merge.hiveMerges.nextQueued": {
+  "workflow.refused.merge.combworkMerges.nextQueued": {
     "defaultMessage": "It is in the merge queue for {target} (position {n, number}) and moves to Done once merged: wait for that, or for it to come back.",
     "description": "The next step after a refused merge of a card Combwork merges, waiting in the merge queue. {target} is a branch name; {n} its place in the queue (1 is next)."
   },
-  "workflow.refused.merge.hiveMerges.nextReturned": {
+  "workflow.refused.merge.combworkMerges.nextReturned": {
     "defaultMessage": "It came back from the merge queue: fix it in your worktree, commit and submit again.",
     "description": "The next step after a refused merge of a card the merge queue returned to its builder (a conflict, failed checks, a hook)."
   },
-  "workflow.refused.merge.hiveMerges.nextStale": {
+  "workflow.refused.merge.combworkMerges.nextStale": {
     "defaultMessage": "Its pass is stale: its line changed since it passed review (it is at {current}). Submit it again for review; it is queued once it passes again.",
     "description": "The next step after a refused merge of a card Combwork merges, approved but its pass stale: its branch has commits the review didn't cover. {current} is a commit's short hash."
   },
-  "workflow.refused.merge.hiveMerges.nextTesting": {
+  "workflow.refused.merge.combworkMerges.nextTesting": {
     "defaultMessage": "The merge queue is merging it into {target} now and moves it to Done once merged: wait for that, or for it to come back.",
     "description": "The next step after a refused merge of a card the merge queue is testing or merging now. {target} is a branch name."
   },
@@ -1951,7 +1951,7 @@
     "defaultMessage": "The branch’s own, with no card key or trailers",
     "description": "A value of the workflow option “Commit message” (glossary 2.6, G19): the commit takes the message the branch’s commits have (with several, the first one’s subject and each one’s message), never the card’s key or Combwork’s trailers. Trailers: git’s “Key: value” lines at a message’s end."
   },
-  "workflow.value.commitMessage.hive": {
+  "workflow.value.commitMessage.cw": {
     "defaultMessage": "Combwork’s: the card’s key and title, with trailers",
     "description": "A value of the workflow option “Commit message” (glossary 2.6, G19): the commit is titled with the card’s key and title (HI-12: Fix the login) and ends with Combwork’s trailers (Combwork-Card: HI-12 and others). Trailers: git’s “Key: value” lines at a message’s end."
   },
@@ -1959,12 +1959,12 @@
     "defaultMessage": "The agent merges, Combwork checks",
     "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
   },
-  "workflow.value.finish.committed": {
-    "defaultMessage": "Committed is done",
+  "workflow.value.finish.combworkMerges": {
+    "defaultMessage": "Combwork merges",
     "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
   },
-  "workflow.value.finish.hiveMerges": {
-    "defaultMessage": "Combwork merges",
+  "workflow.value.finish.committed": {
+    "defaultMessage": "Committed is done",
     "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
   },
   "workflow.value.finish.notChecked": {

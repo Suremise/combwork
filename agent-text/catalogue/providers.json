@@ -19,7 +19,7 @@
     "note": "Starting an agent is refused: its CLI is a .cmd or .bat launcher, and cmd.exe can't take a command line this long. {file} is the launcher's file name; {max} and {length} are numbers of characters. Keep cmd.exe and .exe as they are.",
     "audience": "both"
   },
-  "providers.codex.nativeHive": {
+  "providers.codex.nativeCombwork": {
     "text": "Your Codex config has an MCP server named combwork, reached over HTTP ({file}). Codex merges it into Combwork’s own combwork server, and can’t start with both. Rename yours there to start Codex agents.",
     "note": "Why a Codex agent didn't start: the user's own Codex config has an MCP server named combwork. {file} is that config file's path. combwork is the name of Combwork's MCP server (HI-2463): keep it.",
     "audience": "both"

@@ -406,7 +406,7 @@ export const API = {
   },
   slot: {
     heldGone: agentMsg({ id: 'api.slot.heldGone', text: 'gone (process {pid})' }),
-    heldThisHive: agentMsg({ id: 'api.slot.heldThisHive', text: 'this Combwork' }),
+    heldThisHive: agentMsg({ id: 'api.slot.heldThisCombwork', text: 'this Combwork' }),
     kindArg: agentMsg({ id: 'api.slot.kindArg', text: 'kind is carried or writer' }),
     notAgents: agentMsg({ id: 'api.slot.notAgents', text: 'Project agents can\'t release a slot: that is the user\'s, and the Assistant\'s within Settings → Assistant → Control once the user agrees. Tell the user if a slot is stuck.' })
   },

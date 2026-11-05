@@ -303,6 +303,10 @@
     "defaultMessage": "Combwork couldn't check {agent}'s worktree ({folder}): {error}",
     "description": "Why a template can't be loaded: git couldn't tell whether the worktree {folder} of the agent {agent} it would remove has uncommitted work; {error} is why (often git's own words)."
   },
+  "content.templates.combworkOnly": {
+    "defaultMessage": "Combwork's own templates can't be changed: duplicate one into the workspace or a project to change it.",
+    "description": "An error: saving, renaming, editing, importing into or deleting one of Combwork's own templates (the Combwork scope, read-only). Duplicate is a button: as Combwork names it."
+  },
   "content.templates.connectionAmbiguous": {
     "defaultMessage": "Several connections are called \"{ref}\": name one by its id ({ids}).",
     "description": "An error loading a template or choosing connections (HI-2109): the name given ({ref}) is several connections' names; {ids} lists their ids."
@@ -334,10 +338,6 @@
   "content.templates.gone": {
     "defaultMessage": "That template is no longer there.",
     "description": "An error: the template was deleted or renamed meanwhile."
-  },
-  "content.templates.hiveOnly": {
-    "defaultMessage": "Combwork's own templates can't be changed: duplicate one into the workspace or a project to change it.",
-    "description": "An error: saving, renaming, editing, importing into or deleting one of Combwork's own templates (the Combwork scope, read-only). Duplicate is a button: as Combwork names it."
   },
   "content.templates.importNotJson": {
     "defaultMessage": "It isn't a Combwork agent template (not JSON).",

@@ -457,7 +457,7 @@ const HTTP_KEYS = ['url', 'bearer_token_env_var', 'http_headers', 'env_http_head
 
 /** Why a Codex agent can't start beside a native HTTP server named hive (outrankNativeHive). */
 const NATIVE_HIVE = msg({
-  id: 'providers.codex.nativeHive',
+  id: 'providers.codex.nativeCombwork',
   defaultMessage: 'Your Codex config has an MCP server named combwork, reached over HTTP ({file}). Codex merges it into Combwork’s own combwork server, and can’t start with both. Rename yours there to start Codex agents.',
   description: "Why a Codex agent didn't start: the user's own Codex config has an MCP server named combwork. {file} is that config file's path. combwork is the name of Combwork's MCP server (HI-2463): keep it."
 })

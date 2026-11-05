@@ -91,7 +91,7 @@
     "text": "splitting work",
     "note": "What the split-work skill covers, in the list of the other skills."
   },
-  "contract.board.other.useHiveApi": {
+  "contract.board.other.useCombworkApi": {
     "text": "its HTTP API",
     "note": "What the use-cw-api skill covers, in the list of the other skills."
   },

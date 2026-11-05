@@ -73,7 +73,7 @@ const A = {
     note: "The lane change's reply: the lane's builder wasn't running, and starting it failed (error: why)."
   }),
   byHive: agentMsg({
-    id: 'brief.record.byHive',
+    id: 'brief.record.byCombwork',
     text: "{agent} is running, so Combwork left it as it is: Combwork gives it the lane's first card itself once it is free, so don't prompt it.",
     note: "HI-2029: a running builder, the rules on: Combwork gives it the lane's first card once it is free, so the caller is told not to prompt it (that would race Combwork's start)."
   }),

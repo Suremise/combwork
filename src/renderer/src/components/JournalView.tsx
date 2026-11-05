@@ -42,7 +42,7 @@ const IMPORTANCE = [
 
 const SOURCE: Record<JournalSource, ReturnType<typeof msg>> = {
   assistant: msg({ id: 'assistant.journal.source.assistant', defaultMessage: 'The Assistant', description: 'Who wrote a journal entry: the Combwork Assistant.' }),
-  hive: msg({ id: 'assistant.journal.source.hive', defaultMessage: 'Combwork', description: "Who wrote a journal entry: Combwork itself (its own facts: lanes, merges, unexpected closes). Combwork's name stays as it is." })
+  hive: msg({ id: 'assistant.journal.source.cw', defaultMessage: 'Combwork', description: "Who wrote a journal entry: Combwork itself (its own facts: lanes, merges, unexpected closes). Combwork's name stays as it is." })
 }
 
 const M = {

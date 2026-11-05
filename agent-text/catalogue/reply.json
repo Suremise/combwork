@@ -231,7 +231,7 @@
     "text": "Links: {links}",
     "note": "A journal entry's links (type and ref)."
   },
-  "reply.journal.mark.byHive": {
+  "reply.journal.mark.byCombwork": {
     "text": "by Combwork",
     "note": "A journal entry's mark: Combwork recorded it."
   },
@@ -615,7 +615,7 @@
     "text": "for {audience, select, all {agents and the Assistant} assistant {the Assistant} other {agents}}",
     "note": "Who a Combwork skill is for."
   },
-  "reply.skill.level.hive": {
+  "reply.skill.level.cw": {
     "text": "Combwork",
     "note": "Where a skill comes from in cw_list_skills: Combwork's own."
   },
@@ -695,7 +695,7 @@
     "text": "Yours: {slots}; release with its branch.",
     "note": "A release of a slot not held (#586): the ones the agent does hold or wait for."
   },
-  "reply.team.hive": {
+  "reply.team.cw": {
     "text": "Combwork",
     "note": "What still runs that isn't an agent's: Combwork's own."
   },

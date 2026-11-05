@@ -171,6 +171,42 @@
     "defaultMessage": "{branch} can't be merged into itself.",
     "description": "An error merging from the Merge dialog: the branch picked and the target are the same ({branch})."
   },
+  "main.combworkMove.bothBody": {
+    "defaultMessage": "Combwork uses .combwork and leaves .hive as it is. Move anything you still need out of .hive yourself.",
+    "description": "The warning's text (HI-2462): which of the two folders Combwork uses, and that it never changes the other. Keep .hive and .combwork as they are."
+  },
+  "main.combworkMove.bothTitle": {
+    "defaultMessage": "{folder} has both a .hive and a .combwork folder",
+    "description": "A warning's title as a workspace opens (HI-2462): the folder {folder} has Combwork's folder under both its old name (.hive) and its new one (.combwork). Keep .hive and .combwork as they are."
+  },
+  "main.combworkMove.linkBody": {
+    "defaultMessage": "It is a link to another folder, or the project is a link to a folder outside the workspace, so Combwork leaves it as it is. To use it, rename it .combwork yourself with Combwork closed.",
+    "description": "The warning's text (HI-2462): why the .hive folder wasn't renamed, and how the user can do it. Keep .hive and .combwork as they are."
+  },
+  "main.combworkMove.linkTitle": {
+    "defaultMessage": "{folder}'s .hive folder wasn't moved",
+    "description": "A warning's title as a workspace opens (HI-2462): the folder {folder}'s .hive wasn't renamed .combwork. Keep .hive and .combwork as they are."
+  },
+  "main.combworkMove.what.cards": {
+    "defaultMessage": "the paths in cards",
+    "description": "What the folder move was updating when it failed (service.combworkMove.phaseFailed): links and paths in cards' descriptions and comments."
+  },
+  "main.combworkMove.what.excludes": {
+    "defaultMessage": "git's exclude lines",
+    "description": "What the folder move was updating when it failed (service.combworkMove.phaseFailed): the lines that keep the folder out of git."
+  },
+  "main.combworkMove.what.folders": {
+    "defaultMessage": "the agents' folders inside it",
+    "description": "What the folder move was updating when it failed (service.combworkMove.phaseFailed): slots and other agents' folders kept inside the moved folder."
+  },
+  "main.combworkMove.what.notes": {
+    "defaultMessage": "the paths in shared notes and handovers",
+    "description": "What the folder move was updating when it failed (service.combworkMove.phaseFailed)."
+  },
+  "main.combworkMove.what.worktrees": {
+    "defaultMessage": "the worktrees inside it",
+    "description": "What the folder move was updating when it failed (service.combworkMove.phaseFailed): git worktrees kept inside the moved folder."
+  },
   "main.connections.badMode": {
     "defaultMessage": "{cli} has no permission mode {mode}.",
     "description": "An error saving a connection (HI-2107): the permission mode asked for ({mode}, as given) is not one of the coding agent CLI's ({cli}: \"Codex\")."
@@ -422,42 +458,6 @@
   "main.gitInit.unreadable": {
     "defaultMessage": "Git couldn't read this repository: {why}",
     "description": "Why a folder can't be made a git repository. {why} is git's own message."
-  },
-  "main.hiveMove.bothBody": {
-    "defaultMessage": "Combwork uses .combwork and leaves .hive as it is. Move anything you still need out of .hive yourself.",
-    "description": "The warning's text (HI-2462): which of the two folders Combwork uses, and that it never changes the other. Keep .hive and .combwork as they are."
-  },
-  "main.hiveMove.bothTitle": {
-    "defaultMessage": "{folder} has both a .hive and a .combwork folder",
-    "description": "A warning's title as a workspace opens (HI-2462): the folder {folder} has Combwork's folder under both its old name (.hive) and its new one (.combwork). Keep .hive and .combwork as they are."
-  },
-  "main.hiveMove.linkBody": {
-    "defaultMessage": "It is a link to another folder, or the project is a link to a folder outside the workspace, so Combwork leaves it as it is. To use it, rename it .combwork yourself with Combwork closed.",
-    "description": "The warning's text (HI-2462): why the .hive folder wasn't renamed, and how the user can do it. Keep .hive and .combwork as they are."
-  },
-  "main.hiveMove.linkTitle": {
-    "defaultMessage": "{folder}'s .hive folder wasn't moved",
-    "description": "A warning's title as a workspace opens (HI-2462): the folder {folder}'s .hive wasn't renamed .combwork. Keep .hive and .combwork as they are."
-  },
-  "main.hiveMove.what.cards": {
-    "defaultMessage": "the paths in cards",
-    "description": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): links and paths in cards' descriptions and comments."
-  },
-  "main.hiveMove.what.excludes": {
-    "defaultMessage": "git's exclude lines",
-    "description": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): the lines that keep the folder out of git."
-  },
-  "main.hiveMove.what.folders": {
-    "defaultMessage": "the agents' folders inside it",
-    "description": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): slots and other agents' folders kept inside the moved folder."
-  },
-  "main.hiveMove.what.notes": {
-    "defaultMessage": "the paths in shared notes and handovers",
-    "description": "What the folder move was updating when it failed (service.hiveMove.phaseFailed)."
-  },
-  "main.hiveMove.what.worktrees": {
-    "defaultMessage": "the worktrees inside it",
-    "description": "What the folder move was updating when it failed (service.hiveMove.phaseFailed): git worktrees kept inside the moved folder."
   },
   "main.installDir.close": {
     "defaultMessage": "Close",
@@ -1135,6 +1135,10 @@
     "defaultMessage": "left as it is: its conversations resume there",
     "description": "Remove Project (#1447): an old reviewer folder (a reviewer's own worktree from before 1.0) stays where it is. A clause."
   },
+  "main.removal.folder.notCombwork": {
+    "defaultMessage": "left as it is: it isn't in Combwork's worktrees folder for the project",
+    "description": "Remove Project (#1447): a slot whose folder Combwork didn't make (outside <workspace>.worktrees/<project>) stays. A clause."
+  },
   "main.removal.folder.notForgotten": {
     "defaultMessage": "Combwork's record of the project's slots couldn't all be cleared: {why}",
     "description": "A warning after Delete (#1447): the project's slot or copy records stayed in Combwork's database ({why}: the system's message)."
@@ -1142,10 +1146,6 @@
   "main.removal.folder.notHeld": {
     "defaultMessage": "{n, plural, one {# slot or copy was} other {# slots or copies were}} taken up by another step, and left",
     "description": "A warning's reason after Delete (#1447): records of the project's slots or copies Delete didn't hold, so it didn't delete them. Follows main.removal.folder.notForgotten's colon."
-  },
-  "main.removal.folder.notHives": {
-    "defaultMessage": "left as it is: it isn't in Combwork's worktrees folder for the project",
-    "description": "Remove Project (#1447): a slot whose folder Combwork didn't make (outside <workspace>.worktrees/<project>) stays. A clause."
   },
   "main.removal.folder.notTrashed": {
     "defaultMessage": "{path} couldn't be moved to the Recycle Bin: {why}",

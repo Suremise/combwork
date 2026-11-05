@@ -37,7 +37,7 @@
   "providers.codex.hint.model": "Codex doesn't know this model: choose another in Agent Settings.",
   "providers.codex.hint.settings": "Codex refused its settings: check Extra arguments in Agent Settings and Settings → Codex, and your config.toml.",
   "providers.codex.hint.signIn": "Codex isn't signed in: sign in in Provider Setup, then start it again.",
-  "providers.codex.nativeHive": "Your Codex config has an MCP server named combwork, reached over HTTP ({file}). Codex merges it into Combwork’s own combwork server, and can’t start with both. Rename yours there to start Codex agents.",
+  "providers.codex.nativeCombwork": "Your Codex config has an MCP server named combwork, reached over HTTP ({file}). Codex merges it into Combwork’s own combwork server, and can’t start with both. Rename yours there to start Codex agents.",
   "providers.codex.sandbox.default": "**Set up default sandbox** (recommended): commands run under two local Windows accounts Codex creates for them (`CodexSandboxOffline` and `CodexSandboxOnline`), with a firewall rule that keeps them offline unless you allow it. It isolates commands best. Windows asks for Administrator permission once.",
   "providers.codex.sandbox.needed": "Codex needs a one-time setup of its Windows sandbox; until then it asks before every command.",
   "providers.codex.sandbox.nonAdmin": "**Use non-admin sandbox**: needs no Administrator permission. Commands run under your own account with restricted rights. It protects your files and blocks internet access in most cases, but Codex warns it carries more risk if the agent is tricked by instructions hidden in a file or web page it reads (prompt injection). You can upgrade to the default sandbox from here later.",

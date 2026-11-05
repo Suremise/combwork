@@ -5,7 +5,7 @@
   "slots.release.changed": "{slot} cambió mientras tanto: quien escribe en él ya no es el que se muestra. Vuelve a mirarlo.",
   "slots.release.live": "Quien escribe en {slot} sigue en ejecución en este Combwork: primero detén el agente, o termina o conserva lo que dejó en ejecución.",
   "slots.release.notEnded": "Algunos de los procesos de la lista siguen en ejecución: Windows no dejó que Combwork los terminara, así que {slot} no se liberó. Vuelve a intentarlo o libéralo sin terminarlos.",
-  "slots.release.otherHive": "{slot} está retenido por otro Combwork que sigue en ejecución (proceso {pid}): libéralo allí o cierra primero ese Combwork.",
+  "slots.release.otherCombwork": "{slot} está retenido por otro Combwork que sigue en ejecución (proceso {pid}): libéralo allí o cierra primero ese Combwork.",
   "slots.setting.bad": "Combwork no tiene esa opción de slot.",
   "slots.setting.badSize": "El número de copias de revisión y comprobación es un número entero de {min, number} a {max, number}.",
   "slots.setting.badText": "Un script de slot o una lista de archivos es un texto de {max, number} caracteres como máximo."

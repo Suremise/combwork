@@ -162,8 +162,8 @@ interface HiveMessageValues {
   'settings.advanced.claude-code.outage.connectionError.title': undefined
   'settings.advanced.claude-code.override.mcpIsolation.desc': undefined
   'settings.advanced.claude-code.override.mcpIsolation.title': undefined
-  'settings.advanced.claude-code.override.preApproveHiveTools.desc': undefined
-  'settings.advanced.claude-code.override.preApproveHiveTools.title': undefined
+  'settings.advanced.claude-code.override.preApproveCombworkTools.desc': undefined
+  'settings.advanced.claude-code.override.preApproveCombworkTools.title': undefined
   'settings.advanced.claude-code.override.promptSnapshotOff.desc': undefined
   'settings.advanced.claude-code.override.promptSnapshotOff.title': undefined
   'settings.advanced.claude-code.override.statusLine.desc': undefined
@@ -268,8 +268,8 @@ interface HiveMessageValues {
   'settings.advanced.codex.outage.connectionError.title': undefined
   'settings.advanced.codex.override.mcpIsolation.desc': undefined
   'settings.advanced.codex.override.mcpIsolation.title': undefined
-  'settings.advanced.codex.override.preApproveHiveTools.desc': undefined
-  'settings.advanced.codex.override.preApproveHiveTools.title': undefined
+  'settings.advanced.codex.override.preApproveCombworkTools.desc': undefined
+  'settings.advanced.codex.override.preApproveCombworkTools.title': undefined
   'settings.advanced.codex.override.terminalTitle.desc': undefined
   'settings.advanced.codex.override.terminalTitle.title': undefined
   'settings.advanced.codex.prompt.drawnSeconds.desc': undefined
@@ -348,8 +348,8 @@ interface HiveMessageValues {
   'settings.advanced.copilot.override.mcpIsolation.title': undefined
   'settings.advanced.copilot.override.noAutoUpdate.desc': undefined
   'settings.advanced.copilot.override.noAutoUpdate.title': undefined
-  'settings.advanced.copilot.override.preApproveHiveTools.desc': undefined
-  'settings.advanced.copilot.override.preApproveHiveTools.title': undefined
+  'settings.advanced.copilot.override.preApproveCombworkTools.desc': undefined
+  'settings.advanced.copilot.override.preApproveCombworkTools.title': undefined
   'settings.advanced.copilot.override.stripGitHubTokens.desc': undefined
   'settings.advanced.copilot.override.stripGitHubTokens.title': undefined
   'settings.advanced.copilot.question.field.desc': undefined
@@ -374,6 +374,174 @@ interface HiveMessageValues {
   'settings.advanced.copilot.turnFailed.errorType.title': undefined
   'settings.advanced.copilotFooter.desc': { mode: string | number; footer: string | number; shared: string }
   'settings.advanced.copilotFooter.title': { mode: string | number }
+  'settings.advanced.cw.accounts.usageMoves.desc': undefined
+  'settings.advanced.cw.accounts.usageMoves.title': undefined
+  'settings.advanced.cw.agents.tempFolder.desc': undefined
+  'settings.advanced.cw.agents.tempFolder.title': undefined
+  'settings.advanced.cw.assistant.startView.desc': undefined
+  'settings.advanced.cw.assistant.startView.title': undefined
+  'settings.advanced.cw.cards.attachmentFolders.desc': undefined
+  'settings.advanced.cw.cards.attachmentFolders.title': undefined
+  'settings.advanced.cw.cards.attachmentMax.desc': undefined
+  'settings.advanced.cw.cards.attachmentMax.title': undefined
+  'settings.advanced.cw.cards.titleNudgeChars.desc': undefined
+  'settings.advanced.cw.cards.titleNudgeChars.title': undefined
+  'settings.advanced.cw.console.showText.desc': undefined
+  'settings.advanced.cw.console.showText.title': undefined
+  'settings.advanced.cw.copies.quietWaitMinutes.desc': undefined
+  'settings.advanced.cw.copies.quietWaitMinutes.title': undefined
+  'settings.advanced.cw.copies.review.desc': undefined
+  'settings.advanced.cw.copies.review.title': undefined
+  'settings.advanced.cw.disableHardwareAcceleration.desc': undefined
+  'settings.advanced.cw.disableHardwareAcceleration.title': undefined
+  'settings.advanced.cw.focused.pickSeconds.desc': undefined
+  'settings.advanced.cw.focused.pickSeconds.title': undefined
+  'settings.advanced.cw.guidance.desc': undefined
+  'settings.advanced.cw.guidance.title': undefined
+  'settings.advanced.cw.heapSnapshotNearLimit.desc': undefined
+  'settings.advanced.cw.heapSnapshotNearLimit.title': undefined
+  'settings.advanced.cw.hooks.missingSeconds.desc': undefined
+  'settings.advanced.cw.hooks.missingSeconds.title': undefined
+  'settings.advanced.cw.inbox.checkpoints.desc': undefined
+  'settings.advanced.cw.inbox.checkpoints.title': undefined
+  'settings.advanced.cw.inbox.idleWakes.desc': undefined
+  'settings.advanced.cw.inbox.idleWakes.title': undefined
+  'settings.advanced.cw.inbox.stopContinuation.desc': undefined
+  'settings.advanced.cw.inbox.stopContinuation.title': undefined
+  'settings.advanced.cw.journal.builds.desc': undefined
+  'settings.advanced.cw.journal.builds.title': undefined
+  'settings.advanced.cw.lanes.endWaitMinutes.desc': undefined
+  'settings.advanced.cw.lanes.endWaitMinutes.title': undefined
+  'settings.advanced.cw.lanes.freshStartWaitMinutes.desc': undefined
+  'settings.advanced.cw.lanes.freshStartWaitMinutes.title': undefined
+  'settings.advanced.cw.lanes.gentleEnd.desc': undefined
+  'settings.advanced.cw.lanes.gentleEnd.title': undefined
+  'settings.advanced.cw.lanes.unwatchedNotice.desc': undefined
+  'settings.advanced.cw.lanes.unwatchedNotice.title': undefined
+  'settings.advanced.cw.lanes.waitReviewerMinutes.desc': undefined
+  'settings.advanced.cw.lanes.waitReviewerMinutes.title': undefined
+  'settings.advanced.cw.lanes.waitYouMinutes.desc': undefined
+  'settings.advanced.cw.lanes.waitYouMinutes.title': undefined
+  'settings.advanced.cw.lostLine.steadySeconds.desc': undefined
+  'settings.advanced.cw.lostLine.steadySeconds.title': undefined
+  'settings.advanced.cw.mcp.connectSeconds.desc': undefined
+  'settings.advanced.cw.mcp.connectSeconds.title': undefined
+  'settings.advanced.cw.mcp.replySeconds.desc': undefined
+  'settings.advanced.cw.mcp.replySeconds.title': undefined
+  'settings.advanced.cw.mcpCatalog.downloadSeconds.desc': undefined
+  'settings.advanced.cw.mcpCatalog.downloadSeconds.title': undefined
+  'settings.advanced.cw.mcpCatalog.fetchSeconds.desc': undefined
+  'settings.advanced.cw.mcpCatalog.fetchSeconds.title': undefined
+  'settings.advanced.cw.mcpCatalog.probeSeconds.desc': undefined
+  'settings.advanced.cw.mcpCatalog.probeSeconds.title': undefined
+  'settings.advanced.cw.merge.lockWaitSeconds.desc': undefined
+  'settings.advanced.cw.merge.lockWaitSeconds.title': undefined
+  'settings.advanced.cw.none.baselineSeconds.desc': undefined
+  'settings.advanced.cw.none.baselineSeconds.title': undefined
+  'settings.advanced.cw.notes.deliverWorkspaceNotes.desc': undefined
+  'settings.advanced.cw.notes.deliverWorkspaceNotes.title': undefined
+  'settings.advanced.cw.notes.workspaceNotesMax.desc': undefined
+  'settings.advanced.cw.notes.workspaceNotesMax.title': undefined
+  'settings.advanced.cw.outage.checkFirstSeconds.desc': undefined
+  'settings.advanced.cw.outage.checkFirstSeconds.title': undefined
+  'settings.advanced.cw.outage.checkMostSeconds.desc': undefined
+  'settings.advanced.cw.outage.checkMostSeconds.title': undefined
+  'settings.advanced.cw.outage.checkUrl.claude-code.desc': undefined
+  'settings.advanced.cw.outage.checkUrl.claude-code.title': undefined
+  'settings.advanced.cw.outage.checkUrl.codex.desc': undefined
+  'settings.advanced.cw.outage.checkUrl.codex.title': undefined
+  'settings.advanced.cw.outage.checkUrl.copilot.desc': undefined
+  'settings.advanced.cw.outage.checkUrl.copilot.title': undefined
+  'settings.advanced.cw.outage.notConnection.desc': undefined
+  'settings.advanced.cw.outage.notConnection.title': undefined
+  'settings.advanced.cw.outage.resume.desc': undefined
+  'settings.advanced.cw.outage.resume.title': undefined
+  'settings.advanced.cw.outage.resumesPerHour.desc': undefined
+  'settings.advanced.cw.outage.resumesPerHour.title': undefined
+  'settings.advanced.cw.outage.waitMinutes.desc': undefined
+  'settings.advanced.cw.outage.waitMinutes.title': undefined
+  'settings.advanced.cw.processes.orphanNotice.desc': undefined
+  'settings.advanced.cw.processes.orphanNotice.title': undefined
+  'settings.advanced.cw.progress.lanesShown.desc': undefined
+  'settings.advanced.cw.progress.lanesShown.title': undefined
+  'settings.advanced.cw.progress.replySeconds.desc': undefined
+  'settings.advanced.cw.progress.replySeconds.title': undefined
+  'settings.advanced.cw.prompt.asTyped.desc': undefined
+  'settings.advanced.cw.prompt.asTyped.title': undefined
+  'settings.advanced.cw.prompt.clearDraft.desc': undefined
+  'settings.advanced.cw.prompt.clearDraft.title': undefined
+  'settings.advanced.cw.prompt.rawCardStart.desc': undefined
+  'settings.advanced.cw.prompt.rawCardStart.title': undefined
+  'settings.advanced.cw.queue.checkMinutes.desc': undefined
+  'settings.advanced.cw.queue.checkMinutes.title': undefined
+  'settings.advanced.cw.queue.checkedOutTarget.ask': undefined
+  'settings.advanced.cw.queue.checkedOutTarget.auto': undefined
+  'settings.advanced.cw.queue.checkedOutTarget.desc': undefined
+  'settings.advanced.cw.queue.checkedOutTarget.title': undefined
+  'settings.advanced.cw.queue.focusedJobs.desc': undefined
+  'settings.advanced.cw.queue.focusedJobs.title': undefined
+  'settings.advanced.cw.queue.networkCodes.desc': undefined
+  'settings.advanced.cw.queue.networkCodes.title': undefined
+  'settings.advanced.cw.queue.signSeconds.desc': undefined
+  'settings.advanced.cw.queue.signSeconds.title': undefined
+  'settings.advanced.cw.recorder.afterSeconds.desc': undefined
+  'settings.advanced.cw.recorder.afterSeconds.title': undefined
+  'settings.advanced.cw.recorder.keep.desc': undefined
+  'settings.advanced.cw.recorder.keep.title': undefined
+  'settings.advanced.cw.recorder.minutes.desc': undefined
+  'settings.advanced.cw.recorder.minutes.title': undefined
+  'settings.advanced.cw.recorder.pattern.desc': undefined
+  'settings.advanced.cw.recorder.pattern.title': undefined
+  'settings.advanced.cw.recorder.safeguard.desc': undefined
+  'settings.advanced.cw.recorder.safeguard.title': undefined
+  'settings.advanced.cw.recorder.stalled.desc': undefined
+  'settings.advanced.cw.recorder.stalled.title': undefined
+  'settings.advanced.cw.recorder.unknown.desc': undefined
+  'settings.advanced.cw.recorder.unknown.title': undefined
+  'settings.advanced.cw.recorder.version.desc': undefined
+  'settings.advanced.cw.recorder.version.title': undefined
+  'settings.advanced.cw.restart.resumeAfterUpdate.desc': undefined
+  'settings.advanced.cw.restart.resumeAfterUpdate.title': undefined
+  'settings.advanced.cw.restart.resumeReadySeconds.desc': undefined
+  'settings.advanced.cw.restart.resumeReadySeconds.title': undefined
+  'settings.advanced.cw.retry.tellAssistantAfterSeconds.desc': undefined
+  'settings.advanced.cw.retry.tellAssistantAfterSeconds.title': undefined
+  'settings.advanced.cw.sessions.terminalType.desc': undefined
+  'settings.advanced.cw.sessions.terminalType.title': undefined
+  'settings.advanced.cw.showDeveloperFeatures.desc': undefined
+  'settings.advanced.cw.showDeveloperFeatures.title': undefined
+  'settings.advanced.cw.skills.removeIdleCopies.desc': undefined
+  'settings.advanced.cw.skills.removeIdleCopies.everywhere': undefined
+  'settings.advanced.cw.skills.removeIdleCopies.never': undefined
+  'settings.advanced.cw.skills.removeIdleCopies.slots': undefined
+  'settings.advanced.cw.skills.removeIdleCopies.title': undefined
+  'settings.advanced.cw.slots.deleteMergedLines.desc': undefined
+  'settings.advanced.cw.slots.deleteMergedLines.title': undefined
+  'settings.advanced.cw.slots.removeIdle.desc': undefined
+  'settings.advanced.cw.slots.removeIdle.title': undefined
+  'settings.advanced.cw.slots.renameAdopted.desc': undefined
+  'settings.advanced.cw.slots.renameAdopted.title': undefined
+  'settings.advanced.cw.slots.setupMinutes.desc': undefined
+  'settings.advanced.cw.slots.setupMinutes.title': undefined
+  'settings.advanced.cw.terminal.allKeysToCli.desc': undefined
+  'settings.advanced.cw.terminal.allKeysToCli.title': undefined
+  'settings.advanced.cw.terminal.ctrlCVToCli.desc': undefined
+  'settings.advanced.cw.terminal.ctrlCVToCli.title': undefined
+  'settings.advanced.cw.terminal.osc52.allow': undefined
+  'settings.advanced.cw.terminal.osc52.ask': undefined
+  'settings.advanced.cw.terminal.osc52.block': undefined
+  'settings.advanced.cw.terminal.osc52.desc': undefined
+  'settings.advanced.cw.terminal.osc52.title': undefined
+  'settings.advanced.cw.usage.timelineDetailDays.desc': undefined
+  'settings.advanced.cw.usage.timelineDetailDays.title': undefined
+  'settings.advanced.cw.wait.agentsMaxSeconds.desc': undefined
+  'settings.advanced.cw.wait.agentsMaxSeconds.title': undefined
+  'settings.advanced.cw.wait.cardMaxSeconds.desc': undefined
+  'settings.advanced.cw.wait.cardMaxSeconds.title': undefined
+  'settings.advanced.cw.workflow.enforce.desc': undefined
+  'settings.advanced.cw.workflow.enforce.title': undefined
+  'settings.advanced.cw.workflow.updateAgentBranch.desc': undefined
+  'settings.advanced.cw.workflow.updateAgentBranch.title': undefined
   'settings.advanced.data.desc': undefined
   'settings.advanced.data.tip': undefined
   'settings.advanced.data.title': undefined
@@ -389,174 +557,6 @@ interface HiveMessageValues {
   'settings.advanced.error.oneLine': { title: string | number; most: string | number }
   'settings.advanced.error.pattern': { title: string | number }
   'settings.advanced.error.text': { title: string | number }
-  'settings.advanced.hive.accounts.usageMoves.desc': undefined
-  'settings.advanced.hive.accounts.usageMoves.title': undefined
-  'settings.advanced.hive.agents.tempFolder.desc': undefined
-  'settings.advanced.hive.agents.tempFolder.title': undefined
-  'settings.advanced.hive.assistant.startView.desc': undefined
-  'settings.advanced.hive.assistant.startView.title': undefined
-  'settings.advanced.hive.cards.attachmentFolders.desc': undefined
-  'settings.advanced.hive.cards.attachmentFolders.title': undefined
-  'settings.advanced.hive.cards.attachmentMax.desc': undefined
-  'settings.advanced.hive.cards.attachmentMax.title': undefined
-  'settings.advanced.hive.cards.titleNudgeChars.desc': undefined
-  'settings.advanced.hive.cards.titleNudgeChars.title': undefined
-  'settings.advanced.hive.console.showText.desc': undefined
-  'settings.advanced.hive.console.showText.title': undefined
-  'settings.advanced.hive.copies.quietWaitMinutes.desc': undefined
-  'settings.advanced.hive.copies.quietWaitMinutes.title': undefined
-  'settings.advanced.hive.copies.review.desc': undefined
-  'settings.advanced.hive.copies.review.title': undefined
-  'settings.advanced.hive.disableHardwareAcceleration.desc': undefined
-  'settings.advanced.hive.disableHardwareAcceleration.title': undefined
-  'settings.advanced.hive.focused.pickSeconds.desc': undefined
-  'settings.advanced.hive.focused.pickSeconds.title': undefined
-  'settings.advanced.hive.guidance.desc': undefined
-  'settings.advanced.hive.guidance.title': undefined
-  'settings.advanced.hive.heapSnapshotNearLimit.desc': undefined
-  'settings.advanced.hive.heapSnapshotNearLimit.title': undefined
-  'settings.advanced.hive.hooks.missingSeconds.desc': undefined
-  'settings.advanced.hive.hooks.missingSeconds.title': undefined
-  'settings.advanced.hive.inbox.checkpoints.desc': undefined
-  'settings.advanced.hive.inbox.checkpoints.title': undefined
-  'settings.advanced.hive.inbox.idleWakes.desc': undefined
-  'settings.advanced.hive.inbox.idleWakes.title': undefined
-  'settings.advanced.hive.inbox.stopContinuation.desc': undefined
-  'settings.advanced.hive.inbox.stopContinuation.title': undefined
-  'settings.advanced.hive.journal.builds.desc': undefined
-  'settings.advanced.hive.journal.builds.title': undefined
-  'settings.advanced.hive.lanes.endWaitMinutes.desc': undefined
-  'settings.advanced.hive.lanes.endWaitMinutes.title': undefined
-  'settings.advanced.hive.lanes.freshStartWaitMinutes.desc': undefined
-  'settings.advanced.hive.lanes.freshStartWaitMinutes.title': undefined
-  'settings.advanced.hive.lanes.gentleEnd.desc': undefined
-  'settings.advanced.hive.lanes.gentleEnd.title': undefined
-  'settings.advanced.hive.lanes.unwatchedNotice.desc': undefined
-  'settings.advanced.hive.lanes.unwatchedNotice.title': undefined
-  'settings.advanced.hive.lanes.waitReviewerMinutes.desc': undefined
-  'settings.advanced.hive.lanes.waitReviewerMinutes.title': undefined
-  'settings.advanced.hive.lanes.waitYouMinutes.desc': undefined
-  'settings.advanced.hive.lanes.waitYouMinutes.title': undefined
-  'settings.advanced.hive.lostLine.steadySeconds.desc': undefined
-  'settings.advanced.hive.lostLine.steadySeconds.title': undefined
-  'settings.advanced.hive.mcp.connectSeconds.desc': undefined
-  'settings.advanced.hive.mcp.connectSeconds.title': undefined
-  'settings.advanced.hive.mcp.replySeconds.desc': undefined
-  'settings.advanced.hive.mcp.replySeconds.title': undefined
-  'settings.advanced.hive.mcpCatalog.downloadSeconds.desc': undefined
-  'settings.advanced.hive.mcpCatalog.downloadSeconds.title': undefined
-  'settings.advanced.hive.mcpCatalog.fetchSeconds.desc': undefined
-  'settings.advanced.hive.mcpCatalog.fetchSeconds.title': undefined
-  'settings.advanced.hive.mcpCatalog.probeSeconds.desc': undefined
-  'settings.advanced.hive.mcpCatalog.probeSeconds.title': undefined
-  'settings.advanced.hive.merge.lockWaitSeconds.desc': undefined
-  'settings.advanced.hive.merge.lockWaitSeconds.title': undefined
-  'settings.advanced.hive.none.baselineSeconds.desc': undefined
-  'settings.advanced.hive.none.baselineSeconds.title': undefined
-  'settings.advanced.hive.notes.deliverWorkspaceNotes.desc': undefined
-  'settings.advanced.hive.notes.deliverWorkspaceNotes.title': undefined
-  'settings.advanced.hive.notes.workspaceNotesMax.desc': undefined
-  'settings.advanced.hive.notes.workspaceNotesMax.title': undefined
-  'settings.advanced.hive.outage.checkFirstSeconds.desc': undefined
-  'settings.advanced.hive.outage.checkFirstSeconds.title': undefined
-  'settings.advanced.hive.outage.checkMostSeconds.desc': undefined
-  'settings.advanced.hive.outage.checkMostSeconds.title': undefined
-  'settings.advanced.hive.outage.checkUrl.claude-code.desc': undefined
-  'settings.advanced.hive.outage.checkUrl.claude-code.title': undefined
-  'settings.advanced.hive.outage.checkUrl.codex.desc': undefined
-  'settings.advanced.hive.outage.checkUrl.codex.title': undefined
-  'settings.advanced.hive.outage.checkUrl.copilot.desc': undefined
-  'settings.advanced.hive.outage.checkUrl.copilot.title': undefined
-  'settings.advanced.hive.outage.notConnection.desc': undefined
-  'settings.advanced.hive.outage.notConnection.title': undefined
-  'settings.advanced.hive.outage.resume.desc': undefined
-  'settings.advanced.hive.outage.resume.title': undefined
-  'settings.advanced.hive.outage.resumesPerHour.desc': undefined
-  'settings.advanced.hive.outage.resumesPerHour.title': undefined
-  'settings.advanced.hive.outage.waitMinutes.desc': undefined
-  'settings.advanced.hive.outage.waitMinutes.title': undefined
-  'settings.advanced.hive.processes.orphanNotice.desc': undefined
-  'settings.advanced.hive.processes.orphanNotice.title': undefined
-  'settings.advanced.hive.progress.lanesShown.desc': undefined
-  'settings.advanced.hive.progress.lanesShown.title': undefined
-  'settings.advanced.hive.progress.replySeconds.desc': undefined
-  'settings.advanced.hive.progress.replySeconds.title': undefined
-  'settings.advanced.hive.prompt.asTyped.desc': undefined
-  'settings.advanced.hive.prompt.asTyped.title': undefined
-  'settings.advanced.hive.prompt.clearDraft.desc': undefined
-  'settings.advanced.hive.prompt.clearDraft.title': undefined
-  'settings.advanced.hive.prompt.rawCardStart.desc': undefined
-  'settings.advanced.hive.prompt.rawCardStart.title': undefined
-  'settings.advanced.hive.queue.checkMinutes.desc': undefined
-  'settings.advanced.hive.queue.checkMinutes.title': undefined
-  'settings.advanced.hive.queue.checkedOutTarget.ask': undefined
-  'settings.advanced.hive.queue.checkedOutTarget.auto': undefined
-  'settings.advanced.hive.queue.checkedOutTarget.desc': undefined
-  'settings.advanced.hive.queue.checkedOutTarget.title': undefined
-  'settings.advanced.hive.queue.focusedJobs.desc': undefined
-  'settings.advanced.hive.queue.focusedJobs.title': undefined
-  'settings.advanced.hive.queue.networkCodes.desc': undefined
-  'settings.advanced.hive.queue.networkCodes.title': undefined
-  'settings.advanced.hive.queue.signSeconds.desc': undefined
-  'settings.advanced.hive.queue.signSeconds.title': undefined
-  'settings.advanced.hive.recorder.afterSeconds.desc': undefined
-  'settings.advanced.hive.recorder.afterSeconds.title': undefined
-  'settings.advanced.hive.recorder.keep.desc': undefined
-  'settings.advanced.hive.recorder.keep.title': undefined
-  'settings.advanced.hive.recorder.minutes.desc': undefined
-  'settings.advanced.hive.recorder.minutes.title': undefined
-  'settings.advanced.hive.recorder.pattern.desc': undefined
-  'settings.advanced.hive.recorder.pattern.title': undefined
-  'settings.advanced.hive.recorder.safeguard.desc': undefined
-  'settings.advanced.hive.recorder.safeguard.title': undefined
-  'settings.advanced.hive.recorder.stalled.desc': undefined
-  'settings.advanced.hive.recorder.stalled.title': undefined
-  'settings.advanced.hive.recorder.unknown.desc': undefined
-  'settings.advanced.hive.recorder.unknown.title': undefined
-  'settings.advanced.hive.recorder.version.desc': undefined
-  'settings.advanced.hive.recorder.version.title': undefined
-  'settings.advanced.hive.restart.resumeAfterUpdate.desc': undefined
-  'settings.advanced.hive.restart.resumeAfterUpdate.title': undefined
-  'settings.advanced.hive.restart.resumeReadySeconds.desc': undefined
-  'settings.advanced.hive.restart.resumeReadySeconds.title': undefined
-  'settings.advanced.hive.retry.tellAssistantAfterSeconds.desc': undefined
-  'settings.advanced.hive.retry.tellAssistantAfterSeconds.title': undefined
-  'settings.advanced.hive.sessions.terminalType.desc': undefined
-  'settings.advanced.hive.sessions.terminalType.title': undefined
-  'settings.advanced.hive.showDeveloperFeatures.desc': undefined
-  'settings.advanced.hive.showDeveloperFeatures.title': undefined
-  'settings.advanced.hive.skills.removeIdleCopies.desc': undefined
-  'settings.advanced.hive.skills.removeIdleCopies.everywhere': undefined
-  'settings.advanced.hive.skills.removeIdleCopies.never': undefined
-  'settings.advanced.hive.skills.removeIdleCopies.slots': undefined
-  'settings.advanced.hive.skills.removeIdleCopies.title': undefined
-  'settings.advanced.hive.slots.deleteMergedLines.desc': undefined
-  'settings.advanced.hive.slots.deleteMergedLines.title': undefined
-  'settings.advanced.hive.slots.removeIdle.desc': undefined
-  'settings.advanced.hive.slots.removeIdle.title': undefined
-  'settings.advanced.hive.slots.renameAdopted.desc': undefined
-  'settings.advanced.hive.slots.renameAdopted.title': undefined
-  'settings.advanced.hive.slots.setupMinutes.desc': undefined
-  'settings.advanced.hive.slots.setupMinutes.title': undefined
-  'settings.advanced.hive.terminal.allKeysToCli.desc': undefined
-  'settings.advanced.hive.terminal.allKeysToCli.title': undefined
-  'settings.advanced.hive.terminal.ctrlCVToCli.desc': undefined
-  'settings.advanced.hive.terminal.ctrlCVToCli.title': undefined
-  'settings.advanced.hive.terminal.osc52.allow': undefined
-  'settings.advanced.hive.terminal.osc52.ask': undefined
-  'settings.advanced.hive.terminal.osc52.block': undefined
-  'settings.advanced.hive.terminal.osc52.desc': undefined
-  'settings.advanced.hive.terminal.osc52.title': undefined
-  'settings.advanced.hive.usage.timelineDetailDays.desc': undefined
-  'settings.advanced.hive.usage.timelineDetailDays.title': undefined
-  'settings.advanced.hive.wait.agentsMaxSeconds.desc': undefined
-  'settings.advanced.hive.wait.agentsMaxSeconds.title': undefined
-  'settings.advanced.hive.wait.cardMaxSeconds.desc': undefined
-  'settings.advanced.hive.wait.cardMaxSeconds.title': undefined
-  'settings.advanced.hive.workflow.enforce.desc': undefined
-  'settings.advanced.hive.workflow.enforce.title': undefined
-  'settings.advanced.hive.workflow.updateAgentBranch.desc': undefined
-  'settings.advanced.hive.workflow.updateAgentBranch.title': undefined
   'settings.advanced.logs.desc': undefined
   'settings.advanced.logs.tip': undefined
   'settings.advanced.logs.title': undefined
@@ -648,9 +648,9 @@ interface HiveMessageValues {
   'settings.agentApi.port.desc': undefined
   'settings.agentApi.port.tip': undefined
   'settings.agentApi.port.title': undefined
-  'settings.agentApi.provideHiveMcp.desc': undefined
-  'settings.agentApi.provideHiveMcp.tip': undefined
-  'settings.agentApi.provideHiveMcp.title': undefined
+  'settings.agentApi.provideCombworkMcp.desc': undefined
+  'settings.agentApi.provideCombworkMcp.tip': undefined
+  'settings.agentApi.provideCombworkMcp.title': undefined
   'settings.agentApi.status.tip': undefined
   'settings.agentApi.status.title': undefined
   'settings.agentApi.token.desc': undefined
@@ -756,13 +756,13 @@ interface HiveMessageValues {
   'settings.commands.add': undefined
   'settings.commands.cancel': undefined
   'settings.commands.cantFill': { placeholders: string | number }
+  'settings.commands.combworkBadge': undefined
   'settings.commands.delete': undefined
   'settings.commands.down': undefined
   'settings.commands.edit': undefined
   'settings.commands.empty': undefined
   'settings.commands.folder': undefined
   'settings.commands.gone': undefined
-  'settings.commands.hiveBadge': undefined
   'settings.commands.name': undefined
   'settings.commands.needed': undefined
   'settings.commands.neededBadge': undefined
@@ -1400,9 +1400,9 @@ interface HiveMessageValues {
   'settings.viewers.revokeTitle': { name: string | number }
   'settings.viewers.token': undefined
   'settings.viewers.tokenOf': { name: string | number }
-  'settings.workflow.hiveDefaults.desc': undefined
-  'settings.workflow.hiveDefaults.tip': undefined
-  'settings.workflow.hiveDefaults.title': undefined
+  'settings.workflow.combworkDefaults.desc': undefined
+  'settings.workflow.combworkDefaults.tip': undefined
+  'settings.workflow.combworkDefaults.title': undefined
   'settings.workflow.tabs': undefined
   'settings.workflow.workspaceDefaults.desc': undefined
   'settings.workflow.workspaceDefaults.tip': undefined

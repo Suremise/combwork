@@ -299,7 +299,7 @@
     "defaultMessage": "It has no valid scenarios.",
     "description": "Why a scenario benchmark is not imported to Performance → Compare."
   },
-  "performance.compare.error.notHive": {
+  "performance.compare.error.notCombwork": {
     "defaultMessage": "It isn’t a Combwork benchmark or Performance export.",
     "description": "Why a file is not imported to Performance → Compare."
   },
@@ -483,6 +483,14 @@
     "defaultMessage": "Cache write",
     "description": "A measure in Performance → Compare: tokens written to the provider's prompt cache."
   },
+  "performance.compare.measure.combworkCallErrors": {
+    "defaultMessage": "Failed calls",
+    "description": "A measure in Performance → Compare: calls of Combwork's tools that failed."
+  },
+  "performance.compare.measure.combworkCalls": {
+    "defaultMessage": "Calls run",
+    "description": "A measure in Performance → Compare: calls of Combwork's tools that Combwork ran."
+  },
   "performance.compare.measure.contextBytes": {
     "defaultMessage": "Combwork context",
     "description": "A measure in Performance → Compare: the size of what Combwork put in an agent session's context."
@@ -534,14 +542,6 @@
   "performance.compare.measure.guidanceChars": {
     "defaultMessage": "Launch guidance (characters)",
     "description": "A measure in Performance → Compare: the launch guidance counted in characters."
-  },
-  "performance.compare.measure.hiveCallErrors": {
-    "defaultMessage": "Failed calls",
-    "description": "A measure in Performance → Compare: calls of Combwork's tools that failed."
-  },
-  "performance.compare.measure.hiveCalls": {
-    "defaultMessage": "Calls run",
-    "description": "A measure in Performance → Compare: calls of Combwork's tools that Combwork ran."
   },
   "performance.compare.measure.inputTokens": {
     "defaultMessage": "Input tokens",
@@ -651,6 +651,14 @@
     "defaultMessage": "As the provider reported them.",
     "description": "Tooltip of a token measure in Performance → Compare: the provider's own count."
   },
+  "performance.compare.measureTip.combworkCallErrors": {
+    "defaultMessage": "Combwork tool calls that failed.",
+    "description": "Tooltip of the Failed calls measure in Performance → Compare. Keep Combwork (the app's name)."
+  },
+  "performance.compare.measureTip.combworkCalls": {
+    "defaultMessage": "Combwork tool calls the server ran (its own log).",
+    "description": "Tooltip of the Calls run measure in Performance → Compare. Keep Combwork (the app's name)."
+  },
   "performance.compare.measureTip.contextBytes": {
     "defaultMessage": "What Combwork put in the session’s context: launch guidance (core, project, the Assistant’s role and mode, skills’ catalog), the Combwork tools’ list and every tool reply. Exact UTF-8 bytes, not tokens. Unknown if any part wasn’t measured.",
     "description": "Tooltip of the Combwork context measure in Performance → Compare. \"Combwork tools\" are Combwork's tools for agents (keep Combwork)."
@@ -682,14 +690,6 @@
   "performance.compare.measureTip.guidanceChars": {
     "defaultMessage": "The same parts in characters (UTF-16 code units); the catalog has bytes only.",
     "description": "Tooltip of the Launch guidance (characters) measure in Performance → Compare."
-  },
-  "performance.compare.measureTip.hiveCallErrors": {
-    "defaultMessage": "Combwork tool calls that failed.",
-    "description": "Tooltip of the Failed calls measure in Performance → Compare. Keep Combwork (the app's name)."
-  },
-  "performance.compare.measureTip.hiveCalls": {
-    "defaultMessage": "Combwork tool calls the server ran (its own log).",
-    "description": "Tooltip of the Calls run measure in Performance → Compare. Keep Combwork (the app's name)."
   },
   "performance.compare.measureTip.outputTokens": {
     "defaultMessage": "Reasoning included, as the provider reported them.",

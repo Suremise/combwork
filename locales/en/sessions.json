@@ -287,13 +287,13 @@
     "defaultMessage": "Delete",
     "description": "Button: deletes the session from Combwork. Keep it short."
   },
+  "sessions.delete.detailCombwork": {
+    "defaultMessage": "Combwork's copies of its transcript go to the Recycle Bin and it no longer shows here; what it used stays in the totals. {cli} keeps its own transcript, so {cli}'s own resume list still has it.",
+    "description": "What deleting a session Combwork started does: Combwork's copies go to the Recycle Bin, its usage stays counted, and the CLI ({cli}: \"Claude Code\") keeps its own transcript."
+  },
   "sessions.delete.detailExternal": {
     "defaultMessage": "Combwork stops listing it. {cli} keeps its transcript, so {cli}'s own resume list still has it.",
     "description": "What deleting a session started outside Combwork does: Combwork stops listing it, and the CLI ({cli}: \"Claude Code\") keeps its transcript."
-  },
-  "sessions.delete.detailHive": {
-    "defaultMessage": "Combwork's copies of its transcript go to the Recycle Bin and it no longer shows here; what it used stays in the totals. {cli} keeps its own transcript, so {cli}'s own resume list still has it.",
-    "description": "What deleting a session Combwork started does: Combwork's copies go to the Recycle Bin, its usage stays counted, and the CLI ({cli}: \"Claude Code\") keeps its own transcript."
   },
   "sessions.delete.failed": {
     "defaultMessage": "{kind, select, conversation {Could not delete the conversation} other {Could not delete the session}}",

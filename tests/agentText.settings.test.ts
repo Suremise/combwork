@@ -57,7 +57,7 @@ describe('the settings catalogue in the Default', () => {
     for (const e of SETTINGS_CATALOG) if (!e.action) messageIds([e.text.title, e.text.desc, e.text.tip, e.text.off, (e.options ?? []).map((o) => o.text)], said)
     expect([...said].filter((id) => !ids.has(id))).toEqual(MODE_NAMES)
     expect(catalogue['settings.sessions.compactSuggestTokens.title']?.audience).toBe('both')
-    expect(catalogue['settings.advanced.hive.recorder.keep.desc']?.audience).toBe('both')
+    expect(catalogue['settings.advanced.cw.recorder.keep.desc']?.audience).toBe('both')
     expect(catalogue['settings.agent.helps.general.keepAwake']?.audience).toBeUndefined()
   })
 })

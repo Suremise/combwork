@@ -1,11 +1,11 @@
 {
+  "workflow.contradiction.combworkMergesNeedsGit": {
+    "placeholders": {}
+  },
   "workflow.contradiction.committedNeedsFolder": {
     "placeholders": {}
   },
   "workflow.contradiction.focusedNeedsRunner": {
-    "placeholders": {}
-  },
-  "workflow.contradiction.hiveMergesNeedsGit": {
     "placeholders": {}
   },
   "workflow.contradiction.mergeNeedsSlots": {
@@ -588,15 +588,15 @@
   "workflow.refused.loop.tooEarly.next": {
     "placeholders": {}
   },
-  "workflow.refused.merge.hiveMerges.change": {
+  "workflow.refused.merge.combworkMerges.change": {
     "placeholders": {}
   },
-  "workflow.refused.merge.hiveMerges.message": {
+  "workflow.refused.merge.combworkMerges.message": {
     "placeholders": {
       "card": "plain"
     }
   },
-  "workflow.refused.merge.hiveMerges.next": {
+  "workflow.refused.merge.combworkMerges.next": {
     "placeholders": {}
   },
   "workflow.refused.move.doingNobody.message": {
@@ -1266,16 +1266,16 @@
   "workflow.value.commitMessage.branch": {
     "placeholders": {}
   },
-  "workflow.value.commitMessage.hive": {
+  "workflow.value.commitMessage.cw": {
     "placeholders": {}
   },
   "workflow.value.finish.agentMerges": {
     "placeholders": {}
   },
-  "workflow.value.finish.committed": {
+  "workflow.value.finish.combworkMerges": {
     "placeholders": {}
   },
-  "workflow.value.finish.hiveMerges": {
+  "workflow.value.finish.committed": {
     "placeholders": {}
   },
   "workflow.value.finish.notChecked": {

@@ -39,7 +39,7 @@ interface HiveMessageValues {
   'providers.codex.hint.model': undefined
   'providers.codex.hint.settings': undefined
   'providers.codex.hint.signIn': undefined
-  'providers.codex.nativeHive': { file: string | number }
+  'providers.codex.nativeCombwork': { file: string | number }
   'providers.codex.sandbox.default': undefined
   'providers.codex.sandbox.needed': undefined
   'providers.codex.sandbox.nonAdmin': undefined

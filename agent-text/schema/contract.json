@@ -75,7 +75,7 @@
   "contract.board.other.splitWork": {
     "placeholders": {}
   },
-  "contract.board.other.useHiveApi": {
+  "contract.board.other.useCombworkApi": {
     "placeholders": {}
   },
   "contract.board.other.workspaceNote": {
