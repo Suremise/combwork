@@ -140,6 +140,11 @@ try {
   # folders), and runs with its window; the installer run again closes it and removes Hive Desktop, the folders left as
   # they are.
   InstallPrev
+  # 8.1's installer record came back to Hive's local folder with HiveProfiles (8.2), and a start keeps a record that is
+  # there (profileFolders.ts): taken out, so this start's own (by app) is what 8.moved-at-start reads.
+  $inherited = Join-Path $locHive 'profile-move.json'
+  if (Test-Path $inherited) { Remove-Item -LiteralPath $inherited -Force }
+  if (Test-Path $inherited) { throw "the inherited record at $inherited couldn't be removed" }
   $p = Start-Process -FilePath $combExe -PassThru
   $null = $p.Handle
   WaitFor { $g = Get-Process -Id $p.Id -ErrorAction SilentlyContinue; $g -and $g.MainWindowHandle -ne 0 } 'Combwork running with its window'
