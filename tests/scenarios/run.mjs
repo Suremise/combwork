@@ -10,7 +10,7 @@
 //   npm run scenarios -- --only work-on-card --signed-out=launch   # its OAuth expired: it exits at launch, skipped too
 //   npm run scenarios -- --only work-on-card --signed-out=late   # signed out, shown only once the prompt is sent: skipped too
 //
-// A trial that Hive shows waiting for a sign-in, or whose CLI says it hit a limit or can't reach its API, is skipped for
+// A trial that Combwork shows waiting for a sign-in, or whose CLI says it hit a limit or can't reach its API, is skipped for
 // the environment at once (no checks failed, no cost), and so are the provider's other trials, said once (#302).
 //
 // More than five scenarios, or --repeat, waits for a test slot (tests/e2e/slots.mjs; --no-wait fails at once instead),
@@ -27,7 +27,7 @@
 // HI-2234, HI-2236): results.json
 // (every scenario's checks, skills read, hive calls, versions, usage, measures), benchmark.json (hive-benchmark/1: the
 // Performance page compares two) and summary.md; results.json is written as each trial ends (#1457: a run cut short keeps
-// what it had). Run in a Hive agent's session it shows in the Progress panel, a step per trial (--no-progress: not).
+// what it had). Run in a Combwork agent's session it shows in the Progress panel, a step per trial (--no-progress: not).
 // With a fake provider a failed check fails the run (exit 1); model
 // trials only report (models vary). A dev build that isn't from the source as it is now (tests/e2e/build.mjs) is rebuilt
 // first, so a run (and a baseline) never measures other code.
@@ -54,10 +54,10 @@ const spare = (p) => evidence.protects(p)
 // Without the board nothing a run made could be removed, so copies would pile up (#285): as the e2e runner, it doesn't
 // start (HIVE_TEST_NO_BOARD=1: no board cites test output on this machine).
 if (!evidence.ok) {
-  console.error(`Can't tell what the tests may delete: ${evidence.why}. Fix the board, or set HIVE_TEST_NO_BOARD=1 if no Hive board cites test output on this machine.`)
+  console.error(`Can't tell what the tests may delete: ${evidence.why}. Fix the board, or set HIVE_TEST_NO_BOARD=1 if no Combwork board cites test output on this machine.`)
   process.exit(2)
 }
-// The run's own temp folder in hive-test\tmp (HI-2102): the test copies of Hive and the CLIs its scenarios start get it
+// The run's own temp folder in hive-test\tmp (HI-2102): the test copies of Combwork and the CLIs its scenarios start get it
 // as TEMP (e2e/runContext.cjs ALLOW), not %TEMP%. It goes as the runner exits; its start removes what stopped runs
 // left, as the evidence rules allow. Before lib.cjs loads: Playwright, which the harness runs in this process, takes
 // the temp folder for its playwright-artifacts-* folders as it loads.
@@ -169,7 +169,7 @@ if (pool) {
 process.env.E2E_RUN_SLOTS = creditFor(pool)
 
 // This run's lane: its own folders and Agent API port, so another run at the same time can't remove, open or answer
-// for this one's test Hive. With every lane taken it waits for one (#707), as for a test slot; --no-wait: fail at once.
+// for this one's test Combwork. With every lane taken it waits for one (#707), as for a test slot; --no-wait: fail at once.
 const laneQueue = slotWaitProgress('scenarios', `npm run scenarios -- ${argv.join(' ')}`.trim(), argv, 'a test lane')
 let laneSaid = ''
 const lane = await waitForLane(runContext.LANES_DIR, {
@@ -273,7 +273,7 @@ const save = (name, data) => {
 const results = []
 let spent = 0
 let unknownCostTrials = 0
-// Models of the trials without a cost (the guard names them: usually Hive has no price for one).
+// Models of the trials without a cost (the guard names them: usually Combwork has no price for one).
 const noCostModels = new Set()
 // A trial the environment stopped (not signed in, a limit, the network: #302): the provider's other trials would meet it
 // too, so they are skipped, said once.
@@ -352,7 +352,7 @@ const appVersion = JSON.parse(readFileSync(join(lib.ROOT, 'package.json'), 'utf8
 const benchmarkFile = join(out, 'benchmark.json')
 save('benchmark.json', JSON.stringify(benchmarkOf(meta, results, appVersion), null, 2))
 if (baselineName) console.log(`Baseline "${baselineName}": ${saveBaseline(join(lib.WORK, '..', 'scenarios', 'baselines'), baselineName, benchmarkFile, spare)}`)
-/** What Hive's own parts cost in the scenario (its measures): tool reply characters, requests, guidance at launch. */
+/** What Combwork's own parts cost in the scenario (its measures): tool reply characters, requests, guidance at launch. */
 const hiveCost = (m) => (m ? `${m.toolChars.toLocaleString('en')} chars in ${m.toolCalls} tool calls; ${m.apiRequests} requests; ${(m.coreBytes + m.customBytes + m.roleBytes + m.modeBytes + m.catalogBytes).toLocaleString('en')} B guidance` : 'not measured')
 const row = (r) => {
   if (r.skipped) return `| ${r.scenario} | skipped: ${r.skipped} | | | | | |`
@@ -370,7 +370,7 @@ save(
     `Fixtures v${FIXTURES_VERSION}; source ${meta.source.head}${meta.source.dirty ? ` + changes ${meta.source.dirty}` : ''}; guidance ${meta.guidance}; CLI ${cli}; ${meta.when}; spent ${spendText(meta)}.`,
     ...(dialect ? ['', `Dialect: ${dialect.path} (${dialect.overrides} override(s)), chain ${dialect.files.join(' → ')}, hash ${dialect.hash || '(the Default)'}.`] : []),
     '',
-    '| Scenario | Result | Checks | Skills read | Hive tools | Hive’s cost | Provider cost, time |',
+    '| Scenario | Result | Checks | Skills read | Combwork tools | Combwork’s cost | Provider cost, time |',
     '|---|---|---|---|---|---|---|',
     ...results.map(row)
   ].join('\n') + '\n'

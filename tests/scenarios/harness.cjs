@@ -1,12 +1,12 @@
-// Runs one scenario (scenarios.cjs) through Hive's dev build: a throwaway profile and workspace, a CLI home that is
+// Runs one scenario (scenarios.cjs) through Combwork's dev build: a throwaway profile and workspace, a CLI home that is
 // never the user's own, the scenario's cards, notes, handovers and skill changes; the agent or the Assistant started
 // with its prompt; then what it actually did:
 // - the hive tool calls the hive MCP server ran (its test log, HIVE_TEST_MCP_LOG: executed, with whether each worked);
-// - the Hive skills it read (a successful Skill call, or a read whose result is that skill's own text);
-// - every tool call in its transcript (Hive's parser), names of hive tools it only mentions kept apart;
+// - the Combwork skills it read (a successful Skill call, or a read whose result is that skill's own text);
+// - every tool call in its transcript (Combwork's parser), names of hive tools it only mentions kept apart;
 // - the board, notes and files afterwards (the Agent API and the disk), its usage, and whether any API token showed up
 //   in what it printed or said;
-// - what Hive's own parts cost during the turn (its performance metrics, before the launch and after the turn: the
+// - what Combwork's own parts cost during the turn (its performance metrics, before the launch and after the turn: the
 //   difference is the scenario's), for benchmarks (measuresOf).
 // Scenarios check outcomes, never wording.
 const fs = require('fs')
@@ -28,11 +28,11 @@ const claudeSignedIn = () => fs.existsSync(path.join(CLAUDE_TEST_HOME, '.credent
 
 /**
  * `--dialect <file>` (dialects, HI-2439; plans/2026-11-03-dialects-design.md, section 6): a dialect file for the
- * provider's CLI, checked against the schema as Hive checks one (src/main/dialects/format.ts, loaded in plain Node), and
+ * provider's CLI, checked against the schema as Combwork checks one (src/main/dialects/format.ts, loaded in plain Node), and
  * the chain it gives in the model slot (its files and hash, as the launch record will hold them). Each trial's workspace
  * gets it as a test copy in `.combwork/dialects/<CLI>/` (placeDialect). Null with no --dialect: the shipped files, all
  * empty, so the Default. Throws, saying why, for a file that isn't a dialect.
- * The run's agents pick it (their Dialect setting, HI-2443), so Hive pins it in their chain at launch and their launch
+ * The run's agents pick it (their Dialect setting, HI-2443), so Combwork pins it in their chain at launch and their launch
  * record shows it.
  */
 function dialectForRun(file, providerKey) {
@@ -72,7 +72,7 @@ const PROVIDERS = {
   'fake-codex': { provider: 'codex', fake: true, executable: path.join(lib.ROOT, 'tests', 'e2e', 'fake-codex', 'fake-codex.cmd'), mode: 'full-access' },
   // Accept edits, with the hive tools, commands and skills allowed on the command line (its connection's extra arguments):
   // it never asks, and needs no bypass mode (which Claude Code asks to accept once). One value after `=`: the option
-  // takes a list, and as separate words it also took the first task Hive passes last, so an agent started on a card sat
+  // takes a list, and as separate words it also took the first task Combwork passes last, so an agent started on a card sat
   // idle (#498).
   'claude-code': { provider: 'claude-code', executable: '', mode: 'acceptEdits', extraArgs: '--allowedTools=mcp__combwork,Bash,PowerShell,Skill,Monitor' },
   codex: { provider: 'codex', executable: '', mode: 'full-access' },
@@ -112,7 +112,7 @@ function tokenSightings(known, { tools = [], scripts = [], replies = [] }) {
         const label = `<${t.kind} token>`
         const sentinel = '\u0000'
         // Any other secret beside it (the hook token, 48 hex, HR2's HI-2259 round 1) is masked too: a run of 32 hex or
-        // more, as Hive's tokens are, never ids (a run id is 24, a session id has dashes).
+        // more, as Combwork's tokens are, never ids (a run id is 24, a session id has dashes).
         const whole = mask(text.replace(t.token, sentinel)).replace(/[0-9a-fA-F]{32,}/g, '<hex>')
         const i = whole.indexOf(sentinel)
         const excerpt = (whole.slice(Math.max(0, i - 80), i) + label + whole.slice(i + 1, i + 1 + 40)).replace(/\s+/g, ' ').trim()
@@ -126,8 +126,8 @@ function tokenSightings(known, { tools = [], scripts = [], replies = [] }) {
 }
 
 /**
- * Every token a scenario's Hive issued, for scoring and masking (HI-2262, HR1's rounds 1 and 2): the workspace's
- * (`apiToken`), then each line of its issuance record (`file`, HIVE_TEST_TOKEN_LOG: Hive appends each hook, agent and
+ * Every token a scenario's Combwork issued, for scoring and masking (HI-2262, HR1's rounds 1 and 2): the workspace's
+ * (`apiToken`), then each line of its issuance record (`file`, HIVE_TEST_TOKEN_LOG: Combwork appends each hook, agent and
  * Assistant token as it makes it, before any session can hold it), so a token whose launch ended and whose files went
  * long before the scoring is known. The record is evidence the result needs: missing, unreadable or with a line that
  * isn't `{ kind, token }` it throws, and the scenario fails rather than scoring with tokens left out.
@@ -163,7 +163,7 @@ function retainedObserved(observed, tokens) {
 }
 
 /**
- * What a session's transcript shows: every tool call (name, summary, input, result, error), the Hive skills it read,
+ * What a session's transcript shows: every tool call (name, summary, input, result, error), the Combwork skills it read,
  * the hive tools it names (mentions: a transcript isn't proof a call ran; the server's log is), and its last reply.
  * A skill counts as read only when the read worked and shows the skill: a Skill call for it that didn't fail, or a
  * tool (not a writer) given its SKILL.md whose result has the skill's own `name:` line. That line may come JSON-escaped
@@ -236,7 +236,7 @@ function skillRefsOf(dir, names) {
 }
 
 /**
- * Whether Hive's metrics count every hive call the bridges logged. Both sides are the whole run: the log has every call
+ * Whether Combwork's metrics count every hive call the bridges logged. Both sides are the whole run: the log has every call
  * since the launch, setup's too, and the metrics read covers the run's own workspace from before its setup. (Against the
  * scenario's baseline instead, a setup call reported before it would be in the log but not the difference, #527.) A
  * fake's `direct` board change went through no bridge, so nothing reports it.
@@ -283,13 +283,13 @@ function sourceFingerprint(root = lib.ROOT) {
 }
 
 /**
- * What keeps a model trial from running, or null (#302): Hive showing the session waiting for a sign-in, or the CLI's
+ * What keeps a model trial from running, or null (#302): Combwork showing the session waiting for a sign-in, or the CLI's
  * own words, matched with the e2e runner's list (lib.cjs environmentProblem: a usage or rate limit, the sign-in, an
  * overloaded API, the network). `replies` are what the CLI said (never the prompt, which may name any of these);
  * `screen` is its terminal before anything was typed. Such a trial is skipped for the environment, at once.
  */
 function trialEnvironment({ status = null, replies = [], screen = '' } = {}) {
-  if (status === 'signin') return 'not signed in: Hive shows the session waiting for a sign-in'
+  if (status === 'signin') return 'not signed in: Combwork shows the session waiting for a sign-in'
   return lib.environmentProblem([...replies, screen].join('\n'))
 }
 
@@ -307,7 +307,7 @@ function promptRefused({ prompt = '', screen = '', auth = null } = {}) {
 }
 
 /**
- * How the session under test's trust question is answered in a run after its launch's (HI-2225: Hive's relaunch in a slot,
+ * How the session under test's trust question is answered in a run after its launch's (HI-2225: Combwork's relaunch in a slot,
  * which can come before the harness's prompt has even been taken): 'enter' (Copilot's, Codex's: Yes first), 'claude'
  * (Claude Code's menu, starting on "No, exit": lib.acceptClaudeTrust), or null. Never in the launch's own run (answered as
  * it started; its question may still be in the buffer), nor twice in a run.
@@ -338,7 +338,7 @@ function promptNotTaken({ taken = false, screen = '' } = {}) {
   return `setup: the prompt was never taken; its screen ends: ${JSON.stringify(lib.plainText(screen).trim().slice(-300))}`
 }
 
-/** The lines of Hive's log (a test profile's), or none. */
+/** The lines of Combwork's log (a test profile's), or none. */
 const logLines = (file) => {
   try {
     return fs.readFileSync(file, 'utf8').split(/\r?\n/)
@@ -346,10 +346,10 @@ const logLines = (file) => {
     return []
   }
 }
-/** Whether Hive's log says this agent's terminal exited (its process ended). */
+/** Whether Combwork's log says this agent's terminal exited (its process ended). */
 const ptyExitedIn = (file, agentId) => logLines(file).some((l) => /\[pty\] exit /.test(l) && l.includes(`#${agentId}⁩`))
 /**
- * Why Hive says a CLI exited before its session started (sessions.ts failedStart), or '': the latest such line, which
+ * Why Combwork says a CLI exited before its session started (sessions.ts failedStart), or '': the latest such line, which
  * names the agent by its label, not its id (a scenario's session under test starts first).
  */
 function startFailureIn(file) {
@@ -357,7 +357,7 @@ function startFailureIn(file) {
   return /before it started: ⁨([^⁩]*)⁩/.exec(line)?.[1].trim() ?? ''
 }
 /**
- * What Claude Code's own `auth status --json` says of its home now, through the executable Hive started this agent
+ * What Claude Code's own `auth status --json` says of its home now, through the executable Combwork started this agent
  * with (its log's spawn line), or null if it can't be asked. A test home only: `env` names it.
  */
 function claudeAuthStatus(file, agentId, env) {
@@ -388,14 +388,14 @@ const FAILURE_WORDS = /\b(?:error|errors|failed|failure|invalid|cannot|can't|unk
 
 /**
  * A CLI that exited before its session started (#577): skipped for the environment when what it last showed, the
- * reason Hive gives, or (when Hive gives none) its sign-in status says so (an OAuth session it couldn't refresh prints
+ * reason Combwork gives, or (when Combwork gives none) its sign-in status says so (an OAuth session it couldn't refresh prints
  * its error and exits at once, often before a poll sees the screen); otherwise an error, at once rather than after the
  * trial's limits.
  */
 function launchEnded({ screen = '', reason = '', auth = null } = {}) {
   const env = trialEnvironment({ screen: [screen, reason].join('\n') })
   if (env) return { environment: env }
-  // Its auth status only stands in for a failure nobody saw: a concrete one, in Hive's reason or on its screen (an
+  // Its auth status only stands in for a failure nobody saw: a concrete one, in Combwork's reason or on its screen (an
   // argument it rejects), stays an error even when the test home is signed out too, so a broken launch isn't hidden as
   // the environment. A screen with no error on it (its banner) is no failure.
   const failure = reason.trim() || (FAILURE_WORDS.exec(screen)?.[0] ?? '').slice(0, 200).trim()
@@ -466,11 +466,11 @@ async function runScenario(sc, providerKey, opts = {}) {
   const fakeHome = path.join(root, 'claude-home')
   const fakeCodexHome = path.join(root, 'codex-home')
   const mcpLog = path.join(root, 'mcp-calls.jsonl')
-  // Every token its Hive issues (HIVE_TEST_TOKEN_LOG, HI-2262): in the scenario's own folder, gone with it.
+  // Every token its Combwork issues (HIVE_TEST_TOKEN_LOG, HI-2262): in the scenario's own folder, gone with it.
   const tokenLog = path.join(root, 'tokens.jsonl')
   // Each change to the merge slots, with its time (HIVE_TEST_MERGE_SLOT_LOG, #374): who held one and who waited, when.
   const slotLog = path.join(root, 'merge-slots.jsonl')
-  // Each state view Hive gave the Assistant at a session start (#1032), as Hive's development builds record them.
+  // Each state view Combwork gave the Assistant at a session start (#1032), as Combwork's development builds record them.
   const startViewLog = path.join(root, 'start-views.jsonl')
   // What fake-copilot's stand-in model was sent (it starts just before the launch, below).
   const modelLog = path.join(root, 'copilot-api.jsonl')
@@ -491,12 +491,12 @@ async function runScenario(sc, providerKey, opts = {}) {
     fs.mkdirSync(fakeCodexHome, { recursive: true })
     fs.writeFileSync(path.join(fakeCodexHome, 'config.toml'), '[windows]\nsandbox = "unelevated"\n')
   }
-  // The fakes follow Hive's notices as a model does (#650): told of something in their inbox, they read it and ack it.
+  // The fakes follow Combwork's notices as a model does (#650): told of something in their inbox, they read it and ack it.
   fs.writeFileSync(path.join(fakeHome, 'fake-follow-notices.txt'), '')
   if (providerKey === 'fake-codex') fs.writeFileSync(path.join(fakeCodexHome, 'fake-follow-notices.txt'), '')
   // In code mode, as real Codex works (HI-2235): its calls come from scripts, read back from its rollout.
   if (providerKey === 'fake-codex') fs.writeFileSync(path.join(fakeCodexHome, 'fake-code-mode.txt'), '')
-  lib.gitProject(alpha, { 'README.md': '# alpha\n\nA small project for Hive scenarios.\n', 'math.js': 'module.exports = {}\n', ...sc.files })
+  lib.gitProject(alpha, { 'README.md': '# alpha\n\nA small project for Combwork scenarios.\n', 'math.js': 'module.exports = {}\n', ...sc.files })
   for (const other of sc.projects ?? []) lib.gitProject(path.join(ws, other), { 'README.md': `# ${other}\n` })
   // The run's dialect (--dialect), for the trial's CLI.
   placeDialect(opts.dialect, ws)
@@ -526,7 +526,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       control: sc.control ?? (sc.role === 'assistant' ? 'projects' : 'agents'),
       // Settings → Assistant → Control → Change settings (#186): off unless the scenario turns it on.
       changeSettings: sc.changeSettings === true,
-      // Its mode (#259): the scenario's, else Hive's default.
+      // Its mode (#259): the scenario's, else Combwork's default.
       ...(sc.mode ? { mode: sc.mode } : {}),
       providers: { ...cfg.settings.assistant?.providers, [p.provider]: { model: opts.model ?? '', effort: opts.effort ?? '', permissionMode: p.mode, extraArgs: p.extraArgs ?? '' } }
     }
@@ -555,7 +555,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       // Copilot in the run's own home, its profile folder faked and the GitHub CLI's login hidden (fake-copilot-api.cjs).
       ...(standIn ? copilotTestEnv(standIn, root, { above: root }) : {})
     }
-    // Its token record starts empty: a scenario's Hive appends to it (missing at the end, the run is invalid).
+    // Its token record starts empty: a scenario's Combwork appends to it (missing at the end, the run is invalid).
     fs.writeFileSync(tokenLog, '')
     ;({ app, inv, page } = await lib.launch({ userData, env }))
   } catch (e) {
@@ -567,7 +567,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     const info = await lib.waitForProvider(inv, p.provider, 60000)
     result.cliVersion = info.version ?? null
     await inv('workspace:open', ws)
-    // The Agent API's token, once Hive has written its file (read whole: a file still being written doesn't parse).
+    // The Agent API's token, once Combwork has written its file (read whole: a file still being written doesn't parse).
     const apiFile = path.join(userData, 'agent-api.json')
     const readToken = () => {
       try {
@@ -589,10 +589,10 @@ async function runScenario(sc, providerKey, opts = {}) {
       }
       return { status: res.status, body: parsed, text }
     }
-    // The guidance and skills Hive has before the scenario's setup (the session's own, after it, are recorded below).
+    // The guidance and skills Combwork has before the scenario's setup (the session's own, after it, are recorded below).
     const first = await api('GET', '/v1/status')
-    // A refused token here is another Hive answering on this port, not this one's API (#1127): say so, not "card a: …".
-    if (first.status === 401) throw new Error(`the Agent API on port ${port} refused this test Hive's token: another Hive is listening on that port`)
+    // A refused token here is another Combwork answering on this port, not this one's API (#1127): say so, not "card a: …".
+    if (first.status === 401) throw new Error(`the Agent API on port ${port} refused this test Combwork's token: another Combwork is listening on that port`)
     result.guidance = { atStart: first.body?.guidance ?? null, delivered: null }
 
     // The project's agents: the one under test (Coder), and another that did earlier work (Implementer, never started),
@@ -715,13 +715,13 @@ async function runScenario(sc, providerKey, opts = {}) {
       fakeHome,
       /** The provider under test (claude-code, codex, copilot), whichever of its fakes or the real CLI runs. */
       provider: p.provider,
-      /** The state views Hive gave the Assistant (#1032), oldest first: { at, provider, source, text }. */
+      /** The state views Combwork gave the Assistant (#1032), oldest first: { at, provider, source, text }. */
       startViews: () => (fs.existsSync(startViewLog) ? fs.readFileSync(startViewLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []),
       /** An agent's deliveries (#647) as the Agent API gives them, newest last. */
       deliveries: async (key) => (await api('GET', `/v1/projects/alpha/agents/${encodeURIComponent(ctx.agents[key].name)}/deliveries?limit=50`)).body?.deliveries ?? []
     }
     if (sc.setup) await sc.setup(ctx)
-    // What the fake Claude Code does when Hive wakes it (fake-wakes-<agent>.txt, a line per wake): a scenario's next steps,
+    // What the fake Claude Code does when Combwork wakes it (fake-wakes-<agent>.txt, a line per wake): a scenario's next steps,
     // for the session under test (the Assistant's by its name, #402).
     const wakesOf = sc.role === 'assistant' ? 'Assistant' : coder.name
     if (providerKey === 'fake' && sc.fakeWakes) fs.writeFileSync(path.join(fakeHome, `fake-wakes-${String(wakesOf).replace(/[^\w-]/g, '_')}.txt`), sc.fakeWakes(ctx).join('\n') + '\n')
@@ -731,10 +731,10 @@ async function runScenario(sc, providerKey, opts = {}) {
     const home = (await inv('workspace:refresh')).assistant.path
     const [host, agentId] = sc.role === 'assistant' ? [home, 'assistant'] : [alpha, coder.id]
     const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === host.toLowerCase() && s.agentId === agentId)
-    // Hive's performance metrics before the launch (the run's own workspace: everything in it is this run's).
+    // Combwork's performance metrics before the launch (the run's own workspace: everything in it is this run's).
     const metricsFrom = new Date(started - 2 * 3600_000).toISOString()
     // Each snapshot's request, from just before it was sent to just after its answer (HI-2186): a hive call is in the
-    // measured window when its report reached Hive after the first and before the last (benchmark.cjs splitOf).
+    // measured window when its report reached Combwork after the first and before the last (benchmark.cjs splitOf).
     const snapshots = { before: null, after: null }
     const snapshot = async (side) => {
       const t = Date.now()
@@ -749,36 +749,36 @@ async function runScenario(sc, providerKey, opts = {}) {
     // A change made inside the measured window (a skill edited after the snapshot, before the launch), for scenarios
     // that compare the skill service's work on unchanged and changed revisions.
     if (sc.beforeLaunch) await sc.beforeLaunch(ctx)
-    // Hive's log as the session under test starts: its hive tools connecting is counted from here.
+    // Combwork's log as the session under test starts: its hive tools connecting is counted from here.
     const launchMark = lib.hiveLogLines(userData).length
-    // A subject Hive starts itself (HI-2046: a reviewer given a card that reached Review outside a lane): its launch is
-    // the session under test, and Hive's line its prompt.
+    // A subject Combwork starts itself (HI-2046: a reviewer given a card that reached Review outside a lane): its launch is
+    // the session under test, and Combwork's line its prompt.
     const byHive = !!sc.startedByHive
     // A prompt given at launch (HI-2225), on the CLI's command line: the session's first input, before anything setup left
-    // for it (Hive types nothing into a launch whose CLI hasn't taken its task yet, #712, and a wake waits for the turn
+    // for it (Combwork types nothing into a launch whose CLI hasn't taken its task yet, #712, and a wake waits for the turn
     // after), so a wake can't come first and do the prompt's work without it. Never with beforePrompt, which waits for
     // that wake's turn.
     const atLaunch = !byHive && !!sc.promptAtLaunch
     if (atLaunch && sc.beforePrompt) throw new Error(`${sc.id}: promptAtLaunch and beforePrompt don't go together`)
     const launchPrompt = !atLaunch ? null : p.fake ? (typeof sc.fake === 'function' ? sc.fake(ctx) : sc.fake) : typeof sc.prompt === 'function' ? sc.prompt(ctx) : sc.prompt
-    // The run the session under test launched as (HI-2225), known before any prompt can have Hive relaunch it (a card
+    // The run the session under test launched as (HI-2225), known before any prompt can have Combwork relaunch it (a card
     // given in a slot): its trust is answered as it starts (below); a later run's is answered while its turn is waited for.
     let launchRun = null
     if (!byHive) {
-      // Refused as already running or starting (HI-2215): Hive started it itself after setup (a lane's card, a review),
-      // which a scenario says with startedByHive; never taken as Hive's start here, whose line would then race the prompt.
+      // Refused as already running or starting (HI-2215): Combwork started it itself after setup (a lane's card, a review),
+      // which a scenario says with startedByHive; never taken as Combwork's start here, whose line would then race the prompt.
       const refused = await inv('session:start', host, { agentId, ...(atLaunch ? { prompt: launchPrompt } : {}) }).then((st) => ((launchRun = st?.runId ?? null), null), (e) => e)
       if (refused && /already running or starting/i.test(String(refused.message))) {
-        result.error = `setup: Hive started the session under test itself (${String(refused.message).replace(/^.*Error: /, '')}): mark the scenario startedByHive, or have its setup leave it unstarted`
+        result.error = `setup: Combwork started the session under test itself (${String(refused.message).replace(/^.*Error: /, '')}): mark the scenario startedByHive, or have its setup leave it unstarted`
         return result
       }
       if (refused) throw refused
     } else if (!(await lib.until(async () => !!(launchRun = (await live())?.runId ?? null), 90000))) {
-      result.error = "Hive didn't start the session under test"
+      result.error = "Combwork didn't start the session under test"
       return result
     }
     const key = lib.ptyKey(host, agentId)
-    /** The session under test's conversation as Hive reads it (its transcript's items), or [] before it has one. */
+    /** The session under test's conversation as Combwork reads it (its transcript's items), or [] before it has one. */
     const conversation = async () => {
       const s = await live()
       return s?.sessionId ? ((await inv('transcript:read', host, s.sessionId).catch(() => null))?.items ?? []) : []
@@ -795,7 +795,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       const items = await conversation()
       const at = promptIndex(items, text)
       if (at >= 0 && items.slice(at + 1).some((x) => x.kind === 'assistant')) return true
-      // A CLI whose records Hive doesn't read as a conversation (the fake Codex's rollout has no messages): Hive's turn
+      // A CLI whose records Combwork doesn't read as a conversation (the fake Codex's rollout has no messages): Combwork's turn
       // ledger has a turn over that began after the prompt was sent (its own id, not the one before).
       return !!s.turn?.id && s.turn.state === 'over' && s.turn.id !== (turnBefore.get(text) ?? null)
     }
@@ -823,14 +823,14 @@ async function runScenario(sc, providerKey, opts = {}) {
     // A trust question answered: the session goes on to its prompt (asked again if it doesn't).
     const answered = () => lib.until(async () => ['ready', 'finished'].includes((await live())?.status), HUNG_MS)
     const readyBy = Date.now() + 90000
-    // The CLI's last screen while it starts: Hive drops a terminal's buffer when its process exits (#577).
+    // The CLI's last screen while it starts: Combwork drops a terminal's buffer when its process exits (#577).
     let lastScreen = ''
     let seen = false
     let endedAtLaunch = null
     while (Date.now() < readyBy) {
       const s = await live()
       if (s?.status === 'ready' || s?.status === 'finished') break
-      // Hive's line already at work: a model's turn on it is the trial. The prompt given at launch, the same.
+      // Combwork's line already at work: a model's turn on it is the trial. The prompt given at launch, the same.
       if (((byHive && !p.fake) || atLaunch) && ['working', 'background'].includes(s?.status)) break
       const screen = plain(await inv('pty:buffer', key).catch(() => ''))
       if (screen) lastScreen = screen
@@ -857,13 +857,13 @@ async function runScenario(sc, providerKey, opts = {}) {
       }
       await sleep(500)
     }
-    // What the session under test was given at its launch (after setup): Hive's guidance and each skill as delivered.
+    // What the session under test was given at its launch (after setup): Combwork's guidance and each skill as delivered.
     const subject = sc.role === 'assistant' ? (await inv('workspace:refresh')).assistant : (await inv('workspace:refresh')).projects.find((x) => x.name === 'alpha')
     result.guidance.delivered = subject?.agents.find((a) => a.id === agentId)?.live?.launched ?? null
     // What setup left the session under test rings its doorbell once it's idle, as the prompt is typed (#1613: on Copilot
     // the prompt was lost to the doorbell's turn). A scenario's beforePrompt waits for that turn, so the prompt comes after.
     ctx.subjectStatus = async () => (await live())?.status ?? 'stopped'
-    // Every status the session under test reports, in order, as Hive emits it (HI-2022): a state the loop below would
+    // Every status the session under test reports, in order, as Combwork emits it (HI-2022): a state the loop below would
     // look at between its looks (each a few calls and a second apart; a short watch ends in between) is still seen.
     // Each with the watch it had then (HI-2086): the watch a turn ended with, even once a wake has ended it since.
     await page.evaluate((who) => {
@@ -879,14 +879,14 @@ async function runScenario(sc, providerKey, opts = {}) {
     if (sc.beforePrompt && !endedAtLaunch) await sc.beforePrompt(ctx)
     const prompt = typeof sc.prompt === 'function' ? sc.prompt(ctx) : sc.prompt
     const fakePrompt = typeof sc.fake === 'function' ? sc.fake(ctx) : sc.fake
-    // Started by Hive: its line, once the conversation has it. A model works on it, typed nothing more; a fake (which
+    // Started by Combwork: its line, once the conversation has it. A model works on it, typed nothing more; a fake (which
     // does nothing on a line it has no script for) is typed its steps once that turn is over.
     let hiveLine = null
     if (byHive && !endedAtLaunch) {
       const lineOf = async () => (await conversation()).find((x) => x.kind === 'user' && String(x.text ?? '').startsWith('[CW]'))?.text ?? null
       await lib.until(async () => !!(hiveLine = await lineOf()) && (!p.fake || ['ready', 'finished'].includes((await live())?.status)), 60000)
       if (!hiveLine) {
-        result.error = "Hive's line never reached the session under test"
+        result.error = "Combwork's line never reached the session under test"
         return result
       }
     }
@@ -901,13 +901,13 @@ async function runScenario(sc, providerKey, opts = {}) {
     }
     let notTaken = null
     // Where the prompt's states begin (HI-2086): a watch a turn before it left (a setup wake's, beforePrompt) isn't the
-    // prompt's. A model started by Hive's line has no prompt typed: its turn is the line's, all of them; a prompt given at
+    // prompt's. A model started by Combwork's line has no prompt typed: its turn is the line's, all of them; a prompt given at
     // launch was the first input, so the same.
     const statesFrom = (hiveLine && !p.fake) || atLaunch ? 0 : ((await page.evaluate(() => (window.__subjectStatuses ?? []).length).catch(() => 0)) ?? 0)
     if (!endedAtLaunch && !(hiveLine && !p.fake) && !atLaunch) {
       turnBefore.set(text, (await live())?.turn?.id ?? null)
       const mark = String((await inv('pty:buffer', key).catch(() => '')) ?? '').length
-      // Real Claude Code: its first prompt waits for its hive tools, as Hive's own first line does (HI-1148).
+      // Real Claude Code: its first prompt waits for its hive tools, as Combwork's own first line does (HI-1148).
       const ready = p.provider === 'claude-code' ? () => lib.hiveToolsConnected(userData, agentId, launchMark) : null
       if (!(await lib.sendPrompt(inv, key, text, { submitted, ready, waitMs: 20000 }))) {
         // Never taken: a sign-in or a limit the CLI shows only once something is typed is the environment (#1321).
@@ -933,7 +933,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       const s = await live()
       const status = s?.status ?? 'stopped'
       // The CLI's own notes in the transcript (an API error, "Login expired · Please run /login", a usage limit: notices,
-      // never the prompt or the model's replies), or Hive waiting for a sign-in: skipped for the environment at once,
+      // never the prompt or the model's replies), or Combwork waiting for a sign-in: skipped for the environment at once,
       // rather than waiting out the limit and failing every check (#302).
       const notices = s?.sessionId ? cliNotices((await inv('transcript:read', host, s.sessionId).catch(() => null))?.items) : []
       const stopped = trialEnvironment({ status, replies: notices })
@@ -945,7 +945,7 @@ async function runScenario(sc, providerKey, opts = {}) {
         quietSince ||= Date.now()
         if (Date.now() - quietSince > (status === 'waiting' ? 3000 : 6000)) break
       }
-      // The session under test asking to trust a folder again (HI-2225): Hive gave it its card in a slot, a new run there
+      // The session under test asking to trust a folder again (HI-2225): Combwork gave it its card in a slot, a new run there
       // (preset-pair-lane), whose question (waiting) ended the trial 3 s later, unanswered. Until it is answered the run is
       // still starting.
       // (The screen read only while it waits.)
@@ -975,7 +975,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       // A dispatched agent's work is part of the outcome: wait while one is still working, or at a question (its folder's
       // trust, answered above; #498), within the limit.
       if (sc.waitForAgents && quietSince && running.some((x) => ['working', 'starting', 'background', 'waiting'].includes(x.status))) quietSince = Date.now()
-      // Something Hive does after the turn has ended (a line it types later, #401) is part of the outcome: wait for it.
+      // Something Combwork does after the turn has ended (a line it types later, #401) is part of the outcome: wait for it.
       if (sc.keepWaiting && quietSince && (await sc.keepWaiting(ctx, status))) quietSince = Date.now()
       await sleep(1000)
     }
@@ -983,7 +983,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     if (endedAtLaunch) result.error = endedAtLaunch.error
     else if (notTaken) result.error = notTaken
     else if (!s || Date.now() >= limit) result.error = s ? 'timed out' : 'the session ended'
-    // The bridges report their calls to Hive a batch at a time (every 2 s, or as their CLI closes input): read the
+    // The bridges report their calls to Combwork a batch at a time (every 2 s, or as their CLI closes input): read the
     // metrics once they count every call the bridges logged (allCallsReported). Not all within the bound (a report
     // dropped): the last read, shown as partial.
     let metricsAfter = await snapshot('after')
@@ -1000,7 +1000,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     // Tool calls the parser shortened for display are read in full (for the token check and read evidence), a Codex
     // script's calls too (HI-2246).
     const items = await readWhole(transcript?.items ?? [], (itemId) => inv('transcript:tool', host, sessionId, itemId))
-    // Codex in code mode (HI-2235): each script's calls as Hive's parser gives them (HI-2240, HI-2246), in the script's
+    // Codex in code mode (HI-2235): each script's calls as Combwork's parser gives them (HI-2240, HI-2246), in the script's
     // place. A script whose calls aren't known is no tool: what it ran is unobservable (codeMode.unknown).
     const code = p.provider === 'codex' ? withScriptCalls(items) : { items, scripts: 0, calls: 0, unknown: 0 }
     const observed = observeTranscript(code.items, skillNames, skillRefsOf(ctx.skillsDir, skillNames))
@@ -1015,7 +1015,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     // ended with none. Null if it never ended a turn watching. With no states seen, the snapshot's.
     const states = await ctx.statesSeen(statesFrom).catch(() => [])
     observed.turnWatch = states.length ? (states.findLast((x) => x.status === 'watching')?.watch ?? null) : observed.status === 'watching' ? observed.watch : null
-    // What Hive woke it with (#402), in order: a line it typed in, or (#650: its doorbell) what the session's next
+    // What Combwork woke it with (#402), in order: a line it typed in, or (#650: its doorbell) what the session's next
     // cw_inbox call read, the inbox's own items after the doorbell. Codex calls hive tools from its code tool (Script):
     // its read is the cw_inbox call the script made (HI-2235); with the script's calls unknown, the doorbell's line.
     observed.wakeLines = code.items.flatMap((x, i) => {
@@ -1034,7 +1034,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     // Each change to the merge slots (JSON lines, as the MCP log): { at, slots: [{ project, branch, holder, waiting }] }.
     observed.slotLog = readMcpLog(slotLog)
     // Any Agent API token (the workspace's, or an agent's for this launch) in what the session printed or said.
-    // Every one this Hive issued (its record, knownTokens), each launch's hook token among them (HI-2262, Darren's
+    // Every one this Combwork issued (its record, knownTokens), each launch's hook token among them (HI-2262, Darren's
     // decision: CW_HOOK_TOKEN stays in the session's environment, so a listing of it would print that), those of
     // launches long ended too.
     const known = knownTokens(tokenLog, apiToken)
@@ -1056,14 +1056,14 @@ async function runScenario(sc, providerKey, opts = {}) {
     })
     observed.gitStatus = ctx.git('status', '--porcelain')
     observed.live = (await inv('session:live')).map((x) => ({ project: path.basename(x.projectPath), agentId: x.agentId, status: x.status }))
-    // Hive's settings afterwards, for scenarios about changing them.
+    // Combwork's settings afterwards, for scenarios about changing them.
     observed.settings = await inv('settings:get')
     result.usage = sessionId ? await inv('session:usage', host, sessionId).catch(() => null) : null
     // A fake acts a scenario out with scripted board moves: checks only a model's own work can meet are skipped there.
     result.metricsRecording = metricsAfter?.recording ?? null
     // How complete the measurement was: both reads, recording on, nothing dropped or evicted in between.
     const partial = []
-    if (!metricsBefore || !metricsAfter) partial.push('Hive’s metrics weren’t read')
+    if (!metricsBefore || !metricsAfter) partial.push('Combwork’s metrics weren’t read')
     if (metricsAfter && metricsAfter.recording === false) partial.push('recording was off')
     if (!allReported) partial.push('not every hive call was reported')
     const dropped = Math.max(0, (metricsAfter?.dropped ?? 0) - (metricsBefore?.dropped ?? 0))
@@ -1078,12 +1078,12 @@ async function runScenario(sc, providerKey, opts = {}) {
     // Every scenario starts a new session (session:start with no resumeId): its usage is the scenario's own.
     result.resumed = false
     observed.measures = result.measures
-    // The guidance Hive had at the start against what the session was given: a mismatch is a stale launch.
+    // The guidance Combwork had at the start against what the session was given: a mismatch is a stale launch.
     const startRev = result.guidance?.atStart?.revision
     const gotRev = result.guidance?.delivered?.guidance
     result.staleGuidance = !!(startRev && gotRev && startRev !== gotRev)
-    // What the session left running (#613): stopped as Hive stops an agent, its launch's job is looked at (#507), and
-    // what Hive then lists as left running is what it left. Read once every exited launch has been looked at.
+    // What the session left running (#613): stopped as Combwork stops an agent, its launch's job is looked at (#507), and
+    // what Combwork then lists as left running is what it left. Read once every exited launch has been looked at.
     if (sc.leftovers) {
       await inv('session:stop', host, agentId)
       await lib.until(async () => !(await live()), HUNG_MS)
@@ -1113,10 +1113,10 @@ async function runScenario(sc, providerKey, opts = {}) {
   } catch (e) {
     result.error = String(e?.stack ?? e)
   } finally {
-    // What its Hive started, while it still runs (a command an agent left can outlive its session, #542).
+    // What its Combwork started, while it still runs (a command an agent left can outlive its session, #542).
     const tree = lib.processTree(app.process()?.pid)
     for (const x of await inv('session:live').catch(() => [])) await inv('session:stop', x.projectPath, x.agentId).catch(() => undefined)
-    // Closed once every session has stopped (a CLI still writing its transcript as Hive closes leaves it half-written).
+    // Closed once every session has stopped (a CLI still writing its transcript as Combwork closes leaves it half-written).
     await lib.until(async () => !(await inv('session:live').catch(() => [])).some((x) => !['stopped', 'error'].includes(x.status)), HUNG_MS)
     // What the agents left running, as their launches' jobs hold it (HI-2217): a command whose parent has exited and that
     // names no scenario folder is in neither the tree nor a command line. Asked once their leftovers are settled.
@@ -1132,7 +1132,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     await standIn?.close()
     // A command an agent started can outlive its session (#542): stop it, so it doesn't hold the folder.
     const leftOver = lib.stopProcessesIn(root, started, tree)
-    if (leftOver) result.leftOver = `${leftOver} process(es) the scenario's Hive or its agents started, or still running from its folder, were stopped`
+    if (leftOver) result.leftOver = `${leftOver} process(es) the scenario's Combwork or its agents started, or still running from its folder, were stopped`
     result.seconds = Math.round((Date.now() - started) / 1000)
     // Unless a card cites it now, or the board can't be read (evidence.cjs reads it afresh): then it stays, said in the result.
     const kept = opts.keep ? null : opts.evidence?.protects(root)

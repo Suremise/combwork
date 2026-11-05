@@ -1,4 +1,4 @@
-// A scenario run as a benchmark artifact (#117): what Hive's own parts cost in each scenario, with each sample's
+// A scenario run as a benchmark artifact (#117): what Combwork's own parts cost in each scenario, with each sample's
 // correctness, in a versioned, bounded file the Performance page can import and compare (src/shared/benchmark.ts reads
 // it: schema "hive-benchmark/1"). Runs keep their own folder; baselines are kept apart and never overwritten (the
 // previous copy is kept, the oldest pruned).
@@ -78,7 +78,7 @@ function metricsTotals(r, role) {
 }
 
 /**
- * A scenario's measures (#117): what Hive's parts did between the snapshot before the launch and the one after the turn
+ * A scenario's measures (#117): what Combwork's parts did between the snapshot before the launch and the one after the turn
  * (exact bytes and characters, calls, launches, the skill service's work), the hive calls the server ran (and how many
  * repeated one already made), and the session's own provider usage (a new session: its total is the scenario's; null
  * when the provider reported none).
@@ -151,10 +151,10 @@ function logMeasures(calls, lists) {
   return m
 }
 
-/** What Hive itself records as a tool call (its start view, src/main/metrics.ts START_VIEW_METRIC): in no server's log. */
+/** What Combwork itself records as a tool call (its start view, src/main/metrics.ts START_VIEW_METRIC): in no server's log. */
 const HIVE_OWN_CALLS = new Set(['session start view'])
 
-/** The hive tool calls the servers reported, Hive's own records left out. */
+/** The hive tool calls the servers reported, Combwork's own records left out. */
 function servedCalls(r) {
   let n = 0
   for (const part of [...Object.values(r?.projects ?? {}), ...(r?.workspace ? [r.workspace] : [])]) for (const m of part.mcp ?? []) if (!HIVE_OWN_CALLS.has(m.tool)) n += m.count
@@ -163,8 +163,8 @@ function servedCalls(r) {
 
 /**
  * Where a served call or a tool list of the log is against the two metrics snapshots (HI-2186), by when its own report
- * reached Hive (the server's `kind: 'reported'` line naming its id: when the report was sent, and when Hive had taken
- * it). `snapshots`: each snapshot's request, from before it was sent to after its answer. 'before': Hive had it before
+ * reached Combwork (the server's `kind: 'reported'` line naming its id: when the report was sent, and when Combwork had taken
+ * it). `snapshots`: each snapshot's request, from before it was sent to after its answer. 'before': Combwork had it before
  * the first snapshot was asked for; 'in': sent after the first's answer and taken before the last was asked for;
  * 'after': sent after the last's answer. Null when that can't be told: a report that overlapped a snapshot, or no report
  * on record for a line logged before the last snapshot's answer (its report failed, or was still on its way).
@@ -185,17 +185,17 @@ function placeOf(x, reports, { before, after }) {
  * run's, for builder and reviewer) }. `observed.allHiveCalls`, `observed.mcpLists` and `observed.mcpReports`: the hive
  * servers' test log.
  *
- * The log is used only when it says, for every served call and tool list in it, on which side of each snapshot Hive took
+ * The log is used only when it says, for every served call and tool list in it, on which side of each snapshot Combwork took
  * it (placeOf), by the line's own report: so the window holds the very calls the metrics counted between the
  * snapshots, not as many others. A call it can't place (a report that overlapped a snapshot, one not on record, a log
  * from before HI-2186 without ids), or a window whose counts still differ from the metrics', leaves the log unused
  * (`split: 'partial'`): unknown, never guessed. A fake's board move straight to the API (`direct`) ran no server and is
  * in no metric: a hive call of the window when logged between the snapshots' requests.
  *
- * - The Assistant as subject: Hive's metrics by caller role, the Assistant's and project agents', every measure (with
+ * - The Assistant as subject: Combwork's metrics by caller role, the Assistant's and project agents', every measure (with
  *   complete coverage only, else neither part).
  * - An agent as subject: its tool calls, replies and tool lists from the log, by agent, and the others' the same way.
- *   Its API and launch measures are unknown: Hive's metrics don't say which agent a request or launch was.
+ *   Its API and launch measures are unknown: Combwork's metrics don't say which agent a request or launch was.
  *
  * Also `agents`: each agent's hive calls (and tool lists) in the window, by its fixture name, the subject first.
  */
@@ -319,7 +319,7 @@ function benchmarkOf(meta, results, appVersion) {
   return {
     schema: SCHEMA,
     kind: 'scenarios',
-    app: { name: 'Hive', version: appVersion },
+    app: { name: 'Combwork', version: appVersion },
     createdAt: meta.when,
     scope: { kind: 'workspace' },
     // A run with --dialect (HI-2439) says which, so Performance → Compare tells it from the Default's.
@@ -517,13 +517,13 @@ function parseBudget(v) {
  * Whether another model trial may start. Spend is what the trials so far reported; a trial that reported no cost leaves
  * the spend unknown, so no further trial starts (the budget can't be kept) unless the run was told it may go on without
  * knowing (--allow-unknown-cost). Fakes cost nothing and always go on. `noCostModels`: the models of those trials, named
- * with how to price one (a model Hive has no price for is the usual reason).
+ * with how to price one (a model Combwork has no price for is the usual reason).
  */
 function budgetGate({ fake, budget, spentKnown, unknownCostTrials, allowUnknownCost, noCostModels = [] }) {
   if (fake) return { ok: true }
   if (unknownCostTrials > 0 && !allowUnknownCost) {
     const why = noCostModels.length
-      ? ` with ${noCostModels.join(', ')} (if Hive has no price for it, add one to SHIPPED_PRICES in src/shared/prices.ts from the provider's published prices, or pass --model with a priced model)`
+      ? ` with ${noCostModels.join(', ')} (if Combwork has no price for it, add one to SHIPPED_PRICES in src/shared/prices.ts from the provider's published prices, or pass --model with a priced model)`
       : ''
     return { ok: false, reason: `${unknownCostTrials} trial${unknownCostTrials === 1 ? '' : 's'} reported no cost${why}, so the spend can’t be checked against the budget (--allow-unknown-cost to go on anyway)` }
   }
