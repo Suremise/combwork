@@ -5190,6 +5190,24 @@ a stopped agent is launched with it as a task delivery (`launchWith`), an idle o
 to start leaves the lane recorded and says why. A running lane's menu has **End Lane** and **Abandon Lane…** (asks
 first; `lanes:end`).
 
+**The first card arrives with the brief** [HI-2558, HR1's design s11]. In slots the brief alone cost the builder a turn:
+it asked for its card (`cw_lane next`), started it, and was told to end its turn while Combwork made the card's line,
+then got the card as a new task. Now, with the rules on and the lane's slot lent, a lane started from the window, by
+the Assistant or a script (`POST /v1/lanes`), or after waiting for a slot, starts its first card itself when its
+builder is stopped (from the window, or a slot wait of the window's, also when it is idle outside that slot): the card
+due (`laneStartDue`, a code card) is started on the builder as Combwork starts later cards (`startTask`,
+`CW_LANE_START`, its guard checking the lane still has it due on that builder), with the builder's brief in the start's
+note after one line (*Combwork started this card for you: it is your lane's first card, and your lane's brief
+follows…*). The slot's placement makes the line and starts the builder there once, with the card, its brief and the
+lane's own brief together, as later cards arrive; the builder gets no brief delivery of its own (`launchAgents` skips
+it), and the reviewer starts with its brief as before. Step by step, as before, otherwise: a lane an agent registers
+itself, a builder busy, watching or idle in the slot already, a first card that is no-code or not due, a brief too long
+for a start's note (4,000 characters), or a start refused (its rules, a dependency, the builder busy, the lane changed),
+the refusal then reaching the builder through `cw_lane next` and `cw_start_card`. A start made again after one was cut
+short (its first card Active on the builder, its placement still to come) starts nothing more. A slot that can't be
+prepared for that card (the slot pass's notice and wake) starts its stopped builder with its brief then
+(`briefAfterFailedPrepare`), so it reads why. `lanestart` counts it: one task, one prompt.
+
 **A busy agent's new conversation is owed, never dropped** [HI-2034, HR1's design s11]. An agent found not free at
 its launch (in a turn since the up-front check, a prompt Combwork typed not taken yet, no line of Combwork's free to go in:
 lane A's end notice as lane B started, in p5lane) was reported failed, and since HI-2029 Combwork then gave the builder

@@ -71,6 +71,8 @@ const SETTLE_MS = 5000
 
 /** A Start's note is typed into the agent's terminal with the card. */
 const MAX_NOTE = 4000
+/** The longest note a Start takes (a lane's first card carries its brief in one, HI-2558). */
+export const START_NOTE_MAX = MAX_NOTE
 
 /**
  * Start on a card: gives it to an agent of its project (one that is stopped or idle, or a new one, in the project

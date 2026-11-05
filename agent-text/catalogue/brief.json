@@ -155,6 +155,10 @@
     "text": "Combwork started this card for you: it is your lane's first card. Use card-loop as its builder (cw_lane next names your cards).",
     "note": "HI-2029: with the rules on, Combwork starts a lane's first card on its builder itself. The note of the card's start prompt."
   },
+  "brief.start.firstWithBrief": {
+    "text": "Combwork started this card for you: it is your lane's first card, and your lane's brief follows. Use card-loop as its builder (cw_lane next names the cards after it).",
+    "note": "HI-2558: a lane started over a stopped builder in slots gives it its first card and its brief in one task. The note of the card's start prompt, before the builder's brief (brief.lane.*)."
+  },
   "brief.start.fromUser": {
     "text": "the user",
     "note": "Who a lane's brief is from, as the delivery records it and its agent's inbox names its sender. Stored, so the Default's."

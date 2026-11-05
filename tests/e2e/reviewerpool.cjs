@@ -174,7 +174,10 @@ const commitIn = (dir, files, message, trailer) => {
     check('the dialog closes', !!(await until(async () => (await dialog.count()) === 0, HUNG_MS)), await dialog.locator('.dialog-error, .error').innerText().catch(() => ''))
     const l1 = await until(async () => (await inv('lanes:list')).find((l) => l.builder.id === b1.id && l.state !== 'ended'), HUNG_MS)
     check("B1's lane is the pool's, with no reviewer of its own", !!l1 && l1.pool === true && l1.reviewer === null, JSON.stringify(l1))
-    const brief = await until(async () => (await deliveries('alpha', b1.name)).find((x) => /builder of a lane/.test(x)), HUNG_MS)
+    // Whole, as B1 read it (the fake's log): its brief comes in its first card's task (HI-2558), whose listed body is shortened.
+    const wakesFile = path.join(home, 'fake-wakes.jsonl')
+    const read = () => (fs.existsSync(wakesFile) ? fs.readFileSync(wakesFile, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === b1.name).map((w) => w.text ?? '')
+    const brief = await until(async () => read().find((x) => /builder of a lane/.test(x)), HUNG_MS)
     fs.writeFileSync(path.join(shots, 'brief-builder.txt'), brief ?? '')
     check("B1's brief: reviewed by the pool, naming its reviewers", !!brief && brief.includes(`reviewed by the pool (${r1.name}, ${r2.name} and E1)`), String(brief).slice(0, 500))
     check('…and only B1 started', !(await live(alpha, r1.id)) && !(await live(alpha, r2.id)) && !(await live(alpha, e1.id)))

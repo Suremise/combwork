@@ -4,8 +4,8 @@
 // record and the board are stand-ins.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-type Live = { status: string; sessionId: string }
-const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[], onStart: null as null | ((id: string) => void), lanes: [] as unknown[], lanesHeld: null as null | Promise<void>, lend: { slot: 'slot-c' } as { slot: string } | { waiting: string }, slotWaits: [] as string[], waits: [] as unknown[], onGetTask: null as null | (() => void), beforeLaunch: null as null | ((agentId: string) => void), whileStopping: null as null | ((agentId: string) => void), pending: new Set<string>(), owed: [] as unknown[], noCode: [] as number[] }))
+type Live = { status: string; sessionId: string; cwd?: string }
+const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[], onStart: null as null | ((id: string) => void), lanes: [] as unknown[], lanesHeld: null as null | Promise<void>, lend: { slot: 'slot-c' } as { slot: string } | { waiting: string }, slotWaits: [] as string[], waits: [] as unknown[], onGetTask: null as null | (() => void), beforeLaunch: null as null | ((agentId: string) => void), whileStopping: null as null | ((agentId: string) => void), pending: new Set<string>(), owed: [] as unknown[], noCode: [] as number[], lanesOn: false, view: null as unknown, starts: [] as { n: number; agentId: string; note: string; guard?: (now: unknown) => void }[], startRefuses: null as null | string, placementDue: null as unknown, startGuardView: null as unknown }))
 
 vi.mock('../src/main/sessions', () => ({
   sessions: {
@@ -73,20 +73,39 @@ vi.mock('../src/main/lanes', () => ({
     return true
   },
   freshStartsNow: (_ws: unknown, id: string) => (state.lanes as { id: string; freshStart?: unknown[] }[]).find((l) => l.id === id)?.freshStart ?? [],
-  listLanes: async () => []
+  listLanes: async () => [],
+  // HI-2558: whether lanes' rules are on, and the lane's view (`state.view`).
+  lanesEnforced: async () => state.lanesOn,
+  laneNow: (_ws: unknown, _by: unknown, now?: unknown) => (now && state.startGuardView ? state.startGuardView : state.view)
 }))
 // A lane's slot (#1438): lent as `state.lend` says, before its agents start.
 vi.mock('../src/main/slotCards', () => ({
   lendLane: async (_ws: unknown, _p: string, laneId: string) => {
     state.calls.push(`lend ${laneId}`)
     return state.lend
+  },
+  // HI-2558: a started card's placement still to come, and the slots' folders.
+  placementDue: async () => state.placementDue,
+  slotFolderOf: async (_ws: unknown, _p: string, slot: string) => 'D:\\ws.worktrees\\alpha\\' + slot
+}))
+// A lane's first card started with its brief (HI-2558): recorded, or refused as `state.startRefuses` says.
+vi.mock('../src/main/taskStart', () => ({
+  START_NOTE_MAX: 4000,
+  startTask: async (n: number, target: { agentId: string }, _actor: unknown, note: string, _reason: unknown, guard?: (now: unknown) => void) => {
+    state.calls.push(`startTask ${n} ${target.agentId}`)
+    if (state.startRefuses) throw new Error(state.startRefuses)
+    guard?.({ number: n })
+    state.starts.push({ n, agentId: target.agentId, note, guard })
+    return { card: { number: n }, agentId: target.agentId, agentName: target.agentId, added: false }
   }
 }))
+vi.mock('../src/main/workspace', () => ({ inWorkspace: (_ws: unknown, fn: () => unknown) => fn() }))
 // No line of Combwork's on its way (HI-2034: its own conditions are lineWriter's).
 vi.mock('../src/main/lineWriter', () => ({ whyNoLine: () => null }))
 // Each workspace's board (HI-2288): a workspace with `board` has those cards; any other given has alpha's AL-n. Read with
 // no workspace (the default one's, the last focused window's), it is another workspace's card of the same number.
 vi.mock('../src/main/tasks', () => ({
+  CW_LANE_START: { kind: 'agent', name: 'Combwork' },
   getTask: async (n: number, w?: { board?: Record<number, unknown> }) => {
     state.onGetTask?.()
     if (!w) return { number: n, key: `HI-${n}`, title: `Another workspace's card ${n}`, project: 'hive', column: 'todo', archived: false }
@@ -102,7 +121,7 @@ vi.mock('../src/main/workflow/service', () => ({ workflowEnforced: () => state.e
 vi.mock('../src/main/workflow/cardWork', () => ({ openCardsNoCode: (_ws: unknown, ns: number[]) => ns.length > 0 && ns.every((n) => state.noCode.includes(n)) }))
 vi.mock('../src/main/workflow/rulesets', () => ({ resolvedOf: () => ({ options: state.options }) }))
 
-const { checkLanePool, launchFresh, launchRecordedLane, laneStartInfo, recordedLaneNote, resumeLaneBuilder, startLaneFromWindow, startWaitingLane } = await import('../src/main/laneStart')
+const { briefAfterFailedPrepare, checkLanePool, launchFresh, launchRecordedLane, laneStartInfo, recordedLaneNote, resumeLaneBuilder, startLaneFromWindow, startWaitingLane } = await import('../src/main/laneStart')
 const { allOff } = await import('../src/shared/workflow/options')
 
 const ws = {
@@ -131,6 +150,12 @@ beforeEach(() => {
   state.beforeLaunch = null
   state.whileStopping = null
   state.noCode = []
+  state.lanesOn = false
+  state.view = null
+  state.starts.length = 0
+  state.startRefuses = null
+  state.placementDue = null
+  state.startGuardView = null
 })
 
 describe('Start Lane… with the reviewer pool (#1443)', () => {
@@ -654,5 +679,149 @@ describe('Start Lane… of only no-code cards, in slots (HI-2338)', () => {
     state.options = { ...allOff('git'), review: 'agent', folder: 'project' }
     await startLaneFromWindow(ws, 'D:\\ws\\alpha', { builder: 'b2', reviewer: 'r1', cards: [1, 2] })
     expect(state.calls).toEqual(['record', 'start b2', 'start r1'])
+  })
+})
+
+describe("a lane's first card and brief in one task, in slots (HI-2558)", () => {
+  const ALPHA = 'D:\\ws\\alpha'
+  const FIRST = "Combwork started this card for you: it is your lane's first card, and your lane's brief follows."
+  /** The rules on, cards built in slots, and the lane's view: AL-1 then AL-2 in Todo, its builder `builder`. */
+  const on = (builder = 'b1', first: Partial<{ column: string; number: number }> = {}): void => {
+    state.enforced = true
+    state.lanesOn = true
+    state.options = { ...allOff('git'), review: 'agent', folder: 'slots' }
+    state.view = { id: 'lane-1', state: 'active', builder: { id: builder }, cards: [{ number: 1, column: 'todo', blocked: null, ...first }, { number: 2, column: 'todo', blocked: null }] }
+  }
+
+  it("Start Lane… with its builder stopped: Combwork starts the first card with the builder's brief in its note, and launches only the reviewer with its own", async () => {
+    on()
+    const r = await startLaneFromWindow(ws, ALPHA, { builder: 'b1', reviewer: 'r1', cards: [1, 2] })
+    expect(state.calls).toEqual(['record', 'lend lane-1', 'startTask 1 b1', 'start r1'])
+    expect(state.starts).toHaveLength(1)
+    expect(state.starts[0].note.startsWith(FIRST)).toBe(true)
+    // The brief whole, after that line: the cards, its slot, the rules.
+    expect(state.starts[0].note).toContain('You are the builder of a lane in alpha')
+    expect(state.starts[0].note).toContain('1. AL-1 Card 1')
+    expect(state.starts[0].note).toContain('slot-c')
+    // The reviewer's brief only: the builder is given none of its own.
+    expect(state.briefs).toHaveLength(1)
+    expect(state.briefs[0]).toContain('You are the reviewer')
+    expect(r.started.map((s) => [s.name, s.role, s.how])).toEqual([
+      ['B1', 'builder', 'started'],
+      ['R1', 'reviewer', 'started']
+    ])
+  })
+
+  it("Start Lane… with its builder idle outside the slot: the card's start gives it the card and brief (its new conversation there)", async () => {
+    on()
+    state.live.set('b1', { status: 'ready', sessionId: 'old-b1', cwd: 'D:\\ws\\alpha' })
+    const r = await startLaneFromWindow(ws, ALPHA, { builder: 'b1', reviewer: 'r1', cards: [1, 2] })
+    expect(state.calls).toEqual(['record', 'lend lane-1', 'startTask 1 b1', 'start r1'])
+    expect(r.started[0]).toMatchObject({ name: 'B1', how: 'fresh' })
+  })
+
+  it('Start Lane… with its builder idle in the slot already: step by step, as before (its new conversation with the brief)', async () => {
+    on()
+    state.live.set('b1', { status: 'ready', sessionId: 'old-b1', cwd: 'D:\\ws.worktrees\\alpha\\slot-c' })
+    await startLaneFromWindow(ws, ALPHA, { builder: 'b1', reviewer: 'r1', cards: [1, 2] })
+    expect(state.calls).toEqual(['record', 'lend lane-1', 'newConversation b1', 'start r1'])
+    expect(state.starts).toEqual([])
+  })
+
+  it("the card's start refused (its rules, a dependency, the builder busy): the builder is launched with its brief, step by step", async () => {
+    on()
+    state.startRefuses = 'AL-1 waits for AL-0 to be Done'
+    const r = await startLaneFromWindow(ws, ALPHA, { builder: 'b1', reviewer: 'r1', cards: [1, 2] })
+    expect(state.calls).toEqual(['record', 'lend lane-1', 'startTask 1 b1', 'start b1', 'start r1'])
+    expect(state.briefs).toHaveLength(2)
+    expect(r.started.map((s) => s.how)).toEqual(['started', 'started'])
+  })
+
+  it('the lane changed where the start is written (another builder by then): refused, so step by step', async () => {
+    on()
+    const before = state.view as { builder: { id: string } }
+    // The start's guard reads the lane again as it writes: another builder by then.
+    state.startGuardView = { ...before, builder: { id: 'b2' } }
+    await startLaneFromWindow(ws, ALPHA, { builder: 'b1', reviewer: 'r1', cards: [1, 2] })
+    expect(state.starts).toEqual([])
+    expect(state.calls).toEqual(['record', 'lend lane-1', 'startTask 1 b1', 'start b1', 'start r1'])
+  })
+
+  it('a first card that is no-code, the rules off for lanes, or a brief too long for a note: step by step', async () => {
+    on()
+    state.noCode = [1]
+    await startLaneFromWindow(ws, ALPHA, { builder: 'b1', reviewer: 'r1', cards: [1, 2] })
+    expect(state.calls).toEqual(['record', 'lend lane-1', 'start b1', 'start r1'])
+    state.noCode = []
+    state.calls.length = 0
+    state.live.clear()
+    state.lanesOn = false
+    await startLaneFromWindow(ws, ALPHA, { builder: 'b1', reviewer: 'r1', cards: [1, 2] })
+    expect(state.calls).toEqual(['record', 'lend lane-1', 'start b1', 'start r1'])
+    state.lanesOn = true
+    state.calls.length = 0
+    state.live.clear()
+    await startLaneFromWindow(ws, ALPHA, { builder: 'b1', reviewer: 'r1', cards: [1, 2], note: 'x'.repeat(4000) })
+    expect(state.calls).toEqual(['record', 'lend lane-1', 'start b1', 'start r1'])
+    expect(state.starts).toEqual([])
+  })
+
+  it('a lane the Assistant or a script recorded over a stopped builder: its first card with the brief, the reviewer with its own, and the reply as before', async () => {
+    on('b2')
+    state.lanes = [{ id: 'lane-1', state: 'active', builder: { id: 'b2', name: 'B2' }, reviewer: { id: 'r1', name: 'R1' }, cards: [1, 2], rounds: 3 }]
+    const l = await launchRecordedLane(ws, ALPHA, 'lane-1')
+    expect(state.calls).toEqual(['lend lane-1', 'startTask 1 b2', 'start r1'])
+    expect(state.starts[0].note).toContain('You are the builder')
+    expect(recordedLaneNote(l)).toBe("Started B2 and R1 with the lane's brief, in slot-c.")
+  })
+
+  it('a recorded lane whose builder is idle: left as it is (never given the card by the lane start), as before', async () => {
+    on('b2')
+    state.lanes = [{ id: 'lane-1', state: 'active', builder: { id: 'b2', name: 'B2' }, reviewer: { id: 'r1', name: 'R1' }, cards: [1, 2], rounds: 3 }]
+    state.live.set('b2', { status: 'ready', sessionId: 'old-b2', cwd: ALPHA })
+    await launchRecordedLane(ws, ALPHA, 'lane-1')
+    expect(state.calls).toEqual(['start r1'])
+    expect(state.starts).toEqual([])
+  })
+
+  it('a lane that waited for a slot, lent one now: its first card with the brief', async () => {
+    on()
+    state.lanes = [{ id: 'lane-1', state: 'active', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' }, cards: [1, 2], rounds: 3, slotWait: { since: new Date().toISOString(), note: '' } }]
+    expect(await startWaitingLane(ws, ALPHA, 'lane-1', 'slot-a', () => false)).toBe(true)
+    expect(state.calls).toEqual(['startTask 1 b1', 'start r1'])
+    expect(state.starts[0].note).toContain('slot-a')
+  })
+
+  it('made again after a start cut short (its first card Active on the builder, its placement to come): the builder is neither started again nor given a second brief', async () => {
+    on('b1', { column: 'doing' })
+    state.placementDue = { slot: 'slot-a', lease: 'l1' }
+    const board = { ...(ws as object), board: { 1: { number: 1, key: 'AL-1', title: 'Card 1', project: 'alpha', column: 'doing', archived: false, agent: 'b1' }, 2: { number: 2, key: 'AL-2', title: 'Card 2', project: 'alpha', column: 'todo', archived: false } } } as never
+    state.lanes = [{ id: 'lane-1', state: 'active', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' }, cards: [1, 2], rounds: 3, slotWait: { since: new Date().toISOString(), note: '' } }]
+    expect(await startWaitingLane(board, ALPHA, 'lane-1', 'slot-a', () => false)).toBe(true)
+    expect(state.calls).toEqual(['start r1'])
+  })
+
+  describe("its slot not prepared for the card (the slot pass's failure)", () => {
+    const lane = (): void => void (state.lanes = [{ id: 'lane-1', state: 'active', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' }, cards: [1, 2], rounds: 3 }])
+
+    it('its builder, stopped and never briefed, starts with its brief, so it reads the wake and why', async () => {
+      on()
+      lane()
+      await briefAfterFailedPrepare(ws, ALPHA, 1, 'b1')
+      expect(state.calls).toEqual(['start b1'])
+      expect(state.briefs).toHaveLength(1)
+      expect(state.briefs[0]).toContain('You are the builder')
+    })
+
+    it("nothing for a builder running, a card not its lane's first still to do, or another lane's builder", async () => {
+      on()
+      lane()
+      state.live.set('b1', { status: 'ready', sessionId: 's' })
+      await briefAfterFailedPrepare(ws, ALPHA, 1, 'b1')
+      state.live.clear()
+      await briefAfterFailedPrepare(ws, ALPHA, 2, 'b1')
+      await briefAfterFailedPrepare(ws, ALPHA, 1, 'b2')
+      expect(state.calls).toEqual([])
+    })
   })
 })
