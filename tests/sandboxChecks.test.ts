@@ -380,6 +380,15 @@ test("the profile move's script records the report's check ids, and reads the re
   assert.ok(notices.includes(`log.info(\`${said('checkLine')}`), `profileNotices.ts logs "${said('checkLine')}…" once per check`)
   assert.ok(notices.includes(`log.info('${said('doneLine')}')`), `profileNotices.ts logs "${said('doneLine')}"`)
   assert.ok(/signInChecked: true/.test(notices) && /by: 'installer'/.test(notices), 'the record says signInChecked: true, and by')
+  // The refused start (HI-2603): the error box the script finds by its English title, and the stderr line naming the folder.
+  const refusedTitle = /^\$refusedTitle = "([^"]+)"/m.exec(script)?.[1]
+  assert.ok(refusedTitle, 'the script says $refusedTitle')
+  const english = JSON.parse(fs.readFileSync(path.join(root, 'locales', 'en', 'main.json'), 'utf8'))
+  assert.ok(english['main.profileMove.refusedTitle']?.defaultMessage.includes(refusedTitle), `locales/en's main.profileMove.refusedTitle holds "${refusedTitle}"`)
+  const index = fs.readFileSync(path.join(root, 'src', 'main', 'index.ts'), 'utf8')
+  const refuse = index.slice(index.indexOf('function refuseStart('), index.indexOf('exitBeforeProfile(1)', index.indexOf('function refuseStart(')))
+  assert.ok(refuse.includes("id: 'main.profileMove.refusedTitle'") && refuse.includes('dialog.showErrorBox(title,') && refuse.includes('process.stderr.write(`${title}: ${e.message}'), 'refuseStart shows the title and writes the move\'s message to stderr')
+  assert.ok(/export class ProfileMoveRefused extends Error/.test(folders) && folders.includes('super(`${from} → ${to}: ${reason}`)'), 'ProfileMoveRefused\'s message names the folder it moves from')
 })
 
 // The driver's readiness (tests/sandbox/inside/ready.cjs): what Combwork says is done, never a quiet spell. Each case holds a
