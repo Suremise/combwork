@@ -146,6 +146,7 @@ usage.db-*
 `
 
 /** The Assistant's home's .gitignore (HI-2580: before 1.1 it said Hive; nothing reads it back). */
+// agent-protocol: a .gitignore's fixed text for git and whoever opens the file, not words said to an agent
 export const ASSISTANT_GITIGNORE = "# Combwork Assistant: this machine's sessions (added by Combwork)\n*\n" // i18n-ignore: the Assistant's .gitignore, a file in the workspace
 
 // i18n-ignore: the handovers folder's README, a file committed with the workspace
