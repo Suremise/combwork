@@ -104,6 +104,8 @@
   "session.modeOffer.one": "{agent}を今すぐ切り替えますか？切り替えない場合、新しいモードは次のセッションから適用されます。",
   "session.modeOffer.switch": "今すぐ切り替え",
   "session.modeOffer.title": "権限モードを{modes}に変更しました",
+  "session.model.switched": "{cli}は接続が指定した{launched}ではなく、{running}で動いています。{launched}に戻すにはエージェントを再起動してください。",
+  "session.model.switchedTitle": "{agent}は別のモデルで動いています",
   "session.movedFresh.body": "{n, plural, other {# 件の会話}}を新しく開始しました。フォルダーが.hiveとともに.combworkに移動したため、そこでは続けられません。以前の会話はセッション履歴に残っていて読めます。",
   "session.newConversation.didntStop": "停止しなかったため、新しい会話は開始されませんでした。",
   "session.newConversation.notRunning": "実行されていません。",

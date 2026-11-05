@@ -536,5 +536,7 @@
   "tips.workspaceMovedDefender.text": "如果 Combwork 曾让 Defender 跳过工作区的文件夹，移动后点击“修复…”即可将这些排除项移到新文件夹（一次管理员提示），不会在已不存在的文件夹上留下排除项。你自己创建的排除项保持不变。",
   "tips.workspaceMovedDefender.title": "Defender 排除项会跟随移动后的工作区",
   "tips.workspaceNotes.text": "固定在“共享笔记”顶部的 Workspace notes 用来记录这台机器特有的内容，比如完整路径。每个智能体在启动时都会获得它，无论在哪个文件夹，所以不必写进已提交的 AGENTS.md。以项目名为标题的章节只属于该项目。",
-  "tips.workspaceNotes.title": "让每个智能体都知道的本机笔记"
+  "tips.workspaceNotes.title": "让每个智能体都知道的本机笔记",
+  "tips.modelSwitched.title": "使用其他模型的智能体会被标记",
+  "tips.modelSwitched.text": "如果智能体最终使用的模型不是其连接指定的（接近上限时 Codex 提议的更便宜模型，或 /model），它的页脚会用警告标记该模型，“活动”会显示“模型已更换”。重启智能体即可回到原模型。"
 }

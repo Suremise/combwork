@@ -30,6 +30,8 @@
   "activity.liveTip": "ライブにする：実行中のものを変化に合わせて表示します。タブは開いた時点のスナップショットとして、固定された状態で開きます。",
   "activity.loadFailed": "アクティビティを読み込めませんでした：{error}",
   "activity.loading": "読み込み中…",
+  "activity.modelSwitch": "モデル変更：{launched} → {running}",
+  "activity.modelSwitch.tip": "コーディングエージェントが自分で、または独自の質問でモデルを変更しました。別のモデルで動いている間表示されます。接続のモデルに戻すにはエージェントを再起動してください。",
   "activity.noPrompt": "（プロンプトのテキストなし）",
   "activity.notEnded": "{why, select, notOwn {{label}はもうこのエージェントのプロセスではありません。何も終了していません。} cli {{label}はエージェントのCLIです。終了するには「停止」を使ってください。} other {{label}を終了できませんでした。まだ実行中の可能性があります。}}",
   "activity.notRunning": "実行していません",

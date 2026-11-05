@@ -235,6 +235,10 @@
     "defaultMessage": "{when, select, now {Hand it over to a new conversation: click for Hand Over to…, and choose the agent itself.} other {It can hand over to a new conversation when it has finished: not while it works, merges or is on a card loop's card.}}",
     "description": "What to do about a long transcript, in its hover (pane footer): now (the agent is idle: \"Hand Over to…\" is the agent menu's item, use its translation); other (it is working, merging or on a card loop's card)."
   },
+  "panes.footer.modelSwitched": {
+    "defaultMessage": "Launched with {launched}, its connection's model; {provider} now runs {running}. Restart the agent to go back to {launched}.",
+    "description": "The first paragraph of the hover of the model in a pane's footer, shown with a warning while the agent runs another model than Combwork started it with (HI-2609: Codex switched to a cheaper model at a prompt of its own). {launched} and {running} are model names (\"GPT-6 Astra\"), {provider} the coding agent (\"Codex\"); its connection is the account Combwork started it on."
+  },
   "panes.footer.modelTip": {
     "defaultMessage": "{chosenAs, select, none {} other {{model} · chosen as {chosenAs}. }}{provider} {effort, select, yes {model and effort} other {model}} {live, select, yes {of this session} other {for new sessions}}{reported, select, yes { (effort as the session reports it)} other {}}. Change them in {where}.",
     "description": "Hover of the model in a pane's footer: the model shown and the name it was chosen by ({chosenAs}; none: leave that branch empty), the provider (\"Claude Code\"), whether effort is shown too, whether it is the running session's or new sessions', and where to change them ({where}: \"Agent Settings or Project Settings\")."

@@ -1423,5 +1423,11 @@
   "settings.workspace.onOpen.title": "Ao abrir este espaço de trabalho, rodar",
   "settings.workspace.storage.desc": "O que o Combwork guarda para cada projeto do espaço de trabalho (os maiores primeiro) e para o Assistente: backups de transcrições, sessões arquivadas, anexos e worktrees. Armazenamento abre a página de um projeto, com Limpar… e Expurgar…; aqui, Expurgar… remove tudo o que o Combwork guarda das sessões de todo o espaço de trabalho.",
   "settings.workspace.storage.tip": "Medido em segundo plano, um projeto por vez. As transcrições dos próprios agentes de código (em ~/.claude, ~/.codex e ~/.copilot) não são contadas. Projetos ocultos não entram.",
-  "settings.workspace.storage.title": "Armazenamento"
+  "settings.workspace.storage.title": "Armazenamento",
+  "settings.advanced.codex.rateLimitNudge.hide.title": "Não oferecer um modelo mais barato perto do limite",
+  "settings.advanced.codex.rateLimitNudge.hide.desc": "Cada agente Codex é iniciado com a oferta do Codex de trocar para um modelo mais barato desativada naquela execução, então ele mantém o modelo da conexão quando a conta se aproxima do limite. Nada é gravado nos arquivos do Codex. Desativado, o Codex pode perguntar, e o agente espera sua resposta no terminal: o Combwork não digita nada nele enquanto isso.",
+  "settings.advanced.codex.screen.idleQuestion.title": "Tela: pergunta em repouso",
+  "settings.advanced.codex.screen.idleQuestion.desc": "O título de uma pergunta que o Codex mostra sozinho entre turnos, sem enviar hook (a oferta de um modelo mais barato perto do limite da conta), nas últimas linhas desenhadas. Enquanto ela aparece com uma das opções (Tela: opção da pergunta), o agente espera por você e o Combwork não digita nada nele, porque Enter responderia. Se estiver errado, o Enter de um aviso pode responder a pergunta.",
+  "settings.advanced.codex.screen.idleQuestionChoice.title": "Tela: opção da pergunta",
+  "settings.advanced.codex.screen.idleQuestionChoice.desc": "Uma das opções dessa pergunta (Tela: pergunta em repouso), como o Codex a numera. As duas precisam aparecer perto do fim da tela, e não na entrada, para a pergunta contar; assim as mesmas palavras na conversa não impedem o Combwork de digitar."
 }

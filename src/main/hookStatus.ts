@@ -286,7 +286,7 @@ export function hookStep(ev: HookEvent, s: HookStatusInput): HookStep {
       if (ev.ask.kind === 'permission' && s.reviewed) return { next: null, ...(s.status === 'waiting' ? {} : { review: ev.ask.message }), actions: [] }
       // Anything else is put to a person: once the title says so, or at once (the hooks say so, or the title
       // already asks, so this is a new need).
-      if (s.attention === 'title' && !s.titleAsks) return { next: null, open: [...s.open.filter((a) => !sameCall(a, ev.ask.call)), ev.ask].slice(-MAX_OPEN), actions: [] }
+      if (s.attention === 'title' && !s.titleAsks && !ev.ask.onScreen) return { next: null, open: [...s.open.filter((a) => !sameCall(a, ev.ask.call)), ev.ask].slice(-MAX_OPEN), actions: [] }
       // A second prompt while one waits: the wait is on the newer one, and the first stays open (its call ending
       // doesn't answer this one). The same prompt reported again changes nothing.
       const first = ev.ask.blocking && s.waitingOn && !sameCall(s.waitingOn, ev.ask.call) ? s.waitingOn : null

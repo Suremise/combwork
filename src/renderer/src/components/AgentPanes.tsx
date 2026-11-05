@@ -5,7 +5,7 @@ import { AGENT_STATE_LABEL, AGENT_STATES, agentState, allStopped, mostUrgent as 
 import { agentDoingCards } from '@shared/tasks'
 import { cardsText } from '@shared/agentTable'
 import { cardLabel } from '@shared/projectKeys'
-import { modelCaps, serverModelLabel } from '@shared/models'
+import { modelCaps, modelIdName, serverModelLabel } from '@shared/models'
 import { serverDefaultModel, serverModelOf } from '@shared/serverConnection'
 import { launchedName } from '@shared/connectionLabel'
 import { agentChoosesMcp, agentMcpText } from '@shared/agentMcp'
@@ -1457,6 +1457,12 @@ const RETRY_WAITED = msg({
   defaultMessage: 'This session has waited {minutes, plural, =0 {under a minute} one {# minute} other {# minutes}} in all for {provider} to retry rate-limited or failed requests ({waits, plural, one {# wait} other {# waits}}, the latest from {time}{ongoing, select, yes {, still waiting} other {}}): time not spent on its work.',
   description: "Added to the hover of the model in a pane's footer, after a blank line: how long this session of the agent has spent waiting for its coding agent ({provider}, a product name) to try a model request again after the service refused it (rate-limited) or it failed, so slow work can be told from waiting. {minutes} is the total in minutes, {waits} how many separate waits, {time} the clock time the latest wait began; ongoing yes adds that it is still waiting now."
 })
+/** The footer model's hover, first, while its session runs another model than it was launched with (HI-2609). */
+const MODEL_SWITCHED = msg({
+  id: 'panes.footer.modelSwitched',
+  defaultMessage: "Launched with {launched}, its connection's model; {provider} now runs {running}. Restart the agent to go back to {launched}.",
+  description: "The first paragraph of the hover of the model in a pane's footer, shown with a warning while the agent runs another model than Combwork started it with (HI-2609: Codex switched to a cheaper model at a prompt of its own). {launched} and {running} are model names (\"GPT-6 Astra\"), {provider} the coding agent (\"Codex\"); its connection is the account Combwork started it on."
+})
 const COST_CLICK = msg({ id: 'panes.footer.costClick', defaultMessage: "Click to see this session's details in the Overview", description: "The last line of the hover of a pane footer's cost: what clicking does (the project's Overview tab)." })
 
 /** The footer's context: "ctx 42%", or its tokens while the context window's size isn't known ("ctx 120K", "ctx –"). */
@@ -1570,6 +1576,8 @@ export function PaneFooter({
   const onServer = live?.launchedConnection?.server
   const serverModel = onServer ? serverModelOf(onServer.models, live?.modelId || usage?.model || (live?.launchedWith ? live.launchedWith.model : a.model) || serverDefaultModel(onServer.models) || '') : null
   const model = serverModel?.id ? serverModelLabel(serverModel.id, serverModel.as, tr, serverModel.remote) : shown.label
+  // Another model than it was launched with (HI-2609): marked, and said first in its hover.
+  const switched = live?.modelSwitch ?? null
   // With no effort set or reported, the model's own default when the CLI said what it is ("Medium (default)", #125).
   const runModel = (chose.model && chose.model !== 'inherit' ? chose.model : chose.modelGlobal) || providers[provider]?.defaultModel || null
   // This launch's time waiting for its CLI to retry a request (HI-1996), told apart from a slow model in the hover.
@@ -1744,7 +1752,7 @@ export function PaneFooter({
   return (
     <div ref={footerRef} className="pane-footer-bar" data-fit={fit} onMouseDown={() => focusAgent(project.path, a.id)}>
       <Tooltip
-        content={<span style={{ whiteSpace: 'pre-line' }}>{`${tr(
+        content={<span style={{ whiteSpace: 'pre-line' }}>{`${switched ? `${tr(MODEL_SWITCHED, { launched: modelIdName(provider, switched.launched, providers[provider]), running: modelIdName(provider, switched.running, providers[provider]), provider: providerName(provider) })}\n\n` : ''}${tr(
           msg({
             id: 'panes.footer.modelTip',
             defaultMessage: '{chosenAs, select, none {} other {{model} · chosen as {chosenAs}. }}{provider} {effort, select, yes {model and effort} other {model}} {live, select, yes {of this session} other {for new sessions}}{reported, select, yes { (effort as the session reports it)} other {}}. Change them in {where}.',
@@ -1753,7 +1761,8 @@ export function PaneFooter({
           { chosenAs: shown.chosenAs || 'none', model, provider: providerName(provider), effort: effort ? 'yes' : 'no', live: live ? 'yes' : 'no', reported: live?.effort ? 'yes' : 'no', where: settingsName ?? tr(msg({ id: 'panes.footer.settingsName', defaultMessage: 'Agent Settings or Project Settings', description: "Where an agent's model and effort are changed, ending the footer model's hover (\"Change them in …\"): the two dialogs' names." })) }
         )}${waited ? `\n\n${tr(RETRY_WAITED, { minutes: Math.floor(waited.seconds / 60), waits: waited.waits, provider: providerName(provider), time: formatTime(waited.latest.since), ongoing: waited.latest.ongoing ? 'yes' : 'no' })}` : ''}`}</span>}
       >
-        <span className="pane-foot-item foot-model fit-clip" onClick={() => (onSettings ? onSettings() : set({ agentSettingsFor: { project: project.path, agentId: a.id } }))}>
+        <span className={cx('pane-foot-item', 'foot-model', 'fit-clip', switched && 'warn')} data-switched={switched ? 'yes' : undefined} onClick={() => (onSettings ? onSettings() : set({ agentSettingsFor: { project: project.path, agentId: a.id } }))}>
+          {switched && <Icon name="warning" />}
           {model}
           {effort && <span className="faint"> · {effort}</span>}
         </span>

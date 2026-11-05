@@ -30,6 +30,8 @@
   "activity.liveTip": "Live schalten: zeigen, was läuft, sobald es sich ändert. Der Tab öffnet eingefroren, als Momentaufnahme vom Zeitpunkt des Öffnens.",
   "activity.loadFailed": "Aktivität konnte nicht geladen werden: {error}",
   "activity.loading": "Wird geladen…",
+  "activity.modelSwitch": "Modell gewechselt: {launched} → {running}",
+  "activity.modelSwitch.tip": "Sein Coding-Agent hat das Modell von sich aus oder bei einer eigenen Frage gewechselt. Zu sehen, solange er das andere Modell nutzt; starte den Agenten neu, um zum Modell seiner Verbindung zurückzukehren.",
   "activity.noPrompt": "(kein Prompt-Text)",
   "activity.notEnded": "{why, select, notOwn {{label} gehört nicht mehr zu den Prozessen dieses Agenten: Nichts wurde beendet.} cli {{label} ist die CLI des Agenten: Zum Beenden „Stoppen“ verwenden.} other {{label} konnte nicht beendet werden und läuft womöglich noch.}}",
   "activity.notRunning": "Läuft nicht",

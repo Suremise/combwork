@@ -231,6 +231,8 @@ export const AREAS = [
   { paths: ['src/main/files.ts', 'src/renderer/src/views/FilesTab.tsx', 'src/renderer/src/components/FileView.tsx', 'src/renderer/src/components/DocEditor.tsx', 'src/renderer/src/components/Editors.tsx', 'src/renderer/src/editorDrafts.ts', 'src/renderer/src/monaco.ts', 'src/renderer/src/monacoLang.ts'], suites: ['files', 'editor', 'drafts', 'unsaved', 'icons', 'image', 'assistantimages', 'asarfiles'] },
   { paths: ['src/main/attachmentsFolder.ts', 'src/shared/attachments.ts', 'src/renderer/src/attach.ts', 'src/renderer/src/components/AttachmentChips.tsx'], suites: ['image', 'files', 'assistantimages', 'storage', 'storageclose', 'dialogs', 'asarfiles', 'codex-extra'] },
   { paths: ['src/main/heldLine.ts', 'tests/e2e/idlequestion.cjs'], suites: ['idlequestion', 'wakeuntaken'] },
+  // Codex's offer of a cheaper model (HI-2609): read on its screen, hidden per launch, and a model switch marked.
+  { paths: ['tests/e2e/codexnudge.cjs', 'src/main/providers/codex/adapter.ts', 'src/renderer/src/views/ActivityTab.tsx'], suites: ['codexnudge'] },
   { paths: ['tests/e2e/inputblocked.cjs', 'src/main/lineWriter.ts', 'src/main/slotCards.ts'], suites: ['inputblocked', 'idlequestion'] },
   { paths: ['src/main/hookStatus.ts', 'src/main/terminalTitle.ts', 'src/shared/terminalInput.ts'], suites: ['background', 'idlequestion', 'attention', 'mode', 'busy', 'codex', 'codex-background', 'signin', 'idlestatus', 'turnledger', 'safeguards'] },
   // The turn ledger (#648): status by the CLIs' turn ids, reconciliation, the unknown state and Mark idle.
@@ -556,7 +558,7 @@ export const AREAS = [
   // An agent's Hooks dialog and Activity's lock blocks (HI-982), on the fake Claude Code and the fake Codex.
   { paths: ['tests/e2e/hooksview.cjs', 'src/main/hookListing.ts', 'src/shared/hooks.ts', 'src/renderer/src/components/HooksDialog.tsx', 'src/main/servers.ts', 'src/main/providers/codex/', 'src/main/providers/claude/', 'src/main/providers/copilot/'], suites: ['hooksview'] },
   // The fake Codex CLI: every suite that runs it.
-  { paths: ['tests/e2e/fake-codex/'], suites: ['accounts', 'attachread', 'connectionfirst','carryingon', 'codexqueued', 'attention', 'footerfit', 'skilldelivery', 'models', 'sessiontree', 'termsize', 'freshpath', 'defaultprovider', 'providerdetect', 'codexfolder', 'turnledger', 'flightrecorder', 'hookshealth', 'hookstranscript', 'workspacenotes', 'reviewcopies', 'slotguidance', 'p7lane', 'codexnewline', 'hooksview', 'wakeputoff', 'lockask', 'dialectlaunch', 'agenttemp'] },
+  { paths: ['tests/e2e/fake-codex/'], suites: ['accounts', 'attachread', 'connectionfirst','carryingon', 'codexqueued', 'codexnudge', 'attention', 'footerfit', 'skilldelivery', 'models', 'sessiontree', 'termsize', 'freshpath', 'defaultprovider', 'providerdetect', 'codexfolder', 'turnledger', 'flightrecorder', 'hookshealth', 'hookstranscript', 'workspacenotes', 'reviewcopies', 'slotguidance', 'p7lane', 'codexnewline', 'hooksview', 'wakeputoff', 'lockask', 'dialectlaunch', 'agenttemp'] },
   // Agents' temp folder (HI-2496): each launch's TEMP, TMP, TMPDIR and CLAUDE_CODE_TMPDIR, the empty default, a refused folder.
   { paths: ['src/main/agentTemp.ts', 'tests/e2e/agenttemp.cjs'], suites: ['agenttemp'] },
   // "Ask me" file locks for Codex: the notice's Allow after the blocked turn's end, and the go-ahead (HI-2386).

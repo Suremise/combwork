@@ -259,5 +259,6 @@
   "panes.watchCancel.failed": "Beobachtung konnte nicht abgebrochen werden",
   "panes.watchCell.agents": "Abschluss von {agents}",
   "panes.watchCell.cardsInto": "{cards} → {column}",
-  "panes.worktree.toMerge": "Zu mergen: {work}"
+  "panes.worktree.toMerge": "Zu mergen: {work}",
+  "panes.footer.modelSwitched": "Gestartet mit {launched}, dem Modell seiner Verbindung; {provider} nutzt jetzt {running}. Starte den Agenten neu, um zu {launched} zurückzukehren."
 }

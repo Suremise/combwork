@@ -33,7 +33,7 @@ import { copiesDirOf, grantsCopies } from './copies'
 import { agentWorkflowRole, launchWorkflow, reviewsWork, type LaunchWorkflow } from '../shared/workflow/roles'
 import { agentLaunchSettings, agentProvider, autoProviderPending, canSwitchModeLive, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
 import { isCliOwnMode, modeInEffect } from '../shared/cliOwnMode'
-import { dialectModelId, resolvedModel } from '../shared/models'
+import { dialectModelId, modelIdName, modelSwitched, resolvedModel } from '../shared/models'
 import type {
   AutoCompactSetting,
   AgentDef,
@@ -42,6 +42,7 @@ import type {
   FileLockMode,
   LaunchDialect,
   LiveSessionState,
+  ModelSwitch,
   RuntimeFacts,
   McpServerDef,
   McpServerInfo,
@@ -77,7 +78,7 @@ import { recacheEstimate, withoutAccountEnv, withServerEnv } from './providers/c
 import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcriptFiles'
 import { usesOwnPrices } from '../shared/prices'
 import { priceUsage, withCostFree } from '../shared/usageDays'
-import type { Ask, BackgroundTaskType, ExternalSession, HookEvent, LaunchContext, LaunchHooks, LaunchSkill, ProviderAdapter, SkillDelivery } from './providers/types'
+import type { Ask, BackgroundTaskType, ExternalSession, HookEvent, LaunchContext, LaunchHooks, LaunchSkill, LiveDetails, ProviderAdapter, SkillDelivery } from './providers/types'
 import { HOOK_FIRED_MAX, HOOK_SHORT_MAX, clip, type ActivityHookBlock, type HookFired, type SessionHooks } from '../shared/hooks'
 import { providerService } from './providerService'
 import { config } from './config'
@@ -185,6 +186,8 @@ const BUSY: ReadonlySet<SessionStatus> = new Set<SessionStatus>(['starting', 'wo
  * replies, deliveries), the log and the developer console stay English.
  */
 const M = {
+  modelSwitchTitle: msg({ id: 'session.model.switchedTitle', defaultMessage: '{agent} runs another model', description: "A notice's title (HI-2609): an agent's coding agent now runs another model than Combwork started it with (its connection's). {agent} is the agent." }),
+  modelSwitch: msg({ id: 'session.model.switched', defaultMessage: "{cli} now runs {running}, not {launched}, which its connection gave it. Restart the agent to go back to {launched}.", description: "The notice that an agent runs another model (HI-2609): its coding agent ({cli}, e.g. Codex) changed model by itself or at a prompt of its own. {running} and {launched} are model names (\"GPT-6 Luna\"); its connection is the account Combwork started it on." }),
   assistantCliOwn: msg({ id: 'session.mode.assistantCliOwn', defaultMessage: "The Assistant can't use the CLI's own setting: its Control setting relies on knowing the mode it runs in. Choose one of the CLI's modes.", description: "Switching the Combwork Assistant to the permission choice \"The CLI's own setting\" is refused. Control is the name of an Assistant setting." }),
   connectionFallbackTitle: msg({ id: 'session.connection.fallbackTitle', defaultMessage: '{agent} runs on another connection', description: "A notice's title (HI-2108): an agent started on another connection than its own (its own is off in this workspace, or was removed). {agent} is the agent." }),
   connectionFallback: msg({ id: 'session.connection.fallback', defaultMessage: "{why, select, missing {The connection chosen for it was removed} other {Its connection {wanted} is off in this workspace}}, so it started on {name}, its CLI's first usable one here. Choose another in its Agent Settings.", description: "A notice (HI-2108) when an agent starts on another connection than its own: its own was removed, or is on an account turned off in this workspace ({wanted}: its name). {name} is the account it started on. Agent Settings names a dialog." }),
@@ -597,6 +600,8 @@ interface LiveSession {
   inputBlocked?: { runId: string; ask: Ask; box: string | null; since: number; retrying?: boolean }
   /** A look at its screen for that question and a lost line is queued (one at a time, however much the CLI draws). */
   idleChecking?: boolean
+  /** The user was told this launch runs another model than it was given (HI-2609): once a launch. */
+  modelSwitchTold?: boolean
   /** The held line first seen lost (HI-1959): a second look after cw.lostLine.steadySeconds decides. */
   lostSeen?: { since: string; timer: ReturnType<typeof setTimeout> }
 }
@@ -5353,7 +5358,7 @@ class SessionManager {
     if (question && !l.idleAsk && AT_PROMPT.has(st.status)) {
       const text = withValues(msg({ id: 'session.status.cliAsks', defaultMessage: '{provider} asks: {question}', description: "An agent's status: its coding agent ({provider}, e.g. Claude Code) shows a question of its own on its screen and waits for the user to answer it there. {question} is the question, in the coding agent's own words (English)." }), { provider: l.adapter.descriptor.name, question })
       // agent-stored: agentField says it for each agent where its status is sent (setStatus keeps its text)
-      const ask: Ask = { kind: 'question', blocking: true, message: englishText(text), text }
+      const ask: Ask = { kind: 'question', blocking: true, message: englishText(text), text, onScreen: true }
       l.idleAsk = ask
       log.info(`${userText(this.label(st))}: its CLI asks on its screen: ${question}`)
       const ev: HookEvent = { kind: 'ask', ask }
@@ -5850,11 +5855,13 @@ class SessionManager {
     const onServer = !!st.launchedConnection?.server
     if (d.costUsd != null && !onServer) l.reportedCost = d.costUsd
     const reported = d.costUsd != null && !onServer && !usesOwnPrices(st.provider, config.settings)
-    const next = { autoCompact, effort: d.effort ?? st.effort, modelName: d.modelName ?? st.modelName, modelId: d.modelId ?? st.modelId, costUsd: reported ? d.costUsd : st.costUsd, costEstimated: reported ? false : st.costEstimated, planMode: d.planMode ?? st.planMode, permissionMode: d.permissionMode && !isCliOwnMode(l.launchMode) ? d.permissionMode : st.permissionMode, contextWindow: d.contextWindow ?? st.contextWindow }
+    const modelSwitch = this.modelSwitchOf(l, d)
+    const next = { autoCompact, effort: d.effort ?? st.effort, modelName: d.modelName ?? st.modelName, modelId: d.modelId ?? st.modelId, modelSwitch, costUsd: reported ? d.costUsd : st.costUsd, costEstimated: reported ? false : st.costEstimated, planMode: d.planMode ?? st.planMode, permissionMode: d.permissionMode && !isCliOwnMode(l.launchMode) ? d.permissionMode : st.permissionMode, contextWindow: d.contextWindow ?? st.contextWindow }
     if (
       next.effort === st.effort &&
       next.modelName === st.modelName &&
       next.modelId === st.modelId &&
+      next.modelSwitch === st.modelSwitch &&
       JSON.stringify(next.autoCompact) === JSON.stringify(st.autoCompact) &&
       next.costUsd === st.costUsd &&
       !!next.costEstimated === !!st.costEstimated &&
@@ -5865,11 +5872,45 @@ class SessionManager {
     )
       return
     const windowChanged = next.contextWindow !== st.contextWindow
+    const switched = next.modelSwitch && next.modelSwitch !== st.modelSwitch ? next.modelSwitch : null
     Object.assign(st, next)
+    if (!next.modelSwitch) delete st.modelSwitch
     if (d.permissionMode) st.modeObserved = d.permissionMode
     this.emitState(st)
+    if (switched) this.modelSwitchTold(l, switched)
     // Usage shown in the renderer carries the window: have it read again.
     if (windowChanged && st.sessionId) emit({ type: 'usage-changed', projectPath: st.projectPath, sessionId: st.sessionId })
+  }
+
+  /**
+   * Whether the session runs another model than its launch gave it, after a report (HI-2609, modelSwitched): the same
+   * object while that stands unchanged (so nothing is sent again), a new one when it starts or the model changes again,
+   * undefined while it runs its own. A report recorded before this launch (a resumed rollout's earlier turns) decides
+   * nothing, nor does one on a server connection, whose CLI names the Claude model the server's stands in for (HI-1772).
+   */
+  private modelSwitchOf(l: LiveSession, d: LiveDetails): LiveSessionState['modelSwitch'] {
+    const st = l.state
+    if (!d.modelId || st.launchedConnection?.server) return st.modelSwitch
+    if (d.modelAt && Date.parse(d.modelAt) < Date.parse(st.startedAt)) return st.modelSwitch
+    const s = modelSwitched(st.provider, st.launchedWith, d.modelId, providerService.info(st.provider))
+    if (!s) return undefined
+    const was = st.modelSwitch
+    return was && was.launched === s.launched && was.running === s.running ? was : { ...s, since: new Date().toISOString() }
+  }
+
+  /**
+   * A session seen on another model than its launch gave it (HI-2609): logged, and the user told once a launch (a notice,
+   * kept in Notifications, that opens the agent); the footer and Activity show it for as long as it lasts.
+   */
+  private modelSwitchTold(l: LiveSession, s: ModelSwitch): void {
+    const st = l.state
+    const label = st.agentName ?? this.label(st)
+    log.warn(`${userText(label)}: its CLI reports model ${s.running}, not ${s.launched} as launched`)
+    if (l.modelSwitchTold) return
+    l.modelSwitchTold = true
+    const info = providerService.info(st.provider)
+    const values = { agent: label, cli: l.adapter.descriptor.name, launched: modelIdName(st.provider, s.launched, info), running: modelIdName(st.provider, s.running, info) }
+    toast('warning', tr(M.modelSwitchTitle, values), tr(M.modelSwitch, values), undefined, st.projectPath, agentTarget(st.projectPath, st.agentId, label))
   }
 
   // -------------------------------------------------------------------------

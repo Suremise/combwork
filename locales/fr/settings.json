@@ -1423,5 +1423,11 @@
   "settings.workspace.onOpen.title": "Quand cet espace de travail s’ouvre, exécuter",
   "settings.workspace.storage.desc": "Ce que Combwork conserve pour chacun des projets de l’espace de travail (les plus gros d’abord) et pour l’Assistant : sauvegardes de transcriptions, sessions archivées, pièces jointes et worktrees. Stockage ouvre la page d’un projet, avec Nettoyer… et Purger… ; ici, Purger… retire tout ce que Combwork conserve pour les sessions de tout l’espace de travail.",
   "settings.workspace.storage.tip": "Mesuré en arrière-plan, un projet à la fois. Les transcriptions propres aux agents de code (dans ~/.claude, ~/.codex et ~/.copilot) ne sont pas comptées. Les projets masqués ne sont pas inclus.",
-  "settings.workspace.storage.title": "Stockage"
+  "settings.workspace.storage.title": "Stockage",
+  "settings.advanced.codex.rateLimitNudge.hide.title": "Ne pas proposer de modèle moins cher près de la limite",
+  "settings.advanced.codex.rateLimitNudge.hide.desc": "Chaque agent Codex est lancé avec la proposition de Codex de passer à un modèle moins cher désactivée pour ce lancement, pour qu’il garde le modèle de sa connexion quand le compte approche de sa limite. Rien n’est écrit dans les fichiers de Codex. Désactivé, Codex peut demander, et l’agent attend ta réponse dans son terminal : Combwork n’y tape rien entre-temps.",
+  "settings.advanced.codex.screen.idleQuestion.title": "Écran : question au repos",
+  "settings.advanced.codex.screen.idleQuestion.desc": "Le titre d’une question que Codex affiche de lui-même entre deux tours, sans envoyer de hook (sa proposition d’un modèle moins cher près de la limite du compte), dans les dernières lignes qu’il a dessinées. Tant qu’elle s’affiche avec l’un de ses choix (Écran : choix de la question), l’agent t’attend et Combwork n’y tape rien, car Entrée y répondrait. Si c’est faux, l’Entrée d’un réveil peut répondre à la question.",
+  "settings.advanced.codex.screen.idleQuestionChoice.title": "Écran : choix de la question",
+  "settings.advanced.codex.screen.idleQuestionChoice.desc": "L’un des choix de cette question (Écran : question au repos), tel que Codex le numérote. Les deux doivent s’afficher vers le bas de son écran, et pas dans sa saisie, pour que la question compte : les mêmes mots dans la conversation n’empêchent donc pas Combwork de taper."
 }

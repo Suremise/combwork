@@ -259,5 +259,6 @@
   "panes.watchCancel.failed": "No se pudo cancelar la vigilancia",
   "panes.watchCell.agents": "fin del turno de {agents}",
   "panes.watchCell.cardsInto": "{cards} → {column}",
-  "panes.worktree.toMerge": "Por fusionar: {work}"
+  "panes.worktree.toMerge": "Por fusionar: {work}",
+  "panes.footer.modelSwitched": "Iniciado con {launched}, el modelo de su conexión; {provider} usa ahora {running}. Reinicia el agente para volver a {launched}."
 }

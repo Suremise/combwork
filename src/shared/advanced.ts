@@ -2025,6 +2025,39 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/trust-codex-0.162.1.txt`, version: '0.162.1', text: 'Trust this folder? Codex can read, edit, and run files here' }] // i18n-ignore: a CLI's recorded text (#367)
   },
+  // Its offer of a cheaper model near the account's limit (HI-2609): turned off for each launch, and never typed into.
+  {
+    id: 'codex.rateLimitNudge.hide',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.rateLimitNudge.hide.title', defaultMessage: "Don't offer a cheaper model near the limit", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork (HI-2609): Codex's offer to switch to a cheaper model when the account nears its usage limit." }),
+    desc: msg({ id: 'settings.advanced.codex.rateLimitNudge.hide.desc', defaultMessage: "Each Codex agent is started with Codex's offer to switch to a cheaper model turned off for that launch, so it keeps its connection's model when the account nears its limit. Nothing is written to Codex's files. Off, Codex may ask, and the agent waits for your answer in its terminal: Combwork types nothing into it meanwhile.", description: 'What the advanced setting "Don\'t offer a cheaper model near the limit" is for, and what happens when it is off (Settings → Advanced, HI-2609). A connection is an account Combwork signs a CLI in with.' }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    samples: [{ from: `${FIX}/advanced/ratelimit-nudge-hide-codex-0.166.0.txt`, version: '0.166.0', text: 'invalid type: string "notabool", expected a boolean', shows: 'Codex reading -c notice.hide_rate_limit_model_nudge as its own boolean setting (a wrong value refused), and the offer\'s strings in its binary' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'codex.screen.idleQuestion',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.screen.idleQuestion.title', defaultMessage: 'Screen: question while idle', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.codex.screen.idleQuestion.desc', defaultMessage: "The title of a question Codex shows by itself between turns, sending no hook (its offer of a cheaper model near the account's limit), in the lines it drew last. While it shows with one of its choices (Screen: question's choice), the agent waits for you and Combwork types nothing into it, since Enter would answer it. Wrong, a wake's Enter can answer the question.", description: 'What the advanced setting "Screen: question while idle" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-2609). "Screen: question\'s choice" is another advanced setting\'s title: keep it as translated there.' }),
+    kind: 'pattern',
+    default: String.raw`Approaching rate limits`,
+    flags: 'i',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/ratelimit-nudge-codex-0.166.0.txt`, version: '0.166.0', text: 'Approaching rate limits' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'codex.screen.idleQuestionChoice',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.screen.idleQuestionChoice.title', defaultMessage: "Screen: question's choice", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.codex.screen.idleQuestionChoice.desc', defaultMessage: "One of the choices of that question (Screen: question while idle), as Codex numbers it. Both must show, near the bottom of its screen and not in its input, for the question to count, so the same words in the conversation don't stop Combwork typing.", description: 'What the advanced setting "Screen: question\'s choice" is for (Settings → Advanced, HI-2609). "Screen: question while idle" is another advanced setting\'s title: keep it as translated there.' }),
+    kind: 'pattern',
+    default: String.raw`\b\d\.\s+Keep current model\b`,
+    flags: 'i',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/ratelimit-nudge-codex-0.166.0.txt`, version: '0.166.0', text: '2. Keep current model' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
   {
     id: 'codex.fullAccess.warning',
     group: 'codex',

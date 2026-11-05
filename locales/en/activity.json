@@ -123,6 +123,14 @@
     "defaultMessage": "Loading…",
     "description": "The Activity tab, or a detail in it, while it loads."
   },
+  "activity.modelSwitch": {
+    "defaultMessage": "Model changed: {launched} → {running}",
+    "description": "In the Activity tab, under Now (HI-2609): the agent runs another model ({running}) than Combwork started it with ({launched}), its connection's. Both are model names (\"GPT-6 Astra\"); keep the arrow."
+  },
+  "activity.modelSwitch.tip": {
+    "defaultMessage": "Its coding agent changed model by itself or at a prompt of its own. Shown while it runs the other model; restart the agent to go back to its connection's.",
+    "description": "Tooltip on the \"Model changed\" row in the Activity tab (HI-2609). Its connection is the account Combwork started the agent on."
+  },
   "activity.noPrompt": {
     "defaultMessage": "(no prompt text)",
     "description": "A turn node in the Activity tree whose prompt has no text (only images, say)."

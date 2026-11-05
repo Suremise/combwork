@@ -259,5 +259,6 @@
   "panes.watchCancel.failed": "監視をキャンセルできませんでした",
   "panes.watchCell.agents": "{agents}の完了",
   "panes.watchCell.cardsInto": "{cards} → {column}",
-  "panes.worktree.toMerge": "マージ対象：{work}"
+  "panes.worktree.toMerge": "マージ対象：{work}",
+  "panes.footer.modelSwitched": "接続のモデル{launched}で起動しましたが、{provider}は現在{running}で動いています。{launched}に戻すにはエージェントを再起動してください。"
 }

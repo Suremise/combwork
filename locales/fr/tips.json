@@ -536,5 +536,7 @@
   "tips.workspaceMovedDefender.text": "Si Combwork a fait ignorer à Defender les dossiers de l’espace de travail, Réparer… après un déplacement propose de déplacer ces exclusions vers les nouveaux dossiers, avec une seule demande d’administrateur, pour qu’aucune ne reste sur un dossier disparu. Les exclusions que tu as créées toi-même restent telles quelles.",
   "tips.workspaceMovedDefender.title": "Les exclusions Defender suivent un espace de travail déplacé",
   "tips.workspaceNotes.text": "Workspace notes, épinglée en tête des Notes partagées, sert à ce qui est vrai pour cette machine, comme un chemin complet. Chaque agent la reçoit à son démarrage, dans n’importe quel dossier : inutile de le mettre dans un AGENTS.md commité. Une section portant le nom d’un projet n’est qu’à ce projet.",
-  "tips.workspaceNotes.title": "Des notes sur cette machine pour chaque agent"
+  "tips.workspaceNotes.title": "Des notes sur cette machine pour chaque agent",
+  "tips.modelSwitched.title": "Un agent sur un autre modèle est signalé",
+  "tips.modelSwitched.text": "Si un agent se retrouve sur un autre modèle que celui de sa connexion (la proposition de Codex d’un modèle moins cher près de ta limite, ou /model), son pied de page signale le modèle par un avertissement et Activité indique Modèle changé. Redémarre l’agent pour revenir."
 }

@@ -536,5 +536,7 @@
   "tips.workspaceMovedDefender.text": "Hat Combwork Defender die Ordner des Arbeitsbereichs überspringen lassen, bietet „Reparieren…“ nach einer Verschiebung an, diese Ausschlüsse mit einer Administratorabfrage in die neuen Ordner zu verschieben, damit keiner auf einem Ordner bleibt, den es nicht mehr gibt. Ausschlüsse, die du selbst angelegt hast, bleiben, wie sie sind.",
   "tips.workspaceMovedDefender.title": "Defender-Ausschlüsse folgen einem verschobenen Arbeitsbereich",
   "tips.workspaceNotes.text": "Workspace notes, oben in den gemeinsamen Notizen angeheftet, ist für das, was für diesen Rechner gilt, etwa einen vollständigen Pfad. Jeder Agent bekommt sie beim Start, in jedem Ordner, also muss das nicht in eine committete AGENTS.md. Ein Abschnitt mit dem Namen eines Projekts gehört nur diesem Projekt.",
-  "tips.workspaceNotes.title": "Notizen über diesen Rechner für jeden Agenten"
+  "tips.workspaceNotes.title": "Notizen über diesen Rechner für jeden Agenten",
+  "tips.modelSwitched.title": "Ein Agent mit einem anderen Modell wird markiert",
+  "tips.modelSwitched.text": "Landet ein Agent auf einem anderen Modell, als seine Verbindung ihm gab (das Angebot von Codex für ein günstigeres Modell nahe deinem Limit, oder /model), markiert seine Fußzeile das Modell mit einer Warnung, und Aktivität zeigt „Modell gewechselt“. Starte den Agenten neu, um zurückzukehren."
 }

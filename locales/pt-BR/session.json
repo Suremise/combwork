@@ -104,6 +104,8 @@
   "session.modeOffer.one": "Mudar o agente {agent} agora? Caso contrário, o novo modo vale a partir da próxima sessão dele.",
   "session.modeOffer.switch": "Mudar agora",
   "session.modeOffer.title": "Modo de permissão alterado para {modes}",
+  "session.model.switched": "O {cli} agora usa {running}, não {launched}, que a conexão deu a ele. Reinicie o agente para voltar a {launched}.",
+  "session.model.switchedTitle": "{agent} está usando outro modelo",
   "session.movedFresh.body": "{n, plural, one {# conversa começou} other {# conversas começaram}} do zero: {n, plural, one {a pasta dela foi movida} other {as pastas delas foram movidas}} com .hive para .combwork, então não {n, plural, one {pode} other {podem}} continuar lá. As anteriores ficam em Sessões para ler.",
   "session.newConversation.didntStop": "O agente não parou, então nenhuma nova conversa foi iniciada.",
   "session.newConversation.notRunning": "O agente não está em execução.",

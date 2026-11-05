@@ -2395,6 +2395,12 @@ export interface RetryWaited {
 /** What a start replies (sessions.start): the session as it starts, and why a resume asked for started a new conversation instead (HI-2540). */
 export type StartedSession = LiveSessionState & { startedFresh?: FreshReason }
 
+/** A running session on another model than its launch gave it (HI-2609): the given model's ID, and the one it runs. */
+export interface ModelSwitch {
+  launched: string
+  running: string
+}
+
 export interface LiveSessionState {
   provider: ProviderId
   /** This launch, until the process exits; hooks name it so they reach the right agent. */
@@ -2560,6 +2566,11 @@ export interface LiveSessionState {
   modelName?: string
   /** The model's id as the session reports it (Claude Code's status line, Codex's rollout): what the footer shows (#248). */
   modelId?: string
+  /**
+   * It reports another model than this launch gave it (HI-2609, modelSwitched): the given and the running model's IDs, and
+   * since when. The footer and Activity mark it; absent while it runs the model it was given, or Combwork can't tell.
+   */
+  modelSwitch?: ModelSwitch & { since: string }
   /** How its CLI was set to compact by itself, as read at launch (providers that say: Claude Code, #242). */
   autoCompact?: AutoCompactSetting
   /** API-equivalent cost of the session so far, in USD. */

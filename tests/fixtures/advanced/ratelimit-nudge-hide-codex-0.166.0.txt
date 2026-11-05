@@ -1,0 +1,28 @@
+Codex 0.166.0's setting that turns off its offer of a cheaper model near the account's limit (HI-2609), checked on
+5 Nov 2026 in a new empty CODEX_HOME (no sign-in), with `codex -c <setting> mcp list --json`, which loads the
+configuration and exits:
+
+  -c notice.hide_rate_limit_model_nudge=true      → []   (exit 0: taken)
+  -c notice.hide_rate_limit_model_nudge="notabool" → Error: failed to load bootstrap configuration
+                                                     Caused by: invalid type: string "notabool", expected a boolean
+                                                     in `notice.hide_rate_limit_model_nudge`   (exit 1)
+  -c notice.hide_rate_limit_model_nudge=5          → invalid type: integer `5`, expected a boolean (exit 1)
+
+So the key is Codex's own, typed (an unknown key would be ignored, not refused). The home's config.toml wasn't written.
+
+Strings in codex.exe 0.166.0 beside it (the [notice] table's keys, in order):
+
+  hide_gov_cloud_guidance hide_full_access_warning hide_world_writable_warning fast_default_opt_out
+  hide_rate_limit_model_nudge hide_gpt5_1_migration_prompt …
+
+and the offer itself (its view is named rate-limit-switch-prompt; `{}` is the model):
+
+  Approaching rate limits
+  Switch to {} for lower credit usage?
+  Switch to {}                              Uses fewer credits for upcoming turns.
+  Keep current model
+  Keep current model (never show again)     Hide future rate limit reminders about switching models
+
+"Keep current model (never show again)" ("Hide future rate limit reminders…") is, going by its words and Darren's own
+config.toml (which has hide_rate_limit_model_nudge = true after he chose it once), the choice that saves the key there;
+not tried here. Combwork passes it for the launch instead and writes nothing.

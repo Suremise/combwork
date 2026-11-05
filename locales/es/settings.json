@@ -1423,5 +1423,11 @@
   "settings.workspace.onOpen.title": "Al abrir este espacio de trabajo, ejecutar",
   "settings.workspace.storage.desc": "Lo que Combwork guarda de cada proyecto del espacio de trabajo (los más grandes primero) y del Asistente: copias de las transcripciones, sesiones archivadas, adjuntos y worktrees. Almacenamiento abre la página de un proyecto, con Limpiar… y Purgar…; aquí, Purgar… quita todo lo que Combwork guarda de las sesiones de todo el espacio de trabajo.",
   "settings.workspace.storage.tip": "Se mide en segundo plano, un proyecto cada vez. Las transcripciones propias de los agentes de programación (en ~/.claude, ~/.codex y ~/.copilot) no se cuentan. Los proyectos ocultos no se incluyen.",
-  "settings.workspace.storage.title": "Almacenamiento"
+  "settings.workspace.storage.title": "Almacenamiento",
+  "settings.advanced.codex.rateLimitNudge.hide.title": "No ofrecer un modelo más barato cerca del límite",
+  "settings.advanced.codex.rateLimitNudge.hide.desc": "Cada agente de Codex se inicia con la oferta de Codex de cambiar a un modelo más barato desactivada para ese inicio, así que conserva el modelo de su conexión cuando la cuenta se acerca a su límite. No se escribe nada en los archivos de Codex. Desactivado, Codex puede preguntar, y el agente espera tu respuesta en su terminal: Combwork no escribe nada en él mientras tanto.",
+  "settings.advanced.codex.screen.idleQuestion.title": "Pantalla: pregunta en reposo",
+  "settings.advanced.codex.screen.idleQuestion.desc": "El título de una pregunta que Codex muestra por sí mismo entre turnos, sin enviar ningún hook (su oferta de un modelo más barato cerca del límite de la cuenta), en las últimas líneas que dibujó. Mientras se ve con una de sus opciones (Pantalla: opción de la pregunta), el agente te espera y Combwork no escribe nada en él, porque Enter la respondería. Si es incorrecto, el Enter de un aviso puede responder la pregunta.",
+  "settings.advanced.codex.screen.idleQuestionChoice.title": "Pantalla: opción de la pregunta",
+  "settings.advanced.codex.screen.idleQuestionChoice.desc": "Una de las opciones de esa pregunta (Pantalla: pregunta en reposo), tal como Codex la numera. Ambas deben verse cerca del final de su pantalla y no en su entrada para que la pregunta cuente, así las mismas palabras en la conversación no impiden que Combwork escriba."
 }

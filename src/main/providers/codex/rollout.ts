@@ -157,7 +157,12 @@ export function rolloutDetails(text: string): LiveDetails {
       if (u) out.planUsage = u
     } else if (r.type === 'event_msg' && p.type === 'thread_settings_applied') {
       const ts = p.thread_settings ?? {}
-      if (typeof ts.model === 'string') out.modelName = out.modelId = ts.model
+      if (typeof ts.model === 'string') {
+        out.modelName = out.modelId = ts.model
+        // When (HI-2609): a resumed rollout's earlier records aren't this launch's model.
+        if (typeof r.timestamp === 'string') out.modelAt = r.timestamp
+        else delete out.modelAt
+      }
       const effort = ts.collaboration_mode?.settings?.reasoning_effort ?? ts.reasoning_effort
       if (typeof effort === 'string') out.effort = effort
       if (typeof ts.collaboration_mode?.mode === 'string') out.planMode = ts.collaboration_mode.mode === 'plan'
@@ -166,7 +171,11 @@ export function rolloutDetails(text: string): LiveDetails {
     } else if (r.type === 'event_msg' && p.type === 'task_started' && typeof p.collaboration_mode_kind === 'string') {
       out.planMode = p.collaboration_mode_kind === 'plan'
     } else if (r.type === 'turn_context') {
-      if (typeof p.model === 'string') out.modelName = out.modelId = p.model
+      if (typeof p.model === 'string') {
+        out.modelName = out.modelId = p.model
+        if (typeof r.timestamp === 'string') out.modelAt = r.timestamp
+        else delete out.modelAt
+      }
       if (typeof p.effort === 'string') out.effort = p.effort
     }
   }

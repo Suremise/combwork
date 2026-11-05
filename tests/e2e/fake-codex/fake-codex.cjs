@@ -50,6 +50,12 @@
 //   at a turn's start, sending no hook meanwhile (no UserPromptSubmit: Combwork sees no prompt, as with RR2 on 23 Oct). With
 //   fake-queue-<agent> in CODEX_HOME, a line typed while a turn runs is queued (as Codex queues input) and taken in the
 //   same turn once it has compacted: recorded as a user message, with no UserPromptSubmit; a doorbell read as above.
+// - "nudge" (HI-2609): after the turn, its offer of a cheaper model near the account's limit, as Codex 0.166.0 draws it
+//   (tests/fixtures/advanced/ratelimit-nudge-codex-0.166.0.txt) in place of its input, its first choice selected. Every key
+//   read while it shows is logged in fake-nudge.jsonl in CODEX_HOME; Enter takes the selected choice (its rollout's
+//   thread_settings_applied names gpt-6-luna), "2" or Esc keeps the model. With -c notice.hide_rate_limit_model_nudge=true
+//   it isn't shown (logged as hidden). "switchmodel M": its rollout's thread_settings_applied names M, as /model does.
+//   With fake-turn-context.txt in CODEX_HOME, each turn's rollout has a turn_context naming its -m model.
 const fs = require('fs')
 const path = require('path')
 const { randomUUID } = require('crypto')
@@ -212,6 +218,8 @@ const sessionId = resuming ? args[1] : randomUUID()
 // Options that take a value, so a first prompt (the last plain argument, as Combwork's adapter gives one) can be told apart.
 const WITH_VALUE = new Set(['-c', '--config', '-m', '--model', '-s', '--sandbox', '-a', '--ask-for-approval', '-C', '--cd', '-p', '--profile', '-i', '--image', '--add-dir'])
 let firstPrompt = ''
+/** The model it runs (HI-2609): its -m, until its offer of a cheaper one is taken or "switchmodel" changes it. */
+let model = args.includes('-m') ? (args[args.indexOf('-m') + 1] ?? 'gpt-fake') : 'gpt-fake'
 for (let i = resuming ? 2 : 0; i < args.length; i++) {
   if (WITH_VALUE.has(args[i])) i++
   else if (!args[i].startsWith('-')) firstPrompt = args[i]
@@ -622,6 +630,8 @@ async function runPrompt(text) {
   }
   turnId = randomUUID()
   turnRecord('task_started')
+  // Its model, as each turn's context records it (HI-2609), when the suite asks.
+  if (process.env.CODEX_HOME && fs.existsSync(path.join(process.env.CODEX_HOME, 'fake-turn-context.txt'))) fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'turn_context', payload: { model, turn_id: turnId } }) + '\n')
   // Compacting first (#1514): no hook meanwhile, then what was queued is taken in this turn.
   const compacting = /^compacting (\d+)\b/.exec(text)
   if (compacting) {
@@ -670,6 +680,10 @@ async function runPrompt(text) {
       questions++
     } else if (step === 'hold') {
       await key(['g'])
+    } else if (step === 'nudge') {
+      nudgeAfter = true
+    } else if (/^switchmodel \S+$/.test(step)) {
+      switchModel(step.slice('switchmodel '.length))
     } else if (step === 'ratelimited') {
       await rateLimited()
     } else if (step === 'approve') {
@@ -709,10 +723,49 @@ async function runPrompt(text) {
   if (!/\bsilent\b/.test(text)) turnRecord('task_complete')
   if (late) await hook('PostToolUse', late)
   busy = false
+  if (nudgeAfter) {
+    nudgeAfter = false
+    return showNudge()
+  }
   promptLine()
 }
 
 const promptLine = () => out('\r\n› Ask Codex to do anything\r\n')
+
+/** A "nudge" step this turn: its offer of a cheaper model shows once the turn is over (HI-2609). */
+let nudgeAfter = false
+/** Its offer showing: the choice selected (1: switch). */
+let nudge = null
+const NUDGE_TO = 'gpt-6-luna'
+const nudgeLog = (o) => process.env.CODEX_HOME && fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-nudge.jsonl'), JSON.stringify({ agent: String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_'), at: new Date().toISOString(), ...o }) + '\n')
+/** Its model changed (HI-2609), as Codex records it: thread_settings_applied in its rollout, and a line on its screen. */
+function switchModel(to) {
+  model = to
+  if (rollout) fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type: 'thread_settings_applied', thread_settings: { model: to } } }) + '\n')
+  out(`\r\n• Model changed to ${to}.\r\n`)
+}
+/** Its offer of a cheaper model, drawn in place of its input as Codex 0.166.0 draws it; none when the launch hid it. */
+function showNudge() {
+  if (args.includes('notice.hide_rate_limit_model_nudge=true')) {
+    nudgeLog({ shown: false })
+    return promptLine()
+  }
+  nudge = { selected: 1 }
+  nudgeLog({ shown: true })
+  out(`\r\n\r\n  Approaching rate limits\r\n  Switch to ${NUDGE_TO} for lower credit usage?\r\n\r\n› 1. Switch to ${NUDGE_TO}                    Uses fewer credits for upcoming turns.\r\n  2. Keep current model\r\n  3. Keep current model (never show again)   Hide future rate limit reminders about switching models\r\n`)
+}
+/** A key read while its offer shows: every one logged; Enter takes the selected choice, "2"/"3" or Esc keep the model. */
+function nudgeKey(ch) {
+  nudgeLog({ key: ch })
+  if (ch === '1' || ch === '2' || ch === '3') nudge.selected = Number(ch)
+  if (ch !== '\r' && ch !== '\x1b' && ch !== '2' && ch !== '3') return
+  const take = ch === '\r' && nudge.selected === 1
+  nudge = null
+  nudgeLog({ answer: take ? 'switch' : 'keep' })
+  out('\x1b[2J\x1b[H')
+  if (take) switchModel(NUDGE_TO)
+  promptLine()
+}
 
 let line = ''
 let ctrlC = 0
@@ -723,6 +776,10 @@ process.stdin.on('data', (data) => {
   // on) is a key of its own: a new line in the prompt, not a send, as Codex 0.164's editor takes it (HI-1327).
   const keys = data === '\x1b' ? ['\x1b'] : data.split('\x1b\r').flatMap((part, i) => [...(i > 0 ? ['alt-enter'] : []), ...part.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')])
   for (const ch of keys) {
+    if (nudge) {
+      nudgeKey(ch)
+      continue
+    }
     if (onKey?.(ch)) continue
     if (ch === '\x03') {
       if (++ctrlC >= 2) void hook('SessionEnd').then(() => process.exit(0))

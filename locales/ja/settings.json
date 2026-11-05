@@ -1423,5 +1423,11 @@
   "settings.workspace.onOpen.title": "このワークスペースを開くときに実行",
   "settings.workspace.storage.desc": "ワークスペースの各プロジェクト（大きい順）とアシスタントのために、Combworkが保持しているもの：トランスクリプトのバックアップ、アーカイブしたセッション、添付ファイル、ワークツリー。「ストレージ」でプロジェクトのページが開き、「クリーンアップ…」と「パージ…」を使えます。ここの「パージ…」は、ワークスペース全体のセッションについてCombworkが保持しているものをすべて削除します。",
   "settings.workspace.storage.tip": "バックグラウンドで1プロジェクトずつ計測します。コーディングエージェント自身のトランスクリプト（~/.claude、~/.codex、~/.copilot）は数えられません。非表示のプロジェクトは含まれません。",
-  "settings.workspace.storage.title": "ストレージ"
+  "settings.workspace.storage.title": "ストレージ",
+  "settings.advanced.codex.rateLimitNudge.hide.title": "上限付近で安いモデルを提案しない",
+  "settings.advanced.codex.rateLimitNudge.hide.desc": "各Codexエージェントは、より安いモデルへの切り替えを勧めるCodexの提案をその起動だけオフにして起動されるため、アカウントが上限に近づいても接続のモデルを使い続けます。Codexのファイルには何も書き込みません。オフにすると、Codexが尋ねることがあり、エージェントはターミナルで応答を待ちます。その間、Combworkは何も入力しません。",
+  "settings.advanced.codex.screen.idleQuestion.title": "画面：待機中の質問",
+  "settings.advanced.codex.screen.idleQuestion.desc": "Codexがターンの合間にフックを送らずに自分で表示する質問（アカウントの上限付近での、より安いモデルの提案）のタイトルで、最後に描画された行から探します。その選択肢の1つ（画面：質問の選択肢）と一緒に表示されている間、エージェントは応答を待ち、Combworkは何も入力しません。Enterで答えてしまうためです。間違っていると、通知のEnterが質問に答えてしまうことがあります。",
+  "settings.advanced.codex.screen.idleQuestionChoice.title": "画面：質問の選択肢",
+  "settings.advanced.codex.screen.idleQuestionChoice.desc": "その質問（画面：待機中の質問）の選択肢の1つで、Codexの番号付けどおりです。質問として扱われるには、両方が画面の下の方に、入力欄の外に表示されている必要があります。会話中の同じ言葉でCombworkの入力が止まることはありません。"
 }

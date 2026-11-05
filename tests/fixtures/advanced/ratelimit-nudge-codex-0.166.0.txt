@@ -1,0 +1,22 @@
+
+  >_ OpenAI Codex (v0.166.0)
+     C:\work\alpha
+
+
+› Print a.txt contents
+
+
+• Ran Get-Content a.txt
+  └ hello
+
+• a.txt contains "hello".
+
+  Worked for 6s • 21:41
+
+
+  Approaching rate limits
+  Switch to gpt-6-luna for lower credit usage?
+
+› 1. Switch to gpt-6-luna                    Uses fewer credits for upcoming turns.
+  2. Keep current model
+  3. Keep current model (never show again)   Hide future rate limit reminders about switching models

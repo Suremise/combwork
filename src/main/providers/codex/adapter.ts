@@ -142,6 +142,32 @@ export function codexHoldsInput(screen: string): boolean {
   return last !== undefined && advanced.pattern('codex.queue.hint').test(last)
 }
 /**
+ * Whether a screen line is Codex's input, or a prompt its conversation shows: a line its "›" begins. A choice view's
+ * selected row ("› 1. Switch to gpt-6-luna", HI-2609) begins with it too, and isn't one.
+ */
+export function codexInputLine(line: string): boolean {
+  return /^\s*›/.test(line) && !/^\s*›\s*\d+\.\s/.test(line)
+}
+/** How many of the lines Codex drew last its question by itself is looked for in (HI-2609): its view's title and choices. */
+const IDLE_QUESTION_LINES = 14
+/**
+ * The question Codex shows by itself between turns, sending no hook (HI-2609, 0.166.0: "Approaching rate limits", its
+ * offer of a cheaper model with that choice selected, which Enter takes): its title (codex.screen.idleQuestion) and one
+ * of its choices (codex.screen.idleQuestionChoice), both in the last lines drawn below Codex's last input line. Such a
+ * view replaces the input while it shows, so a title above an input line is a reply's, a prompt's, or what is left of a
+ * view answered; the same words in the input itself don't count either. Null when none shows.
+ */
+export function codexIdleQuestion(screen: string): string | null {
+  const lines = screen.split('\n').map((l) => l.trimEnd())
+  while (lines.length && !lines.at(-1)) lines.pop()
+  const input = lines.findLastIndex(codexInputLine)
+  const bottom = lines.slice(input + 1).slice(-IDLE_QUESTION_LINES)
+  const title = advanced.pattern('codex.screen.idleQuestion')
+  const choice = advanced.pattern('codex.screen.idleQuestionChoice')
+  const asked = bottom.map((l) => title.exec(l)?.[0]).find(Boolean)
+  return asked && bottom.some((l) => choice.test(l)) ? asked.trim() : null
+}
+/**
  * Whether Codex's input still holds `command`, unrun (#363): the input is the last line Codex marks with "›", and holds
  * just the command (a menu's selected row, or an input that is empty or holds anything else, isn't it). Run, or queued
  * by Codex to run when it is free, the command leaves the input.
@@ -561,6 +587,10 @@ export class CodexAdapter implements ProviderAdapter {
   busyScreen(screen: string): boolean {
     return codexHoldsInput(screen)
   }
+  // Its offer of a cheaper model near the account's limit (HI-2609): the agent waits for the user, and nothing is typed.
+  idleQuestion(screen: string): string | null {
+    return codexIdleQuestion(screen)
+  }
 
   startHint(text: string): StartHint | null {
     if (/\bmodel\b/i.test(text) && /not found|invalid|unknown|not supported|does not exist/i.test(text)) return { hint: tr(msg({ id: 'providers.codex.hint.model', defaultMessage: "Codex doesn't know this model: choose another in Agent Settings.", description: "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown." })), fix: 'agent-settings' }
@@ -969,6 +999,9 @@ export class CodexAdapter implements ProviderAdapter {
     // looks its cwd up first, so it never asks in Combwork's folders. The table merges into the home's own for this launch
     // (config overrides.rs, merge.rs at 6aaac69) and nothing is written.
     if (advanced.get<boolean>('codex.trust.perLaunch')) args.push('-c', `projects=${toToml({ [ctx.cwd]: { trust_level: 'trusted' } })}`)
+    // Its offer of a cheaper model near the account's limit turned off for this launch (HI-2609: a wake's Enter took it, and
+    // agents ran another model than their connection's), nothing written; before the user's own arguments, which win.
+    if (advanced.get<boolean>('codex.rateLimitNudge.hide')) args.push('-c', 'notice.hide_rate_limit_model_nudge=true')
     const files = [join(ctx.connectionHome ?? codexHome(), 'config.toml'), join(ctx.cwd, '.codex', 'config.toml')]
     const developer = this.developerOverride(ctx)
     const combwork = { preApprove: launchOverrides(ctx.overrides, CODEX, 'preApproveCombworkTools'), trusted: ctx.trustedCombworkTools }

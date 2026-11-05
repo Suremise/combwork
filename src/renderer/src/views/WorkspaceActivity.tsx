@@ -54,7 +54,7 @@ const activityAgents = (h: ProjectInfo): ActivityAgent[] =>
     const l = a.live
     if (!l) return { id: a.id, name: a.name, live: null }
     const state = agentState(l)
-    return { id: a.id, name: a.name, live: { sessionId: l.sessionId, sessionName: l.sessionName, startedAt: l.startedAt, status: l.status, text: statusText(l), working: state === 'working', waiting: state === 'waiting', failed: state === 'stalled' } }
+    return { id: a.id, name: a.name, live: { sessionId: l.sessionId, sessionName: l.sessionName, startedAt: l.startedAt, status: l.status, text: statusText(l), working: state === 'working', waiting: state === 'waiting', failed: state === 'stalled', ...(l.modelSwitch ? { modelSwitch: { launched: l.modelSwitch.launched, running: l.modelSwitch.running, provider: l.provider } } : {}) } }
   })
 
 /** A card as the Activity tab takes it. */
