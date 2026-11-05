@@ -211,7 +211,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     await page.locator('.template-editor .template-detail-actions button', { hasText: 'Save Template' }).click()
     check("the editor removes None's section, Git's kept", !!(await until(() => JSON.stringify(Object.keys(fileOf('team-a.json').workflow ?? {})) === '["git"]')), JSON.stringify(fileOf('team-a.json').workflow))
 
-    // --- HR5's round 1, 1: imported with a section Hive can't use: said, and no preset offered in its place.
+    // --- HR5's round 1, 1: imported with a section Combwork can't use: said, and no preset offered in its place.
     await page.locator('.activitybar [aria-label="Projects"]').click()
     await select('gitb')
     // gitb last showed Version Control: its Session tab, for + Add ▾.

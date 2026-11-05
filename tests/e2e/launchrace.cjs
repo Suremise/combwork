@@ -1,6 +1,6 @@
 // Closing a workspace while one of its agents is still starting cancels the start: no CLI process is left
 // running for a workspace that is no longer open. Dev build, throwaway profile and workspace; the agent runs the fake
-// Claude Code (fake-claude/, #194): the race is in Hive's start, before the CLI runs.
+// Claude Code (fake-claude/, #194): the race is in Combwork's start, before the CLI runs.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')

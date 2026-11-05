@@ -11,7 +11,7 @@ const root = path.join(scratch, 'agentsui')
 for (const d of [userData, root]) fs.rmSync(d, { recursive: true, force: true })
 const ws = path.join(root, 'ws'), proj = path.join(ws, 'demo')
 fs.mkdirSync(proj, { recursive: true })
-// Git in the test repository, waiting out the Hive under test's own git (lib.git, #199).
+// Git in the test repository, waiting out the Combwork under test's own git (lib.git, #199).
 const g = (cmd, cwd = proj) => lib.git(cwd, cmd)
 g('init -q -b main'); g('config user.email t@e.com'); g('config user.name T')
 fs.writeFileSync(path.join(proj, 'a.txt'), 'a\n'); g('add -A'); g('commit -q -m init')

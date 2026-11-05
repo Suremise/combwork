@@ -88,7 +88,7 @@ function mcp(config, msgs) {
     }
     await until(async () => ['ready', 'finished'].includes((await live(id))?.status), HUNG_MS)
     const before = calls().length
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
     await until(async () => calls().length > before && (await live(id))?.status === 'finished', HUNG_MS)
     return calls().at(-1)
@@ -160,7 +160,7 @@ function mcp(config, msgs) {
   check("the reviewer's session records the card as reviewed", !!rec?.cards?.some((x) => x.number === n && x.review === true), JSON.stringify(rec?.cards))
 
   // --- What the agents' hive tools say, from the MCP server as the reviewer's mcp.json starts it.
-  // In the launch's private folder in Hive's user data, not the project (#345).
+  // In the launch's private folder in Combwork's user data, not the project (#345).
   const mcpFile = path.join(lib.launchDir(userData, (await live(reviewer.id)).runId), 'mcp.json')
   const server = JSON.parse(fs.readFileSync(mcpFile, 'utf8')).mcpServers.combwork
   const [init, list] = await mcp(server, [

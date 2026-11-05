@@ -15,7 +15,7 @@ import { processAlive } from './logs.mjs'
 
 /**
  * Lane k's first slot port is LANE_FIRST + k × LANE_SPAN; it uses LANE_PORTS ports from one below that (the CLI lane)
- * up. Clear of the installed and dev Hives' (47821, 47822) and of the suites' own defaults (478xx–4791x) and the scenarios' (47930, tests/scenarios); and the
+ * up. Clear of the installed and dev builds' (47821, 47822) and of the suites' own defaults (478xx–4791x) and the scenarios' (47930, tests/scenarios); and the
  * highest a runner inside a suite takes (1000 above its parent's slot) stays under 49152, where Windows hands out
  * ports to anything that asks (the hook server's among them).
  */
@@ -33,8 +33,8 @@ const LOCK_MAX_MS = 10_000
 /**
  * Where the lanes of a pool of its own (HIVE_TEST_LANES_DIR, runContext's OWN_LANES: concurrency.mjs's check of a run
  * that waits for a lane, #735) have their ports: above the machine pool's. Runs in other worktrees claim the machine
- * pool's lanes without seeing this pool's claims, so sharing ports let one of them start its test Hive on the port a
- * scenario here had just claimed, and the scenario's Agent API calls reached that Hive, which refused its token (#1127).
+ * pool's lanes without seeing this pool's claims, so sharing ports let one of them start its test Combwork on the port a
+ * scenario here had just claimed, and the scenario's Agent API calls reached that Combwork, which refused its token (#1127).
  * Every pool of its own has these ports, so only one is used at a time on the machine (holdOwnPool). That check starts
  * no runner inside a suite, the only thing that takes ports 1000 above a lane's.
  */
@@ -73,7 +73,7 @@ export function pickLane(claims, busy = new Set(), alive = processAlive, now = D
   return null
 }
 
-/** Whether nothing listens on a port (on 127.0.0.1, where Hive's Agent API listens). */
+/** Whether nothing listens on a port (on 127.0.0.1, where Combwork's Agent API listens). */
 export function portFree(port) {
   return new Promise((resolve) => {
     const srv = createServer()
@@ -102,7 +102,7 @@ export async function withLock(dir, fn) {
     } catch (e) {
       // Windows refuses the folder while one just released is still being deleted (another runner's handle on it, as a
       // stat): EPERM, at times EACCES (HI-1800: 3 of 36 runners racing for it). Taken again once it is gone, within the
-      // same bound; a folder Hive can't write to at all still fails then.
+      // same bound; a folder Combwork can't write to at all still fails then.
       if ((e.code === 'EPERM' || e.code === 'EACCES') && Date.now() - start <= 4 * LOCK_MAX_MS) {
         await sleep(50)
         continue

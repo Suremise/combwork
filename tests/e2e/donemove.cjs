@@ -116,7 +116,7 @@ const until = async (fn, ms = 10000) => {
     return typeof content === 'string' || content === null ? content : (content.find?.((c) => typeof c.content === 'string')?.content ?? null)
   }, 15000)
   // The prompt points to the work-on-card skill, which the agent's launch carries, and which says Review when done (by
-  // submitting it, #1274) and Done only once merged (#170). The session's Hive instructions say both too, with "or when the
+  // submitting it, #1274) and Done only once merged (#170). The session's Combwork instructions say both too, with "or when the
   // user asks", for a session without the skill (tests/guidance.test.ts checks those).
   check('the card prompt points to the work-on-card skill', typeof prompt === 'string' && prompt.includes('Use the work-on-card skill.'), String(prompt))
   const skill = path.join(alpha, '.combwork', `launch-${agent.id}`, 'plugin', 'skills', 'work-on-card', 'SKILL.md')

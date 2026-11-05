@@ -1,4 +1,4 @@
-// Unused Worktrees on slots (#1450, SPEC §16.10.2): a test Hive lends a Git project's slots (the test copies' `slots:test`
+// Unused Worktrees on slots (#1450, SPEC §16.10.2): a test Combwork lends a Git project's slots (the test copies' `slots:test`
 // channel, as #1438's card start will) and Version Control → Changes → Unused worktrees lists only those that need the
 // user: a dirty free slot (with Open, which shows its changes), free slots beyond the pool, and a retired home no
 // conversation resumes in (`slots:test` `homes`, until #1441 records real ones); never the slot lent to a card or the one

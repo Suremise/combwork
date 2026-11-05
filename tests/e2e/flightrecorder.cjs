@@ -4,7 +4,7 @@
 // - every trigger off (the default): a safeguard stop saves nothing and says nothing;
 // - safeguard on: a safeguard stop saves a capture of the turn's hooks before it and the trigger, with no prompt text,
 //   and the notice; the same stop again at once saves no second one (one per trigger and agent every few minutes);
-// - unknown on: an ordinary turn (every field of the fake's known) saves nothing; a hook with a field Hive doesn't know
+// - unknown on: an ordinary turn (every field of the fake's known) saves nothing; a hook with a field Combwork doesn't know
 //   (the fake's "newfield") saves a capture naming it;
 // - version on: the agent started again on another version of its CLI saves a capture saying old → new;
 // - stalled on: the fake Codex silent in a turn past its limit (HIVE_TEST_SILENT_MS) saves a capture;
@@ -18,7 +18,7 @@ const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 30000
-// How long a running turn may be silent before Hive says its state is unknown (the stalled trigger).
+// How long a running turn may be silent before Combwork says its state is unknown (the stalled trigger).
 const SILENT_MS = 2000
 
 const userData = path.join(lib.WORK, 'flightrecorder-profile')
@@ -92,7 +92,7 @@ const captured = (trigger) => lib.until(() => capturesOf(trigger).find((c) => c.
     const setAdvanced = (id, value) => inv('advanced:set', id, value)
     const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
 
-    // Two agents in alpha (so Hive names one "alpha · Claude"), one in beta ("beta").
+    // Two agents in alpha (so Combwork names one "alpha · Claude"), one in beta ("beta").
     const claude = await lib.addAgent(inv, alpha, { name: 'Claude' })
     await lib.addAgent(inv, alpha, { name: 'Spare' })
     const codex = await lib.addAgent(inv, beta, { name: 'Codex', provider: 'codex', permissionMode: 'full-access' })
@@ -108,7 +108,7 @@ const captured = (trigger) => lib.until(() => capturesOf(trigger).find((c) => c.
 
     // --- 1. Every trigger off: a safeguard stop saves nothing, and says nothing.
     check('off: the turn with a safeguard stop ends', !!(await prompts.say('safeguard first')))
-    check('off: Hive noted the safeguard stop', !!(await stops(1)))
+    check('off: Combwork noted the safeguard stop', !!(await stops(1)))
     check('off: no capture is saved', captures().length === 0, JSON.stringify(captures().map((c) => c.name)))
     check('off: no "Captured" notice', (await capturedToasts()).length === 0, JSON.stringify(await capturedToasts()))
     check('off: the recorder noted nothing', !/flight recorder: /.test(hiveLog()))
@@ -135,9 +135,9 @@ const captured = (trigger) => lib.until(() => capturesOf(trigger).find((c) => c.
 
     // --- 6. The same trigger again at once on the same agent: no second capture.
     check('again: the turn with a safeguard stop ends', !!(await prompts.say('safeguard again')))
-    check('again: Hive noted the stop', !!(await stops(3)))
+    check('again: Combwork noted the stop', !!(await stops(3)))
 
-    // --- 3. Unknown on: an ordinary turn saves nothing; a field Hive doesn't know saves a capture naming it.
+    // --- 3. Unknown on: an ordinary turn saves nothing; a field Combwork doesn't know saves a capture naming it.
     await setAdvanced('cw.recorder.unknown', true)
     check('unknown on: an ordinary turn ends', !!(await prompts.say('work 1')))
     check('unknown on: a turn whose hook has a new field ends', !!(await prompts.say('newfield')))
@@ -156,7 +156,7 @@ const captured = (trigger) => lib.until(() => capturesOf(trigger).find((c) => c.
     check('the agent stops', !!(await lib.until(async () => !(await live(alpha, claude)), HUNG_MS)))
     fs.writeFileSync(path.join(claudeHome, 'fake-version.txt'), '2.2.0')
     await inv('provider:refresh', 'claude-code')
-    check('Hive sees the new version of Claude Code', !!(await lib.until(async () => (await inv('provider:info'))['claude-code'].version === '2.2.0', HUNG_MS)), JSON.stringify((await inv('provider:info'))['claude-code'].version))
+    check('Combwork sees the new version of Claude Code', !!(await lib.until(async () => (await inv('provider:info'))['claude-code'].version === '2.2.0', HUNG_MS)), JSON.stringify((await inv('provider:info'))['claude-code'].version))
     check('the agent starts on it', !!(await startClaude()))
     const version = await captured('version')
     check('version on: a capture is saved, saying old → new', !!version && version.header.capture.what === `claude-code ${was} → 2.2.0`, JSON.stringify(version?.header?.capture))

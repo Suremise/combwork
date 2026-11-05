@@ -46,11 +46,11 @@ const record = (what, text) => console.log(`RECORD ${what}: ${text}`)
 
 /** A step that didn't finish within its bound: the run stops there, the step named (#1494). */
 class Hung extends Error {}
-/** The Hives open, for what a hang says about each (set as they start). */
+/** The copies open, for what a hang says about each (set as they start). */
 const running = []
 /**
  * `p` within `ms`, else a FAIL naming `what` and the run stopped (#1494: a hang in the Sandbox printed nothing until the
- * guest's 900 s bound): IPC calls (page.evaluate has no timeout of its own), screenshots and clicks. What each Hive
+ * guest's 900 s bound): IPC calls (page.evaluate has no timeout of its own), screenshots and clicks. What each Combwork
  * still answers is said first: its main process, its window, a screenshot.
  */
 async function bounded(what, p, ms = HUNG_MS) {
@@ -74,7 +74,7 @@ async function bounded(what, p, ms = HUNG_MS) {
   throw new Hung(what)
 }
 /**
- * Closes a Hive within the bound, else ends its process and waits for it to exit (#1494: a hung Hive mustn't hold the
+ * Closes a Combwork within the bound, else ends its process and waits for it to exit (#1494: a hung Combwork mustn't hold the
  * run after the hang is said, HR6's round 1: at its start too).
  */
 async function closeApp(app) {
@@ -84,7 +84,7 @@ async function closeApp(app) {
   if (proc.exitCode !== null || proc.signalCode !== null) return
   const exited = new Promise((res) => proc.once('exit', res))
   // With what it started (its renderer, GPU and network processes), children first, by identity (#603).
-  console.log(`a Hive didn't close within ${HUNG_MS} ms: ended ${endChildTree(proc)} of its processes`)
+  console.log(`a Combwork didn't close within ${HUNG_MS} ms: ended ${endChildTree(proc)} of its processes`)
   await Promise.race([exited, new Promise((res) => setTimeout(res, HUNG_MS))])
 }
 /** An IPC caller whose every call is bounded, named by its channel. */
@@ -164,9 +164,9 @@ async function refusesStart(h, when) {
   const records = await h.inv('session:list', alpha, { own: true })
   check(`…and none was recorded (${when})`, records.length === 0, JSON.stringify(records.map((r) => r.id)))
   // Its CLI's transcript is still in the project's folder (HI-1727): the full listing may show it, as a session started
-  // outside Hive (HI-1681), never as Hive's.
+  // outside Combwork (HI-1681), never as Combwork's.
   const all = await h.inv('session:list', alpha)
-  check(`…any other session listed is the CLI's, not Hive's (${when})`, all.every((r) => r.source === 'external'), JSON.stringify(all.map((r) => [r.id, r.source])))
+  check(`…any other session listed is the CLI's, not Combwork's (${when})`, all.every((r) => r.source === 'external'), JSON.stringify(all.map((r) => [r.id, r.source])))
 }
 const ASK = "Upgrade this workspace's board to 1.0?"
 
@@ -355,7 +355,7 @@ async function themes(dev, name) {
     await close(old4)
     await close(dev2)
   } catch (e) {
-    if (e instanceof Hung) console.log(`STOPPED: ${e.message} didn't finish (its FAIL above, what each Hive answered after it)`)
+    if (e instanceof Hung) console.log(`STOPPED: ${e.message} didn't finish (its FAIL above, what each Combwork answered after it)`)
     else if (!(e instanceof StopHere)) throw e
     else console.log(`NOT RUN ${e.message}`)
   } finally {

@@ -4,8 +4,8 @@
 // cw_inbox (received, so it isn't typed after) and acks it (acked); one typed into it is offered, and received once its
 // CLI takes the line (#649), then acked; one not acked in time shows as overdue; cw_agent_activity gives each one's state
 // and times, so the Assistant sees them. A stop of the agent keeps what waits for it; once the Assistant's launch ends,
-// its message still waiting is refused (#645) and shown in the Assistant's activity list. Then Hive restarts: what was
-// refused stays so; a card event Hive was offering when it stopped (as a watch's wake is, #649) is restored as uncertain,
+// its message still waiting is refused (#645) and shown in the Assistant's activity list. Then Combwork restarts: what was
+// refused stays so; a card event Combwork was offering when it stopped (as a watch's wake is, #649) is restored as uncertain,
 // offered once more to the agent once it is resumed, saying it may repeat, and received once its CLI takes it. Dev build,
 // throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -34,7 +34,7 @@ const check = (name, ok, extra = '') => {
 // The project's deliveries as saved (#1018: in the workspace's database).
 const saved = () => deliveriesOf(alpha)
 
-/** Starts Hive on the suite's profile and workspace; its helpers. */
+/** Starts Combwork on the suite's profile and workspace; its helpers. */
 async function start() {
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off', HIVE_TEST_DELIVERY_OVERDUE_MS: String(OVERDUE_MS) })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
@@ -65,7 +65,7 @@ async function start() {
 
   let { app, page, inv, live } = await start()
   const until = (fn, ms) => lib.until(fn, ms, 250)
-  // What the builder read when Hive's doorbell rang (#650: fake Claude Code reads its inbox then), and the doorbells.
+  // What the builder read when Combwork's doorbell rang (#650: fake Claude Code reads its inbox then), and the doorbells.
   const wakeLog = () => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
     return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === 'Builder')
@@ -73,7 +73,7 @@ async function start() {
   const wakes = () => wakeLog().map((w) => w.text)
   const bells = () => wakeLog().map((w) => w.doorbell ?? '')
   const say = async (id, text) => {
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(alpha, id) })
   }
   const idle = async (id) => ['ready', 'finished'].includes((await live(alpha, id))?.status)
@@ -167,7 +167,7 @@ async function start() {
   check("…and the refusal is in the Assistant's activity list", !!(await until(async () => (await inv('assistant:actions')).some((a) => a.text === 'A message for Builder (m3) was refused' && a.error === "the Assistant's session that left it ended"), HUNG_MS)), JSON.stringify((await inv('assistant:actions')).slice(-3)))
   await until(async () => (await inv('session:live')).length === 0, HUNG_MS)
   await app.close()
-  // A card event Hive was offering the builder when it stopped (a watch's wake, #649): typed into a launch that is gone, its
+  // A card event Combwork was offering the builder when it stopped (a watch's wake, #649): typed into a launch that is gone, its
   // CLI never took it.
   const place = deliveriesPlace(alpha)
   const next = storeMeta(place.ws, 'deliveries', 'next', place.scope)

@@ -52,7 +52,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   // The Assistant off (S54): a test copy never starts it.
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  // The dev build, or the packaged Hive HIVE_EXE names (S54 on the upgraded build in the Sandbox checks, #1337).
+  // The dev build, or the packaged Combwork HIVE_EXE names (S54 on the upgraded build in the Sandbox checks, #1337).
   const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -79,7 +79,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1' })
     const r1 = await lib.addAgent(inv, alpha, { name: 'R1' })
     // The fake trusts the folders it is told of (its trust prompt never shows): the project's slots too, as B1 works in
-    // the lane's (one left at the prompt is never quiet, so Hive would never prepare its next card's line).
+    // the lane's (one left at the prompt is never quiet, so Combwork would never prepare its next card's line).
     const slotRoot = path.join(`${ws}.worktrees`, 'alpha')
     fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws, alpha, ...'abcdefgh'.split('').map((x) => path.join(slotRoot, `slot-${x}`))].map((d) => d.toLowerCase())))
     check('B1 is a builder in the project folder (no worktree of its own)', !b1.worktree, JSON.stringify(b1))
@@ -150,9 +150,9 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
       const f = path.join(claudeHome, 'fake-wakes.jsonl')
       return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent)
     }
-    // A line typed into B1 (typeLine): Hive may type a wake into it at the same moment (a verdict's, a line moved's), and
+    // A line typed into B1 (typeLine): Combwork may type a wake into it at the same moment (a verdict's, a line moved's), and
     // the line is typed again when the wake disturbed it or B1 dropped it.
-    // Each try waits for B1 idle with its inbox quiet (HI-1918: idle between Hive's own turns isn't enough).
+    // Each try waits for B1 idle with its inbox quiet (HI-1918: idle between Combwork's own turns isn't enough).
     const typeTo = (text, taken) => lib.typeLine(inv, lib.ptyKey(alpha, b1.id), claudeHome, 'B1', text, { ready: async () => lib.agentQuiet(PORT, 'alpha', await live(b1.id), tokens.b1), strict: true, ...(taken ? { taken } : { live: () => live(b1.id) }), hungMs: 60000 })
     const shell = async (cmd) => {
       const before = shells().length
@@ -191,7 +191,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
       return rev
     }
     /**
-     * The builder reports a card's merge: Done, its merge checked (Integrated). Hive may have seen the merge in main
+     * The builder reports a card's merge: Done, its merge checked (Integrated). Combwork may have seen the merge in main
      * first (reconciliation, S7): then the card is Done already and the report has nothing left to do.
      */
     const reportMerge = async (n) => {
@@ -206,7 +206,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     }
     /**
      * A card's start, and its Started fact's base and line. Started, it is built in the folder the start names (`wt`, the
-     * lane's slot) on its line (`line`) once Hive has made it there (`made: false` skips that wait).
+     * lane's slot) on its line (`line`) once Combwork has made it there (`made: false` skips that wait).
      */
     const start = async (n, { made = true } = {}) => {
       const s = await intent('b1', n, 'start')

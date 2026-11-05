@@ -58,7 +58,7 @@ const check = (name, ok, extra = '') => {
     return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent).map((w) => w.text)
   }
   const say = async (id, text) => {
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
   }
   const watch = (cards, extra) => `hive cw_wait_for_tasks ${JSON.stringify({ cards, ...extra, wake: true })}`

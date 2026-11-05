@@ -1,8 +1,8 @@
 // A project holding .asar files (an Electron app's build output, dist/win-unpacked/resources/app.asar) stays a set of
-// plain files to Hive (#246): Electron's own fs opens an .asar it stats as an archive and keeps it open until the app
+// plain files to Combwork (#246): Electron's own fs opens an .asar it stats as an archive and keeps it open until the app
 // quits, so `npm run dist` couldn't replace it. Storage, the Files tab (listing, watch, find, read), Changes, Attachments and
 // image previews (a path inside an archive is refused; a real folder named art.asar is just a folder, #261) go over a project and an agent's worktree with .asar files in
-// them, then each file is deleted from outside Hive.
+// them, then each file is deleted from outside Combwork.
 // The workspace watcher still notices projects coming and going and .combwork changes. Dev build, throwaway profile and
 // workspace.
 // Dev build only (#1580): it starts this checkout's Electron itself, and Tree is a 0.9 worktree agent
@@ -36,7 +36,7 @@ const putAsar = (file) => {
   fs.mkdirSync(path.dirname(file), { recursive: true })
   fs.copyFileSync(SAMPLE, file)
 }
-/** Deletes a file from outside Hive, as a build replacing it would: the error's code if Hive holds it. */
+/** Deletes a file from outside Combwork, as a build replacing it would: the error's code if Combwork holds it. */
 const deleteFromOutside = (file) => {
   try {
     fs.rmSync(file)
@@ -157,10 +157,10 @@ const deleteFromOutside = (file) => {
     ["the worktree's dist", treeAsar]
   ]) {
     const err = deleteFromOutside(file)
-    check(`the .asar in ${name} can be deleted while Hive runs`, !err, err)
+    check(`the .asar in ${name} can be deleted while Combwork runs`, !err, err)
   }
   const artErr = deleteFromOutside(path.join(alpha, 'art.asar', 'icon.png'))
-  check('the image shown from art.asar can be deleted while Hive runs', !artErr, artErr)
+  check('the image shown from art.asar can be deleted while Combwork runs', !artErr, artErr)
   let distGone = null
   try {
     fs.rmSync(path.join(alpha, 'dist'), { recursive: true })
@@ -179,8 +179,8 @@ const deleteFromOutside = (file) => {
   const gone = await lib.until(async () => (await eventsOf('workspace-changed')).some((e) => e.workspace && !e.workspace.projects.some((p) => p.name === 'beta')), 10000)
   check('… and goes when it is deleted', !!gone)
   fs.mkdirSync(path.join(ws, '.combwork', 'shared'), { recursive: true })
-  fs.writeFileSync(path.join(ws, '.combwork', 'shared', 'outside.md'), '# Written outside Hive\n')
-  check('a shared note written outside Hive is noticed', !!(await lib.until(async () => (await eventsOf('notes-changed')).length > 0, 10000)))
+  fs.writeFileSync(path.join(ws, '.combwork', 'shared', 'outside.md'), '# Written outside Combwork\n')
+  check('a shared note written outside Combwork is noticed', !!(await lib.until(async () => (await eventsOf('notes-changed')).length > 0, 10000)))
 
   await page.screenshot({ path: path.join(lib.WORK, 'asarfiles.png') })
   await app.close()

@@ -122,7 +122,7 @@ function findBoard(root) {
 /** A card that may cite evidence: neither Done nor archived, with its words (title, description, comments) as pathText. */
 const citing = (c) => (!c || c.archived || c.column === 'done' ? null : { number: c.number, text: pathText([c.title, c.description, ...(c.comments ?? []).map((m) => m.text)].join('\n')) })
 
-/** The cards from a board's database (read-only; Hive writing meanwhile is fine: WAL), as readCards gives them. */
+/** The cards from a board's database (read-only; Combwork writing meanwhile is fine: WAL), as readCards gives them. */
 function readDbCards(file) {
   let db
   try {
@@ -217,7 +217,7 @@ function evidence({ tasksDir, cards, testRoot = runContext.TEST_ROOT, label = 'h
 
 /**
  * The evidence rules for the repository at root (its workspace's board). HIVE_TEST_NO_BOARD=1 says there is no board
- * whose cards could cite test output (a checkout outside a Hive workspace): then nothing is evidence. Without it, no
+ * whose cards could cite test output (a checkout outside a Combwork workspace): then nothing is evidence. Without it, no
  * board found means nothing may be deleted, and the runners won't start (#285: copies would pile up run after run).
  */
 const evidenceFor = (root, opts = {}, env = process.env) => (env.HIVE_TEST_NO_BOARD === '1' ? evidence({ cards: [], ...opts }) : evidence({ tasksDir: findBoard(root), ...opts }))
@@ -321,7 +321,7 @@ function freshFolder(dir, ev, { max = MAX_COPIES, claimed = () => false } = {}) 
       fs.mkdirSync(d, { recursive: true })
       return d
     } catch (e) {
-      // Still in use (a test Hive of a crashed run): take the next.
+      // Still in use (a test Combwork of a crashed run): take the next.
       why = `in use: ${e.code ?? e.message}`
     }
   }

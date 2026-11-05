@@ -1,8 +1,8 @@
 // Crash injection into the merge queue's update of a target checked out in a folder (#1351, SPEC §16.9.2's recovery
 // table; S34d): `main` checked out in the project folder, Merge into a checked-out branch set to Automatically, fake
 // Claude Code agents (one builder, building each card on the slot its start lends, and one reviewer, rejoined in each
-// run of Hive), the Assistant off.
-// - Hive ended (HIVE_TEST_QUEUE_CRASH) after IntegrationStarted, before and after read-tree, before and after update-ref,
+// run of Combwork), the Assistant off.
+// - Combwork ended (HIVE_TEST_QUEUE_CRASH) after IntegrationStarted, before and after read-tree, before and after update-ref,
 //   and in and after a rollback (the target moved by another client just before the swap: HIVE_TEST_QUEUE_RACE): each
 //   next start recovers per the table, the card merged exactly once, the folder clean on main, the queue not paused.
 //   Where a point's recovery can't reach the next run's seam (no rollback), that next run is the restart too.
@@ -10,7 +10,7 @@
 //   the state (branch, ref, the file's side, no command), changes nothing more, and asks in For you (screenshots of the
 //   card dialog's request, both themes); put back and answered, the queue looks again and recovery finishes the swap.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
-// Dev build only (#1578): every part ends Hive at a crash seam (HIVE_TEST_QUEUE_CRASH, _QUEUE_RACE), which a packaged
+// Dev build only (#1578): every part ends Combwork at a crash seam (HIVE_TEST_QUEUE_CRASH, _QUEUE_RACE), which a packaged
 // build ignores.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -33,7 +33,7 @@ const main = () => q.head(fx, 'main')
 ;(async () => {
   q.prepare(fx)
   let crew = null
-  /** A run of Hive with these seams, the crew (made in the first, rejoined after) ready. */
+  /** A run of Combwork with these seams, the crew (made in the first, rejoined after) ready. */
   async function start(env = {}) {
     const h = await q.startHive(fx, { port: PORT, env, keepOptions: !!crew })
     if (!crew) {
@@ -43,13 +43,13 @@ const main = () => q.head(fx, 'main')
     } else crew = { builder: await q.rejoin(fx, h, crew.builder), reviewer: await q.rejoin(fx, h, crew.reviewer) }
     return h
   }
-  /** A card approved in this run, which ends at its seam: whether it did. Hive may end while the verdict is answered. */
+  /** A card approved in this run, which ends at its seam: whether it did. Combwork may end while the verdict is answered. */
   async function crashes(h, label) {
     let ended = false
     h.app.process().once('exit', () => (ended = true))
     q.steer(fx, 'pass')
     const steps = await q.approveBy(fx, h, crew.builder, crew.reviewer, `Card ${label}`, { [`${label}.txt`]: `${label}\n` }).then((r) => r.steps, (e) => String(e?.message ?? e))
-    check(`${label}: Hive ended at the seam`, !!(await waitHung(() => ended)), JSON.stringify(steps))
+    check(`${label}: Combwork ended at the seam`, !!(await waitHung(() => ended)), JSON.stringify(steps))
     await h.app.close().catch(() => {})
   }
   /** After a restart: Done, Integrated once (its result in main), one merge commit, its file there, the folder clean. */

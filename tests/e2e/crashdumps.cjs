@@ -1,4 +1,4 @@
-// Why Hive stopped (#985): a normal quit logs each step of its way out, with the caller; a crash of the window's page
+// Why Combwork stopped (#985): a normal quit logs each step of its way out, with the caller; a crash of the window's page
 // and of the main process each leave a crash dump in the profile (never uploaded) and the page's a log line; the next
 // start logs the dumps and Copy Diagnostics names the newest. Crashes only this test copy: its page by loading
 // chrome://crash, its main process by process.crash() in it, and anything left of it is ended by its own pid and start
@@ -76,7 +76,7 @@ process.on('uncaughtException', (e) => {
       current = null
     }
 
-    // The window's page crashes: a dump and a line; Hive reloads it.
+    // The window's page crashes: a dump and a line; Combwork reloads it.
     {
       const { app } = await start()
       await app.evaluate(({ BrowserWindow }) => void BrowserWindow.getAllWindows()[0].webContents.loadURL('chrome://crash').catch(() => undefined))

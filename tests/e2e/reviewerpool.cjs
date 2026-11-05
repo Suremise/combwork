@@ -1,5 +1,5 @@
 // The reviewer pool (#1443, G17: Reviewers, a shared pool) on fake Claude Code agents, the Assistant off:
-// 1. alpha (Each card in its own folder, the agent merges) from Hive's Team 6 + pool template, trimmed to two builders
+// 1. alpha (Each card in its own folder, the agent merges) from Combwork's Team 6 + pool template, trimmed to two builders
 //    and its two pooled reviewers, and an either-role agent E1: Start Lane offers the reviewer pool, preselected; three
 //    lanes start with it (B1's, B2's and E1's), only their builders starting. Submitted in order, B1's card goes to
 //    R1 and B2's to R2 (oldest first, a different reviewer each, both started for the review in the project folder and
@@ -82,7 +82,7 @@ const commitIn = (dir, files, message, trailer) => {
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots', target: 'main', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] }, reviewerMode: 'pool' } })
     check("alpha's rules have the pool", (await inv('workflow:form', alpha))?.options?.reviewerMode === 'pool')
 
-    // --- Hive's Team 6 + pool, trimmed to two builders and its two reviewers; an either-role agent beside them.
+    // --- Combwork's Team 6 + pool, trimmed to two builders and its two reviewers; an either-role agent beside them.
     const plan = await inv('templates:plan', alpha, 'hive', 'team-6-pool.json')
     check('Team 6 + pool suggests the pool', plan.reviewerMode === 'pool', JSON.stringify(plan.reviewerMode))
     await inv('templates:load', alpha, 'hive', 'team-6-pool.json', plan.remove.map((a) => a.id))
@@ -144,7 +144,7 @@ const commitIn = (dir, files, message, trailer) => {
     /** An agent's turn held until the test says so ("holduntil"): it isn't free meanwhile. */
     const hold = async (p, id, file) => {
       await idle(p, id)
-      // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+      // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
       await lib.typeLine(inv, lib.ptyKey(p, id), home, null, `holduntil ${file}`, { live: () => live(p, id) })
       return until(async () => (await live(p, id))?.status === 'working', HUNG_MS)
     }
@@ -292,7 +292,7 @@ const commitIn = (dir, files, message, trailer) => {
     check('G is Done (committed)', !!(await until(async () => (await card(g))?.column === 'done', HUNG_MS)), (await card(g))?.column)
 
     // --- 3. gamma (HI-2046): one reviewer per lane, but a card started on its builder alone, outside a lane. Submitted,
-    // Hive gives it to the project's stopped reviewer itself: started for the review and told, with no Assistant step.
+    // Combwork gives it to the project's stopped reviewer itself: started for the review and told, with no Assistant step.
     await inv('workflow:setOptions', gamma, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project', preChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
     const gb1 = await lib.addAgent(inv, gamma, { name: 'GA-B1', workflowRole: 'builder' })
     const gr1 = await lib.addAgent(inv, gamma, { name: 'GA-R1', workflowRole: 'reviewer' })

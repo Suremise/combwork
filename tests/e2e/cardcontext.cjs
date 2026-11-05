@@ -1,6 +1,6 @@
 // A card's Read first references (#818): doc sections by file and heading, set through the Agent API, the hive tools and
 // the card dialog, checked (a Markdown file with an optional #slug, never a line number), recorded in the card's
-// history, shown in the dialog as links that open each section in Hive's viewer (Open in Files at its heading), and given
+// history, shown in the dialog as links that open each section in Combwork's viewer (Open in Files at its heading), and given
 // to the agent in its start prompt with each section's size, not the sections themselves. References that don't resolve
 // (#819) are flagged on the card's tile and in its dialog with the closest headings, whether saved so or broken by a
 // change before the start, and named in the prompt. The agent is the fake Claude Code. Pictured in both themes. Dev

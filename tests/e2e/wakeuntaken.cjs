@@ -1,6 +1,6 @@
 // A wake its CLI doesn't take (#430), on a fake Claude Code agent (fake-claude/): a normal wake is taken and the log says
-// how soon; then the CLI drops the Enter of the wake and of Hive's Enter again (fake-drop-enters, as a CLI not reading
-// its input): Hive presses Enter at most twice, then marks the agent ("A line Hive typed wasn't taken" in its pane, its
+// how soon; then the CLI drops the Enter of the wake and of Combwork's Enter again (fake-drop-enters, as a CLI not reading
+// its input): Combwork presses Enter at most twice, then marks the agent ("A line Combwork typed wasn't taken" in its pane, its
 // live state) and tells the user once; the user pressing Enter there submits the line and clears the mark. Dev build,
 // throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -38,7 +38,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  // How long a wake has to be taken (10 s in Hive): set in Hive's main process for each part (takeWindow, below).
+  // How long a wake has to be taken (10 s in Combwork): set in Combwork's main process for each part (takeWindow, below).
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off', HIVE_TEST_NOTIFY_LOG: notifyLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
@@ -66,7 +66,7 @@ const check = (name, ok, extra = '') => {
   // The Windows notifications the user got: each tell() also logs an `entry` line (HI-2320), not a second notice (HI-2369).
   const notices = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((e) => e.kind === 'notification')
   const say = async (id, text) => {
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
   }
   const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
@@ -95,7 +95,7 @@ const check = (name, ok, extra = '') => {
   check('…and the log says so, with how soon', !!(await until(async () => /The wake typed into ⁨?[\w-]+⁩? was taken after \d+ ms/.test(hiveLog()), HUNG_MS)), hiveLog().split('\n').filter((l) => /wake typed/.test(l)).join(' | '))
   await until(() => idle(agent.id), HUNG_MS)
 
-  // Its CLI drops the wake's Enter and Hive's Enter again (not reading its input). A short window, so the two Enters
+  // Its CLI drops the wake's Enter and Combwork's Enter again (not reading its input). A short window, so the two Enters
   // don't take long: the CLI drops them however late it reads them.
   await takeWindow(1500)
   fs.writeFileSync(path.join(claudeHome, 'fake-drop-enters-Watcher.txt'), '2')
@@ -103,7 +103,7 @@ const check = (name, ok, extra = '') => {
   await inv('tasks:comment', card, 'Second change')
   const marked = await until(async () => (await live(agent.id))?.untakenLine, HUNG_MS)
   check('not taken after Enter again: the agent is marked', !!marked && marked.text.startsWith(`[CW] New in your inbox: 1 card event (${named}) (m`) && /^\[CW\] New in your inbox: 1 card event \(.+\) \(m\d+\)\./.test(marked.text), JSON.stringify(marked))
-  // Hive's two Enters were pressed before it marked the agent, but the CLI may not have read them yet (#664, under load).
+  // Combwork's two Enters were pressed before it marked the agent, but the CLI may not have read them yet (#664, under load).
   const drops = () => fs.readFileSync(path.join(claudeHome, 'fake-drop-enters-Watcher.txt'), 'utf8').trim()
   check('Combwork pressed Enter twice, never a third time (the CLI dropped both)', !!(await until(async () => drops() === '0', HUNG_MS)) && wakes().length === 1, JSON.stringify({ left: drops(), wakes: wakes().length }))
   check('the log says: Enter again, still not taken', /wasn't taken: pressed Enter again/.test(hiveLog()) && /still wasn't taken/.test(hiveLog()))

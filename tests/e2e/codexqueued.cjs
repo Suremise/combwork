@@ -1,8 +1,8 @@
 // A Codex line taken as queued input (#1514), on a fake Codex agent (fake-codex/): on 23 Oct Codex reviewers compacted
-// at a turn's start, sending no hook meanwhile; Hive took them for idle and typed a doorbell, which Codex queued and took
-// in that turn with no UserPromptSubmit. The agent read its inbox eight seconds later, yet Hive pressed Enter again, marked
+// at a turn's start, sending no hook meanwhile; Combwork took them for idle and typed a doorbell, which Codex queued and took
+// in that turn with no UserPromptSubmit. The agent read its inbox eight seconds later, yet Combwork pressed Enter again, marked
 // the line not taken and refused every prompt until someone pressed Enter on an empty composer. Here the fake compacts
-// for a while ("compacting N", fake-queue-<agent>): the doorbell Hive types meanwhile is read in that turn, Hive counts it
+// for a while ("compacting N", fake-queue-<agent>): the doorbell Combwork types meanwhile is read in that turn, Combwork counts it
 // taken (what it rang for was read), marks nothing, and types the next line as usual. Dev build,
 // throwaway profile, workspace, CLAUDE_CONFIG_DIR and CODEX_HOME.
 const lib = require('./lib.cjs')
@@ -90,17 +90,17 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const leave = (text) => /\((m\d+)/.exec(tool('cw_message_agent', { project: 'alpha', agent: 'Codex', text }).text)?.[1] ?? null
     const delivery = (id) => JSON.parse(tool('cw_agent_activity', { project: 'alpha', agent: 'Codex', detail: true }).text).inbox?.deliveries?.find((d) => d.id === id) ?? null
 
-    // A turn that compacts for 25 s with no hook: Hive sees no prompt, so the agent looks idle, and the doorbell for a
+    // A turn that compacts for 25 s with no hook: Combwork sees no prompt, so the agent looks idle, and the doorbell for a
     // message left meanwhile is typed into it; Codex queues it and takes it once it has compacted.
     await say(codex.id, 'compacting 25')
     const m1 = leave('Review #166 next.')
     check('a message is left for it', !!m1, String(m1))
-    check('…and its doorbell is typed while it compacts, Hive seeing no turn', !!(await until(() => /Deliveries m\d+ for .* offered/.test(hiveLog()) && wakes().length === 0, HUNG_MS)), hiveLog().slice(-800))
-    check('the agent reads it in that turn, with no prompt Hive saw', !!(await until(() => wakes().some((w) => w.queued && w.text.includes('Review #166 next.')), HUNG_MS)), JSON.stringify(wakes()))
-    check('…and Hive counts the line taken: what it rang for was read', !!(await until(() => /The wake typed into .* was taken after \d+ ms: what it rang for was read, with no prompt seen/.test(hiveLog()), HUNG_MS)), hiveLog().slice(-1200))
+    check('…and its doorbell is typed while it compacts, Combwork seeing no turn', !!(await until(() => /Deliveries m\d+ for .* offered/.test(hiveLog()) && wakes().length === 0, HUNG_MS)), hiveLog().slice(-800))
+    check('the agent reads it in that turn, with no prompt Combwork saw', !!(await until(() => wakes().some((w) => w.queued && w.text.includes('Review #166 next.')), HUNG_MS)), JSON.stringify(wakes()))
+    check('…and Combwork counts the line taken: what it rang for was read', !!(await until(() => /The wake typed into .* was taken after \d+ ms: what it rang for was read, with no prompt seen/.test(hiveLog()), HUNG_MS)), hiveLog().slice(-1200))
     check('the message is read', ['received', 'acked'].includes(delivery(m1)?.state), JSON.stringify(delivery(m1)))
     check('its turn ends and it is idle', !!(await until(() => idle(codex.id), HUNG_MS)), JSON.stringify(await live(codex.id)))
-    // No mark: nothing was left in its composer, and Hive doesn't believe otherwise. (An Enter again while it compacts,
+    // No mark: nothing was left in its composer, and Combwork doesn't believe otherwise. (An Enter again while it compacts,
     // past the first 10 s, is #376's, on an empty composer.)
     const after = await live(codex.id)
     check('no mark that a line was not taken', !after?.untakenLine && !/still wasn't taken|Enter couldn't be pressed again/.test(hiveLog()), JSON.stringify({ untaken: after?.untakenLine, log: hiveLog().match(/.*wasn't taken.*/g) }))

@@ -1,4 +1,4 @@
-// The Hive Assistant's Compact highlight (#290): Settings → Assistant → Highlight Compact over (500,000 by default, its
+// The Combwork Assistant's Compact highlight (#290): Settings → Assistant → Highlight Compact over (500,000 by default, its
 // own, not Settings → Sessions' 200,000 for project agents). At or past it, Compact… in the Assistant's ⋯ (#979) is
 // recommended ("Recommended: the context is over your threshold." under it) and its footer's context turns amber (with
 // "— consider compacting"), as an agent's do; below it, or with Never, neither. A change in Settings shows at once. The
@@ -31,7 +31,7 @@ const check = (name, ok, extra = '') => {
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
-  // As saved by a Hive from before the setting: Settings → Assistant without it.
+  // As saved by a Combwork from before the setting: Settings → Assistant without it.
   delete cfg.settings.assistant?.compactSuggestTokens
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 

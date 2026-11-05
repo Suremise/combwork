@@ -81,7 +81,7 @@ the taskbar, then shows them inactive so they draw for screenshots. From then on
 raising or flashing a window keeps it off screen, Windows notifications are dropped, and message boxes answer as
 cancelled. A window already shown when it is reached fails the launch, saying so. Only its tray icon can appear.
 `packaged-progress` and `packaged-mcp` run Combwork.exe as Node and show nothing. Checked in Windows Sandbox (0.9.3, a
-watcher of on-screen windows and the foreground: none from Hive) and on the host for these suites (the card says how).
+watcher of on-screen windows and the foreground: none from Combwork) and on the host for these suites (the card says how).
 
 **No update checks** (#1332): a packaged Combwork checks GitHub 30 s after it starts and every 6 hours, and each check
 fetches the release's `latest.yml`, which GitHub counts as a download. A packaged test Combwork never does: 1.0 with

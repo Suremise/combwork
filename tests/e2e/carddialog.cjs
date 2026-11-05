@@ -6,8 +6,8 @@
 // wrapping setTitleBarOverlay in main. Dev build, throwaway profile and workspace.
 //
 // Maximise and restore are simulated by default: the window takes a screen's work-area size off screen, says it is
-// maximised and emits the events Hive listens for, so the checks of the card and the buttons run quiet. That covers
-// Hive's handling of the events, not Electron's and Windows' own maximise. HIVE_E2E_NATIVE=1 (`node
+// maximised and emits the events Combwork listens for, so the checks of the card and the buttons run quiet. That covers
+// Combwork's handling of the events, not Electron's and Windows' own maximise. HIVE_E2E_NATIVE=1 (`node
 // tests/e2e/carddialog.cjs` only: the runner drops it) runs the same checks with the real maximize() and unmaximize()
 // in a normal, not quiet, window, which comes on screen and takes the focus while it runs.
 const lib = require('./lib.cjs')
@@ -68,7 +68,7 @@ const LIGHT = { color: '#f3f3f3', dim: '#868686', dim2: '#4a4a4a' }
   // On Windows, maximising always brings the window on screen and to the front, taking the focus from whatever the user
   // is doing (there is no maximise without it), and the test copies never do that (HIVE_TEST_QUIET: their windows stay
   // off screen). So by default the window takes the size of a screen's work area, where it is, as maximising does, and
-  // says it is maximised, with the events Hive listens for. With HIVE_E2E_NATIVE=1, Electron maximises it for real.
+  // says it is maximised, with the events Combwork listens for. With HIVE_E2E_NATIVE=1, Electron maximises it for real.
   const native = (max) =>
     app.evaluate(
       ({ BrowserWindow }, m) =>

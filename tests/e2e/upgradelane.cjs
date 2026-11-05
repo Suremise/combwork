@@ -73,7 +73,7 @@ function jsonl(name) {
 }
 const kinds = (n) => rows('SELECT kind FROM card_facts WHERE card = ? ORDER BY seq', n).map((r) => r.kind)
 
-/** A Hive to drive, the 0.9 one or the dev build, with what the loop needs of it. */
+/** A copy to drive, the 0.9 Hive or the dev build, with what the loop needs of it. */
 function driver(app, page) {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
@@ -97,13 +97,13 @@ function driver(app, page) {
   console.log(`0.9 Hive: ${old.version} (${old.exe})`)
   for (const d of [devProfile, oldProfile, ws]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(alpha)
-  // Both Hives run the fake from the same home (its conversations resume across them); the dev profile's set-up makes a
+  // Both copies run the fake from the same home (its conversations resume across them); the dev profile's set-up makes a
   // home of its own, unused.
   fs.mkdirSync(devProfile, { recursive: true })
   fs.mkdirSync(oldProfile, { recursive: true })
   lib.fakeClaude(devProfile, spareHome)
   const claude = lib.fakeClaude(oldProfile, claudeHome, [alpha])
-  // Closing a Hive with agents running asks first: not here (cardloop's set-up).
+  // Closing a Combwork with agents running asks first: not here (cardloop's set-up).
   for (const profile of [devProfile, oldProfile]) {
     const file = path.join(profile, 'config.json')
     const cfg = JSON.parse(fs.readFileSync(file, 'utf8'))
@@ -162,7 +162,7 @@ function driver(app, page) {
     check('the project has its options as it works today: Git, a reviewer agent, its folder', cfg.platform === 'git' && cfg.workflow?.platform === 'git' && cfg.workflow?.options?.review === 'agent' && cfg.workflow?.options?.folder === 'project', JSON.stringify(cfg.workflow))
     check('nothing moved on the board', (await dev.column(n1)) === 'review' && (await dev.column(n2)) === 'doing' && (await dev.column(n3)) === 'todo')
 
-    // 3. The agents resume their 0.9 conversations and the loop carries on as on 0.9, on Hive's own loop wakes: the
+    // 3. The agents resume their 0.9 conversations and the loop carries on as on 0.9, on Combwork's own loop wakes: the
     // reviewer woken for each card in Review, the builder for each verdict. What each fake does when woken, in order.
     const script = (agent, lines) => fs.writeFileSync(path.join(claudeHome, `fake-wakes-${agent}.txt`), lines.join('\n') + '\n')
     const wakesBefore = jsonl('fake-wakes.jsonl').length
@@ -184,7 +184,7 @@ function driver(app, page) {
     // Launched before the names agents see changed, a 0.9 conversation starts fresh, its work carried (HI-2463).
     const launches = jsonl('fake-launches.jsonl').slice(-2)
     check('…each in a new conversation, as one from before HI-2463 does', launches.length === 2 && launches.every((l) => !l.opts['--resume']), JSON.stringify(launches.map((l) => l.opts)))
-    check('Hive wakes the reviewer for c1, which passes it', !!(await lib.until(async () => (await dev.column(n1)) === 'passed', HUNG_MS)))
+    check('Combwork wakes the reviewer for c1, which passes it', !!(await lib.until(async () => (await dev.column(n1)) === 'passed', HUNG_MS)))
     check('…the builder, woken by the verdict, sends c2 to Review, which passes', !!(await lib.until(async () => (await dev.column(n2)) === 'passed', HUNG_MS)))
     check('…and works c3, from before 1.0, as on 0.9, which passes', !!(await lib.until(async () => (await dev.column(n3)) === 'passed', HUNG_MS)))
     check("c1 and c2 are Done, by the builder's reports of their merges", (await dev.column(n1)) === 'done' && (await dev.column(n2)) === 'done', `${await dev.column(n1)}, ${await dev.column(n2)}`)

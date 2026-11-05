@@ -37,8 +37,8 @@ const PATTERN_LETTERS = 6
  * it doesn't translate, or translates to the same words, or another message's translation), since seeing it is then no
  * sign of a miss. Messages with plain placeholders ("{agent} (removed)") become patterns; plurals, selects and markup don't.
  * Returns { exact: [text], patterns: [{ id, source }], authored: [] } (source: a RegExp's, whole text). authored: what
- * the route itself wrote into Hive as a user would (a template's name, a card's blocked reason, HI-1915), each
- * { text, within } (within: a selector for where Hive shows it), added as cases write it: English there is the user's,
+ * the route itself wrote into Combwork as a user would (a template's name, a card's blocked reason, HI-1915), each
+ * { text, within } (within: a selector for where Combwork shows it), added as cases write it: English there is the user's,
  * even where it equals a message ("Pair") or fits a placeholder message's pattern ("Waiting for {what}").
  */
 function englishLeft(english, translations) {
@@ -156,7 +156,7 @@ function inspectLayout([root, english]) {
     }
     return out
   }
-  /** Whether hovering shows the whole text: a title on it or close around it, or Hive's tooltip wrapper. */
+  /** Whether hovering shows the whole text: a title on it or close around it, or Combwork's tooltip wrapper. */
   const tooltip = (el) => {
     for (let e = el, i = 0; e && i < 4; e = e.parentElement, i++) if (e.hasAttribute('title') || e.classList.contains('tip-wrap')) return true
     return false
@@ -320,12 +320,12 @@ function inspectLayout([root, english]) {
     const patterns = english.patterns.map((p) => ({ id: p.id, re: new RegExp(p.source, 'u') }))
     // Whitespace as englishLeft() reads it (in the page: nothing from outside reaches it).
     const squash = (s) => s.replace(/\s+/g, ' ').trim()
-    // The user's own words where Hive shows them (englishLeft's authored): only that text, only there, so the same
-    // words elsewhere (a message Hive left in English) are still reported.
+    // The user's own words where Combwork shows them (englishLeft's authored): only that text, only there, so the same
+    // words elsewhere (a message Combwork left in English) are still reported.
     const authored = (english.authored ?? []).map((a) => ({ text: squash(a.text), within: a.within }))
     const own = (el, c) => authored.some((a) => a.text === c && !!el.closest(a.within))
     for (const t of texts) {
-      // Not a document Hive renders (a skill, a mode, a note: their words are their author's, not messages).
+      // Not a document Combwork renders (a skill, a mode, a note: their words are their author's, not messages).
       if (t.el.closest('.markdown')) continue
       // The element's text, and each piece of its own text beside its children: a piece only when it reads as words
       // (a space or a capital), not a lower-case fragment of an id ("project" in workspace.new.project).

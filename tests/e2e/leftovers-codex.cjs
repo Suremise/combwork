@@ -1,6 +1,6 @@
 // What Codex leaves running in a background terminal is tracked as the agent's leftovers (#515, #507): the leftovers
-// suite checks Hive's side with the fake. The agent runs `node linger.js` (it writes its pid and waits ten minutes)
-// with exec_command, leaving it running as its turn ends (codex-background), and is stopped as Hive stops it (its
+// suite checks Combwork's side with the fake. The agent runs `node linger.js` (it writes its pid and waits ten minutes)
+// with exec_command, leaving it running as its turn ends (codex-background), and is stopped as Combwork stops it (its
 // terminal ended), then the same with /exit typed into Codex. Either way the process must end with Codex or be listed
 // (session:leftovers) and ended by End: Codex 0.162 ends its background terminals as it exits, both ways.
 // Test CODEX_HOME, throwaway profile and workspace. Two short prompts on a small model.
@@ -44,7 +44,7 @@ const pidOf = (tag) => {
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47867), CODEX_HOME: lib.CODEX_HOME })
   // Codex runs commands in PowerShell 7 where there is one: kept on PATH, the Microsoft Store's too (an alias in
   // WindowsApps). That one is a packaged app whose children start outside every job, and Codex doesn't end them as it
-  // exits: Hive's process tracker takes them in (#543, SPEC §6.2 Leftover processes), so they are listed and ended.
+  // exits: Combwork's process tracker takes them in (#543, SPEC §6.2 Leftover processes), so they are listed and ended.
   const storePwsh = (() => {
     try {
       return !!fs.lstatSync(path.join(process.env.LOCALAPPDATA ?? '', 'Microsoft', 'WindowsApps', 'pwsh.exe'))
@@ -73,7 +73,7 @@ const pidOf = (tag) => {
         await inv('session:start', proj, { agentId: agent.id })
         check(`Codex starts (${tag})`, !!(await lib.until(async () => (await live())?.status === 'ready', 60000, 500)), lib.plainText(await inv('pty:buffer', key)).slice(-400))
         const prompt = `Call exec_command once with cmd "node linger.js ${tag}" and yield_time_ms 1000. It will return a session id while the command keeps running: do not wait for it, poll it or call write_stdin. Reply with the single word STARTED and end your turn.`
-        // Typed the way Hive types prompts (a long text at once is a paste to Codex, and Enter then adds a line).
+        // Typed the way Combwork types prompts (a long text at once is a paste to Codex, and Enter then adds a line).
         for (let i = 0; i < prompt.length; i += 8) {
           await inv('pty:write', key, prompt.slice(i, i + 8))
           await lib.sleep(15)
@@ -86,11 +86,11 @@ const pidOf = (tag) => {
         return pid
       })
 
-    /** What became of the process once the CLI has gone: ended with it, or listed by Hive, and then End ends it. */
+    /** What became of the process once the CLI has gone: ended with it, or listed by Combwork, and then End ends it. */
     const afterExit = async (how, pid) => {
       const was = await lib.until(async () => (!alive(pid) ? 'ended' : (await listed())?.processes.some((p) => p.pid === pid) ? 'listed' : null), 20000, 500)
       console.log(`INFO after ${how} the background process ${was === 'ended' ? 'ended with Codex' : was === 'listed' ? 'outlived it, listed' : 'outlived it, not listed'}`)
-      check(`after ${how}, the background process ends with Codex or Hive lists it`, !!was, JSON.stringify(await listed()))
+      check(`after ${how}, the background process ends with Codex or Combwork lists it`, !!was, JSON.stringify(await listed()))
       if (was !== 'listed') return
       const found = await listed()
       check(`as a node process (${how})`, !!found && found.processes.find((p) => p.pid === pid)?.label.startsWith('node '), JSON.stringify(found))
@@ -100,12 +100,12 @@ const pidOf = (tag) => {
       check(`and it is no longer listed (${how})`, !!(await lib.until(async () => !(await listed()), 10000)))
     }
 
-    // Stopped as Hive stops it (its terminal ended).
+    // Stopped as Combwork stops it (its terminal ended).
     const pid = await startInBackground('stop')
     await page.screenshot({ path: path.join(lib.WORK, 'leftovers-codex-running.png') })
     await inv('session:stop', proj, agent.id)
-    check('Hive stops Codex', !!(await lib.until(async () => !(await live()), 20000)))
-    await afterExit('Hive stops it', pid)
+    check('Combwork stops Codex', !!(await lib.until(async () => !(await live()), 20000)))
+    await afterExit('Combwork stops it', pid)
 
     // /exit: Codex ending by itself.
     const pid2 = await startInBackground('exit')

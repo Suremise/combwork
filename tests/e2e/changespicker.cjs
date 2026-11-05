@@ -1,7 +1,7 @@
 // The Changes tab's picker and pages (#476). A project with no worktrees opens on its folder, with no picker. A project
-// with worktrees opens on Unused worktrees: first the picker says Hive is looking and the page shows a spinner and a
-// message (listing is slowed, HIVE_TEST_SLOW_IPC), then the list, each labelled with who made it ("was B4": the Hive
-// agent whose session last ran there; "not made by Hive": a `git worktree add` of its own). The picker lists the unused
+// with worktrees opens on Unused worktrees: first the picker says Combwork is looking and the page shows a spinner and a
+// message (listing is slowed, HIVE_TEST_SLOW_IPC), then the list, each labelled with who made it ("was B4": the Combwork
+// agent whose session last ran there; "not made by Combwork": a `git worktree add` of its own). The picker lists the unused
 // worktrees, then the folders agents work in (#1569: Coder's 0.9 worktree, the slot kept for it once the project has
 // opened), then the project folder, last. Coming back shows the last list at once while it is
 // checked again, and Refresh looks again; a Refresh that fails keeps the list, says so, and Retry recovers
@@ -47,8 +47,8 @@ function inUse(project, name) {
   for (const d of [userData, ws, trees, outside]) fs.rmSync(d, { recursive: true, force: true })
   for (const p of [solo, repo, busy, cold, coldfail, plain]) lib.gitProject(p)
   const main = git(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim()
-  // repo: Coder works in a worktree; B4's worktree (Hive's folder, a session of B4's ran there) and one made outside
-  // Hive are unused.
+  // repo: Coder works in a worktree; B4's worktree (Combwork's folder, a session of B4's ran there) and one made outside
+  // Combwork are unused.
   const coder = inUse(repo, 'Coder')
   const b4 = path.join(trees, 'repo', 'b4')
   git(repo, 'worktree', 'add', '-q', '-b', 'hive/b4', b4, main)
@@ -104,7 +104,7 @@ function inUse(project, name) {
   check('…saying what the page shows', (await about.innerText()).includes('The project folder'), await about.innerText().catch(() => ''))
   await shots('project-only')
 
-  // --- Worktrees: Unused worktrees, with a spinner and a message while Hive looks.
+  // --- Worktrees: Unused worktrees, with a spinner and a message while Combwork looks.
   await slow('worktrees:unused=4000')
   await openChanges('repo')
   const loadingPage = page.locator('[data-unused-loading]')
@@ -168,7 +168,7 @@ function inUse(project, name) {
   check('the project folder, last: what it shows', !!(await lib.until(async () => (await about.getAttribute('data-about')) === 'project', 8000)))
   await shots('project-folder')
 
-  // --- Open file opens the file of the folder whose diff is shown (#495): an agent's worktree, an unused one in Hive's
+  // --- Open file opens the file of the folder whose diff is shown (#495): an agent's worktree, an unused one in Combwork's
   // folder, one made outside the workspace, and the project folder, each with a file only it has. Main's shell is
   // stubbed, so nothing opens: the path it was asked to open is recorded.
   await app.evaluate(({ shell }) => {
@@ -212,7 +212,7 @@ function inUse(project, name) {
   // --- The first look fails: never taken for "no worktrees". Its error and Retry, then what Retry finds.
   const failedPage = page.locator('[data-unused-error]')
   for (const [name, expectRows] of [['coldfail', true], ['plain', false]]) {
-    // Hive reads it again only when its value changes (at its next call): a value of each project's own, so each
+    // Combwork reads it again only when its value changes (at its next call): a value of each project's own, so each
     // project's first look fails once.
     await failing(`worktrees:unused*1,none-${name}`)
     await openChanges(name)

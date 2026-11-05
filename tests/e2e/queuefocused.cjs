@@ -1,4 +1,4 @@
-// Each card's focused tests (G20, HI-1367; SPEC §16.9.1): a project set to "Hive merges" into `integration`
+// Each card's focused tests (G20, HI-1367; SPEC §16.9.1): a project set to "Combwork merges" into `integration`
 // (queueFixture.cjs) with no G9 checks and G20 on, its picker and runner node scripts outside the repository, steered by
 // a control file; fake Claude Code agents acting by their own tokens. The picker's tests are kept with the submission;
 // the queue runs them once with the jobs Settings → Advanced gives, and merges on green; a failed test returns the card

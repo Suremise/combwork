@@ -68,7 +68,7 @@ const check = (name, ok, extra = '') => {
     }
   }
   const type = async (proj, id, text) => {
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(proj, id), claudeHome, null, text, { live: () => live(proj, id) })
   }
   const agentsOf = async (proj) => ((await inv('workspace:refresh')).projects.find((p) => p.path.toLowerCase() === proj.toLowerCase())?.agents ?? []).map((a) => a.name)

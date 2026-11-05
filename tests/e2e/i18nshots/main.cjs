@@ -1,8 +1,8 @@
 // Screenshot cases for the `main` area (#796): text the main process shows, reached for the i18nshots route
 // (tests/e2e/i18nshots.cjs has the case format) with locale-independent means only: IPC, command ids, the notify log,
 // stand-ins for native dialogs and structural hooks, never English text. What Windows or Electron draws (a
-// notification, a message box) can't be photographed in the window, so its text, as Hive recorded it, is drawn on the
-// page and photographed there; the install-folder message, drawn by Hive itself to a picture (HIVE_TEST_DIALOG_SNAPSHOT)
+// notification, a message box) can't be photographed in the window, so its text, as Combwork recorded it, is drawn on the
+// page and photographed there; the install-folder message, drawn by Combwork itself to a picture (HIVE_TEST_DIALOG_SNAPSHOT)
 // by a start of its own in the language, is shown the same way.
 const fs = require('fs')
 const path = require('path')
@@ -19,7 +19,7 @@ async function shown(ctx, locator, what) {
   return locator.first()
 }
 
-/** Draws what Hive said outside the window (each { title, body, buttons }, or a picture) on top of the page. */
+/** Draws what Combwork said outside the window (each { title, body, buttons }, or a picture) on top of the page. */
 async function overlay(ctx, items) {
   await ctx.page.evaluate(
     ([attr, list]) => {
@@ -89,7 +89,7 @@ async function notes(ctx) {
   return fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
 }
 
-/** Two agents finish together while Hive is in the background: the Windows notification (main's bursts) it records. */
+/** Two agents finish together while Combwork is in the background: the Windows notification (main's bursts) it records. */
 async function finishedNotification(ctx) {
   const { inv, lib, project } = ctx
   const agents = ctx.agents.slice(0, 2)
@@ -143,7 +143,7 @@ async function closeHang(ctx) {
 }
 
 /**
- * Hive started from a folder whose permissions it can't fix (as tests/e2e/installdir.cjs makes one): the message it
+ * Combwork started from a folder whose permissions it can't fix (as tests/e2e/installdir.cjs makes one): the message it
  * shows before it is ready, in the language, drawn to a picture by that start of its own, which then quits.
  */
 async function installFolder(ctx) {

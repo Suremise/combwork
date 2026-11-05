@@ -1,4 +1,4 @@
-// Merging into a target checked out in a folder (#1351, SPEC §16.9.2; S27, S34a–c, S42, OP-40): a project set to "Hive
+// Merging into a target checked out in a folder (#1351, SPEC §16.9.2; S27, S34a–c, S42, OP-40): a project set to "Combwork
 // merges" into `main`, checked out in the project folder, fake Claude Code agents acting by their own tokens (a reviewer
 // whose session lives in the project folder, idle; one builder, building each card on the slot its start lends, as 1.0
 // does: #1573), the Assistant off.

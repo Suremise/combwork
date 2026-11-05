@@ -1,5 +1,5 @@
 // HI-2137: where the test copy's PATH git is Git for Windows' launcher (<root>\cmd\git.exe, as a Start-menu PATH has it,
-// with no other Git folder on PATH), Hive starts the real git beneath it directly: git's trace2 ancestry shows no
+// with no other Git folder on PATH), Combwork starts the real git beneath it directly: git's trace2 ancestry shows no
 // launcher layer (git.exe < electron.exe) for the test copy's own git, and a hook, and an alias through sh run from it,
 // see the launcher's PATH folders first (its MinGW folder's bin, such as /mingw64/bin or /ucrt64/bin, then /usr/bin). Skipped where git isn't Git for Windows. Throwaway
 // profile and workspace, quiet; no agent is started.
@@ -70,15 +70,15 @@ function traced(before = new Set()) {
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     const tool = await inv('git:tool', true)
-    check('Hive finds git, its path the launcher', tool.state === 'ok' && tool.path?.toLowerCase() === found.launcher.toLowerCase(), JSON.stringify(tool))
+    check('Combwork finds git, its path the launcher', tool.state === 'ok' && tool.path?.toLowerCase() === found.launcher.toLowerCase(), JSON.stringify(tool))
     // Git as checked so far, the check's own (PATH's git, by design) and any started before it found the real one: not counted.
     const before = new Set(fs.readdirSync(trace))
     await lib.openWorkspace(inv, page, ws)
 
-    // --- A hook and an alias through sh, from the real git Hive starts.
+    // --- A hook and an alias through sh, from the real git Combwork starts.
     await inv('git:createBranch', repo, 'hive/direct')
     const said = await lib.until(() => (fs.existsSync(hookOut) && fs.readFileSync(hookOut, 'utf8').includes('alias-through-sh') ? fs.readFileSync(hookOut, 'utf8') : null), HUNG_MS)
-    check("Hive's checkout ran the hook, and the hook the alias through sh", !!said, said ?? 'no hook output')
+    check("Combwork's checkout ran the hook, and the hook the alias through sh", !!said, said ?? 'no hook output')
     // Git puts its exec-path first itself; then the launcher's folders, then ~/bin (the real git alone, with no MSYSTEM,
     // would put ~/bin first).
     // The MinGW folder is Git's build's (mingw64, or ucrt64 from Git 2.5x; gitTool.ts's MINGW): the same one throughout.

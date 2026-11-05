@@ -1,5 +1,5 @@
 // For you, the main side (#1269, SPEC §16.8.5, §16.11.4), on fake Claude Code agents (fake-claude/): a builder and a
-// reviewer in a lane with a round limit of 1. The reviewer fails the card on the board: Hive asks the user (a request in
+// reviewer in a lane with a round limit of 1. The reviewer fails the card on the board: Combwork asks the user (a request in
 // `tasks:forYou`, Decide, with its message for the window), the lane pauses on the card, and a notice says so. The
 // user's answer (`tasks:answer`: carry on, one more round) clears it, the lane runs again and the builder is woken with
 // the choice, once; an answer to it again is refused. The window (#1276): in a project whose review is the user's,
@@ -68,7 +68,7 @@ const check = (name, ok, extra = '') => {
     }
     const told = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8') : '')
     const say = async (id, text) => {
-      // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+      // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
       await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
     }
     const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
@@ -119,9 +119,9 @@ const check = (name, ok, extra = '') => {
     check('an answer to it again is refused', !!again, String(again))
     await lib.until(() => idle(builder.id), HUNG_MS)
     check('…and the builder was woken once for it', wakes('Builder').filter(answerWake).length === 1, JSON.stringify(wakes('Builder')))
-    // The card's history says whom Hive told of the answer (#1269 round 2), as the card dialog shows it.
+    // The card's history says whom Combwork told of the answer (#1269 round 2), as the card dialog shows it.
     const toldLine = 'Told agent Builder (alpha) of your answer'
-    check("the card's history says whom Hive told of the answer", !!(await lib.until(async () => (await card(n))?.history.some((h) => h.by === 'Combwork' && h.what === toldLine), HUNG_MS)), JSON.stringify((await card(n))?.history.map((h) => h.what)))
+    check("the card's history says whom Combwork told of the answer", !!(await lib.until(async () => (await card(n))?.history.some((h) => h.by === 'Combwork' && h.what === toldLine), HUNG_MS)), JSON.stringify((await card(n))?.history.map((h) => h.what)))
     await showBoard(page)
     await openByTitle(page, n)
     const dialog = lib.cardDialog(page, await lib.cardLabel(inv, n))
@@ -143,7 +143,7 @@ const check = (name, ok, extra = '') => {
     const makerIdle = async () => ['ready', 'finished'].includes((await liveIn(beta, maker.id))?.status)
     const makerSays = async (text) => {
       await lib.until(makerIdle, HUNG_MS)
-      // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+      // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
       await lib.typeLine(inv, lib.ptyKey(beta, maker.id), claudeHome, null, text, { live: () => liveIn(beta, maker.id) })
     }
     await inv('session:start', beta, { agentId: maker.id })
@@ -282,8 +282,8 @@ const check = (name, ok, extra = '') => {
     await rSection.screenshot({ path: path.join(lib.WORK, 'foryou-dialog-pl.png') })
     await speak(base)
     await lib.until(async () => (await rSection.innerText().catch(() => '')).includes('Approve'), HUNG_MS)
-    // HI-2286: on Hive's own OK the note is a comment only.
-    check("Approve's note on Hive's OK says it is your comment", ((await rSection.locator('.for-you-approve-note').getAttribute('placeholder')) ?? '').includes('added as your comment'), await rSection.locator('.for-you-approve-note').getAttribute('placeholder'))
+    // HI-2286: on Combwork's own OK the note is a comment only.
+    check("Approve's note on Combwork's OK says it is your comment", ((await rSection.locator('.for-you-approve-note').getAttribute('placeholder')) ?? '').includes('added as your comment'), await rSection.locator('.for-you-approve-note').getAttribute('placeholder'))
     await rSection.getByRole('button', { name: 'Approve' }).click()
     const toldR = () => wakes('Maker').some((w) => w.startsWith(`[CW] ${rKey}`) && w.includes('merge it and report the merge'))
     check('the OK given: the builder is told to merge it', !!(await lib.until(async () => toldR() && (await rSection.count()) === 0, HUNG_MS)), JSON.stringify(wakes('Maker')))

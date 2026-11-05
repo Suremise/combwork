@@ -2,7 +2,7 @@
 // off; alpha is a 6×6 team (#1448: B1–B6 each in a worktree of its own, R2 too, the other reviewers in the folder).
 // The workspace is made as 0.9 left it: each builder's own worktree in project.json, the slots' migration held off
 // for the first start (HIVE_TEST_SLOT_MIGRATION=off, unpackaged only), so the dev build runs it as 0.9 did:
-// 1. "0.9 day": alpha (Pair with Hive merges into integration, cards in slots) runs a lane of two cards on B1, whose
+// 1. "0.9 day": alpha (Pair with Combwork merges into integration, cards in slots) runs a lane of two cards on B1, whose
 //    worktree hb1 is where it works and where card 1 starts; the solo project's agent Me works in its worktree, no cards.
 // 2. The upgrade (the next start, migrated): hb1 is a slot carried by B1 for the lane, me one carried by Me for nothing.
 //    The lane finishes there: card 1 submitted, reviewed and merged, card 2 started in hb1 too (the stand-in path), and
@@ -195,7 +195,7 @@ const isIn = (dir, rev, ref) => {
     if (!(await live(alpha, 'r1'))) await inv('session:start', alpha, { agentId: 'r1' })
     const tr1 = await tokenOf(alpha, 'r1')
     check('card 1 submitted, reviewed and passed', await pass(tb1b, tr1, c1, 'Old one'))
-    check("…merged by Hive's queue: Done", !!(await until(async () => (await card(c1))?.column === 'done', HUNG_MS)) && isIn(alpha, git(hb1, 'rev-parse', 'HEAD'), 'integration'), (await card(c1))?.column)
+    check("…merged by Combwork's queue: Done", !!(await until(async () => (await card(c1))?.column === 'done', HUNG_MS)) && isIn(alpha, git(hb1, 'rev-parse', 'HEAD'), 'integration'), (await card(c1))?.column)
     const s2 = await intent(tb1b, c2, 'start')
     check('card 2 starts in hb1 too (the lane goes on there)', s2.status === 200 && same(s2.body?.data?.folder, hb1), JSON.stringify(s2.body))
     check('…on its own branch, no per-card line', branchIn(hb1) === 'hive/hb1')
@@ -233,11 +233,11 @@ const isIn = (dir, rev, ref) => {
     const handed = await until(async () => (await slots(solo)).find((s) => s.name === 'me' && s.lease?.kind === 'card'), HUNG_MS)
     check('…its slot handed over to the card', handed?.lease?.card === cMe && handed.lease.agent === 'me', JSON.stringify(await slots(solo)))
     check('…the same conversation going on', (await live(solo, 'me'))?.sessionId === meOld.sessionId && (await sessionOf(solo, meOld.sessionId))?.lease === handed?.lease?.id)
-    // Hive gives Me the card there once Me is quiet (slotCards.ts's placement, recorded as BuilderPlaced after the start's
-    // reply). Waited for before the close: one cut short is owed at the restart, where Hive starts Me itself with the
+    // Combwork gives Me the card there once Me is quiet (slotCards.ts's placement, recorded as BuilderPlaced after the start's
+    // reply). Waited for before the close: one cut short is owed at the restart, where Combwork starts Me itself with the
     // card's prompt and races Resume All (HI-1732).
     const placed = await until(async () => (await inv('tasks:facts', cMe)).find((f) => f.kind === 'BuilderPlaced'), HUNG_MS)
-    check('…Hive gives Me the card there, typed into that conversation', placed?.data?.how === 'typed' && (await live(solo, 'me'))?.sessionId === meOld.sessionId, JSON.stringify(placed))
+    check('…Combwork gives Me the card there, typed into that conversation', placed?.data?.how === 'typed' && (await live(solo, 'me'))?.sessionId === meOld.sessionId, JSON.stringify(placed))
     await close()
 
     // --- 3. A restart: Resume All resumes Me there, on its card's lease.

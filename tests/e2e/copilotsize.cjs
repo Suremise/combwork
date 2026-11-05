@@ -2,7 +2,7 @@
 // terminal had another size, stayed at the old width (stacked "Loading" frames, rules cut short) until the window was
 // resized. The real Copilot CLI, offline against the scripted stand-in model (fake-copilot-api.cjs), in a folder it
 // already trusts. Started while Settings hides its pane and the window changes size: its terminal is the process's size
-// meanwhile (not xterm's 80 × 24); shown, it is fitted, and Hive gives Copilot a size refresh once it is ready. Started
+// meanwhile (not xterm's 80 × 24); shown, it is fitted, and Combwork gives Copilot a size refresh once it is ready. Started
 // while the window changes size several times: the same. Switched live to Plan and back: a refresh after each.
 // Restarted in another mode (Ask): the new process starts at the pane's size. Each time the screen is checked: one
 // prompt, one header, full-width rules, no loading frames left; then the pane shows it, as drawn (HI-2277: a clean
@@ -50,7 +50,7 @@ const check = (name, ok, extra = '') => {
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   const hiveLog = path.join(userData, 'logs', 'hive.log')
-  /** The size refreshes Hive has given Copilot so far ("cols × rows"). */
+  /** The size refreshes Combwork has given Copilot so far ("cols × rows"). */
   const refreshes = () => {
     try {
       return [...fs.readFileSync(hiveLog, 'utf8').matchAll(/size refresh .*?: (\d+) × (\d+)/g)].map((m) => `${m[1]}x${m[2]}`)
@@ -81,11 +81,11 @@ const check = (name, ok, extra = '') => {
     /**
      * What a clean Copilot screen holds once it has settled, at the terminal's size: its header once, its prompt once,
      * every rule (a line of ─) as wide as the terminal, and no loading frame left over. A screen drawn at another
-     * width has short rules, and stacked frames repeat the prompt or leave "Loading:" lines. Checked once Hive has given
+     * width has short rules, and stacked frames repeat the prompt or leave "Loading:" lines. Checked once Combwork has given
      * Copilot its size refresh (the `refreshed`-th) and Copilot has redrawn: the screen as it is then, or after 10 s.
      */
     const cleanScreen = async (label, refreshed) => {
-      check(`${label}: Hive gave Copilot a size refresh once it was ready`, !!(await lib.until(() => refreshes().length >= refreshed, 10000, 100)), JSON.stringify(refreshes()))
+      check(`${label}: Combwork gave Copilot a size refresh once it was ready`, !!(await lib.until(() => refreshes().length >= refreshed, 10000, 100)), JSON.stringify(refreshes()))
       const look = async () => {
         const t = await term()
         const pty = await inv('pty:size', key)
@@ -199,7 +199,7 @@ const check = (name, ok, extra = '') => {
     check('…its size refresh ends at the terminal’s size', after.length >= 1 && after.every((s) => s === `${t2?.cols}x${t2?.rows}`), JSON.stringify({ after, t2 }))
     await page.screenshot({ path: path.join(lib.WORK, 'copilotsize-2-load.png') })
 
-    // Accept edits (Copilot's default): Hive's badge says why Copilot's own footer still says Manual Approval.
+    // Accept edits (Copilot's default): Combwork's badge says why Copilot's own footer still says Manual Approval.
     check('Accept edits: the session runs in it', (await live())?.permissionMode === 'accept-edits', (await live())?.permissionMode)
     const badge = page.locator('.mode-badge', { hasText: 'Accept edits' }).first()
     await badge.hover()

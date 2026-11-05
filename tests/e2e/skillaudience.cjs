@@ -1,4 +1,4 @@
-// Who gets each Hive skill, as the Skills UI says it: a skill's audience (metadata.audience in its SKILL.md: project
+// Who gets each Combwork skill, as the Skills UI says it: a skill's audience (metadata.audience in its SKILL.md: project
 // agents by default, the Assistant, or both) on its page and, when it isn't the default, its row, including a
 // deleted bundled skill; the delete and Copy to workspace wording for each audience; the project's Skills tab
 // leaving out (and counting) the Assistant's skills. Checked against what launches select (skills:workspace, the
@@ -22,7 +22,7 @@ const skill = (dir, name, audience) => {
   const meta = audience ? `metadata:\n  audience: ${audience}\n` : ''
   fs.writeFileSync(path.join(dir, name, 'SKILL.md'), `---\nname: ${name}\ndescription: The ${name} skill.\n${meta}---\n\nSteps.\n`)
 }
-// The Hive skills left out of the project tab: the bundled ones for the Assistant, and this suite's weekly-report.
+// The Combwork skills left out of the project tab: the bundled ones for the Assistant, and this suite's weekly-report.
 const bundledDir = path.join(lib.ROOT, 'resources', 'skills')
 const bundledForAssistant = fs.readdirSync(bundledDir).filter((n) => /^\s*audience:\s*assistant\s*$/m.test(fs.readFileSync(path.join(bundledDir, n, 'SKILL.md'), 'utf8')))
 const assistantOnly = bundledForAssistant.length + 1

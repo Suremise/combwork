@@ -1,7 +1,7 @@
 // A change of language while the window is open (#795): the command palette, already open, relabels its rows without
 // a keystroke, and Settings → Keyboard Shortcuts keeps its clashes by command, not by label: a language change gives
 // no command a clash with itself, and two commands whose names translate alike still show a real clash. A stopped
-// session's transcript, open, shows Hive's own notices in the new language at once, with its file unchanged (#797).
+// session's transcript, open, shows Combwork's own notices in the new language at once, with its file unchanged (#797).
 // Project Settings opened in another language shows its sections (the list, the heading and its description) and its
 // rows in it, and follows a change of language while it is open (#793, E1's catalogue in lane C's view). A connection's
 // dialog names its permission modes in it, their values the ids, and a running agent's mode menu says what a mode does
@@ -14,7 +14,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 
-// A stopped session of a project, as Hive keeps its backup (compressed, #1110): a prompt, then the user interrupting it.
+// A stopped session of a project, as Combwork keeps its backup (compressed, #1110): a prompt, then the user interrupting it.
 const ws = path.join(lib.WORK, 'i18nlive-ws')
 const proj = path.join(ws, 'demo')
 const SESSION = '33333333-aaaa-bbbb-cccc-000000000003' // synthetic
@@ -80,7 +80,7 @@ const check = (name, ok, extra = '') => {
     await inv('settings:setKeybinding', 'project.goto', null)
     check('and none once the shortcut is taken off again', !!(await lib.until(async () => (await warnings('palette.show')) === 0, HUNG_MS)))
 
-    // A stopped session's transcript, open in English: its notice is Hive's own.
+    // A stopped session's transcript, open in English: its notice is Combwork's own.
     await speak('en', {})
     await lib.openWorkspace(inv, page, ws)
     await page.getByText('demo', { exact: true }).first().click()

@@ -2,7 +2,7 @@
 // `integration`; fake Claude Code builders starting cards by their own tokens, the Assistant off):
 // - leftovers: hive/hb3 (an agent's branch from before slots, merged), card A's line (2 commits of its own; moved to Done
 //   by the user, superseded, and archived), card B's line (Done, then merged into integration by hand: its card chip
-//   shows Done), card E's line (Done, 1 commit of its own). Hive keeps a Done card's line only while it has commits of
+//   shows Done), card E's line (Done, 1 commit of its own). Combwork keeps a Done card's line only while it has commits of
 //   its own (one with none is deleted at Done), so B's and E's have one. Tags named as integration and as B's line
 //   don't change their names (HR1's round 1);
 // - never offered: main, integration, the open card C's line (Active, in its slot), and blocked card D's line, whose slot
@@ -146,7 +146,7 @@ const heads = () => git(fx.alpha, 'for-each-ref', '--format=%(refname)', 'refs/h
     await lib.until(async () => (await hbDialog.count()) === 0, HUNG_MS)
     // Free again: merged, deleted on one confirm.
     git(fx.alpha, 'worktree', 'remove', '--force', wt)
-    // Changed outside Hive: read again.
+    // Changed outside Combwork: read again.
     await pageEl.locator('[data-action="refresh-leftovers"]').click()
     check('…free again once its worktree is gone, read again', !!(await lib.until(async () => (await pageEl.locator('[data-leftover="hive/hb3"]').count()) === 1, HUNG_MS)))
     await pageEl.locator('[data-leftover="hive/hb3"] [data-action="delete-leftover"]').click()

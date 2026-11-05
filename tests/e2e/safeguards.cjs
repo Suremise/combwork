@@ -1,5 +1,5 @@
 // When a CLI's safety classifier stops an agent's response (#606): a stop and a model switch after it (Claude Code's
-// fallback, by itself) are noted on the agent (its pane's shield with the model it runs on now, Hive's notice, a note on
+// fallback, by itself) are noted on the agent (its pane's shield with the model it runs on now, Combwork's notice, a note on
 // its Doing card, cw_agent_activity's safeguard field: names only, never what was stopped); and Claude Code's prompt
 // about a stop after its turn's Stop (HB3's, 11 Oct) waits for the user saying why, with its last tool calls, stays
 // waiting through the idle notice while it shows, and once answered is idle after the stop, ready for a nudge, taking a
@@ -110,12 +110,12 @@ const check = (name, ok, extra = '') => {
     }, HUNG_MS)
     check('its pane on screen counts as seen (out of the attention inbox)', !!seen, JSON.stringify(seen?.safeguard))
     const told = await until(() => notices().find((n) => /now runs on/.test(n.title ?? '')), HUNG_MS)
-    check("Hive's notice says so", !!told && /safety classifier stopped a response/.test(told.body ?? ''), JSON.stringify(notices()))
+    check("Combwork's notice says so", !!told && /safety classifier stopped a response/.test(told.body ?? ''), JSON.stringify(notices()))
     const comment = await until(async () => {
       const c = await api('GET', `/v1/tasks/${card.number}/comments/latest`)
       return /now runs on/.test(JSON.stringify(c.body)) && c.body
     }, HUNG_MS)
-    check('its Doing card gets a note from Hive', !!comment && /"by":"Combwork"/.test(JSON.stringify(comment)), JSON.stringify(comment))
+    check('its Doing card gets a note from Combwork', !!comment && /"by":"Combwork"/.test(JSON.stringify(comment)), JSON.stringify(comment))
     const activity = await api('GET', '/v1/projects/alpha/agents/Tester/activity')
     const field = activity.body?.safeguard
     check('cw_agent_activity has the safeguard field', field?.switchedTo === 'claude-opus-4-8' && field.stops === 1 && field.toolsBefore?.includes('Bash'), JSON.stringify(field))
@@ -199,7 +199,7 @@ const check = (name, ok, extra = '') => {
     const screenStops = record?.screenStops ?? []
     check('the session keeps both stops seen on screen, each with its turn', screenStops.length === 2 && screenStops.every((s) => s.turn) && screenStops[0].turn !== screenStops[1].turn, JSON.stringify(screenStops))
 
-    // One more prompt, left waiting when Hive quits: Claude Code records that stop while Hive is down (below).
+    // One more prompt, left waiting when Combwork quits: Claude Code records that stop while Combwork is down (below).
     const last = await api('POST', '/v1/projects/alpha/agents/Tester/prompt', { text: 'safeguardprompt' })
     const left = await until(async () => {
       const s = await live(alpha, id)
@@ -213,15 +213,15 @@ const check = (name, ok, extra = '') => {
     await app.close()
   }
 
-  // While Hive is down, Claude Code records the stop its last prompt showed (answered "Switch automatically" then): in
-  // the same turn of its transcript, so it is that stop, not another, though Hive never saw the two together.
+  // While Combwork is down, Claude Code records the stop its last prompt showed (answered "Switch automatically" then): in
+  // the same turn of its transcript, so it is that stop, not another, though Combwork never saw the two together.
   const find = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? find(path.join(dir, e.name)) : e.name === `${sessionId}.jsonl` ? [path.join(dir, e.name)] : []))
   const transcript = sessionId ? find(path.join(claudeHome, 'projects'))[0] : undefined
   check('its transcript is found', !!transcript, String(sessionId))
   if (transcript) fs.appendFileSync(transcript, JSON.stringify({ type: 'system', subtype: 'model_refusal_fallback', direction: 'retry', scope: 'session', content: "Opus 5.5's safeguards flagged this message. Switched to Opus 4.8.", level: 'warning', trigger: 'refusal', originalModel: 'claude-sonnet-5-5', fallbackModel: 'claude-opus-4-8', requestId: 'req_while_down', apiRefusalCategory: 'cyber', isMeta: false, timestamp: new Date().toISOString(), uuid: 'record-while-down', sessionId }) + '\n')
 
   // After a restart, Performance counts the same: the stops seen only on screen are kept on the session's record, and the
-  // one recorded while Hive was down is matched to its prompt by their turn (#606 round 3).
+  // one recorded while Combwork was down is matched to its prompt by their turn (#606 round 3).
   const again = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await again.firstWindow()

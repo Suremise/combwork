@@ -1,5 +1,5 @@
 // The workflow rules #1425's options table found with no test of them acting in the app (#1507), each with fake Claude
-// Code agents acting by their own tokens (queueFixture.cjs: alpha is "Hive merges" into `integration`, one merge check):
+// Code agents acting by their own tokens (queueFixture.cjs: alpha is "Combwork merges" into `integration`, one merge check):
 // - G1b two reviewers: one pass leaves the card in Review, the same reviewer again doesn't count, a second reviewer's
 //   pass approves it (S57's quorum), then it is merged;
 // - G13 stop own runs: the builder's own Progress run still open refuses its submit, naming the run; once it ends, the

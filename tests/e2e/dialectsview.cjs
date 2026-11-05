@@ -1,7 +1,7 @@
 // The Dialects view (HI-2444; plans/2026-11-03-dialects-design.md, section 4; HR1's design checks s12 and s15): the list
 // of a workspace's dialect files with their state, which running agents use them (a known model on the empty shipped
 // file too) and an on/off switch; a file showing every agent text, inherited text dimmed with its layer, expanding to
-// each layer's value; outdated overrides flagged with the current Default (or none, for an id this Hive no longer has);
+// each layer's value; outdated overrides flagged with the current Default (or none, for an id this Combwork no longer has);
 // Save checking the schema only, refused with reasons and the draft kept, from the Texts tab and from the JSON tab (an
 // invalid JSON never saving an older draft); a change on disk while editing refused (changedOnDisk) and Keep My Changes;
 // Duplicate (no model), Set Model (Promote; HI-2523), New Model File on a CLI's group with a model typed (never seen)
@@ -39,7 +39,7 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
   lib.gitProject(proj)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([proj.toLowerCase(), ws.toLowerCase()]))
   fs.mkdirSync(path.join(dialects, 'claude-code'), { recursive: true })
-  // The Workspace file overrides the contract's first line; the test copy has two outdated overrides: an id this Hive
+  // The Workspace file overrides the contract's first line; the test copy has two outdated overrides: an id this Combwork
   // doesn't have, and a text missing a placeholder.
   fs.writeFileSync(path.join(dialects, 'workspace.json'), file('Workspace', { [HOST]: 'WS-HOST {hasProject, select, yes {{project}} other {}}.' }))
   fs.writeFileSync(path.join(dialects, ...TEST_COPY.split('/')), file('Mark v2', { 'gone.text': 'old', 'api.http.noRoute': 'MARK {method}' }))
@@ -90,7 +90,7 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
     await dialog.locator('.btn.primary, .btn.danger').last().click()
   }
 
-  // --- An agent on a model Hive can name, on the empty shipped Opus 5.5 file (Auto).
+  // --- An agent on a model Combwork can name, on the empty shipped Opus 5.5 file (Auto).
   const clara = await lib.addAgent(inv, proj, { name: 'Clara' })
   await lib.setLaunch(inv, proj, clara.id, { model: 'claude-opus-5-5' })
   await inv('session:start', proj, { agentId: clara.id })
@@ -127,7 +127,7 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
   check('expanding it shows each layer, top to bottom: this file, the CLI file, Workspace, Default', JSON.stringify(layers) === JSON.stringify(['file', 'cli', 'workspace', 'default']), JSON.stringify(layers))
   check('…the empty layers saying "—", the Workspace its text', (await host.locator('.dialect-layer[data-layer="workspace"]').innerText()).includes('WS-HOST') && (await host.locator('.dialect-layer[data-layer="file"]').innerText()).includes('—'))
 
-  // --- Outdated: flagged with the Default beside them; an id this Hive no longer has, with no Default.
+  // --- Outdated: flagged with the Default beside them; an id this Combwork no longer has, with no Default.
   const outdated = pane.locator('.dialect-area[data-area="outdated"]')
   check('the outdated overrides are listed first', (await outdated.locator('.dialect-text').count()) === 2)
   check('…an id this Combwork no longer has says there is no current Default', (await outdated.locator('.dialect-text[data-text-id="gone.text"] [data-problem="unknown"]').count()) === 1 && /No current Default/.test(await outdated.locator('.dialect-text[data-text-id="gone.text"]').innerText()))
@@ -270,7 +270,7 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
       return undefined
     }
   }
-  check('Revert to shipped puts back the file as Hive ships it', !!(await until(() => modelOf('claude-code/Opus 5.5.json') === 'claude-opus-5-5', HUNG_MS)))
+  check('Revert to shipped puts back the file as Combwork ships it', !!(await until(() => modelOf('claude-code/Opus 5.5.json') === 'claude-opus-5-5', HUNG_MS)))
   // A file deleted, or renamed, outside while it is shown: it says it is no longer there, never loading forever (HR2 r1).
   const goneShown = () => until(() => page.locator('[data-dialect-gone]').count(), HUNG_MS)
   await row('claude-code/Opus 5.5 v2.json').click()

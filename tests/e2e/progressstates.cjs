@@ -1,5 +1,5 @@
 // Honest run states in the Progress panel (#549), on a fake Claude Code agent (fake-claude/) whose "shell:" step runs
-// hive-progress as an agent's shell does (Hive's shims: Electron as Node): a run waiting for a test slot shows what it
+// hive-progress as an agent's shell does (Combwork's shims: Electron as Node): a run waiting for a test slot shows what it
 // waits for and how long it has waited, never a time left, with a still, hatched bar, and goes on with its steps when the
 // wait ends; a run past its estimate says "finishing", never "0 s left"; a command interrupted by Ctrl+C (its exit code,
 // a shell's 130) shows as stopped, not failed; a wrapper killed with its command (an agent stopping a preview server) shows as ended
@@ -121,7 +121,7 @@ const t = setInterval(() => {
   await shoot('waiting')
   fs.writeFileSync(release, '')
   check('the wait ends: it goes on with its steps', !!(await until(async () => /1 of 2: first suite/.test(await textOf(q?.id)) && !/waiting/.test(await textOf(q?.id)), 15000)), await textOf(q?.id))
-  check('…and Hive has it waiting no more', !!(await until(async () => (await runs()).find((r) => r.id === q?.id)?.waiting === null, 5000)))
+  check('…and Combwork has it waiting no more', !!(await until(async () => (await runs()).find((r) => r.id === q?.id)?.waiting === null, 5000)))
   fs.writeFileSync(end, '')
   const qEnd = await queued()
   check('…then it passes', qEnd?.code === 0 && !!(await until(async () => (await runs()).find((r) => r.id === q?.id)?.state === 'passed', 10000)), JSON.stringify(qEnd))
@@ -158,7 +158,7 @@ const t = setInterval(() => {
   check('the server run reports its process', !!srv && Number.isInteger(srv.pid) && srv.pid > 0, JSON.stringify(srv))
   // Its identity while it is known to be the server (it runs until ended), for ending it as that process (#603).
   const [serverId] = srv?.pid ? lib.identify([srv.pid]) : []
-  // What this checks is Hive's side of a run whose wrapper never reports its end (wrapper.ts, runWrapped): the wrapper
+  // What this checks is Combwork's side of a run whose wrapper never reports its end (wrapper.ts, runWrapped): the wrapper
   // must not run between its command's ending and its own. Ended one by one, children first, it outlived its command for
   // the moment between the two: it saw the command killed (exit code 4294967295, Kill's -1), rightly reported a failure
   // and exited before its own turn (HI-2284, under load). So it is suspended first (by its identity, #603) and sees
@@ -180,7 +180,7 @@ const t = setInterval(() => {
   check('its process tree is ended (as an agent stopping it does)', !!serverId && ended >= 1 && lib.stillSame([serverId]).length === 0, `${ended} ended`)
   await server()
   const gone = await until(async () => (await runs()).find((r) => r.id === srv?.id && r.finishedAt !== null), 45000)
-  check('Hive sees its process gone: ended without a report', gone?.state === 'stopped' && gone.stopReason === 'gone', JSON.stringify(gone))
+  check('Combwork sees its process gone: ended without a report', gone?.state === 'stopped' && gone.stopReason === 'gone', JSON.stringify(gone))
   check('…never "stopped reporting" meanwhile, nor failed', gone?.staleReason === null && gone?.summary === null)
   check('…its row says so', !!(await until(async () => /Ended without a report after/.test(await textOf(srv?.id)), 5000)) && !/Stopped reporting/i.test(await textOf(srv?.id)), await textOf(srv?.id))
   await shoot('ended')

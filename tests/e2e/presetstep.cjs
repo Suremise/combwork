@@ -3,7 +3,7 @@
 //   Control tab at the step, Git in the header, Pair suggested; Choose asks once (nothing in flight) and saves Pair, and
 //   the header reads "Workflow: Git · Pair";
 // - the switch sequence: to None, None's step (Git's answer doesn't stop it); Not now; a folder found meanwhile gets the
-//   notice, Not now; Hive restarted: no step for None and no notice; back to Git, Pair restored and no step; to None
+//   notice, Not now; Combwork restarted: no step for None and no notice; back to Git, Pair restored and no step; to None
 //   again, its Not now respected;
 // - New Project (a folder with no version control): its tab opens at None's step, with no notice; Customise… fills the
 //   Workflow section with the preset, not saved;

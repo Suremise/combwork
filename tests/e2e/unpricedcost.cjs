@@ -1,4 +1,4 @@
-// A session whose model Hive has no price for has an unknown cost, never $0: the agent's footer shows "$?", the
+// A session whose model Combwork has no price for has an unknown cost, never $0: the agent's footer shows "$?", the
 // Overview's running agent and its cost cards "Unknown" (the summary, the provider's, the session's),
 // each naming the model on hover; with a price of the user's they show the estimate. The agent is the fake Claude
 // Code, whose transcript reports the model "claude-fake" and no cost. Dev build, throwaway profile, workspace and

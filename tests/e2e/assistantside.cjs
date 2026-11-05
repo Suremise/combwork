@@ -1,4 +1,4 @@
-// The Hive Assistant's panel on the left or the right (#158): right by default; moved from the command palette, the
+// The Combwork Assistant's panel on the left or the right (#158): right by default; moved from the command palette, the
 // View menu, the panel's ⋯ menu and Settings → Assistant → Panel side. On the left it sits between the project list
 // and the main area, is resized from its right edge, folds to its strip there (its arrow pointing the other way), and
 // no longer pushes the tip card and toasts away from the bottom-right corner. The choice survives a restart.

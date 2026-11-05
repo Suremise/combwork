@@ -4,7 +4,7 @@
 // project, source, dates) narrow it; Forget These… asks with how many, then deletes just those; an entry opens beside
 // the timeline with its detail, why, links and tags, is edited (summary, kind, importance) and deleted after asking; the
 // footer says its size and retention and opens Settings → Assistant; off, the browser says so, still reads it, and Turn
-// On turns it on. The keyboard moves along the rows. Screenshots in both themes. Entries are Hive's facts (a card into
+// On turns it on. The keyboard moves along the rows. Screenshots in both themes. Entries are Combwork's facts (a card into
 // Done) plus rows written into the journal's file as the Assistant would (its tools are measured in replysize). No
 // agents. Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
@@ -24,12 +24,12 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 
-/** Entries as the Assistant writes them, into the journal Hive made (its triggers index them). */
+/** Entries as the Assistant writes them, into the journal Combwork made (its triggers index them). */
 function seed(cards, secondKey) {
   const db = new DatabaseSync(dbFile)
   try {
     db.function('journal_text', { deterministic: true, varargs: true }, (detail) => (typeof detail === 'string' ? detail : ''))
-    // Today's between midnight and Hive's fact (the newest), whatever the time the suite runs.
+    // Today's between midnight and Combwork's fact (the newest), whatever the time the suite runs.
     const midnight = new Date()
     midnight.setHours(0, 0, 0, 0)
     const fact = Date.parse(db.prepare('SELECT max(at) AS at FROM entries').get().at)
@@ -72,13 +72,13 @@ function seed(cards, secondKey) {
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
-    // Hive's own fact: a card into Done makes the journal and its first entry.
+    // Combwork's own fact: a card into Done makes the journal and its first entry.
     const first = await inv('tasks:create', { title: 'Journal browser', project: 'alpha' })
     // A long title (HI-2000): its chip in an entry's Links cut its key in two ("HI-" over "1985").
     const second = await inv('tasks:create', { title: 'Timeline rows: newest first by day, with search, filters, the keyboard and the entry pane beside them', project: 'alpha' })
     await inv('tasks:update', second.number, { column: 'doing' })
     await inv('tasks:update', first.number, { column: 'done' })
-    check("Hive's fact made the journal", !!(await lib.until(async () => (await inv('journal:status')).entries === 1, HUNG_MS)))
+    check("Combwork's fact made the journal", !!(await lib.until(async () => (await inv('journal:status')).entries === 1, HUNG_MS)))
     // The plan links its card by key (HI-1661: as cw_journal_write's link asks), the decision by number (written before).
     seed([first.number, second.number], second.key)
 
@@ -88,7 +88,7 @@ function seed(cards, secondKey) {
     const rows = view.locator('.journal-row')
     check('Journal → Timeline shows every entry', !!(await lib.until(async () => (await rows.count()) === 7, HUNG_MS)), String(await rows.count()))
     const summaries = async () => rows.locator('.journal-summary').allInnerTexts()
-    check("newest first, by day (Today first): Hive's fact, then the Assistant's", /^[A-Z]{2,4}-\d+ "Journal browser" is Done/.test((await summaries())[0]) && (await summaries())[1] === 'Ship the journal browser under the Assistant view' && (await view.locator('.journal-day-head').first().innerText()).toLowerCase() === 'today', JSON.stringify(await summaries()))
+    check("newest first, by day (Today first): Combwork's fact, then the Assistant's", /^[A-Z]{2,4}-\d+ "Journal browser" is Done/.test((await summaries())[0]) && (await summaries())[1] === 'Ship the journal browser under the Assistant view' && (await view.locator('.journal-day-head').first().innerText()).toLowerCase() === 'today', JSON.stringify(await summaries()))
     const top = rows.filter({ hasText: 'Ship the journal browser' })
     check('a row has its kind mark, project, source and card chip', (await top.locator('.journal-kind-mark').count()) === 1 && /alpha/.test(await top.innerText()) && (await top.locator('.journal-source-mark').count()) === 1 && (await top.locator(`.card-chip[data-task="${first.number}"]`).count()) === 1)
     check('important entries are marked', (await top.locator('.journal-important').count()) === 1)
@@ -253,7 +253,7 @@ function seed(cards, secondKey) {
     check('the kind filter', !!(await lib.until(async () => JSON.stringify(await summaries()) === JSON.stringify(['Ship the journal browser (edited)', 'Build the timeline first, then the entry pane']), HUNG_MS)), JSON.stringify(await summaries()))
     await view.locator('.journal-kind').selectOption('')
     await view.locator('.journal-source').selectOption('hive')
-    check('the source filter: only Hive\'s facts', !!(await lib.until(async () => (await rows.count()) === 1 && /Journal browser/.test(await rows.first().innerText()), HUNG_MS)), JSON.stringify(await summaries()))
+    check('the source filter: only Combwork\'s facts', !!(await lib.until(async () => (await rows.count()) === 1 && /Journal browser/.test(await rows.first().innerText()), HUNG_MS)), JSON.stringify(await summaries()))
     await view.locator('.journal-source').selectOption('')
     await view.locator('.journal-project').selectOption('alpha')
     check('the project filter', !!(await lib.until(async () => (await rows.count()) === 3, HUNG_MS)), JSON.stringify(await summaries()))

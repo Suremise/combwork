@@ -1,5 +1,5 @@
 // Agent watches (#416): cw_wait_for_agents with wake, on fake Claude Code agents (fake-claude/). A watcher asks to be
-// told when another agent is done and ends its turn at once (watching, "Waiting for Worker to finish"); Hive types one
+// told when another agent is done and ends its turn at once (watching, "Waiting for Worker to finish"); Combwork types one
 // line into it when the agent finishes its turn (with its reply), starts waiting for the user, or stops; exactly once
 // each. Also: an agent not working is the answer at once; nothing is typed while the watcher works or the user types
 // there; limitMinutes ends a watch with a "still working" line; cancel ends one. Dev build, throwaway profile,
@@ -71,7 +71,7 @@ const check = (name, ok, extra = '') => {
   }
   /** Types a prompt into an agent (as the user does), Enter included. */
   const say = async (id, text) => {
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
   }
   const watchOn = (name, extra = {}) => `hive cw_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: name }], wake: true, ...extra })}`

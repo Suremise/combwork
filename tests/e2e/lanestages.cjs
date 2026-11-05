@@ -1,5 +1,5 @@
 // The Progress panel's P6 changes (#1421, SPEC §16.13's P6 line), on fake Claude Code agents acting by their own tokens,
-// the Assistant off: a "Hive merges" project (queueFixture.cjs's, its user's OK for cards labelled ui) whose lane has a
+// the Assistant off: a "Combwork merges" project (queueFixture.cjs's, its user's OK for cards labelled ui) whose lane has a
 // card in Review, one Approved (waiting for your OK) and one Merging (its merge check held): each segment's hover and
 // accessible name say its stage, in its category's colour, with the divider on Approved and Merging; the legend on the
 // Lanes bar by hover and by keyboard (Esc closes it), with a rename; a Solo project's lanes left out of Pulse until one
@@ -35,7 +35,7 @@ const beta = path.join(fx.ws, 'beta')
     let page = h.page
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(h.app, page, { width: 1500, height: 950 })
-    // Pair-like, Hive merges into integration, your OK for cards labelled ui (so one waits in Approved).
+    // Pair-like, Combwork merges into integration, your OK for cards labelled ui (so one waits in Approved).
     const options = q.queueOptions(fx, { okBefore: { mode: 'labels', labels: ['ui'] } })
     await inv('workflow:setOptions', fx.alpha, { preset: 'pair', options })
     // Solo, its Maximum agents raised to 2 as a user would (HI-2091): beta's two lanes below each add an agent.
@@ -83,7 +83,7 @@ const beta = path.join(fx.ws, 'beta')
     // A second lane, its card still to do: started before the options change, it keeps the ruleset of then.
     const bx = await q.agent(fx, h, 'BX')
     const nx = (await inv('tasks:create', { title: 'Next card', project: 'alpha' })).number
-    // Held (blocked) until the options change: BX idle, Hive would start it at once (HI-2029), before the change.
+    // Held (blocked) until the options change: BX idle, Combwork would start it at once (HI-2029), before the change.
     await inv('tasks:update', nx, { blocked: 'Held until the options change' })
     const l2 = await startLane('alpha', 'BX', 'R1', 'next', [nx])
     check('the lanes are recorded with their rulesets, no old rules yet', !!l1 && !!l2 && (await laneNow(l1))?.oldRules === false && (await laneNow(l2))?.oldRules === false, JSON.stringify(await inv('lanes:list')))
@@ -177,7 +177,7 @@ const beta = path.join(fx.ws, 'beta')
 
     // The lane's next card, started after the change, keeps the lane's ruleset (§16.5.4): the one in force before it, as
     // the cards started then have.
-    // Unblocked, Hive starts it on BX, its lane's builder (HI-2029), and the lanes' rows reorder. HI-2052: with the tag's
+    // Unblocked, Combwork starts it on BX, its lane's builder (HI-2029), and the lanes' rows reorder. HI-2052: with the tag's
     // tooltip up and the mouse still, its tag moves from under the mouse; the tooltip closes once the mouse moves, and the
     // next hover's tooltip is the only one.
     check("…the tag's tooltip up before the rows reorder", !!(await hover(tag(l1), (t) => t.includes('New lanes and cards'))), await tipText())
@@ -263,10 +263,10 @@ const beta = path.join(fx.ws, 'beta')
     const s2 = await startLane('beta', 'S2', null, 'solo running', [bc2])
     check('…a running lane of beta shows in Pulse', !!(await waitHung(async () => (await row(s2).count()) === 1)) && (await row(s1).count()) === 0, await panel.innerText())
 
-    // --- Japanese (a long locale): Hive started again in it, the same lanes.
+    // --- Japanese (a long locale): Combwork started again in it, the same lanes.
     fs.writeFileSync(fx.go, 'go')
     await h.app.close()
-    // The lanes' agents were working: Hive offers to resume them (its restart record), in a notice over Pulse's bar and
+    // The lanes' agents were working: Combwork offers to resume them (its restart record), in a notice over Pulse's bar and
     // marks, perhaps more than one as each is decided (HI-1792: the hovers below timed out under it). Answered Don't
     // Resume until the record is gone (nothing left to offer) and no offer shows.
     const restartRecord = path.join(fx.userData, 'restart.json')

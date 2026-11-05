@@ -1,5 +1,5 @@
 // P7's default-on switches turned off, in the app (#1563, tests/workflow/README.md's P7 table; slotcards and slotupgrade
-// have them on): Pair with Hive merges, each card in its own folder, fake Claude Code agents, a temp Git project whose
+// have them on): Pair with Combwork merges, each card in its own folder, fake Claude Code agents, a temp Git project whose
 // package-lock.json card 1 changes, the slots' setup a script that records each install:
 // - Slots are brought up to date before each card (G15) off: a lane of two cards in slot-a; card 2 starts there from
 //   the new target, and nothing is installed for it (slot-a's setup ran once, as it was made);
@@ -67,7 +67,7 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     await lib.waitForProvider(inv)
     await lib.openWorkspace(inv, page, ws)
     const until = (fn, ms) => lib.until(fn, ms, 250)
-    // Pair with Hive merges into integration (checked out nowhere), cards in slots, G15 off.
+    // Pair with Combwork merges into integration (checked out nowhere), cards in slots, G15 off.
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] }, slotsUpToDate: false } })
     check('G15 (Slots are brought up to date before each card) is off', (await inv('workflow:form', alpha))?.options?.slotsUpToDate === false, JSON.stringify((await inv('workflow:form', alpha))?.options))
     await inv('advanced:set', 'cw.slots.deleteMergedLines', false)
@@ -126,7 +126,7 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     check("card 1 starts in slot-a, on its line", s1.status === 200 && same(s1.body?.data?.folder, slotA) && !!(await until(() => branchIn(slotA) === line(c1, 'switch-one'), HUNG_MS)), JSON.stringify(s1.body))
     commitIn(slotA, { 'one.txt': 'one\n', 'package-lock.json': '{"v":2}\n' }, 'Switch one')
     check('B1 submits card 1; R1 passes it', (await intent(tb1, c1, 'submit', { summary: 'Switch one: ready' })).status === 200 && (await intent(tr1, c1, 'start-review')).status === 200 && (await intent(tr1, c1, 'verdict', { pass: true, comment: 'Switch one: passed' })).status === 200)
-    check("Hive's queue merges card 1: Done", !!(await until(async () => (await card(c1))?.column === 'done', HUNG_MS)), (await card(c1))?.column)
+    check("Combwork's queue merges card 1: Done", !!(await until(async () => (await card(c1))?.column === 'done', HUNG_MS)), (await card(c1))?.column)
 
     // --- Card 2 in slot-a: G15 off, nothing installed; card 1's merged line kept.
     const s2 = await intent(tb1, c2, 'start')

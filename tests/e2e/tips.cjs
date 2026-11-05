@@ -1,4 +1,4 @@
-// Tips: the day's tip in a card when Hive starts (once a day), Next tip, Learn more (the user guide at its
+// Tips: the day's tip in a card when Combwork starts (once a day), Next tip, Learn more (the user guide at its
 // heading), closing it, a moment's tip once (a second agent), Help → Tips… (grouped, searchable, Try it runs the
 // command, Learn more closes it), and Don't show tips. No agents run. Dev build, throwaway profile and workspace with tips turned on.
 const lib = require('./lib.cjs')
@@ -47,7 +47,7 @@ const check = (name, ok, extra = '') => {
   const saved = () => JSON.parse(fs.readFileSync(cfgFile, 'utf8')).ui?.tips ?? {}
 
   // --- The day's tip.
-  check('a tip shows when Hive starts', !!(await until(async () => (await card.count()) === 1, 10000)))
+  check('a tip shows when Combwork starts', !!(await until(async () => (await card.count()) === 1, 10000)))
   check('the first tip, numbered', (await title()) === 'Compact with a focus' && /Tip · 1 of \d+/.test(await card.locator('.tip-head').innerText()), await title())
   check('its shortcut is shown', (await card.locator('.tip-text kbd').count()) === 1)
   check('it is not a dialog: the window works around it', (await page.locator('[role="dialog"]').count()) === 0)

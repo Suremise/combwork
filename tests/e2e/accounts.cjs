@@ -1,5 +1,5 @@
 // Settings → Accounts & Connections (HI-980; HI-2107: the section's id still 'accounts'; on for everyone since HI-1774):
-// Add Account… makes the account's folder (its projects\ a junction to the CLI home's) and opens its sign-in in Hive's
+// Add Account… makes the account's folder (its projects\ a junction to the CLI home's) and opens its sign-in in Combwork's
 // terminal, nothing typed into it; once it ends, the row says who it is signed in as, and Set Up (HI-1826) runs the CLI
 // itself on the folder for its first-run screens. Turned on, it is this workspace's
 // default. A login changed in its folder while Settings is closed (as a /login in a pane would) is found by its watch
@@ -138,7 +138,7 @@ const check = (name, ok, extra = '') => {
     check('Add Account… adds it', !!personal)
     const folder = personal ? path.join(accountsRoot, personal.id) : ''
     check('…its folder in the profile’s accounts folder, projects a junction to the CLI home’s', !!personal && fs.lstatSync(path.join(folder, 'projects')).isSymbolicLink() && fs.existsSync(path.join(folder, 'projects', 'C--work-alpha', 'kept.jsonl')))
-    check('…and opens its sign-in in a terminal of Hive’s', !!(await lib.until(async () => (await page.locator('.account-signin .task-terminal').count()) === 1, HUNG_MS)))
+    check('…and opens its sign-in in a terminal of Combwork’s', !!(await lib.until(async () => (await page.locator('.account-signin .task-terminal').count()) === 1, HUNG_MS)))
     const signed = await lib.until(async () => {
       const a = (await list()).connections.find((x) => x.id === personal?.id)
       return a?.accepted?.email === 'one@example.com' && a.observed?.loggedIn === true ? a : null
@@ -184,7 +184,7 @@ const check = (name, ok, extra = '') => {
     check('…and its row says so: On here', !!(await lib.until(async () => (await row('Personal').locator('[data-on-here] [role="switch"]').getAttribute('aria-checked')) === 'true', HUNG_MS)))
 
     // --- Set up for this workspace (HI-1870): on here, its CLI must trust the folders it would be used in too, read
-    // from its .claude.json (never written by Hive). Claude Code's trust of a folder covers those inside it (HI-1871),
+    // from its .claude.json (never written by Combwork). Claude Code's trust of a folder covers those inside it (HI-1871),
     // so Set Up asks once, in the workspace's folder; the fake records the trust answered there.
     const ws1Real = fs.realpathSync.native(ws1)
     const trustOf = async (invoke, id) => (await invoke('connections:list')).connections.find((a) => a.id === id)?.trust ?? null
@@ -279,8 +279,8 @@ const check = (name, ok, extra = '') => {
 
     // --- Rename: the name only.
     await menuOf('Personal', 'Rename…')
-    await fillPrompt('Hive overnight')
-    check('Rename… changes its name, not its folder', !!(await lib.until(async () => (await list()).connections.some((a) => a.id === personal.id && a.name === 'Hive overnight'), HUNG_MS)) && fs.existsSync(folder))
+    await fillPrompt('Combwork overnight')
+    check('Rename… changes its name, not its folder', !!(await lib.until(async () => (await list()).connections.some((a) => a.id === personal.id && a.name === 'Combwork overnight'), HUNG_MS)) && fs.existsSync(folder))
 
     // --- A login changed with Settings closed (a /login in a pane): its watch finds it.
     await page.keyboard.press('Escape')
@@ -296,9 +296,9 @@ const check = (name, ok, extra = '') => {
     check('a login changed in its folder with Settings closed is found by itself', !!changed && changed.accepted?.email === 'one@example.com')
     await openSettings()
     await nav.click()
-    check('…and shown as changed, with what it was', !!(await lib.until(async () => /Login changed/.test(await row('Hive overnight').innerText().catch(() => '')) && /Now signed in as two@example\.com, was one@example\.com/.test(await row('Hive overnight').innerText().catch(() => '')), HUNG_MS)))
+    check('…and shown as changed, with what it was', !!(await lib.until(async () => /Login changed/.test(await row('Combwork overnight').innerText().catch(() => '')) && /Now signed in as two@example\.com, was one@example\.com/.test(await row('Combwork overnight').innerText().catch(() => '')), HUNG_MS)))
     await shots('changed')
-    await row('Hive overnight').getByRole('button', { name: 'Keep the New Login' }).click()
+    await row('Combwork overnight').getByRole('button', { name: 'Keep the New Login' }).click()
     await fillPrompt('Two')
     check('Keep the New Login takes it on, and offers a rename', !!(await lib.until(async () => (await list()).connections.some((a) => a.id === personal.id && a.accepted?.email === 'two@example.com' && a.name === 'Two'), HUNG_MS)))
 

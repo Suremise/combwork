@@ -2,7 +2,7 @@
 // session in its worktree, so its session record and the fake Claude home have its folder; Third has a commit on its branch)
 // and a plain agent, plus Claude Code's memory for the project's folder. The workspace and its worktrees folder are
 // moved together, Second's worktree then on to somewhere else and Third's deleted, and a file blocks the copy of
-// Builder's Claude folder. Hive reopens it: the banner offers Repair…; Repair refuses while an agent runs; the dialog's
+// Builder's Claude folder. Combwork reopens it: the banner offers Repair…; Repair refuses while an agent runs; the dialog's
 // plan; Recreate worktree for Third (made again on its branch, with its commit); the report with the failed copy and
 // Second still to locate, the copy kept to do in project.json. After a restart: still pending, nothing repeated; with
 // the blocker gone and Second located, Repair finishes: git lists the worktrees at their new folders and they work, the
@@ -127,7 +127,7 @@ async function launch() {
     fs.mkdirSync(path.join(home, 'projects', enc(alpha1), 'memory'), { recursive: true })
     fs.writeFileSync(path.join(home, 'projects', enc(alpha1), 'memory', 'MEMORY.md'), '- [A fact](fact.md) — remembered before the move\n')
     const recorded = await lib.until(() => readJson(path.join(ws1, '.combwork', 'workspace.json')).lastPath && readJson(path.join(alpha1, '.combwork', 'project.json')).lastPath, 10000)
-    check('Hive records where the workspace and its projects are', !!recorded && same(readJson(path.join(ws1, '.combwork', 'workspace.json')).lastPath, ws1) && same(readJson(path.join(alpha1, '.combwork', 'project.json')).lastPath, alpha1))
+    check('Combwork records where the workspace and its projects are', !!recorded && same(readJson(path.join(ws1, '.combwork', 'workspace.json')).lastPath, ws1) && same(readJson(path.join(alpha1, '.combwork', 'project.json')).lastPath, alpha1))
     const sessions = sessionsOf(alpha1).sessions
     check('the sessions ran in the worktrees (their cwd)', sessions.some((s) => same(s.cwd, wt1)) && sessions.some((s) => same(s.cwd, third1)), JSON.stringify(sessions.map((s) => s.cwd)))
     check('…and the fake Claude home has its transcript under the worktree’s folder name', fs.existsSync(path.join(home, 'projects', enc(wt1))))
@@ -216,7 +216,7 @@ async function launch() {
     await app.close()
   }
 
-  // Hive restarts before the retry: the failed copy is still to do; nothing done before is done again.
+  // Combwork restarts before the retry: the failed copy is still to do; nothing done before is done again.
   {
     const { app, page, inv } = await launch()
     await lib.openWorkspace(inv, page, ws2)
@@ -251,7 +251,7 @@ async function launch() {
     await app.close()
   }
 
-  // Hive restarts, the records writable again: Repair finishes Third's sessions and data without repeating git.
+  // Combwork restarts, the records writable again: Repair finishes Third's sessions and data without repeating git.
   {
     const { app, page, inv } = await launch()
     await lib.openWorkspace(inv, page, ws2)

@@ -79,7 +79,7 @@ const until = async (fn, ms = 10000) => {
       }
     })
   }
-  // How long its launch line may take to appear once Hive shows it ready: generous, for a loaded machine.
+  // How long its launch line may take to appear once Combwork shows it ready: generous, for a loaded machine.
   const LAUNCH_RECORD_MS = 20000
   const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), LAUNCH_RECORD_MS)
   const mcpServers = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers : {}
@@ -204,7 +204,7 @@ const until = async (fn, ms = 10000) => {
           if (done) break
           got.text += Buffer.from(value).toString('utf8')
         }
-        // Ended by Hive (not by stop(), whose abort rejects the read instead).
+        // Ended by Combwork (not by stop(), whose abort rejects the read instead).
         got.done = true
       })
       .catch(() => undefined)
@@ -267,7 +267,7 @@ const until = async (fn, ms = 10000) => {
   check("…and carries nothing of beta's sessions", !agentStream.text.includes(betaPath) && !agentStream.text.includes('PRIVATE'), agentStream.text.slice(0, 400))
   check("the workspace token's stream has beta's sessions too", scriptStream.text.includes(betaPath) && scriptStream.text.includes(alphaPath), scriptStream.text.slice(0, 200))
 
-  // --- Skills: another project's own skills are its agents' business; the workspace's Hive skills are everyone's.
+  // --- Skills: another project's own skills are its agents' business; the workspace's Combwork skills are everyone's.
   fs.mkdirSync(path.join(beta, '.claude', 'skills', 'beta-secret'), { recursive: true })
   fs.writeFileSync(path.join(beta, '.claude', 'skills', 'beta-secret', 'SKILL.md'), '---\nname: beta-secret\ndescription: PRIVATE beta skill.\n---\n')
   r = await as('GET', '/v1/skills?project=beta')
@@ -277,7 +277,7 @@ const until = async (fn, ms = 10000) => {
   r = await as('GET', '/v1/skills?project=alpha')
   check('its own project\'s skills are open to it', r.status === 200 && r.body.some((s) => s.name === 'work-on-card' && s.level === 'hive'), JSON.stringify(r).slice(0, 300))
   r = await as('GET', '/v1/status')
-  check('the status says who it is to Hive', r.status === 200 && r.body.caller?.role === 'agent' && r.body.caller.project === 'alpha' && r.body.caller.agent === 'Alfie' && r.body.api?.version >= 2, JSON.stringify(r.body?.caller))
+  check('the status says who it is to Combwork', r.status === 200 && r.body.caller?.role === 'agent' && r.body.caller.project === 'alpha' && r.body.caller.agent === 'Alfie' && r.body.api?.version >= 2, JSON.stringify(r.body?.caller))
 
   // --- Another agent's card in Doing is its work in progress: Alfie can't move it on (409), even taking it in the same
   // change; the workspace token (a script, as the user's board) can.

@@ -131,7 +131,7 @@ function state() {
   await shots('stale-page')
   await stale.getByRole('button', { name: 'Retry' }).click()
   check('…Retry reads it: the next page, no longer stale', !!(await lib.until(async () => (await stale.count()) === 0 && /Page 2 of 3/.test(await text(commits.locator('.table-paging'))), HUNG_MS)), await text(page.locator('.split-main')))
-  // Hive reads the value again only when it changes: another one, so this read fails once too.
+  // Combwork reads the value again only when it changes: another one, so this read fails once too.
   await failing('git:compare*1,none-refresh')
   await page.locator('.split-list .pane-header [aria-label="Compare again"]').click()
   check('a refresh that fails: the last result stays, said to be stale', !!(await lib.until(async () => (await stale.count()) === 1, HUNG_MS)) && (await counts.getAttribute('data-compare-ahead')) === '121', await text(page.locator('.split-main')))

@@ -1,4 +1,4 @@
-// Hive's tool replies stay lean: every hive MCP tool (through out/main/hive-mcp.js, as an agent and as the
+// Combwork's tool replies stay lean: every hive MCP tool (through out/main/hive-mcp.js, as an agent and as the
 // Assistant) and the Agent API routes behind them, against a busy workspace (four projects, ~75 cards with long
 // descriptions and comments, handovers, notes, running agents). Checks what the replies say and that each stays
 // within its size; prints every reply's size in characters and writes the sizes and texts to replysize.json and
@@ -51,7 +51,7 @@ const prose = (seed, n) => {
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
-  // Once (4 Oct 2026) the page closed during a workspace switch, with nothing in Hive's log: say what happened, if again.
+  // Once (4 Oct 2026) the page closed during a workspace switch, with nothing in Combwork's log: say what happened, if again.
   page.on('crash', () => console.log(`PAGE CRASHED ${new Date().toISOString()}`))
   page.on('close', () => console.log(`PAGE CLOSED ${new Date().toISOString()}`))
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.on('close', () => console.log(`HIVE WINDOW CLOSING ${new Date().toISOString()}`)))
@@ -289,7 +289,7 @@ const prose = (seed, n) => {
   check('summary=true: the latest comment as its first line, with its whole length', summary.comment?.text === fullLatest.split('\n').map((l) => l.trim()).find(Boolean).slice(0, 300) && (summary.comment.text === fullLatest.trim() || summary.comment.length === fullLatest.length), JSON.stringify(summary).slice(0, 300))
   const allSummary = JSON.parse(tool('cw_read_task', { number: target, summary: true }).text)
   check('…and every comment of a card read with it', allSummary.comments.length === read.comments.length && allSummary.comments.every((x, i) => x.text.length <= 300 && read.comments[i].text.includes(x.text.replace(/…$/, '').slice(0, 20))), JSON.stringify(allSummary.comments).slice(0, 300))
-  // A card's attachment read through Hive (HI-1751): a page of its text (64 KB at most) with a short line before it, the
+  // A card's attachment read through Combwork (HI-1751): a page of its text (64 KB at most) with a short line before it, the
   // next page from the offset it names; an image by its path alone.
   const attachSrc = path.join(ws, 'alpha', 'attach-src')
   fs.mkdirSync(attachSrc, { recursive: true })
@@ -351,7 +351,7 @@ const prose = (seed, n) => {
   // Lanes (#483): a start, a join (a lane made for a builder that hasn't registered yet), the listing and an end. The
   // start, join and listing with the coder's own token, as a card loop calls them (HI-1933: with the workspace's, the
   // start is a script's, which since HI-1900 starts the lane's stopped agents and says so); the end (an abandon, the
-  // user's or the Assistant's) with the workspace's. Coder waits on another card while the lane runs (HI-2082): Hive
+  // user's or the Assistant's) with the workspace's. Coder waits on another card while the lane runs (HI-2082): Combwork
   // starts a lane's first card on its builder once it next looks at the board (HI-2029), and a look the moves above set
   // off could land before the end and give Coder a turn of its own; a builder waiting on other work is never given one.
   // Alpha's last card in Todo, which nothing here changes (a change would wake it).
@@ -377,7 +377,7 @@ const prose = (seed, n) => {
   check('a lane ended', measure('cw_lane (end)', tool('cw_lane', { action: 'end', lane: laneId, abandoned: true }), 400).startsWith('Lane abandoned: '), texts['cw_lane (end)'])
   tool('cw_wait_for_tasks', { cancel: true }, 'own')
   check('…and no longer waits once it has ended', !!(await until(async () => ['ready', 'finished'].includes((await live(alpha, coder.id))?.status), HUNG_MS)), (await live(alpha, coder.id))?.status)
-  // The merge queue (#1353): alpha's workflow doesn't have Hive merge, so it has none, said in a line.
+  // The merge queue (#1353): alpha's workflow doesn't have Combwork merge, so it has none, said in a line.
   check('cw_queue (list): no queue, in a line', measure('cw_queue (list)', tool('cw_queue', { action: 'list' }), 200).startsWith('No merge queue in alpha: '), texts['cw_queue (list)'])
   const skillList = measure('cw_list_skills', tool('cw_list_skills', {}), 4000)
   check('skills: a line each, who they are for, no folders', /^work-on-card \(Combwork, for agents\): /m.test(skillList) && !skillList.includes(ws), skillList.slice(0, 300))
@@ -391,7 +391,7 @@ const prose = (seed, n) => {
   const agentSkills = tool('cw_list_skills', {}).text
   check("skills (agent): its project's agents' skills, without the Assistant's", has(agentSkills, '^for-default \\(Combwork, for agents\\)') && has(agentSkills, '^for-both \\(Combwork, for agents and the Assistant\\)') && !has(agentSkills, '^for-assistant ') && !has(agentSkills, '^coordinate-agents '), agentSkills.slice(0, 400))
   const allSkills = tool('cw_list_skills', {}, 'assistant').text
-  check("skills (Assistant): every Hive skill with who gets it", has(allSkills, '^for-assistant \\(Combwork, for the Assistant\\)') && has(allSkills, '^coordinate-agents \\(Combwork, for the Assistant\\)') && has(allSkills, '^for-both \\(Combwork, for agents and the Assistant\\)') && has(allSkills, '^for-default \\(Combwork, for agents\\)'), allSkills.slice(0, 400))
+  check("skills (Assistant): every Combwork skill with who gets it", has(allSkills, '^for-assistant \\(Combwork, for the Assistant\\)') && has(allSkills, '^coordinate-agents \\(Combwork, for the Assistant\\)') && has(allSkills, '^for-both \\(Combwork, for agents and the Assistant\\)') && has(allSkills, '^for-default \\(Combwork, for agents\\)'), allSkills.slice(0, 400))
   const projectSkills = tool('cw_list_skills', { project: 'alpha' }, 'assistant').text
   check("skills (Assistant, a project): what that project's agents get", !has(projectSkills, '^for-assistant ') && has(projectSkills, '^for-both ') && has(projectSkills, '^for-default '), projectSkills.slice(0, 400))
   check('skills: the descriptions say a listing, not what a session loaded', /not of what a running session loaded/.test(toolDescription('cw_list_skills')) && /for agents \(not those for the Assistant alone\)/.test(toolDescription('cw_list_skills')) && /user and plugin skills/.test(toolDescription('cw_list_skills', 'assistant')))
@@ -425,7 +425,7 @@ const prose = (seed, n) => {
 
   // The developer console (#636; offered while Settings → Agent API lets agents read it): with no console open a read
   // starts nothing and says so; with the window watching Coder, a turn reads as a line an event (its prompt hidden), one
-  // event in full, the sources (a page at a time) and Hive's events as the Assistant.
+  // event in full, the sources (a page at a time) and Combwork's events as the Assistant.
   const consoleClosed = measure('cw_console (no console open)', tool('cw_console', { agent: 'Coder' }), 300)
   check('with no console open a read says nothing is captured', consoleClosed.startsWith("alpha · Coder: not captured: the developer console isn't open on it"), consoleClosed)
   const coderSource = (await inv('console:sources')).find((s) => s.agentId === coder.id)
@@ -439,11 +439,11 @@ const prose = (seed, n) => {
   check('a turn: a line an event, its prompt hidden', /^#\d+ \d\d:\d\d:\d\d hook UserPromptSubmit → prompt; working/m.test(consoleTurn ?? '') && !(consoleTurn ?? '').includes('turn 5 console'), consoleTurn)
   const promptSeq = Number(/^#(\d+) .*UserPromptSubmit/m.exec(consoleTurn ?? '')?.[1])
   const consoleOne = measure('cw_console (an event in full)', tool('cw_console', { agent: 'Coder', seq: [promptSeq] }), 3000)
-  check('…one in full: the raw hook and what Hive made of it, its prompt still hidden', consoleOne.includes('"raw"') && consoleOne.includes('"made"') && /"prompt":"<text: \d+ chars>"/.test(consoleOne), consoleOne)
+  check('…one in full: the raw hook and what Combwork made of it, its prompt still hidden', consoleOne.includes('"raw"') && consoleOne.includes('"made"') && /"prompt":"<text: \d+ chars>"/.test(consoleOne), consoleOne)
   const consoleList = measure('cw_console (sources, as the Assistant)', tool('cw_console', { action: 'sources' }, 'assistant'), 1200)
   check('the sources: a line each, with how to name it', /^alpha · Coder \(claude-code\): captured, \d+ events \[agent="a-[\w-]+" project="alpha"\]$/m.test(consoleList) && /^Combwork: not captured \[source="hive"\]$/m.test(consoleList), consoleList)
   // On a connection of its own (agent: false): after the slow tool calls above, fetch's kept-alive socket can be the one
-  // Hive's server is closing for idleness, which reset this request once under load.
+  // Combwork's server is closing for idleness, which reset this request once under load.
   const sourcePage = await new Promise((resolve, reject) => {
     require('http')
       .get(`${API}/v1/console/sources?limit=2`, { agent: false, headers: { Authorization: `Bearer ${apiToken}` } }, (res) => {
@@ -455,12 +455,12 @@ const prose = (seed, n) => {
       .on('error', reject)
   })
   check('sources come a page at a time, with the total', sourcePage.status === 200 && sourcePage.body.sources.length === 2 && sourcePage.body.total > 2 && sourcePage.body.offset === 0, sourcePage.text.slice(0, 300))
-  measure("cw_console (Hive's events, as the Assistant)", tool('cw_console', { source: 'hive' }, 'assistant'), 300)
+  measure("cw_console (Combwork's events, as the Assistant)", tool('cw_console', { source: 'hive' }, 'assistant'), 300)
   await inv('console:subscribe', [])
 
   console.log('\n--- hive tools (as the Assistant)')
   measure('cw_list_providers', tool('cw_list_providers', {}, 'assistant'))
-  // Hive's settings (#186): a listing (all, narrowed, a project's), one in full, and a change with Change settings on.
+  // Combwork's settings (#186): a listing (all, narrowed, a project's), one in full, and a change with Change settings on.
   // A line a setting (about 85 characters with its title): 6,200 since #418 added Tell the Assistant when I reply to an agent;
   // 7,000 since #450 added GitHub Copilot, a third provider with its own settings (about 730 characters); 7,200 since #412
   // added the workspace's Card loop rounds and wait (about 100 characters); 7,400 since #636 added Let agents read the
@@ -472,8 +472,8 @@ const prose = (seed, n) => {
   const settingsList = measure('cw_list_settings', tool('cw_list_settings', {}, 'assistant'), 7860)
   check("settings: the fake CLI's path as it is set, whatever its length (#1586)",settingsList.split('\n').some((l) => l.startsWith(`claude-code.executablePath = ${path.join(__dirname, 'fake-claude', 'fake-claude.cmd')} `)), settingsList.split('\n').find((l) => l.startsWith('claude-code.executablePath')))
   check('settings: a line each, id = value, read-only ones marked',/^sessions\.compactSuggestTokens = 200000 · Suggest compacting above$/m.test(settingsList) && /^agentApi\.port = \d+ \[read-only\] · /m.test(settingsList) && /^advanced\.showDeveloperFeatures = off · /m.test(settingsList) && !/^advanced\.(logs|data|reset) /m.test(settingsList), settingsList.slice(0, 300))
-  // 1,800 and 11 lines since #1286's Advanced switches The Assistant starts with Hive's start view and Clear the CLI's
-  // draft before Hive types, whose text names compaction and Compact (about 120 characters each).
+  // 1,800 and 11 lines since #1286's Advanced switches The Assistant starts with Combwork's start view and Clear the CLI's
+  // draft before Combwork types, whose text names compaction and Compact (about 120 characters each).
   const compactList = measure('cw_list_settings (query)', tool('cw_list_settings', { query: 'compact' }, 'assistant'), 1800)
   check('query narrows it, saying what each does', compactList.split('\n').length <= 11 && /^assistant\.compactSuggestTokens = 500000 · Highlight Compact over: Context size/m.test(compactList), compactList)
   // 3,100 since #1417's project.workflow.stageNames (one line, about 50 characters); 3,200 since #1382's
@@ -675,7 +675,7 @@ const prose = (seed, n) => {
   check("the status has the new skill's revision", /^[0-9a-f]{16}$/.test(statusAgain.guidance.skills.find((x) => x.name === 'bulky')?.revision ?? ''), JSON.stringify(statusAgain.guidance.skills.find((x) => x.name === 'bulky')))
   fs.rmSync(bulky, { recursive: true, force: true })
   const doc = (await api('GET', '/v1/docs/agent-api')).body
-  check("the API's own reference, from the running Hive", doc?.content?.startsWith('# Combwork Agent API') && doc.api === status.api.version, JSON.stringify(doc).slice(0, 120))
+  check("the API's own reference, from the running Combwork", doc?.content?.startsWith('# Combwork Agent API') && doc.api === status.api.version, JSON.stringify(doc).slice(0, 120))
   await route('GET /v1/workspace', 'GET', '/v1/workspace')
   await route('GET /v1/workspaces', 'GET', '/v1/workspaces')
   await route('GET /v1/projects/alpha/sessions', 'GET', '/v1/projects/alpha/sessions')
@@ -756,7 +756,7 @@ const prose = (seed, n) => {
   const own = await coderApi('/v1/metrics?scope=project&project=alpha')
   check('metrics: an agent reads its own project only', own.status === 200 && Object.keys(own.body.projects).join() === 'alpha' && !own.body.workspace && !own.body.app, JSON.stringify(Object.keys(own.body ?? {})))
   check("metrics: an agent's project report carries only its own loss count, nothing of the workspace's", typeof own.body.dropped === 'number' && !('droppedUntracked' in own.body) && !own.body.skills, JSON.stringify(Object.keys(own.body ?? {})))
-  // A request refused before Hive knew whose it was; one whose client went away while sending its body.
+  // A request refused before Combwork knew whose it was; one whose client went away while sending its body.
   const before = report.app.unauthenticated
   await api('GET', '/v1/tasks', undefined, 'not-a-token')
   const net = require('net')
@@ -808,7 +808,7 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
     return { text: r.content[0].text, isError: !!r.isError }
   }
   // In a lane Tester reviews (#1382: a design needs a reviewer to check it), ended once the design is measured. The card
-  // is started first (HI-2082): a card in Doing is never a lane's to start, so Hive's own look can't start it first.
+  // is started first (HI-2082): a card in Doing is never a lane's to start, so Combwork's own look can't start it first.
   const startedOwn = measure('cw_start_card', intent('cw_start_card', { card: `#${todo[40]}` }), 400)
   const designStart = tool('cw_lane', { action: 'start', cards: [todo[40]], reviewer: 'Tester', name: 'design step' }, 'own').text
   const designLane = designStart.match(/lane-[0-9a-f]+$/)?.[0]
@@ -924,7 +924,7 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
   const reported = (after.providers ?? []).find((x) => x.provider === 'claude-code' && x.role === 'agent')
   check("metrics: the providers' own reported usage for sessions in the range", reported?.sessions >= 1 && reported.inputTokens > 0, JSON.stringify(after.providers))
   check("metrics: the skill service is the workspace's own", after.skills?.scans?.count >= 1 && after.skills.hits + after.skills.misses > 0, JSON.stringify(after.skills))
-  // What recording costs a request: 300 sequential calls with it on, then off (and back on). Recording is work in Hive's
+  // What recording costs a request: 300 sequential calls with it on, then off (and back on). Recording is work in Combwork's
   // main process, so it is measured as that process's CPU time a request (#428): a request's wall-clock time (about 14 ms
   // here, mostly waiting) drifts by more than recording costs on a loaded machine, CPU time far less.
   const cpuMs = () => app.evaluate(() => {
@@ -951,8 +951,8 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
     add(off, await burst())
     await inv('settings:update', { sessions: { recordPerformance: true } })
   }
-  console.log(`metrics overhead: Hive's CPU ${on.cpu.toFixed(3)} ms a request recording, ${off.cpu.toFixed(3)} ms not (3 x 300 each); wall-clock ${on.wall.toFixed(2)} vs ${off.wall.toFixed(2)} ms (best of 3)`)
-  check('metrics: recording adds well under a millisecond to a request', on.cpu - off.cpu < 1, `Hive's CPU ${on.cpu.toFixed(3)} vs ${off.cpu.toFixed(3)} ms`)
+  console.log(`metrics overhead: Combwork's CPU ${on.cpu.toFixed(3)} ms a request recording, ${off.cpu.toFixed(3)} ms not (3 x 300 each); wall-clock ${on.wall.toFixed(2)} vs ${off.wall.toFixed(2)} ms (best of 3)`)
+  check('metrics: recording adds well under a millisecond to a request', on.cpu - off.cpu < 1, `Combwork's CPU ${on.cpu.toFixed(3)} vs ${off.cpu.toFixed(3)} ms`)
   const recorded = (await api('GET', `/v1/metrics?scope=workspace&from=${encodeURIComponent(since)}`)).body
   check('metrics: turned off, nothing was recorded', workspaceCalls(recorded) - callsBefore === 1200, String(workspaceCalls(recorded) - callsBefore))
 

@@ -1,4 +1,4 @@
-// The i18n screenshot route (#769; #756's design, section 4): opens each screen of Hive in a language and photographs
+// The i18n screenshot route (#769; #756's design, section 4): opens each screen of Combwork in a language and photographs
 // it in both themes, for a person or an agent to look at: under the pseudo-locale (en-XA, the default) anything still
 // plain English was missed; under a language (`npm run e2e -- i18nshots --lang pl`), text that is cut off or wraps
 // badly shows. It reaches screens only by means that don't depend on the language: IPC, command ids (the menu-command
@@ -14,7 +14,7 @@
 // in order, so a screen leaves the window as it found it (or as its close() does).
 //
 // Languages: E2E_I18N_LANGS (comma-separated; the runner's --lang sets it), else en-XA. Each starts its own test copy
-// with HIVE_LANG set to it (the run context pins every other suite to English) and checks Hive shows that language.
+// with HIVE_LANG set to it (the run context pins every other suite to English) and checks Combwork shows that language.
 // Written to the suite folder's i18nshots-shots: <lang>/<area>-<screen>-<theme>.png, a language's notify.log when it
 // would have shown a Windows notification, and reached.json (per language and screen: its screenshots, or why it wasn't
 // reached). The runner keeps them after a pass with --keep-files, which --lang implies.
@@ -30,7 +30,7 @@ const HUNG_MS = 25000
 const CASES = path.join(__dirname, 'i18nshots')
 const THEMES = ['dark', 'light']
 const SCREEN_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
-/** A language tag as --lang takes it: pl, pt-BR, zh-CN, en-XA. Whether Hive has it is checked by starting it. */
+/** A language tag as --lang takes it: pl, pt-BR, zh-CN, en-XA. Whether Combwork has it is checked by starting it. */
 const LANG_TAG = /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i
 
 /** The languages to photograph, from E2E_I18N_LANGS (comma-separated), else the pseudo-locale. */
@@ -99,7 +99,7 @@ if (require.main === module) {
     const claudeHome = path.join(lib.WORK, `i18nshots-${lang}-claude-home`)
     for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
     for (const d of [dir, alpha]) fs.mkdirSync(d, { recursive: true })
-    // A Git project from the start (#1416: Hive records the version control it finds, and shows Git's sections for Git
+    // A Git project from the start (#1416: Combwork records the version control it finds, and shows Git's sections for Git
     // only); the cases add its commits.
     execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: alpha, env: lib.gitEnv(), stdio: 'pipe' })
     const cenv = lib.fakeClaude(userData, claudeHome, [alpha])
@@ -128,7 +128,7 @@ if (require.main === module) {
       result.language = info.code
       result.translations = Object.keys(info.messages ?? {}).length
       const shows = info.code.toLowerCase() === lang.toLowerCase()
-      check(`${lang}: Hive shows it (${result.translations} translations)`, shows, `Hive shows ${info.code}${info.forced ? `, started with ${info.forced}` : ''}: is ${lang} one of its languages?`)
+      check(`${lang}: Combwork shows it (${result.translations} translations)`, shows, `Combwork shows ${info.code}${info.forced ? `, started with ${info.forced}` : ''}: is ${lang} one of its languages?`)
       if (!shows) return result
       // English left is looked for in a translated run only: in English, every message is its English text.
       const english = /^en(?:-(?!XA)|$)/i.test(info.code) ? null : layout.englishLeft(layout.englishCatalogue(), info.messages ?? {})
@@ -150,7 +150,7 @@ if (require.main === module) {
         claudeHome,
         hungMs: HUNG_MS,
         /**
-         * Text a case writes into Hive as a user would, and where Hive shows it (a selector), so English left skips it
+         * Text a case writes into Combwork as a user would, and where Combwork shows it (a selector), so English left skips it
          * there (HI-1915: a template named "Pair", a blocked reason "Waiting for the release").
          */
         authored: (text, within) => english?.authored.push({ text, within }),
@@ -163,7 +163,7 @@ if (require.main === module) {
           if (!r.ok) throw new Error(`${method} ${route}: ${r.status} ${JSON.stringify(json)}`)
           return json
         },
-        /** The window's focus as Hive sees it (a quiet test copy is never really focused): banners need it on. */
+        /** The window's focus as Combwork sees it (a quiet test copy is never really focused): banners need it on. */
         setFocus: (on) =>
           app.evaluate(({ BrowserWindow }, f) => {
             const w = BrowserWindow.getAllWindows()[0]

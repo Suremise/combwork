@@ -1,5 +1,5 @@
 // Agent names from patterns (#1440, SPEC §16.10.6), fake Claude Code, the Assistant off: two projects keyed AM
-// (ambrosia) and AP (apiary) each load Hive's Team 3×3 without a rename (AM-B1… and AP-B1…, Load template ready at
+// (ambrosia) and AP (apiary) each load Combwork's Team 3×3 without a rename (AM-B1… and AP-B1…, Load template ready at
 // once); ambrosia's agents saved as a template with "Use the project key in names" keep patterns ({key}-B{n}), and
 // without it fixed names; the fixed-name one loaded into apiary has every name taken by ambrosia's, so free names are
 // filled in (AP-B1…, the key swapped), one edited to a taken name greys Load template out until it is fixed; loaded,
@@ -41,7 +41,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     lib.git(p, ['branch', '-M', 'main'])
   }
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), ambrosia.toLowerCase(), apiary.toLowerCase()]))
-  // Claude Code only: Codex stays off, so Hive's templates' reviewers run on Claude Code (#1436).
+  // Claude Code only: Codex stays off, so Combwork's templates' reviewers run on Claude Code (#1436).
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -102,7 +102,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     }
     const team = ['B1', 'B2', 'B3', 'R1', 'R2', 'R3']
 
-    // --- Hive's Team 3×3 into each project: its key's names, nothing to rename, Load template ready at once.
+    // --- Combwork's Team 3×3 into each project: its key's names, nothing to rename, Load template ready at once.
     for (const [p, name, key] of [[ambrosia, 'ambrosia', 'AM'], [apiary, 'apiary', 'AP']]) {
       await select(name)
       const d = await openLoad('Team 3×3')

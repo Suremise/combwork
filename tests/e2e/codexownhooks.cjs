@@ -1,15 +1,15 @@
-// Hive's hooks run beside the user's own Codex hooks (#1285, #966 row 11, Darren's decision: no "Keep my Codex hooks"
+// Combwork's hooks run beside the user's own Codex hooks (#1285, #966 row 11, Darren's decision: no "Keep my Codex hooks"
 // switch, as there is nothing to keep). Asked of the installed Codex's own hook discovery (its app server's hooks/list),
-// so a Codex that starts letting Hive's -c overrides displace the user's hooks, or drop their trust, fails here first:
-// - the user's Stop and PreToolUse hooks (their config.toml) and Hive's of the same events (-c hooks.<event>, the session
+// so a Codex that starts letting Combwork's -c overrides displace the user's hooks, or drop their trust, fails here first:
+// - the user's Stop and PreToolUse hooks (their config.toml) and Combwork's of the same events (-c hooks.<event>, the session
 //   flags) are listed side by side, each under its own key;
-// - the user's trust records (their config.toml's hooks.state) survive Hive's -c hooks.state table: their hooks stay
-//   trusted, and Hive's table names only its own session-flags keys;
-// - the developer_instructions a session gets, as Hive reads them before putting its guidance after them (#1285, row
+// - the user's trust records (their config.toml's hooks.state) survive Combwork's -c hooks.state table: their hooks stay
+//   trusted, and Combwork's table names only its own session-flags keys;
+// - the developer_instructions a session gets, as Combwork reads them before putting its guidance after them (#1285, row
 //   13): Codex's own rendering of the session's prompt (debug prompt-input, offline), as is and with them cleared, at
 //   every layer (the user's, a selected profile in each form, a trusted and an untrusted project), each missing, empty,
 //   blank or set.
-// The -c forms are Hive's (codex/adapter.ts hookOverrides; a unit test, cliOverrides, pins its keys). A throwaway
+// The -c forms are Combwork's (codex/adapter.ts hookOverrides; a unit test, cliOverrides, pins its keys). A throwaway
 // CODEX_HOME of its own, never the user's ~/.codex nor the signed-in test home: hooks/list needs no sign-in.
 const lib = require('./lib.cjs')
 const { spawn } = require('child_process')
@@ -31,7 +31,7 @@ const check = (name, ok, extra = '') => {
 const env = (codexHome = home) => lib.childEnv({ CODEX_HOME: codexHome, PATH: lib.pathWithoutStoreAliases() })
 const toml = (s) => JSON.stringify(s)
 
-/** Hive's form of a hook (-c hooks.<event>=[{ matcher, hooks = [{ type, command, timeout }] }]). */
+/** Combwork's form of a hook (-c hooks.<event>=[{ matcher, hooks = [{ type, command, timeout }] }]). */
 const hiveHook = (event, matcher) => ['-c', `hooks.${event}=[{ ${matcher ? `matcher = ${toml(matcher)}, ` : ''}hooks = [{ type = "command", command = ${toml(`echo hive-${event}`)}, timeout = 5 }] }]`]
 
 /** Codex's app server's hooks/list for the project, given `args` (in `codexHome`): its hooks, each with its source, command and trust. */
@@ -89,21 +89,21 @@ const brief = (r) => (r.error ? r.error : JSON.stringify(r.hooks.map((h) => ({ s
   const trusted = await hooksList([])
   check("…and trusts them once their config's hooks.state says so", user(trusted).length === 2 && user(trusted).every((h) => h.trustStatus === 'trusted'), brief(trusted))
 
-  // With Hive's hooks for the same events: both sets, each under its own key.
+  // With Combwork's hooks for the same events: both sets, each under its own key.
   const both = await hooksList(hive)
-  check("Hive's hooks for the same events are listed beside the user's, not in their place", user(both).length === 2 && ours(both).length === 2, brief(both))
+  check("Combwork's hooks for the same events are listed beside the user's, not in their place", user(both).length === 2 && ours(both).length === 2, brief(both))
   check("…each under its own key: the user's config's, and the session flags'", user(both).every((h) => !h.key.startsWith(SESSION_FLAGS)) && ours(both).every((h) => h.key.startsWith(SESSION_FLAGS)), brief(both))
   check('…the commands as each gave them', user(both).map((h) => h.command).sort().join() === 'echo user-PreToolUse,echo user-Stop' && ours(both).map((h) => h.command).sort().join() === 'echo hive-PreToolUse,echo hive-Stop', brief(both))
 
-  // With Hive's trust table too (its own session-flags keys only): the user's trust survives.
+  // With Combwork's trust table too (its own session-flags keys only): the user's trust survives.
   const table = Object.fromEntries(ours(both).map((h) => [h.key, { trusted_hash: h.currentHash }]))
   const state = `hooks.state={ ${Object.entries(table).map(([k, v]) => `${toml(k)} = { trusted_hash = ${toml(v.trusted_hash)} }`).join(', ')} }`
   const withState = await hooksList([...hive, '-c', state])
-  check("with Hive's hooks.state table, the user's hooks stay trusted", user(withState).length === 2 && user(withState).every((h) => h.trustStatus === 'trusted'), brief(withState))
-  check("…and Hive's are trusted by their own records", ours(withState).length === 2 && ours(withState).every((h) => h.trustStatus === 'trusted'), brief(withState))
+  check("with Combwork's hooks.state table, the user's hooks stay trusted", user(withState).length === 2 && user(withState).every((h) => h.trustStatus === 'trusted'), brief(withState))
+  check("…and Combwork's are trusted by their own records", ours(withState).length === 2 && ours(withState).every((h) => h.trustStatus === 'trusted'), brief(withState))
 
-  // A connection's home (HI-1757): new, as Hive makes one (its sessions and archived_sessions junctions to the CLI home's,
-  // no config, no sign-in), with the file store a connection's Codex is given. Hive's hooks are trusted by their own
+  // A connection's home (HI-1757): new, as Combwork makes one (its sessions and archived_sessions junctions to the CLI home's,
+  // no config, no sign-in), with the file store a connection's Codex is given. Combwork's hooks are trusted by their own
   // records on the command line alone; the user's, in ~/.codex's config, aren't this home's.
   const conn = path.join(work, 'accounts', 'a-connection')
   fs.mkdirSync(conn, { recursive: true })
@@ -112,10 +112,10 @@ const brief = (r) => (r.error ? r.error : JSON.stringify(r.hooks.map((h) => ({ s
     fs.symlinkSync(path.join(home, n), path.join(conn, n), 'junction')
   }
   const inConnection = await hooksList(['-c', 'cli_auth_credentials_store="file"', ...hive, '-c', state], conn)
-  check("in a connection's new home, with the file store, Hive's hooks are trusted by their own records", ours(inConnection).length === 2 && ours(inConnection).every((h) => h.trustStatus === 'trusted'), brief(inConnection))
+  check("in a connection's new home, with the file store, Combwork's hooks are trusted by their own records", ours(inConnection).length === 2 && ours(inConnection).every((h) => h.trustStatus === 'trusted'), brief(inConnection))
   check("…and the user's own hooks (their home's config) aren't the connection's", user(inConnection).length === 0, brief(inConnection))
 
-  // ---- developer_instructions (#1285, HR4's rounds 1–3, the Assistant's design): Hive asks Codex which apply by
+  // ---- developer_instructions (#1285, HR4's rounds 1–3, the Assistant's design): Combwork asks Codex which apply by
   // rendering the session's prompt offline with the agent's own arguments (debug prompt-input), as is and with them
   // cleared, and puts its guidance after what the first has in front of the second. Codex decides every layer itself:
   // checked here at each, with each kind of value, and every profile form, through that same reading (its rule is
@@ -131,7 +131,7 @@ const brief = (r) => (r.error ? r.error : JSON.stringify(r.hooks.map((h) => ({ s
       return { error: String(e.stderr ?? e).slice(0, 200) }
     }
   }
-  /** What Hive reads as the session's developer_instructions: '' none, null when it can't tell (as Hive's own rule). */
+  /** What Combwork reads as the session's developer_instructions: '' none, null when it can't tell (as Combwork's own rule). */
   const effective = (args) => {
     const as = developerTexts(args)
     const cleared = developerTexts([...args, '-c', 'developer_instructions=""'])
@@ -179,10 +179,10 @@ const brief = (r) => (r.error ? r.error : JSON.stringify(r.hooks.map((h) => ({ s
     const got = effective(args)
     check(`developer_instructions with ${JSON.stringify(layers)} ${args.join(' ') || '(no arguments)'}: ${JSON.stringify(want)}`, got === want, JSON.stringify(got))
   }
-  // Two profiles: Codex refuses them (so would the session); Hive, unable to read them, gives its guidance alone.
+  // Two profiles: Codex refuses them (so would the session); Combwork, unable to read them, gives its guidance alone.
   setLayers({ user: 'USER-ONLY', profile: 'PROFILE-ONLY' })
   const twice = effective(['-p', 'other', '--profile', 'mine'])
-  check('two profiles: Codex refuses them, and Hive reads no answer', /cannot be used multiple times/.test(twice?.error ?? ''), JSON.stringify(twice))
+  check('two profiles: Codex refuses them, and Combwork reads no answer', /cannot be used multiple times/.test(twice?.error ?? ''), JSON.stringify(twice))
 
   // Its folder stays for the runner to prune: a Codex just ended can still hold its files for a moment.
   console.log(failed ? `\n${failed} check(s) FAILED` : '\nALL PASS')

@@ -1,8 +1,8 @@
-// Pop-ups (#157, HI-2320: one pop-up system): while a Hive window is focused, an agent finishing or waiting is a pop-up
+// Pop-ups (#157, HI-2320: one pop-up system): while a Combwork window is focused, an agent finishing or waiting is a pop-up
 // in it, kept in its bell, not a Windows notification; a finished one closes after its seconds (kept while hovered or
 // focused), a waiting one stays until the agent moves on; clicking one shows its agent; × and Escape dismiss; the
 // position setting places them (bottom right by default); Show pop-ups about agents for This project and None (only in
-// the bell); with Hive in the background, a Windows notification and a quiet bell row, never a pop-up; and a profile from
+// the bell); with Combwork in the background, a Windows notification and a quiet bell row, never a pop-up; and a profile from
 // before (config 5) gets the 1.0 settings. The test copy runs quiet and records the
 // Windows notifications it would show (HIVE_TEST_NOTIFY_LOG); the window's focus is stubbed (Windows won't give a
 // background app the focus). Fake Claude Code; throwaway profile and workspace.
@@ -49,7 +49,7 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
 
   const n0 = (await inv('settings:get')).notifications
-  check('a profile from before gets the one notification system: no While Hive is focused, pop-ups bottom right', !('whileFocused' in n0) && !('onlyWhenUnfocused' in n0) && n0.bannerPosition === 'bottom-right' && n0.bannerScope === 'all' && n0.bannerSeconds === 6 && n0.waitingBannerStays === true, JSON.stringify(n0))
+  check('a profile from before gets the one notification system: no While Combwork is focused, pop-ups bottom right', !('whileFocused' in n0) && !('onlyWhenUnfocused' in n0) && n0.bannerPosition === 'bottom-right' && n0.bannerScope === 'all' && n0.bannerSeconds === 6 && n0.waitingBannerStays === true, JSON.stringify(n0))
   // Shorter banners, so the suite doesn't wait 6 s for each.
   await inv('settings:update', { notifications: { bannerSeconds: 2 } })
 
@@ -66,7 +66,7 @@ const check = (name, ok, extra = '') => {
   }
   const turnEnds = (p, a) => lib.until(async () => (await live(p, a))?.status === 'finished', 20000)
 
-  // The window's focus, as the test says (and the events Hive listens for).
+  // The window's focus, as the test says (and the events Combwork listens for).
   const setFocus = (on) =>
     app.evaluate(({ BrowserWindow }, f) => {
       const w = BrowserWindow.getAllWindows()[0]
@@ -254,7 +254,7 @@ const check = (name, ok, extra = '') => {
   await lib.sleep(4500) // A fixed wait on purpose: the finish group (3 s), to show nothing pops up.
   check('None (only in the bell): no pop-up, no Windows notification while focused', (await banners().count()) === 0 && osNotes().length === before)
 
-  // --- Hive in the background: a Windows notification and a quiet bell row, never a pop-up, whatever the scope.
+  // --- Combwork in the background: a Windows notification and a quiet bell row, never a pop-up, whatever the scope.
   await setFocus(false)
   await send(alpha, one, 'go work 1')
   await turnEnds(alpha, one)

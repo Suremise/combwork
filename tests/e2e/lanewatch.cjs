@@ -54,7 +54,7 @@ const check = (name, ok, extra = '') => {
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
     return v
   }
-  /** The lines Hive typed into the Assistant (fake-wakes.jsonl; the project agents' loop wakes left out), as text. */
+  /** The lines Combwork typed into the Assistant (fake-wakes.jsonl; the project agents' loop wakes left out), as text. */
   const rawWakes = () => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
     return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => !['Builder', 'Reviewer', 'Builder2'].includes(w.agent)).map((w) => w.text)
@@ -62,7 +62,7 @@ const check = (name, ok, extra = '') => {
   // The wakes as their checks read them: cards by number (they name them by key too, checked once below, #1219).
   const wakes = () => rawWakes().map(lib.unkey)
   const say = async (p, id, text) => {
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(p, id), claudeHome, null, text, { live: () => live(p, id) })
   }
   const idle = async (p, id) => ['ready', 'finished'].includes((await live(p, id))?.status)
@@ -94,7 +94,7 @@ const check = (name, ok, extra = '') => {
     return until(async () => (await live(home, 'assistant'))?.status === 'watching' && (await live(home, 'assistant'))?.watch, 15000)
   }
 
-  // HI-2069: a turn of the Assistant's ending with the lane running and no watch is carried on once by Hive's line,
+  // HI-2069: a turn of the Assistant's ending with the lane running and no watch is carried on once by Combwork's line,
   // naming the lane's builder (its Stop's context, fake-notices.jsonl); the turn that starts its watch gets none.
   const laneNotices = () => {
     const f = path.join(claudeHome, 'fake-notices.jsonl')

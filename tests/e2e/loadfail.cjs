@@ -144,7 +144,7 @@ const check = (name, ok, extra = '') => {
   check('templates view: the failed read says so in the sidebar', !!(await until(async () => (await sideFailed.count()) === 1, HUNG_MS)))
   await failAll('')
   await sideFailed.getByRole('button', { name: 'Retry' }).click()
-  // (The workspace's: Hive's own are listed too, #1436.)
+  // (The workspace's: Combwork's own are listed too, #1436.)
   const templateRow = page.locator('.sidebar .template-row[data-scope="workspace"]').first()
   check("templates view: the sidebar's Retry lists the templates", !!(await until(async () => (await templateRow.count()) === 1, HUNG_MS)))
   await templateRow.click()

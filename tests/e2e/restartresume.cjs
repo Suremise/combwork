@@ -1,10 +1,10 @@
 // Restarts announced and resumed (HI-1707), on fake Claude Code agents in a throwaway profile and workspace:
 // 1. An installer's request to close (restart-request.json in the profile, for this copy's process): the agents that
-//    were working, watching a card, and a running lane's builder and reviewer are told and recorded, Hive acknowledges
+//    were working, watching a card, and a running lane's builder and reviewer are told and recorded, Combwork acknowledges
 //    and quits by itself. At the next start they resume in their conversations one at a time, each with a note of where
 //    it was; the lane's card shows no stall meanwhile; an agent that never gets ready (fake-start-hold) is stopped and
 //    reported before the next one starts; a request left from the earlier process is removed, never acted on.
-// 2. Hive ended from outside while an agent is starting: the next start resumes it once, and nothing else twice.
+// 2. Combwork ended from outside while an agent is starting: the next start resumes it once, and nothing else twice.
 // 3. An ordinary quit: the next start offers to resume, and nothing resumes until Resume is chosen.
 // 4. An offer left unanswered, then another quit with another agent working: one offer of both; Don't Resume resumes none.
 // 5. Settings → Advanced → Resume agents after an update off: an install offers instead of resuming.
@@ -61,7 +61,7 @@ const alive = (pid) => {
   }
 }
 /**
- * Hive's main process, as its running marker names it (process.pid in Hive: what the installer finds, and what a request
+ * Combwork's main process, as its running marker names it (process.pid in Combwork: what the installer finds, and what a request
  * must name). Playwright's launched process isn't always it.
  */
 async function hivePid(launchedAt) {
@@ -78,7 +78,7 @@ async function hivePid(launchedAt) {
 /** Waits for a process to be gone. */
 const gone = (pid) => lib.until(() => !alive(pid), HUNG_MS, 200)
 
-/** Starts a copy of Hive on the profile, its workspace restored. */
+/** Starts a copy of Combwork on the profile, its workspace restored. */
 async function start() {
   const launchedAt = Date.now()
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', ...claudeEnv })
@@ -200,7 +200,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     const nonce = '6f1c8b2e-0a43-4d6e-9b5a-3c2d1e0f9a87'
     writeRequest(firstPid, nonce)
     const quitByItself = await gone(firstPid)
-    check('the installer asks Hive to close: it acknowledges, and quits by itself', !!quitByItself && fs.existsSync(path.join(userData, `restart-ack-${nonce}.json`)))
+    check('the installer asks Combwork to close: it acknowledges, and quits by itself', !!quitByItself && fs.existsSync(path.join(userData, `restart-ack-${nonce}.json`)))
     c = null
     const rec = record()
     const entries = Object.fromEntries((rec?.entries ?? []).map((e) => [e.agentName, e]))
@@ -214,7 +214,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     writeRequest(firstPid, '7a2d9c3b-1b54-4e7f-8c6b-4d3e2f1a0b98')
     const before = logLines().length
     c = await start()
-    check("the earlier process's request is removed, and Hive runs on", !!(await lib.until(() => !fs.existsSync(requestFile), HUNG_MS)) && logLines().slice(before).some((l) => /Removed an installer's request to close: (for another process|for an earlier process|stale)/.test(l)))
+    check("the earlier process's request is removed, and Combwork runs on", !!(await lib.until(() => !fs.existsSync(requestFile), HUNG_MS)) && logLines().slice(before).some((l) => /Removed an installer's request to close: (for another process|for an earlier process|stale)/.test(l)))
     // Builder isn't running yet as the others resume first: its lane card shows no stall meanwhile.
     let unstalledWhileWaiting = null
     let stallSeen = ''
@@ -246,7 +246,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     }, HUNG_MS)
     check('one notice says what was resumed, and that Watcher was stopped, not ready in time', !!report && report.includes("Not resumed: Watcher (alpha): it didn't get ready in time, so it was stopped."), report)
     // One at a time: each agent's launch after the one before it was resumed or stopped. The queue's order is the record's
-    // (the live sessions' order as Hive closed), which isn't the suite's to fix: the lane's start above gives the idle
+    // (the live sessions' order as Combwork closed), which isn't the suite's to fix: the lane's start above gives the idle
     // Builder a new conversation (HI-2232), so it comes after Reviewer now. So taken in the order they were launched.
     const lines = logLines().slice(before)
     const at = (re) => lines.findIndex((l) => re.test(l))
@@ -263,17 +263,17 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     check('the record is gone: every entry has its outcome', !!(await lib.until(() => !fs.existsSync(recordFile), HUNG_MS)), JSON.stringify(record()))
 
     // --- 2. Ended from outside while an agent is starting: resumed once at the next start, nothing else twice.
-    // Resumes have long enough again: Worker, held below, is still starting when Hive is ended.
+    // Resumes have long enough again: Worker, held below, is still starting when Combwork is ended.
     await c.inv('advanced:set', 'cw.restart.resumeReadySeconds', 90)
     // Worker working again; a close for an install records it (and the lane's two); then it is held at its next resume.
     await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Worker.id), 'holduntil go-worker-2', { submitted: async () => (await c.live(agents.Worker.id))?.status === 'working' })
     writeRequest(c.pid, '8b3e0d4c-2c65-4f80-9d7c-5e4f3a2b1c09')
-    check('Hive quits by itself for the install', !!(await gone(c.pid)))
+    check('Combwork quits by itself for the install', !!(await gone(c.pid)))
     c = null
     fs.writeFileSync(path.join(claudeHome, 'fake-start-hold-Worker'), '')
     c = await start()
     check('Worker is starting (its CLI held)', !!(await lib.until(async () => (await c.live(agents.Worker.id))?.status === 'starting' && record()?.entries?.find((e) => e.agentName === 'Worker')?.state === 'starting', HUNG_MS, 200)), JSON.stringify(record()))
-    check('Hive is ended from outside meanwhile', await endFromOutside(c))
+    check('Combwork is ended from outside meanwhile', await endFromOutside(c))
     c = null
     const midway = logLines().length
     c = await start()
@@ -297,7 +297,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     for (const p of c.app.windows()) await p.evaluate(([x, id]) => window.hive.invoke('session:stop', x, id), [beta, agents.Other.id]).catch(() => undefined)
     check('Watcher, Builder, Reviewer and Other are stopped', !!(await lib.until(async () => (await Promise.all([...others.map((n) => c.live(agents[n].id)), liveAny(beta, agents.Other.id)])).every((s) => !s), HUNG_MS, 300)))
     await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Worker.id), 'holduntil go-worker-3', { submitted: async () => (await c.live(agents.Worker.id))?.status === 'working' })
-    check('Hive quits', await quit(c))
+    check('Combwork quits', await quit(c))
     c = null
     check('the quit recorded Worker alone, and the record is a quit', record()?.reason === 'quit' && record()?.entries?.length === 1 && record()?.entries?.[0]?.agentName === 'Worker' && record()?.entries?.[0]?.state === 'pending', JSON.stringify(record()))
     c = await start()
@@ -305,18 +305,18 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     check('the next start offers to resume Worker', !!offer && /Combwork was quit while they were working or in a card loop: Worker \(alpha\)/.test(offer), offer)
     check('…and resumes nothing meanwhile (the record has it offered)', record()?.entries?.find((e) => e.agentName === 'Worker')?.state === 'offered' && !(await c.live(agents.Worker.id)), JSON.stringify(record()))
     await clickToast(c, 'Resume the agent that was working?', 'Resume')
-    check('Resume resumes it, its note saying Hive was quit', !!(await lib.until(async () => ((await notes(c, agents.Worker.id)).at(-1) ?? '').startsWith('[CW] Combwork was quit and started again'), HUNG_MS)))
+    check('Resume resumes it, its note saying Combwork was quit', !!(await lib.until(async () => ((await notes(c, agents.Worker.id)).at(-1) ?? '').startsWith('[CW] Combwork was quit and started again'), HUNG_MS)))
 
     // --- 4. An offer left unanswered, then another quit with Builder working too: one offer of both; Don't Resume.
     await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Worker.id), 'holduntil go-worker-4', { submitted: async () => (await c.live(agents.Worker.id))?.status === 'working' })
-    check('Hive quits again', await quit(c))
+    check('Combwork quits again', await quit(c))
     c = null
     c = await start()
     await lib.until(async () => (await anyToast(c, /Resume the agent that was working\?/))?.text, HUNG_MS)
     await c.inv('session:start', alpha, { agentId: agents.Builder.id }).catch(() => undefined)
     await lib.until(async () => (await c.live(agents.Builder.id))?.status === 'ready', HUNG_MS, 300)
     await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Builder.id), 'holduntil go-builder', { submitted: async () => (await c.live(agents.Builder.id))?.status === 'working' })
-    check('Hive quits with the offer unanswered', await quit(c))
+    check('Combwork quits with the offer unanswered', await quit(c))
     c = null
     c = await start()
     const both = await lib.until(async () => (await anyToast(c, /Resume the 2 agents that were working\?/))?.text, HUNG_MS)
@@ -330,7 +330,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     await lib.until(async () => (await c.live(agents.Worker.id))?.status === 'ready', HUNG_MS, 300)
     await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Worker.id), 'holduntil go-worker-5', { submitted: async () => (await c.live(agents.Worker.id))?.status === 'working' })
     writeRequest(c.pid, '9c4f1e5d-3d76-4091-8e8d-6f5a4b3c2d10')
-    check('Hive quits by itself for the install (the switch off)', !!(await gone(c.pid)))
+    check('Combwork quits by itself for the install (the switch off)', !!(await gone(c.pid)))
     c = null
     c = await start()
     const offered = await lib.until(async () => (await anyToast(c, /Resume the agent that was working\?/))?.text, HUNG_MS)

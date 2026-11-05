@@ -1,5 +1,5 @@
 // Branches next to their cards (#1424, SPEC §16.20's Git support), on fake Claude Code agents acting by their own tokens,
-// the Assistant off, a temp Git project where Hive merges into integration (queueFixture.cjs's): in Version Control →
+// the Assistant off, a temp Git project where Combwork merges into integration (queueFixture.cjs's): in Version Control →
 // Branches & remotes, a card started in an agent's worktree shows on its branch's row (and the worktree's) with its key
 // and Active; submitted, Review and the revision under review, the same as its Work section's; merged by the queue, Done
 // and merged with Integrated's revision; a no-code card's builder's branch has no card; a branch no card works on is as
@@ -121,7 +121,7 @@ const waitHung = (fn) => lib.until(fn, HUNG_MS, 150)
     check('a branch no card works on shows as before: no card', (await row('feature/plain').count()) === 1 && (await row('feature/plain').locator('[data-branch-card]').count()) === 0, await text(row('feature/plain')))
 
     // --- A worktree names its agent's card, whatever its folder has checked out (HR4's round 1): B1 starts another
-    // card, then something outside Hive checks out feature/plain in B1's worktree.
+    // card, then something outside Combwork checks out feature/plain in B1's worktree.
     const n2 = (await inv('tasks:create', { title: 'Next on B1', project: 'alpha' })).number
     const key2 = (await h.card(n2)).key
     const s2 = await q.intent(h, b1, n2, 'start')

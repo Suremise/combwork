@@ -1,4 +1,4 @@
-// The Hive Assistant: its home and modes (#259) in a workspace, the side panel (remembered per workspace), switching
+// The Combwork Assistant: its home and modes (#259) in a workspace, the side panel (remembered per workspace), switching
 // mode, Assistant Settings (its connection and mode, HI-2108; dark and light screenshots), the Modes view, and one launch (no prompt is sent)
 // that runs in the workspace folder, in Auto mode, named "Assistant" in the quit dialog. The Assistant runs the fake
 // Claude Code (fake-claude/, #195); that the real Claude Code takes its launch (and falls back from Auto with Haiku) is
@@ -37,14 +37,14 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
 
-  // The workspace gets the Assistant's home and Hive's modes; the home is not a project.
+  // The workspace gets the Assistant's home and Combwork's modes; the home is not a project.
   const info = await inv('workspace:get')
   check('the Assistant has its home and one agent', info.assistant?.path.toLowerCase() === home.toLowerCase() && info.assistant.agents.length === 1)
   check('its home is not listed as a project', info.projects.map((p) => p.name).sort().join(',') === 'api,web')
   check("its sessions are kept out of git", fs.readFileSync(path.join(home, '.gitignore'), 'utf8').includes('*'))
   // Brought in after the open (HI-1705): wait for them.
   const modes = () => (fs.existsSync(path.join(ws, '.combwork', 'modes')) ? fs.readdirSync(path.join(ws, '.combwork', 'modes')).sort().join(',') : '')
-  check('Hive\'s four modes are in the workspace', await becomes(() => modes() === 'coordinator.md,planner.md,qa-triager.md,release-manager.md'), modes())
+  check('Combwork\'s four modes are in the workspace', await becomes(() => modes() === 'coordinator.md,planner.md,qa-triager.md,release-manager.md'), modes())
   check("it defaults to the agents' model and effort, and Auto mode", JSON.stringify(info.assistant.config.providers['claude-code']) === JSON.stringify({ model: 'inherit', effort: 'inherit', permissionMode: 'auto', extraArgs: '', use200kContext: 'inherit' }), JSON.stringify(info.assistant.config.providers['claude-code']))
 
   // The panel: hidden at first, Ctrl+Alt+I shows it, and each workspace remembers it.
@@ -134,7 +134,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('a deleted bundled mode is offered for restoring', listed.find((p) => p.id === 'qa-triager')?.bundled === 'missing')
   await inv('modes:restore', 'qa-triager')
   check('and restores', (await inv('modes:list')).find((p) => p.id === 'qa-triager')?.bundled === 'same')
-  // The Hive Assistant view: a summary, its conversations and its modes.
+  // The Combwork Assistant view: a summary, its conversations and its modes.
   await page.locator('.activity-btn[aria-label="Assistant"]').click()
   check('the Assistant view has a summary', await becomes(async () => (await page.locator('.assistant-summary .assistant-stat').count()) === 4))
   // The summary's stats are drawn at once (showing "…" until its conversations are read), the list once they are: so
@@ -147,7 +147,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('a mode opens in the editor', await becomes(async () => (await page.locator('.split-main .editor-toolbar', { hasText: 'QA triager' }).count()) === 1))
   check('its toolbar can delete it', (await page.locator('.split-main .editor-toolbar [aria-label="Delete mode"]').count()) === 1)
 
-  // One launch (no prompt): in the workspace folder, asking for Auto, with Hive's reading tools allowed.
+  // One launch (no prompt): in the workspace folder, asking for Auto, with Combwork's reading tools allowed.
   await inv('session:start', home, { agentId: 'assistant' })
   await lib.acceptClaudeTrust(inv, home, 'assistant', 20000)
   const t0 = Date.now()
@@ -162,7 +162,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('it launches in Auto', launch.includes('"--permission-mode","auto"'))
   check('…with the model its connection sets', launch.includes('"--model","sonnet"'))
   check("its mode is appended to Claude Code's system prompt", launch.includes('--append-system-prompt-file'))
-  check("Hive's reading tools are allowed", launch.includes('mcp__combwork__cw_list_projects') && !launch.includes('mcp__combwork__cw_write_shared_note'))
+  check("Combwork's reading tools are allowed", launch.includes('mcp__combwork__cw_list_projects') && !launch.includes('mcp__combwork__cw_write_shared_note'))
   check('Planner\'s instructions are in the launch', fs.readFileSync(path.join(home, '.combwork', 'launch-assistant', 'instructions.md'), 'utf8').includes('# Your mode: Planner'))
   check('it is not a project agent', (await inv('workspace:get')).projects.every((p) => p.agents.every((a) => a.id !== 'assistant')))
   // The header's fold button (#1330), as the Progress panel's: its tooltip names the shortcut (a rebinding too), and
@@ -171,7 +171,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('the header has a fold button, with its shortcut', (await fold.getAttribute('aria-label')) === 'Fold the Assistant panel (Ctrl+Alt+I)', await fold.getAttribute('aria-label'))
   await inv('settings:setKeybinding', 'assistant.toggle', 'Mod+Alt+J')
   check('…the shortcut as rebound', await becomes(async () => (await fold.getAttribute('aria-label')) === 'Fold the Assistant panel (Ctrl+Alt+J)'), await fold.getAttribute('aria-label'))
-  // null removes the shortcut (the tooltip names none); undefined resets it to Hive's (setKeybinding).
+  // null removes the shortcut (the tooltip names none); undefined resets it to Combwork's (setKeybinding).
   await inv('settings:setKeybinding', 'assistant.toggle', null)
   check('…none once it is removed', await becomes(async () => (await fold.getAttribute('aria-label')) === 'Fold the Assistant panel'), await fold.getAttribute('aria-label'))
   await inv('settings:setKeybinding', 'assistant.toggle', undefined)

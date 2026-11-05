@@ -1,4 +1,4 @@
-// Per-project view preferences from two windows (#245). Window 1 shows alpha's Skills tab on Codex with Hive's skills
+// Per-project view preferences from two windows (#245). Window 1 shows alpha's Skills tab on Codex with Combwork's skills
 // folded; window 2 then shows beta's on Claude Code with its provider skills open. Each window keeps its own copy of the
 // saved maps, and used to save its whole copy, so window 2's save replaced alpha's. Now each change is merged in main:
 // both are saved, survive a restart, and show again. ui:set no longer writes these maps, and ui:setProjectPref refuses
@@ -82,7 +82,7 @@ const skillsTab = async (page, name) => {
   for (const w of app.windows().slice(1)) await w.close().catch(() => undefined)
   await lib.openWorkspace(inv, page, wsA)
   const a2 = await skillsTab(page, 'alpha')
-  check('restarted: alpha shows Codex, Hive’s skills folded', (await a2.pick.inputValue()) === 'codex' && (await a2.hive.getAttribute('aria-expanded')) === 'false', JSON.stringify({ pick: await a2.pick.inputValue(), hive: await a2.hive.getAttribute('aria-expanded') }))
+  check('restarted: alpha shows Codex, Combwork’s skills folded', (await a2.pick.inputValue()) === 'codex' && (await a2.hive.getAttribute('aria-expanded')) === 'false', JSON.stringify({ pick: await a2.pick.inputValue(), hive: await a2.hive.getAttribute('aria-expanded') }))
   await lib.openWorkspace(inv, page, wsB)
   const b2 = await skillsTab(page, 'beta')
   check('restarted: beta shows Claude Code, its skills open', (await b2.pick.inputValue()) === 'claude-code' && (await b2.provider.getAttribute('aria-expanded')) === 'true', JSON.stringify({ pick: await b2.pick.inputValue(), provider: await b2.provider.getAttribute('aria-expanded') }))

@@ -1,16 +1,16 @@
-// What a Codex launch through its app server would rely on (#653's spike, before Hive builds that launch mode): the
-// real TUI attached to `codex app-server` with `--remote`, and a client of Hive's on the same WebSocket. Checked against
+// What a Codex launch through its app server would rely on (#653's spike, before Combwork builds that launch mode): the
+// real TUI attached to `codex app-server` with `--remote`, and a client of Combwork's on the same WebSocket. Checked against
 // the installed Codex so that a Codex update that changes any of it (the WebSocket is documented as experimental) fails
-// here first. In the Codex test home (a few short turns, low effort), without a test Hive (noHive). Each part:
+// here first. In the Codex test home (a few short turns, low effort), without a test Combwork (noHive). Each part:
 // - the TUI's thread is joined (thread/resume) once its first turn is written (joining earlier says "no rollout found");
-// - a typed turn and a turn Hive starts (turn/start) both come as identified turn/started and turn/completed, and their
-//   user message's clientId tells them apart (Hive's own id, or the TUI's); the TUI shows Hive's turn, and a draft the
+// - a typed turn and a turn Combwork starts (turn/start) both come as identified turn/started and turn/completed, and their
+//   user message's clientId tells them apart (Combwork's own id, or the TUI's); the TUI shows Combwork's turn, and a draft the
 //   user is typing stays in its prompt;
-// - Hive's hooks given to the app server run for both (UserPromptSubmit, Stop);
+// - Combwork's hooks given to the app server run for both (UserPromptSubmit, Stop);
 // - turn/interrupt ends a running turn as interrupted (0.164.0: a command it ran goes on, its end reported later under
 //   the interrupted turn: not checked here, notes/2026-10-20-codex-app-server-spike.md);
-// - an approval request reaches both the TUI and Hive's client; answered in the TUI, Hive's client sees it resolved;
-// - Hive's client can drop and rejoin;
+// - an approval request reaches both the TUI and Combwork's client; answered in the TUI, Combwork's client sees it resolved;
+// - Combwork's client can drop and rejoin;
 // - after the app server is replaced, `codex resume <id> --remote` brings the thread back, and it is joined again.
 // Not checked here (the spike's evidence only, notes/2026-10-20-codex-app-server-spike.md): the running TUI reconnecting
 // by itself to a new server on the same port, and the user's Enter racing turn/start (one turn with both messages).
@@ -47,8 +47,8 @@ const freePort = () =>
 const text = (s) => [{ type: 'text', text: s, text_elements: [] }]
 
 /**
- * The test home's own MCP servers turned off, as Hive's launch turns off the user's (#1281), so the app server runs as a
- * Hive launch would: one of them (userfake) never starts, and each thread an app server loads would start it again.
+ * The test home's own MCP servers turned off, as Combwork's launch turns off the user's (#1281), so the app server runs as a
+ * Combwork launch would: one of them (userfake) never starts, and each thread an app server loads would start it again.
  */
 const ownServersOff = () => {
   const config = path.join(lib.CODEX_HOME, 'config.toml')
@@ -79,7 +79,7 @@ function rateLimited(threadId, from) {
   return null
 }
 
-/** `codex app-server` on a WebSocket, with Hive's hooks (`hookArgs`). */
+/** `codex app-server` on a WebSocket, with Combwork's hooks (`hookArgs`). */
 const appServer = (port, hookArgs) => spawn('codex.exe', ['app-server', '--listen', `ws://127.0.0.1:${port}`, '-c', 'model_reasoning_effort="low"', ...ownServersOff(), ...hookArgs], { cwd: work, env: env(), windowsHide: true, stdio: 'ignore' })
 
 /** The real TUI in a terminal, attached to the app server, with its screen rendered. */
@@ -96,7 +96,7 @@ function tui(args) {
   const type = async (s) => {
     for (let i = 0; i < s.length; i += 8) {
       t.write(s.slice(i, i + 8))
-      await lib.sleep(10) // on purpose: typed in pieces, as Hive types
+      await lib.sleep(10) // on purpose: typed in pieces, as Combwork types
     }
   }
   /** The end of `s` (spaces left out, as the TUI wraps it) shows on the screen. */
@@ -123,11 +123,11 @@ const methods = (events) => events.map((e) => e.method).filter((m) => !/delta|to
 
 const notices = new Set()
 
-/** How long Hive's client waits for the app server to open its connection or answer a call. */
+/** How long Combwork's client waits for the app server to open its connection or answer a call. */
 const CALL_MS = 60000
 
 /**
- * Hive's side: a JSON-RPC client on the app server's WebSocket. Its connection and every call are bounded (CALL_MS),
+ * Combwork's side: a JSON-RPC client on the app server's WebSocket. Its connection and every call are bounded (CALL_MS),
  * and a connection that closes or fails rejects what is still waiting, so a server that drops or stops answering fails
  * the step that waited on it instead of holding the suite.
  */
@@ -181,7 +181,7 @@ async function client(port) {
       ws.send(JSON.stringify({ id, method, params }))
     })
   try {
-    await call('initialize', { clientInfo: { name: 'hive-e2e', title: 'Hive e2e', version: '0' }, capabilities: null })
+    await call('initialize', { clientInfo: { name: 'hive-e2e', title: 'Combwork e2e', version: '0' }, capabilities: null })
   } catch (e) {
     ws.close()
     throw e
@@ -203,7 +203,7 @@ async function client(port) {
     lib.gitProject(work, { 'README.md': '# probe\n' })
     lib.trustForCodex(work, lib.CODEX_HOME)
 
-    // Hive's hooks as its Codex launch gives them (hookForwardCommand's form, hookHash's trust), to a stand-in.
+    // Combwork's hooks as its Codex launch gives them (hookForwardCommand's form, hookHash's trust), to a stand-in.
     const seenHooks = []
     hooks = http.createServer((req, res) => {
       let b = ''
@@ -232,7 +232,7 @@ async function client(port) {
     const port = await freePort()
     srv = appServer(port, hookArgs)
     c = await lib.until(async () => client(port).catch(() => null), HUNG_MS, 300)
-    check('the app server listens on its WebSocket, and a client of Hive\'s initializes', !!c)
+    check('the app server listens on its WebSocket, and a client of Combwork\'s initializes', !!c)
     if (!c) throw new Error('no app server')
     // The TUI in read-only, asking before anything else (its own flags set its thread's sandbox and approvals).
     ui = tui(['--remote', `ws://127.0.0.1:${port}`, '-C', work, '-s', 'read-only', '-a', 'on-request'])
@@ -240,7 +240,7 @@ async function client(port) {
     check('the TUI attached with --remote loads its thread on the app server', !!threadId)
     await ui.ready('after it attached')
 
-    // A step waiting on Codex's model (lib.cliStep). lib's own skip reads a test Hive's sessions, and this suite starts
+    // A step waiting on Codex's model (lib.cliStep). lib's own skip reads a test Combwork's sessions, and this suite starts
     // none: a check failing in a step while Codex waits out a rate limit on the thread (rateLimited) makes the suite a
     // SKIP for the environment instead, as long as nothing failed before it.
     const step = async (name, fn) => {
@@ -258,11 +258,11 @@ async function client(port) {
       await ui.say('Reply with just: one')
       check('the typed turn ends (the thread shows idle)', !!(await lib.until(() => c.seen('thread/status/changed', (e) => e.params.threadId === threadId && e.params.status.type === 'idle'), HUNG_MS)))
       const joined = await c.call('thread/resume', { threadId })
-      check('Hive joins the thread once its first turn is written', !joined.error, JSON.stringify(joined.error))
-      check("Hive's hooks given to the app server run for a typed turn (UserPromptSubmit, Stop)", !!(await lib.until(() => ['UserPromptSubmit', 'Stop'].every((h) => seenHooks.slice(h0).includes(h)), 20000)), JSON.stringify(seenHooks.slice(h0)))
+      check('Combwork joins the thread once its first turn is written', !joined.error, JSON.stringify(joined.error))
+      check("Combwork's hooks given to the app server run for a typed turn (UserPromptSubmit, Stop)", !!(await lib.until(() => ['UserPromptSubmit', 'Stop'].every((h) => seenHooks.slice(h0).includes(h)), 20000)), JSON.stringify(seenHooks.slice(h0)))
     })
 
-    await step('typed and Hive turns, identified', async () => {
+    await step('typed and Combwork turns, identified', async () => {
       const n = c.events.length
       await ui.say('Reply with just: typed')
       const done = await lib.until(() => c.seen('turn/completed', () => true, n), HUNG_MS)
@@ -270,17 +270,17 @@ async function client(port) {
       check('a typed turn comes as identified turn/started and turn/completed', !!c.seen('turn/started', () => true, n) && !!done?.params?.turn?.id, JSON.stringify({ status: done?.params?.turn?.status, events: methods(c.events.slice(n)) }))
       check("…its user message has the TUI's own clientId", !!typed?.params?.item?.clientId && typed.params.item.clientId !== 'hive-m1', JSON.stringify(typed?.params?.item))
       await ui.ready('after the typed turn')
-      // The draft in the prompt before Hive's turn starts (else a draft arriving late would pass without testing it).
+      // The draft in the prompt before Combwork's turn starts (else a draft arriving late would pass without testing it).
       await ui.typeShown('DRAFT kept')
       const h1 = seenHooks.length
       const m = c.events.length
       const started = await c.call('turn/start', { threadId, clientUserMessageId: 'hive-m1', input: text('[CW] New in your inbox: 1 message (m1). Reply with just: two') })
       const hiveDone = await lib.until(() => c.seen('turn/completed', (e) => e.params.turn.id === started.result?.turn?.id, m), HUNG_MS)
       const own = c.events.slice(m).find((e) => e.method === 'item/completed' && e.params?.item?.type === 'userMessage')
-      check('a turn Hive starts comes as identified turn events too, with the id turn/start answered', !!hiveDone && hiveDone.params.turn.status === 'completed', JSON.stringify(started.error ?? hiveDone?.params?.turn?.status))
-      check("…its user message has Hive's clientUserMessageId", own?.params?.item?.clientId === 'hive-m1', JSON.stringify(own?.params?.item?.clientId))
+      check('a turn Combwork starts comes as identified turn events too, with the id turn/start answered', !!hiveDone && hiveDone.params.turn.status === 'completed', JSON.stringify(started.error ?? hiveDone?.params?.turn?.status))
+      check("…its user message has Combwork's clientUserMessageId", own?.params?.item?.clientId === 'hive-m1', JSON.stringify(own?.params?.item?.clientId))
       check('…the TUI shows it, and the draft the user is typing stays in its prompt', !!(await lib.until(() => /New in your inbox: 1 message \(m1\)/.test(ui.screen()) && /DRAFT kept/.test(ui.screen()), 15000)), ui.screen().split('\n').filter(Boolean).slice(-6).join(' | '))
-      check("…and Hive's hooks run for it too", !!(await lib.until(() => ['UserPromptSubmit', 'Stop'].every((h) => seenHooks.slice(h1).includes(h)), 20000)), JSON.stringify(seenHooks.slice(h1)))
+      check("…and Combwork's hooks run for it too", !!(await lib.until(() => ['UserPromptSubmit', 'Stop'].every((h) => seenHooks.slice(h1).includes(h)), 20000)), JSON.stringify(seenHooks.slice(h1)))
       // Clear the draft (Ctrl+U), as the user would.
       ui.t.write('\x15')
     })
@@ -301,15 +301,15 @@ async function client(port) {
       const n = c.events.length
       await c.call('turn/start', { threadId, clientUserMessageId: 'hive-approve', input: text('Create a file named approved.txt containing hi in the current folder with a shell command.') })
       const asked = await lib.until(() => c.events.slice(n).find((e) => e.id !== undefined && /requestApproval/.test(e.method)), HUNG_MS)
-      check("an approval request reaches Hive's client", !!asked, JSON.stringify(c.events.slice(n).map((e) => e.method)))
+      check("an approval request reaches Combwork's client", !!asked, JSON.stringify(c.events.slice(n).map((e) => e.method)))
       check('…and the TUI asks it', !!(await lib.until(() => /Would you like to run|Yes, proceed/.test(ui.screen()), 20000)), ui.screen().split('\n').filter(Boolean).slice(-6).join(' | '))
       ui.t.write('\r')
-      check("answered in the TUI, Hive's client sees it resolved", !!(await lib.until(() => c.seen('serverRequest/resolved', () => true, n), 20000)))
+      check("answered in the TUI, Combwork's client sees it resolved", !!(await lib.until(() => c.seen('serverRequest/resolved', () => true, n), 20000)))
       const done = await lib.until(() => c.seen('turn/completed', () => true, n), HUNG_MS)
       check('…and the turn goes on and ends', done?.params?.turn?.status === 'completed' && fs.existsSync(path.join(work, 'approved.txt')), JSON.stringify(done?.params?.turn?.status))
     })
 
-    await step("Hive's client drops and rejoins", async () => {
+    await step("Combwork's client drops and rejoins", async () => {
       c.close()
       await lib.until(() => c.closed(), 10000)
       c = await client(port)
@@ -337,7 +337,7 @@ async function client(port) {
       await ui.ready('before the next step')
       await ui.say('Reply with just: resumed')
       const done = await lib.until(() => c.seen('turn/completed', () => true, n), HUNG_MS)
-      check('…and Hive joins it again and gets its turns', !joined.error && done?.params?.turn?.status === 'completed', JSON.stringify(joined.error ?? { status: done?.params?.turn?.status, events: methods(c.events.slice(n)), screen: tail(ui.screen()) }))
+      check('…and Combwork joins it again and gets its turns', !joined.error && done?.params?.turn?.status === 'completed', JSON.stringify(joined.error ?? { status: done?.params?.turn?.status, events: methods(c.events.slice(n)), screen: tail(ui.screen()) }))
     })
   } catch (e) {
     if (e.skip) skipped = e.skip

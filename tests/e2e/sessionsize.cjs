@@ -1,6 +1,6 @@
 // Transcript sizes in the Sessions tab (#671): every session shows its transcript file's size beside its context, for
 // all three CLIs (Claude Code's projects folder, Codex's rollout, Copilot's events.jsonl); amber past Warn when a
-// transcript is over, with a tooltip suggesting a handover; "—" when the CLI has no file (only Hive's backup); a size
+// transcript is over, with a tooltip suggesting a handover; "—" when the CLI has no file (only Combwork's backup); a size
 // that grew shows when the list opens again. The Assistant's conversations show theirs too, with its own advice. Both
 // themes, and a narrow window. Fixtures only (nothing runs). Dev build, throwaway profile, workspace and CLI homes; quiet.
 const lib = require('./lib.cjs')
@@ -84,7 +84,7 @@ const sizeText = (n) => (n < MB ? `${Math.max(1, Math.round(n / 1024))} KB` : `$
     await lib.openWorkspace(inv, page, ws)
     await page.getByText('alpha', { exact: true }).first().click()
 
-    // --- A session of each CLI, one past the limit, and one whose CLI transcript is gone (only Hive's backup).
+    // --- A session of each CLI, one past the limit, and one whose CLI transcript is gone (only Combwork's backup).
     const S = { small: id(1), long: id(2), gone: id(3), codex: id(4), copilot: id(5), assistant: id(6) }
     const files = {
       small: claudeFile(alpha, S.small),

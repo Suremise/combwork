@@ -1,4 +1,4 @@
-// Templates view and tab, export and import (#127): the Templates view on the activity bar (after Skills and Dialects, HI-2444) lists Hive's
+// Templates view and tab, export and import (#127): the Templates view on the activity bar (after Skills and Dialects, HI-2444) lists Combwork's
 // own (#1436), the workspace's templates and each project's, with a filter; selecting one shows its agents and layout; Rename…,
 // Duplicate… (into another project), Load into Project… (the project chosen, then loading's own confirmation),
 // Export… to a test folder (nothing personal in the file), Import… of that file (where to keep it; a name clash offers
@@ -63,7 +63,7 @@ const check = (name, ok, extra = '') => {
   const sidebar = page.locator('.sidebar')
   // The view's main area (a project's Templates tab has a .tab-body of its own).
   const detail = page.locator('.main-area > .tab-body .template-detail')
-  // The templates kept in the workspace and its projects (Hive's own, #1436, aside), and one of them by name.
+  // The templates kept in the workspace and its projects (Combwork's own, #1436, aside), and one of them by name.
   const rowNames = async (where) => (await where.locator('.template-row:not([data-scope="hive"]) .label').allInnerTexts()).map((t) => t.split('\n')[0].trim())
   const userRow = (where, name) => where.locator(`.template-row:not([data-scope="hive"])[aria-label="${name}"]`)
   const HIVE_NAMES = ['Solo', 'Pair', 'Pair: one provider', 'Team 3×3', 'Team 6×6', 'Team 6 + pool']
@@ -389,7 +389,7 @@ const check = (name, ok, extra = '') => {
     await testerDialog.getByRole('button', { name: 'Save' }).click()
     await lib.until(async () => (await testerDialog.count()) === 0, HUNG_MS)
   }
-  // (Another value: Hive reads the setting again only when it changes.)
+  // (Another value: Combwork reads the setting again only when it changes.)
   await slow('templates:update=2501*1')
   await saveTester('first-save')
   const duringAgentSave = await disabledNow()

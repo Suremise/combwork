@@ -1,5 +1,5 @@
 // HI-2466: a lane that waits for a slot gets it once what held the slot is gone, with no restart. On fake Claude Code
-// agents, the Assistant off, one slot (Maximum agents: 1), Pair with Hive merges and each card in its own folder:
+// agents, the Assistant off, one slot (Maximum agents: 1), Pair with Combwork merges and each card in its own folder:
 // 1. B1's first lane is lent slot-a, B1 runs there; the lane is ended and B1 stopped, slot-a free (ready, no lease);
 // 2. a process still holds slot-a (a file in it open, as a CLI's child holds it for a while after its session ends:
 //    the incident's "busy" leases); B1's next lane, started then, can't be lent slot-a: it waits for a slot, and its
@@ -10,7 +10,7 @@
 // what B1's own run left there (the incident's: a Windows Sandbox server started from the agent's slot, its working
 // folder slot-a, outliving the session):
 // 4. B1, in a turn in slot-a, starts a process that outlives it (detached, a file in slot-a open); its lane is ended
-//    and its next one recorded over it while its turn still runs: Hive leaves the running builder as it is and gives it
+//    and its next one recorded over it while its turn still runs: Combwork leaves the running builder as it is and gives it
 //    the lane's first card once it is free. Its turn ends and it is stopped; the card's start is refused while the
 //    process holds slot-a, its status (HI-2468) and its row in the Progress panel naming slot-a and the program B1's run left
 //    (text, hover, screenshot); once the process ends, the card starts in slot-a with no other call;
@@ -45,7 +45,7 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
-/** Whether a folder can be renamed now (Hive's own look at a free slot, slots.ts quiet): nothing holds it. */
+/** Whether a folder can be renamed now (Combwork's own look at a free slot, slots.ts quiet): nothing holds it. */
 const renamable = (dir) => {
   try {
     fs.renameSync(dir, `${dir}.probe`)
@@ -206,7 +206,7 @@ const renamable = (dir) => {
     const t4 = Date.now()
     const stop4 = watchStatus(c3, t4)
     const third = await apiLane([c3])
-    check('B1’s next lane, recorded through the API while B1 is still in its turn: B1 left as it is, Hive to give it the card', third.status === 200 && (await live(b1.id))?.status === 'working', JSON.stringify(third.body))
+    check('B1’s next lane, recorded through the API while B1 is still in its turn: B1 left as it is, Combwork to give it the card', third.status === 200 && (await live(b1.id))?.status === 'working', JSON.stringify(third.body))
     fs.writeFileSync(turnGo, 'go')
     check('…B1’s turn ends and it is stopped (its old lane’s lease gone), the process still holding slot-a', !!(await until(async () => !(await live(b1.id)), HUNG_MS)) && beating(beat4) && !renamable(slotA), JSON.stringify(await live(b1.id)))
     check('…its card isn’t started while slot-a is held', !!(await until(async () => (await laneOf(c3))?.status?.reason === 'startWait' || (await laneOf(c3))?.status?.reason === 'slot', HUNG_MS)) && (await card(c3))?.column === 'todo' && beating(beat4), JSON.stringify((await laneOf(c3))?.status))

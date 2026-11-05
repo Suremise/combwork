@@ -2,9 +2,9 @@
 // input box: after a turn it offers to teach auto mode about the environment, with no hook, as it did to HB4. The agent
 // waits for the user with the question; a message left meanwhile isn't typed into the question, and no Enter answers it;
 // once the user puts it off (Esc), the agent is idle and the message is delivered; the same for the offer drawn under its
-// empty input box, as 2.1.314 draws it (HI-2191). Then a line Hive typed that its CLI
+// empty input box, as 2.1.314 draws it (HI-2191). Then a line Combwork typed that its CLI
 // didn't take (both Enters dropped), taken off its input as that screen took HB4's wake: once its input is empty at its
-// prompt, still so on Hive's second look, the hold goes and the message is typed again, and read once. Dev build,
+// prompt, still so on Combwork's second look, the hold goes and the message is typed again, and read once. Dev build,
 // throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -31,9 +31,9 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.rmSync(notifyLog, { force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
-  // Every read of the agents' input recorded, for typeLine (#1560) and for when Hive typed what.
+  // Every read of the agents' input recorded, for typeLine (#1560) and for when Combwork typed what.
   lib.logFakeInput(claudeHome)
-  // Claude Code 2.1.312's input box, which Hive reads a lost line by.
+  // Claude Code 2.1.312's input box, which Combwork reads a lost line by.
   fs.writeFileSync(path.join(claudeHome, 'fake-input-box.txt'), '')
   lib.gitProject(alpha)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
@@ -82,7 +82,7 @@ const check = (name, ok, extra = '') => {
       const inbox = (await api('GET', '/v1/projects/alpha/agents/Builder/activity')).body?.inbox
       return !!inbox?.deliveries?.some((d) => d.id === id && (d.state === 'received' || d.state === 'acked'))
     }
-    /** The doorbells Hive typed into the agent (the input log's reads with "[CW] New in your inbox"), with when. */
+    /** The doorbells Combwork typed into the agent (the input log's reads with "[CW] New in your inbox"), with when. */
     const doorbells = () => jsonl('fake-input.jsonl').filter((r) => /\[CW\] New in your inbox/.test(r.data))
     const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
 
@@ -115,8 +115,8 @@ const check = (name, ok, extra = '') => {
     check('put off, the agent is idle again', !!(await until(() => idle(agent.id))), JSON.stringify(await live(agent.id)))
     check('…and the message is delivered and read', !!(await until(() => read(first.body?.id))))
     const rung = doorbells()
-    check('nothing of Hive\'s was typed while the question showed: its doorbell came after the user\'s Esc', rung.length > 0 && rung.every((r) => r.at >= escAt), JSON.stringify({ escAt, rung: rung.map((r) => r.at) }))
-    check('Hive never answered the question (no Enter on it)', JSON.stringify(jsonl('fake-envsetup.jsonl').map((r) => r.answer)) === '["later"]', JSON.stringify(jsonl('fake-envsetup.jsonl')))
+    check('nothing of Combwork\'s was typed while the question showed: its doorbell came after the user\'s Esc', rung.length > 0 && rung.every((r) => r.at >= escAt), JSON.stringify({ escAt, rung: rung.map((r) => r.at) }))
+    check('Combwork never answered the question (no Enter on it)', JSON.stringify(jsonl('fake-envsetup.jsonl').map((r) => r.answer)) === '["later"]', JSON.stringify(jsonl('fake-envsetup.jsonl')))
     await until(() => idle(agent.id))
 
     // ---- The same offer as Claude Code 2.1.314 draws it (HI-2191): under its input box, the empty box kept above it.
@@ -130,11 +130,11 @@ const check = (name, ok, extra = '') => {
     const underEsc = new Date().toISOString()
     await inv('pty:write', key, '\x1b')
     check('…put off, it is idle again and the message is read', !!(await until(() => idle(agent.id))) && !!(await until(() => read(third.body?.id))), JSON.stringify(await live(agent.id)))
-    check("…and nothing of Hive's was typed into it while it showed", doorbells().filter((r) => r.data.includes(`(${third.body?.id})`)).every((r) => r.at >= underEsc), JSON.stringify(doorbells().slice(-3)))
-    check('…never answered by Hive', JSON.stringify(jsonl('fake-envsetup.jsonl').map((r) => r.answer)) === '["later","later"]', JSON.stringify(jsonl('fake-envsetup.jsonl')))
+    check("…and nothing of Combwork's was typed into it while it showed", doorbells().filter((r) => r.data.includes(`(${third.body?.id})`)).every((r) => r.at >= underEsc), JSON.stringify(doorbells().slice(-3)))
+    check('…never answered by Combwork', JSON.stringify(jsonl('fake-envsetup.jsonl').map((r) => r.answer)) === '["later","later"]', JSON.stringify(jsonl('fake-envsetup.jsonl')))
     await until(() => idle(agent.id))
 
-    // ---- A line Hive typed that its CLI didn't take, then taken off its input (as the question took HB4's wake).
+    // ---- A line Combwork typed that its CLI didn't take, then taken off its input (as the question took HB4's wake).
     await app.evaluate((_, v) => void (process.env.HIVE_TEST_WAKE_TAKE_MS = v), '1500')
     fs.writeFileSync(path.join(claudeHome, 'fake-drop-enters-Builder.txt'), '2')
     const second = await api('POST', '/v1/projects/alpha/agents/Builder/message', { text: 'Darren pushed the tag: carry on with the release.' })

@@ -1,5 +1,5 @@
 // The hive-progress wrapper in an agent's session (#137), on a fake Claude Code agent (fake-claude/) whose "shell:" step
-// runs a command in cmd with the session's environment: hive-progress is on the session's PATH (Hive's bin folder
+// runs a command in cmd with the session's environment: hive-progress is on the session's PATH (Combwork's bin folder
 // first), passes the command's output and exit code through and takes out its step lines.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -59,7 +59,7 @@ const check = (name, ok, extra = '') => {
     return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
   }
   /**
-   * Has the agent start a command (as its shell would), typed again if a wake of Hive's disturbed it (typeLine): taken
+   * Has the agent start a command (as its shell would), typed again if a wake of Combwork's disturbed it (typeLine): taken
    * once a turn of its starts. Resolves to a wait for what it recorded. `disturb`: typeLine's own check.
    */
   const startShell = async (id, cmd, ms = 30000, { disturb = null } = {}) => {
@@ -125,7 +125,7 @@ const check = (name, ok, extra = '') => {
   check('the agent starts', !!(await until(async () => (await live(builder.id))?.status === 'ready', HUNG_MS)))
 
   const bin = path.join(userData, 'bin')
-  // typeLine's own check (#1560): a line a wake of Hive's disturbed is typed again, whether the wake's Ctrl+U came
+  // typeLine's own check (#1560): a line a wake of Combwork's disturbed is typed again, whether the wake's Ctrl+U came
   // between the line and its Enter, or its text was on the line before the line was typed.
   const disturbed = await startShell(builder.id, 'where hive-progress', 30000, { disturb: 'enter' })
   check('a line a Ctrl+U cleared before its Enter is typed again (typeLine)', disturbed.typed.attempt === 2 && disturbed.typed.lost[0]?.startsWith('disturbed'), JSON.stringify(disturbed.typed))
@@ -137,7 +137,7 @@ const check = (name, ok, extra = '') => {
   // where lists the sh script (for Git Bash) too; cmd and PowerShell run the .cmd beside it, as with npm's pair.
   const found = (where?.stdout ?? '').trim().split(/\r?\n/).map((l) => l.toLowerCase())
   const mine = [path.join(bin, 'hive-progress'), path.join(bin, 'hive-progress.cmd')].map((f) => f.toLowerCase())
-  check("hive-progress is on the session's PATH, from this Hive's bin folder first (the .cmd and the sh script)", where?.code === 0 && mine.every((f) => found.slice(0, 2).includes(f)), JSON.stringify(where))
+  check("hive-progress is on the session's PATH, from this Combwork's bin folder first (the .cmd and the sh script)", where?.code === 0 && mine.every((f) => found.slice(0, 2).includes(f)), JSON.stringify(where))
 
   const run = await shell(builder.id, `hive-progress --title Demo -- node -e "console.log('hi'); console.log('##hive-progress step=1 total=2 name=one'); console.error('warn'); process.exit(3)"`)
   check("the command's output passes through, without its step lines", run?.stdout.replace(/\r/g, '') === 'hi\n' && run?.stderr.replace(/\r/g, '') === 'warn\n', JSON.stringify(run))
@@ -145,7 +145,7 @@ const check = (name, ok, extra = '') => {
   const demo = (await runs()).find((r) => r.title === 'Demo')
   check('the run was reported as the agent, and failed with its exit code', demo?.agentName === 'Builder' && demo?.state === 'failed' && demo?.summary === 'exit code 3', JSON.stringify(demo))
 
-  // --- An Electron app run through either shim starts as an app (the shims run hive-progress with Hive's executable as
+  // --- An Electron app run through either shim starts as an app (the shims run hive-progress with Combwork's executable as
   // Node; that setting isn't passed on to the command). The app quits rather than exits: app.exit() as soon as it's
   // ready sometimes crashes Electron under load (0x80000003, exit code 3 in bash; 0xC0000005), app.quit() never (#656).
   const electronApp = path.join(lib.WORK, 'progressreport-electron-app.cjs')
@@ -241,7 +241,7 @@ const check = (name, ok, extra = '') => {
   const refused = await shell(builder.id, `hive-progress --card "#${card.number}" --revision HEAD~1 -- node -e "require('fs').writeFileSync('refused-ran.txt', 'x')"`)
   check("a --revision that isn't checked out is refused, and the command never runs", refused?.code === 2 && /isn't what's checked out here/.test(refused?.stderr ?? '') && !fs.existsSync(path.join(alpha, 'refused-ran.txt')), JSON.stringify(refused))
   // The check commands are set through the app's own save (#1594): a direct write of project.json, made in place, could
-  // be read half written by Hive meanwhile, taken as damaged and replaced by its .bak, losing the commands.
+  // be read half written by Combwork meanwhile, taken as damaged and replaced by its .bak, losing the commands.
   const commands = { quick: `node -e "require('fs').writeFileSync('check-ran.txt', 'yes')"` }
   const setCommands = async () => {
     const form = await inv('workflow:setOptions', alpha, { preset: null, options: { commands } })
@@ -279,7 +279,7 @@ const check = (name, ok, extra = '') => {
   check('…and with no command for the name, runs nothing and says so', unknown?.code === 2 && /no command configured for the check "lint"/.test(unknown?.stderr ?? ''), JSON.stringify(unknown))
   await inv('tasks:update', card.number, { column: 'todo' }).catch(() => undefined)
 
-  // --- Hive's own runners in an agent's session: shown in this Hive's panel as the agent's, with steps and estimates.
+  // --- Combwork's own runners in an agent's session: shown in this Combwork's panel as the agent's, with steps and estimates.
   const root = lib.ROOT
   const withTimings = `set "HIVE_TEST_PROGRESS_TIMINGS=${timings}"&& `
   const unitCmd = `${withTimings}cd /d "${root}" && npx vitest run tests/tips.test.ts tests/e2esuites.test.ts`
@@ -305,7 +305,7 @@ const check = (name, ok, extra = '') => {
   const e1 = (await runs()).find((r) => !known.includes(r.id) && r.title === 'e2e: 1 suite')
   check('npm run e2e reports "e2e: 1 suite" as the agent, with its step and the estimate from earlier runs', e2e?.code === 0 && e1?.agentName === 'Builder' && e1?.total === 1 && e1?.state === 'passed' && lib.hadEstimate(e1), JSON.stringify({ code: e2e?.code, out: e2e?.stdout?.slice(-300), e1 }))
   check('…and its output is the runner\'s usual', /about\s+pass/.test(e2e?.stdout ?? '') && /1 passed, 0 failed, 0 skipped/.test(e2e?.stdout ?? ''), e2e?.stdout)
-  check('only those runs: the test Hive the suite started reported nothing here', (await runs()).filter((r) => !known.includes(r.id)).length === 1, JSON.stringify((await runs()).filter((r) => !known.includes(r.id))))
+  check('only those runs: the test Combwork the suite started reported nothing here', (await runs()).filter((r) => !known.includes(r.id)).length === 1, JSON.stringify((await runs()).filter((r) => !known.includes(r.id))))
 
   await app.close()
   console.log(failed ? `${failed} failed` : 'all passed')

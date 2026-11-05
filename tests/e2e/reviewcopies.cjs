@@ -107,7 +107,7 @@ const starts = () => lines(started)
     const lr1 = await codexOf(r1.id)
     const lr2 = await codexOf(r2.id)
     check("R1's and R2's launches (Codex reviewers) have --add-dir the copies folder", [lr1, lr2].every((l) => l && addDirs(l.args).length === 1 && same(addDirs(l.args)[0], copiesDir)), JSON.stringify([lr1?.args, lr2?.args].map((a) => a && addDirs(a))))
-    check('…which Hive made', fs.existsSync(copiesDir))
+    check('…which Combwork made', fs.existsSync(copiesDir))
 
     const claudeToken = async (id) => {
       const l = await claudeLaunch(id)

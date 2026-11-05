@@ -472,7 +472,7 @@ const check = (name, ok, extra = '') => {
   await d.locator('label.choice').filter({ has: page.getByText('Hide', { exact: true }) }).click()
   await d.locator('.dialog-footer .btn', { hasText: 'Hide' }).click()
   const names = async () => (await inv('workspace:get')).projects.map((p) => p.name)
-  check('Hide takes the project out of Hive', !!(await until(async () => !(await names()).includes('delta'), 8000)))
+  check('Hide takes the project out of Combwork', !!(await until(async () => !(await names()).includes('delta'), 8000)))
   check('its folder stays', fs.existsSync(path.join(ws, 'delta')))
   const deltaCards = (await cards()).filter((c) => c.project === 'delta')
   // Evidence for #548: missing (a read that failed) or there but not archived (Hide missed it).
@@ -500,11 +500,11 @@ const check = (name, ok, extra = '') => {
   await d.locator('input.input').fill('gamma')
   await del.click()
   check('Delete moves the folder to the Recycle Bin', !!(await until(async () => !fs.existsSync(path.join(ws, 'gamma')), 10000)))
-  // A test copy's Recycle Bin is the suite's own trash folder (#414): the folder arrived there, whole. Hive notes the
+  // A test copy's Recycle Bin is the suite's own trash folder (#414): the folder arrived there, whole. Combwork notes the
   // move in trash.jsonl just after it, so wait for the note (#441).
   const arrived = () => lib.trashed(path.join(ws, 'gamma')).find((e) => e.from.toLowerCase() === path.join(ws, 'gamma').toLowerCase() && fs.existsSync(e.to))
   check("…which in a test copy is the suite's own trash folder, not the user's Recycle Bin", !!(await until(async () => arrived(), 5000)), JSON.stringify(lib.trashed()))
-  check('and Hive forgets it', !!(await until(async () => !(await names()).includes('gamma'), 8000)))
+  check('and Combwork forgets it', !!(await until(async () => !(await names()).includes('gamma'), 8000)))
 
   await app.close()
   process.exit(failed ? 1 : 0)

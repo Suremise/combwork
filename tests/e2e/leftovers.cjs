@@ -45,7 +45,7 @@ const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile,
 
   // Someone else's process with the project folder as its working folder: never the agent's. It runs until the suite
   // ends it (endExactly, below), not for a set time: one that lived 120 s had ended before a 213 s run under load checked
-  // that it outlives Hive (#708). It ends itself only once this suite's process is gone (or after an hour), so a suite
+  // that it outlives Combwork (#708). It ends itself only once this suite's process is gone (or after an hour), so a suite
   // killed part-way leaves nothing running.
   const strangerCode = `const suite = ${process.pid}; setInterval(() => { try { process.kill(suite, 0) } catch { process.exit(0) } }, 1000); setTimeout(() => process.exit(0), 3600000)`
   const stranger = spawn(process.execPath, ['-e', strangerCode], { cwd: proj, detached: true, stdio: 'ignore', windowsHide: true, env: lib.childEnv() })
@@ -176,7 +176,7 @@ const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile,
   }
 
   // A PC where the process tracker never gets going (HIVE_TEST_PROCESS_TRACKER=silent: its helper starts but never says it is ready; given up on after HIVE_TEST_TRACKER_WAIT_MS): agents start
-  // all the same, untracked, and Hive says so once; Diagnostics says why.
+  // all the same, untracked, and Combwork says so once; Diagnostics says why.
   const second = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: lib.port(47882), HIVE_TEST_PROCESS_TRACKER: 'silent', HIVE_TEST_TRACKER_WAIT_MS: '3000' } })
   try {
     const { page: p2, inv: inv2 } = second

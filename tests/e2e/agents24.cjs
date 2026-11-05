@@ -65,7 +65,7 @@ const check = (name, ok, extra = '') => {
     }
     /** Types a prompt into an agent (as the user does), Enter included. */
     const say = async (id, text) => {
-      // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+      // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
       await lib.typeLine(inv, lib.ptyKey(crowd, id), claudeHome, null, text, { live: () => live(id) })
     }
     const openRuns = async () => (await inv('progress:list')).filter((r) => r.finishedAt === null && r.projectPath?.toLowerCase() === crowd.toLowerCase())

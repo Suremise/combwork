@@ -1,7 +1,7 @@
 // The Assistant panel's watch line and "Done by the Assistant" (#312, #399, #979). The header has the Assistant's state
 // mark (#973: a ring idle, a pulsing dot working, a diamond waiting for you) and no status text. Under it, "Status: …"
 // says what the Assistant is doing: Not running, Idle, Working, Waiting for you (the attention colour), and a card
-// watch's cards as the app's card chips (their column's colour) that open the card, with the watch's end, and Hive's own
+// watch's cards as the app's card chips (their column's colour) that open the card, with the watch's end, and Combwork's own
 // approval cards (stopping a busy agent) as "Waiting for your approval" in the attention colour until answered. At the
 // line's end, once it has done something, "Done by the Assistant (n)" opens the list under it (closed at first): the last
 // 3 of its newest message's changes (#1283: rows of one height, each with Undo), Show all scrolling every one inside the same height (nothing
@@ -47,7 +47,7 @@ const check = (name, ok, extra = '') => {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  // A call that hasn't answered in 60 s fails the suite saying which, and whether the window and Hive's main process
+  // A call that hasn't answered in 60 s fails the suite saying which, and whether the window and Combwork's main process
   // still answer, with a screenshot (#492: once, under two full sets, the suite hung here until the runner's 10 minutes).
   const answers = (p, ms) => Promise.race([p.then(() => 'yes', (e) => `error: ${e.message}`), lib.sleep(ms).then(() => 'no')])
   const watched = (call, what) => {
@@ -55,7 +55,7 @@ const check = (name, ok, extra = '') => {
       const renderer = await answers(page.evaluate(() => 1), 5000)
       const main = await answers(app.evaluate(() => 1), 5000)
       const shot = await answers(page.screenshot({ path: path.join(lib.WORK, 'assistantpanel-unanswered.png') }), 10000)
-      console.log(`FAIL ${what} hasn't answered in 60 s (the window answers: ${renderer}; Hive's main process answers: ${main}; screenshot taken: ${shot})`)
+      console.log(`FAIL ${what} hasn't answered in 60 s (the window answers: ${renderer}; Combwork's main process answers: ${main}; screenshot taken: ${shot})`)
       process.exit(1)
     }, 60000)
     return call.finally(() => clearTimeout(t))
@@ -229,7 +229,7 @@ const check = (name, ok, extra = '') => {
   check('…inside its box, nothing clipped', fits)
   await shots('folded')
 
-  // --- Hive's own question its action waits on (stopping a busy agent): waiting for your approval, until answered.
+  // --- Combwork's own question its action waits on (stopping a busy agent): waiting for your approval, until answered.
   // Its task is "work 60", spelled with a JSON escape so the fake Assistant doesn't take it as its own "work 60".
   check('it adds an agent to alpha', await say('hive cw_add_agent {"project":"alpha","name":"Fixer","prompt":"w\\u006frk 60"}'))
   const alpha = path.join(ws, 'alpha')
@@ -290,7 +290,7 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => (await head.getAttribute('aria-expanded')) === 'false', HUNG_MS)
   await page.locator('.assistant-panel > .pane-resizer').dblclick()
 
-  // --- After a restart: still folded (once it has done something again; the list is the running Hive's).
+  // --- After a restart: still folded (once it has done something again; the list is the running Combwork's).
   await inv('session:stop', home, 'assistant')
   await lib.until(async () => !(await live()), 15000)
   await app.close()

@@ -1,6 +1,6 @@
 // Switching a project's version control (#1419, SPEC §16.3.5, §16.6.5, S20, OP-29), the Assistant off, fake Claude Code
 // agents acting by their own tokens:
-// - alpha (queueFixture's "Hive merges" into `integration`): one card testing and one queued when its queue is paused,
+// - alpha (queueFixture's "Combwork merges" into `integration`): one card testing and one queued when its queue is paused,
 //   then switched to None (the warning lists both cards in flight and that the folder is still a Git repository; no
 //   switch back is offered afterwards). The Merge queue section stays, reached from the Progress panel's queue card;
 //   the queued card is removed there, a new card starts under None's rules meanwhile, and the testing one merges once
@@ -36,7 +36,7 @@ const check = (name, ok, extra = '') => {
 }
 const until = (fn, ms) => lib.until(fn, ms, 200)
 
-/** A project's .combwork/project.json, as Hive keeps it. */
+/** A project's .combwork/project.json, as Combwork keeps it. */
 function writeProject(dir, cfg) {
   fs.mkdirSync(path.join(dir, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(dir, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [], ...cfg }))
@@ -279,7 +279,7 @@ function writeProject(dir, cfg) {
     check('a subfolder project says actions affect the whole repository', !!(await until(async () => (await text(page.locator('[data-vc-fact]'))) === `This folder is inside a Git repository at ${outer}: branch and merge actions affect that whole repository.`, HUNG_MS)))
     const merging = q.queueOptions(fx, { target: '' })
     const op29 = await inv('workflow:setOptions', inner, { preset: null, options: merging }).then(() => 'saved', (e) => e.message)
-    check('Hive merges with no target of its own is refused (OP-29)', /This project is inside a larger repository: name the branch its work merges into\./.test(op29), op29)
+    check('Combwork merges with no target of its own is refused (OP-29)', /This project is inside a larger repository: name the branch its work merges into\./.test(op29), op29)
     const named = await inv('workflow:setOptions', inner, { preset: null, options: { ...merging, target: 'main' } }).then(() => 'saved', (e) => e.message)
     check('…and saved once it names one', named === 'saved', named)
   } catch (e) {

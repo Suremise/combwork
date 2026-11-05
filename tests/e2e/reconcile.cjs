@@ -1,7 +1,7 @@
 // Reconciliation in the dev build (#1217; with workflow rules enforced since #1263, a Doing card still only gets marks): a card started by its agent, which works in a git worktree
 // (P7: its carried slot once the opening has adopted it, HI-2126, where the slot's preparation makes the card's own line;
 // never taken for gone before, #1551);
-// a commit made there with plain git, outside Hive, is seen by the watcher and recorded on the card as
+// a commit made there with plain git, outside Combwork, is seen by the watcher and recorded on the card as
 // an observed HeadMoved within the debounce, read over IPC; the card doesn't move. Then the branch merged into main by
 // hand: Integrated, by outside, the card still where it was. No agents run. Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
@@ -58,10 +58,10 @@ const git = (cwd, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'u
     // #1551: its line didn't exist until then, and was never taken for gone, nor its head for moved to nothing.
     check('…its line never taken for gone before it was made', !(await facts()).some((f) => (f.kind === 'Gone' && f.data.what === 'line') || (f.kind === 'HeadMoved' && f.data.to === null)), JSON.stringify((await facts()).map((f) => f.kind)))
 
-    // A commit made with plain git, outside Hive.
+    // A commit made with plain git, outside Combwork.
     fs.writeFileSync(path.join(wt, 'b.txt'), 'two\n')
     git(wt, 'add', '-A')
-    git(wt, 'commit', '-qm', 'outside Hive')
+    git(wt, 'commit', '-qm', 'outside Combwork')
     const head = git(wt, 'rev-parse', 'HEAD')
     const seen = await lib.until(async () => (await facts()).find((f) => f.kind === 'HeadMoved' && f.data.to === head), HUNG_MS)
     check('the commit is observed: HeadMoved to it, by outside', !!seen && seen.actor === 'outside' && seen.source === 'observed', JSON.stringify((await facts()).map((f) => f.kind)))

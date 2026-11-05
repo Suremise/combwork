@@ -251,7 +251,7 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   // In ui-state.json beside config.json since #1111, which no longer has it.
   const ui = JSON.parse(fs.readFileSync(path.join(userData, 'ui-state.json'), 'utf8')).boardFold ?? {}
   check('not in config.json', JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).ui?.boardFold === undefined)
-  check("kept in Hive's own settings for this workspace, not in the cards", Object.keys(ui).length === 1 && Object.keys(ui)[0] === ws.toLowerCase() && !Object.keys(lib.readCard(ws, n.t1)).some((k) => /fold|collapse/i.test(k)), JSON.stringify(ui))
+  check("kept in Combwork's own settings for this workspace, not in the cards", Object.keys(ui).length === 1 && Object.keys(ui)[0] === ws.toLowerCase() && !Object.keys(lib.readCard(ws, n.t1)).some((k) => /fold|collapse/i.test(k)), JSON.stringify(ui))
 
   // --- Two windows, each with its own workspace, both open before either changes its board: A's change, then B's,
   // keep each other (a window saves a change on what is saved now, never the folds it read when it opened).

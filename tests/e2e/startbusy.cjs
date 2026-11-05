@@ -2,7 +2,7 @@
 // builds only), from the click until the agent runs the button clicked shows a spinner and "Resuming…" or "Starting…",
 // is disabled and aria-busy, and the other ways to start that agent are disabled too, elsewhere as well (the project
 // header's Resume, the Sessions tab's); once it runs they are gone. In an agent's pane (its ended bar), the Sessions
-// tab (also for a session no agent can run, while one is added for it), Start Without Setup and the Hive Assistant's
+// tab (also for a session no agent can run, while one is added for it), Start Without Setup and the Combwork Assistant's
 // panel, in both themes (screenshots in the run's folder). The agents run the fake Claude Code (fake-claude/). Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
 // Dev build only (#1580): session:start is slowed through HIVE_TEST_SLOW_IPC (a seam a packaged build ignores), and
@@ -150,7 +150,7 @@ const check = (name, ok, extra = '') => {
     check('the worktree agent starts without its setup', await started(alpha, tree.id))
     check('and stops', await stop(alpha, tree.id))
 
-    // --- The Hive Assistant's panel: Start, then Resume.
+    // --- The Combwork Assistant's panel: Start, then Resume.
     const home = (await inv('workspace:refresh')).assistant.path
     await page.locator('.assistant-rail').click().catch(() => undefined)
     const panel = page.locator('.assistant-panel')

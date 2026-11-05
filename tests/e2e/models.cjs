@@ -147,7 +147,7 @@ const check = (name, ok, extra = '') => {
   const footerText = async () => (await footer.innerText().catch(() => '')) + (await footer.locator('[title]').evaluateAll((es) => es.map((e) => e.getAttribute('title')).join(' ')).catch(() => ''))
   const shown = await lib.until(async () => /Medium \(default\)/.test(await footerText()), 8000)
   check("the footer shows the model's default effort: Medium (default)", !!shown, await footer.innerText().catch(() => ''))
-  // Effort levels renamed in Settings name the footer's effort too, as they do the pickers' (#230); Reset gives Hive's.
+  // Effort levels renamed in Settings name the footer's effort too, as they do the pickers' (#230); Reset gives Combwork's.
   await inv('settings:setProviderFallback', 'codex', 'efforts', [{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Mid' }, { value: 'high', label: 'High' }])
   check('a renamed effort level names the footer’s effort: Mid (default)', !!(await lib.until(async () => /Mid \(default\)/.test(await footerText()), 8000)), await footer.innerText().catch(() => ''))
   await inv('settings:setProviderFallback', 'codex', 'efforts', null)
@@ -188,7 +188,7 @@ const check = (name, ok, extra = '') => {
   await page.keyboard.press('Control+,')
   await openSection('Claude Code')
   const modelsRow = page.locator('.fallback-table', { has: page.locator('.fallback-source', { hasText: 'Models now' }) })
-  // While the CLI answers and the list is Hive's own, it is folded.
+  // While the CLI answers and the list is Combwork's own, it is folded.
   check("the models fallback is folded while the CLI's answer is in use", (await modelsRow.locator('.fallback-toggle', { hasText: /Show the list \(\d+ models\)/ }).count()) === 1 && (await modelsRow.locator('.fallback-list').count()) === 0)
   await modelsRow.locator('.fallback-toggle').click()
   await modelsRow.getByLabel("New model id").fill('claude-test-9')
@@ -196,7 +196,7 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => ((await update({})).providers['claude-code'].modelFallback ?? []).some((m) => m.value === 'claude-test-9'), HUNG_MS)
   const edited = (await update({})).providers['claude-code'].modelFallback ?? []
   check('adding a model stores the list as yours (the shipped ones and yours)', edited.at(-1)?.value === 'claude-test-9' && edited.some((m) => m.value === 'opus'), JSON.stringify(edited.map((m) => m.value)))
-  // The CLI can't be asked: one that gives its version but answers nothing else (a missing path would have Hive look
+  // The CLI can't be asked: one that gives its version but answers nothing else (a missing path would have Combwork look
   // for the machine's own Claude Code, which a test never uses).
   const broken = path.join(lib.WORK, 'models-broken-claude', 'claude.cmd')
   fs.mkdirSync(path.dirname(broken), { recursive: true })
@@ -204,7 +204,7 @@ const check = (name, ok, extra = '') => {
   await update({ providers: { 'claude-code': { executablePath: broken } } })
   await inv('provider:refresh', 'claude-code')
   await lib.until(async () => { const i = await info('claude-code'); return !i.checking && i.version === '2.1.998' && !i.catalog }, 20000)
-  check('the broken CLI is the one Hive uses, and it gave no models', (await info('claude-code')).version === '2.1.998' && !(await info('claude-code')).catalog, JSON.stringify((await info('claude-code')).version))
+  check('the broken CLI is the one Combwork uses, and it gave no models', (await info('claude-code')).version === '2.1.998' && !(await info('claude-code')).catalog, JSON.stringify((await info('claude-code')).version))
   // The picker: a connection's (Claude Code has no default model of its own, HI-1774); the list's source on its page.
   await editConnection(claudeAccount)
   const fallbackOffered = (await options(modelSelect)).map((o) => o.value)
@@ -220,7 +220,7 @@ const check = (name, ok, extra = '') => {
   await editConnection(claudeAccount)
   const shipped = await modelSelect.locator('optgroup').evaluateAll((gs) => gs.map((g) => g.label))
   await cancelConnection()
-  check("Reset to defaults: Hive's own list again", !(await update({})).providers['claude-code'].modelFallback && shipped[0] === 'Latest (follows new releases)', JSON.stringify(shipped))
+  check("Reset to defaults: Combwork's own list again", !(await update({})).providers['claude-code'].modelFallback && shipped[0] === 'Latest (follows new releases)', JSON.stringify(shipped))
   await openSection('Claude Code')
   // The effort fallback: renamed levels name the pickers' options.
   const effortsRow = page.locator('.fallback-table', { has: page.locator('.fallback-source', { hasText: /levels|per-model/ }) })

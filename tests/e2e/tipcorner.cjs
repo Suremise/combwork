@@ -1,4 +1,4 @@
-// The tip card and toasts keep out of the way of buttons in their corner: with the Hive Assistant's panel open they sit
+// The tip card and toasts keep out of the way of buttons in their corner: with the Combwork Assistant's panel open they sit
 // left of it, so the panel's ended bar (Resume, New) is never covered; with it hidden, they sit just above the
 // bottom-right agent pane's ended bar. Each button is clicked with the real pointer, after checking it is what lies
 // under its middle. Tips are on in this suite's profile, finished notices off. The agents run the fake Claude Code (fake-claude/). Dev build,

@@ -148,7 +148,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     if (r.status !== 200) check(`lane of ${builder} starts`, false, JSON.stringify(r))
     return r.body?.lane?.id
   }
-  // B1 quiet first (idle, nothing of Hive's being typed into it or waiting to be): the board set-up above sends it card
+  // B1 quiet first (idle, nothing of Combwork's being typed into it or waiting to be): the board set-up above sends it card
   // events, and taking them as its lane starts would make its new conversation owed (or leave it as it is, mid-turn).
   check('B1 is quiet before its lane starts', !!(await until(async () => lib.agentQuiet(PORT, 'alpha', await live(b1.id), tr), 45000)), JSON.stringify(await live(b1.id)))
   const l1 = await startLane('B1', 'R1', 'lanes and loops', lane1)
@@ -703,9 +703,9 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await page.mouse.move(5, 5)
   await shoot('lanes-reordered')
 
-  // --- Hive restarted: the workspace's lanes chosen (five) are kept (#569).
+  // --- Combwork restarted: the workspace's lanes chosen (five) are kept (#569).
   await app.close().catch(() => undefined)
-  // The lanes' agents were in running lanes: Hive offers to resume them (its restart record), in a notice that can cover
+  // The lanes' agents were in running lanes: Combwork offers to resume them (its restart record), in a notice that can cover
   // the lane menu (HI-1809: Usual Order's click timed out under it). Answered Don't Resume, below, until the record is
   // gone (nothing left to offer) and no offer shows.
   const restartRecord = path.join(userData, 'restart.json')
@@ -751,7 +751,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   check('Usual Order puts the lanes back, and keeps no order', !!(await until(async () => (await order2()).join() === usualOrder.join() && (await saved2()) === null, HUNG_MS)), JSON.stringify({ order: await order2(), saved: await saved2() }))
 
   // --- A lane's queued list change in the Lanes tab (HI-2151): B10's lane, its first card in flight, changed to add a
-  // card and reorder the rest, so Hive queues it behind that card. The tab says what it will do under the lane's bar;
+  // card and reorder the rest, so Combwork queues it behind that card. The tab says what it will do under the lane's bar;
   // once that card is Done the change applies and the line goes.
   const panel2 = page2.locator('.progress-panel')
   const b10 = await lib.addAgent(inv2, alpha, { name: 'B10' })

@@ -1,10 +1,10 @@
 // A wake put off part-way (HI-1974), on a fake Claude Code and a fake Codex agent: a doorbell typed into an idle agent
 // whose terminal is 40 columns wide, so the line wraps onto several rows, is held before its Enter (HIVE_TEST_HOLD_TYPED),
-// and idle wakes are turned off meanwhile, so it is no longer wanted. What Hive typed is taken back whole: the input is
+// and idle wakes are turned off meanwhile, so it is no longer wanted. What Combwork typed is taken back whole: the input is
 // empty again (the fake Claude Code's Ctrl+U deletes one wrapped row, as Claude Code 2.1.312's does; LB1 kept a stopped
 // wake's first rows, and the next wake was sent after them). Idle wakes on again, the next wake is typed and sent alone.
 // Codex (and Copilot, wakepaste-copilot) clear the whole line with one Ctrl+U. Then a draft the user left in Claude
-// Code's input (HI-1979), which its Ctrl+U clears a row at a time: Hive types only once it reads the input box empty.
+// Code's input (HI-1979), which its Ctrl+U clears a row at a time: Combwork types only once it reads the input box empty.
 // One taller than the screen, with line breaks, is cleared and the doorbell sent alone; with the fake's input not read
 // (fake-slow-input), nothing is typed until it reads again, then the same. Dev build only (the seam), throwaway profile,
 // workspace, CLAUDE_CONFIG_DIR and CODEX_HOME.
@@ -50,11 +50,11 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
   cfg.settings.providers.codex.executablePath = path.join(__dirname, 'fake-codex', 'fake-codex.cmd')
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
-  // A short pause after the user types (HI-1979's drafts): Hive types nothing into a pane for this long after a key there.
+  // A short pause after the user types (HI-1979's drafts): Combwork types nothing into a pane for this long after a key there.
   cfg.settings.assistant = { ...cfg.settings.assistant, typingPause: 2, enterEndsPause: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), ws.toLowerCase()]))
-  // Both follow Hive's notices, as a model does: they read their inbox and ack what they listed.
+  // Both follow Combwork's notices, as a model does: they read their inbox and ack what they listed.
   fs.writeFileSync(path.join(claudeHome, 'fake-follow-notices.txt'), '')
   fs.writeFileSync(path.join(codexHome, 'fake-follow-notices.txt'), '')
 
@@ -131,7 +131,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
       // No longer wanted as it waits there: what it was made for can't be typed by itself now.
       await setSwitch('idleWakes', false)
       check(`${a.name}: idle wakes turned off: the wake is put off part-way`, !!(await until(() => logCount(/put off: It is no longer wanted/) > putOff, HUNG_MS)))
-      if (draws) check(`${a.name}: …what Hive typed is taken back whole: none of it is left in the input`, !!(await until(async () => (await onScreen(a)) === 0, HUNG_MS)), await screen(a))
+      if (draws) check(`${a.name}: …what Combwork typed is taken back whole: none of it is left in the input`, !!(await until(async () => (await onScreen(a)) === 0, HUNG_MS)), await screen(a))
       const m = await left
       const waiting = await delivery(a, m)
       check(`${a.name}: …nothing was sent, the message still waits`, !!m && wakes(a).length === before && waiting?.state === 'queued', JSON.stringify({ m, wakes: wakes(a).slice(before), d: waiting }))
@@ -200,7 +200,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
       }
     }
 
-    // --- HI-1979: a draft the user left in Claude Code's input, which its Ctrl+U clears a row at a time. Hive types only
+    // --- HI-1979: a draft the user left in Claude Code's input, which its Ctrl+U clears a row at a time. Combwork types only
     // once it reads the input box empty; a box it can't see cleared, it types nothing into.
     const key = lib.ptyKey(alpha, claude.id)
     const box = async () => (await screen(claude)).replace(/\s+/g, '')
@@ -224,7 +224,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     check('Claude: …alone, with none of the draft before it: the one prompt it took is the doorbell', sent.length === 1 && taken.length === 1 && taken[0].startsWith('[CW] New in your inbox') && !taken[0].includes('draft line'), JSON.stringify({ sent, taken }))
     check('Claude: …it reads and acks the message', !!(await until(async () => (await delivery(claude, m))?.state === 'acked' && (await idle(claude.id)), HUNG_MS)), JSON.stringify(await delivery(claude, m)))
 
-    // Its input not read meanwhile (a busy CLI: fake-slow-input): a Ctrl+U it doesn't answer. Hive types nothing, puts the
+    // Its input not read meanwhile (a busy CLI: fake-slow-input): a Ctrl+U it doesn't answer. Combwork types nothing, puts the
     // doorbell off, and once the CLI reads its input again, clears the draft and sends the doorbell alone.
     const knob = path.join(claudeHome, `fake-slow-input-${claude.name}.txt`)
     const paused = path.join(claudeHome, `fake-slow-input-${claude.name}.paused`)

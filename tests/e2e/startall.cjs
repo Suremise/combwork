@@ -56,7 +56,7 @@ const check = (name, ok, extra = '') => {
     return v
   }
   const type = async (id, text) => {
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
   }
   // Starts an agent (trusting its folder) and has one exchange, so it has a conversation.
@@ -158,7 +158,7 @@ const check = (name, ok, extra = '') => {
   }, HUNG_MS)), JSON.stringify(await focusState()))
   await page.evaluate(() => document.activeElement?.blur())
   // Narrower: the actions turn to icons (named for screen readers and in their tooltips) and the title gives way; at the
-  // narrowest window Hive supports (900 px, sidebar and rails open), every action is inside the header, on screen and
+  // narrowest window Combwork supports (900 px, sidebar and rails open), every action is inside the header, on screen and
   // the thing under its own centre, in both themes. With the Assistant's panel open too, Agents ▾'s actions go into ⋯.
   // Every action found and read in one evaluation in the page, so a refold (the Assistant opening) can't leave a stale or
   // detached control between the two (a locator's evaluateAll queries first, then evaluates).

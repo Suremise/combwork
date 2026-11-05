@@ -1,7 +1,7 @@
 // The cw-progress wrapper as installed (#137): dist/win-unpacked's cw-progress.js, outside the asar, run with Combwork.exe
 // as Node (as its shims run it), against a stand-in for the Agent API's progress endpoints. Checked: output and exit
 // code pass through, the run is reported with its steps (step lines taken out of the output), the second run has an
-// estimate, and with Hive unreachable the command still runs. HIVE_PROGRESS_CHECK_DEV=1 checks the dev build instead.
+// estimate, and with Combwork unreachable the command still runs. HIVE_PROGRESS_CHECK_DEV=1 checks the dev build instead.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -55,7 +55,7 @@ const wrap = (args, apiUrl) =>
   const started = () => calls.find((c) => c.method === 'POST' && c.path === '/v1/progress')
   const r = await wrap(cmd, url)
   check('output passes through, step lines taken out; exit code 0', r.code === 0 && r.out === 'hello\n' && r.err === '', JSON.stringify(r))
-  check('it asks Hive what the run is for first, as the agent, from its folder', calls[0]?.method === 'POST' && calls[0]?.path === '/v1/progress/resolve' && calls[0]?.auth === 'Bearer agent-token' && !!calls[0]?.body?.folder, JSON.stringify(calls[0]))
+  check('it asks Combwork what the run is for first, as the agent, from its folder', calls[0]?.method === 'POST' && calls[0]?.path === '/v1/progress/resolve' && calls[0]?.auth === 'Bearer agent-token' && !!calls[0]?.body?.folder, JSON.stringify(calls[0]))
   check('the run is started as the agent, with its title and command', started()?.auth === 'Bearer agent-token' && started()?.body?.title === 'Packaged check' && /node -e/.test(started()?.body?.command), JSON.stringify(calls))
   // Step lines name the step starting; the API counts those finished.
   check('…with the total and first step from its first step line', started()?.body?.total === 2 && started()?.body?.step === 0 && started()?.body?.stepName === 'one', JSON.stringify(started()?.body))
@@ -74,9 +74,9 @@ const wrap = (args, apiUrl) =>
 
   const t0 = Date.now()
   const away = await wrap(['--', 'node', '-e', "console.log('still runs'); process.exit(4)"], 'http://127.0.0.1:9')
-  check('Hive unreachable: the command runs as usual, quickly', away.code === 4 && away.out === 'still runs\n' && Date.now() - t0 < 8000, JSON.stringify(away))
+  check('Combwork unreachable: the command runs as usual, quickly', away.code === 4 && away.out === 'still runs\n' && Date.now() - t0 < 8000, JSON.stringify(away))
 
-  // An Electron app run through hive-progress (itself run by Hive's executable as Node) starts as an app, exactly as
+  // An Electron app run through hive-progress (itself run by Combwork's executable as Node) starts as an app, exactly as
   // when run directly: ELECTRON_RUN_AS_NODE, the shims' setting for the wrapper, isn't passed on. Reporting on,
   // off and unavailable. The app quits rather than exits: app.exit() as soon as it's ready sometimes crashes Electron
   // under load, app.quit() never (#656).
@@ -89,7 +89,7 @@ const wrap = (args, apiUrl) =>
     p.on('close', (code) => resolve({ code, out: out.replace(/\r/g, '') }))
   })
   check('the Electron app, run directly, starts as an app', direct.code === 0 && direct.out.trim() === 'OK: Electron app', JSON.stringify(direct))
-  for (const [mode, apiUrl, extra] of [['reporting', url, {}], ['Hive unreachable', 'http://127.0.0.1:9', {}], ['CW_PROGRESS=0', url, { CW_PROGRESS: '0' }]]) {
+  for (const [mode, apiUrl, extra] of [['reporting', url, {}], ['Combwork unreachable', 'http://127.0.0.1:9', {}], ['CW_PROGRESS=0', url, { CW_PROGRESS: '0' }]]) {
     const before = calls.length
     const wrapped = await new Promise((resolve) => {
       const env = lib.childEnv({ ELECTRON_RUN_AS_NODE: '1', CW_PROGRESS_DATA: data, CW_API_URL: apiUrl, CW_API_TOKEN_FILE: lib.tokenFile('agent-token'), ...extra })

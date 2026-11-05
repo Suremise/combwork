@@ -106,7 +106,7 @@ function sizes(home) {
     await show()
     // Shown again: one new size after a font change; otherwise none, which only time can tell (on purpose).
     if (sizeChanges) await lib.until(() => agents.every((g, i) => sizes(g.home).length > before[i].n), 5000)
-    // No further size may follow, and past the time Hive holds a terminal at the bottom, it must stay there.
+    // No further size may follow, and past the time Combwork holds a terminal at the bottom, it must stay there.
     await lib.sleep(1600) // on purpose
     for (const [i, b] of before.entries()) {
       const g = b.g
@@ -132,7 +132,7 @@ function sizes(home) {
     sizeChanges: true
   })
   await page.screenshot({ path: path.join(lib.WORK, 'termsize-after-settings.png') })
-  // Shown again, xterm can move the view itself a moment later (its scroll position synced from a stale one): Hive puts
+  // Shown again, xterm can move the view itself a moment later (its scroll position synced from a stale one): Combwork puts
   // a terminal that follows its output back at the bottom. The same move, made just after coming back from Settings.
   await settingsBtn.click()
   await lib.sleep(500)
@@ -188,7 +188,7 @@ function sizes(home) {
   await roundTrip('Settings after scrolling back down', () => settingsBtn.click(), () => projectsBtn.click())
   await page.screenshot({ path: path.join(lib.WORK, 'termsize-end.png') })
 
-  // Narrowed, what the terminal shows re-wraps instead of being cut at its edge (#896): Hive's exit line, and a line as
+  // Narrowed, what the terminal shows re-wraps instead of being cut at its edge (#896): Combwork's exit line, and a line as
   // wide as the terminal was, written in a wide window. xterm keeps a line's cells past a narrower terminal's edge
   // without drawing them, so only what is drawn counts.
   const fitted = () => page.evaluate(() => window.__hiveTerminalsFitted())
@@ -196,11 +196,11 @@ function sizes(home) {
     const cols = (await state(writer.key)).cols
     return ((await page.evaluate((k) => window.__hiveTerminalLines(k), writer.key)) ?? []).map((l) => l.slice(0, cols)).join('')
   }
-  // One pane: two columns at the narrowest window with the panel open are narrower than Hive fits a terminal to.
+  // One pane: two columns at the narrowest window with the panel open are narrower than Combwork fits a terminal to.
   await page.locator('.layout-switch button[aria-label="One at a time"]').click()
   await lib.fitWindow(app, page, { width: 1400, height: 650 })
   await inv('session:stop', alpha, claude.id)
-  check('reflow: Hive writes its exit line', !!(await lib.until(async () => (await drawn()).includes('[process exited with code'), HUNG_MS)), await drawn())
+  check('reflow: Combwork writes its exit line', !!(await lib.until(async () => (await drawn()).includes('[process exited with code'), HUNG_MS)), await drawn())
   check('reflow: the terminal is fitted to the wide window', !!(await lib.until(fitted, HUNG_MS)), JSON.stringify(await state(writer.key)))
   const wide = (await state(writer.key)).cols
   const marker = Array.from({ length: wide }, (_, i) => String.fromCharCode(65 + (i % 26))).join('')

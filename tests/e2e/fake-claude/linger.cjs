@@ -16,7 +16,7 @@ if (role === 'app-starter') {
   setTimeout(() => process.exit(0), 200)
 } else if (role === 'unnamed-starter') {
   // fake-claude's "hidden-linger" (HI-2217): the same, but what is left names no test folder on its command line (its
-  // file comes in its environment), as a model's `find / -name x` did: only its launch's job (Hive's) knows it.
+  // file comes in its environment), as a model's `find / -name x` did: only its launch's job (Combwork's) knows it.
   spawn(process.execPath, [__filename, 'linger-unnamed', agent], { detached: true, stdio: 'ignore', windowsHide: true, env: { ...process.env, FAKE_LINGER_FILE: file } }).unref()
   setTimeout(() => process.exit(0), 200)
 } else {

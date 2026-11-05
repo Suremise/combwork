@@ -12,7 +12,7 @@ const srv = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x')
   res.setHeader('Content-Type', 'application/json')
   if (u.pathname === '/v1/shared') return res.end(JSON.stringify(tree))
-  // A project's handovers, newest first (#514: Hive finds them; here by the file name alone).
+  // A project's handovers, newest first (#514: Combwork finds them; here by the file name alone).
   if (u.pathname === '/v1/shared/handovers') {
     const want = u.searchParams.get('project')
     const files = tree[0].children.filter((f) => f.name !== 'README.md' && (!want || f.name.slice(11).startsWith(`${want}-`)))

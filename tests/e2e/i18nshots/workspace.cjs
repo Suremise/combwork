@@ -96,7 +96,7 @@ async function statusBar(ctx) {
 }
 
 /**
- * A session of the Hive Assistant with usage today, as a Hive backup (.combwork/sessions in its home), so the Workspace
+ * A session of the Combwork Assistant with usage today, as a Combwork backup (.combwork/sessions in its home), so the Workspace
  * Overview has an Assistant row and chart series (wsoverview seeds projects the same way).
  */
 function seedAssistantUsage(ctx) {
@@ -117,7 +117,7 @@ function seedAssistantUsage(ctx) {
 }
 
 /**
- * The seeded session in the usage history, which the Overview reads (#1106). A record written behind Hive's back reaches
+ * The seeded session in the usage history, which the Overview reads (#1106). A record written behind Combwork's back reaches
  * it when a list of its host's sessions asks for it, as the Assistant's session picker does (the ten-minute sweep
  * otherwise, #1172): listed, then waited for until main counts it.
  */
@@ -205,7 +205,7 @@ async function settingsWorkspace(ctx) {
   return windowShot()
 }
 
-/** A project's Storage (Project Settings): what Hive keeps for it. */
+/** A project's Storage (Project Settings): what Combwork keeps for it. */
 async function projectStorage(ctx) {
   await ctx.command('view.projects')
   await ctx.command('project.tab.settings')

@@ -1,7 +1,7 @@
-// What the agents had started, after Hive closed unexpectedly (#987): while an agent runs, the running marker keeps what
+// What the agents had started, after Combwork closed unexpectedly (#987): while an agent runs, the running marker keeps what
 // its launch started (its process job's members, each by id and start time). The fake Claude Code's "linger 1" leaves a
 // node running, as a test run under hive-progress was left (Darren, 17 Oct). The test copy is ended from outside (by its
-// own pid and start time, lib.identify, never by name): the node keeps running, and the next start's "Hive closed
+// own pid and start time, lib.identify, never by name): the node keeps running, and the next start's "Combwork closed
 // unexpectedly" notice says one process the agents started is still running, with Stop Them. Nothing is stopped on its
 // own; Stop Them ends exactly that node. A kept record whose pid names another process by then (a stranger's, with
 // another start time) is never listed, and the stranger is never ended. #1008: a command left running through
@@ -51,7 +51,7 @@ process.on('uncaughtException', (e) => {
 const identities = []
 let claudeEnv = null
 
-/** Starts a copy of Hive on the profile, with its workspace restored. */
+/** Starts a copy of Combwork on the profile, with its workspace restored. */
 async function start() {
   const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(API_PORT), ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
@@ -74,7 +74,7 @@ async function apiGet(route) {
 /**
  * Ends the copy from outside, as a crash or a kill would: its own process (by pid and start time) and what it started,
  * apart from the hive-progress run under `outlives` (its pid): from the shell that ran the hive-progress command down, it
- * keeps going, as a test run did when Hive closed under it (#1008).
+ * keeps going, as a test run did when Combwork closed under it (#1008).
  */
 async function endFromOutside(app, outlives) {
   const proc = app.process()
@@ -91,7 +91,7 @@ async function endFromOutside(app, outlives) {
   return ended > 0 && exited
 }
 
-/** Whether nothing listens on the Agent API port (on 127.0.0.1, where Hive listens), told as lanes.mjs portFree tells it. */
+/** Whether nothing listens on the Agent API port (on 127.0.0.1, where Combwork listens), told as lanes.mjs portFree tells it. */
 const apiPortFree = () =>
   new Promise((resolve) => {
     const srv = net.createServer()
@@ -212,7 +212,7 @@ const notice = (page) => page.evaluate(() => [...document.querySelectorAll('.toa
       const text = await lib.until(() => notice(page), START_MS)
       // The node, and the hive-progress run as one item named by its title (cmd, hive-progress and its node).
       const said = /(\d+) processes the agents started are still running: ([^\n]*)/.exec(text)
-      check('the notice says Hive closed unexpectedly, and what the agents started that is still running', !!said && /node [^,]*linger/.test(said[2]), text)
+      check('the notice says Combwork closed unexpectedly, and what the agents started that is still running', !!said && /node [^,]*linger/.test(said[2]), text)
       check('…the hive-progress run as one item, named by its title, with how many of its processes run', !!said && /Left running \((\d+) processes\)/.test(said[2]) && Number(/Left running \((\d+)/.exec(said[2])[1]) >= 2 && !/(hive|cw)-progress|cmd /.test(said[2]), text)
       const launch = await apiGet(`/v1/projects/site/agents/Website/launches/${encodeURIComponent(runId)}`)
       check('the Agent API says the launch the run was started in has ended', launch.body?.running === false, JSON.stringify(launch))

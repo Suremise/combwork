@@ -1,12 +1,12 @@
-// Hive's end-to-end suites (tests/e2e/<name>.cjs), for run.mjs, the affected-suite map and their tests.
+// Combwork's end-to-end suites (tests/e2e/<name>.cjs), for run.mjs, the affected-suite map and their tests.
 // needs: claude = starts the real Claude Code; codex = the signed-in test Codex home; packaged = dist/win-unpacked;
 // copilot = the installed Copilot CLI, offline against the scripted stand-in model (fake-copilot-api.cjs: no sign-in, no
 // cost), so it stays in the fake tier (the full set) and is skipped where Copilot isn't installed.
 // claudeHome: 'own' = its Claude Code runs in a home of its own with a made-up API key (no sign-in: the runner asks about none);
 // 'test' = in the signed-in Claude Code test home (CLAUDE_TEST_HOME, never the user's own), for suites that send prompts.
 // Every suite that starts the real Claude Code has one (#368): none runs in the user's ~/.claude (tests/e2esuites.test.ts).
-// noHive (with why): a real suite that runs its CLI without a test copy of Hive, so the run record has no version Hive
-// selected for it: npm run tested-clis requires it to pass, and takes the CLI's version from its suites that start Hive.
+// noHive (with why): a real suite that runs its CLI without a test copy of Combwork, so the run record has no version Combwork
+// selected for it: npm run tested-clis requires it to pass, and takes the CLI's version from its suites that start Combwork.
 // Suites that start a real CLI (claude, codex) share it with each other, so they run one at a time, in a lane beside
 // the others; those marked serial (with why) and the installer's run last, alone; every other suite is safe to run
 // beside others (its own profile, folders and Agent API port). Sorted by name, so suites added on different

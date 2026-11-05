@@ -54,7 +54,7 @@ describe('the run record says which real CLIs ran, as Hive selected them (#365)'
     expect(realCliVersions([...results, pass(both, [{ ...CLAUDE, version: '2.1.1' }, CODEX])], suites)).toEqual({ claude: ['2.1.1', '2.1.292'], codex: ['0.160.1'] })
     const clis = { claude: ['2.1.292'], codex: ['0.160.1', '0.161.0'] }
     const md = recordMarkdown({ code: 'abc', when: 'now', jobs: 4, results, logDir: 'x', summary: '3 passed', clis })
-    expect(md).toContain('Real CLIs (as Hive selected them): Claude Code 2.1.292, Codex 0.160.1 and 0.161.0.')
+    expect(md).toContain('Real CLIs (as Combwork selected them): Claude Code 2.1.292, Codex 0.160.1 and 0.161.0.')
     expect(recordMarkdown({ code: 'abc', when: 'now', jobs: 4, results: [pass('about')], logDir: 'x', summary: '1 passed' })).not.toContain('Real CLIs')
     const json = recordJson({ code: 'abc', when: 'now', results: [pass('a', [CLAUDE]), { name: 'b', ok: true, skipped: 'environment: usage limit', environment: true }], problems: ['code changed'], clis: { claude: ['2.1.292'] } })
     expect(json).toEqual({ code: 'abc', when: 'now', valid: false, problems: ['code changed'], clis: { claude: ['2.1.292'] }, results: [{ name: 'a', ok: true, skipped: null, environment: false, clis: [CLAUDE] }, { name: 'b', ok: true, skipped: 'environment: usage limit', environment: true, clis: [] }], notRun: [] })

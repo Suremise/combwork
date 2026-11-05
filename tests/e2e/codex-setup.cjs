@@ -1,4 +1,4 @@
-// The Codex sandbox "Set up" task: Hive opens Codex in a task terminal and brings up its sandbox setup
+// The Codex sandbox "Set up" task: Combwork opens Codex in a task terminal and brings up its sandbox setup
 // prompt (through /permissions, as no sandbox is set up yet). Uses a copy of the test home's sign-in with no
 // sandbox configured. Only looks at the prompt Codex shows; never chooses an option (the admin one needs the user).
 const lib = require('./lib.cjs')
@@ -36,7 +36,7 @@ const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${
   check('Codex opened without a trust prompt', !/Trust this folder/.test(text))
   check('Codex shows its sandbox setup prompt', /Set up default sandbox/i.test(text) && /non-admin sandbox/i.test(text), text.slice(-400))
   check('no unrecognized command', !/Unrecognized command/i.test(text))
-  // Codex stays open after the setup; Hive closes it once the config names a sandbox. Stands in for Codex
+  // Codex stays open after the setup; Combwork closes it once the config names a sandbox. Stands in for Codex
   // finishing (the real setup needs the user) by writing what Codex writes.
   fs.writeFileSync(path.join(home, 'config.toml'), '[windows]\nsandbox = "unelevated"\n')
   let closed = false
@@ -44,7 +44,7 @@ const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${
     await sleep(1000) // The poll interval of the loop around it, which waits for a condition (not a fixed wait).
     closed = (await inv('pty:buffer', key)) === ''
   }
-  check('Hive closes Codex once the sandbox is set up', closed)
+  check('Combwork closes Codex once the sandbox is set up', closed)
   if (!closed) await inv('pty:kill', key)
   await lib.until(async () => (await inv('pty:buffer', key).catch(() => '')) === '', 10000)
   await app.close()

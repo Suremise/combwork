@@ -1,7 +1,7 @@
 // Overview tab: the session details' agent picker and the compaction history, a data table (#124): pages, rows per
 // page, a trigger filter and a text filter (no matches: Clear filters), sorting by a header, and a row opening its
 // compaction in the Sessions tab at its divider; a compaction after a big turn says so (#154). In a throwaway profile
-// and workspace. Transcripts are Hive backups (.combwork/sessions); no agent is started.
+// and workspace. Transcripts are Combwork backups (.combwork/sessions); no agent is started.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -53,7 +53,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   const alpha = await lib.addAgent(inv, proj, { name: 'Alpha' })
   const beta = await lib.addAgent(inv, proj, { name: 'Beta' })
   const t = '2026-09-29T09:00:00.000Z'
-  // Hive has read the project's records: they are replaced in the workspace's database (#1061).
+  // Combwork has read the project's records: they are replaced in the workspace's database (#1061).
   putSessions(proj, { version: 1, sessions: [
     { id: A, agent: 'claude-code', agentId: alpha.id, name: 'Alpha work', createdAt: t, lastActiveAt: t, archived: false },
     { id: B, agent: 'claude-code', agentId: beta.id, name: 'Beta work', createdAt: t, lastActiveAt: '2026-09-29T10:00:00.000Z', archived: false }

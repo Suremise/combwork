@@ -1,12 +1,12 @@
-// One notification system (HI-2320): each event is told exactly once, in one place, and is in the bell. While a Hive
+// One notification system (HI-2320): each event is told exactly once, in one place, and is in the bell. While a Combwork
 // window is focused, an agent finishing, an agent waiting for you, and an agent's warning or result (cw_notify) are
-// each one entry: one pop-up, one bell row, no Windows notification. With Hive in the background, the agent's finish and
-// wait are one Windows notification and one quiet bell row, never a pop-up; Hive's own messages (a warning) wait as a
+// each one entry: one pop-up, one bell row, no Windows notification. With Combwork in the background, the agent's finish and
+// wait are one Windows notification and one quiet bell row, never a pop-up; Combwork's own messages (a warning) wait as a
 // pop-up in the window, its clock paused. A focus change while finishes are being collected decides where their group
 // goes. A waiting agent's entry says Answered once it no longer asks, and a newer ask is its own entry, untouched by the
 // older one's answer. The test copy runs quiet and records each entry it tells and each Windows notification it would
 // show (HIVE_TEST_NOTIFY_LOG); the window's focus is stubbed. Fake Claude Code; throwaway profile and workspace.
-// Kinds routed by main alone (plan usage, a lane's notice, a long conversation, an update, Hive closing) are covered by
+// Kinds routed by main alone (plan usage, a lane's notice, a long conversation, an update, Combwork closing) are covered by
 // tests/notify.test.ts, which runs the same table and tell().
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -71,7 +71,7 @@ const check = (name, ok, extra = '') => {
     const log = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
     const bell = () => page.evaluate(() => window.__hiveBell())
     const popupTexts = () => page.locator('.popups .popup').allInnerTexts()
-    /** Everything Hive did for one event, found by its title: entries told, Windows notifications, bell rows, pop-ups. */
+    /** Everything Combwork did for one event, found by its title: entries told, Windows notifications, bell rows, pop-ups. */
     const told = async (title) => {
       const entries = log().filter((e) => e.kind === 'entry' && e.title.includes(title))
       return {
@@ -109,7 +109,7 @@ const check = (name, ok, extra = '') => {
     await lib.until(async () => (await status()) === 'finished', HUNG_MS)
     await lib.until(async () => (await page.locator('.popups .popup').count()) === 0, HUNG_MS)
 
-    // --- In the background: agents' news is one Windows notification and a quiet bell row; Hive's own warning waits.
+    // --- In the background: agents' news is one Windows notification and a quiet bell row; Combwork's own warning waits.
     await setFocus(false)
     const before = log().filter((e) => e.kind === 'notification').length
     await send('go work 1')
@@ -118,7 +118,7 @@ const check = (name, ok, extra = '') => {
       return t.windows === 1 && t.entries.filter((r) => r === 'windows').length === 1 && t.bell.filter((b) => b === 'quiet').length === 1 && t.popups === 0
     }, HUNG_MS)), JSON.stringify(await told(finishTitle)))
     check('cw_notify warning accepted in the background', (await notifyApi({ title: 'Hooks are quiet', level: 'warning', source: alpha })) === 200)
-    check('…Hive\'s own warning: a pop-up that waits in the window, no Windows notification', !!(await lib.until(async () => same(await told('Hooks are quiet'), { entries: ['popup'], windows: 0, bell: ['shown'], popups: 1 }), HUNG_MS)))
+    check('…Combwork\'s own warning: a pop-up that waits in the window, no Windows notification', !!(await lib.until(async () => same(await told('Hooks are quiet'), { entries: ['popup'], windows: 0, bell: ['shown'], popups: 1 }), HUNG_MS)))
     await lib.sleep(3500) // A fixed wait on purpose: longer than its 2 s, to show it does NOT close while the window is in the background.
     check('…still there while the window is in the background', (await told('Hooks are quiet')).popups === 1)
     await setFocus(true)

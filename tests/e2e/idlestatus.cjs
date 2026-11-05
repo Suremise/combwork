@@ -1,7 +1,7 @@
 // An idle agent stays idle through what Claude Code does by itself (#612): a compaction while idle (shown as
 // "Compacting the conversation…", then idle again) and a recap (no change); and an agent whose turn's end never reached
-// Hive (its Stop lost, as HB3's was) is idle again once Claude Code says it is waiting for input (its idle_prompt
-// notification), the log saying what Hive saw. Each time it takes a new task (cw_prompt_agent refused "is working"
+// Combwork (its Stop lost, as HB3's was) is idle again once Claude Code says it is waiting for input (its idle_prompt
+// notification), the log saying what Combwork saw. Each time it takes a new task (cw_prompt_agent refused "is working"
 // before). The agent runs the fake Claude Code (fake-claude/), so nothing signs in or spends tokens. Dev build,
 // throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -106,7 +106,7 @@ const check = (name, ok, extra = '') => {
   check('it is idle again once the compaction is over', after?.status === 'ready' && !after.statusMessage, JSON.stringify(after && { status: after.status, message: after.statusMessage }))
   check('and takes a task', (await task('work 1')).status === 200)
 
-  // A recap: Claude Code writes it by itself, and sends no hook of Hive's.
+  // A recap: Claude Code writes it by itself, and sends no hook of Combwork's.
   made('fake-recap-Tester')
   const recapped = await until(async () => {
     const s = await live(alpha, id)
@@ -115,9 +115,9 @@ const check = (name, ok, extra = '') => {
   check('a recap leaves it idle', recapped?.status === 'finished', JSON.stringify(recapped && { status: recapped.status, message: recapped.statusMessage }))
   check('and it takes a task', (await task('work 1')).status === 200)
 
-  // A turn whose Stop never reaches Hive: working, until Claude Code says it is waiting for input.
+  // A turn whose Stop never reaches Combwork: working, until Claude Code says it is waiting for input.
   const lost = await api('POST', '/v1/projects/alpha/agents/Tester/prompt', { text: 'work 1 loststop' })
-  check('a task whose turn end Hive misses', lost.status === 200, JSON.stringify(lost.body))
+  check('a task whose turn end Combwork misses', lost.status === 200, JSON.stringify(lost.body))
   const idleAgain = await until(async () => {
     const s = await live(alpha, id)
     return transcriptHas(s, 'Done: work 1 loststop') && s.status === 'ready' && s
@@ -125,7 +125,7 @@ const check = (name, ok, extra = '') => {
   check("it is idle again once Claude Code says it's waiting for input", idleAgain?.status === 'ready', JSON.stringify(idleAgain && { status: idleAgain.status }))
   const logFile = path.join(userData, 'logs', 'hive.log')
   const said = await until(() => fs.existsSync(logFile) && /idle at its prompt while Hive showed it working; idle again \(hooks before: .*prompt/.test(fs.readFileSync(logFile, 'utf8')), HUNG_MS)
-  check('the log says what Hive saw before', !!said)
+  check('the log says what Combwork saw before', !!said)
   check('and it takes a task', (await task('work 1')).status === 200)
   const done = await live(alpha, id)
   check('which it finishes', done?.status === 'finished', done?.status)

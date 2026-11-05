@@ -1,9 +1,9 @@
-// S28 (#1347, SPEC §16.9.3): two Hives merge into one repository at once, and one waits on the repository lock. Two
-// test Hives (their own profiles and ports) each have a project in the same repository: A's the main checkout, B's a
+// S28 (#1347, SPEC §16.9.3): two copies of Combwork merge into one repository at once, and one waits on the repository lock. Two
+// test copies (their own profiles and ports) each have a project in the same repository: A's the main checkout, B's a
 // linked worktree of it, so they share its common git dir and so its lock. A git hook holds A's merge (the lock taken)
-// until the test lets it go: B's merge waits, its window saying which Hive holds the repository, and merges once A's is
+// until the test lets it go: B's merge waits, its window saying which Combwork holds the repository, and merges once A's is
 // done. With B's wait (Settings → Advanced) cut to 1 s, B gives up, changing nothing and naming A. Dev build, fake tier.
-// Dev build only (#1580): each Hive's agent is a 0.9 worktree agent (agents:testLegacy, refused by a packaged build),
+// Dev build only (#1580): each Combwork's agent is a 0.9 worktree agent (agents:testLegacy, refused by a packaged build),
 // with a commit on its branch to merge (S28 isn't one of the packaged checks).
 const lib = require('./lib.cjs')
 const fs = require('fs')

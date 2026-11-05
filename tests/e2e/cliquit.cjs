@@ -1,6 +1,6 @@
-// The real CLIs end by themselves on the exit command Hive types at a lane's end (HI-1706, sessions.quit): Claude Code
+// The real CLIs end by themselves on the exit command Combwork types at a lane's end (HI-1706, sessions.quit): Claude Code
 // on /exit and Codex on /quit, each typed into the CLI at its prompt (through slots:test's quit, the lane end's own
-// call), exit with code 0, and Hive never kills them. No prompt is sent: Claude Code runs in a home of the suite's own
+// call), exit with code 0, and Combwork never kills them. No prompt is sent: Claude Code runs in a home of the suite's own
 // with a made-up API key (lib.ownClaudeHome, no sign-in), Codex in the Codex test home in a folder trusted there.
 // Throwaway profile and workspace. Dev build only: slots:test is refused by a packaged build.
 const lib = require('./lib.cjs')
@@ -50,7 +50,7 @@ const check = (name, ok, extra = '') => {
       if (c.provider === 'claude-code') await lib.acceptClaudeTrust(inv, proj, agent.id)
       const ready = await lib.until(async () => (await live(agent.id))?.status === 'ready', HUNG_MS, 300)
       check(`${c.name} starts and is at its prompt`, !!ready, lib.plainText(await inv('pty:buffer', key).catch(() => '')).slice(-400))
-      // Its hive tools connected: Hive types nothing into a CLI before then (sessions.hiveToolsSettled).
+      // Its hive tools connected: Combwork types nothing into a CLI before then (sessions.hiveToolsSettled).
       await lib.until(() => lib.hiveToolsConnected(userData, agent.id), HUNG_MS, 300)
       const version = (await live(agent.id))?.cliVersion ?? null
       const since = Math.max(0, lib.hiveLogLines(userData).length - 1) // the last element is the empty one after the final newline

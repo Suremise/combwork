@@ -1,7 +1,7 @@
-// Release Slot through the Agent API and the Hive Assistant (#1561, SPEC §16.10.3): B1's card is lent slot-a, whose
-// writer is planted as a run of a Hive that has gone (`slots:test` writer, a process that has ended); B2, a 0.9 agent,
+// Release Slot through the Agent API and the Combwork Assistant (#1561, SPEC §16.10.3): B1's card is lent slot-a, whose
+// writer is planted as a run of a Combwork that has gone (`slots:test` writer, a process that has ended); B2, a 0.9 agent,
 // has its worktree carried as hb2. On the fake Claude Code, the Agent API on:
-// 1. GET …/slots/releasable lists hb2 (kept for B2) and slot-a (held by B1's ended run, its Hive gone), for a script
+// 1. GET …/slots/releasable lists hb2 (kept for B2) and slot-a (held by B1's ended run, its Combwork gone), for a script
 //    and for a project agent of the project.
 // 2. Releasing is refused (403) to a project agent and a script, and to the Assistant at Look and advise: nothing changes.
 // 3. The Assistant at Control agents: a writer's release without the user's confirmation (400) or naming another run
@@ -86,13 +86,13 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     check("B2's 0.9 worktree carried as its slot hb2", carried?.kind === 'carried', JSON.stringify(carried))
     const l12 = await op({ op: 'lend', agent: b1.id, card: 12 })
     check("B1's card #12 is lent slot-a", l12?.ok && l12.slot.name === 'slot-a', JSON.stringify(l12))
-    // slot-a's writer: a run of B1's in a Hive whose process has ended (a crash), never this Hive.
+    // slot-a's writer: a run of B1's in a Combwork whose process has ended (a crash), never this Combwork.
     const gone = spawnSync(process.execPath, ['-e', ''], { env: runContext.baseEnv() }).pid
-    check("slot-a's writer planted: B1's run in a Hive that has gone", (await op({ op: 'writer', slot: 'slot-a', agent: b1.id, run: 'r-crashed', pid: gone, started: 1 })) === true)
+    check("slot-a's writer planted: B1's run in a Combwork that has gone", (await op({ op: 'writer', slot: 'slot-a', agent: b1.id, run: 'r-crashed', pid: gone, started: 1 })) === true)
 
     // --- 1. What there is to release, for a script and for a project agent of the project.
     const listed = await releasable()
-    check('GET releasable: hb2 kept for B2, slot-a held by B1\'s ended run (its Hive gone, nothing known of its processes)', listed.status === 200 && JSON.stringify(listed.body?.carried) === JSON.stringify([{ slot: 'hb2', agent: 'B2' }]) && listed.body?.held?.length === 1 && listed.body.held[0].slot === 'slot-a' && listed.body.held[0].agent === 'B1' && listed.body.held[0].run === 'r-crashed' && listed.body.held[0].hive === `gone (process ${gone})` && listed.body.held[0].processes === null, JSON.stringify(listed.body))
+    check('GET releasable: hb2 kept for B2, slot-a held by B1\'s ended run (its Combwork gone, nothing known of its processes)', listed.status === 200 && JSON.stringify(listed.body?.carried) === JSON.stringify([{ slot: 'hb2', agent: 'B2' }]) && listed.body?.held?.length === 1 && listed.body.held[0].slot === 'slot-a' && listed.body.held[0].agent === 'B1' && listed.body.held[0].run === 'r-crashed' && listed.body.held[0].hive === `gone (process ${gone})` && listed.body.held[0].processes === null, JSON.stringify(listed.body))
     await inv('session:start', alpha, { agentId: r1.id })
     const r1Token = await tokenOf(r1.id)
     check('R1 (a project agent) has its token', !!r1Token)

@@ -1,4 +1,4 @@
-// The merge queue's e2e fixture (#1348; later P5 suites add helpers here only): a git project set to "Hive merges" into
+// The merge queue's e2e fixture (#1348; later P5 suites add helpers here only): a git project set to "Combwork merges" into
 // `integration` (a branch checked out in no folder, as #1348's advance needs; the project folder stays on main), with one
 // merge check whose behaviour a test steers from outside the repository, fake Claude Code agents acting by their own
 // tokens (a builder per card, or one for many, each card on the slot its start lends: no 0.9 worktree agents, #1578; one
@@ -69,13 +69,13 @@ function steer(fx, mode, say, maxMs) {
 }
 
 /**
- * The options "Hive merges" into integration, with the one merge check (G9), set as the project's (no preset: #1355's).
- * Hive's commit message chosen (G19: the branch's own is every preset's since HI-1997), so each merge names its card.
+ * The options "Combwork merges" into integration, with the one merge check (G9), set as the project's (no preset: #1355's).
+ * Combwork's commit message chosen (G19: the branch's own is every preset's since HI-1997), so each merge names its card.
  */
 const queueOptions = (fx, over = {}) => ({ review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'integration', style: 'merge', commitMessage: 'hive', preChecks: [], mergeChecks: ['quick'], commands: { quick: `"${fx.tool}"` }, identity: fx.identity, okBefore: { mode: 'never', labels: [] }, ...over })
 
 /**
- * Launches Hive on the fixture (its profile, a port, CLAUDE_CONFIG_DIR) and opens the workspace; sets the options
+ * Launches Combwork on the fixture (its profile, a port, CLAUDE_CONFIG_DIR) and opens the workspace; sets the options
  * unless `keepOptions`. The page's helpers: inv, card, facts, kinds.
  */
 async function startHive(fx, { port, env = {}, keepOptions = false } = {}) {
@@ -103,7 +103,7 @@ async function agent(fx, h, name, { worktree = false, project = fx.alpha } = {})
   const a = await lib.addAgent(h.inv, project, { name, ...(worktree ? { location: 'new-worktree' } : {}) })
   const folder = a.worktree?.path ?? project
   // The fake trusts the folders it is told of (its trust prompt never shows), the project's slots too (#1567): an agent
-  // left at the prompt in one is never quiet, so Hive never prepares its next card's slot.
+  // left at the prompt in one is never quiet, so Combwork never prepares its next card's slot.
   const slotRoot = path.join(`${fx.ws}.worktrees`, path.basename(project))
   const slots = 'abcdefgh'.split('').map((x) => path.join(slotRoot, `slot-${x}`).toLowerCase())
   const trusted = path.join(fx.claudeHome, 'fake-trusted.json')
@@ -117,7 +117,7 @@ async function agent(fx, h, name, { worktree = false, project = fx.alpha } = {})
 
 /**
  * The live session's own launch and its token (#1615): the launch of the run live now (its private folder is named by
- * the run), read inside the wait. A run Hive ends meanwhile (superseded: a resumed session keeps its id) has its folder
+ * the run), read inside the wait. A run Combwork ends meanwhile (superseded: a resumed session keeps its id) has its folder
  * removed with its mcp.json, so a read after the wait failed (ENOENT); here the next poll reads the run live then.
  * `where` narrows the live session (in a folder); `stale`, a token an earlier run had, is passed over until a new run's
  * comes: { launch, token }, or null if none came.
@@ -141,7 +141,7 @@ async function liveToken(fx, live, where = () => true, stale = null) {
 }
 
 /**
- * An agent Hive gave a new conversation (HI-2232: a lane recorded for an idle builder outside slots restarts it, now or
+ * An agent Combwork gave a new conversation (HI-2232: a lane recorded for an idle builder outside slots restarts it, now or
  * once it is free): the new run's token, as each launch has its own (the earlier one's is refused). `project`: the
  * agent's. The agent with it, or with a null token if no new run came.
  */
@@ -152,8 +152,8 @@ async function renewed(fx, h, a, project = fx.alpha) {
 }
 
 /**
- * An agent added before (`agent`), started again in a new run of Hive (#1351: suites that restart Hive reuse their
- * agents, under the project's agent limit): its token, which each launch has its own of. Slots held by the run of a Hive
+ * An agent added before (`agent`), started again in a new run of Combwork (#1351: suites that restart Combwork reuse their
+ * agents, under the project's agent limit): its token, which each launch has its own of. Slots held by the run of a Combwork
  * that ended at a seam are released first (`releaseHeld`).
  */
 async function rejoin(fx, h, a) {
@@ -166,7 +166,7 @@ async function rejoin(fx, h, a) {
 }
 
 /**
- * Release Slot… on each slot whose writer is held (#1434, #1506): a builder's run in a Hive that ended without quitting
+ * Release Slot… on each slot whose writer is held (#1434, #1506): a builder's run in a Combwork that ended without quitting
  * (a seam) keeps its slot until the user releases it, and with one builder the pool soon has no free slot. What the user
  * does after such an end; the queue's own recovery doesn't depend on it. Returns the slots released.
  */
@@ -175,7 +175,7 @@ async function releaseHeld(fx, h) {
   for (const s of await h.inv('slots:list', fx.alpha)) {
     if (!s.writer?.held) continue
     const w = await h.inv('slots:heldWriter', fx.alpha, s.name)
-    // Refused as changed meanwhile: Hive may have freed it itself since it was read (HI-2055: a gone Hive's writer whose
+    // Refused as changed meanwhile: Combwork may have freed it itself since it was read (HI-2055: a gone Combwork's writer whose
     // run left nothing running), which is what the release was for (HI-2177): only once a read shows that run no longer
     // holds it. Still held by that run: the release's own failure; the read failing: its error (HR2's round 1).
     if (w) await h.inv('slots:releaseWriter', fx.alpha, s.name, w.run, false).catch(async (e) => {
@@ -191,7 +191,7 @@ const sameDir = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.r
 
 /**
  * A card started by its builder as 1.0 builds it (#1567, SPEC §16.10): in the folder the start names (a slot lent for it),
- * once Hive has made its line there, the builder followed into it. Hive starts the builder again there in a new
+ * once Combwork has made its line there, the builder followed into it. Combwork starts the builder again there in a new
  * conversation unless it already works there, and each launch has its own token: `builder`'s folder and token become
  * that launch's. Returns the start's { status, body }.
  */
@@ -201,11 +201,11 @@ async function startCard(fx, h, builder, n) {
   let start = null
   // No slot free yet (the last card's: its builder's session there just ended with its lease, until its processes are
   // known to have ended): as an agent told "Wait for a slot to be free", started again once one is (a few times at most).
-  // A start sent as Hive stops it (401, its token ended with that session): once it has, started again.
+  // A start sent as Combwork stops it (401, its token ended with that session): once it has, started again.
   for (let tries = 0; tries < 4 && (!start || start.status === 401 || start.body?.rule === 'start.slotAvailable'); tries++) {
     if (start?.status === 401) await lib.until(async () => !(await live()), HUNG_MS, 200)
     else if (start) await lib.until(free, HUNG_MS, 200)
-    // Stopped by Hive meanwhile (its session ended with its slot's lease, as a card's Done or its recovery after a seam
+    // Stopped by Combwork meanwhile (its session ended with its slot's lease, as a card's Done or its recovery after a seam
     // ends it): started again, with its new launch's token.
     if (!(await live())) Object.assign(builder, await rejoin(fx, h, builder))
     start = await intent(h, builder, n, 'start')
@@ -252,7 +252,7 @@ async function intent(h, who, n, name, body = {}) {
 }
 
 /**
- * A card taken to approved, so Hive queues it: a new builder in the project folder (#1578: 1.0 adds no worktree agents)
+ * A card taken to approved, so Combwork queues it: a new builder in the project folder (#1578: 1.0 adds no worktree agents)
  * starts it on the slot its start lends (startCard), commits `files` there, submits; the reviewer starts its review and
  * passes it. Each card's builder has a slot of its own, as each had a worktree in 0.9. `opts.afterStart`: approveCard's.
  * Returns { n, builder, revision, steps } (each step's status; `builder.folder` its slot).
@@ -275,7 +275,7 @@ function commitOn(fx, branch, files, message) {
   return lib.git(fx.alpha, ['rev-parse', branch]).trim()
 }
 
-/** A hand merge of a revision into a branch checked out nowhere (someone merging outside Hive). */
+/** A hand merge of a revision into a branch checked out nowhere (someone merging outside Combwork). */
 function mergeOn(fx, branch, revision, message) {
   const tmp = lib.probeDir(`${fx.name}-merge`)
   const dir = path.join(tmp, 'wt')
@@ -286,7 +286,7 @@ function mergeOn(fx, branch, revision, message) {
 }
 
 /**
- * Whether a part needing one of the dev build's test seams runs (#1578): a packaged Hive (HIVE_EXE, the Sandbox checks)
+ * Whether a part needing one of the dev build's test seams runs (#1578): a packaged Combwork (HIVE_EXE, the Sandbox checks)
  * ignores HIVE_TEST_… and refuses the test channels, so there the part says NOT RUN and the suite's other checks stand.
  */
 function devSeam(what) {
@@ -316,7 +316,7 @@ async function openByTitle(page, n) {
 
 /**
  * Helpers for suites merging into `main` checked out in the project folder (#1351): the options, the folder's status
- * (tracked files only), Hive's merge commits of a card on main (never two), a file's text as written (any line ending),
+ * (tracked files only), Combwork's merge commits of a card on main (never two), a file's text as written (any line ending),
  * a card by its title, screenshots in both themes, and a card's For you section in its dialog.
  */
 function folderHelpers(fx) {
@@ -374,7 +374,7 @@ async function mergesTab(h, project = 'alpha') {
 }
 
 /**
- * Another Hive's profile on the fixture's workspace (#1358's queuelease: S50, two Hives on one hive.db), set up as
+ * Another Combwork's profile on the fixture's workspace (#1358's queuelease: S50, two copies on one hive.db), set up as
  * prepare sets the fixture's own: the fake Claude Code, quiet, the Agent API on. Returns the fixture with that profile,
  * for startHive.
  */

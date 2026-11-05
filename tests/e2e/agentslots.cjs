@@ -153,7 +153,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     check("B2's stopped pane: works in hb2, the slot kept for it", !!b2Says && !/own worktree/.test(b2Says), (await placeholder('B2').innerText().catch(() => '')) || JSON.stringify((await agentInfo(b2.id))?.place))
     await inv('session:stop', alpha, r1.id)
     check('R1 stops', !!(await until(async () => !(await live(r1.id)), HUNG_MS)))
-    // A pane whose session ended here keeps its terminal (the ended bar); after an upgrade Hive opens with none: open
+    // A pane whose session ended here keeps its terminal (the ended bar); after an upgrade Combwork opens with none: open
     // it again, as then, and read R1's pane.
     await h.app.close()
     h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT) }, viewport: { width: 1500, height: 900 } })
@@ -163,7 +163,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     await lib.fitWindow(h.app, again.page, { width: 1500, height: 900 })
     const placeholder2 = (name) => again.page.locator('.agent-pane', { has: lib.paneHeader(again.page, name) }).first().locator('.pane-placeholder')
     const r1Says = 'A new conversation starts in the project folder; Resume opens its last one in its old folder, hr1.'
-    check("R1, stopped, Hive opened again: its pane says a new conversation starts in the project folder, Resume in its old folder hr1", !!(await until(async () => (await placeholder2('R1').innerText().catch(() => '')).includes(r1Says), HUNG_MS)), await placeholder2('R1').innerText().catch(() => ''))
+    check("R1, stopped, Combwork opened again: its pane says a new conversation starts in the project folder, Resume in its old folder hr1", !!(await until(async () => (await placeholder2('R1').innerText().catch(() => '')).includes(r1Says), HUNG_MS)), await placeholder2('R1').innerText().catch(() => ''))
     check("…and not its 0.9 worktree", !/own worktree/.test(await placeholder2('R1').innerText().catch(() => '')))
     for (const theme of ['light', 'dark']) {
       await again.inv('settings:update', { appearance: { theme } })

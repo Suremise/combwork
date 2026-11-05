@@ -1,5 +1,5 @@
 // MCP catalogues (HI-545), in the window, from file:// catalogues on a throwaway share (no network: ours is off). The MCP
-// view's Catalogue lists each source as a category with the one-time note for a source Hive doesn't check; search and
+// view's Catalogue lists each source as a category with the one-time note for a source Combwork doesn't check; search and
 // the filter narrow it; a server's view shows its requirements checked; Install shows what it runs first and adds it
 // to the workspace added nowhere, its view opening for Add to…. A newer version is offered only after ↻ (the
 // catalogues aren't read otherwise), and Update says what changes and keeps the places it is added. Settings → MCP
@@ -70,7 +70,7 @@ function publish(dir, version, script, name = 'Test catalogue') {
     const row = (n) => page.locator(`.sidebar [data-catalog-server="${n}"]`)
     check('the Catalogue lists the source as a category with its servers', !!(await lib.until(async () => (await row('demo').count()) === 1 && (await row('mac-only').count()) === 1, HUNG_MS)) && (await page.locator('.sidebar .section-header', { hasText: 'Test catalogue' }).count()) === 1)
     check("…with the note that Combwork doesn't check its servers", (await page.locator('[data-catalog-unvetted]').count()) === 1)
-    check('…said once: remembered in Hive\'s settings', !!(await lib.until(async () => cfgNow().sources[0].noted === true, HUNG_MS)), JSON.stringify(cfgNow()))
+    check('…said once: remembered in Combwork\'s settings', !!(await lib.until(async () => cfgNow().sources[0].noted === true, HUNG_MS)), JSON.stringify(cfgNow()))
     check("mac-only says it can't run here", (await row('mac-only').innerText()).includes("Can't run here"))
     await page.locator('[data-catalog-filter]').selectOption('meets')
     check('Runs on this PC hides mac-only', !!(await lib.until(async () => (await row('mac-only').count()) === 0 && (await row('demo').count()) === 1, HUNG_MS)))

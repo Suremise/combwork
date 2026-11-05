@@ -61,7 +61,7 @@ const check = (name, ok, extra = '') => {
   }
   check('a turn ends', !!(await turn('hello')), JSON.stringify(await live()))
   const told = await lib.until(async () => ((await warnings()).length ? await warnings() : null), 10000)
-  check('…and Hive warns of the stray .codex folder, naming it and what it holds', told?.length === 1 && told[0].includes(path.join(alpha, '.codex')) && told[0].includes('scratch'), (told ?? []).join(' | '))
+  check('…and Combwork warns of the stray .codex folder, naming it and what it holds', told?.length === 1 && told[0].includes(path.join(alpha, '.codex')) && told[0].includes('scratch'), (told ?? []).join(' | '))
   await page.screenshot({ path: path.join(lib.WORK, 'codexfolder-warning.png') })
   check('another turn ends', !!(await turn('again')), JSON.stringify(await live()))
   await new Promise((r) => setTimeout(r, 1000))

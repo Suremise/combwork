@@ -1,10 +1,10 @@
-// A CLI installed while Hive runs is found without a restart (#472). The test copy starts with a PATH holding no Codex
+// A CLI installed while Combwork runs is found without a restart (#472). The test copy starts with a PATH holding no Codex
 // (the run context's, without the folders that have one) and a stand-in for the registry's PATH
 // (HIVE_TEST_REGISTRY_PATH: test copies never read the machine's). Then the suite "installs" the fake Codex as an
-// installer does: a folder of its own with codex.cmd, added to the registry's PATH (the stand-in, changed in Hive's main
-// process while it runs). Provider Setup's Check again finds it there (via PATH), Hive's own PATH has the folder, and a new
+// installer does: a folder of its own with codex.cmd, added to the registry's PATH (the stand-in, changed in Combwork's main
+// process while it runs). Provider Setup's Check again finds it there (via PATH), Combwork's own PATH has the folder, and a new
 // Codex agent starts with it, its session's PATH holding the folder too. Then a tool is "installed" the same way with no
-// Check again (#821): a Sign in task's terminal and the agent started again after it get its folder, as Hive reads the
+// Check again (#821): a Sign in task's terminal and the agent started again after it get its folder, as Combwork reads the
 // registry's PATH before it starts a process. No real CLI is installed: the fake Codex is tests/e2e/fake-codex.
 // Throwaway profile, workspace and CODEX_HOME; quiet.
 const lib = require('./lib.cjs')
@@ -16,7 +16,7 @@ const ws = path.join(lib.WORK, 'freshpath-ws')
 const codexHome = path.join(lib.WORK, 'freshpath-codex-home')
 // The "install" folder, with codex.cmd (a one-line launcher, as npm makes) and its script.
 const bin = path.join(lib.WORK, 'freshpath-bin')
-// A tool's folder, installed later outside Hive (#821).
+// A tool's folder, installed later outside Combwork (#821).
 const tool = path.join(lib.WORK, 'freshpath-tool')
 const seen = path.join(lib.WORK, 'freshpath-seen.jsonl')
 const alpha = path.join(ws, 'alpha')
@@ -65,11 +65,11 @@ function pathWithoutCodex() {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   const codexInfo = async () => (await inv('provider:info')).codex
   const before = await codexInfo()
-  // Where Codex is installed on this machine, Hive still finds that one (its standalone or npm folder): not this one.
-  check('before the install, Hive has not found this Codex', before.path !== path.join(bin, 'codex.cmd'), JSON.stringify({ path: before.path, source: before.source }))
+  // Where Codex is installed on this machine, Combwork still finds that one (its standalone or npm folder): not this one.
+  check('before the install, Combwork has not found this Codex', before.path !== path.join(bin, 'codex.cmd'), JSON.stringify({ path: before.path, source: before.source }))
   if (!before.found) check('…and says Codex is not installed', (before.readiness ?? []).some((r) => r.id === 'not-installed'), JSON.stringify(before.readiness))
 
-  // --- The install: the folder goes on the registry's PATH, not on Hive's.
+  // --- The install: the folder goes on the registry's PATH, not on Combwork's.
   await app.evaluate((_, dir) => {
     process.env.HIVE_TEST_REGISTRY_PATH = dir
   }, bin)
@@ -87,13 +87,13 @@ function pathWithoutCodex() {
     const i = await codexInfo()
     return !i.checking && i.path === path.join(bin, 'codex.cmd') ? i : null
   }, 30000)
-  check('Check again finds the new Codex on the PATH, without restarting Hive', !!after && after.source === 'PATH' && after.version === VERSION, JSON.stringify(after ?? (await codexInfo())))
+  check('Check again finds the new Codex on the PATH, without restarting Combwork', !!after && after.source === 'PATH' && after.version === VERSION, JSON.stringify(after ?? (await codexInfo())))
   check('…and it is ready (installed)', !!after && !(after.readiness ?? []).some((r) => r.id === 'not-installed'), JSON.stringify(after?.readiness))
   const shows = await lib.until(async () => (await setup.innerText()).includes(`Codex ${VERSION}`), 10000)
   check('Provider Setup shows it found, via PATH', !!shows && (await setup.innerText()).includes('found via PATH'), (await setup.innerText()).slice(0, 300))
   await page.screenshot({ path: path.join(lib.WORK, 'freshpath-setup.png') })
   const hivePath = await app.evaluate(() => process.env.PATH ?? process.env.Path ?? '')
-  check("Hive's own PATH has the folder, after its own folders", hivePath.toLowerCase().endsWith(bin.toLowerCase()) && hivePath.toLowerCase().startsWith(hidden.split(path.delimiter)[0].toLowerCase()), hivePath.slice(-200))
+  check("Combwork's own PATH has the folder, after its own folders", hivePath.toLowerCase().endsWith(bin.toLowerCase()) && hivePath.toLowerCase().startsWith(hidden.split(path.delimiter)[0].toLowerCase()), hivePath.slice(-200))
   await setup.locator('button', { hasText: 'Close' }).click()
 
   // --- A new agent uses it, with the new PATH.
@@ -108,8 +108,8 @@ function pathWithoutCodex() {
   check("…and its session's PATH has the new folder", session.length > 0 && session.every((r) => r.hasBin), JSON.stringify(runs().slice(n)))
   check('…but not a folder not installed yet', session.every((r) => !r.hasTool), JSON.stringify(runs().slice(n)))
 
-  // --- A tool installed later, outside Hive (#821): its folder goes on the registry's PATH, and nothing makes Hive
-  // look for the CLIs again. What Hive starts from now on has it.
+  // --- A tool installed later, outside Combwork (#821): its folder goes on the registry's PATH, and nothing makes Combwork
+  // look for the CLIs again. What Combwork starts from now on has it.
   await app.evaluate((_, dirs) => {
     process.env.HIVE_TEST_REGISTRY_PATH = dirs
   }, [bin, tool].join(';'))

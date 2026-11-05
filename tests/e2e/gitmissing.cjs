@@ -1,7 +1,7 @@
 // Git missing (#346): a test copy whose PATH has no git (through the run context's environment, never the machine's)
 // says so wherever git matters, never "not a git repository": Provider Setup's Git row (Git not found, with the fix and
 // Git for Windows), the status bar, the Changes tab, the Merge dialog. Remove All's opt-in deletion keeps the worktree, with the reason. A repository with a worktree agent, made
-// with the suite's own git before Hive starts. Throwaway profile and workspace, quiet; no agent is started.
+// with the suite's own git before Combwork starts. Throwaway profile and workspace, quiet; no agent is started.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -56,7 +56,7 @@ function pathWithoutGit() {
     const t = await inv('git:tool', true)
     return t.state === 'missing' ? t : null
   }, 15000)
-  check('Hive finds git missing', !!tool, JSON.stringify(await inv('git:tool')))
+  check('Combwork finds git missing', !!tool, JSON.stringify(await inv('git:tool')))
   const item = page.locator('.statusbar .status-item.warn', { hasText: 'Git' })
   check('the status bar shows it', !!(await lib.until(async () => (await item.count()) === 1, 10000)))
 

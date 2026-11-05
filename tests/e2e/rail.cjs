@@ -99,7 +99,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('kept after reload', (await sbWidth()) === 48)
 
   // Count badges and status dots stick out of the tiles: fully visible (outline included) inside the scrolling list,
-  // and a badge clear of the dot of the tile above, at the zoom levels Hive offers and with a two-digit count.
+  // and a badge clear of the dot of the tile above, at the zoom levels Combwork offers and with a two-digit count.
   await page.evaluate(() => {
     document.querySelectorAll('.rail-project').forEach((t, i) => {
       const b = document.createElement('span')

@@ -57,9 +57,9 @@ const sessionsIn = (host, ids) => {
 }
 sessionsIn(path.join(ws, 'alpha'), ['66666666-aaaa-bbbb-cccc-000000000001', '66666666-aaaa-bbbb-cccc-000000000002'])
 sessionsIn(path.join(ws, '.combwork', 'assistant'), ['66666666-aaaa-bbbb-cccc-000000000003'])
-// One loss Hive couldn't attribute to a project (its bookkeeping was full), in alpha's hour.
+// One loss Combwork couldn't attribute to a project (its bookkeeping was full), in alpha's hour.
 Object.assign(buckets[1], { dropped: 1, droppedBy: { '\u0000untracked': 1 } })
-// Observed: around the older work, then the last day with a 4-hour gap (Hive closed) 10 to 6 hours ago.
+// Observed: around the older work, then the last day with a 4-hour gap (Combwork closed) 10 to 6 hours ago.
 const observed = [
   [now - 3 * 24 * HOUR - HOUR, now - 3 * 24 * HOUR + 2 * HOUR],
   [now - 26 * HOUR, now - 10 * HOUR],
@@ -143,7 +143,7 @@ const check = (name, ok, extra = '') => {
   const guidanceTable = page.locator('.performance-page:visible .table-wrap', { has: page.locator('th', { hasText: 'Core' }) }).filter({ has: page.locator('th', { hasText: 'Workflow role' }) })
   const toolTable = page.locator('.performance-page:visible .table-wrap', { has: page.locator('th', { hasText: 'Descriptions' }) })
   const toolRow = async () => ((await toolTable.locator('tbody tr').allInnerTexts()).join('|')).replace(/\s+/g, ' ')
-  check('the Hive tool list a start, by workflow role, in its parts (HI-2063)', (await toolTable.count()) === 1 && /Builder 2 40 50,000 20,000 8,000 22,000/.test(await toolRow()), await toolRow())
+  check('the Combwork tool list a start, by workflow role, in its parts (HI-2063)', (await toolTable.count()) === 1 && /Builder 2 40 50,000 20,000 8,000 22,000/.test(await toolRow()), await toolRow())
   check('…and each launch’s workflow role (HI-2049)', (await guidanceTable.count()) === 1 && (await guidanceTable.locator('tbody tr', { hasText: 'Builder' }).count()) >= 1, (await page.locator('.table-wrap th').allInnerTexts()).join('|'))
   check('cancelled requests are shown apart from failures', /cancelled/.test(await page.locator('.performance-page:visible .card', { hasText: 'API requests' }).innerText()))
   await shot('wide-dark')
@@ -167,7 +167,7 @@ const check = (name, ok, extra = '') => {
   await routes7.locator('th button', { hasText: 'p95' }).click()
   check('…fastest first: it comes last', (await routeOrder()).at(-1) === '/v1/projects', JSON.stringify(await routeOrder()))
   await routes7.locator('th button', { hasText: 'p95' }).click()
-  check('…and says history Hive removed for space is unavailable', /removed to keep the metrics file under its size limit/.test(await page.locator('.perf-coverage').innerText()), await page.locator('.perf-coverage').innerText())
+  check('…and says history Combwork removed for space is unavailable', /removed to keep the metrics file under its size limit/.test(await page.locator('.perf-coverage').innerText()), await page.locator('.perf-coverage').innerText())
   await page.locator('.performance-page:visible .segmented button', { hasText: '24 hours' }).click()
   await until(async () => (await requests()) === '47', HUNG_MS)
 

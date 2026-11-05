@@ -1,7 +1,7 @@
 // A window whose page crashes is reloaded, its terminals reattach and the agents keep running; a second crash
-// within a minute asks instead (Reload / Open Logs / Quit Hive); a hang offers Wait / Reload, and recovering
+// within a minute asks instead (Reload / Open Logs / Quit Combwork); a hang offers Wait / Reload, and recovering
 // dismisses that. Native dialogs are stubbed in the test build's main process. Crashes only this test build's
-// page (forcefullyCrashRenderer), never another Hive. The agent is the fake Claude Code. Dev build, throwaway
+// page (forcefullyCrashRenderer), never another Combwork. The agent is the fake Claude Code. Dev build, throwaway
 // profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')

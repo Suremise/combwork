@@ -1,8 +1,8 @@
 // Maximum agents (HI-2001), on fake Claude Code with no agent started: Agents per project from before (advanced.json's
-// 16, the workspace's own 5) becomes Hive's and the workspace's Maximum agents, and leaves advanced.json. A project on
+// 16, the workspace's own 5) becomes Combwork's and the workspace's Maximum agents, and leaves advanced.json. A project on
 // Solo (Maximum agents 1, one agent): the Agent API's add is refused (409), naming Maximum agents and where the user
 // raises it; the user's own too (HI-2058): + Add ▾'s entries greyed out with why, the shortcut's warning linking to
-// Version Control → Workflow. Hive's Team 6 + pool loaded by hand into it: with its workflow, the dialog says its 8 is
+// Version Control → Workflow. Combwork's Team 6 + pool loaded by hand into it: with its workflow, the dialog says its 8 is
 // saved with its agents; unticked, Load is greyed out with why and a link that opens Workflow, nothing loaded; loaded
 // with it, Maximum agents is 8 at once, the form showing it as the project's own, and Discard Changes keeps it; lowered
 // again in the form, the note says the agents stay; Team's preview shows the Maximum agents it sets against the value
@@ -64,9 +64,9 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
       await inv('settings:update', { appearance: { theme: 'dark' } })
     }
 
-    // --- Agents per project carried over: Hive's 16 and the workspace's own 5, each its level's Maximum agents.
+    // --- Agents per project carried over: Combwork's 16 and the workspace's own 5, each its level's Maximum agents.
     const levelMax = async (level, platform) => (await inv('workflow:levelForm', level, platform)).own.maxAgents
-    check("Hive's Agents per project (16) is Maximum agents in Hive's workflow defaults, for None and Git", !!(await until(async () => (await levelMax('global', 'none')) === 16 && (await levelMax('global', 'git')) === 16)), JSON.stringify([await levelMax('global', 'none'), await levelMax('global', 'git')]))
+    check("Combwork's Agents per project (16) is Maximum agents in Combwork's workflow defaults, for None and Git", !!(await until(async () => (await levelMax('global', 'none')) === 16 && (await levelMax('global', 'git')) === 16)), JSON.stringify([await levelMax('global', 'none'), await levelMax('global', 'git')]))
     check("…and the workspace's own (5) in the workspace's", (await levelMax('workspace', 'none')) === 5 && (await levelMax('workspace', 'git')) === 5, JSON.stringify([await levelMax('workspace', 'none'), await levelMax('workspace', 'git')]))
     const advancedValues = () => JSON.parse(fs.readFileSync(path.join(userData, 'advanced.json'), 'utf8')).values ?? {}
     check('…and gone from advanced.json', !!(await until(() => !('hive.agents.perProject' in advancedValues()))), JSON.stringify(advancedValues()))
@@ -111,7 +111,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     check('…which opens Version Control → Workflow, Maximum agents there', !!(await until(async () => (await box.count()) === 1 && (await box.inputValue()) === '1')), await text(page.locator('.vc-view')))
     check('…nothing added', JSON.stringify(agentNames()) === '["SO-B1"]', JSON.stringify(agentNames()))
 
-    // --- Hive's Team 6 + pool (8 agents) loaded by hand: its workflow raises Maximum agents with its agents (HI-2058).
+    // --- Combwork's Team 6 + pool (8 agents) loaded by hand: its workflow raises Maximum agents with its agents (HI-2058).
     const openLoad = async () => {
       // From the project's Session tab, where + Add ▾ is.
       await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()

@@ -1,6 +1,6 @@
-// Carrying on (#1432, #966 row 16): Hive's three ways of getting an agent to read its inbox, each with its own switch
+// Carrying on (#1432, #966 row 16): Combwork's three ways of getting an agent to read its inbox, each with its own switch
 // (Settings → Advanced, a project's own in Project Settings → Sessions), on a fake Claude Code and a fake Codex agent
-// that both follow Hive's notices (fake-claude/, fake-codex/: a tool's PostToolUse reply and a Stop's reach "the
+// that both follow Combwork's notices (fake-claude/, fake-codex/: a tool's PostToolUse reply and a Stop's reach "the
 // model"; a doorbell they read is logged in fake-wakes.jsonl). For each CLI:
 // 1. checkpoints on: a message left during a tool is told at that tool's end, read and acked in the same turn;
 // 2. checkpoints and Stop continuation off: nothing at the tool's end nor at the Stop, the turn ends as the CLI ends it,
@@ -51,7 +51,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   // The Assistant's fake runs in the workspace's folder: trusted too, so a line typed into it isn't taken as the answer.
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), ws.toLowerCase()]))
-  // Both follow Hive's notices, as a model does: they read their inbox and ack what they listed.
+  // Both follow Combwork's notices, as a model does: they read their inbox and ack what they listed.
   fs.writeFileSync(path.join(claudeHome, 'fake-follow-notices.txt'), '')
   fs.writeFileSync(path.join(codexHome, 'fake-follow-notices.txt'), '')
 
@@ -70,7 +70,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const status = async (id) => (await live(id))?.status
     const idle = async (id) => ['ready', 'finished'].includes(await status(id))
     const say = async (id, text) => {
-      // Into Claude Code typed again if a wake of Hive's disturbed it (lib.typeLine, #1560). The fake Codex keeps no input
+      // Into Claude Code typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560). The fake Codex keeps no input
       // log: typed, then a pause before its Enter on purpose (it reads a typed line before its Enter, as a CLI does).
       if (id !== codex.id) return lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
       await inv('pty:write', lib.ptyKey(alpha, id), text)
@@ -207,7 +207,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     // --- 5. The Assistant follows Settings' switch (it has no project): its watch's wake waits in its inbox, its panel's ⋯
     // shows it unread, and Deliver Now there types its line once.
     const asst = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === home.toLowerCase())
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(home, 'assistant'), claudeHome, null, `hive cw_wait_for_tasks ${JSON.stringify({ cards: [n], changes: ['comment'], wake: true })}`, { live: asst })
     check('the Assistant watches the card', !!(await until(async () => (await asst())?.status === 'watching', HUNG_MS)), (await asst())?.status)
     await inv('tasks:comment', n, 'A note for the watch.')

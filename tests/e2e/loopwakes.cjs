@@ -1,4 +1,4 @@
-// Hive's loop wakes (#405), on fake Claude Code agents (fake-claude/) with no card watches: a card in a lane arriving in
+// Combwork's loop wakes (#405), on fake Claude Code agents (fake-claude/) with no card watches: a card in a lane arriving in
 // Review wakes the lane's reviewer; a failed verdict and a passing one wake the builder; a wake waits while its agent
 // works and is typed once it is idle; an agent whose own watch tells it gets one line, not two (a builder waiting for
 // Passed alone still hears of a failed verdict); a wake waiting while the lane's reviewer changes goes to the new one;
@@ -60,7 +60,7 @@ const check = (name, ok, extra = '') => {
     return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent).map((w) => w.text)
   }
   const say = async (id, text) => {
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
   }
   const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
@@ -132,8 +132,8 @@ const check = (name, ok, extra = '') => {
   await until(async () => (await idle(reviewer.id)) && (await idle(builder.id)), 15000)
 
   // The builder waits for Passed alone; a failed verdict sends the card back to Doing (HI-1946), which that watch doesn't
-  // count: Hive wakes the builder, once. Put in Review again, the passing verdict then moves it to Passed: the watch tells
-  // it, and Hive doesn't too.
+  // count: Combwork wakes the builder, once. Put in Review again, the passing verdict then moves it to Passed: the watch tells
+  // it, and Combwork doesn't too.
   await say(builder.id, `hive cw_wait_for_tasks ${JSON.stringify({ cards: [c2], column: 'passed', wake: true })}`)
   check('the builder watches for Passed alone', !!(await until(async () => (await live(builder.id))?.status === 'watching', 15000)))
   await say(reviewer.id, `boardreview ${c2} start then boardreview ${c2} failed`)

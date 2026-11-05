@@ -1,9 +1,9 @@
-// Hive's guidance for agents (#1285, #966 row 13: cw.guidance, on by default), on a fake Claude Code session
+// Combwork's guidance for agents (#1285, #966 row 13: cw.guidance, on by default), on a fake Claude Code session
 // (fake-claude/), so nothing signs in or spends tokens. The hive MCP server each launch was given (its --mcp-config, as
-// Hive wrote it) is started here as Claude Code would start it and asked to initialize:
-// - on: it answers with Hive's guidance as its instructions;
-// - off (Settings → Advanced, from the next session): the same server, Hive's tools still there, answers with none.
-// Then the new Advanced rows (this switch and Claude Code's "Hive's status line in place of yours", row 12) in both
+// Combwork wrote it) is started here as Claude Code would start it and asked to initialize:
+// - on: it answers with Combwork's guidance as its instructions;
+// - off (Settings → Advanced, from the next session): the same server, Combwork's tools still there, answers with none.
+// Then the new Advanced rows (this switch and Claude Code's "Combwork's status line in place of yours", row 12) in both
 // themes (agentguidance-*.png in the run's folder). Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -79,7 +79,7 @@ function descriptions(tools) {
 }
 
 /**
- * What a built script requires, through the chunks it loads: anything but Node's built-ins and Hive's own chunks. The
+ * What a built script requires, through the chunks it loads: anything but Node's built-ins and Combwork's own chunks. The
  * scripts run outside the asar, where nothing in node_modules can be found (a dev build would find this checkout's, so
  * only the built files can tell): agent text's formatter must be bundled in (HI-2433).
  */
@@ -145,7 +145,7 @@ function packagesRequired(entry) {
     const on = await hiveServer()
     check('the launch has the hive server', !!on?.command, JSON.stringify(on))
     const withGuidance = await initialize(on)
-    check("on: the hive server answers with Hive's guidance as its instructions", typeof withGuidance?.instructions === 'string' && /cw_inbox|Hive/.test(withGuidance.instructions), JSON.stringify(withGuidance).slice(0, 300))
+    check("on: the hive server answers with Combwork's guidance as its instructions", typeof withGuidance?.instructions === 'string' && /cw_inbox|Combwork/.test(withGuidance.instructions), JSON.stringify(withGuidance).slice(0, 300))
 
     // ---- The canary dialect (HI-2065): the same server given a dialect file with every catalogue text in markers. Its
     // instructions must come through the catalogue whole: a word outside the markers bypassed it.
@@ -159,7 +159,7 @@ function packagesRequired(entry) {
     check("canary: the server reads the dialect file, and every word of its instructions is the catalogue's", problems.length === 0 && canary.instructions.includes('⟦contract.agent.host⟧'), `${problems.join('; ')} | ${String(canary?.instructions).slice(0, 300)}`)
 
     // Its tool lists (HI-2434), for each role, Control level and switch, and the errors its own code gives: every
-    // description and error word the catalogue's. Nothing here needs Hive: the lists and these errors come before any call.
+    // description and error word the catalogue's. Nothing here needs Combwork: the lists and these errors come before any call.
     const ids = new Set(Object.keys(catalogue))
     const canaryEnv = { ...on.env, CW_DIALECT_FILE: dialectFile, CW_DIALECT: 'canary' }
     const assistant = (control) => ({ HIVE_ROLE: 'assistant', CW_PROJECT: '', HIVE_ASSISTANT_CONTROL: control, HIVE_ASSISTANT_SETTINGS: '1', HIVE_JOURNAL: '1', HIVE_DEV_CONSOLE: '1' })
@@ -182,7 +182,7 @@ function packagesRequired(entry) {
     // ---- Off: the same server, its tools still there, no instructions.
     await inv('advanced:set', GUIDANCE, false)
     const off = await hiveServer()
-    check('off: the launch still has the hive server (Hive\'s tools)', !!off?.command && off.env?.HIVE_GUIDANCE === '0', JSON.stringify(off?.env ?? {}).slice(0, 300))
+    check('off: the launch still has the hive server (Combwork\'s tools)', !!off?.command && off.env?.HIVE_GUIDANCE === '0', JSON.stringify(off?.env ?? {}).slice(0, 300))
     const without = await initialize(off)
     check('…which answers with no instructions', !!without && !('instructions' in without), JSON.stringify(without).slice(0, 300))
     await inv('advanced:set', GUIDANCE, true)

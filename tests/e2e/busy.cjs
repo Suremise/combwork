@@ -172,7 +172,7 @@ const check = (name, ok, extra = '') => {
   const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
   // One typed exchange, so the conversation has usage to show: 30 in context (its 20 input and 10 output).
   await until(async () => ['ready', 'finished'].includes((await live())?.status), 15000)
-  // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+  // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
   await lib.typeLine(inv, lib.ptyKey(alpha, agent.id), claudeHome, null, 'hello', { live })
   check('the first conversation shows its usage', !!(await until(async () => /\bctx 30\b/.test(await footer.innerText().catch(() => '')), 15000)), await footer.innerText().catch(() => ''))
   const first = (await live())?.sessionId
