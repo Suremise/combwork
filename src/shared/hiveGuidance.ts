@@ -49,8 +49,8 @@ const A = {
   }),
   stop: agentMsg({
     id: 'contract.agent.stop',
-    text: "Stop what you start: watch a run with something that ends with it (cw-progress, your CLI's notice that a background command ended), never `tail -f`, and end anything you started that won't end by itself before your card ends, unless the user wants it running.",
-    note: '#613: log watchers (tail -f) agents left running outlived the runs they watched, 16 at once.'
+    text: "Stop what you start: watch a run with something that ends with it (cw-progress, your CLI's notice that a background command ended), never `tail -f`/`-F` (in a monitor too), and before your card ends, end whatever you started that still runs, unless the user wants it running.",
+    note: "#613: log watchers (tail -f) agents left running outlived the runs they watched, 16 at once. HI-2560: Sonnet 5.5 watched with `tail -F` under Claude Code's Monitor, whose expiry it read as ending by itself, and left it running past its card."
   }),
   inboxRule: agentMsg({
     id: 'contract.inbox.rule',
