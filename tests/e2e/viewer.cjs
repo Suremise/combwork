@@ -337,7 +337,7 @@ function stream(token) {
   check("…and the Assistant's panel keeps it", (await inv('assistant:actions')).some((a) => a.kind === 'add-agent' && a.text.includes(LAUNCH_SECRET)))
   const kinds = viewerStream.events.filter((e) => e.type === 'assistant-activity').map((e) => e.data.action)
   check('every action on the stream has a kind', kinds.length > 0 && kinds.every((a) => typeof a.kind === 'string'), shown())
-  const FIELDS = ['id', 'at', 'text', 'ok', 'error', 'revertOf', 'kind', 'project', 'agent', 'toAgent', 'card', 'cards', 'lane', 'column', 'settingId']
+  const FIELDS = ['id', 'at', 'text', 'ok', 'error', 'kind', 'project', 'agent', 'toAgent', 'card', 'cards', 'lane', 'column', 'settingId']
   check('…and only the documented fields', kinds.every((a) => Object.keys(a).every((k) => FIELDS.includes(k))), shown())
   // Real wrapped commands, as an agent runs them: one with no title of its own, so its command line is its title, longer
   // than a title (120) and a command (200) are kept, the credential early in its arguments (round 2's finding); one with
