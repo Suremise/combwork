@@ -9,7 +9,7 @@ import { dirname, join } from 'path'
 import { git } from '../git'
 import { withRepoLock } from '../repoLock'
 import type { CardState, FileChange } from '../../shared/workflow/facts'
-import type { GuardInputs, GuardRefusal } from '../../shared/workflow/guards'
+import { GUARD_FNS, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { CardRecord } from '../workflow/factStore'
 import { attributeFolder, reconcileGit, type ReconcileHooks } from '../workflow/reconcile'
@@ -345,6 +345,15 @@ export class GitPlatform implements PlatformAdapter {
       // Whether its folder has changes says which next step fits (HI-2227): commit them, or a card needing none is no-code.
       // In a shared folder, other agents' recorded changes aren't this card's.
       if (args.predicted) return { ok: false, refusal: { rule: 'submit.empty', values: { card: card.key } } }
+      // HI-2562: nothing of its own, but a commit naming no card since it started, with another card's agent in the
+      // folder: most likely its own work without the trailer, so the trailer's refusal (the commit, and the amend that
+      // fixes it), not "nothing committed".
+      if (commits && args.guards.includes('submit.trailer')) {
+        const u = await this.untrailered(card, s)
+        if (isUnknown(u)) return { ok: false, refusal: unknownRefusal(card, u, 'submit') }
+        const refusal = u ? GUARD_FNS['submit.trailer']({ card, untrailered: u } as GuardInputs) : null
+        if (refusal) return { ok: false, refusal }
+      }
       const all = dirty ?? (await G.dirty(folder))
       const notMine = this.wf.ownLine(s) || isUnknown(all) ? [] : await this.inRepo(this.notMine(card, s))
       const mine = isUnknown(all) ? null : all.filter((f) => !notMine.some((x) => under(f, x.path)))
@@ -362,7 +371,7 @@ export class GitPlatform implements PlatformAdapter {
       inputs.dirty = isUnknown(all) || !notMine.length ? all : all.filter((f) => f.startsWith('(') || !notMine.some((x) => under(f, x.path)))
     }
     if (args.guards.includes('submit.ready')) inputs.conflicts = [] // a Git commit can't store unresolved conflicts
-    if (args.guards.includes('submit.trailer')) inputs.untrailered = this.untrailered(card, s)
+    if (args.guards.includes('submit.trailer')) inputs.untrailered = await this.untrailered(card, s)
     if (args.guards.includes('submit.identity')) inputs.badIdentity = await this.badIdentity(base!, revision, commits, o)
     const warnings = o.sharedFolderWarning && shared ? othersFiles(others, files.map((f) => f.path)) : []
     return { ok: true, revision, base, key, files, ...(commits ? { commits } : {}), inputs, warnings }
@@ -383,14 +392,31 @@ export class GitPlatform implements PlatformAdapter {
     return { files: [...files].map(([path, status]) => ({ path, status })), key: keys.length ? keys.join('+') : null }
   }
 
-  /** A commit attributed to no card, made in the folder since the card's last submission, when another unfinished card shares it. */
-  private untrailered(card: CardRecord, s: CardState): string | null {
+  /**
+   * A commit attributed to no card, made in the folder since the card's last submission, when another unfinished card
+   * shares it: the newest, the one an amend fixes. HI-2562: only one made since the card started and still on the
+   * folder's line (one an amend or a reset replaced isn't, nor one from before it started).
+   */
+  private async untrailered(card: CardRecord, s: CardState): Promise<Maybe<string | null>> {
     const others = this.wf.store.cards().filter((c) => c.id !== card.id && ['active', 'review', 'approved'].includes(c.stage) && this.wf.state(c).started?.folder === 'project')
     if (!others.length) return null
     const lastSub = s.latest?.commits?.at(-1)
     const rows = this.wf.store.folderCommits(this.project)
-    const since = lastSub ? rows.slice(rows.findIndex((x) => x.sha === lastSub) + 1) : rows
-    return since.find((x) => x.card === null)?.sha ?? null
+    const since = (lastSub ? rows.slice(rows.findIndex((x) => x.sha === lastSub) + 1) : rows).filter((x) => x.card === null && x.sha !== s.started!.base)
+    if (!since.length) return null
+    const head = await G.head(this.project)
+    if (isUnknown(head)) return head
+    if (!head) return null
+    const base = s.started!.base
+    for (const x of since.reverse()) {
+      const on = await G.isAncestor(this.project, x.sha, head)
+      if (isUnknown(on)) return on
+      if (!on) continue
+      const after = base ? await G.isAncestor(this.project, base, x.sha) : true
+      if (isUnknown(after)) return after
+      if (after) return x.sha
+    }
+    return null
   }
 
   /**

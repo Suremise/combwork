@@ -1556,7 +1556,10 @@ All Git calls go through the `git()` runner (`src/main/git.ts:47`); the two bypa
   - `submit.trailer` holds when an unfinished other card shares the folder and the agent's commits since its last
     submission include one attributed to no card, with the fix `git commit --amend --trailer "Hive-Card: AM-12"` for
     the newest commit, or a non-interactive `git rebase --exec` for older ones (not on the target line itself once
-    other agents' commits follow: then the user assigns it in the tab).
+    other agents' commits follow: then the user assigns it in the tab). Only commits made since the card started and
+    still on the folder's line count (HI-2562: one an amend replaced is not), and the refusal names the newest. A card
+    with no commit of its own but such a commit gets this refusal, not `submit.empty`: its work is most likely that
+    commit, made without the trailer.
   - **Review and checks see the folder as it is:** a review copy at the card's revision contains other cards' earlier
     commits, and a check run on it tests them too; the reviewer reviews the card's own commits (their diff is what
     `start review` lists). The option's description says so; slots are the answer when that matters.
