@@ -347,6 +347,23 @@ const check = (name, ok, extra = '') => {
     check('…closed while Codex runs (asked, confirmed), its row then says it is set up', !!(await closeRunning(true)) && !!(await lib.until(async () => (await row('ChatGPT').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
     await shots('codex-set-up')
 
+    // --- Its terminal in its own card (HI-2541): Set Up on the middle account opens under that account's row, above
+    // the next account, not under the whole list; scrolled into view, and kept there as its state is read again.
+    const middle = page.locator('.account-block').nth(1)
+    const middleId = await middle.getAttribute('data-account')
+    await middle.locator('[data-action="account-menu"]').click()
+    await page.locator('.menu .menu-item', { hasText: 'Set Up' }).first().click()
+    const panel = page.locator('.account-signin')
+    check('Set Up on the middle account opens its terminal in that account’s card', !!(await lib.until(async () => (await middle.locator('.account-signin .task-terminal').count()) === 1, HUNG_MS)) && (await panel.count()) === 1 && (await panel.getAttribute('data-terminal-of')) === middleId)
+    const boxes = async () => ({ row: await middle.locator('.account-row').boundingBox(), panel: await panel.boundingBox(), next: await page.locator('.account-block').nth(2).boundingBox() })
+    const placed = await boxes()
+    check('…under its row and above the next account', !!placed.row && !!placed.panel && !!placed.next && placed.panel.y >= placed.row.y + placed.row.height - 1 && placed.panel.y + placed.panel.height <= placed.next.y + 1, JSON.stringify(placed))
+    check('…scrolled into view', await panel.locator('.task-terminal').evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight }))
+    await lib.until(async () => (await middle.locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)
+    check('…and stays there as its row is read again', (await middle.locator('.account-signin .task-terminal').count()) === 1 && (await page.locator('.accounts-settings > .account-signin').count()) === 0)
+    await shots('set-up-middle')
+    check('…closed, its card is as it was', !!(await closeRunning(true)) && !!(await lib.until(async () => (await panel.count()) === 0, HUNG_MS)))
+
     // --- A sign-in still waiting for its browser: Close asks, and Remove offers to close it (HI-1870).
     loginAs('held@example.com', true)
     await addVia('claude-code', 'Held')

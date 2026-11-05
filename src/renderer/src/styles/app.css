@@ -5200,6 +5200,15 @@ h2.section#unused-worktrees {
   align-self: stretch;
   margin-top: 10px;
 }
+/* In its account's card, under its row (HI-2541): the card's padding, a line from the connections under it. */
+.account-block .account-signin {
+  margin: 0;
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.account-block .account-signin > .hint:first-child {
+  margin-top: 0;
+}
 .task-terminal {
   height: 280px;
   background: #1a1a1a;

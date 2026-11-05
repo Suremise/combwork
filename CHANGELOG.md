@@ -27,6 +27,7 @@
 
 ### Fixed
 
+- **An account's Sign In and Set Up terminal opens in its own card** (HI-2541). Settings → Accounts & Connections opened it under the whole list of accounts, so Set Up on an account higher up showed its terminal far from it, below the others. It now opens in that account's card, under its name, scrolled into view.
 - **Stopped agents' panes no longer scroll sideways in German** (HI-2536). At 900 px with two panes side by side, Neue Sitzung and Fortsetzen didn't fit on one row and each pane got a horizontal scrollbar; the buttons now wrap, one above the other, when a pane is too narrow for both.
 - **Resume says when a conversation from before the rename starts fresh** (HI-2540). Pressing Resume on a conversation from before Combwork renamed the tools agents use asked whether to re-cache its tokens, then started a new conversation anyway and said so only afterwards. Now its Resume says it starts a new conversation (its tooltip, and the session pickers), and pressing it asks **Start a new conversation?** instead, carrying on the agent's work as before. The same goes for one that ran in a folder that moved with `.hive` to `.combwork`. The Agent API's reply to such a resume says it started fresh, and why.
 - **The "No account is on" warning fits narrow panes** (HI-2535). In a narrow window, with the sidebar and the Assistant open, the warning in a project and in the Assistant's panel squeezed its message into a thin column of six or seven lines beside **Add an Account**. The button now goes under the message when there isn't room beside it.
