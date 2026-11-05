@@ -1,6 +1,6 @@
-// The usage history in a workspace (#1106): its one-time import takes each record's transcript (or Hive's backup), a
+// The usage history in a workspace (#1106): its one-time import takes each record's transcript (or Combwork's backup), a
 // record's kept usage when it has no file left, and each deleted session's kept usage, so nothing already counted is
-// lost; the Overview's figures then come from it, and stay when the transcripts go; a transcript that grows while Hive
+// lost; the Overview's figures then come from it, and stay when the transcripts go; a transcript that grows while Combwork
 // isn't reading it is found by the sweep; card costs come from its rows.
 import { appendFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -12,7 +12,7 @@ import type { SessionListItem, SessionUsage } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
 const base = tempDir('hive-usage-history-')
-// The CLIs' homes are the test's own (HI-1666): a list looks in each for sessions started outside Hive, and the user's
+// The CLIs' homes are the test's own (HI-1666): a list looks in each for sessions started outside Combwork, and the user's
 // ~/.codex (a thousand rollouts) took 17 s of it under a full unit run's load.
 process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
 process.env.CODEX_HOME = join(base, 'codex-home')
@@ -41,7 +41,7 @@ const write = (file: string, text: string): void => {
 }
 const backup = (id: string): string => join(p, '.combwork', 'sessions', `${id}.jsonl`)
 const cliFile = (id: string): string => join(cli, `${id}.jsonl`)
-/** A kept usage, priced as Hive kept them before the history. */
+/** A kept usage, priced as Combwork kept them before the history. */
 const keptUsage = (sid: string, output: number): SessionUsage => {
   const parser = newUsageParser('claude-code', sid)!
   parser.feed(transcript(sid, [output]))
@@ -69,7 +69,7 @@ describe('the usage history of a workspace', () => {
     write(cliFile(inCli), transcript(inCli, [100, 200]))
     write(backup(inCli), transcript(inCli, [100, 200]))
     write(backup(onlyBackup), transcript(onlyBackup, [300]))
-    // Sessions as an older Hive left them: records (one whose transcripts went, with its kept usage) and a deleted one's usage.
+    // Sessions as an older Combwork left them: records (one whose transcripts went, with its kept usage) and a deleted one's usage.
     const at = new Date(T0).toISOString()
     write(
       join(p, '.combwork', 'sessions.json'),
@@ -85,7 +85,7 @@ describe('the usage history of a workspace', () => {
         deletedUsage: [{ id: deleted, provider: 'claude-code', agentId: 'c1', name: 'deleted', cwd: p, usage: keptUsage(deleted, 500) }]
       })
     )
-    // As Hive starts it: its tick, and the board read for holds dropped after a change.
+    // As Combwork starts it: its tick, and the board read for holds dropped after a change.
     usageHistory.start()
     w = createWorkspaceService()
     await w.open(wsPath)
@@ -96,7 +96,7 @@ describe('the usage history of a workspace', () => {
     await usageHistory.stop()
   })
 
-  it('before its import, the Overview counts what an older Hive kept, and says the figures are partial', async () => {
+  it('before its import, the Overview counts what an older Combwork kept, and says the figures are partial', async () => {
     expect(usageHistory.progressOf(wsPath).importing).toBe(true)
     const items = await run(() => sessions.usageItems(p))
     expect(outputOf(items, keptOnRecord)).toBe(400)
@@ -130,7 +130,7 @@ describe('the usage history of a workspace', () => {
     expect((await run(() => sessions.usage(p, onlyBackup)))?.outputTokens).toBe(300)
   })
 
-  it("a transcript that grew while Hive wasn't reading it is found and read", async () => {
+  it("a transcript that grew while Combwork wasn't reading it is found and read", async () => {
     const id = newId()
     await run(() => workspace.upsertSession(p, { id, agent: 'claude-code', agentId: 'c1', name: 'grows', lastActiveAt: new Date(T0).toISOString() }))
     write(cliFile(id), transcript(id, [10]))
@@ -153,7 +153,7 @@ describe('the usage history of a workspace', () => {
     expect(outputOf(kept, id)).toBe(70)
   })
 
-  it("a session started outside Hive is kept for the Sessions list, never counted, until a record makes it Hive's", async () => {
+  it("a session started outside Combwork is kept for the Sessions list, never counted, until a record makes it Combwork's", async () => {
     const id = newId()
     write(cliFile(id), transcript(id, [40]))
     expect((await usageHistory.ingestExternal(p, { id, provider: 'claude-code', transcriptPath: cliFile(id) }))?.status).toBe('written')
@@ -161,7 +161,7 @@ describe('the usage history of a workspace', () => {
     expect(stored.get(id)).toMatchObject({ source: 'external', read: { path: cliFile(id) } })
     expect(outputOf(await run(() => sessions.usageItems(p)), id)).toBeUndefined()
     expect((await run(() => sessions.keptUsage(p))).some((k) => k.id === id)).toBe(false)
-    // Adopted: its record's job makes it Hive's, so once deleted it stays in the totals.
+    // Adopted: its record's job makes it Combwork's, so once deleted it stays in the totals.
     await run(() => workspace.upsertSession(p, { id, agent: 'claude-code', agentId: 'c1', name: 'adopted', lastActiveAt: new Date(T0).toISOString() }))
     await usageHistory.ingest(p, id, { priority: 1, keepState: 'no' })
     expect((await usageHistory.storedUsage(p)).get(id)?.source).toBe('transcript')

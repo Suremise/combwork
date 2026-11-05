@@ -1,10 +1,10 @@
 // A test run's own temp folder (#995, HI-2102), in the test area, %LOCALAPPDATA%\hive-test\tmp (#992), not %TEMP%:
-// Hive's Antivirus scanning setting covers the test area, and what tests make and remove in %TEMP% kept Defender busy.
+// Combwork's Antivirus scanning setting covers the test area, and what tests make and remove in %TEMP% kept Defender busy.
 // Each run has its own folder there, run-<pid>-<random>, made as it starts and made its temp folder (TEMP, TMP and
 // TMPDIR), which what it starts inherits: the unit run (vitest.config.ts, before the workers start; tests/tempRun.ts
 // removes it once the run has ended) and the e2e and scenario runners (before their suites, removed as they exit), so
-// Vitest's module copies, Playwright's playwright-artifacts-* folders, and the temp files of Hive's code under test, the
-// test copies of Hive, git and the CLIs go there. A run's start removes the folders older than a day that stopped runs
+// Vitest's module copies, Playwright's playwright-artifacts-* folders, and the temp files of Combwork's code under test, the
+// test copies of Combwork, git and the CLIs go there. A run's start removes the folders older than a day that stopped runs
 // left, where the board's evidence rules let them go; npm run test:clean (tests/e2e/clean.mjs) sweeps the rest of tmp.
 // Where LOCALAPPDATA is unset (off Windows), it is in the temp folder. LOCALAPPDATA is read once, as this loads: a test
 // that changes it later doesn't move the folder.

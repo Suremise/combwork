@@ -14,7 +14,7 @@ const NONE = stagesOf(allOff('none'))
 const ids = (layout: ReturnType<typeof boardLayout>): string => layout.map((g) => `${g.category}[${g.columns.map((c) => `${c.id}:${c.stage}`).join(',')}]`).join(' ')
 
 describe("the board's columns from stages (#1420)", () => {
-  it('Pair (Hive merges): every category, Approved with Merging as two columns, Merging no drop target', () => {
+  it('Pair (Combwork merges): every category, Approved with Merging as two columns, Merging no drop target', () => {
     const layout = boardLayout([{ name: 'web', stages: PAIR }], [])
     expect(ids(layout)).toBe('hold[hold:hold] todo[todo:todo] doing[doing:active] review[review:review] passed[passed:approved,merging:merging] done[done:done]')
     const approved = layout.find((g) => g.category === 'passed')!

@@ -1,6 +1,6 @@
 // The merge queue in the Progress panel (#1356): which queues show (item 0: by their state, an old ruleset's included),
 // what a queue's card says (testing with its step and the estimate, queued, just merged, returned until seen, paused),
-// Pulse's line, the badge, what is announced, and the Runs tab's "Hive (merge queue)".
+// Pulse's line, the badge, what is announced, and the Runs tab's "Combwork (merge queue)".
 import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
@@ -41,7 +41,7 @@ const run = (over: Partial<ProgressRun> = {}): ProgressRun =>
     workspacePath: 'D:\\ws',
     projectPath: 'D:\\ws\\alpha',
     agentId: null,
-    agentName: 'Hive (merge queue)',
+    agentName: 'Combwork (merge queue)',
     defaultName: 'mergeQueue',
     provider: null,
     source: 'hive',
@@ -79,7 +79,7 @@ describe('which merge queues show (#1356 item 0)', () => {
     expect(queueShown(view(), NOW)).toBe(false)
   })
 
-  it('shows, empty, while the current options have Hive merge into it', () => {
+  it('shows, empty, while the current options have Combwork merge into it', () => {
     expect(queueShown(view({ hiveMerges: true }), NOW)).toBe(true)
   })
 
@@ -87,7 +87,7 @@ describe('which merge queues show (#1356 item 0)', () => {
     expect(queueShown(view({ testing }), NOW)).toBe(true)
     expect(queueShown(view({ queued: [queued(107)] }), NOW)).toBe(true)
     expect(queueShown(view({ paused: { reason: 'user', card: null, files: [], by: 'user', at: iso(NOW) } }), NOW)).toBe(true)
-    expect(queueShown(view({ runBy: 'Hive-Dev' }), NOW)).toBe(true)
+    expect(queueShown(view({ runBy: 'Combwork-Dev' }), NOW)).toBe(true)
     expect(queueShown(view({ inFlight: [61] }), NOW)).toBe(true)
   })
 
@@ -111,10 +111,10 @@ describe('which merge queues show (#1356 item 0)', () => {
   })
 
   it('All projects: an inactive project\'s queue only while it is busy (HI-2165)', () => {
-    const idle = view({ project: 'beta', projectPath: 'D:\\ws\\beta', hiveMerges: true, runBy: 'Hive' })
+    const idle = view({ project: 'beta', projectPath: 'D:\\ws\\beta', hiveMerges: true, runBy: 'Combwork' })
     const active = new Set(['d:\\ws\\alpha'])
     const shown = (v: QueueView, now = NOW): boolean => allProjectsQueues([v], active, now).length > 0
-    // The project being worked on: its idle queue shows; another's doesn't, even run and merged into by Hive.
+    // The project being worked on: its idle queue shows; another's doesn't, even run and merged into by Combwork.
     expect(shown(view({ hiveMerges: true }))).toBe(true)
     expect(queueBusy(idle, NOW)).toBe(false)
     expect(shown(idle)).toBe(false)
@@ -193,7 +193,7 @@ describe('returns on a queue card', () => {
     expect(returnedText(recent({ key: 'HI-108' }), 'conflict', null, tr)).toBe('HI-108 returned: conflict')
   })
 
-  it("a red check's run is the card's Hive run in the project with the log its outcome recorded (Show log's)", () => {
+  it("a red check's run is the card's Combwork run in the project with the log its outcome recorded (Show log's)", () => {
     const r = recent({ outcome: 'returned', reason: 'checks', at: iso(NOW), check: 'unit', logPath: 'D:\\logs\\x.log' })
     const v = view({ recent: [r] })
     const red = run({ state: 'failed', finishedAt: NOW - 1_000, logPath: 'd:\\logs\\X.log', title: 'HI-61 · unit · 9e1f0aa' })
@@ -214,7 +214,7 @@ describe('returns on a queue card', () => {
     expect(returnRun(v, unit, runs)?.logPath).toBe('D:\\logs\\e1-unit.log')
     expect(returnWhy(unit, returnCheck(unit, returnRun(v, unit, runs)), 'main', tr, list)).toBe('checks failed: unit')
     expect(returnWhy(lint, returnCheck(lint, returnRun(v, lint, runs)), 'main', tr, list)).toBe('checks failed: lint')
-    // Its runs gone (Hive keeps a run for a while): the outcome's own check still says which.
+    // Its runs gone (Combwork keeps a run for a while): the outcome's own check still says which.
     expect(returnRun(v, unit, [])).toBeNull()
     expect(returnWhy(unit, returnCheck(unit, null), 'main', tr, list)).toBe('checks failed: unit')
     // An outcome that kept no log never takes another run by its time.
@@ -238,7 +238,7 @@ describe('what a queue card says', () => {
     expect(mergedText(recent({ result: '9e1f0aa' + 'c'.repeat(33) }), tr)).toBe('HI-61 merged as 9e1f0aa')
   })
 
-  it("each pause in a sentence: the user's, the Assistant's, Hive's own with the files and git's message, an unknown one", () => {
+  it("each pause in a sentence: the user's, the Assistant's, Combwork's own with the files and git's message, an unknown one", () => {
     expect(pauseText({ reason: 'user', card: null, files: [], by: 'user', at: null }, 'main', tr, list)).toBe('Paused by you. The queue merges nothing until you resume it.')
     expect(pauseText({ reason: 'user', card: null, files: [], by: 'assistant', at: null }, 'main', tr, list)).toMatch(/^Paused by the Assistant/)
     expect(pauseText({ reason: 'unstagedChanges', card: 'HI-61', files: ['a.ts', 'b.ts'], by: null, at: null }, 'main', tr, list)).toBe('a.ts and b.ts have changes in the folder main is checked out in. Commit or undo them, then resume.')
@@ -329,8 +329,8 @@ describe('announced politely (#1356 item 8)', () => {
   })
 })
 
-describe("Hive's runs in the Runs tab (#1356 item 5)", () => {
-  it('the Agent filter has Hive (merge queue) for them', () => {
+describe("Combwork's runs in the Runs tab (#1356 item 5)", () => {
+  it('the Agent filter has Combwork (merge queue) for them', () => {
     const r = run()
     expect(runAgentKey(r)).toBe(HIVE_RUNS)
     expect(runAgentKey(run({ source: 'agent', agentId: 'b1' }))).toBe('b1')
@@ -342,17 +342,17 @@ describe("Hive's runs in the Runs tab (#1356 item 5)", () => {
 
   it("each slot's and copy's set-up runs are an Agent filter entry of their own (#1446), apart from the merge queue's", () => {
     const words = (x: ProgressRun): string => x.title
-    const slotB = run({ defaultName: 'slot', slot: 'slot-b', agentName: 'Hive (slot slot-b)' })
-    const copy1 = run({ defaultName: 'copy', copy: 'copy-1', agentName: 'Hive (review copies)' })
+    const slotB = run({ defaultName: 'slot', slot: 'slot-b', agentName: 'Combwork (slot slot-b)' })
+    const copy1 = run({ defaultName: 'copy', copy: 'copy-1', agentName: 'Combwork (review copies)' })
     expect([runAgentKey(slotB), runAgentKey(copy1), runAgentKey(run())]).toEqual([slotRunsKey('slot-b'), copiesRunsKey, HIVE_RUNS])
     expect(new Set([slotRunsKey('slot-b'), slotRunsKey('slot-c'), copiesRunsKey, HIVE_RUNS]).size).toBe(4)
     // HI-1710: the copies' runs no lease credits are one entry, whichever copy; one a lease credits is its agent's.
-    expect(runAgentKey(run({ defaultName: 'copy', copy: 'copy-2', agentName: 'Hive (review copies)' }))).toBe(copiesRunsKey)
+    expect(runAgentKey(run({ defaultName: 'copy', copy: 'copy-2', agentName: 'Combwork (review copies)' }))).toBe(copiesRunsKey)
     expect(runAgentKey(run({ copy: 'copy-1', agentId: 'r1', agentName: 'R1' }))).toBe('r1')
     expect(runMatches(slotB, { ...NO_RUNS_FILTER, agent: slotRunsKey('slot-b') }, words)).toBe(true)
     expect(runMatches(run(), { ...NO_RUNS_FILTER, agent: slotRunsKey('slot-b') }, words)).toBe(false)
     expect(runMatches(slotB, { ...NO_RUNS_FILTER, agent: HIVE_RUNS }, words)).toBe(false)
-    // An agent's isolated check in a copy is its agent's, never Hive's.
+    // An agent's isolated check in a copy is its agent's, never Combwork's.
     expect(runAgentKey(run({ source: 'agent', agentId: 'r1', copy: 'copy-1' }))).toBe('r1')
   })
 

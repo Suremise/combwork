@@ -34,7 +34,7 @@ const tracker = vi.hoisted(() => ({
   listed: new Map<string, { processes: Proc[]; more: number; restored: boolean }>(),
   ended: [] as { run?: string; at: string | null }[],
   writerAt: () => null as string | null,
-  /** The last run's marker's launches (the notice that Hive closed unexpectedly), and whether ending them works. */
+  /** The last run's marker's launches (the notice that Combwork closed unexpectedly), and whether ending them works. */
   restart: [] as { projectPath: string; agentId: string; agentName: string; runId?: string; processes: Proc[] }[],
   endedExactly: [] as { list: Proc[]; at: string | null }[],
   endWorks: true,
@@ -46,7 +46,7 @@ const tracker = vi.hoisted(() => ({
   /** Which of the processes asked about still run (by default every one). */
   stillRunning: null as null | ((list: Proc[]) => Proc[] | null),
   /**
-   * HI-2055: each run's keeper state as `keeperState` would take it (null: none, or not one it takes), the Hive it was
+   * HI-2055: each run's keeper state as `keeperState` would take it (null: none, or not one it takes), the Combwork it was
    * asked for, whether a helper is still bound (`bound`, by default yes), what is done while it is read (`reading`), and
    * the keepers' states forgotten once their writers were cleared.
    */
@@ -179,8 +179,8 @@ afterAll(async () => {
 })
 
 /**
- * A pool on the project (this Hive's holder and live tokens), and the app's writer host on it. `others`: whether
- * another Hive (a writer's holder) still runs, as the probe says it (null: can't be told).
+ * A pool on the project (this Combwork's holder and live tokens), and the app's writer host on it. `others`: whether
+ * another Combwork (a writer's holder) still runs, as the probe says it (null: can't be told).
  */
 function hostOn(others: boolean | null = true): void {
   pool = new SlotPool({ store, project, root: base, options: async () => ({ setup: '', archive: '', copy: '' }), builders: () => 2, cap: () => 2, runner: async () => ({ ok: true, exitCode: 0, settled: true, logPath: null }), settle: async () => true, holder: { self: async () => me, alive: async () => others, live }, writerOver: (w) => writerOver(w), writerGone: { settles: (w, slot) => goneWriterSettles(project, w, slot), cleared: goneWriterCleared, still: goneWriterStill } })
@@ -466,7 +466,7 @@ describe('Release Slot… on a held writer (#1506)', () => {
     tracker.endedExactly.length = 0
     tracker.endWorks = true
   })
-  /** A run of b1's in slot-a, over, its processes kept running: its writer held by this Hive. */
+  /** A run of b1's in slot-a, over, its processes kept running: its writer held by this Combwork. */
   const heldRun = async (): Promise<string> => {
     const run = (await start()).runId
     ;(manager.settleWriterOf as (run: string) => void).call(manager, run)
@@ -476,13 +476,13 @@ describe('Release Slot… on a held writer (#1506)', () => {
     manager.runs.clear()
     return run
   }
-  /** slot-a's writer as another Hive (process pid) left it: its run, under b1's carried lease. */
+  /** slot-a's writer as another Combwork (process pid) left it: its run, under b1's carried lease. */
   const plant = (run: string, pid = me.pid + 1) => {
     const lease = store.openLease('slot-a')!.id
     return store.conn.write((db) => db.prepare('UPDATE slots SET writer_run = ?, writer_lease = ?, writer_agent = ?, writer_pid = ?, writer_started = ? WHERE project = ? AND name = ?').run(run, lease, 'b1', pid, 5, projectId, 'slot-a'))
   }
 
-  it("is refused while its run is live in this Hive; once held, it is released after the user's confirmation and the slot can be taken again", async () => {
+  it("is refused while its run is live in this Combwork; once held, it is released after the user's confirmation and the slot can be taken again", async () => {
     hostOn()
     const run = (await start()).runId
     expect(await heldWriter(project, 'slot-a')).toMatchObject({ run, agent: 'b1', live: true, hive: { self: true } })
@@ -508,7 +508,7 @@ describe('Release Slot… on a held writer (#1506)', () => {
     expect(writer()?.run).toBe(again.runId)
   })
 
-  it("another Hive's writer: refused while that Hive runs or can't be told; released once it has gone", async () => {
+  it("another Combwork's writer: refused while that Combwork runs or can't be told; released once it has gone", async () => {
     for (const others of [true, null, false]) {
       hostOn(others)
       await plant(`other-${others}`)
@@ -543,7 +543,7 @@ describe('Release Slot… on a held writer (#1506)', () => {
     expect(writer()).toBeNull()
   })
 
-  it("its Hive gone with nothing listed for its run: the notice's list of that run's own processes that still run, ended exactly first when asked; a failed end releases nothing", async () => {
+  it("its Combwork gone with nothing listed for its run: the notice's list of that run's own processes that still run, ended exactly first when asked; a failed end releases nothing", async () => {
     hostOn(false)
     tracker.writerAt = () => writer()?.run ?? null
     const node = { pid: 5150, name: 'node.exe', label: 'node serve.js', created: '133900000000000000' }
@@ -568,7 +568,7 @@ describe('Release Slot… on a held writer (#1506)', () => {
     await releaseHeldWriter(project, 'slot-a', 'r-crash', { end: true })
     expect(tracker.endedExactly.map((e) => ({ pids: e.list.map((p) => p.pid), at: e.at }))).toEqual([{ pids: [5150], at: 'r-crash' }, { pids: [5150], at: 'r-crash' }])
     expect(writer()).toBeNull()
-    // This Hive's own writer never takes the last run's list (its run's leftovers are what it knows).
+    // This Combwork's own writer never takes the last run's list (its run's leftovers are what it knows).
     hostOn()
     await plant('r-mine', me.pid)
     await store.conn.write((db) => db.prepare('UPDATE slots SET writer_started = ? WHERE project = ? AND name = ?').run(me.started, projectId, 'slot-a'))
@@ -597,7 +597,7 @@ describe('Release Slot… on a held writer (#1506)', () => {
   })
 })
 
-describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () => {
+describe("a gone Combwork's writer settled by itself after a restart (HI-1886)", () => {
   // The user's Release Slot… earlier forgets its run's records too (HI-2303): none carried in.
   beforeEach(() => {
     tracker.forgotten.length = 0
@@ -623,7 +623,7 @@ describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () 
   const node = { pid: 5150, name: 'node.exe', label: 'node serve.js', created: '133900000000000000' }
   const claude = { pid: 6160, name: 'claude.exe', label: 'claude', created: '133900000000000001' }
   /**
-   * slot-a's writer as a Hive that has gone (another process) left it: its run, b1's, under b1's carried lease (open), or
+   * slot-a's writer as a Combwork that has gone (another process) left it: its run, b1's, under b1's carried lease (open), or
    * under a lease that has ended since (`ended`: its lane abandoned, its card done).
    */
   const plant = (run: string, o: { ended?: boolean } = {}) => {
@@ -690,11 +690,11 @@ describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () 
     expect(tracker.keeperForgotten).toEqual(['r-own'])
   })
 
-  describe("its keeper's state (HI-2055: the helper that held its job, kept past its Hive)", () => {
+  describe("its keeper's state (HI-2055: the helper that held its job, kept past its Combwork)", () => {
     const helper = '4242:133900000000000099'
     const hive = () => `${me.pid + 1}:5`
 
-    it('"ended" from the helper its run is bound to: freed at the slot sweep, asked for its own Hive, its state then forgotten', async () => {
+    it('"ended" from the helper its run is bound to: freed at the slot sweep, asked for its own Combwork, its state then forgotten', async () => {
       hostOn(false)
       await plant('r-kept', { ended: true })
       tracker.keeper.set('r-kept', { state: 'ended', helper })
@@ -921,7 +921,7 @@ describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () 
     await store.clearWriterRun('r-snap')
   })
 
-  it("nothing kept of its run, or its Hive still running (or can't be told) though its run was seen ended: left held for Release…", async () => {
+  it("nothing kept of its run, or its Combwork still running (or can't be told) though its run was seen ended: left held for Release…", async () => {
     hostOn(false)
     await plant('r-unknown', { ended: true })
     await pool.refresh()
@@ -952,7 +952,7 @@ describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () 
 })
 
 describe('Release Slot through the Agent API and the Assistant (#1561)', () => {
-  /** slot-a's writer as another Hive (process pid) left it, under b1's carried lease. */
+  /** slot-a's writer as another Combwork (process pid) left it, under b1's carried lease. */
   const plant = (run: string) => {
     const lease = store.openLease('slot-a')!.id
     return store.conn.write((db) => db.prepare('UPDATE slots SET writer_run = ?, writer_lease = ?, writer_agent = ?, writer_pid = ?, writer_started = ? WHERE project = ? AND name = ?').run(run, lease, 'b1', me.pid + 1, 5, projectId, 'slot-a'))
@@ -969,7 +969,7 @@ describe('Release Slot through the Agent API and the Assistant (#1561)', () => {
     }
   }
 
-  it('lists the carried slot and a held writer of a Hive gone; another Hive still running holds its own (not listed)', async () => {
+  it('lists the carried slot and a held writer of a Combwork gone; another Combwork still running holds its own (not listed)', async () => {
     hostOn(true)
     await plant('r-alive')
     expect(await list()).toEqual({ carried: [{ slot: 'slot-a', agent: { id: 'b1', name: 'B1' } }], held: [] })
@@ -999,7 +999,7 @@ describe('Release Slot through the Agent API and the Assistant (#1561)', () => {
     expect(await refusal(release('slot-a', { kind: 'writer', confirm: { slot: 'slot-a', run: 'r-c' } }))).toBe(409)
   })
 
-  it("the window's refusals: its run live in this Hive, or another Hive holding it still running (or not known)", async () => {
+  it("the window's refusals: its run live in this Combwork, or another Combwork holding it still running (or not known)", async () => {
     hostOn()
     const run = (await start()).runId
     expect(await refusal(release('slot-a', { kind: 'writer', confirm: { slot: 'slot-a', run } }))).toMatch(/still running in this Combwork/)
@@ -1043,7 +1043,7 @@ describe('Release Slot through the Agent API and the Assistant (#1561)', () => {
       const guard = () => {
         if (revoked) throw new Error(why)
       }
-      // Revoked while the release reads whether the holder's Hive still runs: its listed processes aren't ended.
+      // Revoked while the release reads whether the holder's Combwork still runs: its listed processes aren't ended.
       hostOn(false)
       setWriterHost({ self: async () => me, alive: async (pid) => ((revoked = true), pid === me.pid), live, track: async () => pool.trackWriter(), drained: async (_p, slot) => pool.drained(slot) })
       await plant('r-guard')

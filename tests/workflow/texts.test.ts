@@ -1,6 +1,6 @@
 // The workflow core's text in every language (#1264, SPEC §16.8.3): each refusal's three sentences render in each locale
 // with sample values (no placeholder left, no English where a translation exists), the names in their values (a stage,
-// a move, a rule) and what a platform couldn't read shown through their own messages, and Hive's For you requests kept
+// a move, a rule) and what a platform couldn't read shown through their own messages, and Combwork's For you requests kept
 // as data beside their English.
 import { afterEach, describe, expect, it } from 'vitest'
 import { fmt, setLanguage, tr } from '../../src/shared/i18n'
@@ -257,7 +257,7 @@ describe("what a platform couldn't read", () => {
     expect(unreadWhy('revision', { unknown: { revision: 'cannot read repository HEAD' }, unknownText: {} }, format)).toEqual({ note: 'other', why: 'cannot read repository HEAD' })
   })
 
-  it("an id this Hive doesn't know (a newer Hive's record) shows as nothing rather than failing", () => {
+  it("an id this Combwork doesn't know (a newer Combwork's record) shows as nothing rather than failing", () => {
     expect(workflowLine({ id: 'workflow.unreadable.fromTheFuture' }, (m) => tr(m))).toBeNull()
     expect(workflowEnglish({ id: 'workflow.unreadable.fromTheFuture' })).toBe('workflow.unreadable.fromTheFuture')
   })

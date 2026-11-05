@@ -382,7 +382,7 @@ describe('what is read from a connection’s home', () => {
   it('auto memory: every file the Memory tab lists opens and saves, by either path, and nothing else of the CLI’s home (HI-1999)', async () => {
     const a = await signedInConnection('Personal', 'me@example.com')
     const f = accounts.accountFolder(a.id)
-    // The connection's projects is Hive's junction to the CLI home's, where the list reads auto memory from.
+    // The connection's projects is Combwork's junction to the CLI home's, where the list reads auto memory from.
     expect(lstatSync(join(f, 'projects')).isSymbolicLink()).toBe(true)
     const project = join(wsPath, 'alpha')
     const key = encodeProjectPath(realpathSync(project))
@@ -1393,7 +1393,7 @@ describe('connections as Settings → Accounts & Connections changes them (HI-21
       mkdirSync(join(p, '.combwork'), { recursive: true })
       writeFileSync(file, JSON.stringify(agentOn()))
       await w.refresh()
-      // As Hive's start sets it (initConnections).
+      // As Combwork's start sets it (initConnections).
       setConnectionGuard(accounts.connectionAssignable)
     })
     afterAll(() => writeFileSync(file, JSON.stringify({ version: 2, id, agents: [] })))

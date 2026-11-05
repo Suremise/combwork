@@ -1,8 +1,8 @@
 // #640: HB3 showed "working" after its turn ended (13 Oct, Hive 0.6.0). It had stopped its only background task (a
-// `sleep 2400` slot timer) with TaskStop 9 s before its Stop; its Stop left it waiting on background tasks, and when Hive
+// `sleep 2400` slot timer) with TaskStop 9 s before its Stop; its Stop left it waiting on background tasks, and when Combwork
 // then read the TaskStop it took the task's end for a wake, as a <task-notification> is, and showed it working: Claude
 // Code tells the agent of a task that ends, starting a turn, but not of one it stopped itself. Here the transcript is read
-// as Hive reads it, the status settled after each read: a task stopped by the agent leaves it finished; one that ends
+// as Combwork reads it, the status settled after each read: a task stopped by the agent leaves it finished; one that ends
 // by itself wakes it, as before.
 import { appendFileSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -34,13 +34,13 @@ async function agent(): Promise<{ l: Live; file: string; read: () => Promise<voi
   writeFileSync(file, started('b6yi5x9z5', ago(120)))
   const state = { provider: 'claude-code', runId: `run-${n}`, projectPath: join(base, 'p'), agentId: `a${n}`, sessionId: '55c580da-ba19-49b0-850b-41b41157471b', status: 'working', startedAt: ago(600) }
   const l: Live = { state, adapter: claudeCode, transcriptPath: file }
-  // What the transcript gained, read as Hive does when it grows: the count, then the status from it.
+  // What the transcript gained, read as Combwork does when it grows: the count, then the status from it.
   const read = async (): Promise<void> => {
     s.settleBackground(l, await s.readBackground(l, file, statSync(file).size))
   }
   await read()
   expect(l.tasks?.size).toBe(1)
-  // Its Stop came before Hive read the end: waiting on its background task.
+  // Its Stop came before Combwork read the end: waiting on its background task.
   l.state.status = 'background'
   return { l, file, read }
 }

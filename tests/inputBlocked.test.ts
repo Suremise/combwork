@@ -1,5 +1,5 @@
 // An agent whose input takes no keys (HI-2191): Claude Code 2.1.314 drew its offer to teach auto mode under its empty
-// input box, the dialog took the keys, and Hive typed its letter into it 105 times in five minutes while nobody was told.
+// input box, the dialog took the keys, and Combwork typed its letter into it 105 times in five minutes while nobody was told.
 // With the real SessionManager on a stand-in Claude Code input (claudeInputStandIn) that stops reading keys: three
 // clears in a row unanswered while the box reads empty block the input, the agent waits for the user with why, and no key
 // is pressed there until it is seen to take keys again (its box taking the user's key, a hook that moves it, or the
@@ -123,7 +123,7 @@ describe('an input that takes no keys (HI-2191)', () => {
     expect(e.state.statusMessage).toBe(OTHER.message)
   })
 
-  it("Hive done with a line it typed says so (lineWriter.onLineFreed): what waits on 'already typing' looks again by it", async () => {
+  it("Combwork done with a line it typed says so (lineWriter.onLineFreed): what waits on 'already typing' looks again by it", async () => {
     running()
     const told: string[] = []
     const off = writer.onLineFreed((p, a) => void told.push(`${p}#${a}`))
@@ -176,7 +176,7 @@ describe('an input that takes no keys (HI-2191)', () => {
       expect(sessions.inputBlocked(project, id)).toBe(false)
       expect(e.state.status).toBe('ready')
       expect(e.state.inputBlocked).toBeUndefined()
-      expect(writes, 'Hive pressed nothing').toEqual([])
+      expect(writes, 'Combwork pressed nothing').toEqual([])
     })
 
     it('a hook that moves it frees it (a prompt: working; a new question keeps its own reason); its idle notice does not', async () => {
@@ -224,7 +224,7 @@ describe('an input that takes no keys (HI-2191)', () => {
       expect(writes).toEqual([])
     })
 
-    it("Try again just after the user's Esc tries (their click); their text in the box frees it without a key of Hive's", async () => {
+    it("Try again just after the user's Esc tries (their click); their text in the box frees it without a key of Combwork's", async () => {
       const e = await blocked()
       const since = e.state.inputBlocked!.since
       // Their Esc a moment ago (typing, for the pause after it): Try again is theirs, so it tries.

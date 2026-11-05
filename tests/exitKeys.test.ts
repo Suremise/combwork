@@ -1,5 +1,5 @@
 // Stop's exit keys on conditions (HI-2272, src/main/exitKeys.ts), against a simulated Copilot on a test clock: a turn
-// whose cancel takes a while, keys lost as it winds down, Hive's view of the turn a second behind, the hint once a key at
+// whose cancel takes a while, keys lost as it winds down, Combwork's view of the turn a second behind, the hint once a key at
 // its prompt arms the exit, and the exit a while after the key that exits it.
 import { describe, expect, it } from 'vitest'
 import { driveExitKeys, EXIT_POLL_MS, type ExitKeysIO } from '../src/main/exitKeys'
@@ -11,7 +11,7 @@ interface Model {
   cancelMs?: number
   /** Keys arriving this long after the turn's end are lost (it is still winding down). */
   absorbMs?: number
-  /** How long after the turn's end Hive's view of it (the ledger, from its events) says so. */
+  /** How long after the turn's end Combwork's view of it (the ledger, from its events) says so. */
   ledgerLagMs?: number
   /** How long a key at its prompt takes to show the hint, and how long the exit stays armed. */
   hintMs?: number
@@ -164,8 +164,8 @@ describe('Stop’s exit keys on conditions (HI-2272)', () => {
     }
   })
 
-  it('Hive’s view of the turn behind (the hint shows, it still says working): the key that exits goes anyway', async () => {
-    // Already at its prompt, but Hive still thinks it in a turn: the first key arms it, and the hint ends the wait.
+  it('Combwork’s view of the turn behind (the hint shows, it still says working): the key that exits goes anyway', async () => {
+    // Already at its prompt, but Combwork still thinks it in a turn: the first key arms it, and the hint ends the wait.
     const sim = copilotModel({ inTurn: true, cancelMs: 0, absorbMs: 0 })
     const io: ExitKeysIO = { ...sim.io, inTurn: () => true }
     sim.io.press()

@@ -6,7 +6,7 @@
 // nothing personal in the file), an import checked first and refused saying why, name clashes (replace, keep both), an
 // unknown coding agent kept but blocking a load, a project's template loaded into another project, and changes at once
 // to one place (imports, duplicates, saves) serialised. #1436: format v2 (roles in the workflow, notes, a suggested
-// preset, a reviewer mode and pairs; no worktrees), 0.9's refused, Hive's own templates (valid, read-only, copied,
+// preset, a reviewer mode and pairs; no worktrees), 0.9's refused, Combwork's own templates (valid, read-only, copied,
 // loaded with names from the project's key, pairs kept as the agents' pairing, a provider that can't run swapped).
 import { execFileSync } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, utimesSync, writeFileSync } from 'fs'
@@ -46,7 +46,7 @@ const { providerService } = await import('../src/main/providerService')
 const { sessions } = await import('../src/main/sessions')
 const tasks = await import('../src/main/tasks')
 const { addAgent, claimMark, removedSince, reserveForRemoval } = await import('../src/main/projectAgents')
-// Paths compared as places: git lists the long names of folders Hive may know by short (8.3) ones, as on CI (#389).
+// Paths compared as places: git lists the long names of folders Combwork may know by short (8.3) ones, as on CI (#389).
 const { placeKey } = await import('../src/main/fsutil')
 const { worktreesRoot } = await import('../src/main/worktrees')
 
@@ -109,7 +109,7 @@ describe('the template format', () => {
     expect([isAgentTemplate(readAny({ ...team, pairs: [{ builder: 'E1', reviewer: 'R1' }] })), isAgentTemplate(readAny({ ...team, pairs: [{ builder: 'B1', reviewer: 'E1' }] }))]).toEqual([true, true])
     const odd = readTemplate({ ...team, suggestedPreset: 'chaos', reviewerMode: 'mob' })
     expect(typeof odd !== 'string' && [odd.suggestedPreset, odd.reviewerMode]).toEqual([undefined, undefined])
-    // A CLI this Hive doesn't know is kept as the suggestion (shown flagged, never used), if it looks like a provider's id.
+    // A CLI this Combwork doesn't know is kept as the suggestion (shown flagged, never used), if it looks like a provider's id.
     const later = readTemplate({ ...ok, agents: [{ name: 'A', provider: 'gemini' }, { name: 'B', provider: 'claude-code' }] })
     expect(typeof later !== 'string' && later.agents.map((a) => a.provider)).toEqual(['gemini', 'claude-code'])
     expect(typeof later !== 'string' && unknownProviders(later.agents)).toEqual(['gemini'])
@@ -218,7 +218,7 @@ describe('the template format', () => {
     expect(suggestTemplateAgentName('Builder', 'apiary', 'AP', ['Builder'])).toBe('Builder (apiary)')
   })
 
-  it("Hive's own templates (#1436): each valid as a file is, its names a pattern each role reads as, paired builders with reviewers, a layout that fits within the cap", () => {
+  it("Combwork's own templates (#1436): each valid as a file is, its names a pattern each role reads as, paired builders with reviewers, a layout that fits within the cap", () => {
     expect(HIVE_TEMPLATES.map((h) => [h.file, h.template.name])).toEqual([
       ['solo.json', 'Solo'],
       ['pair.json', 'Pair'],
@@ -335,7 +335,7 @@ describe('saving and loading templates', () => {
    * An agent with a 0.9 worktree, as a project upgraded from 0.9 has one (#1451: 1.0 adds none): a worktree on its own
    * branch from main, and the agent written into project.json with it (its setup still to run when the project has one).
    * In the worktrees folder beside the workspace, where 0.9 made them (HI-2142): one in the workspace folder is taken for
-   * a project, so each refresh its root watch starts writes Hive's files into it while the test works there.
+   * a project, so each refresh its root watch starts writes Combwork's files into it while the test works there.
    */
   const legacyAgent = (p: string, name: string, branch = `hive/legacy-${++legacyNo}`): StoredAgent => {
     const path = join(worktreesRoot(wsPath), basename(p), `wt-${legacyNo}-${name.replace(/\W+/g, '-').toLowerCase()}`)
@@ -376,7 +376,7 @@ describe('saving and loading templates', () => {
     live.clear()
     templates.testHooks.staged = undefined
   })
-  /** The templates kept in the workspace and its projects (Hive's own left out). */
+  /** The templates kept in the workspace and its projects (Combwork's own left out). */
   const userTemplates = <T extends { scope: string }>(list: T[]): T[] => list.filter((t) => t.scope !== 'hive')
 
   it('saves in either scope; a name in both is listed twice, and saving over a name asks first', async () => {
@@ -384,7 +384,7 @@ describe('saving and loading templates', () => {
     expect('saved' in saved && saved.saved).toMatchObject({ scope: 'workspace', file: 'pair.json', name: 'Pair', layout: 'columns2' })
     await run(() => templates.saveTemplate(alpha, 'project', 'pair'))
     const listed = await run(() => templates.listTemplates(alpha))
-    // Hive's own first (#1436), in their order; then the workspace's and the project's.
+    // Combwork's own first (#1436), in their order; then the workspace's and the project's.
     expect(listed.map((t) => `${t.scope}:${t.file}`).slice(0, 6)).toEqual(HIVE_TEMPLATES.map((h) => `hive:${h.file}`))
     expect(userTemplates(listed).map((t) => `${t.scope}:${t.name}`)).toEqual(['workspace:Pair', 'project:pair'])
     // The project's are its own: beta sees only the workspace's.
@@ -636,7 +636,7 @@ describe('saving and loading templates', () => {
     const ws = all.filter((t) => t.scope === 'workspace')
     expect(ws.length).toBeGreaterThan(0)
     expect(ws.every((t) => t.project === undefined)).toBe(true)
-    // Hive's own first (#1436), then the workspace's, then each project's.
+    // Combwork's own first (#1436), then the workspace's, then each project's.
     expect(all.slice(0, HIVE_TEMPLATES.length).map((t) => [t.scope, t.file, t.project])).toEqual(HIVE_TEMPLATES.map((h) => ['hive', h.file, undefined]))
     expect(all.findIndex((t) => t.scope === 'workspace')).toBe(HIVE_TEMPLATES.length)
     expect(all.findIndex((t) => t.scope === 'project')).toBe(HIVE_TEMPLATES.length + ws.length)
@@ -674,7 +674,7 @@ describe('saving and loading templates', () => {
     await expect(run(() => templates.duplicateTemplate(ref, { scope: 'project', project: base }))).rejects.toThrow()
   })
 
-  it("Hive's own are read-only (#1436): loaded, duplicated and exported, never saved over, renamed, edited, imported into or deleted", async () => {
+  it("Combwork's own are read-only (#1436): loaded, duplicated and exported, never saved over, renamed, edited, imported into or deleted", async () => {
     const pair = { scope: 'hive' as const, file: 'pair.json' }
     const refused = /Combwork's own templates can't be changed: duplicate one/
     await expect(run(() => templates.renameTemplate(pair, 'Mine'))).rejects.toThrow(refused)
@@ -761,7 +761,7 @@ describe('saving and loading templates', () => {
     await expect(run(() => templates.importTemplate(f('big.json', JSON.stringify({ ...good, pad: 'x'.repeat(300 * 1024) })), where))).rejects.toThrow(/over 256 KB/)
     await expect(run(() => templates.importTemplate(join(dir, 'missing.json'), where))).rejects.toThrow(/isn't there/)
     expect(await count()).toBe(n)
-    // With a BOM, extra keys and a provider from a newer Hive: imported (the extras dropped), flagged.
+    // With a BOM, extra keys and a provider from a newer Combwork: imported (the extras dropped), flagged.
     const later = f('later.json', '﻿' + JSON.stringify({ ...good, name: 'Later', author: 'someone', agents: [...good.agents, { name: 'G', provider: 'gemini', model: 'g-1' }] }))
     expect((await run(() => templates.inspectImport(later))).unknown).toEqual(['gemini'])
     const imported = await run(() => templates.importTemplate(later, where))
@@ -795,7 +795,7 @@ describe('saving and loading templates', () => {
     expect(cfgOf(alpha).agents.find((a: StoredAgent) => a.id === source.id)?.worktree).toEqual(source.worktree)
   })
 
-  gitIt("Hive's Team 3×3 (#1436): six agents named from the project's key, paired both ways, in a grid, none in a worktree; each role on the first connection of the CLI it suggests, else the first usable (HI-2109)", async () => {
+  gitIt("Combwork's Team 3×3 (#1436): six agents named from the project's key, paired both ways, in a grid, none in a worktree; each role on the first connection of the CLI it suggests, else the first usable (HI-2109)", async () => {
     const ids = cfgOf(beta).agents.map((a: StoredAgent) => a.id)
     // Names made from the key that can't be read (beta has none yet): refused, never a guessed key (#1440).
     await expect(run(() => templates.templatePlan(beta, 'hive', 'team-3x3.json'))).rejects.toThrow(/couldn't read beta's key/)
@@ -831,7 +831,7 @@ describe('saving and loading templates', () => {
     await w.mutateProjectConfig(beta, () => ({ workflow: { platform: 'git', preset: 'team', options: {} } }) as never)
     expect((await run(() => templates.templatePlan(beta, 'hive', 'team-3x3.json'))).suggestedPreset).toBeNull()
     // Codex not installed (HI-2109): its connections aren't offered; the reviewer suggesting it gets the first usable one,
-    // Hive's own templates and the user's alike (a suggestion, never a refusal).
+    // Combwork's own templates and the user's alike (a suggestion, never a refusal).
     const info = providerService.info
     providerService.info = ((id: string) => ({ provider: id, found: id !== 'codex' })) as never
     try {
@@ -1078,7 +1078,7 @@ describe("a template's workflow (HI-1910)", () => {
     const dir = join(base, 'imports-workflow')
     mkdirSync(dir, { recursive: true })
     const agents = [{ name: 'IM-B1', role: 'builder', provider: 'claude-code' }]
-    // HR5's two cases: a section with a value Hive can't use, and a workflow that isn't one.
+    // HR5's two cases: a section with a value Combwork can't use, and a workflow that isn't one.
     const cases: [string, unknown][] = [['Bad none', { none: { preset: null, options: { review: 'bogus' } } }], ['Bogus', 'bogus']]
     for (const [name, workflow] of cases) {
       const file = join(dir, `${name}.hive-template.json`)
@@ -1109,7 +1109,7 @@ describe("a template's workflow (HI-1910)", () => {
     expect(r.workflow?.options.loopRounds).toBe(8)
   })
 
-  it("Hive's own: its preset as this project's form offers it, its pool kept", async () => {
+  it("Combwork's own: its preset as this project's form offers it, its pool kept", async () => {
     // Its agents' names are made from the project's key.
     const { keyProjects } = await import('../src/main/projectKeys')
     await run(() => keyProjects(w))

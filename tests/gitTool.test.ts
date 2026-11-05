@@ -1,5 +1,5 @@
 // Git itself missing, too old or failing (#346): never read as "not a repository", and never as merged, clean or
-// nothing to lose. Git is hidden from this test process's own PATH (never the machine's), which every git call Hive
+// nothing to lose. Git is hidden from this test process's own PATH (never the machine's), which every git call Combwork
 // makes inherits.
 import { execFileSync } from 'child_process'
 import { createRequire } from 'module'
@@ -57,7 +57,7 @@ describe('git versions', () => {
     expect(compareGitVersions('2.38.0', GIT_MIN)).toBe(0)
   })
 
-  it('below 2.38 is old; below 2.17 nothing of Hive runs, so it is a problem like a missing git', () => {
+  it('below 2.38 is old; below 2.17 nothing of Combwork runs, so it is a problem like a missing git', () => {
     expect(gitStateOf('2.45.1')).toBe('ok')
     expect(gitStateOf('2.37.9')).toBe('old')
     expect(gitUnusable({ state: 'old', version: '2.30.0' })).toBe(false)
@@ -119,7 +119,7 @@ describe('git missing', () => {
     expect(run(p, 'branch', '--format=%(refname:short)')).toMatch(/hive\/wt/)
   })
 
-  it('.combwork is still excluded by the line Hive writes, marked unconfirmed', async () => {
+  it('.combwork is still excluded by the line Combwork writes, marked unconfirmed', async () => {
     const { p } = await project()
     hideGit()
     expect(await ensureHiveExcluded(p)).toMatchObject({ excluded: true, unconfirmed: true })
@@ -154,9 +154,9 @@ describe('git failing', () => {
   })
 })
 
-// HI-2137: where PATH's git is Git for Windows' launcher (<root>\cmd\git.exe), Hive starts the real git beneath it
+// HI-2137: where PATH's git is Git for Windows' launcher (<root>\cmd\git.exe), Combwork starts the real git beneath it
 // directly; anything else keeps PATH's git.
-describe('the git Hive starts', () => {
+describe('the git Combwork starts', () => {
   /** A Git for Windows layout: its launcher, and its real git under `mingw` (empty files: only where they are counts). */
   const layouts: string[] = []
   afterEach(() => {
@@ -240,7 +240,7 @@ describe('the git Hive starts', () => {
     expect(await realGit(SAID, other.launcher, ask)).toEqual({ exe: 'git' })
   })
 
-  it('this machine: with the launcher first on PATH, Hive starts the real git, and git runs', async () => {
+  it('this machine: with the launcher first on PATH, Combwork starts the real git, and git runs', async () => {
     const execPath = run(process.cwd(), '--exec-path').trim()
     const launcher = join(dirname(dirname(dirname(win32.normalize(execPath)))), 'cmd', 'git.exe')
     if (!existsSync(launcher)) return // Not Git for Windows: nothing of this applies.

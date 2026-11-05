@@ -45,7 +45,7 @@ describe('the setting', () => {
     for (const bad of ['D:\\a; E:\\b', 'agent-tmp', 'tmp\\x', 42]) expect('error' in checkAdvanced(def, bad), String(bad)).toBe(true)
     expect((checkAdvanced(def, 'agent-tmp') as { error: string }).error).toMatch(/one folder's full path/)
   })
-  it("reads the workspace's own over Hive's; empty, none", async () => {
+  it("reads the workspace's own over Combwork's; empty, none", async () => {
     expect(agentTempSetting(null)).toBeNull()
     await advanced.set(AGENT_TEMP_FOLDER_ID, 'D:\\hive-wide')
     expect(agentTempSetting(null)).toBe('D:\\hive-wide')

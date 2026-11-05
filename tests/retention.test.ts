@@ -20,8 +20,8 @@ const { readStats } = await import('../src/main/fsutil')
 type WS = ReturnType<typeof createWorkspaceService>
 
 /**
- * A workspace with Hive's skills and modes, then skills up to `entries` in the skills folder (s0, s1…: `added` of
- * them, however many Hive ships), and `modes` more.
+ * A workspace with Combwork's skills and modes, then skills up to `entries` in the skills folder (s0, s1…: `added` of
+ * them, however many Combwork ships), and `modes` more.
  */
 async function workspace(name: string, entries: number, modes: number, body = 'Step.\n'): Promise<{ w: WS; ws: string; modePaths: string[]; added: number }> {
   const ws = join(base, name)
@@ -41,7 +41,7 @@ async function workspace(name: string, entries: number, modes: number, body = 'S
   return { w, ws, modePaths, added: entries - have }
 }
 
-/** One scan as Hive does it: every skill's header and revision (the status), and every mode's revision. */
+/** One scan as Combwork does it: every skill's header and revision (the status), and every mode's revision. */
 const scan = (w: WS, modes: string[]) => inWorkspace(w, async () => {
   await skillRevisions()
   for (const p of modes) await revisionOf(p)
@@ -73,7 +73,7 @@ describe('the largest supported catalog', () => {
   it('with larger bodies (64 KB each, 300 skills): warm scans still read nothing', async () => {
     const { w, modePaths, added } = await workspace('bodies', 300, 0, 'Words. '.repeat(64 * 1024 / 7))
     const cold = await measure('300 skills of 64 KB, cold', () => scan(w, modePaths))
-    // Every big one read (64 KB less a few bytes each), besides Hive's own.
+    // Every big one read (64 KB less a few bytes each), besides Combwork's own.
     expect(cold.bytes).toBeGreaterThan(added * 65_000)
     expect(nothing(await measure('300 skills of 64 KB, warm', () => scan(w, modePaths)))).toEqual({ files: 0, bytes: 0, metaBytes: 0 })
     await disposeWorkspaceService(w)
@@ -82,7 +82,7 @@ describe('the largest supported catalog', () => {
 
 describe('past the retention limits', () => {
   it('the least recently used go one at a time: the most recent stay, so the whole inventory is never cleared', async () => {
-    // 60 skills of its own (s0–s59), whatever Hive ships.
+    // 60 skills of its own (s0–s59), whatever Combwork ships.
     const { w, ws } = await workspace('overflow', 60 + readdirSync(join(__dirname, '..', 'resources', 'skills')).length, 0)
     const saved = { ...RETENTION }
     RETENTION.revisions = 50

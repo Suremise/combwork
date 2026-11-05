@@ -1,4 +1,4 @@
-// A line Hive types that its CLI doesn't take (#430), with the real SessionManager and the terminal's writes caught:
+// A line Combwork types that its CLI doesn't take (#430), with the real SessionManager and the terminal's writes caught:
 // nothing more is typed over a line still waiting to be taken (typed and not yet taken, or marked not taken), whoever
 // types it; the user's Enter alone doesn't count as taken; only the CLI taking a prompt clears the mark. And a wake's
 // Enter again, when it can't be pressed at once, is pressed once it can, else the line is marked, saying so.
@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { sessions } from '../src/main/sessions'
 import * as pty from '../src/main/ptyHost'
 import { config } from '../src/main/config'
-// The writer of Hive's lines and their confirmation (#649: lineWriter.ts, which the delivery service types with).
+// The writer of Combwork's lines and their confirmation (#649: lineWriter.ts, which the delivery service types with).
 import * as writer from '../src/main/lineWriter'
 
 const project = 'C:/fake-ws/alpha'
@@ -200,7 +200,7 @@ describe("a line whose CLI took it with no prompt seen: what it rang for was rea
     sessions.lineTaken(project, id, 'run1', 'mB', 'mB, which it rang for, was read')
     expect(sessions.lineUntaken(project, id)).toBe(false)
     expect(sessions.lineWaiting(project, id)).toBe(false)
-    // A line that rang for nothing Hive knows (its mark has no deliveries): no read clears it.
+    // A line that rang for nothing Combwork knows (its mark has no deliveries): no read clears it.
     sessions.lineNotTaken(project, id, 'run1', 'A TASK', true)
     sessions.lineTaken(project, id, 'run1', 'mB', 'mB, which it rang for, was read')
     expect(sessions.lineUntaken(project, id)).toBe(true)
@@ -216,7 +216,7 @@ describe("a line whose CLI took it with no prompt seen: what it rang for was rea
   })
 })
 
-describe("a line of Hive's the user typed into is theirs (#652 round 1 finding 2)", () => {
+describe("a line of Combwork's the user typed into is theirs (#652 round 1 finding 2)", () => {
   const was = config.settings.assistant
   afterEach(() => {
     live.delete(key)
@@ -242,7 +242,7 @@ describe("a line of Hive's the user typed into is theirs (#652 round 1 finding 2
       vi.spyOn(pty, 'writePty').mockImplementation((_k, data) => void writes.push(data))
       const marks = vi.spyOn(sessions, 'lineNotTaken').mockImplementation(() => undefined)
       const e = typedAt(t)
-      // The user replaces Hive's line with a draft of their own, and leaves it unsent past the pause.
+      // The user replaces Combwork's line with a draft of their own, and leaves it unsent past the pause.
       sessions.noteUserInput(`session:${key}`, 'my unsent draft')
       vi.setSystemTime(t + 20_000)
       expect(sessions.userMayBeTyping(project, id)).toBe(false)
@@ -252,7 +252,7 @@ describe("a line of Hive's the user typed into is theirs (#652 round 1 finding 2
       expect(writes).toEqual([])
       expect(left).toBe(1)
       expect(marks).not.toHaveBeenCalled()
-      // Not Hive's to send even directly, and nothing is typed over the draft, however long it stands.
+      // Not Combwork's to send even directly, and nothing is typed over the draft, however long it stands.
       expect(sessions.submitAgain(project, id, 'run1')).toBe(false)
       vi.setSystemTime(t + 10 * 60_000)
       expect(sessions.lineWaiting(project, id)).toBe(true)

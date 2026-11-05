@@ -1,6 +1,6 @@
 // A session host's records in its workspace's database (#1061, sessionStore.ts): each project's sessions.json moved in
 // the first time its records are read (rows and the mark in one transaction, then the file kept as a backup), so a crash
-// midway loses nothing; a change writes only the rows it changed, and concurrent changes all land; Remove from Hive
+// midway loses nothing; a change writes only the rows it changed, and concurrent changes all land; Remove from Combwork
 // writes them back into the folder, and a workspace finding such a file where the project has no records moves it in;
 // a project renamed keeps them (they are under its id), the Assistant's are its own.
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
@@ -16,7 +16,7 @@ const base = tempDir('hive-session-store-')
 process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
 process.env.CODEX_HOME = join(base, 'codex-home')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
-// Kept files written as Hive writes them; `afterWrite`, when set, runs once a file is written (the export's, to race it).
+// Kept files written as Combwork writes them; `afterWrite`, when set, runs once a file is written (the export's, to race it).
 const fileHooks = vi.hoisted(() => ({ afterWrite: null as ((path: string) => void) | null }))
 // A file's read held (#1161): the next read of `held.path` says it has started, then waits for `held.gate`.
 const held = vi.hoisted(() => ({ path: '', started: null as (() => void) | null, gate: null as Promise<void> | null }))
@@ -135,7 +135,7 @@ describe('changes', () => {
   it("write only the rows they change: a session's last activity is one row, the deleted sessions' usage untouched", async () => {
     const p = join(wsPath, 'gamma')
     await run(() => workspace.sessionsFile(p))
-    // Every row written from here is counted, on the connection Hive writes with.
+    // Every row written from here is counted, on the connection Combwork writes with.
     const db = workspaceDb(wsPath).writer
     // Its tables' rows (#1211): a record's, its cards', the deleted lists'.
     const watched = ['sessions', 'session_cards', 'sessions_deleted', 'sessions_deleted_usage']
@@ -322,7 +322,7 @@ describe('following the project', () => {
     await run(() => workspace.ensureProject(p))
     await run(() => workspace.projectIds({ fresh: true }))
     await run(() => workspace.upsertSession(p, { id: 'one', name: 'before' }))
-    // Another process's connection to the same database (another Hive, a script) changes the record just as the file lands.
+    // Another process's connection to the same database (another Combwork, a script) changes the record just as the file lands.
     let wrote: 'committed' | 'blocked' | null = null
     fileHooks.afterWrite = (path) => {
       if (!path.endsWith('sessions.json')) return
@@ -350,7 +350,7 @@ describe('following the project', () => {
     else expect(name).toBe('before')
   })
 
-  it('Remove from Hive with refreshes on the way leaves the file in the folder; another workspace takes them in; Restore here brings them back with what came meanwhile', { timeout: 60_000 }, async () => {
+  it('Remove from Combwork with refreshes on the way leaves the file in the folder; another workspace takes them in; Restore here brings them back with what came meanwhile', { timeout: 60_000 }, async () => {
     const p = project('travels')
     await run(() => workspace.ensureProject(p))
     await run(() => workspace.projectIds({ fresh: true }))

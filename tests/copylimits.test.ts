@@ -1,4 +1,4 @@
-// A skill's source can change while Hive copies it for a session. The copy keeps the size limits (bytes read, entries,
+// A skill's source can change while Combwork copies it for a session. The copy keeps the size limits (bytes read, entries,
 // depth) as it goes, is checked before it is published, and what is recorded as delivered is the copy's own revision:
 // a source grown past the limits, or with a file gone or unreadable mid-copy, never replaces a usable copy (Codex keeps
 // its old one and says why) and is never left half-copied for a session (Claude Code: no copy, and why). A source that
@@ -49,7 +49,7 @@ const { claudeCode } = await import('../src/main/providers/claude/adapter')
 type Delivery = { revision: string | null; problem?: string; lasting?: true }
 
 // The entry and byte limits lowered for this file (HI-2453), as revisions.test.ts does (#215, #666): the copy and the
-// check read HASH_LIMITS as they go, so the same limits are kept over a tenth of the files and a 1 MB file. At Hive's own
+// check read HASH_LIMITS as they go, so the same limits are kept over a tenth of the files and a 1 MB file. At Combwork's own
 // 2000 entries and 64 MB a test wrote and copied 2000 files or 65 MB, and under a loaded full run one passed even its
 // 180 s bound. The real values are checked below, before they are lowered.
 const HIVE_LIMITS = { ...HASH_LIMITS }
@@ -61,7 +61,7 @@ afterAll(() => {
   Object.assign(HASH_LIMITS, HIVE_LIMITS)
 })
 
-it("Hive's own limits, lowered for this file: 2000 entries, 12 folders deep, 64 MB", () => {
+it("Combwork's own limits, lowered for this file: 2000 entries, 12 folders deep, 64 MB", () => {
   expect(HIVE_LIMITS).toEqual({ entries: 2000, depth: 12, bytes: 64 * MB })
 })
 
@@ -280,7 +280,7 @@ describe('a skill at the entry limit', () => {
   const launchClaude = (project: string, skills: { name: string; sourcePath: string }[]) =>
     claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills, mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/hive/hook-auth/x.txt', privateDir: `${project}-private` } as never) as Promise<Record<string, Delivery>>
 
-  // At the file's lowered limit (LIMITS, above), not Hive's 2000: the same boundary over a tenth of the file work, which
+  // At the file's lowered limit (LIMITS, above), not Combwork's 2000: the same boundary over a tenth of the file work, which
   // at 2000 passed even a 180 s bound under a loaded full run (#356, HI-2423, HI-2453). The test hashes the source only
   // once itself: the next launch's revision is its copy's own hash, so its equal to the first, the source's, says the
   // copy is the source.

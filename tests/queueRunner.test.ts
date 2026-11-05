@@ -25,7 +25,7 @@ import { preset } from '../src/shared/workflow/options'
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
 
-/** A Hive in a process of its own: its runner, driven by commands. */
+/** A Combwork in a process of its own: its runner, driven by commands. */
 interface Host {
   proc: ChildProcess
   ask: (op: string) => Promise<Record<string, unknown>>
@@ -84,13 +84,13 @@ function world(): World {
   }
 }
 
-/** Starts a Hive (a host process) on a world's hive.db, for its project, worktrees folder and `main` (or another target). */
+/** Starts a Combwork (a host process) on a world's hive.db, for its project, worktrees folder and `main` (or another target). */
 function host(w: World, profile: string, seams: { linger?: boolean; stallSettle?: boolean; target?: string } = {}): Host {
   const env = { ...baseEnv(), ...(seams.linger ? { QR_LINGER: '1' } : {}), ...(seams.stallSettle ? { QR_STALL_SETTLE: '1' } : {}) }
   const proc = spawn(process.execPath, [bundle, boardFile(w.ws), w.project, w.root, profile, seams.target ?? 'main'], { env, stdio: ['pipe', 'pipe', 'inherit'], windowsHide: true })
   const waiting = new Map<number, (r: Record<string, unknown>) => void>()
   createInterface({ input: proc.stdout! }).on('line', (l) => {
-    // Its replies (tests/queueRunnerHost.ts); the rest is Hive's log.
+    // Its replies (tests/queueRunnerHost.ts); the rest is Combwork's log.
     if (!l.startsWith('queue-host: ')) return
     const r = JSON.parse(l.slice('queue-host: '.length)) as { id: number }
     waiting.get(r.id)?.(r)
@@ -131,39 +131,39 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
   it("one runs, and the other doesn't while the first lives", async () => {
     const w = world()
     try {
-      const a = host(w, 'Hive-A')
-      const b = host(w, 'Hive-B')
+      const a = host(w, 'Combwork-A')
+      const b = host(w, 'Combwork-B')
       expect(await a.ask('acquire')).toMatchObject({ ok: true, paused: null })
-      expect(await b.ask('acquire')).toMatchObject({ ok: false, heldBy: { profile: 'Hive-A', pid: a.proc.pid } })
+      expect(await b.ask('acquire')).toMatchObject({ ok: false, heldBy: { profile: 'Combwork-A', pid: a.proc.pid } })
       expect(await a.ask('holds')).toMatchObject({ holds: true })
-      expect(w.store.queueLease('main')).toMatchObject({ profile: 'Hive-A', pid: a.proc.pid })
+      expect(w.store.queueLease('main')).toMatchObject({ profile: 'Combwork-A', pid: a.proc.pid })
     } finally {
       await w.close()
     }
   })
 
-  it('a stalled Hive keeps its queue: renewals stopped for as long as you like are never a takeover', async () => {
+  it('a stalled Combwork keeps its queue: renewals stopped for as long as you like are never a takeover', async () => {
     const w = world()
     try {
-      const a = host(w, 'Hive-A')
+      const a = host(w, 'Combwork-A')
       await a.ask('acquire')
       await a.ask('stall')
-      // Last seen a day ago (a Hive stuck that long): the lease's renewal is only what the panel shows.
+      // Last seen a day ago (a Combwork stuck that long): the lease's renewal is only what the panel shows.
       const l = w.store.queueLease('main')!
       const dayAgo = new Date(Date.now() - 86_400_000).toISOString()
       w.store.renewQueueLease(l.lease, l.token, dayAgo)
-      const b = host(w, 'Hive-B')
-      expect(await b.ask('acquire')).toMatchObject({ ok: false, heldBy: { profile: 'Hive-A', renewedAt: dayAgo } })
+      const b = host(w, 'Combwork-B')
+      expect(await b.ask('acquire')).toMatchObject({ ok: false, heldBy: { profile: 'Combwork-A', renewedAt: dayAgo } })
       expect(await a.ask('holds')).toMatchObject({ holds: true })
     } finally {
       await w.close()
     }
   })
 
-  it("a crashed Hive's processes end with it, detached ones too: its job closes", async () => {
+  it("a crashed Combwork's processes end with it, detached ones too: its job closes", async () => {
     const w = world()
     try {
-      const a = host(w, 'Hive-A')
+      const a = host(w, 'Combwork-A')
       await a.ask('acquire')
       const r = (await a.ask('sleeper')) as { check: number; detached: number }
       const check = await identify(r.check)
@@ -173,7 +173,7 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
       await ends(check)
       await ends(detached)
       // Its duties are still recorded: the next runner sees them gone and drops them.
-      const b = host(w, 'Hive-B')
+      const b = host(w, 'Combwork-B')
       expect(await b.ask('acquire')).toMatchObject({ ok: true, paused: null })
       const mine = w.store.queueLease('main')!.lease
       expect(w.store.queueProcs(null, 'main').every((p) => p.lease === mine)).toBe(true)
@@ -185,7 +185,7 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
   it('a dead runner whose job outlived it is taken over: its job and recorded check ended first, a new folder, the old one removed', async () => {
     const w = world()
     try {
-      const a = host(w, 'Hive-A', { linger: true })
+      const a = host(w, 'Combwork-A', { linger: true })
       const got = (await a.ask('acquire')) as { lease: string; folder: string; supervisor: number }
       // Its supervisor outlives it (the seam), and is ended when the test ends.
       await identify(got.supervisor)
@@ -194,13 +194,13 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
       const r = (await a.ask('sleeper')) as { check: number; detached: number }
       const check = await identify(r.check)
       const detached = await identify(r.detached)
-      // Hive A ends mid-check (a crash); its job's supervisor here doesn't: the check and its child run on.
+      // Combwork A ends mid-check (a crash); its job's supervisor here doesn't: the check and its child run on.
       a.proc.kill()
       await a.exited
       expect(await running(check)).toBe(true)
       expect(await running(detached)).toBe(true)
 
-      const b = host(w, 'Hive-B')
+      const b = host(w, 'Combwork-B')
       const took = (await b.ask('acquire')) as { ok: boolean; lease: string; folder: string; paused: number | null }
       expect(took).toMatchObject({ ok: true, paused: null })
       expect(took.folder).not.toBe(got.folder)
@@ -209,7 +209,7 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
       expect(existsSync(got.folder)).toBe(false)
       expect(forward(sh(w.project, 'worktree', 'list', '--porcelain'))).not.toContain(forward(got.folder))
       expect(w.store.queueProcs(got.lease)).toEqual([])
-      expect(w.store.queueLease('main')).toMatchObject({ profile: 'Hive-B', lease: took.lease, pid: b.proc.pid })
+      expect(w.store.queueLease('main')).toMatchObject({ profile: 'Combwork-B', lease: took.lease, pid: b.proc.pid })
       expect(w.store.queueFolders('main').map((f) => f.folder)).toEqual([took.folder])
     } finally {
       await w.close()
@@ -219,7 +219,7 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
   it('two crashes in a row (HR4 r1 #2): the runner that crashed mid-takeover leaves the duties, and the next settles them all before it runs', async () => {
     const w = world()
     try {
-      const a = host(w, 'Hive-A', { linger: true })
+      const a = host(w, 'Combwork-A', { linger: true })
       const got = (await a.ask('acquire')) as { lease: string; folder: string; supervisor: number }
       await identify(got.supervisor)
       await a.ask('worktree')
@@ -229,11 +229,11 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
       a.proc.kill()
       await a.exited
       // B takes the lease and its job, stops before ending anything (it never answers), then crashes.
-      const b = host(w, 'Hive-B', { stallSettle: true })
+      const b = host(w, 'Combwork-B', { stallSettle: true })
       void b.ask('acquire').catch(() => undefined)
       const bReady = (): boolean => {
         const l = w.store.queueLease('main')
-        return !!l && l.profile === 'Hive-B' && w.store.queueProcs(l.lease).some((p) => p.what === 'job')
+        return !!l && l.profile === 'Combwork-B' && w.store.queueProcs(l.lease).some((p) => p.what === 'job')
       }
       await vi.waitFor(() => expect(bReady()).toBe(true), { timeout: 90_000, interval: 100 })
       b.proc.kill()
@@ -241,7 +241,7 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
       expect(await running(check)).toBe(true)
       expect(await running(detached)).toBe(true)
 
-      const c = host(w, 'Hive-C')
+      const c = host(w, 'Combwork-C')
       expect(await c.ask('acquire')).toMatchObject({ ok: true, paused: null })
       expect(await running(check)).toBe(false)
       expect(await running(detached)).toBe(false)
@@ -256,7 +256,7 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
   it('a check that starts a detached server and exits (HR4 r1 #3): the server is in the job, and the release ends it', async () => {
     const w = world()
     try {
-      const a = host(w, 'Hive-A')
+      const a = host(w, 'Combwork-A')
       const got = (await a.ask('acquire')) as { lease: string }
       const r = (await a.ask('server')) as { check: number; detached: number }
       const server = await identify(r.detached)
@@ -267,17 +267,17 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
       expect(await running(server)).toBe(false)
       expect(w.store.queueLease('main')).toBeNull()
       expect(w.store.queueProcs(null, 'main')).toEqual([])
-      const b = host(w, 'Hive-B')
+      const b = host(w, 'Combwork-B')
       expect(await b.ask('acquire')).toMatchObject({ ok: true, paused: null })
     } finally {
       await w.close()
     }
   })
 
-  it("HR4 r3 #1: a process the supervisor follows (as a packaged app's escaped one) is journalled before it is followed: a crash at once, its Hive's board writes stuck, and the next runner still ends it", async () => {
+  it("HR4 r3 #1: a process the supervisor follows (as a packaged app's escaped one) is journalled before it is followed: a crash at once, its Combwork's board writes stuck, and the next runner still ends it", async () => {
     const w = world()
     try {
-      const a = host(w, 'Hive-A', { linger: true })
+      const a = host(w, 'Combwork-A', { linger: true })
       const got = (await a.ask('acquire')) as { lease: string; supervisor: number }
       await identify(got.supervisor)
       // From here A's board writes never complete (a busy board): nothing of the follow can reach hive.db.
@@ -291,7 +291,7 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
       expect(await running(outside)).toBe(true)
       expect(readFileSync(join(w.root, '.queue-journals', `${got.lease}.followed`), 'utf8')).toMatch(new RegExp(`^${f.pid}:\\d+`, 'm'))
       // Not in the job: ending the job wouldn't end it. Its journal does.
-      const b = host(w, 'Hive-B')
+      const b = host(w, 'Combwork-B')
       expect(await b.ask('acquire')).toMatchObject({ ok: true, paused: null })
       expect(await running(outside)).toBe(false)
       expect(w.store.queueProcs(got.lease)).toEqual([])
@@ -305,7 +305,7 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
   it("HR4 r5: a known writer whose journal record was torn (its last digits and newline lost) keeps its duty: the next runner pauses rather than forget it", async () => {
     const w = world()
     try {
-      const a = host(w, 'Hive-A', { linger: true })
+      const a = host(w, 'Combwork-A', { linger: true })
       const got = (await a.ask('acquire')) as { lease: string; supervisor: number }
       await identify(got.supervisor)
       const f = (await a.ask('follow')) as { followed: boolean; pid: number }
@@ -316,7 +316,7 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
       // A torn final append, as HR4's probe made it: still digits, but cut short.
       const file = join(w.root, '.queue-journals', `${got.lease}.followed`)
       writeFileSync(file, readFileSync(file, 'utf8').slice(0, -3))
-      const b = host(w, 'Hive-B')
+      const b = host(w, 'Combwork-B')
       const took = (await b.ask('acquire')) as { ok: boolean; paused: number | null }
       expect(took.ok).toBe(true)
       expect(took.paused).not.toBeNull()
@@ -328,27 +328,27 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
     }
   })
 
-  it('HR4 r3 #2: a target whose start failed in a living Hive never leaves its shared supervisor to another Hive: B takes that target, and A, its other target and its checks run on', async () => {
+  it('HR4 r3 #2: a target whose start failed in a living Combwork never leaves its shared supervisor to another Combwork: B takes that target, and A, its other target and its checks run on', async () => {
     const w = world()
     try {
-      const a = host(w, 'Hive-A')
+      const a = host(w, 'Combwork-A')
       const got = (await a.ask('acquire')) as { lease: string; supervisor: number }
       const sup = await identify(got.supervisor)
       const r = (await a.ask('sleeper')) as { check: number; detached: number }
       const check = await identify(r.check)
       const detached = await identify(r.detached)
-      // In the same Hive, another target's start fails part way, after its job was made.
+      // In the same Combwork, another target's start fails part way, after its job was made.
       expect(await a.ask('other')).toMatchObject({ failed: true, why: 'disk full' })
       expect(w.store.queueLease('other')).toBeNull()
       expect(w.store.queueProcs(null, 'other')).toEqual([])
-      // Another Hive takes that target.
-      const b = host(w, 'Hive-B', { target: 'other' })
+      // Another Combwork takes that target.
+      const b = host(w, 'Combwork-B', { target: 'other' })
       expect(await b.ask('acquire')).toMatchObject({ ok: true, paused: null })
       expect(await running(sup)).toBe(true)
       expect(await running(check)).toBe(true)
       expect(await running(detached)).toBe(true)
       expect(await a.ask('holds')).toMatchObject({ holds: true })
-      expect(w.store.queueLease('main')).toMatchObject({ profile: 'Hive-A' })
+      expect(w.store.queueLease('main')).toMatchObject({ profile: 'Combwork-A' })
     } finally {
       await w.close()
     }
@@ -357,7 +357,7 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
   it('HR4 r2 #1: a release ends what its job follows too, before it gives its duties up', async () => {
     const w = world()
     try {
-      const a = host(w, 'Hive-A')
+      const a = host(w, 'Combwork-A')
       const got = (await a.ask('acquire')) as { lease: string }
       const f = (await a.ask('follow')) as { followed: boolean; pid: number }
       expect(f.followed).toBe(true)
@@ -371,10 +371,10 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
     }
   })
 
-  it('a release ends a check still running, then gives the lease up for the next Hive (keeping nothing the queue no longer needs)', async () => {
+  it('a release ends a check still running, then gives the lease up for the next Combwork (keeping nothing the queue no longer needs)', async () => {
     const w = world()
     try {
-      const a = host(w, 'Hive-A')
+      const a = host(w, 'Combwork-A')
       const got = (await a.ask('acquire')) as { folder: string }
       await a.ask('worktree')
       const r = (await a.ask('sleeper')) as { check: number; detached: number }
@@ -385,7 +385,7 @@ describe('one runner per target across Hives (#1360)', { timeout: 180_000 }, () 
       expect(await running(detached)).toBe(false)
       expect(w.store.queueLease('main')).toBeNull()
       expect(existsSync(got.folder)).toBe(false)
-      const b = host(w, 'Hive-B')
+      const b = host(w, 'Combwork-B')
       expect(await b.ask('acquire')).toMatchObject({ ok: true })
     } finally {
       await w.close()
@@ -401,7 +401,7 @@ const probeWith = (dead: Set<number>, self = { pid: 1001, started: 5 }): Process
   end: async () => []
 })
 
-/** A project whose cards Hive merges (Team's options, as the queue's own tests use). */
+/** A project whose cards Combwork merges (Team's options, as the queue's own tests use). */
 const team = (): Env => setup({ ...preset('git', 'team', { quick: ['quick'], tests: [] }), preChecks: [], okBefore: { mode: 'never', labels: [] }, commands: { quick: 'npm run quick' } })
 
 /** A card approved and queued: started by B1, committed, submitted, passed by R1. */
@@ -427,7 +427,7 @@ describe("a runner's fence (#1360)", { timeout: 120_000 }, () => {
       const before = sh(e.project, 'rev-parse', 'main')
       const a = (await QueueRunner.acquire({ store: e.store, project: e.project, target: 'main', root: rootOf(e), profile: 'A', probe: probeWith(new Set()) })) as { ok: true; runner: QueueRunner }
       const runner = a.runner
-      // Mid-entry, after its test merge, another Hive finds A's process gone (as it looks from there) and takes over:
+      // Mid-entry, after its test merge, another Combwork finds A's process gone (as it looks from there) and takes over:
       // set going here, outside A's queue (whose work is fenced by A's lease), and let go from the queue's seam.
       const other = e.reopen()
       let b: QueueRunner | null = null
@@ -490,7 +490,7 @@ describe("a runner's fence (#1360)", { timeout: 120_000 }, () => {
     }
   })
 
-  it('HR4 r1 #4: a stale queue finding its change merged outside Hive writes nothing: containment is fenced too', async () => {
+  it('HR4 r1 #4: a stale queue finding its change merged outside Combwork writes nothing: containment is fenced too', async () => {
     const e = team()
     try {
       const { card, folder } = await queued(e)
@@ -514,7 +514,7 @@ describe("a runner's fence (#1360)", { timeout: 120_000 }, () => {
       sh(e.project, 'merge', '-q', '--no-ff', '-m', 'by hand', sh(folder, 'rev-parse', 'HEAD'))
       const facts = e.kinds(card.id)
       let lost = false
-      // Another Hive takes the lease while this one's first git read runs.
+      // Another Combwork takes the lease while this one's first git read runs.
       gitTestHooks.started = () => {
         lost = true
       }
@@ -569,7 +569,7 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     await a.runner.release()
   })
 
-  it('HR4 r1 #1: a launcher whose Hive is gone before the go-ahead (its input closed) exits, running nothing', async () => {
+  it('HR4 r1 #1: a launcher whose Combwork is gone before the go-ahead (its input closed) exits, running nothing', async () => {
     const marker = join(tempDir('qr-marker-'), 'ran')
     const { child } = startLauncher({ command: process.execPath, args: ['-e', `require('fs').writeFileSync(${JSON.stringify(marker)}, 'x')`] }, { env: baseEnv() })
     const code = new Promise<number | null>((res) => child.once('exit', (c) => res(c)))
@@ -578,7 +578,7 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     expect(existsSync(marker)).toBe(false)
   })
 
-  it('HR4 r2 #2: a failed start gives its lease up: once the store works again, a retry in the same Hive runs', async () => {
+  it('HR4 r2 #2: a failed start gives its lease up: once the store works again, a retry in the same Combwork runs', async () => {
     const cfg = { store: w.store, project: w.project, target: 'retry', root: w.root, profile: 'A' }
     const add = w.store.addQueueProc.bind(w.store)
     // Recording its job fails (a full disk, for a moment).
@@ -965,10 +965,10 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
 })
 
 describe('the folder kept while in-flight rules need it (#1360 item 5)', () => {
-  it("an in-flight card whose ruleset says Hive merges keeps it, after the project's options changed to another finisher", async () => {
+  it("an in-flight card whose ruleset says Combwork merges keeps it, after the project's options changed to another finisher", async () => {
     const e = team()
     try {
-      const c = e.wf.createCard({ title: 'Merged by Hive' })
+      const c = e.wf.createCard({ title: 'Merged by Combwork' })
       expect(queueFolderNeeded(e.wf, 'main')).toBe(false)
       moved(await e.wf.start(c.key, B1))
       expect(queueFolderNeeded(e.wf, 'main')).toBe(true)

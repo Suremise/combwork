@@ -66,7 +66,7 @@ describe("what an open starts in the background, in one line (HI-1705)", () => {
   }
 
   it('says each part, failed ones too, once all have ended and nothing more is to come; one that never ran is left out', async () => {
-    // What Hive logs (to the console in an unpackaged build, as the tests are).
+    // What Combwork logs (to the console in an unpackaged build, as the tests are).
     const logged: string[] = []
     const keep = (...a: unknown[]): void => void logged.push(a.map(String).join(' '))
     const spies = [vi.spyOn(console, 'log').mockImplementation(keep), vi.spyOn(console, 'error').mockImplementation(keep)]

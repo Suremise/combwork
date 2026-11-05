@@ -1,6 +1,6 @@
-// The dialect files Hive ships (HI-2442, dialects card 8; plans/2026-11-03-dialects-design.md, section 3, decision 8):
+// The dialect files Combwork ships (HI-2442, dialects card 8; plans/2026-11-03-dialects-design.md, section 3, decision 8):
 // the five model files (Opus 5.5, Haiku 5.5 and Sonnet 5.5 for Claude Code; GPT-6.1 Sol and GPT-6 Astra for Codex),
-// each with its real model ID, and the CLI and API files; in Hive's own format, passing the schema; and synced into a
+// each with its real model ID, and the CLI and API files; in Combwork's own format, passing the schema; and synced into a
 // workspace by the bundled kind (card 6, HI-2439): a fresh workspace gets them all, an untouched copy follows an update,
 // an edited one is kept. A dialect-only release runs this file first (scripts/dialectRelease.mjs) and may change no
 // test (HR2, HI-2442 r1), so it checks what any shipped file must be, whatever its texts: a measured override (HI-2282)
@@ -18,7 +18,7 @@ import { tempDir } from './tempDir'
 
 const RES = join(__dirname, '..', 'resources', 'dialects')
 
-/** What Hive ships at least (decision 8, "those 5 for now"), by id (`<folder>/<label>`): each file's name and, for a model file, its model ID. */
+/** What Combwork ships at least (decision 8, "those 5 for now"), by id (`<folder>/<label>`): each file's name and, for a model file, its model ID. */
 const SHIPPED: Record<string, { name: string; model?: string }> = {
   'api/cli': { name: 'API' },
   'claude-code/cli': { name: 'Claude Code' },
@@ -44,7 +44,7 @@ const parsed = (id: string): DialectFile => {
   return (p as { file: DialectFile }).file
 }
 
-describe('the dialect files Hive ships', () => {
+describe('the dialect files Combwork ships', () => {
   it('include the five model files, a CLI file for each CLI and the API file, in no other folders', () => {
     const ids = shippedIds()
     for (const id of Object.keys(SHIPPED)) expect(ids, id).toContain(id)
@@ -58,13 +58,13 @@ describe('the dialect files Hive ships', () => {
     }
   })
 
-  it('each are in the form Hive writes and pass the schema; a model file names its model, a CLI file none', () => {
+  it('each are in the form Combwork writes and pass the schema; a model file names its model, a CLI file none', () => {
     const schema = agentTextSchema()
     for (const id of shippedIds()) {
       const f = parsed(id)
       expect(read(id), `${id}: as dialectFileText writes it`).toBe(dialectFileText(f))
       expect(checkTexts(f, schema).outdated, id).toEqual([])
-      // Hive ships no test copy: a file in a CLI folder other than cli.json is a model file.
+      // Combwork ships no test copy: a file in a CLI folder other than cli.json is a model file.
       if (id.endsWith('/cli')) expect(f.model, id).toBeUndefined()
       else expect(f.model, id).toMatch(/\S/)
     }
@@ -102,7 +102,7 @@ describe('the shipped dialect files in a workspace', () => {
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   let mod: typeof import('../src/main/bundled')
   let wsMod: typeof import('../src/main/workspace')
-  /** An Opus 5.5 file as an earlier Hive might have shipped it, recorded in the history before the current one. */
+  /** An Opus 5.5 file as an earlier Combwork might have shipped it, recorded in the history before the current one. */
   const OLDER = dialectFileText({ name: 'Opus 5.5', model: 'claude-opus-5-5', texts: { 'older.text': { text: 'Older.', why: 'a test' } } })
 
   beforeAll(async () => {
@@ -128,7 +128,7 @@ describe('the shipped dialect files in a workspace', () => {
       await wsMod.inWorkspace(w, () => mod.syncBundled({ fresh: true }))
       const dir = join(ws, '.combwork', 'dialects')
       for (const id of Object.keys(SHIPPED)) expect(readFileSync(join(dir, `${id}.json`), 'utf8').replace(/\r\n/g, '\n'), id).toBe(read(id))
-      expect(existsSync(join(dir, 'workspace.json')), "workspace.json is the user's: Hive never ships into it").toBe(false)
+      expect(existsSync(join(dir, 'workspace.json')), "workspace.json is the user's: Combwork never ships into it").toBe(false)
 
       const opus = join(dir, 'claude-code', 'Opus 5.5.json')
       writeFileSync(opus, OLDER)

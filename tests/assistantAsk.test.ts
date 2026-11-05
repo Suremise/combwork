@@ -1,4 +1,4 @@
-// An agent's request for the Hive Assistant on a card (HI-1866, main/assistantAsk.ts, `cw_ask_assistant`): written as
+// An agent's request for the Combwork Assistant on a card (HI-1866, main/assistantAsk.ts, `cw_ask_assistant`): written as
 // the agent's comment with a history line, and given to the Assistant as a delivery from that agent quoting it whole.
 // Refused before anything is written: another project's card, a card archived or in Done, the Assistant unable to act
 // (Settings → Assistant → Control below changing cards), an agent-less caller, a text past a comment's limit. One that

@@ -183,7 +183,7 @@ describe("a card's folder moved with its worktree (#1343)", () => {
     pending(e.wf)
     await reconcile(e.wf, card)
     expect(e.wf.state(card).started).toMatchObject({ folder: to, line: renamed })
-    // The Hive started again: its own connection, the same records; and repeats.
+    // The Combwork started again: its own connection, the same records; and repeats.
     const restarted = e.another()
     record([restarted], to, true)
     pending(restarted)

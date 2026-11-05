@@ -123,13 +123,13 @@ describe('status polls', () => {
     await disposeWorkspaceService(w)
   })
 
-  // Real file work, not a wait (#596): three workspaces opened with Hive's bundled skills, two with 20 more, and polled:
+  // Real file work, not a wait (#596): three workspaces opened with Combwork's bundled skills, two with 20 more, and polled:
   // about 8,000 file system calls through Node's four I/O threads. Measured: 1 s alone, 2 to 5 s under a full unit run
   // beside other runs, over 20 s under heavier load. So it is bounded by FS_HUNG_MS rather than the suite's 20 s: only a
   // hung read takes a minute.
   const FS_HUNG_MS = 60_000
   it('ten polls at once on a cold workspace read what one poll does', { timeout: FS_HUNG_MS }, async () => {
-    // Hive's shipped skills have one inventory for the whole process (revisions.ts), hashed by its first poll, whichever
+    // Combwork's shipped skills have one inventory for the whole process (revisions.ts), hashed by its first poll, whichever
     // test makes it: polled here first, so the polls compared below read only their own workspaces' skills.
     const warm = await open(join(base, 'cold-warm'))
     await inWorkspace(warm, () => skillRevisions())

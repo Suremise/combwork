@@ -1,9 +1,9 @@
-// Hive's performance metrics (src/main/metrics.ts): exact units, hourly buckets on a fake clock (folded into days after
+// Combwork's performance metrics (src/main/metrics.ts): exact units, hourly buckets on a fake clock (folded into days after
 // a week, gone after 30 days), per-workspace stores that never mix, project parts that add up to the workspace's totals
 // with the workspace's own work kept apart, caps that drop and count rather than grow, malformed bridge reports refused,
 // recording off, what is saved (in the workspace database, #1019: moved in from metrics.json once, its totals unchanged;
 // size-capped, reset; read as untrusted input), work started in a workspace
-// that has since closed or switched (dropped, never moved), retention applied however long Hive was idle and whichever
+// that has since closed or switched (dropped, never moved), retention applied however long Combwork was idle and whichever
 // way the clock moved, the launch's skill sizes measured on the copies delivered, and what recording costs. MEASURE=1 prints the overhead numbers (docs/ARCHITECTURE.md records them).
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -211,7 +211,7 @@ describe('bounds', () => {
       expect(metrics.recordMcp(metrics.metricsHandle(w), 'alpha', 'agent', bad as never)).toBe(false)
     }
     expect(metrics.recordMcp(metrics.metricsHandle(w), 'alpha', 'agent', { ...ok, tool: 'rm -rf /' })).toBe(true)
-    // Well-formed, but not one of Hive's tools: not recorded under its name.
+    // Well-formed, but not one of Combwork's tools: not recorded under its name.
     expect(metrics.recordMcp(metrics.metricsHandle(w), 'alpha', 'agent', { ...ok, tool: 'hive_private_secret' })).toBe(true)
     expect(metrics.recordCatalog(metrics.metricsHandle(w), 'alpha', 'agent', 'builder', { tools: 1.5, toolsBytes: 10 })).toBe(false)
     const part = metrics.queryMetrics(w, { scope: { kind: 'project', project: 'alpha' } }).projects.alpha
@@ -608,7 +608,7 @@ describe('moved into the workspace database (#1019)', () => {
 
   it("a migrated workspace's metrics report the same numbers (#1019)", async () => {
     const { metricsReport } = await import('../src/main/metricsUsage')
-    // Recorded as Hive records them, over 13 days (hours for the last week, days before it): projects, the workspace's
+    // Recorded as Combwork records them, over 13 days (hours for the last week, days before it): projects, the workspace's
     // own work, API, MCP, catalog, guidance and skill-service series, observed in stretches.
     const { w: src, path: srcPath } = await open()
     for (let d = 12; d >= 0; d--) {
@@ -706,7 +706,7 @@ describe('cost', () => {
     const N = 100_000
     for (let i = 0; i < N; i++) metrics.recordApi(metrics.metricsHandle(w), `p${i % 20}`, api(i % 2 ? '/v1/tasks' : '/v1/tasks/:n', { ms: i % 300 }))
     const perCallUs = ((performance.now() - t) * 1000) / N
-    // Every series the caps allow, in one hour: Hive's tools x roles x modes x outcomes, over projects.
+    // Every series the caps allow, in one hour: Combwork's tools x roles x modes x outcomes, over projects.
     const { HIVE_TOOLS } = await import('../src/shared/assistantTools')
     const h = metrics.metricsHandle(w)
     for (let p = 0; p < 12; p++) for (const tool of HIVE_TOOLS) for (const role of ['agent', 'assistant'] as const) for (const mode of ['compact', 'detail']) for (const ok of [true, false]) metrics.recordMcp(h, `project-${p}`, role, { tool, mode, ok, chars: 1000, bytes: 1200, ms: 3 })
@@ -792,7 +792,7 @@ describe('round 3: names, drops, saved expiry, byte cap, unmeasured copies', () 
     await disposeWorkspaceService(w)
   })
 
-  it('the size cap is in UTF-8 bytes, a lone bucket over it included, so Hive never saves more than it would read', async () => {
+  it('the size cap is in UTF-8 bytes, a lone bucket over it included, so Combwork never saves more than it would read', async () => {
     const { w, path } = await open()
     const saved = { ...metrics.METRICS_LIMITS }
     try {
@@ -996,7 +996,7 @@ describe('round 7: a shortened label never equals a real project name', () => {
     // The label the round-6 encoding gave the long project: a valid name of its own.
     const lookalike = `${long.slice(0, 111)}~${createHash('sha256').update(long.toLowerCase()).digest('hex').slice(0, 16)}`
     await w.createProject(lookalike)
-    // The new encoding's separator can't be in a project's name: Hive refuses it.
+    // The new encoding's separator can't be in a project's name: Combwork refuses it.
     await expect(w.createProject(`${long.slice(0, 111)}|${'0'.repeat(16)}`)).rejects.toThrow(/Project names cannot/)
     metrics.recordApi(metrics.metricsHandle(w), long, api())
     metrics.recordApi(metrics.metricsHandle(w), lookalike, api('/v1/tasks/:n'))
@@ -1274,7 +1274,7 @@ describe('#116 round 1: filters, coverage, attribution, unknown usage, guidance 
     expect([agent.guidanceBytes, agent.customBytes, agent.roleBytes, agent.modeBytes]).toEqual([utf8Bytes(core), utf8Bytes(withHandover) - utf8Bytes(core), 0, 0])
     expect(agent.customChars).toBeGreaterThan(0)
     const mode = '# Your mode: Bee\n\nBuzz. Ünïcödé.'
-    const text = `You are the Hive Assistant…\n\n${mode}`
+    const text = `You are the Combwork Assistant…\n\n${mode}`
     const assistant = launchParts(hiveInstructions('', 'assistant'), 'assistant', 'assistant', { text, modeText: mode })
     expect([assistant.customBytes, assistant.roleBytes, assistant.modeBytes]).toEqual([0, utf8Bytes(text) - utf8Bytes(mode), utf8Bytes(mode)])
     // The Assistant's journal (HI-2112): off, the contract is all core; on, its skills line changes inside the contract
@@ -1501,7 +1501,7 @@ describe('HI-2049: launches and tool lists by workflow role', () => {
     expect(metrics.recordCatalog(h, 'alpha', 'agent', 'builder', { tools: 42, toolsBytes: 9500, toolsChars: 9400 })).toBe(true)
     expect(metrics.recordCatalog(h, 'alpha', 'agent', 'unknown', { tools: 1, toolsBytes: 10, toolsChars: 10 })).toBe(true)
     for (const bad of [{ toolsChars: -1 }, { toolsChars: 1.5 }, { toolsChars: 'many' }]) expect(metrics.recordCatalog(h, 'alpha', 'agent', 'builder', { tools: 1, toolsBytes: 10, ...bad })).toBe(false)
-    // A side Hive doesn't record is unknown, never one it does.
+    // A side Combwork doesn't record is unknown, never one it does.
     expect(metrics.recordCatalog(h, 'alpha', 'agent', 'boss' as never, { tools: 1, toolsBytes: 10, toolsChars: 10 })).toBe(true)
     const c = metrics.queryMetrics(w, { scope: { kind: 'project', project: 'alpha' } }).projects.alpha.catalog
     const by = Object.fromEntries(c.map((s) => [s.workflow, s]))

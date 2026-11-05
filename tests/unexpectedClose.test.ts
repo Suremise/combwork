@@ -1,5 +1,5 @@
-// Hive closing unexpectedly (#984): the running marker reads back (a damaged one is no marker, bad agent rows are left
-// out), and the notice says when Hive was last seen, which agents were running where, what became of them, a crash dump
+// Combwork closing unexpectedly (#984): the running marker reads back (a damaged one is no marker, bad agent rows are left
+// out), and the notice says when Combwork was last seen, which agents were running where, what became of them, a crash dump
 // and a merge left half done with the folder to check. #987: the marker keeps what the agents' launches had started, each
 // process by id and start time (one without either isn't kept), within bounds, and the notice says how many still run.
 // #1008: a hive-progress run (a test run left over) is one item of the notice, named by its title.
@@ -14,7 +14,7 @@ const HUNG_MS = 10_000
 const marker = (over: Record<string, unknown> = {}): string => JSON.stringify({ version: 1, pid: 42, startedAt: '2026-10-17T01:00:00.000Z', lastSeen: '2026-10-17T03:02:56.000Z', hive: '0.9.0', workspaces: ['D:/ws'], agents: [agent('B1', 'hive'), agent('R1', 'ambrosia')], ...over })
 
 describe('the running marker (#984)', () => {
-  it('reads back what a running Hive wrote', () => {
+  it('reads back what a running Combwork wrote', () => {
     const m = parseRunMarker(marker())
     expect(m?.lastSeen).toBe('2026-10-17T03:02:56.000Z')
     expect(m?.agents.map((a) => a.agentName)).toEqual(['B1', 'R1'])
@@ -108,7 +108,7 @@ describe('a hive-progress run left running is one item, named by its title (#100
   // hive-progress (10) → cmd (11) → runner (12) → a test copy (13); a node of its own (20); 14 names 10 as parent but
   // started before it (a later process took a dead parent's id): not the run's.
   const p = (pid: number, parent: number, created: string, label: string, run?: string): AgentProcess => ({ pid, parent, created, name: 'x.exe', label, ...(run ? { run } : {}) })
-  const tree = [p(10, 1, '100', 'Hive hive-progress.js', 'e2e: 196 suites in hb2'), p(11, 10, '101', 'cmd /c npm run e2e'), p(12, 11, '102', 'node run.mjs'), p(13, 12, '103', 'electron .'), p(20, 1, '100', 'node serve.js'), p(14, 10, '99', 'node older.js')]
+  const tree = [p(10, 1, '100', 'Combwork hive-progress.js', 'e2e: 196 suites in hb2'), p(11, 10, '101', 'cmd /c npm run e2e'), p(12, 11, '102', 'node run.mjs'), p(13, 12, '103', 'electron .'), p(20, 1, '100', 'node serve.js'), p(14, 10, '99', 'node older.js')]
 
   it('groups a run with everything below it, by parent and start time', () => {
     const { runs, rest } = groupProgressRuns(tree)
@@ -142,7 +142,7 @@ describe('a hive-progress run left running is one item, named by its title (#100
   it('Stop Them ends a run from its top and each of its processes, and keeps what it could not end to say so and try again', async () => {
     const ids = (ps: readonly AgentProcess[]) => ps.map((x) => x.pid)
     const running = tree.filter((x) => [12, 13, 20].includes(x.pid))
-    // A child born after the marker (99) that Windows won't let Hive end; everything listed ends.
+    // A child born after the marker (99) that Windows won't let Combwork end; everything listed ends.
     const late: AgentProcess = { pid: 99, created: '500', name: '', label: '' }
     const asked: { trees: number[]; exact: number[]; still: number[] } = { trees: [], exact: [], still: [] }
     const alive = new Set([99])
@@ -169,7 +169,7 @@ describe('a hive-progress run left running is one item, named by its title (#100
   })
 
   it("Stop Them is no success while a run's child it could neither end nor check still runs", async () => {
-    // Everything listed ends; the run's new child (not in the marker) runs, and Windows lets Hive neither end nor read it.
+    // Everything listed ends; the run's new child (not in the marker) runs, and Windows lets Combwork neither end nor read it.
     const running = tree.filter((x) => [12, 13].includes(x.pid))
     const r = await stopStillRunning(running, tree, { endTrees: async () => ({ failed: [], unverified: [4242] }), endExact: async () => undefined, stillRunning: async () => [] })
     expect(r).toEqual({ stopped: 2, still: [], unverified: [4242] })

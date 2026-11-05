@@ -8,7 +8,7 @@ describe('endReason', () => {
   it('a failed launch has none: its failed bar says why', () => {
     expect(endReason({ ...base, failed: true, stopRequested: true, cause: 'you' })).toBeNull()
   })
-  it('Hive quitting comes before any stop asked for', () => {
+  it('Combwork quitting comes before any stop asked for', () => {
     expect(endReason({ ...base, shuttingDown: true, stopRequested: true, cause: 'you' })).toBe('quit')
   })
   it("a stop's cause, as its caller gave it", () => {

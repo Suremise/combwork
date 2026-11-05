@@ -1,8 +1,8 @@
 // Compressed transcript backups (#1110): a session's backups are gzipped once it ends or is archived, never while it
 // runs; archiving and unarchiving move them compressed; the viewer, search, export and usage read them as plain ones;
-// Storage says what they hold before compression. Backup retention (off by default) sends Hive's copies of sessions idle
+// Storage says what they hold before compression. Backup retention (off by default) sends Combwork's copies of sessions idle
 // that long to the Recycle Bin, only where the CLI still has the session, after the usage history has what it used; a
-// session whose only copy is Hive's is never touched.
+// session whose only copy is Combwork's is never touched.
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { gunzipSync, gzipSync } from 'zlib'
@@ -53,7 +53,7 @@ const backup = (id: string, archived = false): string => join(p, '.combwork', ar
 const cliFile = (id: string): string => join(cli, `${id}.jsonl`)
 const gz = (file: string): string => gunzipSync(readFileSync(file + '.gz')).toString('utf8')
 
-/** One of Hive's sessions, last active `days` ago, with a plain backup; `inCli`: the CLI still has its transcript. */
+/** One of Combwork's sessions, last active `days` ago, with a plain backup; `inCli`: the CLI still has its transcript. */
 async function session(opts: { days?: number; inCli?: boolean; archived?: boolean } = {}): Promise<string> {
   const id = newId()
   await run(() => workspace.upsertSession(p, { id, agent: 'claude-code', name: id, archived: !!opts.archived, lastActiveAt: ago(opts.days ?? 100) }))
@@ -192,7 +192,7 @@ describe('compressed transcript backups', () => {
       expect(trashed).toEqual([])
     })
 
-    it("sends Hive's copies of sessions idle that long to the Recycle Bin, only where the CLI has the session, and keeps what they used", async () => {
+    it("sends Combwork's copies of sessions idle that long to the Recycle Bin, only where the CLI has the session, and keeps what they used", async () => {
       config.settings.sessions.backupRetention = '30'
       const gone = await session({ days: 40, inCli: true })
       write(backup(gone, true) + '.gz', '')

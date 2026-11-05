@@ -22,7 +22,7 @@ const base = shortPath(made) ?? made
 ;(electron.shell as unknown as { trashItem: (p: string) => Promise<void> }).trashItem = async (p) => rmSync(p, { recursive: true, force: true })
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
-/** Makes a git command fail as git would (exit 128) while set: what Hive can't check it never offers to remove. */
+/** Makes a git command fail as git would (exit 128) while set: what Combwork can't check it never offers to remove. */
 let failing: ((args: string[]) => boolean) | null = null
 vi.mock('../src/main/git', async (importOriginal) => {
   const real = await importOriginal<typeof import('../src/main/git')>()
@@ -35,7 +35,7 @@ const { createWorktree } = await import('../src/main/worktrees')
 const { addAgent, reserveForRemoval, worktreeChecks } = await import('../src/main/projectAgents')
 const { gitTestHooks } = await import('../src/main/git')
 const { gitOnPath, setGitToolForTests } = await import('../src/main/gitTool')
-// Paths compared as places: git lists the long names of folders Hive may know by short (8.3) ones, as on CI (#389).
+// Paths compared as places: git lists the long names of folders Combwork may know by short (8.3) ones, as on CI (#389).
 const { fileLockDepth, placeKey, withFileLock } = await import('../src/main/fsutil')
 const { commonGitDir } = await import('../src/main/repoLock')
 const { REPO_LOCK_FILE } = await import('../src/main/repoLockCore')
@@ -77,7 +77,7 @@ const branches = (): string[] => git(proj, 'branch', '--format=%(refname:short)'
 const listOf = async (): Promise<UnusedWorktree[]> => (await run(() => unusedWorktrees(proj))).worktrees
 const find = async (path: string): Promise<UnusedWorktree | undefined> => (await listOf()).find((x) => placeKey(x.path) === placeKey(path))
 /**
- * Agents of the project, with these worktrees. The project keeps its id (#1149): written without it, Hive gives it a new
+ * Agents of the project, with these worktrees. The project keeps its id (#1149): written without it, Combwork gives it a new
  * one at its next read of the ids (a second later or more, as under load), and its session records are under the old one.
  */
 const agents = (trees: { path: string; branch: string }[]): void => {
@@ -159,7 +159,7 @@ describe('listing', () => {
     agents([])
   })
 
-  it("says who made each (#476): the Hive agent whose session last ran there, else Hive's folder, else not Hive", async () => {
+  it("says who made each (#476): the Combwork agent whose session last ran there, else Combwork's folder, else not Combwork", async () => {
     const ran = await tree(`ran${++n}`)
     const hive = await tree(`hive${n}`)
     const other = { path: join(base, 'elsewhere', `other${n}`), branch: `feature/other${n}` }
@@ -209,13 +209,13 @@ describe('listing', () => {
       return need
     })
     try {
-      const held = { target: 'main', lease, token: 't1', profile: 'Hive-Dev', pid: process.pid, started: 1, takenAt: '2026-10-21T00:00:00.000Z', renewedAt: '2026-10-21T00:00:00.000Z' }
+      const held = { target: 'main', lease, token: 't1', profile: 'Combwork-Dev', pid: process.pid, started: 1, takenAt: '2026-10-21T00:00:00.000Z', renewedAt: '2026-10-21T00:00:00.000Z' }
       await run(() => boardWrite(w, async () => store.takeQueueLease(held, null) && store.setQueueFolder({ folder: t, target: 'main', lease })))
       // Its runner merging in it: not listed, not removable, even though nothing else needs it.
       expect(await find(t)).toBeUndefined()
       await expect(run(() => removalPreview(proj, t))).rejects.toThrow(/Combwork doesn't remove it/)
       expect(existsSync(t)).toBe(true)
-      // Its Hive crashed (the lease names a process that has ended): the queue's, while the queue needs it.
+      // Its Combwork crashed (the lease names a process that has ended): the queue's, while the queue needs it.
       const ended = execFileSync(process.execPath, ['-e', 'process.stdout.write(String(process.pid))'], { encoding: 'utf8', env: { SystemRoot: process.env.SystemRoot ?? '' } })
       await run(() => boardWrite(w, async () => store.takeQueueLease({ ...held, token: 't2', pid: Number(ended) }, 't1')))
       need = true
@@ -250,7 +250,7 @@ describe('listing', () => {
     const lease = `ac${++n}`
     const t = join(root, `queue-0123456789ab-${lease}`)
     git(proj, 'worktree', 'add', '-q', '--detach', t)
-    const runner = (token: string): Parameters<typeof store.takeQueueLease>[0] => ({ target: 'main', lease, token, profile: 'Hive-Dev', pid: process.pid, started: 1, takenAt: '2026-10-25T00:00:00.000Z', renewedAt: '2026-10-25T00:00:00.000Z' })
+    const runner = (token: string): Parameters<typeof store.takeQueueLease>[0] => ({ target: 'main', lease, token, profile: 'Combwork-Dev', pid: process.pid, started: 1, takenAt: '2026-10-25T00:00:00.000Z', renewedAt: '2026-10-25T00:00:00.000Z' })
     const takes = (token: string): void => {
       store.takeQueueLease(runner(token), null)
       store.setQueueFolder({ folder: t, target: 'main', lease })
@@ -310,7 +310,7 @@ describe('listing', () => {
     expect(await find(q)).toMatchObject({ kind: 'queue' })
   })
 
-  it("Branches & remotes' groups (HI-1710): a review copy is Hive's 'copy', a queue folder its 'queue', anything else no one of Hive's", async () => {
+  it("Branches & remotes' groups (HI-1710): a review copy is Combwork's 'copy', a queue folder its 'queue', anything else no one of Combwork's", async () => {
     const copy = join(root, 'copies', `copy-${++n}`)
     const q = join(root, `queue-0123456789ab-ef${n}`)
     const plain = await tree(`plain${n}`)
@@ -321,7 +321,7 @@ describe('listing', () => {
     expect(await of(q)).toBe('queue')
     expect(await of(plain.path)).toBeNull()
     expect(await of(proj)).toBeNull()
-    // Named like one, but not in the project's own folder of Hive's worktrees: not Hive's.
+    // Named like one, but not in the project's own folder of Combwork's worktrees: not Combwork's.
     expect(await of(join(base, 'elsewhere', 'copies', 'copy-1'))).toBeNull()
     expect(await of(join(base, 'elsewhere', 'queue-0123456789ab-ef1'))).toBeNull()
     expect(await of(join(root, 'copies-old', 'copy-1'))).toBeNull()

@@ -43,7 +43,7 @@ export function agentApiCall(url: string, method: string, headers: Record<string
       clearTimeout(deadline)
       reject(e)
     }
-    const deadline = setTimeout(() => req.destroy(new Error(`Hive didn't reply within ${Math.ceil(replyMs / 1000)} s`)), replyMs)
+    const deadline = setTimeout(() => req.destroy(new Error(`Combwork didn't reply within ${Math.ceil(replyMs / 1000)} s`)), replyMs)
     req.on('error', fail)
     req.end(data)
   })

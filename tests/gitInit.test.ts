@@ -107,7 +107,7 @@ describe('initialising', () => {
     expect(refresh).toHaveBeenCalledTimes(1)
   })
 
-  it('commits the folder with a starter .gitignore, never .combwork nor what the template ignores, and keeps Hive skill copies out', async () => {
+  it('commits the folder with a starter .gitignore, never .combwork nor what the template ignores, and keeps Combwork skill copies out', async () => {
     globalIdentity()
     const p = project('node-app', { 'package.json': '{}\n', 'src/index.js': 'x\n', 'node_modules/a/index.js': 'y\n', 'debug.log': 'z\n', '.agents/skills/hive-handover/SKILL.md': 'copy\n' })
     expect((await initCheck(p)).empty).toBe(false)

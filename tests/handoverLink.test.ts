@@ -31,9 +31,9 @@ describe('a handover links the conversations it joins, whenever the target names
   let w: ReturnType<typeof createWorkspaceService>
   const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
   const key = (agentId: string) => `${proj.toLowerCase()}#${agentId}`
-  // The session's record as Hive keeps it (#1061: in the workspace's database).
+  // The session's record as Combwork keeps it (#1061: in the workspace's database).
   const linkOf = async (id: string): Promise<string | undefined> => (await run(() => workspace.sessionsFile(proj))).sessions.find((s) => s.id === id)?.handedOverFrom
-  // A launch of `agentId` as Hive keeps it: Codex's, its session not named yet.
+  // A launch of `agentId` as Combwork keeps it: Codex's, its session not named yet.
   const launch = (agentId: string, runId: string, handedOverFrom?: string): Live => {
     const l: Live = { state: { runId, sessionId: '', projectPath: proj, agentId, provider: 'codex', cwd: proj, startedAt: new Date().toISOString(), status: 'ready' }, name: 'Session', adapter: { descriptor: { capabilities: { fixedSessionId: false } } }, ...(handedOverFrom ? { handedOverFrom } : {}) }
     internals.live.set(key(agentId), l)
@@ -125,7 +125,7 @@ describe('a handover links the conversations it joins, whenever the target names
     const old = launch('dst', 'run-f')
     const real = internals.deliveries as { now: (h: string, nd: unknown) => Promise<unknown> }
     const now = real.now
-    // The delivery lands, then the agent restarts before Hive links: another launch, by then.
+    // The delivery lands, then the agent restarts before Combwork links: another launch, by then.
     real.now = async (h, nd) => {
       await now(h, nd)
       internals.live.delete(key('dst'))

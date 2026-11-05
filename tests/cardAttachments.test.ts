@@ -174,7 +174,7 @@ describe('recovering what an interrupted operation left (HI-1700, s13)', () => {
     expect(trashed().some((t) => t.endsWith(a.file))).toBe(true)
   })
 
-  it("a record naming a path outside its folder, or an id Hive never makes, is left as it is: nothing it names is touched (HR4's round 1)", async () => {
+  it("a record naming a path outside its folder, or an id Combwork never makes, is left as it is: nothing it names is touched (HR4's round 1)", async () => {
     const { w, root } = await workspace()
     const c = await card(w)
     const host = join(root, 'p')
@@ -194,12 +194,12 @@ describe('recovering what an interrupted operation left (HI-1700, s13)', () => {
     const { w, root } = await workspace()
     const c = await card(w)
     const elsewhere = join(base, `elsewhere-${++n}`)
-    const kept = file(join(elsewhere, 'files'), 'precious.txt', 'not Hive’s')
+    const kept = file(join(elsewhere, 'files'), 'precious.txt', 'not Combwork’s')
     writeFileSync(join(elsewhere, OP_FILE), JSON.stringify({ kind: 'delete', card: 999999 }))
     mkdirSync(join(att.cardsRoot(join(root, 'p')), TRASH), { recursive: true })
     junction(elsewhere, join(att.cardsRoot(join(root, 'p')), TRASH, 'op-link'))
     await inWorkspace(w, () => att.recoverCardAttachments(w))
-    expect(readFileSync(kept, 'utf8')).toBe('not Hive’s')
+    expect(readFileSync(kept, 'utf8')).toBe('not Combwork’s')
     // A whole cards folder that is a junction: left as it is.
     const other = join(base, `elsewhere-${++n}`)
     const theirs = file(join(other, String(c)), 'theirs.txt', 'theirs')
@@ -307,7 +307,7 @@ describe("never a session's (HI-1700)", () => {
 })
 
 describe('where a file may come from (HI-1700, s13 §2)', () => {
-  it("a project's agent: its project, its slots and the temp folder; never another project's, nested or through a junction, nor Hive's own folders", async () => {
+  it("a project's agent: its project, its slots and the temp folder; never another project's, nested or through a junction, nor Combwork's own folders", async () => {
     const { w, root } = await workspace()
     const agent = { kind: 'agent', project: 'p' } as const
     const own = file(join(root, 'p', 'src'), 'mine.png', 'mine')
@@ -337,7 +337,7 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
     await expect(att.attachableSource(w, ws, join(root, 'q', '.combwork', 'project.json'))).rejects.toThrow()
   })
 
-  // HI-2480: a folder the user lists (Settings → Advanced → Card attachments: more folders, Hive's or the workspace's).
+  // HI-2480: a folder the user lists (Settings → Advanced → Card attachments: more folders, Combwork's or the workspace's).
   it('more folders: a file under one attaches; outside every accepted folder it is refused, saying which are and where to add one', async () => {
     const { w, root } = await workspace()
     const agent = { kind: 'agent', project: 'p' } as const
@@ -356,7 +356,7 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
       await expect(att.attachableSource(w, script, zip)).rejects.toThrow(/Files can come from the workspace and its projects, the temp folder/)
       expect(await att.attachableSource(w, agent, file(temp, 'shot.png', 's'))).toBeTruthy()
 
-      // Hive's own list, with a variable at its start: the agent's and the script's file attaches; elsewhere is still refused.
+      // Combwork's own list, with a variable at its start: the agent's and the script's file attaches; elsewhere is still refused.
       process.env.HIVE_EVIDENCE = evidence
       await advanced.set(CARD_ATTACHMENT_FOLDERS_ID, '%hive_evidence%; Q:\\not\\there')
       expect(att.extraFolders(w)).toEqual([evidence, 'Q:\\not\\there'])
@@ -373,13 +373,13 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
       await expect(att.attachableSource(w, agent, file(join(root, 'q'), 'theirs.png', 't'))).rejects.toThrow(/not a file that can be attached/)
       await expect(att.attachableSource(w, agent, file(join(root, '.combwork'), 'x.txt', 'x'))).rejects.toThrow(/not a file that can be attached/)
 
-      // The workspace's own list over Hive's; unset, Hive's again. A variable that isn't set leaves its folder out.
+      // The workspace's own list over Combwork's; unset, Combwork's again. A variable that isn't set leaves its folder out.
       await w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, [evidence])
       expect(att.extraFolders(w)).toEqual([evidence])
       await w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, '%HIVE_NOT_SET_2480%\\x')
       expect(att.extraFolders(w)).toEqual([])
       await expect(att.attachableSource(w, agent, zip)).rejects.toThrow(/not a file that can be attached/)
-      // A workspace's [] (written by hand or the API) is Hive's list, as its emptied box in Settings is.
+      // A workspace's [] (written by hand or the API) is Combwork's list, as its emptied box in Settings is.
       await w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, [])
       expect(att.extraFolders(w)).toEqual([root])
       await w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, null)

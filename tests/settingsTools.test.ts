@@ -52,7 +52,7 @@ describe("the settings tools on a provider's prices", () => {
   })
 
   // HI-2480 round 2: where agents may attach files from is a permission: the Assistant reads it and never sets it.
-  it("Card attachments: more folders is the user's: read and explained, never set by the Assistant, Hive's or a workspace's", async () => {
+  it("Card attachments: more folders is the user's: read and explained, never set by the Assistant, Combwork's or a workspace's", async () => {
     for (const id of ['advanced.cw.cards.attachmentFolders', 'workspace.advanced.cw.cards.attachmentFolders']) {
       const e = settingEntry(id)!
       expect(e, id).toMatchObject({ sensitive: true })
@@ -62,7 +62,7 @@ describe("the settings tools on a provider's prices", () => {
     expect(advanced.get(CARD_ATTACHMENT_FOLDERS_ID)).toEqual([])
   })
   // HI-2496: Agents' temp folder redirects every agent's file writes, the Assistant's own launch's too: the user's alone.
-  it("Agents' temp folder is the user's: read and explained, never set by the Assistant, Hive's or a workspace's", async () => {
+  it("Agents' temp folder is the user's: read and explained, never set by the Assistant, Combwork's or a workspace's", async () => {
     for (const id of ['advanced.cw.agents.tempFolder', 'workspace.advanced.cw.agents.tempFolder']) {
       const e = settingEntry(id)!
       expect(e, id).toMatchObject({ sensitive: true })
@@ -94,7 +94,7 @@ describe('extra arguments with a bare "--" (#523)', () => {
   })
 })
 
-describe("the settings tools on the copied files, Hive's slot default (HI-1765)", () => {
+describe("the settings tools on the copied files, Combwork's slot default (HI-1765)", () => {
   it('sets patterns, none and inherit, saved as Settings saves the level, the old and new values said', async () => {
     const e = settingEntry('workflow.git.slotCopy')!
     const was = config.settings.slotDefaults

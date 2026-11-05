@@ -86,10 +86,10 @@ export class ServerMarks {
     if (this.failClosedHosts.size >= FAIL_CLOSED_HOSTS_MAX) {
       this.failClosedHosts.clear()
       this.everywhere = true
-      this.warn(`Every session's usage is read without its CLI's cost reports until Hive restarts: ${why}, in more than ${FAIL_CLOSED_HOSTS_MAX} folders`, null) // i18n-ignore: hive.log
+      this.warn(`Every session's usage is read without its CLI's cost reports until Combwork restarts: ${why}, in more than ${FAIL_CLOSED_HOSTS_MAX} folders`, null) // i18n-ignore: hive.log
       return
     }
     this.failClosedHosts.add(k)
-    this.warn(`Sessions here are read without their CLI's cost reports until Hive restarts: ${why}`, k) // i18n-ignore: hive.log
+    this.warn(`Sessions here are read without their CLI's cost reports until Combwork restarts: ${why}`, k) // i18n-ignore: hive.log
   }
 }

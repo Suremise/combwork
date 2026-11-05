@@ -237,7 +237,7 @@ describe('the watcher on a Git repository', () => {
     await seen({ kind: 'lineMoved', line: 'feature', to: b })
     await seen({ kind: 'folderMoved', folder: wt, to: b })
     events.length = 0
-    // Moved outside Hive, and a refresh follows the same projects at once, before the watch's own read.
+    // Moved outside Combwork, and a refresh follows the same projects at once, before the watch's own read.
     run(p, 'update-ref', 'refs/heads/side', b)
     run(wt, 'checkout', '-q', '--detach', a)
     o.follow([{ path: p, platform: 'git', root: p }])

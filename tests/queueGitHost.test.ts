@@ -599,7 +599,7 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
       beforeHostSend: async () => {
         if (took) return
         took = true
-        // Another Hive takes the lease (as if this one looked dead) and ends its job by name, as its settle does first.
+        // Another Combwork takes the lease (as if this one looked dead) and ends its job by name, as its settle does first.
         const now = w.store.queueLease('main')!
         w.store.takeQueueLease({ ...now, lease: 'successor', token: 'successor', profile: 'B', pid: 1 }, now.token)
         expect(await endLeaseJob(queueHost(), runner.lease)).toBe(true)
@@ -619,7 +619,7 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
     }
   })
 
-  it('HI-2137: the git Hive starts (gitExe), in the host and through the launcher; one gone, PATH git once more', async () => {
+  it('HI-2137: the git Combwork starts (gitExe), in the host and through the launcher; one gone, PATH git once more', async () => {
     // As checkGit resolves it, from the launcher: before anything is acquired, so nothing is left open where it can't.
     const execPath = win32.normalize(sh(tempDir('qgh-exec-'), '--exec-path'))
     const top = join(execPath, '..', '..', '..')
@@ -641,7 +641,7 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
       expect(await runner.git(w.project, alias, 'testMerge', { env })).toMatchObject({ ok: true, out: `${resolved.launcherEnv!.msystem} /usr/bin/sed\n` })
       expect(await runner.git(w.project, ['rev-parse', 'HEAD'], 'testMerge', { env, timeoutMs: 60_000 })).toMatchObject({ ok: true })
       await vi.waitFor(() => expect(started().filter((a) => a.toLowerCase() === real.toLowerCase())).toHaveLength(2), { timeout: 10_000, interval: 50 })
-      // The real git gone (uninstalled, moved): the command runs with PATH's git, which is what Hive starts from then on.
+      // The real git gone (uninstalled, moved): the command runs with PATH's git, which is what Combwork starts from then on.
       const gone = join(tempDir('qgh-gone-'), 'git.exe')
       setGitToolForTests({ state: 'ok', version: '2.51.0' }, { exe: gone })
       // Several at once, in the host and through the launcher: each once more from PATH, whichever found it gone first.

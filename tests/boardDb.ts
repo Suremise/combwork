@@ -1,4 +1,4 @@
-// The board's cards as tests read and change them by hand (#1017): in the workspace's database, as Hive keeps them now.
+// The board's cards as tests read and change them by hand (#1017): in the workspace's database, as Combwork keeps them now.
 import { DatabaseSync } from 'node:sqlite'
 import { BOARD_MIGRATIONS, boardChanged, boardFile, boardWrite, cardDoc, deleteCard, putCard } from '../src/main/boardStore'
 import { composeCard, decomposeCard, readCardRows, writeCardRows } from '../src/main/schema/cardRows'
@@ -26,7 +26,7 @@ export async function editCard(ws: WorkspaceService, n: number, edit: (doc: Reco
   await writeCard(ws, n, edit(doc) ?? doc)
 }
 
-/** Removes a card as a program outside Hive would (no reference to it dropped). */
+/** Removes a card as a program outside Combwork would (no reference to it dropped). */
 export function removeCard(ws: WorkspaceService, n: number): Promise<void> {
   return boardWrite(ws, async () => {
     deleteCard(ws, n)
@@ -35,7 +35,7 @@ export function removeCard(ws: WorkspaceService, n: number): Promise<void> {
 }
 
 /**
- * Saves a card's document from outside this Hive (another copy of Hive, a script): its own connection to the board's file,
+ * Saves a card's document from outside this Combwork (another copy of Combwork, a script): its own connection to the board's file,
  * past the board's lock in this process (a test holding it to make a change wait).
  */
 export function writeCardOutside(workspacePath: string, n: number, doc: Record<string, unknown>): void {
@@ -53,7 +53,7 @@ export function writeCardOutside(workspacePath: string, n: number, doc: Record<s
 /**
  * Puts a 1.0 board's file back as 0.9 left it (#1209): its cards as JSON documents in 0.9's `cards` table (from the
  * board's own first step), every table of the 1.0 group's steps dropped (#1212's too), 0.9's tables it no longer has made again (store_rows, #1211), and none of them recorded. For a board made by
- * this Hive (a new file takes every step) that a test needs from before its upgrade. The file must be closed.
+ * this Combwork (a new file takes every step) that a test needs from before its upgrade. The file must be closed.
  */
 export function as09(file: string): void {
   const db = new DatabaseSync(file, { timeout: 5000 })
@@ -91,7 +91,7 @@ export function as09(file: string): void {
 /** The key of the board's lock in this process (a test holds it to make a change wait). */
 export const boardLockKey = (workspacePath: string): string => `board-lock:${workspacePath}`
 
-/** A card's document read from the board's file on its own connection (any workspace, open in this Hive or not). */
+/** A card's document read from the board's file on its own connection (any workspace, open in this Combwork or not). */
 export function readCardIn(workspacePath: string, n: number): Record<string, unknown> {
   const db = new DatabaseSync(boardFile(workspacePath), { readOnly: true, timeout: 5000 })
   try {

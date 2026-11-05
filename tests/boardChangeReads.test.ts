@@ -54,7 +54,7 @@ const BOARD = 200
 let w: ReturnType<typeof createWorkspaceService>
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
 const COLUMNS = ['todo', 'doing', 'review', 'passed', 'done'] as const
-/** A card as Hive saves one, with a long description and comments: what a reader of heads must not parse. */
+/** A card as Combwork saves one, with a long description and comments: what a reader of heads must not parse. */
 const card = (n: number): Record<string, unknown> => ({
   number: n,
   title: `Card ${n}`,

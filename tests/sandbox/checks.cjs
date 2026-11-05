@@ -1,12 +1,12 @@
 /**
- * Hive's installer checks in Windows Sandbox (the Sandbox checks, a release step: RELEASING.md, tests/e2e/README.md):
- * fresh install and first run, first run with no CLIs, a CLI appearing while Hive runs, the upgrade from the previous
+ * Combwork's installer checks in Windows Sandbox (the Sandbox checks, a release step: RELEASING.md, tests/e2e/README.md):
+ * fresh install and first run, first run with no CLIs, a CLI appearing while Combwork runs, the upgrade from the previous
  * release, uninstall, and a new workspace. Drives the windows-sandbox MCP server (the hive-mcp project's) over stdio, as
  * any MCP client does: one Sandbox for scenarios 1, 2, 3, 5 and 6, a second for 4. Network off throughout, fake CLIs
  * only, nothing signed in; every command has a timeout. Writes a short report (report.md, report.json) with screenshots
  * to --report. Moved from the hive-mcp repo (servers/windows-sandbox/scenarios/hive-checks.js at c5dee8a, HI-2298).
  *
- *   npm run sandbox-checks -- --installer <Combwork-Setup-x.y.z.exe> [--previous <older installer>] [--hive <Hive repo>]
+ *   npm run sandbox-checks -- --installer <Combwork-Setup-x.y.z.exe> [--previous <older installer>] [--hive <Combwork repo>]
  *        [--server <windows-sandbox server.js>] [--report <folder>] [--only fresh|upgrade|manual|edges] [--short <installer>] [--wait-min N]
  *        [--smart-app-control off]
  *
@@ -14,7 +14,7 @@
  * <hive>\dist other than --installer, so pass the main checkout from a worktree. Both installers must sit under one
  * folder (not a drive root), which is mapped read-only at C:\build. This checkout's tests folder (the scripts in
  * tests\sandbox\inside and the e2e fake CLIs) and its playwright-core are mapped read-only too; Node is this one's folder.
- * --server (or WSB_SERVER) is the server's server.js; by default the copy Hive installed from the MCP catalogue in the
+ * --server (or WSB_SERVER) is the server's server.js; by default the copy Combwork installed from the MCP catalogue in the
  * workspace holding <hive> (<workspace>\.combwork\mcp\windows-sandbox), else a hive-mcp checkout beside <hive>
  * (<hive>\..\mcp\servers\windows-sandbox). The server keeps its run folders in %LOCALAPPDATA%\hive-test\sandbox.
  * Exit code: 0 all checks passed, 1 a check failed (or a Sandbox's cleanup wasn't confirmed), 2 not run (also when the
@@ -130,7 +130,7 @@ function plan(argv) {
   const hive = path.resolve(opt('--hive', process.env.HIVE_REPO || REPO))
   const serverOpt = opt('--server', process.env.WSB_SERVER)
   const serverJs = serverOpt ? path.resolve(serverOpt) : serverCandidates(hive).find(f => fs.existsSync(f))
-  if (!serverJs) throw new Error(`No windows-sandbox server found (looked in ${serverCandidates(hive).join(' and ')}): pass --server <its server.js> (or WSB_SERVER), or install it from Hive's MCP catalogue`)
+  if (!serverJs) throw new Error(`No windows-sandbox server found (looked in ${serverCandidates(hive).join(' and ')}): pass --server <its server.js> (or WSB_SERVER), or install it from Combwork's MCP catalogue`)
   if (!fs.existsSync(serverJs)) throw new Error(`--server ${serverJs} doesn't exist: name the windows-sandbox server's server.js`)
   const installer = opt('--installer') && path.resolve(opt('--installer'))
   // The edge cases' second installer (HI-2460): built with HIVE_TEST_SHORT_LEGACY_WAIT=1, its legacy-mutex wait 20 s.
@@ -341,7 +341,7 @@ async function main(argv) {
       await s.desktop(1, 's1-installed-apps')
       await s.run(1, '1. close Settings', 'powershell.exe -NoProfile -Command "Get-Process SystemSettings -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.Id -Force }"', { timeoutSec: 30 })
       await time('1-2. first run, Provider Setup, both themes', () => s.drive(2, '1-2. first run', 'first-run', 's1'))
-      await time('3. a CLI appears while Hive runs', () => s.drive(3, '3. CLI appears', 'cli-appears', 's3'))
+      await time('3. a CLI appears while Combwork runs', () => s.drive(3, '3. CLI appears', 'cli-appears', 's3'))
       await time('6. a new workspace', () => s.drive(6, '6. new workspace', 'workspace', 's6'))
       await time('5. silent uninstall', () => s.ps(5, '5. uninstall', 'install.ps1', `-Exe "%LOCALAPPDATA%\\Programs\\${p.app.exeName}\\Uninstall ${p.app.exeName}.exe" -Arguments "/S" -Name s5 -Uninstall`, { timeoutSec: 300 }))
       await s.desktop(5, 's5-desktop')

@@ -25,7 +25,7 @@ afterAll(() => {
 })
 
 const agent = { kind: 'agent' as const, name: 'B1 (alpha)' }
-const long = 'Tray: the restart notice stays after Hive restarts, because the update check in updater.ts runs before the window opens'
+const long = 'Tray: the restart notice stays after Combwork restarts, because the update check in updater.ts runs before the window opens'
 const change = (nudge: string | null): TaskChange => ({ number: 7, key: 'AL-7', title: long, column: 'todo', position: 1, of: 1, project: 'alpha', agent: null, changes: [], ...(nudge ? { nudge } : {}) })
 
 describe('titleNudge', () => {

@@ -123,7 +123,7 @@ describe('the full-text search on a real board’s copy', () => {
     const medianSync = (fn: () => number, times = 11): number => Array.from({ length: times }, fn).sort((a, b) => a - b)[Math.floor(times / 2)]
     results[`#${largest} (the longest description) retitled, its trigger kept`] = medianSync(() => retitle(true))
     results['that edit without the trigger'] = medianSync(() => retitle(false))
-    results['a full commentTask through Hive (no trigger: comments aren\'t searched)'] = await median(() => tasks.commentTask(largest, 'A comment', user), 5)
+    results['a full commentTask through Combwork (no trigger: comments aren\'t searched)'] = await median(() => tasks.commentTask(largest, 'A comment', user), 5)
 
     const plan = (writer.prepare(`EXPLAIN QUERY PLAN ${QUERIES['board.search'].sql}`).all(store.searchMatch('usage')) as { detail: string }[]).map((r) => r.detail)
     console.log(`search bench: ${all.length} cards (${live.length} not archived); the cards' searched text ${(textBytes / 1048576).toFixed(1)} MB`)

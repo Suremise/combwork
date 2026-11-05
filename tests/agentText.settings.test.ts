@@ -21,7 +21,7 @@ const chain = (texts: Record<string, string>): DialectChain => ({ texts, files: 
 const canary = (): void => setProcessChain(chain(canaryTexts(catalogue)))
 const entry = (id: string) => settingEntry(id)!
 
-/** The permission modes a provider's "Enable the … option" names: the CLIs' own names for them, not Hive's wording. */
+/** The permission modes a provider's "Enable the … option" names: the CLIs' own names for them, not Combwork's wording. */
 const MODE_NAMES = ['agents.claude.bypass', 'agents.codex.fullAccess', 'agents.copilot.autopilot']
 
 /** The window's message ids in a text, nested ones too. */

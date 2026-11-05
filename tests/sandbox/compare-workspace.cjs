@@ -1,14 +1,14 @@
 /**
- * The fresh-install comparison, without a model: what a fresh Hive install shows and makes
+ * The fresh-install comparison, without a model: what a fresh Combwork install shows and makes
  * of a new workspace (scenarios 1, 2 and 6 of a Sandbox checks run, tests/sandbox/checks.cjs), against an existing workspace on this machine, with
  * its conventions and history. Writes comparison.md and comparison.json next to the run's report.
  *
- *   node tests\sandbox\compare-workspace.cjs --report <Sandbox checks report folder> [--workspace <Hive workspace folder>]
+ *   node tests\sandbox\compare-workspace.cjs --report <Sandbox checks report folder> [--workspace <Combwork workspace folder>]
  *
  * --workspace defaults to the current folder.
  *
  * It claims only what was measured: the run's first-run and new-workspace evidence must be complete and passing
- * (each driver finished, its required checks passed, its facts present), and the workspace must be a readable Hive
+ * (each driver finished, its required checks passed, its facts present), and the workspace must be a readable Combwork
  * workspace; otherwise it writes nothing and exits 1 saying what is missing. A folder that doesn't exist counts as
  * empty; one that can't be read is an error, never "none".
  *
@@ -46,14 +46,14 @@ function setDiff(fresh, here) {
 }
 const describeDiff = d => (d.same ? 'same set' : `differs: ${[d.onlyFresh.length ? `only in the fresh install: ${d.onlyFresh.join(', ')}` : null, d.onlyHere.length ? `only here: ${d.onlyHere.join(', ')}` : null].filter(Boolean).join('; ')}`)
 
-/** What a workspace holds, by name. Throws if it isn't a readable Hive workspace. */
+/** What a workspace holds, by name. Throws if it isn't a readable Combwork workspace. */
 function inventory(ws) {
   let st
   try { st = fs.statSync(ws) } catch (e) { throw new Error(`The workspace ${ws} can't be read: ${e.code || e.message}`, { cause: e }) }
   if (!st.isDirectory()) throw new Error(`The workspace ${ws} is not a folder`)
   // .combwork from 1.1 (HI-2462); .hive in a workspace no 1.1 has opened yet.
   const h = ['.combwork', '.hive'].map((f) => path.join(ws, f)).find((d) => exists(path.join(d, 'workspace.json')))
-  if (!h) throw new Error(`${ws} is not a Hive workspace (no .combwork\\workspace.json or .hive\\workspace.json)`)
+  if (!h) throw new Error(`${ws} is not a Combwork workspace (no .combwork\\workspace.json or .hive\\workspace.json)`)
   const workspaceJson = readJson(path.join(h, 'workspace.json'))
   const bundled = readJson(path.join(h, 'bundled.json'), { optional: true })
   const skills = dirs(path.join(h, 'skills'))
@@ -68,7 +68,7 @@ function inventory(ws) {
       ownSkills: [...new Set([...dirs(path.join(p, '.claude', 'skills')), ...dirs(path.join(p, '.agents', 'skills'))])].filter(s => !s.startsWith('hive-'))
     }
   })
-  // Where each skill and mode came from (Hive's bundled set, or the workspace's own): separate from the set comparison.
+  // Where each skill and mode came from (Combwork's bundled set, or the workspace's own): separate from the set comparison.
   const origin = (kind, list) => (bundled ? list.filter(s => !bundled[kind]?.[s]) : null)
   return {
     path: ws,
@@ -157,7 +157,7 @@ function compare(report, here) {
   const noteNames = shared => Object.entries(shared).flatMap(([k, v]) => v.map(n => `${k}/${n}`))
   const notesDiff = setDiff(noteNames(fresh.shared), noteNames(here.shared))
   const rows = [
-    ['Hive skills', `${fresh.skills.length}: ${list(fresh.skills)}`, `${here.skills.length}${origin(here.customSkills)}`, describeDiff(skills)],
+    ['Combwork skills', `${fresh.skills.length}: ${list(fresh.skills)}`, `${here.skills.length}${origin(here.customSkills)}`, describeDiff(skills)],
     ['Assistant modes (personas)', `${fresh.personas.length}: ${list(fresh.personas)}`, `${here.personas.length}: ${list(here.personas)}${origin(here.customPersonas)}`, describeDiff(personas)],
     ['Templates', String(fresh.templates), String(here.templates), here.templates === fresh.templates ? 'same number' : 'differs'],
     ['Workspace MCP servers', `${list(fresh.mcpServers)}; enabled: ${list(fresh.mcpEnabled)}`, `${list(here.mcpServers)}; enabled: ${list(here.mcpEnabled)}`, describeDiff(mcp)],
@@ -167,7 +167,7 @@ function compare(report, here) {
     ['Agent memory', 'none', 'in each CLI\'s home (~/.claude/projects/…), not read here by rule', 'not compared (needs a model)']
   ]
   const env = [
-    ['Git', fresh.git ? 'found' : `missing${fresh.gitMissing ? ': Hive shows its Git warning (status bar "Git", Provider Setup "Git not found")' : ''}`, onPath('git.exe') ? 'on PATH' : 'not on PATH'],
+    ['Git', fresh.git ? 'found' : `missing${fresh.gitMissing ? ': Combwork shows its Git warning (status bar "Git", Provider Setup "Git not found")' : ''}`, onPath('git.exe') ? 'on PATH' : 'not on PATH'],
     ['Node', fresh.node ? 'found' : 'missing (the checks map the host\'s, read-only)', onPath('node.exe') ? 'on PATH' : 'not on PATH'],
     ['Coding-agent CLIs', `banner: "${fresh.banner.replace(/\s+/g, ' ')}"; Provider Setup tabs: ${list(fresh.setupTabs)}`, ['claude', 'codex', 'copilot'].filter(c => ['.exe', '.cmd'].some(x => onPath(c + x))).join(', ') || 'none on PATH']
   ]
@@ -180,7 +180,7 @@ function markdown(c, report) {
   return [
     '# Fresh install vs this workspace (no model)',
     '',
-    `Fresh side: Hive ${c.fresh.version} (\`${m.installer || '?'}\`${m.buildInfo ? `, code ${m.buildInfo.code}` : ''}) installed in Windows Sandbox, network off, fake CLIs only, a new workspace with one project folder (scenarios 1, 2 and 6 of the Sandbox checks, ${m.date || ''}). This side: \`${c.here.path}\`, by name only (no note, skill or convention file was read, and no CLI home).`,
+    `Fresh side: Combwork ${c.fresh.version} (\`${m.installer || '?'}\`${m.buildInfo ? `, code ${m.buildInfo.code}` : ''}) installed in Windows Sandbox, network off, fake CLIs only, a new workspace with one project folder (scenarios 1, 2 and 6 of the Sandbox checks, ${m.date || ''}). This side: \`${c.here.path}\`, by name only (no note, skill or convention file was read, and no CLI home).`,
     '',
     '## What a workspace has',
     '',

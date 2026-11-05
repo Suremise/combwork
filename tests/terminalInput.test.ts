@@ -25,7 +25,7 @@ describe('isTyping', () => {
 describe('copyPasteKey (#1286)', () => {
   const key = (k: string, more: Partial<{ ctrlKey: boolean; metaKey: boolean; altKey: boolean }> = {}) => ({ key: k, ctrlKey: true, metaKey: false, altKey: false, ...more })
 
-  it("by default (the switch off), Hive's copy with a selection and paste; Ctrl+C with none goes on to the CLI", () => {
+  it("by default (the switch off), Combwork's copy with a selection and paste; Ctrl+C with none goes on to the CLI", () => {
     expect(copyPasteKey(key('c'), false, true)).toBe('copy')
     expect(copyPasteKey(key('C'), false, true)).toBe('copy')
     expect(copyPasteKey(key('c'), false, false)).toBeNull()
@@ -47,11 +47,11 @@ describe('copyPasteKey (#1286)', () => {
   })
 })
 
-// All keys go to the CLI (#1292, #966 row 26, Darren's choice on #1120 point 5): off, Hive's bound shortcuts take their
+// All keys go to the CLI (#1292, #966 row 26, Darren's choice on #1120 point 5): off, Combwork's bound shortcuts take their
 // keys but those the CLI uses itself; on, only the command palette's, so every command stays in reach.
 describe('appTakesTerminalKey (#1292)', () => {
   const o = { palette: 'Ctrl+Shift+P', reserved: new Set(['CTRL+B']), bound: ['CTRL+SHIFT+P', 'CTRL+P', 'CTRL+B', 'CTRL+,'] }
-  it("off: Hive's bound keys, never one the CLI keeps, never an unbound one", () => {
+  it("off: Combwork's bound keys, never one the CLI keeps, never an unbound one", () => {
     const off = { ...o, allKeysToCli: false }
     expect(appTakesTerminalKey('Ctrl+P', off)).toBe(true)
     expect(appTakesTerminalKey('ctrl+,', off)).toBe(true)
@@ -66,13 +66,13 @@ describe('appTakesTerminalKey (#1292)', () => {
     expect(appTakesTerminalKey('Ctrl+B', on)).toBe(false)
     expect(appTakesTerminalKey('Ctrl+Shift+P', on)).toBe(true)
     expect(appTakesTerminalKey('ctrl+shift+p', on)).toBe(true)
-    // The palette rebound: its new shortcut stays Hive's, the old one goes to the CLI.
+    // The palette rebound: its new shortcut stays Combwork's, the old one goes to the CLI.
     expect(appTakesTerminalKey('F1', { ...on, palette: 'F1' })).toBe(true)
     expect(appTakesTerminalKey('Ctrl+Shift+P', { ...on, palette: 'F1' })).toBe(false)
-    // The palette unbound: nothing of Hive's (it is still in the menus).
+    // The palette unbound: nothing of Combwork's (it is still in the menus).
     expect(appTakesTerminalKey('Ctrl+Shift+P', { ...on, palette: null })).toBe(false)
   })
-  // A two-step palette shortcut (HR4's round 1): its first key starts Hive's chord, its second completes it while that
+  // A two-step palette shortcut (HR4's round 1): its first key starts Combwork's chord, its second completes it while that
   // chord is pending; any other key (another chord's second step, the second step alone) goes to the CLI.
   it('on, with the palette rebound to two steps: its first key, then its second while pending; nothing else', () => {
     const chord = { ...o, allKeysToCli: true, palette: 'Mod+K Mod+P', bound: ['MOD+K MOD+P', 'MOD+K MOD+N'] }
@@ -86,7 +86,7 @@ describe('appTakesTerminalKey (#1292)', () => {
     expect(appTakesTerminalKey('Mod+P', { ...chord, pending: 'Mod+J' })).toBe(false)
     // While pending, its first key again isn't a second step.
     expect(appTakesTerminalKey('Mod+K', { ...chord, pending: 'Mod+K' })).toBe(false)
-    // Off, chords are never begun from a pane (as before): neither key is Hive's alone.
+    // Off, chords are never begun from a pane (as before): neither key is Combwork's alone.
     expect(appTakesTerminalKey('Mod+K', { ...chord, allKeysToCli: false })).toBe(false)
   })
 })

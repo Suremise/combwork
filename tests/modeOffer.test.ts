@@ -1,4 +1,4 @@
-// The "Permission mode changed" offer (#1234): Hive offers to switch a running agent when its permission mode setting
+// The "Permission mode changed" offer (#1234): Combwork offers to switch a running agent when its permission mode setting
 // changes, never because it restarted. An agent given a task in a new conversation stops and starts again; a refresh
 // landing while the new launch reads its settings once saw a session with no mode yet and offered to switch it into
 // the mode it was already in.
@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-// The notices Hive raises, recorded (and still sent).
+// The notices Combwork raises, recorded (and still sent).
 const toasts = vi.hoisted(() => ({ titles: [] as string[] }))
 vi.mock('../src/main/events', async (original) => {
   const real = await original<typeof import('../src/main/events')>()

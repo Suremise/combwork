@@ -1,4 +1,4 @@
-// Test copies of Hive an earlier run left running (HI-1453), ended at a run's start: only in the lanes no running runner
+// Test copies of Combwork an earlier run left running (HI-1453), ended at a run's start: only in the lanes no running runner
 // holds, only those started before the lanes were read (a runner claiming a lane after that starts its own after it).
 // The real processes: the harnessleftovers e2e.
 import { readFileSync, writeFileSync } from 'fs'

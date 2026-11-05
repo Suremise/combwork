@@ -4,7 +4,7 @@
 // an agent's worktree), relinks them, moves their rows and their sessions' folders; a slot busy under an operation keeps
 // its row until a later Repair. A gone leased slot is made again on its line, its lease kept, or released. Project
 // removal removes clean, merged slots and free copies through their pools' guarded clean-up, and keeps, with why, a slot
-// with unmerged work, a retired home and a folder Hive didn't make. The workspace, its board, the pools and git are real;
+// with unmerged work, a retired home and a folder Combwork didn't make. The workspace, its board, the pools and git are real;
 // the CLIs' homes are the test's; no session is started.
 import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -173,7 +173,7 @@ describe('Repair a Moved Workspace with slots, copies and homes (#1447)', () => 
 })
 
 describe('project removal on slots (#1447)', () => {
-  it('removes clean, merged slots and free copies; keeps a slot with unmerged work, a home and a folder Hive did not make, with why', async () => {
+  it('removes clean, merged slots and free copies; keeps a slot with unmerged work, a home and a folder Combwork did not make, with why', async () => {
     const p = project()
     const pool = await run(() => poolFor(ws, p))
     // hb1 (carried): unmerged work. A free clean slot made for the test, and one adopted from outside the pool's folder.
@@ -273,7 +273,7 @@ describe("a gone slot's recreation, guarded and recovered (#1447, HR1 round 1 fi
   const noPrune = async (): Promise<string[]> => []
   const open = (name: string) => boardRead(ws, (db) => (db.prepare('SELECT id FROM slot_leases WHERE project = ? AND slot = ? AND ended_at IS NULL').get(projectId, name) as { id: string } | undefined)?.id ?? null)
 
-  it('refused when the plan is stale (another Hive relinked it meanwhile) or a writer holds it; nothing made', async () => {
+  it('refused when the plan is stale (another Combwork relinked it meanwhile) or a writer holds it; nothing made', async () => {
     const g = await goneSlot('rc1')
     const pool = await run(() => poolFor(ws, project()))
     // Relinked elsewhere since the plan: its folder isn't the plan's.
@@ -413,7 +413,7 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
     expect(sh(g.home, 'branch', '--show-current')).toBe('hive/hr')
   })
 
-  // Another Hive on the same workspace (HR1's round 2): its own connection to hive.db, its own holder.
+  // Another Combwork on the same workspace (HR1's round 2): its own connection to hive.db, its own holder.
   const otherHive = { pid: 990_001, started: 1 }
   const dbFile = (): string => join(ws.path!, '.combwork', 'hive.db')
   const reservation = (id: string): string | undefined => boardRead(ws, (db) => (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(deleteKey(id)) as { value: string } | undefined)?.value)
@@ -428,10 +428,10 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
     return { id, copy }
   }
 
-  it("a claim another Hive makes after Delete's check wins: Delete's hold refused, nothing written or recycled", async () => {
+  it("a claim another Combwork makes after Delete's check wins: Delete's hold refused, nothing written or recycled", async () => {
     const g = await gamma('gamma4', [531, 532])
     const { id, copy } = await withCopy(g)
-    // The plan Delete checked, read before the other Hive's claims.
+    // The plan Delete checked, read before the other Combwork's claims.
     const checked = await projectFolders(ws, g.p)
     const conn = fileSlotConn(dbFile())
     try {
@@ -441,12 +441,12 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
       expect(await reserveDelete(ws, id, checked, 'd-test4', otherHive)).toEqual({ busy: [slot.name], deleting: false })
       expect(reservation(id)).toBeUndefined()
       expect(opsOf(id).filter((o) => o === 'd-test4')).toEqual([])
-      // Through Delete itself: refused, nothing deleted, the other Hive's operation untouched.
+      // Through Delete itself: refused, nothing deleted, the other Combwork's operation untouched.
       const { removeProject } = await removal()
       await expect(run(() => removeProject(g.p, 'delete'))).rejects.toThrow(/Nothing was deleted/)
       expect(slots.slot(slot.name)!.op?.token).toBe('o-other')
       await conn.write((db) => db.prepare("UPDATE slots SET op = NULL, op_kind = NULL, op_lease = NULL, op_pid = NULL, op_started = NULL WHERE op = 'o-other'").run())
-      // A copy the other Hive leased after the plan refuses it the same way.
+      // A copy the other Combwork leased after the plan refuses it the same way.
       const copies = new CopyStore(conn, id)
       const leased = await copies.take({ kind: 'review', card: 533, revision: 'HEAD' }, { size: 2, dir: join(copy, '..'), token: 'o-copy', holder: otherHive, profile: 'test' })
       expect(leased.ok).toBe(true)
@@ -458,7 +458,7 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
     }
   })
 
-  it("a slot another Hive's Repair relinks after Delete's check refuses its hold, outside the worktrees folder or in it; nothing recycled, the row and work kept", async () => {
+  it("a slot another Combwork's Repair relinks after Delete's check refuses its hold, outside the worktrees folder or in it; nothing recycled, the row and work kept", async () => {
     const g = await gamma('gamma7', [561, 562])
     const id = (await ws.projectConfig(g.p)).id!
     const checked = await projectFolders(ws, g.p)
@@ -466,7 +466,7 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
     try {
       const slots = new SlotStore(conn, id)
       const slot = checked.find((f) => f.of.kind === 'slot' && f.folder.toLowerCase() === g.unmerged.toLowerCase())!
-      // Moved for real and relinked outside the project's worktrees folder, as a Repair in the other Hive does.
+      // Moved for real and relinked outside the project's worktrees folder, as a Repair in the other Combwork does.
       const outside = join(base, 'outside-gamma7')
       sh(g.p, 'worktree', 'move', g.unmerged, outside)
       expect(await slots.relocate(slot.name, outside)).toBe(true)
@@ -491,7 +491,7 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
     }
   })
 
-  it("Delete's hold wins: while it recycles, the other Hive can begin nothing on the project's slots or copies, nor make one", async () => {
+  it("Delete's hold wins: while it recycles, the other Combwork can begin nothing on the project's slots or copies, nor make one", async () => {
     const g = await gamma('gamma5', [541, 542])
     const { id, copy } = await withCopy(g)
     const trees = join(`${ws.path!}.worktrees`, 'gamma5')
@@ -528,7 +528,7 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
     }
   })
 
-  it("Delete's Hive gone after its hold: the next refresh lets the slots and copies go, as they were", async () => {
+  it("Delete's Combwork gone after its hold: the next refresh lets the slots and copies go, as they were", async () => {
     const g = await gamma('gamma6', [551, 552])
     const { id } = await withCopy(g)
     const { spawnSync } = await import('child_process')

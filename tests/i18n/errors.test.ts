@@ -4,7 +4,7 @@ import { join, resolve } from 'path'
 import { tempDir } from '../tempDir'
 
 // #845 (E10a): errors read by both audiences. A service throws a HiveError: its message is English (the Agent API, the
-// log), and IPC tells the window its text in the language Hive shows. The window's text as data beside an English
+// log), and IPC tells the window its text in the language Combwork shows. The window's text as data beside an English
 // field never reaches agents.
 
 /** Handlers IPC registers, by channel (ipcMain stands in for Electron's). */
@@ -14,7 +14,7 @@ vi.mock('electron', async () => {
   const ipcMain = { handle: (channel: string, fn: (e: unknown, ...args: unknown[]) => Promise<unknown>) => void handlers.set(channel, fn) }
   return { ...stub, ipcMain, default: { ...stub.default, ipcMain } }
 })
-/** The window a call comes from: Hive's own, showing a workspace. */
+/** The window a call comes from: Combwork's own, showing a workspace. */
 let callerWorkspace: unknown = null
 vi.mock('../../src/main/windows', async (original) => ({ ...(await original<object>()), windowOf: () => (callerWorkspace ? { ws: callerWorkspace } : null) }))
 
@@ -41,7 +41,7 @@ const GERMAN = {
   'errors.test.wrapped': 'Konnte sie nicht verschieben: {why}',
   'errors.lane.required': 'Welche Spur beendet werden soll, fehlt',
   'errors.workspace.none': 'Kein Arbeitsbereich ist geöffnet.',
-  'agents.provider.extraArgsDashes': 'Hive übergibt die Aufgabe nach "--"; entferne es aus den zusätzlichen Argumenten.'
+  'agents.provider.extraArgsDashes': 'Combwork übergibt die Aufgabe nach "--"; entferne es aus den zusätzlichen Argumenten.'
 }
 
 afterEach(() => setLanguage('en', {}))
@@ -59,7 +59,7 @@ describe('the errors area', () => {
 })
 
 describe('HiveError', () => {
-  it('keeps its English as its message, whatever language Hive shows, and gives the window its text in that language', () => {
+  it('keeps its English as its message, whatever language Combwork shows, and gives the window its text in that language', () => {
     setLanguage('de', GERMAN)
     const e = hiveError(M.gone, { n: 12 }, { kind: 'notFound' })
     expect(e).toBeInstanceOf(Error)
@@ -135,7 +135,7 @@ describe('IPC (#845)', () => {
 })
 
 describe('the Agent API (#845)', () => {
-  it('answers a HiveError in English, with the status its kind says, whatever language Hive shows', () => {
+  it('answers a HiveError in English, with the status its kind says, whatever language Combwork shows', () => {
     setLanguage('de', GERMAN)
     expect(apiErrorReply(hiveError(M.gone, { n: 4 }, { kind: 'notFound' }))).toEqual({ status: 404, body: { error: 'Card #4 is gone.' } })
     expect(apiErrorReply(hiveError(msg({ id: 'errors.workspace.none', defaultMessage: 'No workspace is open.', description: 'test' }), undefined, { kind: 'conflict' }))).toEqual({ status: 409, body: { error: 'No workspace is open.' } })
@@ -146,9 +146,9 @@ describe('the Agent API (#845)', () => {
 
   it("leaves the window's text as data out where a whole object goes to agents, and only that", () => {
     const history = { at: 'x', by: 'You', what: 'Moved to Review', whatText: { id: 'tasks.history.moved', values: { column: 'review' } }, id: 'h1' }
-    const comment = { at: 'x', by: 'Hive', text: 'Session started', hiveText: { id: 'tasks.comment.started' }, id: 'c1' }
+    const comment = { at: 'x', by: 'Combwork', text: 'Session started', hiveText: { id: 'tasks.comment.started' }, id: 'c1' }
     expect(entryForAgents(history)).toEqual({ at: 'x', by: 'You', what: 'Moved to Review' })
-    expect(entryForAgents(comment)).toEqual({ at: 'x', by: 'Hive', text: 'Session started' })
+    expect(entryForAgents(comment)).toEqual({ at: 'x', by: 'Combwork', text: 'Session started' })
     const metrics = { notMeasured: ['Provider network traffic'], notMeasuredText: [M.gone], filters: { scope: 'workspace', notFiltered: ['Trend'], notFilteredText: [M.gone] }, totals: { errorText: { n: 1 } } }
     expect(metricsForAgents(metrics)).toEqual({ notMeasured: ['Provider network traffic'], filters: { scope: 'workspace', notFiltered: ['Trend'] }, totals: { errorText: { n: 1 } } })
     const added = { id: 'a-1', name: 'B2', reuse: { branch: 'b', reused: false, base: 'main', notReused: 'it holds work', notReusedText: M.gone } }

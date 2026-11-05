@@ -45,7 +45,7 @@ describe('sessions.backupAllNow', () => {
     const t = join(profile, 'one.jsonl')
     writeFileSync(t, '{"a":1}\n')
     add('a1', SID, t)
-    // A transcript Hive hasn't found yet: left out, and counted.
+    // A transcript Combwork hasn't found yet: left out, and counted.
     add('a2', SID2)
     const parse = vi.spyOn(sessions as unknown as { transcriptChanged: () => Promise<void> }, 'transcriptChanged')
     expect(sessions.backupAllNow(2000)).toEqual({ saved: 1, incomplete: 0, skipped: 1, failed: 0 })

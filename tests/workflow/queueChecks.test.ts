@@ -1,4 +1,4 @@
-// The merge queue's checks as Hive's own runs (#1349, SPEC §16.9.1 steps 5 and 8, §16.13): the runner (queueChecks.ts)
+// The merge queue's checks as Combwork's own runs (#1349, SPEC §16.9.1 steps 5 and 8, §16.13): the runner (queueChecks.ts)
 // on real temporary repositories with P2's MergeQueue: only a counted green advances, a check that changed the folder is
 // tested again and then pauses, installs from scratch when the manifests changed (or always), transient vs red, the
 // environment a check gets, and S4's and S13's cores.
@@ -60,7 +60,7 @@ const base = (): Record<string, string> => ({
   ELECTRON_RUN_AS_NODE: '1'
 })
 
-/** Hive's runs as the runner reports them. */
+/** Combwork's runs as the runner reports them. */
 function runsLog() {
   const started: Parameters<QueueRuns['start']>[0][] = []
   const finished: ({ id: string } & Parameters<QueueRuns['finish']>[1])[] = []
@@ -222,7 +222,7 @@ describe('which failed checks are temporary (#1362)', () => {
     expect(oracle(texts[3])).toBeNull()
   })
 
-  it("Hive's run keeps why (shown in its details), across a restart; another source's run can't say it", () => {
+  it("Combwork's run keeps why (shown in its details), across a restart; another source's run can't say it", () => {
     const store = new ProgressStore({ now: () => Date.now(), changed: () => undefined, ownerRunning: () => false })
     const ws = tempDir('qc-ws-')
     const runs = progressRuns(store, () => true, ws, join(ws, 'app'))
@@ -306,11 +306,11 @@ describe('the mergeInstall option', () => {
   })
 })
 
-describe("Hive's runs in the Progress panel", () => {
+describe("Combwork's runs in the Progress panel", () => {
   const caller = { source: 'hive' as const, workspacePath: 'C:\\ws', projectPath: 'C:\\ws\\app' }
   const store = () => new ProgressStore({ now: () => Date.now(), changed: () => undefined, ownerRunning: () => false })
 
-  it('are "Hive (merge queue)" in the project, no agent; only Hive changes them; they never go stale; kept as they were', () => {
+  it('are "Combwork (merge queue)" in the project, no agent; only Combwork changes them; they never go stale; kept as they were', () => {
     const p = store()
     const r = p.start({ ...caller, noInstall: true }, { title: 'AM-1 · check · a3f2c1d', command: 'npm test' }, { card: 1, revision: 'a'.repeat(40), testedCheckout: 'a'.repeat(40) })
     expect(r).toMatchObject({ source: 'hive', agentName: HIVE_RUNS, defaultName: 'mergeQueue', projectPath: caller.projectPath, agentId: null, provider: null, noInstall: true, card: 1 })
@@ -330,7 +330,7 @@ describe("Hive's runs in the Progress panel", () => {
 describe("the runner's own runs, outside the queue", () => {
   const ctx = { card: 'AM-1', number: 1, revision: 'a'.repeat(40) }
 
-  it("an install's command line (a token in it) stays in Hive: the Agent API's public run and its event give no part of it", async () => {
+  it("an install's command line (a token in it) stays in Combwork: the Agent API's public run and its event give no part of it", async () => {
     const store = new ProgressStore({ now: () => Date.now(), changed: () => undefined, ownerRunning: () => false })
     const ws = tempDir('qc-ws-')
     const project = join(ws, 'app')
@@ -445,8 +445,8 @@ describe('the install from scratch with real npm (offline, a local tarball)', ()
   })
 })
 
-describe('merge checks as Hive\'s runs (temporary repositories)', () => {
-  it('a green check runs in the queue\'s folder as "Hive (merge queue)" for the result revision, counted; the target advances', async () => {
+describe('merge checks as Combwork\'s runs (temporary repositories)', () => {
+  it('a green check runs in the queue\'s folder as "Combwork (merge queue)" for the result revision, counted; the target advances', async () => {
     const out = join(tempDir('qc-env-'), 'env.json')
     const e = team({}, script(`require('fs').writeFileSync(${JSON.stringify(out)}, JSON.stringify({ env: process.env, cwd: process.cwd() }))`))
     const r = runner()
@@ -579,7 +579,7 @@ describe('installing from scratch before the merge checks (S13, #187)', () => {
     expect(await installs('always', [null, null])).toEqual([1, 2])
   })
 
-  it("the install is one of Hive's runs, the setup command with its clean state; it fails → the card returns", async () => {
+  it("the install is one of Combwork's runs, the setup command with its clean state; it fails → the card returns", async () => {
     const e = team()
     const r = runner({ setupCommand: () => script("console.error('npm ERR! missing script'); process.exit(1)") })
     const { card } = await queued(e)

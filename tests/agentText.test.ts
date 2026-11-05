@@ -67,7 +67,7 @@ describe('the agent text ICU formatter (FormatJS, tags off)', () => {
   it('formats every message of the catalogue, with every select option and some plurals', () => {
     expect(Object.keys(catalogue).length).toBeGreaterThan(40)
     for (const [id, m] of Object.entries(catalogue)) for (const values of samples(m.text)) expect(() => formatIcu(m.text, values), `${id} ${JSON.stringify(values)}`).not.toThrow()
-    expect(formatIcu("Hive's {n, plural, one {# card} other {# cards}} '{'x'}' <command>", { n: 1200 })).toBe("Hive's 1,200 cards {x} <command>")
+    expect(formatIcu("Combwork's {n, plural, one {# card} other {# cards}} '{'x'}' <command>", { n: 1200 })).toBe("Combwork's 1,200 cards {x} <command>")
   })
 
   // HI-2433 round 2: a value named like an Object property is a value with no option of its own, so other.
@@ -227,7 +227,7 @@ describe('the canary dialect over the session contract (card 1)', () => {
 
 describe('the canary dialect over wakes, doorbells and the inbox (card 4, HI-2437)', () => {
   const ids = new Set(Object.keys(catalogue))
-  /** Protocol, outside the catalogue: Hive's fixed prefixes, and the user's name when they set none. */
+  /** Protocol, outside the catalogue: Combwork's fixed prefixes, and the user's name when they set none. */
   const PROTOCOL = ['[CW]', 'New in your inbox:', 'User']
   const NAMES = ['Codex', 'Claudette', 'Reviewer', 'Builder', 'Sam', 'Fix the parser', 'needs logs', 'Round one failed', 'design text', 'waiting on the API']
   type Said = { name: string; text: string; values?: string[] }
@@ -360,21 +360,21 @@ describe('the canary dialect over wakes, doorbells and the inbox (card 4, HI-243
   })
 })
 
-describe("the canary dialect over the inbox's, lane, agent and usage watches' and Hive's notices' builders (card 4)", () => {
+describe("the canary dialect over the inbox's, lane, agent and usage watches' and Combwork's notices' builders (card 4)", () => {
   const ids = new Set(Object.keys(catalogue))
   const PROTOCOL = ['[CW]', 'New in your inbox:', 'User']
   const VALUES = ['HB1', 'HB2', 'alpha', 'Ship it', 'Yes', 'hello', 'Anthropic', 'greet', 'l-1', '1.0.0', '1.0.1', 'UTC', 'nope', 'x']
   const ms = Array.from({ length: 30 }, (_, i) => `m${i + 1}`)
-  const record = (n: number, over: Partial<DeliveryRecord> = {}): DeliveryRecord => ({ id: `m${n}`, seq: n, agentId: 'a1', conversation: null, kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, card: 7, body: 'hello', state: 'offered', created: '2026-11-03T10:00:00.000Z', expires: '2026-11-04T10:00:00.000Z', ...over })
+  const record = (n: number, over: Partial<DeliveryRecord> = {}): DeliveryRecord => ({ id: `m${n}`, seq: n, agentId: 'a1', conversation: null, kind: 'card-event', from: { kind: 'hive', name: 'Combwork' }, card: 7, body: 'hello', state: 'offered', created: '2026-11-03T10:00:00.000Z', expires: '2026-11-04T10:00:00.000Z', ...over })
   const agent = { projectPath: 'C:/ws/alpha', agentId: 'b1', name: 'HB1', project: 'alpha' }
 
   function texts(): { name: string; text: string; values?: string[] }[] {
     const out: { name: string; text: string; values?: string[] }[] = []
     const add = (name: string, text: string | null | undefined, values: string[] = []): void => void out.push({ name, text: text ?? '', values })
     // The inbox (shared/deliveries.ts) and the user's answers relayed to the Assistant (answerRelay.ts).
-    add('offer', offerLine([record(1), record(2, { kind: 'task', again: 'Hive restarted while offering it' })], 'Waiting for #12'), ['Hive restarted while offering it'])
+    add('offer', offerLine([record(1), record(2, { kind: 'task', again: 'Combwork restarted while offering it' })], 'Waiting for #12'), ['Combwork restarted while offering it'])
     add('offer, no watch', offerLine([record(1)], null))
-    add('inbox', inboxText(inboxItems([record(1), record(2), record(3, { kind: 'task', card: 9 })]), ['m1']), ['Hive'])
+    add('inbox', inboxText(inboxItems([record(1), record(2), record(3, { kind: 'task', card: 9 })]), ['m1']), ['Combwork'])
     add('inbox, empty', inboxText([], ['m3']))
     add('ack', ackText(['m1'], ['m9'], ['m2'], true))
     add('ack, unread', ackText([], [], ['m2', 'm3']))
@@ -401,7 +401,7 @@ describe("the canary dialect over the inbox's, lane, agent and usage watches' an
     add('usage label', usageWatchLabel(usage))
     add('usage wake', usageWakeLine(['Anthropic']))
     add('usage limit', usageLimitLine(usage, 60))
-    // Hive's notices: restarts, outages, a team pause.
+    // Combwork's notices: restarts, outages, a team pause.
     add('restarting', restartingLine())
     add('resumed', restartResumeNote({ from: '1.0.0', at: '2026-11-03T10:00:00Z', status: 'watching', card: { label: '#12', round: 2 }, lane: { id: 'l-1', name: 'greet', role: 'builder' } }, '1.0.1', 'update'))
     add('resumed, quit', restartResumeNote({ from: '1.0.0', at: '2026-11-03T10:00:00Z', status: 'working' }, '1.0.0', 'quit'))

@@ -238,7 +238,7 @@ describe('captures and triggers', async () => {
     expect(whats.some((w) => /terminal title: found the needle/.test(w))).toBe(true)
   })
 
-  it("the notice and the list say what a capture saw in Hive's language; the file keeps its English beside it", async () => {
+  it("the notice and the list say what a capture saw in Combwork's language; the file keeps its English beside it", async () => {
     const PL = join(__dirname, '..', 'locales', 'pl')
     const polish = Object.assign({}, ...readdirSync(PL).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(PL, f), 'utf8'))))
     set({ 'cw.recorder.safeguard': true, 'cw.recorder.unknown': true })

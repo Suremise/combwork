@@ -188,7 +188,7 @@ describe("Codex's log's worker as a thread (HI-1972)", () => {
     const home = join(file, '..')
     await useCodexLogTransport(null, bundle)
     expect(await codexRetryWait({ sessionId: THREAD, env: { CODEX_HOME: home }, since: 0 })).toMatchObject({ attempt: 1, status: 429 })
-    // Ended (as Hive's quit or a crash would): the next read starts another.
+    // Ended (as Combwork's quit or a crash would): the next read starts another.
     await useCodexLogTransport(null, bundle)
     expect(await codexRetryWait({ sessionId: THREAD, env: { CODEX_HOME: home }, since: 0 })).toMatchObject({ attempt: 1, status: 429 })
   }, 30_000)

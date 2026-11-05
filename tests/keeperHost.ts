@@ -1,7 +1,7 @@
-// A Hive's process helper in a process of its own, for tests/keeperKilled.test.ts (HI-2314): the real JobHost, started
-// as Hive starts it, configured as the keeper for Hive `hive` in folder `dir` (HI-2055), holding launch `run`'s job
+// A Combwork's process helper in a process of its own, for tests/keeperKilled.test.ts (HI-2314): the real JobHost, started
+// as Combwork starts it, configured as the keeper for Combwork `hive` in folder `dir` (HI-2055), holding launch `run`'s job
 // with process `member` in it. Bundled by the test (esbuild) and run by Node; once set up it prints one line,
-// "ready <helper's pid> <helper's identity>", and waits to be ended from outside, as a crash would end Hive.
+// "ready <helper's pid> <helper's identity>", and waits to be ended from outside, as a crash would end Combwork.
 import { JobHost } from '../src/main/processSupervisor'
 
 const [hive, dir, run, member] = process.argv.slice(2)

@@ -1,7 +1,7 @@
-// Hive's own line is never told as the user's reply (HI-2218, #418): the user pressed Enter in an agent's pane, then
-// within 15 s Hive typed a line there whose prompt its CLI reported taken while sendPrompt still waited for it (its
+// Combwork's own line is never told as the user's reply (HI-2218, #418): the user pressed Enter in an agent's pane, then
+// within 15 s Combwork typed a line there whose prompt its CLI reported taken while sendPrompt still waited for it (its
 // confirm loop, before `typed` was recorded); or a launch's task on its command line was taken just after the user
-// answered its start screen. With the real SessionManager on a stand-in Claude Code input: no reply is told for Hive's
+// answered its start screen. With the real SessionManager on a stand-in Claude Code input: no reply is told for Combwork's
 // line or task; the user's own prompt after it still is.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -49,7 +49,7 @@ const prompted = (e: Entry, text: string): void => {
   s.carryOut(key, e, hookStep(ev as never, s.statusInput(e) as never), 'Hook', ev)
 }
 
-describe("Hive's own line isn't the user's reply (HI-2218)", () => {
+describe("Combwork's own line isn't the user's reply (HI-2218)", () => {
   afterEach(() => {
     s.live.delete(key)
     s.delivering.clear()
@@ -61,7 +61,7 @@ describe("Hive's own line isn't the user's reply (HI-2218)", () => {
     vi.restoreAllMocks()
   })
 
-  it("the user's Enter, then Hive's line reported taken before its delivery returns: no reply; the user's own prompt after it is one", async () => {
+  it("the user's Enter, then Combwork's line reported taken before its delivery returns: no reply; the user's own prompt after it is one", async () => {
     const replies: string[] = []
     vi.spyOn(sessions, 'userReplied').mockImplementation((_p, _a, _n, text) => void replies.push(text))
     const e = running()
@@ -69,17 +69,17 @@ describe("Hive's own line isn't the user's reply (HI-2218)", () => {
     sessions.noteUserInput(pty, '\r')
     const line = '[CW] New in your inbox: 1 task (m672)'
     let reportedWhileDelivering = false
-    // Its CLI takes Hive's line at its Enter, while sendPrompt's confirm still waits (`typed` not recorded yet).
+    // Its CLI takes Combwork's line at its Enter, while sendPrompt's confirm still waits (`typed` not recorded yet).
     onEnter.fn = () => {
       onEnter.fn = null
       reportedWhileDelivering = s.delivering.has(pty) && !e.typed
       prompted(e, line)
     }
     await sessions.sendPrompt(project, id, line, undefined, { confirm: true })
-    expect(reportedWhileDelivering, 'reported while Hive still delivered it').toBe(true)
+    expect(reportedWhileDelivering, 'reported while Combwork still delivered it').toBe(true)
     expect(writes.join('')).toContain('New in your inbox')
-    expect(replies, "Hive's line is told as nobody's reply").toEqual([])
-    // The user then types a prompt of their own and sends it, their Enter later than Hive's: told.
+    expect(replies, "Combwork's line is told as nobody's reply").toEqual([])
+    // The user then types a prompt of their own and sends it, their Enter later than Combwork's: told.
     await vi.waitFor(() => expect(Date.now()).toBeGreaterThan(e.hiveEnterAt as number))
     sessions.noteUserInput(pty, 'Red\r')
     prompted(e, 'Red')
@@ -89,7 +89,7 @@ describe("Hive's own line isn't the user's reply (HI-2218)", () => {
   it("a launch's task on its command line, taken just after the user answered its start screen: no reply; the user's next prompt is one", () => {
     const replies: string[] = []
     vi.spyOn(sessions, 'userReplied').mockImplementation((_p, _a, _n, text) => void replies.push(text))
-    // Launched with its first task on its command line (#712): nothing typed, so no `typed` and no Enter of Hive's.
+    // Launched with its first task on its command line (#712): nothing typed, so no `typed` and no Enter of Combwork's.
     const e = running()
     e.launchTask = true
     // The user answers its trust screen with Enter (the reported case: a new sign-in's home), then its CLI takes the task.

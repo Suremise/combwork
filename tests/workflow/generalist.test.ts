@@ -1,5 +1,5 @@
 // A generalist's card (HI-686): a generalist has no rules of its own, so a card it takes goes the way the project's
-// Workflow options say, as any agent's does. G1 (a generalist) works a code card under Hive's own Solo preset (the project
+// Workflow options say, as any agent's does. G1 (a generalist) works a code card under Combwork's own Solo preset (the project
 // folder, done once committed) and under Pair with a reviewer agent (its own folder, R1's review, never its own, then the
 // agent's merge). The workflow runtime reads no role: what the role decides (lanes, the pool, the slots' count) is the
 // lane service's and the slot pool's, tested in lanes.test.ts and generalistSlots.test.ts.

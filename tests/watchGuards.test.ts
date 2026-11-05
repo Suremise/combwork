@@ -1,6 +1,6 @@
 // Guards on an agent's new watch (HI-2197): a plain number that reads as another card's key is refused, naming both,
 // never remapped (2189 was HI-2182's number while HB3's card was HI-2189); a number with no such key, `#N` and keys go
-// on; a card outside the agent's project stays unknown. A watch is refused while Hive is giving the agent a card in a
+// on; a card outside the agent's project stays unknown. A watch is refused while Combwork is giving the agent a card in a
 // slot (its own start), as it would hold that placement off; and a start that leaves its placement due ends the
 // caller's watch.
 import { mkdirSync, writeFileSync } from 'fs'
@@ -83,7 +83,7 @@ describe("an agent's plain number in a watch (HI-2197)", () => {
   })
 })
 
-describe("a watch while Hive is giving the agent a card in a slot (HI-2197)", () => {
+describe("a watch while Combwork is giving the agent a card in a slot (HI-2197)", () => {
   it('refused, naming the card and slot, only while a placement of its own Active card is due', async () => {
     const [key, number] = pCards()[0]
     await run(() => tasks.updateTask(number, { column: 'doing' }, user))

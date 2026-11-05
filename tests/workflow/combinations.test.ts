@@ -191,7 +191,7 @@ describe('#1592: the OK before merging under not checked', () => {
     const ok = s.requests.find((r) => r.gate === 'okBefore')
     if (!applies) expect(ok).toBeUndefined()
     else {
-      expect(ok, 'Hive asks for the OK').toMatchObject({ kind: 'approve', for: 'user' })
+      expect(ok, 'Combwork asks for the OK').toMatchObject({ kind: 'approve', for: 'user' })
       refusedBy(await e.wf.reportMerge(card.key, B1), 'approval.given')
       moved(await e.wf.answer(card.key, ok!.request, 'approved'))
       expect(e.wakes.at(-1)).toMatchObject({ agent: 'B1', why: expect.stringContaining('approved: merge it and report the merge') })

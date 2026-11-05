@@ -1,5 +1,5 @@
 // The 1.0 upgrade's migration of agents' worktrees into slots (#1441), tried on a copy of a real 0.9 workspace. Skipped
-// unless HIVE_TRIAL_WS names one (never committed with a path in it). Its Hive files are copied read-only into a
+// unless HIVE_TRIAL_WS names one (never committed with a path in it). Its Combwork files are copied read-only into a
 // tempDir() (the board through SQLite's backup, workspace.json and each project.json), each project with git is a scratch
 // clone sharing the original's objects (read, never written), and each agent's worktree is made again as a worktree of
 // it at the same layout and commit. The copy's board is upgraded and adopted as the upgrade does, its sessions' folders

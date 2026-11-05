@@ -1,5 +1,5 @@
-// Open External Terminal Here (#1103 round 1): the terminal it starts gets the folders of the CLIs Hive found, as
-// sessions do, so `claude` found off PATH (Claude Code's native install in ~\.local\bin) runs in it by name; Hive's own
+// Open External Terminal Here (#1103 round 1): the terminal it starts gets the folders of the CLIs Combwork found, as
+// sessions do, so `claude` found off PATH (Claude Code's native install in ~\.local\bin) runs in it by name; Combwork's own
 // PATH stays as it is. Windows Terminal, its cmd fallback and the system terminal elsewhere. Spawn is intercepted: no
 // terminal is opened and nothing of the user's environment changes.
 import { delimiter } from 'path'
@@ -34,7 +34,7 @@ const pathOf = (): string => process.env[Object.keys(process.env).find((k) => k.
 describe('Open External Terminal Here (#1103)', () => {
   afterEach(() => noteCliFolder('claude-code', null))
 
-  it("Windows Terminal gets the found CLI's folder at the end of its PATH; Hive's own PATH stays as it is", () => {
+  it("Windows Terminal gets the found CLI's folder at the end of its PATH; Combwork's own PATH stays as it is", () => {
     noteCliFolder('claude-code', exe)
     const own = pathOf()
     const { calls, spawn } = fakeSpawn()
@@ -51,13 +51,13 @@ describe('Open External Terminal Here (#1103)', () => {
     const { calls, spawn } = fakeSpawn(['wt.exe'])
     expect(openExternalTerminal('C:\\work\\demo', spawn, 'win32')).toBe('cmd')
     expect(calls.map((c) => c.file)).toEqual(['wt.exe', 'cmd.exe'])
-    // Its arguments joined: the start command, as Hive has always run the fallback (never run here).
+    // Its arguments joined: the start command, as Combwork has always run the fallback (never run here).
     expect(calls[1].args.join(' ')).toBe('/c start cmd.exe')
     expect(calls[1].cwd).toBe('C:\\work\\demo')
     expect(calls[1].path.split(delimiter).at(-1)).toBe(folder)
   })
 
-  it("elsewhere the system's terminal; with no CLI found off PATH, the PATH is Hive's", () => {
+  it("elsewhere the system's terminal; with no CLI found off PATH, the PATH is Combwork's", () => {
     const { calls, spawn } = fakeSpawn()
     expect(openExternalTerminal('/work/demo', spawn, 'linux')).toBe('x-terminal-emulator')
     expect(calls[0]).toMatchObject({ file: 'x-terminal-emulator', cwd: '/work/demo', path: pathOf() })

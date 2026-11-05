@@ -113,7 +113,7 @@ describe('the rules (shared/cardCleanup.ts)', () => {
 })
 
 describe("cleaning up archived cards' attachments (HI-1842)", () => {
-  it("an archived card's files go to the Recycle Bin after the days, rows and all, with Hive's comment; open and Done cards keep theirs", async () => {
+  it("an archived card's files go to the Recycle Bin after the days, rows and all, with Combwork's comment; open and Done cards keep theirs", async () => {
     const { w, p } = await workspace()
     const archived = await card(w, { archived: true })
     const open = await card(w)

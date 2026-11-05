@@ -101,7 +101,7 @@ describe('what a lane watch counts (#531)', () => {
     const was: LaneMark = { state: 'active', mergeDue: false, cards: { 1: card({ q: '' }) } }
     const ask = { since: t1, by: 'HB6', text: 'Push the tag now?\nIt is v1.0.0.' }
     expect(laneHits(was, now(t1, ask), ['failed', 'paused-user'])!.parts).toEqual([{ n: 1, event: 'paused-user', text: '#1 waits for the user (HB6 asks)', detail: 'Push the tag now?' }])
-    // Hive's own request (no asker), a second question after the first, none new, one answered: told, told, quiet, quiet.
+    // Combwork's own request (no asker), a second question after the first, none new, one answered: told, told, quiet, quiet.
     expect(laneHits(was, now(t1, { since: t1, by: null, text: 'Approve the merge?' }), ['paused-user'])!.parts[0].text).toBe('#1 waits for the user (Combwork asks)')
     expect(laneHits(now(t1).mark, now(t2, { ...ask, since: t2 }), ['paused-user'])).not.toBeNull()
     expect(laneHits(now(t1).mark, now(t1, ask), ['paused-user'])).toBeNull()
@@ -399,10 +399,10 @@ describe('lane watches (main/watches.ts, #531)', async () => {
   const tasks = await import('../src/main/tasks')
   const watches = await import('../src/main/watches')
   watches.testHooks.settleMs = 0
-  // A check reads what Hive did after `await watches.settled()`: deliveries run in the background (#570).
+  // A check reads what Combwork did after `await watches.settled()`: deliveries run in the background (#570).
   const lanes = await import('../src/main/lanes')
 
-  /** Workflow rules off for one test (#1270: Hive owns the lane while they are on), on again after it. */
+  /** Workflow rules off for one test (#1270: Combwork owns the lane while they are on), on again after it. */
   const { advanced } = await import('../src/main/advanced')
   const { ENFORCE } = await import('../src/main/workflow/service')
   const rulesOff = (): Promise<unknown> => advanced.set(ENFORCE, false)
@@ -422,7 +422,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     return { w, alpha, home: w.assistantHome }
   }
   /**
-   * The Assistant (watching, then working once typed into; #650: it follows Hive's doorbell with cw_inbox, and what it
+   * The Assistant (watching, then working once typed into; #650: it follows Combwork's doorbell with cw_inbox, and what it
    * read is `told`), and every agent of alpha running and working.
    */
   const fake = (alpha: string, home: string) => {
@@ -461,7 +461,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     st.status = 'watching'
     return watches.registerLaneWatch(w, home, 'assistant', { ids: 'all', events: [...LANE_DEFAULT_EVENTS] }, undefined, { ...(cards ? { cards } : {}), changes: [...LANE_CARD_CHANGES] })
   }
-  /** An alpha agent's status as Hive records it (#726: the session-status event). */
+  /** An alpha agent's status as Combwork records it (#726: the session-status event). */
   const status = (alpha: string, st: { agents: Record<string, string> }, id: string, s: string, statusMessage?: string) => {
     st.agents[id] = s
     watches.noteAgentStatus({ projectPath: alpha, agentId: id, agentName: id.toUpperCase(), status: s, runId: id, ...(statusMessage ? { statusMessage } : {}) } as never)
@@ -505,7 +505,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     expect(st.told[2]).toMatch(/^\[CW\] Lane B1 \/ R1 \(greetings\): all its cards passed: its merge is due\./)
     await watchAll(w, home, st)
     for (const n of [a, b]) await inWorkspace(w, () => tasks.updateTask(n, { column: 'done' }, user))
-    // Hive ends a lane whose cards are all Done as it follows the board (lanes.refresh).
+    // Combwork ends a lane whose cards are all Done as it follows the board (lanes.refresh).
     await lanes.refresh(w)
     await watches.evaluateWatches(w)
     await vi.waitFor(() => expect(st.told).toHaveLength(4), { timeout: HUNG_MS })
@@ -1015,10 +1015,10 @@ describe('lane watches (main/watches.ts, #531)', async () => {
       expect(st.told).toEqual([])
       expect(st.typed).toEqual([])
       // Its start fails: stalled, with the failure rather than "isn't running".
-      startEnded(alpha, 'b1', `#${a}`, { failed: "Hive couldn't get slot-g ready: git worktree add failed" })
+      startEnded(alpha, 'b1', `#${a}`, { failed: "Combwork couldn't get slot-g ready: git worktree add failed" })
       await watches.evaluateWatches(w)
       await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
-      expect(st.told[0]).toContain(`#${a} is stalled: "B1's start failed: Hive couldn't get slot-g ready: git worktree add failed"`)
+      expect(st.told[0]).toContain(`#${a} is stalled: "B1's start failed: Combwork couldn't get slot-g ready: git worktree add failed"`)
     } finally {
       Object.assign(sessions, { liveFor })
       resetAgentStartsForTests()
@@ -1040,7 +1040,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await watches.evaluateWatches(w)
     await watches.settled()
     expect(st.typed).toEqual([])
-    // Its only-watching passes the limit: Hive's clock moves on (the lane tick looks again now and then).
+    // Its only-watching passes the limit: Combwork's clock moves on (the lane tick looks again now and then).
     vi.useFakeTimers({ toFake: ['Date'] })
     try {
       vi.setSystemTime(Date.parse(since) + REVIEW_WAIT_STALL_MS + 60_000)
@@ -1292,7 +1292,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await watches.evaluateWatches(w)
     await watches.settled()
     expect(st.typed).toEqual([])
-    // Neither moves for the limit: Hive's clock moves on (the lane tick looks again now and then).
+    // Neither moves for the limit: Combwork's clock moves on (the lane tick looks again now and then).
     vi.useFakeTimers({ toFake: ['Date'] })
     try {
       vi.setSystemTime(Date.parse(since) + REVIEW_WAIT_STALL_MS + 60_000)
@@ -1323,7 +1323,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await watches.evaluateWatches(w)
     await watches.settled()
     expect(st.told).toHaveLength(1)
-    // The limit passes: Hive's clock moves on (the lane tick looks again now and then).
+    // The limit passes: Combwork's clock moves on (the lane tick looks again now and then).
     vi.useFakeTimers({ toFake: ['Date'] })
     try {
       vi.setSystemTime(Date.parse(idleSince) + MERGE_STALL_MS + 60_000)

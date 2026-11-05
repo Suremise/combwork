@@ -72,7 +72,7 @@ describe('the schema', () => {
   })
 })
 
-// Dialects (HI-2438): a fact Hive writes keeps its message beside its English, to be said in each reader's dialect.
+// Dialects (HI-2438): a fact Combwork writes keeps its message beside its English, to be said in each reader's dialect.
 describe("a summary's message", () => {
   const stored = (h: string, id: number): string | null => {
     j.closeJournal(h)
@@ -84,7 +84,7 @@ describe("a summary's message", () => {
     }
   }
 
-  it("is kept with Hive's facts, none with the Assistant's own entries, and goes once the summary is edited", () => {
+  it("is kept with Combwork's facts, none with the Assistant's own entries, and goes once the summary is edited", () => {
     const h = home()
     const text = { id: 'finish.journal.done', values: { card: 'AM-1', title: 'Fix it', how: 'queue', byUser: 'no', by: 'hive' } }
     const fact = j.writeEntry(h, all, { kind: 'event', summary: 'AM-1 "Fix it" is Done', summaryText: text }, 'hive')

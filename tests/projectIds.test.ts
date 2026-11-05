@@ -22,7 +22,7 @@ const { movePlan, repairMove } = await import('../src/main/workspaceMove')
 const { atomicTestHooks } = await import('../src/main/fsutil')
 
 vi.setConfig({ testTimeout: 30_000 })
-/** Bounds a wait for Hive's folder watcher: only a hung watcher takes this long. */
+/** Bounds a wait for Combwork's folder watcher: only a hung watcher takes this long. */
 const HUNG_MS = 15_000
 
 const user = { kind: 'user' } as const
@@ -122,7 +122,7 @@ describe('a workspace', () => {
   beforeAll(async () => {
     project(wsPath, 'alpha', { agents: [{ id: 'a1', name: 'A1', provider: 'claude-code' }, { id: 'r1', name: 'R1', provider: 'claude-code' }] })
     project(wsPath, 'beta')
-    // Renamed from old-site while Hive was closed, before projects had ids (as hive-website → website): its agent
+    // Renamed from old-site while Combwork was closed, before projects had ids (as hive-website → website): its agent
     // Claude was removed since, but its sessions are still the project's.
     project(wsPath, 'site', {}, [{ agentId: 'a-claude' }])
     // A card saved before ids, by a project of the workspace: it gets the id when the workspace opens.
@@ -162,7 +162,7 @@ describe('a workspace', () => {
     const file = readCard(wsPath, c.number)
     expect(Object.keys(file).slice(0, 5)).toEqual(['number', 'title', 'description', 'project', 'projectId'])
     expect(file.projectId).toBe(projectJson(join(wsPath, 'alpha')).id)
-    // Not part of the card as Hive shows it (the Agent API, the board).
+    // Not part of the card as Combwork shows it (the Agent API, the board).
     expect('projectId' in c).toBe(false)
     expect('projectId' in (await run(() => tasks.getTask(c.number)))).toBe(false)
   })
@@ -262,7 +262,7 @@ describe('a saved id decides; nothing is lost on the way (#508 round 2)', () => 
     mkdirSync(tasksDir, { recursive: true })
     legacy(1, 'alpha', { custom: { kept: true } })
     legacy(2, 'beta')
-    // Saved before ids under a project renamed since (site was old-site), with a field this Hive doesn't know.
+    // Saved before ids under a project renamed since (site was old-site), with a field this Combwork doesn't know.
     legacy(3, 'old-site', { agent: 'a-old', agentName: 'Old', custom: 'mine' })
     writeFileSync(join(tasksDir, 'board.json'), JSON.stringify({ version: 1, next: 4 }))
     // A lane saved before ids, and one under old-site.
@@ -425,7 +425,7 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
         await w.projectIds({ fresh: true })
       }
       expect(w.lastSeenCount()).toBe(1 + 2)
-      // p1, missed longest ago, is forgotten: back under another name it is a project Hive hasn't seen.
+      // p1, missed longest ago, is forgotten: back under another name it is a project Combwork hasn't seen.
       seen.length = 0
       await moveFolder(join(base, 'ws-bound-out1'), join(wsPath, 'p1-back'))
       await w.projectIds({ fresh: true })
@@ -760,7 +760,7 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
   })
 })
 
-describe('merge holds Hive closed under are told in their project now (#508 round 3)', () => {
+describe('merge holds Combwork closed under are told in their project now (#508 round 3)', () => {
   const holdsFile = async (ws: string): Promise<string> => {
     const { hashText } = await import('../src/main/fsutil')
     return join(base, 'profile', 'merge-slots', `${hashText(ws.toLowerCase())}.json`)
@@ -855,7 +855,7 @@ describe('a workspace moved with a project renamed (#1305): Working on by the na
   it('the plan names the project as it is called now, and Repair marks it so, never its old name', async () => {
     const before = join(base, 'Scratch')
     const wsPath = join(base, 'Tools')
-    // juniper, now dialect: moved with its workspace (Scratch → Tools) and renamed while Hive was closed.
+    // juniper, now dialect: moved with its workspace (Scratch → Tools) and renamed while Combwork was closed.
     project(wsPath, 'dialect', { lastPath: join(before, 'juniper') })
     const w = createWorkspaceService()
     await w.open(wsPath)

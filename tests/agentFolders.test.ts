@@ -254,7 +254,7 @@ describe("a slot's writer: claimed in one write with the resume authority, held 
 
   /**
    * A workspace's hive.db with a project's slot-b lent to b1 for #12 (lease l1), slot-c free and ready, and b1's
-   * session s1 in slot-b, bound to l1. `other()` is another Hive's connection to the same file.
+   * session s1 in slot-b, bound to l1. `other()` is another Combwork's connection to the same file.
    */
   function board(): { store: SlotStore; db: DatabaseSync; other: () => SlotStore } {
     const ws = join(tempDir('agentfolders-'), 'ws')
@@ -325,7 +325,7 @@ describe("a slot's writer: claimed in one write with the resume authority, held 
     const b = board()
     expect(await claim(b.store, { run: 'run-1' })).toMatchObject({ lease: 'l1', slot: { name: 'slot-b', writer: { run: 'run-1', agent: 'b1', lease: 'l1' } } })
     expect(writerOf(b.store)).toMatchObject({ run: 'run-1', lease: 'l1', agent: 'b1', pid: process.pid })
-    // Another run (another Hive's, say) for the same lease: refused, the slot is written.
+    // Another run (another Combwork's, say) for the same lease: refused, the slot is written.
     expect(await refusal(claim(b.other(), { run: 'run-2' }))).toEqual({ is: 'busy', slot: 'slot-b', agent: 'b1' })
     // The lease ends while the run drains: the slot still isn't lent, adopted or removed.
     await b.store.end('l1', 'done')
@@ -400,14 +400,14 @@ describe("a slot's writer: claimed in one write with the resume authority, held 
     expect(leaseOf(b.db)).toBe('l3')
   })
 
-  it("another agent's run still draining in a free slot: the slot holds its work, and a writer left by a Hive that is gone is never taken over by a claim", async () => {
+  it("another agent's run still draining in a free slot: the slot holds its work, and a writer left by a Combwork that is gone is never taken over by a claim", async () => {
     const b = board()
     await claim(b.store, { run: 'run-1' })
     await b.store.end('l1', 'done')
     const s2 = { id: 's2', cwd: slotFolder('slot-b'), lease: 'l0' }
     const b2: FolderAgent = { id: 'b2', role: 'builder', legacy: null }
     expect(resumeHold({ ...facts([]), slots: b.store.conn.read((db) => slotsIn(db, 'p1')) }, b2, s2)).toMatchObject({ is: 'reused', card: 12 })
-    // A lease of slot-b again (#13) while run-1's writer stays (its Hive crashed, its processes not known to have ended).
+    // A lease of slot-b again (#13) while run-1's writer stays (its Combwork crashed, its processes not known to have ended).
     b.db.prepare("INSERT INTO slot_leases (id, project, slot, kind, card, agent, from_at) VALUES ('l2', 'p1', 'slot-b', 'card', 13, 'b1', '2026-10-23T09:00:00.000Z')").run()
     b.db.prepare("UPDATE slots SET writer_pid = 999999 WHERE project = 'p1' AND name = 'slot-b'").run()
     expect(await refusal(claim(b.store, { run: 'run-2' }))).toEqual({ is: 'busy', slot: 'slot-b', agent: 'b1' })

@@ -1,5 +1,5 @@
 // The agent-text guard (scripts/agentTextGuard.mjs, dialects, HI-2065): no new hard-coded text in what agents get. Its
-// rules on fixtures, each in a tree of its own, its ratchet, and Hive's own source with its real lists.
+// rules on fixtures, each in a tree of its own, its ratchet, and Combwork's own source with its real lists.
 import { afterEach, describe, expect, it } from 'vitest'
 import { spawnSync } from 'child_process'
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
@@ -102,7 +102,7 @@ describe('the agent-text guard', () => {
   })
 })
 
-describe("Hive's own source", () => {
+describe("Combwork's own source", () => {
   it('has no new hard-coded agent text, and its lists are no bigger than at the merge base', () => {
     const ref = defaultBaseRef(ROOT)
     const base = baseLists(ROOT, ref, ALLOW_DIR) as { base: string; lists: Lists | null } | null

@@ -108,7 +108,7 @@ describe("a lane's end waits for its builder's turn to be over", () => {
     expect(h.retired).toEqual(['its run ended'])
   })
 
-  it('a quit held by the user typing (or a line of Hive\'s) is tried again, never forced before the deadline', async () => {
+  it('a quit held by the user typing (or a line of Combwork\'s) is tried again, never forced before the deadline', async () => {
     const h = harness()
     h.s.why = null
     h.s.quitAnswer = 'held'

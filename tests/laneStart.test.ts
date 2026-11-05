@@ -10,7 +10,7 @@ const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as st
 vi.mock('../src/main/sessions', () => ({
   sessions: {
     liveFor: (_p: string, id: string) => state.live.get(id) ?? null,
-    // A prompt Hive typed that its CLI hasn't taken yet (HI-2034): `state.pending`.
+    // A prompt Combwork typed that its CLI hasn't taken yet (HI-2034): `state.pending`.
     agentNow: (_p: string, id: string) => (state.live.has(id) ? { pending: state.pending.has(id) } : null),
     start: async (_p: string, o: { agentId: string }) => {
       state.calls.push(`start ${o.agentId}`)
@@ -82,7 +82,7 @@ vi.mock('../src/main/slotCards', () => ({
     return state.lend
   }
 }))
-// No line of Hive's on its way (HI-2034: its own conditions are lineWriter's).
+// No line of Combwork's on its way (HI-2034: its own conditions are lineWriter's).
 vi.mock('../src/main/lineWriter', () => ({ whyNoLine: () => null }))
 // Each workspace's board (HI-2288): a workspace with `board` has those cards; any other given has alpha's AL-n. Read with
 // no workspace (the default one's, the last focused window's), it is another workspace's card of the same number.
@@ -257,7 +257,7 @@ describe('Start lane… in main (#1280)', () => {
   })
 })
 
-describe('a lane waiting for a slot, started as Hive quits (#1628)', () => {
+describe('a lane waiting for a slot, started as Combwork quits (#1628)', () => {
   const waiting = (): void => void (state.lanes = [{ id: 'lane-1', state: 'active', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' }, cards: [1], rounds: 3 }])
 
   it("lent its slot with its builder not free: owed its new conversation with the slot wait's note (HR1 round 1, finding 2), never failed", async () => {
@@ -386,7 +386,7 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
     state.live.set('r1', { status: 'working', sessionId: 's-r1' })
     const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
     expect(state.calls).toEqual([])
-    // The rules on: Hive gives the builder its first card itself (HI-2029), so the caller tells only the reviewer (HR1).
+    // The rules on: Combwork gives the builder its first card itself (HI-2029), so the caller tells only the reviewer (HR1).
     expect(recordedLaneNote(l)).toBe("B2 is running, so Combwork left it as it is: Combwork gives it the lane's first card itself once it is free, so don't prompt it. R1 is running, so Combwork left it as it is: tell it about the lane.")
     // The rules off: nothing starts the builder's card, so the caller tells both (a busy builder: an idle one outside
     // slots gets the lane in a new conversation, HI-2232).

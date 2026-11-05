@@ -25,7 +25,7 @@ const agent = (status: SessionStatus = 'ready'): Agent => ({ status, ledger: new
 
 const input = (a: Agent): HookStatusInput => ({ status: a.status, statusMessage: a.statusMessage, askedAtStart: false, compacting: null, backgroundWakes: false, tasks: 0, attention: 'hooks', reviewed: false, titleAsks: false, open: [], waitingOn: null, question: false, reviewing: false, safeguardPrompt: false })
 
-/** One hook through the ledger and the status rules; `continued`: Hive answered this Stop with a continuation. */
+/** One hook through the ledger and the status rules; `continued`: Combwork answered this Stop with a continuation. */
 function feed(a: Agent, ev: HookEvent, i: HookIds, continued = false): Agent {
   const took = admit(a.ledger, ev, i, { hiveContinued: continued, now: a.ledger.seq })
   if (took.verdict === 'apply') applyStep(a, hookStep(took.event, input(a)))
@@ -140,7 +140,7 @@ describe('the turn ledger', () => {
     }
   })
 
-  it("an id Hive doesn't remember is stale, never new: only a start opens one under an id never seen (a prompt; a compaction, below)", () => {
+  it("an id Combwork doesn't remember is stale, never new: only a start opens one under an id never seen (a prompt; a compaction, below)", () => {
     // A turn the CLI began without a prompt hook (no prompt seen), news of every other kind under it: nothing changes.
     const kinds = everyKind('t-never').filter(([ev]) => ev.kind !== 'prompt' && ev.kind !== 'compactStart')
     expect(kinds).toHaveLength(10)
@@ -153,7 +153,7 @@ describe('the turn ledger', () => {
       feed(a, ev, i)
       expect([a.status, a.ledger.active?.id, a.ledger.active?.state], ev.kind).toEqual(['finished', 't1', 'over'])
       expect(a.stale, ev.kind).toHaveLength(2)
-      expect(a.stale.every((why) => why.endsWith('of a turn Hive saw no prompt for')), ev.kind).toBe(true)
+      expect(a.stale.every((why) => why.endsWith('of a turn Combwork saw no prompt for')), ev.kind).toBe(true)
     }
     // With no turn known yet either.
     const fresh = feed(agent('ready'), { kind: 'toolStart' }, ids('t-never', { call: 'c' }))
@@ -214,7 +214,7 @@ describe('the turn ledger', () => {
     feed(c, { kind: 'compactEnd' }, ids('k2'))
     feed(c, { kind: 'toolStart' }, ids('t1', { call: 'c1' }))
     expect([c.status, c.statusMessage, c.ledger.compaction, c.ledger.active?.id, c.ledger.active?.state, openCalls(c.ledger)]).toEqual(['working', undefined, null, 't1', 'running', 1])
-    expect(c.stale).toEqual(['a compaction start of a turn Hive saw no prompt for', 'a compaction end of a turn Hive saw no prompt for'])
+    expect(c.stale).toEqual(['a compaction start of a turn Combwork saw no prompt for', 'a compaction end of a turn Combwork saw no prompt for'])
     // An end with no start seen opens nothing (above: a compaction end under an id never seen is stale).
   })
 
@@ -350,7 +350,7 @@ describe('the turn ledger', () => {
     for (const [ev, i] of everyKind('t2').filter(([e]) => e.kind !== 'toolStart' && e.kind !== 'prompt' && e.kind !== 'compactStart')) woke(b, ev, i, true)
     expect([b.status, b.ledger.active?.id, b.ledger.active?.state]).toEqual(['background', 't1', 'over'])
     expect(b.stale).toHaveLength(13)
-    expect(b.stale.every((why) => why.endsWith('of a turn Hive saw no prompt for'))).toBe(true)
+    expect(b.stale.every((why) => why.endsWith('of a turn Combwork saw no prompt for'))).toBe(true)
     // While it woke, a tool call the launch never saw: that turn begins.
     woke(b, { kind: 'toolStart' }, ids('t2', { call: 'c2' }), true)
     expect([b.status, b.ledger.active?.id, b.ledger.active?.state, openCalls(b.ledger)]).toEqual(['working', 't2', 'running', 1])
@@ -362,7 +362,7 @@ describe('the turn ledger', () => {
     woke(b, { kind: 'toolStart' }, ids('t4', { call: 'c4' }), true)
     woke(b, { kind: 'toolStart' }, ids('t1', { call: 'c5' }), true)
     expect([b.ledger.active?.id, b.ledger.active?.state]).toEqual(['t3', 'running'])
-    expect(b.stale.slice(13)).toEqual(['a tool start of a turn Hive saw no prompt for', 'a tool start of an earlier turn'])
+    expect(b.stale.slice(13)).toEqual(['a tool start of a turn Combwork saw no prompt for', 'a tool start of an earlier turn'])
   })
 
   it('past the bound on remembered ids, a forgotten id is stale, never a new turn, also while the CLI woke (the bound itself: maxSeen)', () => {
@@ -384,11 +384,11 @@ describe('the turn ledger', () => {
     }
     expect([a.status, a.ledger.active?.id, a.ledger.active?.state]).toEqual(['finished', 't5', 'over'])
     const kinds = ['a tool start', 'a tool end', 'a Stop', 'idle news', 'a compaction start', 'a session end']
-    expect(a.stale).toEqual([...kinds.map((k) => `${k} of a turn Hive saw no prompt for`), ...kinds.map((k) => `${k} of an earlier turn`)])
+    expect(a.stale).toEqual([...kinds.map((k) => `${k} of a turn Combwork saw no prompt for`), ...kinds.map((k) => `${k} of an earlier turn`)])
     // While the CLI woke too (HR3's case: a delayed PreToolUse of t0, its own call or a new one), and a compaction start
     // under an id never seen: past the bound an id not remembered may be an earlier one, so nothing opens.
     a.status = 'background'
-    for (const call of ['c0', 'c-new']) expect(admit(a.ledger, { kind: 'toolStart' }, ids('t0', { call }), { woke: true }), call).toEqual({ verdict: 'stale', why: 'a tool start of a turn Hive saw no prompt for' })
+    for (const call of ['c0', 'c-new']) expect(admit(a.ledger, { kind: 'toolStart' }, ids('t0', { call }), { woke: true }), call).toEqual({ verdict: 'stale', why: 'a tool start of a turn Combwork saw no prompt for' })
     expect(admit(a.ledger, { kind: 'toolStart' }, ids('t-new', { call: 'c-new' }), { woke: true }).verdict).toBe('stale')
     expect(admit(a.ledger, { kind: 'compactStart', trigger: 'auto' }, ids('k-new')).verdict).toBe('stale')
     expect([a.ledger.active?.id, a.ledger.active?.state, a.ledger.compaction]).toEqual(['t5', 'over', null])
@@ -406,7 +406,7 @@ describe('the turn ledger', () => {
     expect(admit(b.ledger, { kind: 'toolStart' }, ids('t2', { call: 'c-new' }), { woke: true }).verdict).toBe('stale')
   })
 
-  it("a Stop Hive answered with a continuation is not the turn's end: the Stop answered with nothing is", () => {
+  it("a Stop Combwork answered with a continuation is not the turn's end: the Stop answered with nothing is", () => {
     const a = agent()
     feed(a, { kind: 'prompt' }, ids('t1'))
     feed(a, { kind: 'stop', lastMessage: null }, ids('t1'), true)
@@ -432,7 +432,7 @@ describe('the turn ledger', () => {
     expect(a.stale).toEqual(["a sub-agent's tool outside the running turn", "a sub-agent's Stop"])
   })
 
-  it("a prompt in the running turn isn't a new turn; one Hive put there itself isn't a prompt at all (Messaging 5)", () => {
+  it("a prompt in the running turn isn't a new turn; one Combwork put there itself isn't a prompt at all (Messaging 5)", () => {
     const a = agent()
     feed(a, { kind: 'prompt', text: 'go' }, ids('t1'))
     const mid = admit(a.ledger, { kind: 'prompt', text: 'a word from the user' }, ids('t1'))
@@ -469,7 +469,7 @@ describe('the turn ledger', () => {
     expect(l.active?.state).toBe('running')
   })
 
-  it("the CLI's record of a turn's end by id reconciles only the turn Hive has running under that id", () => {
+  it("the CLI's record of a turn's end by id reconciles only the turn Combwork has running under that id", () => {
     const l = newLedger(0)
     admit(l, { kind: 'prompt' }, ids('t2'))
     expect(reconciles(l, 't1')).toBe(false)
@@ -482,12 +482,12 @@ describe('the turn ledger', () => {
     expect(reconciles(c, 't1')).toBe(false)
   })
 
-  it("records naming no turn (Copilot): a Stop answered since the turn began that Hive never got ends it; earlier ones don't", () => {
+  it("records naming no turn (Copilot): a Stop answered since the turn began that Combwork never got ends it; earlier ones don't", () => {
     // An earlier turn's Stop answered at 900 (in the tail read with the new prompt): not this turn's.
     const c = newLedger(0)
     admit(c, { kind: 'prompt' }, ids(null), { now: 1000 })
     expect(unheardStop(c, [900])).toBe(false)
-    // Carried on by Hive once, then its final Stop missed: the second answer is one Hive never got.
+    // Carried on by Combwork once, then its final Stop missed: the second answer is one Combwork never got.
     const e = newLedger(0)
     admit(e, { kind: 'prompt' }, ids(null), { now: 1000 })
     admit(e, { kind: 'stop', lastMessage: null }, ids(null), { hiveContinued: true, now: 1100 })
@@ -505,7 +505,7 @@ describe('the real CLIs’ hooks through the ledger (#645 spike recordings)', ()
     const { claudeCode } = await import('../src/main/providers/claude/adapter')
     const hooks = fixture('turns-claude-2.1.296.json')
     const a = agent()
-    // In the recording a hook blocked every Stop but the last of each turn; Hive would have answered them so.
+    // In the recording a hook blocked every Stop but the last of each turn; Combwork would have answered them so.
     const last = (i: number) => hooks.slice(i + 1).find((b) => b.hook_event_name === 'Stop' || b.hook_event_name === 'UserPromptSubmit')?.hook_event_name !== 'Stop'
     const statuses: string[] = []
     hooks.forEach((body, i) => {
@@ -591,7 +591,7 @@ describe("the adapters' turn ids, Stop replies and idle screens", () => {
     expect(codex.stopContinues({ hookSpecificOutput: { hookEventName: 'Stop', additionalContext: 'You have mail' } })).toBe(false)
   })
 
-  it("Claude Code 2.1.296's screens, recorded alone and in Hive: idle at its prompt, or working; older versions aren't read", async () => {
+  it("Claude Code 2.1.296's screens, recorded alone and in Combwork: idle at its prompt, or working; older versions aren't read", async () => {
     const { claudeCode } = await import('../src/main/providers/claude/adapter')
     const turn = claudeCode.turnScreen('2.1.296')!
     const recorded = screen('screen-claude-2.1.296-idle.txt')
@@ -604,7 +604,7 @@ describe("the adapters' turn ids, Stop replies and idle screens", () => {
     // A dialog, or no status line: not sure.
     expect(turn('Do you want to proceed?\n❯ 1. Yes\n  2. No')).toBeNull()
     expect(turn('※ recap: the work is merged\n❯ ')).toBeNull()
-    // As Hive's own terminal renders it (#648's real check: its input marked ">", its spinner with no "esc to interrupt"):
+    // As Combwork's own terminal renders it (#648's real check: its input marked ">", its spinner with no "esc to interrupt"):
     // a reply held for seconds ("✢ Embellishing…"), and once done.
     expect(turn(screen('screen-claude-2.1.296-hive-working.txt'))).toBe('working')
     expect(turn(screen('screen-claude-2.1.296-hive-idle.txt'))).toBe('idle')

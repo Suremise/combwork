@@ -18,7 +18,7 @@ const chain = (texts: Record<string, string>): DialectChain => ({ texts, files: 
 
 afterEach(() => setProcessChain(null))
 
-/** What a test put in an output (names, keys, titles, paths, column names): not Hive's wording. */
+/** What a test put in an output (names, keys, titles, paths, column names): not Combwork's wording. */
 const VALUES = ['Fix it', 'The details', 'Only the tests', 'First thoughts', 'Failed', 'the redirect loops', 'Reviewer', 'alpha', 'You', 'Agent2', 'B1', 'R1', 'R2', 'R3', 'AL-1', 'AL-2', 'Lane data', 'Lane hover', 'Keep the API stable', 'typecheck', 'lint', 'ui', 'api', 'slot', 'hive', 'Done', 'Review', 'Passed', 'docs', 'md', 'intro', 'setup', 'install', 'att', 'png', 'x', 'k', 'Slot', 'held', 'no', 'CLI']
 
 function prompts(): { name: string; text: string }[] {

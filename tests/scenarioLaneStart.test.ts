@@ -1,4 +1,4 @@
-// The scenarios' wait for Hive's start of a lane's first card (HI-2278, scenarios.cjs laneStartLanded): it has landed
+// The scenarios' wait for Combwork's start of a lane's first card (HI-2278, scenarios.cjs laneStartLanded): it has landed
 // only once the card is in Doing, the builder is past starting, and the start's task delivery is offered (or read) with
 // its doorbell, which names its id, in what the current launch shows. Never on a delivery uncertain or ended, one still
 // queued, one for another card, or one whose line only an earlier launch showed.

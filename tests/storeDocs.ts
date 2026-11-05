@@ -11,7 +11,7 @@ const inTables = (store: AnyStore): store is TableStore => store === 'lanes' || 
 
 /**
  * Runs `read` on a lease's connection to the workspace's database, closing it again after when it wasn't open: a look at
- * any workspace's, held by a window or not (#1395: Hive keeps none open but a window's), that holds nothing open after.
+ * any workspace's, held by a window or not (#1395: Combwork keeps none open but a window's), that holds nothing open after.
  */
 function peek<T>(workspacePath: string, read: (db: Db['reader']) => T): T {
   const lease = leaseDb(workspacePath)
@@ -39,7 +39,7 @@ export const storeMeta = <T = unknown>(workspacePath: string, store: AnyStore, k
 }
 
 /**
- * Saves a store's entries as Hive would have (a test's stand-in for writing its file by hand before #1018): lanes, watches
+ * Saves a store's entries as Combwork would have (a test's stand-in for writing its file by hand before #1018): lanes, watches
  * and metrics in their tables (each entry's key from the entry), deliveries in theirs; `meta` its values (JSON-encoded here;
  * null removes one). `key` is no longer used: every store keys its entries itself.
  */
@@ -48,7 +48,7 @@ export async function putStoreDocs(workspacePath: string, store: AnyStore, docs:
   for (const [k, v] of Object.entries(o.meta ?? {})) meta[k] = v === null ? null : JSON.stringify(v)
   if (inTables(store)) return saveTable(workspacePath, store, docs, meta)
   if (store === 'deliveries') {
-    // Their table (#1211): the host's rows replaced; an entry Hive wouldn't read back goes with those kept aside, as the
+    // Their table (#1211): the host's rows replaced; an entry Combwork wouldn't read back goes with those kept aside, as the
     // 1.0 step puts it.
     const scope = o.scope ?? ''
     await saveTypedTable(workspacePath, store, scope, (db) => {
@@ -69,7 +69,7 @@ export function metricsSaved(workspacePath: string): { version: 1; buckets: Reco
   return { version: 1, buckets: JSON.parse(JSON.stringify(docs)) as Record<string, unknown>[], observed: meta.has('observed') ? (JSON.parse(meta.get('observed')!) as [number, number][]) : [], ...(num('evictedThrough') ? { evictedThrough: num('evictedThrough') } : {}), ...(num('renamesApplied') ? { renamesApplied: num('renamesApplied') } : {}) }
 }
 
-/** Saves performance metrics as Hive would (a test's stand-in for writing metrics.json by hand), in its form. */
+/** Saves performance metrics as Combwork would (a test's stand-in for writing metrics.json by hand), in its form. */
 export async function putMetrics(workspacePath: string, data: { buckets: { span: string; start: number }[]; observed?: unknown; evictedThrough?: number; renamesApplied?: number }): Promise<void> {
   await saveTable(workspacePath, 'metrics', data.buckets, { imported: JSON.stringify({ at: new Date().toISOString(), rows: data.buckets.length, file: null }), observed: JSON.stringify(data.observed ?? []), evictedThrough: data.evictedThrough ? String(data.evictedThrough) : null, renamesApplied: data.renamesApplied ? String(data.renamesApplied) : null })
 }

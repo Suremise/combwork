@@ -202,7 +202,7 @@ describe('chosen at submit, in the card folder at exactly the revision', () => {
   it('a picker that writes a tracked file in the folder proves nothing: unknown, refused', async () => {
     const e = team(script("const fs = require('fs'); const t = fs.readFileSync('README.md'); fs.writeFileSync('README.md', 'x'); fs.writeFileSync('README.md', t); process.stdout.write('')"), runner().command)
     const { card } = await built(e)
-    // Refused either way, nothing submitted: the bracket's (unknown, changed) or Hive's own evidence check, which may see it first.
+    // Refused either way, nothing submitted: the bracket's (unknown, changed) or Combwork's own evidence check, which may see it first.
     const r = await e.wf.submit(card.key, B1, { summary: 'x' })
     expect(isRefusal(r) && ['submit.focusedChosen', 'evidence.changed'].includes(r.rule)).toBe(true)
     expect(e.kinds(card.id)).not.toContain('Submitted')

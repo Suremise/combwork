@@ -1,5 +1,5 @@
-// How Hive puts a prompt into a CLI (#597, SessionManager.sendPrompt): a CLI that reads a bracketed paste as text
-// (Claude Code) gets the line as one while its terminal has bracketed paste on, so a busy CLI reading Hive's Ctrl+U,
+// How Combwork puts a prompt into a CLI (#597, SessionManager.sendPrompt): a CLI that reads a bracketed paste as text
+// (Claude Code) gets the line as one while its terminal has bracketed paste on, so a busy CLI reading Combwork's Ctrl+U,
 // the line and its Enter in one go still sends it; a slash command, a CLI without the capability, or one with
 // bracketed paste off gets it typed in pieces, as before. The real helpers, on a stand-in live session; the terminal's
 // writes are recorded, never sent.
@@ -8,7 +8,7 @@ import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { claudeBox, claudeInput, type ClaudeInput } from './claudeInputStandIn'
 
-// The CLI's echo (#600): with `echo.to` set, what Hive types is drawn on that screen, as a CLI reading its input draws it.
+// The CLI's echo (#600): with `echo.to` set, what Combwork types is drawn on that screen, as a CLI reading its input draws it.
 const { writes, echo } = vi.hoisted(() => ({ writes: [] as string[], echo: { to: null as null | { write(d: string): void } } }))
 vi.mock('../src/main/ptyHost', async (original) => ({ ...((await original()) as object), writePty: (_key: string, data: string) => void (writes.push(data), echo.to?.write(data)) }))
 const { sessions } = await import('../src/main/sessions')
@@ -24,12 +24,12 @@ const { providerService } = await import('../src/main/providerService')
 const { NEWLINE_TRIED } = await import('../src/main/providers/codex/adapter')
 
 /**
- * How Hive clears an empty Claude Code input before it types (HI-1979, HR6's round 1): a letter, seen alone in its box,
+ * How Combwork clears an empty Claude Code input before it types (HI-1979, HR6's round 1): a letter, seen alone in its box,
  * then the Backspace that takes it back (one Ctrl+U for the other CLIs).
  */
 const CLEARED = ['x', '\x7f']
 
-describe('a prompt Hive puts into a CLI (#597)', () => {
+describe('a prompt Combwork puts into a CLI (#597)', () => {
   const p = 'C:/hive-test/pasted-prompt'
   const id = 'b1'
   const s = sessions as unknown as { live: Map<string, unknown> }
@@ -39,7 +39,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
   let claude: ClaudeInput | null = null
   /**
    * An idle launch of `adapter` whose screen has had `output` (the CLI's own) drawn on it. Claude Code's is its input box
-   * (a stand-in, `claude`: HI-1979, Hive types into it only once that box shows empty after a key of Hive's) with
+   * (a stand-in, `claude`: HI-1979, Combwork types into it only once that box shows empty after a key of Combwork's) with
    * `box`'s options, bracketed paste as `output` leaves it; `box` false: `output` alone, on a screen nothing more draws on.
    */
   const running = async (adapter: unknown, output: string, cliVersion: string | null = null, box: false | Parameters<typeof claudeInput>[0] = {}) => {
@@ -61,7 +61,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
     writes.length = 0
     echo.to = null
     vi.useRealTimers()
-    // A test that failed while Hive was typing mustn't leave the next one refused as busy.
+    // A test that failed while Combwork was typing mustn't leave the next one refused as busy.
     ;(sessions as unknown as { delivering: Set<string> }).delivering.clear()
     for (const x of screens.splice(0)) x.dispose()
     claude = null
@@ -109,7 +109,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
     expect(writes).toEqual(['\x15', '\x1b[200~[CW] New in your inbox: 1 message (m4). Call cw_inbox to read it, act on it, then ack it.\x1b[201~', '\r'])
   })
 
-  describe("Settings → Advanced's switches for what Hive types (#1286)", () => {
+  describe("Settings → Advanced's switches for what Combwork types (#1286)", () => {
     /** Runs `fn` with these switches as given (the others as they are). */
     const withSwitches = async (values: Record<string, boolean | string>, fn: () => Promise<void>): Promise<void> => {
       const get = advanced.get.bind(advanced)
@@ -122,7 +122,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
     }
     const written = 'A plan:\r\n  1. one\n\n\t2. two  \x03'
 
-    it('both default to what Hive did before: the draft cleared, the prompt on one line', () => {
+    it('both default to what Combwork did before: the draft cleared, the prompt on one line', () => {
       expect([advanced.get<boolean>(PROMPT_CLEAR_DRAFT), advanced.get<boolean>(PROMPT_AS_TYPED)]).toEqual([true, false])
     })
 
@@ -143,7 +143,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
       expect(writes).toEqual([...CLEARED, '\x1b[200~A plan: 1. one 2. two \x1b[201~', '\r'])
     })
 
-    it('as typed into a CLI Hive types into (Codex): each line break or tab a space, the spacing kept', async () => {
+    it('as typed into a CLI Combwork types into (Codex): each line break or tab a space, the spacing kept', async () => {
       echo.to = await running(codex, '\x1b[?2004h')
       await withSwitches({ [PROMPT_AS_TYPED]: true }, () => sessions.sendPrompt(p, id, written))
       expect(writes.some((w) => w.includes('\x1b[200~'))).toBe(false)
@@ -154,7 +154,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
       const NEWLINE = 'codex.prompt.newlineKey'
       const ALT_ENTER = TYPED_NEWLINE_KEYS['alt-enter']
       const CTRL_J = TYPED_NEWLINE_KEYS['ctrl-j']
-      /** The prompt as Codex would read it: Hive's writes between Ctrl+U and Enter, each key back as a line break. */
+      /** The prompt as Codex would read it: Combwork's writes between Ctrl+U and Enter, each key back as a line break. */
       const asRead = (key: string): string => writes.slice(1, -1).join('').split(key).join('\n')
 
       /** Runs `fn` with Codex's installed version reported as `version`. */
@@ -224,7 +224,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
         return box
       }
 
-      it('stopped part-way through a multi-line prompt, what Hive typed is taken back whole, and the next prompt goes alone', async () => {
+      it('stopped part-way through a multi-line prompt, what Combwork typed is taken back whole, and the next prompt goes alone', async () => {
         const box = composer(await running(codex, '', '0.164.0'))
         // The agent gets busy once two of its line breaks are in, its CLI still running.
         const guard = (): void => {
@@ -298,7 +298,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
         // CRLF, a lone CR and an LF; an escape sequence spanning the first chunk's end (8 characters), and ones beside breaks.
         await chosen('alt-enter', { [PROMPT_AS_TYPED]: true },() => sessions.sendPrompt(p, id, 'abcdefg\x1b[31m\x1b\r\nx\x1b\x07\ry\x1b\nz\x9b'))
         expect(asRead(ALT_ENTER)).toBe('abcdefg[31m\nx\ny\nz')
-        // Between Hive's own Ctrl+U and Enter: nothing but text and the keys.
+        // Between Combwork's own Ctrl+U and Enter: nothing but text and the keys.
         expect(writes.slice(1, -1).filter((w) => w !== ALT_ENTER).some((w) => /[\x00-\x1f\x7f-\x9f]/.test(w))).toBe(false)
       })
 
@@ -385,7 +385,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
         for (const clear of [true, false]) {
           writes.length = 0
           await running(adapter, '\x1b[?2004h')
-          // The guard passes until the line is typed, then refuses (the agent got busy): Hive stops before Enter.
+          // The guard passes until the line is typed, then refuses (the agent got busy): Combwork stops before Enter.
           const guard = (): void => {
             if (writes.some((w) => w.startsWith('\x1b[200~'))) throw new Error('busy now')
           }
@@ -397,12 +397,12 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
 
     // HI-1974: Claude Code 2.1.312's Ctrl+U deletes only the wrapped row the cursor is on, so one left a stopped wake's
     // first rows in LB1's input and the next wake was sent after them; and a row count misses wide characters (HR6's
-    // round 1). Its input is the stand-in written apart from Hive's code (claudeInputStandIn): a Backspace deletes one
-    // character as the user sees it (a grapheme: stricter than the code points Hive counts); a Ctrl+U would take back a
-    // row, never what Hive needs, so none is pressed.
+    // round 1). Its input is the stand-in written apart from Combwork's code (claudeInputStandIn): a Backspace deletes one
+    // character as the user sees it (a grapheme: stricter than the code points Combwork counts); a Ctrl+U would take back a
+    // row, never what Combwork needs, so none is pressed.
     it('a line with wide characters stopped part-way in Claude Code is taken back whole, and the next prompt goes alone', async () => {
       const wide = `${'界'.repeat(500)} 👩‍💻 ${'supercalifragilisticexpialidocious-and-more '.repeat(3)}${'é'.normalize('NFD')} end`
-      for (const line of [wide, '[CW] New in your inbox: 1 card event (LE-191) (m315). Call cw_inbox to read it. (Your watch is still on, waiting for LE-191: do what this asks, then end your turn, and Hive wakes you when it changes.)']) {
+      for (const line of [wide, '[CW] New in your inbox: 1 card event (LE-191) (m315). Call cw_inbox to read it. (Your watch is still on, waiting for LE-191: do what this asks, then end your turn, and Combwork wakes you when it changes.)']) {
         writes.length = 0
         await running(claudeCode, '\x1b[?2004h')
         // Refused once the line is in (as a wake no longer wanted is), never before.
@@ -417,7 +417,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
       }
     })
 
-    describe("Claude Code's draft cleared before Hive types (HI-1979)", () => {
+    describe("Claude Code's draft cleared before Combwork types (HI-1979)", () => {
       /** Runs `fn` with Advanced's wait for each key short (a refusal needn't take its 2 s). */
       const shortWait = async <T,>(fn: () => Promise<T>): Promise<T> => {
         const number = advanced.number.bind(advanced)
@@ -605,7 +605,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
       await sent
     })
 
-    it('every CLI Hive waits for to draw a line has that wait in Settings → Advanced', async () => {
+    it('every CLI Combwork waits for to draw a line has that wait in Settings → Advanced', async () => {
       const { PROVIDERS } = await import('../src/shared/providers')
       const { advancedDef } = await import('../src/shared/advanced')
       const waiting = PROVIDERS.filter((d) => d.capabilities.enterOnceDrawn)

@@ -1,4 +1,4 @@
-// Hive starts a lane's next card on its builder (HI-1990): once the card before it is Done and the builder's turn is
+// Combwork starts a lane's next card on its builder (HI-1990): once the card before it is Done and the builder's turn is
 // over, as the Assistant's Start gives one (its doorbell typed into the idle builder); its first card too (HI-2029), never
 // while the lane's own start launches its agents, never into a turn, and not with the workflow rules off.
 import { mkdirSync, writeFileSync } from 'fs'
@@ -8,7 +8,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { claudeInput } from './claudeInputStandIn'
 
-// What Hive types into agents' terminals, recorded instead (no process runs).
+// What Combwork types into agents' terminals, recorded instead (no process runs).
 const pty = vi.hoisted(() => ({ typed: [] as string[] }))
 vi.mock('../src/main/ptyHost', async (original) => ({
   ...(await original<object>()),
@@ -52,7 +52,7 @@ function builder(status: string, id = 'b1'): { status: string } {
     enumerable: true
   })
   state.status = status
-  // Its input box (HI-1979: Hive types into Claude Code only once its own key shows the box empty), fed what is typed.
+  // Its input box (HI-1979: Combwork types into Claude Code only once its own key shows the box empty), fed what is typed.
   const input = claudeInput({ paste: false })
   input.from(() => pty.typed)
   s.live.set(`${p.toLowerCase()}#${id}`, { state, adapter: claudeCode, screen: input.screen, transcriptMtime: '', defaultModel: false, modeTail: '', launchMode: null, configuredMode: null })
@@ -64,7 +64,7 @@ const columnOf = async (n: number): Promise<string> => (await run(() => tasks.ge
 // The builder's doorbell for its task (#650: the task's id, which it reads with cw_inbox).
 const rung = (): boolean => pty.typed.join('').includes('New in your inbox: 1 task')
 
-describe("Hive starts a lane's next card (HI-1990)", () => {
+describe("Combwork starts a lane's next card (HI-1990)", () => {
   beforeAll(async () => {
     mkdirSync(join(wsPath, '.combwork'), { recursive: true })
     mkdirSync(join(p, '.combwork'), { recursive: true })
@@ -86,7 +86,7 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
     await advanced.set(ENFORCE, true)
   })
 
-  it("a lane's first card (HI-2029): while its builder is in a turn the lane says why it waits, and Hive starts it once the turn is over", async () => {
+  it("a lane's first card (HI-2029): while its builder is in a turn the lane says why it waits, and Combwork starts it once the turn is over", async () => {
     const first = await card('Retry the sync')
     const next = await card('Show sync progress')
     const lane = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [first, next], by: 'the Assistant' })).lane
@@ -160,7 +160,7 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
       await checkLaneStarts(w)
       expect(await columnOf(first)).toBe('todo')
       expect(rung()).toBe(false)
-      // Launched: the pass clears the wait, and Hive's start comes after.
+      // Launched: the pass clears the wait, and Combwork's start comes after.
       await lanes.setLaneSlotWait(w, lane.id, null)
       await checkLaneStarts(w)
       expect(await columnOf(first)).toBe('doing')
@@ -217,7 +217,7 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
     offeredTo.sessionId = 'conv-e2'
     const told = await run(() => leaveMessage(p, 'e2', 'E2', sender, 'You are the builder of lane L: start its card.'))
     expect(['typed']).toContain(told.fate)
-    // A line queued for D6 and not offered yet (as m637 was), D6 idle: Hive has the delivery service offer it first, under
+    // A line queued for D6 and not offered yet (as m637 was), D6 idle: Combwork has the delivery service offer it first, under
     // its own rules, and never gives the card over it; the lane says so meanwhile (HR1 on HI-2029: no time bound).
     const first = await card('Retest installer', 'd6')
     const b = builder('working', 'd6')
@@ -321,7 +321,7 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
     expect(await columnOf(a2)).toBe('doing')
   })
 
-  it("a start whose condition no longer holds where it is written assigns, writes and delivers nothing (the guard Hive's start checks there)", async () => {
+  it("a start whose condition no longer holds where it is written assigns, writes and delivers nothing (the guard Combwork's start checks there)", async () => {
     const n = await card('Guarded', 'b6')
     builder('ready', 'b6')
     const { startTask } = await import('../src/main/taskStart')
@@ -359,13 +359,13 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
     expect(order.waitsForDependency).toEqual({ card: first, on: depKey })
     const c = await run(() => tasks.getTask(first, w))
     expect(laneNextWaitReason(c, order, { name: 'B9', status: 'watching' }, Date.parse(view.startedAt) + 2 * LANE_NEXT_STALL_MS)).toBeNull()
-    // Idle too: Hive starts it once the card it depends on is Done, so nothing waits on its builder.
+    // Idle too: Combwork starts it once the card it depends on is Done, so nothing waits on its builder.
     b.status = 'ready'
     await checkLaneStarts(w)
     expect(await columnOf(first)).toBe('todo')
     expect((await lanes.getLane(w, lane.id)).status).toMatchObject({ why: 'dependencies' })
     expect(rung()).toBe(false)
-    // Done (by hand, never started: nothing of it to find in the target): the wait is over, and Hive starts it on its
+    // Done (by hand, never started: nothing of it to find in the target): the wait is over, and Combwork starts it on its
     // free builder.
     await run(() => tasks.updateTask(dep, { column: 'done' }, user))
     await checkLaneStarts(w)

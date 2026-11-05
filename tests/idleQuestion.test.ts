@@ -1,5 +1,5 @@
 // Claude Code 2.1.312's offer to teach auto mode about the environment (HI-1959): a question it puts on its screen by
-// itself after a turn, with no hook. HB4's wake was typed into it, Hive's Enter again answered it, and the line it took
+// itself after a turn, with no hook. HB4's wake was typed into it, Combwork's Enter again answered it, and the line it took
 // left the agent held behind an empty input. The adapter reads the question and its input box from recorded screens;
 // with the real SessionManager and the terminal's writes caught, the agent waits for the user with the question, nothing
 // is typed or pressed meanwhile, and a held line gone from the input is let go only on a second look that says the same.
@@ -64,7 +64,7 @@ describe("Claude Code's question by itself and its input box, on its screen (2.1
     expect(claudeCode.promptText('')).toBeNull()
   })
 
-  it("2.1.312's screens still match what else Hive reads of them: its auto mode footer, its turn's done line", () => {
+  it("2.1.312's screens still match what else Combwork reads of them: its auto mode footer, its turn's done line", () => {
     const re = (id: string): RegExp => new RegExp(String(ADVANCED_DEFS.find((d) => d.id === id)!.default), ADVANCED_DEFS.find((d) => d.id === id)!.flags ?? '')
     expect(re('claude-code.footer.auto').test(fixture('advanced/input-claude-2.1.312.txt'))).toBe(true)
     expect(re('claude-code.trust.prompt').test(fixture('advanced/input-claude-2.1.312.txt'))).toBe(false)
@@ -143,7 +143,7 @@ describe('the agent and its question by itself (HI-1959)', () => {
     vi.restoreAllMocks()
   })
 
-  it('nothing is typed into the question and no Enter pressed: the agent is refused with why, and so is a line of Hive\'s', async () => {
+  it('nothing is typed into the question and no Enter pressed: the agent is refused with why, and so is a line of Combwork\'s', async () => {
     const writes: string[] = []
     vi.spyOn(pty, 'writePty').mockImplementation((_k, data) => void writes.push(data))
     const e = running()

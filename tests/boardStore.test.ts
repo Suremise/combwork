@@ -1,4 +1,4 @@
-// The board in SQLite (#1017): the database layer (settings, migrations, a file from a newer Hive), the move of the cards'
+// The board in SQLite (#1017): the database layer (settings, migrations, a file from a newer Combwork), the move of the cards'
 // files into it (once, checked, the folder kept as a backup and a stub left for older versions), cards an older Hive saved
 // meanwhile, Export Board to JSON (an export read back is the same board), and the window's board with archived cards in short.
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
@@ -110,7 +110,7 @@ describe('the database layer (db.ts)', () => {
     }
   })
 
-  it('a file from a newer Hive opens read-only, migrated not at all', () => {
+  it('a file from a newer Combwork opens read-only, migrated not at all', () => {
     const file = join(base, `layer-${++n}`, 'x.db')
     const steps = [{ version: 1, name: 'one', up: (d: DatabaseSync) => d.exec('CREATE TABLE a (x)') }]
     openDb(file, { migrations: steps, hiveVersion: '1' }).close()
@@ -132,7 +132,7 @@ describe('the database layer (db.ts)', () => {
   it('an open that fails with an I/O error is tried again, and opens once the error has gone (HI-2179)', () => {
     const file = join(base, `layer-${++n}`, 'x.db')
     const steps = [{ version: 1, name: 'one', up: (d: DatabaseSync) => d.exec('CREATE TABLE a (x)') }]
-    // As just after a Hive ended without quitting: the first two opens fail (4618: SQLITE_IOERR_SHMOPEN).
+    // As just after a Combwork ended without quitting: the first two opens fail (4618: SQLITE_IOERR_SHMOPEN).
     let failing = 2
     const retries: number[] = []
     const db = openDb(file, {
@@ -178,9 +178,9 @@ describe('the database layer (db.ts)', () => {
   })
 })
 
-// --- HI-2199: a Hive that ended without quitting leaves the board's -shm, which another process can still have mapped.
+// --- HI-2199: a Combwork that ended without quitting leaves the board's -shm, which another process can still have mapped.
 
-/** A workspace whose board has a card ("Kept"), left as a Hive ended from outside leaves it. */
+/** A workspace whose board has a card ("Kept"), left as a Combwork ended from outside leaves it. */
 async function killedWorkspace(): Promise<{ ws: string; file: string }> {
   const ws = workspaceWith()
   const first = await open(ws)
@@ -316,7 +316,7 @@ describe("moving the cards' files in (#1017)", () => {
     const w = await open(ws)
     const all = await inWorkspace(w, () => tasks.allTasks(w))
     expect(all.map((c) => c.number)).toEqual([1, 2])
-    // Every field kept, the ones this Hive doesn't know too.
+    // Every field kept, the ones this Combwork doesn't know too.
     expect(store.cardDoc(w, 1)).toEqual(card(1, { custom: { kept: true } }))
     expect(await inWorkspace(w, () => tasks.archiveBatches(w))).toEqual([expect.objectContaining({ id: 'b1', cards: [2] })])
     // The next number is board.json's: a new card never takes one used before.
@@ -495,7 +495,7 @@ describe('reviewing the set-aside cards (#1044, Darren\'s decision on #1017: the
     expect(store.cardDoc(w, 7)!.links).toEqual([1, 40])
     expect((await inWorkspace(w, () => tasks.getTask(2, w))).links).toEqual([7])
     expect(c.history.at(-1)).toMatchObject({ by: 'Repair', what: 'Added from an older Combwork, where it was made as #7' })
-    // The older Hive's file goes to the Recycle Bin, recoverable.
+    // The older Combwork's file goes to the Recycle Bin, recoverable.
     await vi.waitFor(() => expect(asideIn(ws)).toEqual([]), { timeout: HUNG_MS })
     await vi.waitFor(() => expect(trashedFrom(ws)).toEqual([join('.combwork', store.SET_ASIDE, '7.json')]), { timeout: HUNG_MS })
     expect(await inWorkspace(w, () => tasks.setAsideCards(w))).toEqual([])
@@ -592,7 +592,7 @@ describe('reviewing the set-aside cards (#1044, Darren\'s decision on #1017: the
 const titlesOf = async (w: WS): Promise<string[]> => (await inWorkspace(w, () => tasks.allTasks(w))).map((c) => `#${c.number} ${c.title}`).sort()
 
 describe('numbers an older Hive could take (#1017 round 1)', () => {
-  it("the stub's next number moves on as each number is taken, before Hive closes (ended without closing, an older Hive never reuses one)", async () => {
+  it("the stub's next number moves on as each number is taken, before Combwork closes (ended without closing, an older Hive never reuses one)", async () => {
     const ws = workspaceWith({ '1.json': fileOf(card(1)) })
     const w = await open(ws)
     const made = await inWorkspace(w, () => tasks.createTask({ title: 'Made in 0.9', project: 'p' }, user))
@@ -798,7 +798,7 @@ describe('a board opened under another name for its folder (#1402)', () => {
   })
 })
 
-describe('a board saved by a newer Hive (#1017)', () => {
+describe('a board saved by a newer Combwork (#1017)', () => {
   it('reads its cards but refuses every change, saying why', async () => {
     const ws = workspaceWith({ '1.json': fileOf(card(1)) })
     let w = await open(ws)
@@ -814,7 +814,7 @@ describe('a board saved by a newer Hive (#1017)', () => {
 })
 
 describe('reads that need only some cards (#1107)', () => {
-  // A busy board's archived cards are most of it (945 of 1058, 13 MB, most of that comments): what Hive reads often
+  // A busy board's archived cards are most of it (945 of 1058, 13 MB, most of that comments): what Combwork reads often
   // asks the query for what it needs, and never parses an archived card's document for nothing.
   const marker = 'ARCHIVED-COMMENTS-1107'
   const from = '2026-10-02T00:00:00.000Z'

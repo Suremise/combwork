@@ -1,4 +1,4 @@
-// Undo for the Hive Assistant's changes (#1282, SPEC §16.14): each change it makes is recorded, as it is made, with what
+// Undo for the Combwork Assistant's changes (#1282, SPEC §16.14): each change it makes is recorded, as it is made, with what
 // it replaced, grouped by the user's message, kept 7 days across restarts; undo puts back what is still as it left it and
 // says what someone changed since, never overwriting it. Through the same code the Agent API runs: assistantBatch for a
 // batch (as POST /v1/tasks/batch), recordingChanges around a single change (as assistantChange), and the routes' own
@@ -210,7 +210,7 @@ describe("the Assistant's changes, recorded and undone (#1282)", () => {
     expect(projectAgents(await w.projectConfig(alpha)).find((x) => x.id === 'a1')!.name).toBe('A1')
   })
 
-  it('a Hive setting: set back while still as it set it; changed since, left', async () => {
+  it('a Combwork setting: set back while still as it set it; changed since, left', async () => {
     const e = entryOf('sessions.confirmStop')
     const record = async () => {
       const group = newMessage()

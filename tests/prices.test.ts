@@ -58,7 +58,7 @@ describe('estimated cost', () => {
     expect(modelPrice('claude-code', 'sonnet', settings)).toEqual(own)
     expect(estimateCost({ ...usage('claude-code', 'claude-sonnet-5-5'), inputTokens: 0, cacheWriteTokens: 0, outputTokens: 0 }, settings)).toBeCloseTo(0.4, 6)
   })
-  it("uses the user's prices over Hive's", () => {
+  it("uses the user's prices over Combwork's", () => {
     const settings = { providers: { codex: { prices: { 'gpt-6-luna': { input: 1, cachedInput: 0, output: 0 } } } } } as never
     expect(estimateCost({ ...usage('codex', 'gpt-6-luna'), cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0 }, settings)).toBeCloseTo(1, 6)
     expect(estimateCost(usage('codex', 'no-such-model'))).toBeNull()

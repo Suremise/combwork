@@ -12,7 +12,7 @@ const st = vi.hoisted(() => ({
   delivering: false,
   holdRead: null as { id: string; until: Promise<void> } | null,
   holdSend: null as Promise<void> | null,
-  // Holds the next save before it has project.json's lock (still waiting for it, as Hive's file lock retries), once.
+  // Holds the next save before it has project.json's lock (still waiting for it, as Combwork's file lock retries), once.
   holdSave: null as Promise<void> | null,
   lock: Promise.resolve() as Promise<unknown>,
   onStatus: null as ((e: unknown) => void) | null
@@ -37,13 +37,13 @@ vi.mock('../src/main/workspace', () => {
       get assistantHome() {
         return st.home
       },
-      // As Hive's: one writer at a time, each reading the file inside the lock.
+      // As Combwork's: one writer at a time, each reading the file inside the lock.
       mutateProjectConfig: async (_home: string, fn: (cfg: { agents: { id: string; name: string; mode?: string }[] }) => { agents?: { id: string; mode?: string }[] }) => {
         const hold = st.holdSave
         st.holdSave = null
         if (hold) await hold
         const run = st.lock.then(async () => {
-          const next = fn({ agents: [{ id: 'assistant', name: 'Hive Assistant', mode: st.saved }] })
+          const next = fn({ agents: [{ id: 'assistant', name: 'Combwork Assistant', mode: st.saved }] })
           if (next.agents) st.saved = next.agents[0].mode ?? ''
         })
         st.lock = run.catch(() => undefined)
@@ -59,9 +59,9 @@ vi.mock('../src/main/sessions', () => ({
     onAssistantResumed: () => undefined,
     liveFor: () => st.live,
     userMayBeTyping: () => false,
-    // As Hive's: one prompt at a time, and the guard checked again before Enter.
+    // As Combwork's: one prompt at a time, and the guard checked again before Enter.
     sendPrompt: async (_home: string, _agent: string, text: string, guard: () => void) => {
-      if (st.delivering) throw new Error('Hive is already typing a prompt into this agent; it is busy.')
+      if (st.delivering) throw new Error('Combwork is already typing a prompt into this agent; it is busy.')
       st.delivering = true
       try {
         guard()
@@ -146,7 +146,7 @@ beforeEach(async () => {
   sessions = (await import('../src/main/sessions')).sessions as never
   mod.initAssistantModes()
 })
-/** Hive's status event for the Assistant becoming idle: a waiting message is typed half a second later. */
+/** Combwork's status event for the Assistant becoming idle: a waiting message is typed half a second later. */
 const idleAgain = async (): Promise<void> => {
   st.onStatus?.({ type: 'session-status', state: { agentId: 'assistant', projectPath: st.home, status: 'ready' } })
   await settle(600)

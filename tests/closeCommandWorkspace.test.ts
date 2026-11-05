@@ -1,7 +1,7 @@
 // HI-1368 with a real WorkspaceService (HR6's round 3, Darren's decision of 28 Oct ~15:30): a switch whose old workspace's
 // close is held by a closing task shows its saving step; Skip the command keeps the panel up and the close going, never
 // cancelled or begun again; once the close is released the panel goes, the switch opens the next workspace, intact, and
-// neither the workspace's command nor When Hive quits starts. The runner's start is stood in for (it would run a command).
+// neither the workspace's command nor When Combwork quits starts. The runner's start is stood in for (it would run a command).
 import { mkdirSync, rmSync } from 'fs'
 import { EventEmitter } from 'events'
 import { join } from 'path'

@@ -1,4 +1,4 @@
-// Hooks health (#1336): when an agent's hooks stop reaching Hive, Hive says so rather than show a wrong status. The
+// Hooks health (#1336): when an agent's hooks stop reaching Combwork, Combwork says so rather than show a wrong status. The
 // check's two signs and their bounds (its start; a prompt its screen shows it working on), never on time alone: a long
 // silent think after a prompt's hook never counts, nor an Enter that started nothing, nor a late hook of a turn that is
 // over as an answer. What follows: the agent's state unknown (stalled, its status words), nothing typed into it, its lane
@@ -177,7 +177,7 @@ describe('what follows', () => {
     expect(runtimeLabel(live())).toBeNull()
   })
 
-  it('the note says why when Hive can tell, and what to do', () => {
+  it('the note says why when Combwork can tell, and what to do', () => {
     expect(hooksMissingNote(live({ hooksMissing: missing }), tr)).toMatch(/^Combwork isn't hearing from Claude Code's hooks, so its status may be wrong\. None came after a prompt it went to work on\. .*Restart the session/)
     expect(hooksMissingNote(live({ hooksMissing: { ...missing, after: 'start' } }), tr)).toContain('None came after it started.')
     expect(hooksMissingNote(live({ hooksMissing: { ...missing, why: 'off', offIn: 'managed settings' } }), tr)).toContain('managed settings turns hooks off (disableAllHooks).')
@@ -237,7 +237,7 @@ describe("a turn its transcript shows (#1371)", () => {
   const turn = (id: string, at = 2_000, worked = true) => ({ id, at, worked })
   const idWatch = () => newHooksWatch(since, false, 'id')
 
-  it('worked, and no hook named it: missing once the bound has passed since Hive found it, not a moment before', () => {
+  it('worked, and no hook named it: missing once the bound has passed since Combwork found it, not a moment before', () => {
     const w = idWatch()
     transcriptTurns(w, [turn('E')], 10_000, since)
     expect(hooksMissing(w, quiet, 10_000 + BOUND - 1, BOUND)).toBeNull()

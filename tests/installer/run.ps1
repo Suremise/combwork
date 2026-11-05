@@ -46,7 +46,7 @@ $rc = Wait-Exit $rel; $lc = Wait-Exit $loc
 $r = Ticks 'rel'; $l = Ticks 'loc'
 Say ($rc -eq 0 -and $lc -eq 0 -and $r -and $l -and $l.start -ge $r.end) 'release first: the local installer waits for it and installs last' "exits $rc/$lc; release ended $($r.end), local started $($l.start)"
 
-# 3. The local installer first, then the release one (Hive quit while it ran): the release quits, installing nothing.
+# 3. The local installer first, then the release one (Combwork quit while it ran): the release quits, installing nothing.
 $loc = Start-Stand 'local.exe' 'loc2'
 Wait-Held
 $rel = Start-Stand 'release.exe' 'rel2'

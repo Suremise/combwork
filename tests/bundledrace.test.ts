@@ -1,8 +1,8 @@
 // An automatic update of a bundled skill or mode never overwrites the user: a copy edited, deleted or replaced after
-// Hive decided to update it (while the new version is being copied, after the old one is moved aside, or through a file
+// Combwork decided to update it (while the new version is being copied, after the old one is moved aside, or through a file
 // left open until after the new one is in place) stays as the user has it, the update is abandoned, and the manifest
 // isn't told it happened. Other items still update. What a crash in a swap left is removed only when it is a version
-// Hive shipped; anything else is kept as a visible "-conflict-" copy. The races are made deterministic by hooks in
+// Combwork shipped; anything else is kept as a visible "-conflict-" copy. The races are made deterministic by hooks in
 // fs/promises: `onCopy` runs before the first file of a swap's copy is written (opened for writing), `afterRename` after a rename.
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, cpSync } from 'fs'
 import { join } from 'path'
@@ -61,7 +61,7 @@ beforeAll(async () => {
   const history = structuredClone(HISTORY)
   history.skills.handover = [oldSkill, ...history.skills.handover]
   history.modes.planner = [oldMode, ...history.modes.planner]
-  // An Overseer Hive shipped before working modes retired it (#259).
+  // An Overseer Combwork shipped before working modes retired it (#259).
   writeFileSync(join(old, 'overseer.md'), OLD_OVERSEER)
   retiredHash = await fsutil.contentHash(join(old, 'overseer.md'))
   history.modes.overseer = [...(history.modes.overseer ?? []), retiredHash]
@@ -110,10 +110,10 @@ async function older(): Promise<{ ws: string; w: ReturnType<typeof wsMod.createW
   }
 }
 
-/** Hive's swap leftovers (dot-names) in a folder: there should be none once a sync is over. */
+/** Combwork's swap leftovers (dot-names) in a folder: there should be none once a sync is over. */
 const leftovers = (dir: string): string[] => readdirSync(dir).filter((f) => /\.hive-(new|old|back)-/.test(f))
 
-describe('a skill changed while Hive updates it', () => {
+describe('a skill changed while Combwork updates it', () => {
   it('edited while the new version is copied: the edit stays, the update is abandoned', async () => {
     const t = await older()
     hooks.onCopy = () => writeFileSync(join(t.skill, 'SKILL.md'), OLD_HANDOVER + 'MY EDIT\n')
@@ -241,8 +241,8 @@ describe('a skill changed while Hive updates it', () => {
   })
 })
 
-describe('a retired persona changed while Hive removes it (#259)', () => {
-  /** A workspace holding Hive's untouched old Overseer, which its Assistant chose. */
+describe('a retired persona changed while Combwork removes it (#259)', () => {
+  /** A workspace holding Combwork's untouched old Overseer, which its Assistant chose. */
   async function retiring() {
     const t = await older()
     const mode = join(t.ws, '.combwork', 'modes', 'overseer.md')
@@ -302,7 +302,7 @@ describe('a retired persona changed while Hive removes it (#259)', () => {
     expect(leftovers(join(t.ws, '.combwork', 'modes'))).toEqual([])
   })
 
-  it('changed after Hive decided to remove it: swapOut leaves it as it is', async () => {
+  it('changed after Combwork decided to remove it: swapOut leaves it as it is', async () => {
     const t = await retiring()
     writeFileSync(t.retired, `${OLD_OVERSEER}USER EDIT\n`)
     // As retirement does, with the hash it decided on.
@@ -312,12 +312,12 @@ describe('a retired persona changed while Hive removes it (#259)', () => {
   })
 })
 
-describe('a skill made while Hive adds it', () => {
+describe('a skill made while Combwork adds it', () => {
   it("a folder of the user's with the name, made while the new skill is copied: theirs stays", async () => {
     const t = await older()
     const coord = join(t.ws, '.combwork', 'skills', 'coordinate-agents')
     rmSync(coord, { recursive: true, force: true })
-    // Never given: the manifest doesn't have it, so Hive adds it.
+    // Never given: the manifest doesn't have it, so Combwork adds it.
     const manifest = join(t.ws, '.combwork', 'bundled.json')
     const m = JSON.parse(readFileSync(manifest, 'utf8'))
     delete m.skills['coordinate-agents']
@@ -335,7 +335,7 @@ describe('a skill made while Hive adds it', () => {
   })
 })
 
-describe('a mode changed while Hive updates it', () => {
+describe('a mode changed while Combwork updates it', () => {
   const onlyMode = async (t: Awaited<ReturnType<typeof older>>): Promise<void> => {
     // The skill current, so the mode's swap is the first copy.
     cpSync(join(RES, 'skills', 'handover'), t.skill, { recursive: true, force: true })
@@ -379,7 +379,7 @@ describe('a mode changed while Hive updates it', () => {
   })
 })
 
-describe('a mode edited twice while Hive updates it', () => {
+describe('a mode edited twice while Combwork updates it', () => {
   it('the old copy through an open file and the new one: neither edit is lost', async () => {
     const t = await older()
     cpSync(join(RES, 'skills', 'handover'), t.skill, { recursive: true, force: true })
@@ -413,7 +413,7 @@ describe('after a crash in a swap', () => {
     writeFileSync(join(skills, '.handover.hive-old-1-5', 'SKILL.md'), 'ORIGINAL USER EDIT')
     mkdirSync(join(skills, '.handover.hive-back-1-5'))
     writeFileSync(join(skills, '.handover.hive-back-1-5', 'SKILL.md'), 'BACKUP USER EDIT')
-    // A backup that is just a version Hive shipped is Hive's: removed.
+    // A backup that is just a version Combwork shipped is Combwork's: removed.
     cpSync(join(RES, 'skills', 'pick-up'), join(skills, '.pick-up.hive-back-1-6'), { recursive: true })
     await t.sync()
     expect(readFileSync(join(t.skill, 'SKILL.md'), 'utf8')).toBe('ORIGINAL USER EDIT')
@@ -427,7 +427,7 @@ describe('after a crash in a swap', () => {
     const t = await older()
     const skills = join(t.ws, '.combwork', 'skills')
     const modes = join(t.ws, '.combwork', 'modes')
-    // handover in place, with an old copy beside it that the user had edited; pick-up's old copy is Hive's own.
+    // handover in place, with an old copy beside it that the user had edited; pick-up's old copy is Combwork's own.
     mkdirSync(join(skills, '.handover.hive-old-1-1'))
     writeFileSync(join(skills, '.handover.hive-old-1-1', 'SKILL.md'), 'USER WORK')
     cpSync(join(RES, 'skills', 'pick-up'), join(skills, '.pick-up.hive-old-1-2'), { recursive: true })

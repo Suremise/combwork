@@ -45,17 +45,17 @@ describe('usage by day', () => {
     // The first report ($1) covered 100 then 300 tokens' worth: shared 1 : 3.
     expect(d28 + d29).toBeCloseTo(1, 6)
     expect(d29 / d28).toBeCloseTo(3, 6)
-    // The 30th: the second report's $0.50, plus Hive's estimate for r4 (after the last report).
+    // The 30th: the second report's $0.50, plus Combwork's estimate for r4 (after the last report).
     const d30 = u.days![localDay(at(30, 9))]
     expect(d30.costUsd!).toBeGreaterThan(0.5)
     expect(d30.costEstimated).toBe(true)
     expect(u.costReports).toBeUndefined()
   })
 
-  it("Claude Code's reported cost by default; with the user's prices chosen, Hive's estimate, each day too (#436)", () => {
+  it("Claude Code's reported cost by default; with the user's prices chosen, Combwork's estimate, each day too (#436)", () => {
     const raw = parseTranscript(text, 's')
     const reported = priceUsage(raw, DEFAULT_SETTINGS)
-    // The last report ($1.50) plus Hive's estimate for r4, after it.
+    // The last report ($1.50) plus Combwork's estimate for r4, after it.
     expect(reported.costUsd!).toBeGreaterThan(1.5)
     expect(reported.costUsd!).toBeLessThan(1.6)
     const mine = { providers: { ...DEFAULT_SETTINGS.providers, 'claude-code': { ...DEFAULT_SETTINGS.providers['claude-code'], costSource: 'prices' as const, prices: { 'claude-sonnet-5-5': { input: 1, cachedInput: 0.1, cacheWrite: 1.25, output: 5 } } } } }

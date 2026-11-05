@@ -59,7 +59,7 @@ describe('cleanupPlan: the age cut-off', () => {
 
 describe('cleanupPlan: what each action takes', () => {
   const items = [item(1, 24 * 10), item(2, 24 * 10, { archived: true }), item(3, 24 * 10, { source: 'external' })]
-  it("archive takes only Hive's own sessions that aren't archived yet", () => {
+  it("archive takes only Combwork's own sessions that aren't archived yet", () => {
     expect(plan(items, 'week', 'archive').go).toEqual([id(1)])
   })
   it('delete takes every old session, archived and external ones too', () => {

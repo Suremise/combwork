@@ -196,7 +196,7 @@ export function stallWatcher(d: StallDeps, t = STALL_TIMING): { tick(): void; po
       d.defer(() => {
         const ms = Math.round(delay)
         if (sleptOver(power, from, now - delay)) return d.info(`The main process was paused for ${ms} ms while the PC slept: not counted as busy`)
-        if (d.pausedAlongside?.(now - delay, now)) return d.info(`The main process was paused for ${ms} ms with the rest of Hive's process (its watchdog thread stopped too: the PC or the process was paused): not counted as busy`)
+        if (d.pausedAlongside?.(now - delay, now)) return d.info(`The main process was paused for ${ms} ms with the rest of Combwork's process (its watchdog thread stopped too: the PC or the process was paused): not counted as busy`)
         const cpuMs = cpuUsed === null ? null : Math.round(Math.min(cpuUsed, delay + t.every))
         // Kept before the log's quiet minute: the view lists the stalls the log leaves out too.
         d.record?.(stallOf(...span, ms, cpuMs, held), now)

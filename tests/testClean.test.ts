@@ -180,7 +180,7 @@ describe('what cards cite (they keep it)', () => {
     expect(citedBy('e2e/e.png', read.cards)).toBe(null)
   })
 
-  it('finds the database before the stub folder an older Hive reads (#1017): a moved board never reads as empty', () => {
+  it('finds the database before the stub folder an older Combwork reads (#1017): a moved board never reads as empty', () => {
     const ws = temp('hive-clean-find-')
     mkdirSync(join(ws, '.combwork', 'tasks'), { recursive: true })
     writeFileSync(join(ws, '.combwork', 'tasks', 'board.json'), '{"next":9}')
@@ -752,7 +752,7 @@ describe("the runners' own deletions keep evidence too", () => {
     expect(MAX_COPIES).toBeGreaterThanOrEqual(30)
   })
 
-  /** A real board folder: cards written as Hive writes them, so a test can change one between two looks. */
+  /** A real board folder: cards written as Combwork writes them, so a test can change one between two looks. */
   function board(root: string) {
     const dir = join(root, 'board')
     mkdirSync(dir, { recursive: true })

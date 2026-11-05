@@ -1,8 +1,8 @@
-// Monaco's DOMPurify is Hive's (#1141). monaco-editor 0.57.0 bundles its own copy of DOMPurify 3.4.15 (two IN_PLACE
+// Monaco's DOMPurify is Combwork's (#1141). monaco-editor 0.57.0 bundles its own copy of DOMPurify 3.4.15 (two IN_PLACE
 // advisories) and imports it by a relative path, so package.json's override alone wouldn't change what ships: the
-// renderer build's hive-monaco-dompurify plugin (electron.vite.config.ts) gives Monaco's domSanitize.js Hive's dompurify
+// renderer build's hive-monaco-dompurify plugin (electron.vite.config.ts) gives Monaco's domSanitize.js Combwork's dompurify
 // instead, and a build that would take Monaco's copy fails. Built here for real (Monaco's sanitiser alone, with the
-// plugin), the bundle has Hive's DOMPurify and not Monaco's. And once Monaco bundles 3.4.17 or later, a test here fails
+// plugin), the bundle has Combwork's DOMPurify and not Monaco's. And once Monaco bundles 3.4.17 or later, a test here fails
 // to say the plugin and the override are to go.
 import { readFileSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
@@ -25,7 +25,7 @@ const atLeast = (v: string, min: number[]): boolean => {
   return true
 }
 
-describe("Monaco's DOMPurify is Hive's (#1141)", () => {
+describe("Monaco's DOMPurify is Combwork's (#1141)", () => {
   it("is still needed: Monaco bundles a DOMPurify older than 3.4.17 (else remove the plugin and package.json's override)", () => {
     const bundled = versionOf(monacosCopy)
     const listed = (JSON.parse(readFileSync(join(root, 'node_modules', 'monaco-editor', 'package.json'), 'utf8')) as { dependencies?: Record<string, string> }).dependencies?.dompurify ?? ''
@@ -33,7 +33,7 @@ describe("Monaco's DOMPurify is Hive's (#1141)", () => {
     expect(atLeast(bundled, [3, 4, 17]) || atLeast(listed.replace(/^[^\d]*/, ''), [3, 4, 17]), `Monaco now has DOMPurify ${bundled} (lists ${listed}): remove the hive-monaco-dompurify plugin (electron.vite.config.ts) and package.json's dompurify override, and this test`).toBe(false)
   })
 
-  it("maps only domSanitize.js's import of Monaco's copy to Hive's dompurify", () => {
+  it("maps only domSanitize.js's import of Monaco's copy to Combwork's dompurify", () => {
     const plugin = monacoDompurify() as unknown as { resolveId: (s: string, i?: string) => string | null; load: (id: string) => null }
     expect(plugin.resolveId('./dompurify/dompurify.js', sanitize)).toBe(hives)
     expect(plugin.resolveId('./dompurify/dompurify.js', join(monacoEsm, 'markdownRenderer.js'))).toBeNull()
@@ -43,7 +43,7 @@ describe("Monaco's DOMPurify is Hive's (#1141)", () => {
     expect(() => plugin.load(monacosCopy)).toThrow(/Monaco's own DOMPurify would be bundled/)
   })
 
-  it("a build of Monaco's sanitiser has Hive's DOMPurify, not Monaco's", async () => {
+  it("a build of Monaco's sanitiser has Combwork's DOMPurify, not Monaco's", async () => {
     const dir = tempDir('monaco-dompurify')
     const entry = join(dir, 'entry.js')
     writeFileSync(entry, `import { sanitizeHtml } from ${JSON.stringify(sanitize.split('\\').join('/'))}\nexport default sanitizeHtml\n`)

@@ -77,7 +77,7 @@ describe('recording', () => {
 })
 
 describe('recordingToFixture', () => {
-  it("keeps the CLI's events and Hive's reading of them, in order, without times, paths or Hive's own work", async () => {
+  it("keeps the CLI's events and Combwork's reading of them, in order, without times, paths or Combwork's own work", async () => {
     const f = recordingToFixture(await record(false))
     expect(f).toMatchObject({ format: 1, provider: 'claude-code', cli: '2.1.296', hive: '0.7.0', recordedAt: '2026-10-12T09:00:00.000Z' })
     expect(f.events.map((e) => `${e.kind} ${e.name}`)).toEqual(['hook UserPromptSubmit', 'hook PreToolUse'])
@@ -112,38 +112,38 @@ describe('compareContract', () => {
       { level: 'change', event: 'hook PreToolUse', what: 'field tool_name is gone (renamed to toolName?)' },
       { level: 'new', event: 'hook PreToolUse', what: 'field toolName is new' },
       { level: 'change', event: 'hook PreToolUse', what: 'field tool_input.file_path was string, now number' },
-      { level: 'change', event: 'hook PreToolUse', what: "Hive's reading changed: it was actions= kind=toolStart status=working; now actions= kind=ignore status=working" },
+      { level: 'change', event: 'hook PreToolUse', what: "Combwork's reading changed: it was actions= kind=toolStart status=working; now actions= kind=ignore status=working" },
       { level: 'change', event: 'hook Stop', what: 'no longer arrives' }
     ])
   })
 
-  it("flags Hive no longer ending the turn the same way: the same fields and event kind, another status or actions", () => {
+  it("flags Combwork no longer ending the turn the same way: the same fields and event kind, another status or actions", () => {
     expect(compareContract(base, fixture([pre({ hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: '<path>' } }), stop('working', []), ready(), line]))).toEqual([
-      { level: 'change', event: 'hook Stop', what: "Hive's reading changed: it was actions=releaseLocks,turnEnded kind=stop status=finished; now actions= kind=stop status=working" }
+      { level: 'change', event: 'hook Stop', what: "Combwork's reading changed: it was actions=releaseLocks,turnEnded kind=stop status=finished; now actions= kind=stop status=working" }
     ])
   })
 
-  it('flags a status line that stops arriving, and a screen Hive no longer recognises or reads differently, never a status marker that timing hid', () => {
+  it('flags a status line that stops arriving, and a screen Combwork no longer recognises or reads differently, never a status marker that timing hid', () => {
     const noLine = fixture([pre({ hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: '<path>' } }), stop(), ready()])
     expect(compareContract(base, noLine)).toEqual([{ level: 'change', event: 'statusline statusline', what: 'no longer arrives' }])
-    // Hive's ready marker comes and goes with timing (a transcript can make the agent ready first): never required.
+    // Combwork's ready marker comes and goes with timing (a transcript can make the agent ready first): never required.
     const noReady = fixture([pre({ hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: '<path>' } }), stop(), line])
     expect(compareContract(base, noReady)).toEqual([])
-    // What Hive recognised on the screen is: a prompt or footer no longer recognised is a change.
+    // What Combwork recognised on the screen is: a prompt or footer no longer recognised is a change.
     const shown: ConsoleFixture['events'][number] = { kind: 'terminal', name: 'prompt shown', made: { recognised: 'prompt' } }
     const seen: ConsoleFixture['events'][number] = { kind: 'terminal', name: 'footer seen', raw: { footer: 'accept-edits' }, made: { recognised: 'footer', permissionMode: 'accept-edits' } }
     const withScreen = fixture([...base.events, shown, seen])
-    expect(compareContract(withScreen, fixture([...base.events, seen]))).toEqual([{ level: 'change', event: 'terminal prompt shown', what: 'Hive no longer recognises it on the screen' }])
-    expect(compareContract(withScreen, fixture([...base.events, shown, { ...seen, made: { recognised: 'footer', permissionMode: 'plan' } }]))).toEqual([{ level: 'change', event: 'terminal footer seen', what: "Hive's reading changed: it was permissionMode=accept-edits recognised=footer; now permissionMode=plan recognised=footer" }])
+    expect(compareContract(withScreen, fixture([...base.events, seen]))).toEqual([{ level: 'change', event: 'terminal prompt shown', what: 'Combwork no longer recognises it on the screen' }])
+    expect(compareContract(withScreen, fixture([...base.events, shown, { ...seen, made: { recognised: 'footer', permissionMode: 'plan' } }]))).toEqual([{ level: 'change', event: 'terminal footer seen', what: "Combwork's reading changed: it was permissionMode=accept-edits recognised=footer; now permissionMode=plan recognised=footer" }])
     const waiting = fixture([pre({ hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: '<path>' } }), stop(), ready('waiting'), line])
-    expect(compareContract(base, waiting)).toEqual([{ level: 'change', event: 'terminal ready', what: "Hive's reading changed: it was status=ready; now status=waiting" }])
+    expect(compareContract(base, waiting)).toEqual([{ level: 'change', event: 'terminal ready', what: "Combwork's reading changed: it was status=ready; now status=waiting" }])
   })
 
   it('only flags what is new: a new hook, a new field, a value where there was none, a further reading', () => {
     const live = fixture([pre({ hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: '<path>' }, effort: 'high' }), stop(), stop('finished', ['releaseLocks', 'turnEnded', 'notifyFinished']), ready(), line, { kind: 'hook', name: 'Notification', raw: { hook_event_name: 'Notification' } }])
     expect(compareContract(base, live)).toEqual([
       { level: 'new', event: 'hook PreToolUse', what: 'field effort is new' },
-      { level: 'new', event: 'hook Stop', what: 'Hive also reads it as actions=releaseLocks,turnEnded,notifyFinished kind=stop status=finished' },
+      { level: 'new', event: 'hook Stop', what: 'Combwork also reads it as actions=releaseLocks,turnEnded,notifyFinished kind=stop status=finished' },
       { level: 'new', event: 'hook Notification', what: 'arrives now, and is not in the fixture' }
     ])
     const wasNull = fixture([pre({ hook_event_name: 'PreToolUse', model: null })])

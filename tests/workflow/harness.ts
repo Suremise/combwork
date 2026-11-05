@@ -25,7 +25,7 @@ export const R2 = agentActor('R2')
 const ID = ['-c', 'user.name=Hive Test', '-c', 'user.email=test@hive.invalid']
 
 /**
- * HI-2025 (Darren's decision): the bound of a merge-queue test whose work is 65 to 110 git processes (Hive's own git per
+ * HI-2025 (Darren's decision): the bound of a merge-queue test whose work is 65 to 110 git processes (Combwork's own git per
  * queue step, about 95% of its time; nothing in it waits for time). Alone they take 2 to 11 s. 15 such tests passed 20 s
  * (the run's limit, vitest.config.ts) in HI-2025's runs of the workflow files under load: 5 in the baseline run, 13 in
  * the run beside three other lanes' full unit runs (CPU at 80%), after git was made cheaper, and 1 in the first final
@@ -92,9 +92,9 @@ export interface Env {
   wakes: { agent: string; card: string; why: string }[]
   notes: { card: string; text: string; shown?: StoredText }[]
   queue: (cfg?: Partial<QueueConfig>) => MergeQueue
-  /** Another Hive on the same workspace: its own store connection and Workflow (§16.17). */
+  /** Another Combwork on the same workspace: its own store connection and Workflow (§16.17). */
   another: () => Workflow
-  /** A store on a connection of its own to the workspace's hive.db, as a restarted Hive opens it (closed with the rest). */
+  /** A store on a connection of its own to the workspace's hive.db, as a restarted Combwork opens it (closed with the rest). */
   reopen: () => FactStore
   /** Facts of a card, by kind. */
   kinds: (card: number) => FactKind[]
@@ -110,7 +110,7 @@ export function setup(options: Partial<WorkflowOptions> & { platform: 'git' | 'n
   if (extra.files) for (const [f, c] of Object.entries(extra.files)) put(project, f, c)
   const o: WorkflowOptions = { ...allOff(options.platform), ...options }
   // The workspace's hive.db, made through the board's open path (#1215: the project's cards are the board's); the
-  // runtime, outside any board change, has a connection of its own to it, as another Hive would.
+  // runtime, outside any board change, has a connection of its own to it, as another Combwork would.
   const scope = { project: 'project', key: 'AM' }
   // Its window's, as a window opening it would admit it (#1395).
   const dismiss = admitted(home)

@@ -1,4 +1,4 @@
-// Reconciliation in the app (#1217, SPEC §16.4.4): what was done outside Hive to a card's work becomes observed facts on
+// Reconciliation in the app (#1217, SPEC §16.4.4): what was done outside Combwork to a card's work becomes observed facts on
 // the board's store. Record-only with workflow rules not enforced (Settings → Advanced, #1263), as most of this file
 // runs: nothing moves. Enforced, it acts at the app level (S7, S41). A card works in its agent's worktree on its own line: a hand
 // merge of its branch after its pass (Integrated by outside, the card still Passed), a rebase after a pass (CarriedOver),
@@ -142,13 +142,13 @@ describe('reconciliation in the app, record-only (#1217)', () => {
     const a = git(wt, 'rev-parse', 'HEAD')
     const runtime = (s: ReturnType<typeof FactStore.open>, locked?: <T>(fn: () => T) => Promise<T>) =>
       new Workflow({ store: s, project: repo, projectKey: '', options: () => allOff('git'), slots: join(ws, '.combwork', 'slots'), autoRun: false, reconcileActs: false, ...(locked ? { locked } : {}) })
-    // This Hive: the board's store, its writes changes of the board. The other: a connection of its own.
+    // This Combwork: the board's store, its writes changes of the board. The other: a connection of its own.
     const ours = runtime(FactStore.forBoard(w, { project: 'p', key: '' }), (fn) => store.boardWrite(w, async () => fn()))
     const other = FactStore.open(store.boardFile(ws), { project: 'p', key: '' })
     const theirs = runtime(other)
     try {
       const b = commitIn(wt, 'b.txt')
-      // Ours reads B, then waits: meanwhile the head moves to C and the other Hive records A→C.
+      // Ours reads B, then waits: meanwhile the head moves to C and the other Combwork records A→C.
       let c = ''
       await reconcile(ours, ours.store.card(card), {
         afterRead: async () => {
@@ -158,7 +158,7 @@ describe('reconciliation in the app, record-only (#1217)', () => {
       })
       const heads = factsOf(w, card).filter((f) => f.kind === 'HeadMoved').map((f) => f.data)
       expect(b).not.toBe(c)
-      // One observation, from where its line started (A) to where it is now (C): B, which only one Hive saw, isn't in it.
+      // One observation, from where its line started (A) to where it is now (C): B, which only one Combwork saw, isn't in it.
       expect(heads).toEqual([{ line: 'card', from: a, to: c }])
       expect(foldCard(factsOf(w, card)).head).toBe(c)
     } finally {
@@ -286,7 +286,7 @@ describe('reconciliation in the app, round 2 (#1217)', () => {
     expect(factsOf(other.w, c2).filter((f) => f.kind === 'Gone').map((f) => f.data)).toEqual([{ what: 'repository' }])
   })
 
-  it("a Done card's target reset while Hive was closed: found at the next open, with no event", async () => {
+  it("a Done card's target reset while Combwork was closed: found at the next open, with no event", async () => {
     const { w, repo, wt } = await workspace()
     const { card, head } = await passedCard(w, wt)
     const before = git(repo, 'rev-parse', 'main')

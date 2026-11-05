@@ -208,7 +208,7 @@ describe('Git adapter', () => {
     const [base, rev] = branchWith('one', { 'one.txt': '1\n' })
     const ancestors = (ran: string[]) => ran.filter((c) => c.startsWith('merge-base --is-ancestor')).length
     const twice = async () => [await G.isAncestor(repo, base, rev), await G.isAncestor(repo, base, rev), await G.mergeBase(repo, base, rev), await G.mergeBase(repo, base, rev), await G.lineHead(repo, 'one'), await G.lineHead(repo, 'one')]
-    // Outside a step: kept once asked, for as long as Hive runs (HI-2115: its own tests are gitStarts.test.ts).
+    // Outside a step: kept once asked, for as long as Combwork runs (HI-2115: its own tests are gitStarts.test.ts).
     const outside = await counted(twice)
     expect(ancestors(outside.ran)).toBe(1)
     G.forgetKeptAnswers()

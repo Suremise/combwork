@@ -100,7 +100,7 @@ describe('the tabs (HI-1743)', () => {
     input.now = { launches: [{ agentId: 'hr1', runId: 'r', cli: [10], processes: [proc(10, 0), proc(11, 1, 10)], more: 0 }], tasks: [] }
     expect(activityTabs(input).map((t) => t.agentId)).toEqual(['hb1', 'hr1', 'solo'])
     input.now = { launches: [{ agentId: 'hr1', runId: 'r', cli: [10], processes: [proc(10, 0), { ...proc(12, 1, 10), command: 'electron.exe C:\\hive\\out\\main\\hive-mcp.js' }], more: 0 }], tasks: [{ agentId: 'hb2', sessionId: 'z', id: 't', at: T0 }] }
-    // Its CLI (and Hive's tool server for it) isn't something running; HB2 isn't running at all, whatever is listed for it.
+    // Its CLI (and Combwork's tool server for it) isn't something running; HB2 isn't running at all, whatever is listed for it.
     expect(activityTabs(input).map((t) => t.agentId)).toEqual(['hb1', 'solo'])
   })
 

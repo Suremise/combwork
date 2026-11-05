@@ -113,11 +113,11 @@ describe('the fact store in hive.db (#1215)', () => {
   it('a restart runs a claimed action a crash left pending, once; one claimed before the crash is not run again (#1266)', async () => {
     const { ws, w } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Crashed', project: 'p' }, user))).number
-    // Written by another Hive's connection (no worker there runs them): left pending, as a crash right after the commit.
+    // Written by another Combwork's connection (no worker there runs them): left pending, as a crash right after the commit.
     const other = FactStore.open(store.boardFile(ws), scope)
     stores.push(other)
     const [first, second] = other.tx((tx) => [tx.action(card, 'notice', { n: 1 }, null), tx.action(card, 'notice', { n: 2 }, null)])
-    // The second was claimed (marked done before its effect), and Hive ended before its effect: at most once, never again.
+    // The second was claimed (marked done before its effect), and Combwork ended before its effect: at most once, never again.
     other.markAction(second, 'done')
     const ran: unknown[] = []
     worker.onAction('notice', (a) => void ran.push(a.payload.n))
@@ -176,7 +176,7 @@ describe('the fact store in hive.db (#1215)', () => {
     stores.push(other)
     const id = other.tx((tx) => tx.action(card, 'wake', { agent: 'r1' }, null))
     expect(other.deliver({ action: id, kind: 'wake', target: 'r1', payload: { agent: 'r1' } })).toBe(true)
-    // Again (a restart, another Hive's runner): the unique row is there.
+    // Again (a restart, another Combwork's runner): the unique row is there.
     const again = FactStore.open(store.boardFile(ws), scope)
     stores.push(again)
     expect(again.deliver({ action: id, kind: 'wake', target: 'r1', payload: { agent: 'r1' } })).toBe(false)
@@ -193,7 +193,7 @@ describe('the fact store in hive.db (#1215)', () => {
     // A copy each time: changing one read leaves the next as it was.
     facts.facts(card).push({} as never)
     expect(factsOf(facts, card)).toEqual([])
-    // Another connection's commit (another Hive's): read again.
+    // Another connection's commit (another Combwork's): read again.
     const other = FactStore.open(store.boardFile(ws), scope)
     stores.push(other)
     other.tx((tx) => tx.appendObserved(card, seen('a')))

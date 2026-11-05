@@ -1,8 +1,8 @@
-// The keeper (HI-2055): once its Hive has gone (its input ended), the helper stays while an agent's launch job it holds
+// The keeper (HI-2055): once its Combwork has gone (its input ended), the helper stays while an agent's launch job it holds
 // still has a process, and writes each job's state to keeper-<job>.json: "live" with its members while it has any,
 // "ended" once it sees it empty (its whole membership: the job's and what it follows, by its own sweeps), then exits.
 // Driven here through the helper's C# (HOST_SOURCE) in a PowerShell of the test's own, with processes of the test's
-// own (node sleepers), each ended by the test; the keeper is what its Hive's end would leave running.
+// own (node sleepers), each ended by the test; the keeper is what its Combwork's end would leave running.
 import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
@@ -20,7 +20,7 @@ const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { 
 type Identity = { pid: number; started: number }
 const { identify, endExactly } = createRequire(import.meta.url)('./e2e/folderProcesses.cjs') as { identify: (pids: number[]) => Identity[]; endExactly: (targets: Identity[]) => number }
 
-// The next Hive's side (agentProcesses.ts) reads its profile: a folder of the test's own.
+// The next Combwork's side (agentProcesses.ts) reads its profile: a folder of the test's own.
 const profile = vi.hoisted(() => ({ dir: '' }))
 vi.mock('electron', async (importOriginal) => {
   const stub = await importOriginal<typeof import('./electron-stub')>()
@@ -36,7 +36,7 @@ profile.dir = join(dir, 'profile')
 const src = join(dir, 'host.cs')
 writeFileSync(src, HOST_SOURCE)
 /**
- * The helper as its Hive leaves it: configured as a keeper for Hive "100:5", its jobs as given ("add <job> <pid>", or
+ * The helper as its Combwork leaves it: configured as a keeper for Combwork "100:5", its jobs as given ("add <job> <pid>", or
  * "follow <job> <pid>" for a process it follows outside the job), then, once told "keep", what its input's end does.
  */
 const script = join(dir, 'keeper.ps1')
@@ -97,7 +97,7 @@ const waitFor = <T>(fn: () => T) => vi.waitFor(fn, { timeout: HUNG_MS, interval:
 const exited = (c: ChildProcess) => (c.exitCode !== null || c.signalCode !== null ? Promise.resolve() : new Promise<void>((r) => c.once('exit', () => r())))
 
 describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
-  it('a job already empty when its input ends: "ended" at once, from this helper for its Hive, and it exits', async () => {
+  it('a job already empty when its input ends: "ended" at once, from this helper for its Combwork, and it exits', async () => {
     const k = keeper('empty')
     const s = sleeper()
     await waitFor(() => expect(k.out.find((l) => l.startsWith('self '))).toBeTruthy())
@@ -243,12 +243,12 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
   }, 60_000)
 
   /**
-   * The boundary whole: a Hive's real job host (its transport and script) configured as a keeper, a launch's process in
-   * its job and the run bound to it in the profile (as trackLaunch keeps it); the Hive goes (quits, or crashes: its
-   * pipe cut); the next Hive's agentProcesses, reading the same profile, takes the keeper's "live", then its "ended".
+   * The boundary whole: a Combwork's real job host (its transport and script) configured as a keeper, a launch's process in
+   * its job and the run bound to it in the profile (as trackLaunch keeps it); the Combwork goes (quits, or crashes: its
+   * pipe cut); the next Combwork's agentProcesses, reading the same profile, takes the keeper's "live", then its "ended".
    */
   for (const how of ['quits', 'crashes'] as const) {
-    it(`a Hive that ${how} with a launch's process running: the next one reads "live", then "ended" once it ends`, async () => {
+    it(`a Combwork that ${how} with a launch's process running: the next one reads "live", then "ended" once it ends`, async () => {
       profile.dir = join(dir, `profile-${how}`)
       mkdirSync(profile.dir, { recursive: true })
       const { keeperDir } = await import('../src/main/agentProcesses')
@@ -261,7 +261,7 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
         onLost: () => undefined,
         onFailed: () => undefined,
         launch: (file, args) => {
-          // As Hive starts it (its launcher, with its control pipe: helperLaunch).
+          // As Combwork starts it (its launcher, with its control pipe: helperLaunch).
           helperProc = spawn(file, args, { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe', 'pipe'], env: baseEnv(), cwd: dir }) as ChildProcessWithoutNullStreams
           started.push(helperProc)
           return helperProc
@@ -279,7 +279,7 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
       vi.resetModules()
       const next = await import('../src/main/agentProcesses')
       await waitFor(async () => expect(await next.keeperState('boundary-run', '100:5')).toMatchObject({ state: 'live', helper, members: expect.arrayContaining([expect.objectContaining({ pid: s.pid })]) }))
-      // Another Hive's, or a run never bound: none.
+      // Another Combwork's, or a run never bound: none.
       expect(await next.keeperState('boundary-run', '100:6')).toBeNull()
       s.kill()
       await exited(helperProc!)
@@ -288,7 +288,7 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
   }
 
   /**
-   * HI-2313: what a later Hive asks of the keeper over its pipe (one line, "observe <run>"), and its answer's one line;
+   * HI-2313: what a later Combwork asks of the keeper over its pipe (one line, "observe <run>"), and its answer's one line;
    * null when it can't be asked now (busy with another client, not there).
    */
   const ask = (self: string, line: string, opts: { hold?: boolean } = {}): Promise<{ answer: unknown; socket: Socket } | null> =>
@@ -337,14 +337,14 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
     await waitFor(() => expect(k.out).toContain('failsnap set'))
     k.say(`add j8 ${s.pid}`)
     await waitFor(() => expect(k.out).toContain('added ok'))
-    // Not served before it keeps: its Hive is still there.
+    // Not served before it keeps: its Combwork is still there.
     expect(await ask(self, 'observe j8\n')).toBeNull()
     k.say('keep')
     await waitFor(() => expect(k.state('j8')).toMatchObject({ state: 'live', members: expect.arrayContaining([expect.objectContaining({ pid: s.pid })]) }))
     const { parseObservation } = await import('../src/main/agentProcesses')
     const now = await answered(self, 'observe j8\n')
     expect(now).toMatchObject({ v: 1, run: 'j8', helper: self, hive: '100:5', state: 'now', observed: 'complete', members: expect.arrayContaining([expect.objectContaining({ pid: s.pid, name: 'node' })]) })
-    // Its real answer is one the next Hive takes (parseObservation), its console host counted and not listed.
+    // Its real answer is one the next Combwork takes (parseObservation), its console host counted and not listed.
     expect(parseObservation(JSON.stringify(now), 'j8', self, '100:5')).toMatchObject({ helper: self, more: 0, members: [expect.objectContaining({ pid: s.pid })] })
     expect(parseObservation(JSON.stringify(now), 'j8', self, '100:6')).toBeNull()
     expect(parseObservation(JSON.stringify(now), 'j8', '1:1', '100:5')).toBeNull()

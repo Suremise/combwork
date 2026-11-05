@@ -341,11 +341,11 @@ describe('copies: the quiescence barrier (#1435)', { timeout: 60_000 }, () => {
     expect(await w.pool.leaseCopy({ kind: 'check', card: 2, revision: head(w.project) })).toEqual({ ok: false, refusal: { why: 'stillInUse', copy: 'copy-1', by: 'R1 (working)' } })
   })
 
-  it('restart: a leased copy whose Hive is gone and a returning one are both freed only through the barrier', async () => {
+  it('restart: a leased copy whose Combwork is gone and a returning one are both freed only through the barrier', async () => {
     const w = world({ size: 3 })
     const a = await leased(w, { kind: 'review', card: 1, agent: 'A1' })
     const b = await leased(w, { kind: 'review', card: 2, agent: 'B1' })
-    // b's holder still busy when it returned: returning. Then Hive 1 goes, and Hive 2 opens the workspace.
+    // b's holder still busy when it returned: returning. Then Combwork 1 goes, and Combwork 2 opens the workspace.
     w.set.busy.set('B1', 'B1 (working)')
     await w.pool.returnCopy(b.lease.id, 'verdict')
     w.set.busy.set('A1', 'A1 (working)')
@@ -355,13 +355,13 @@ describe('copies: the quiescence barrier (#1435)', { timeout: 60_000 }, () => {
     expect(h2.store.lease(a.lease.id)).toMatchObject({ why: 'hiveGone', returned: expect.any(String), freed: null })
     expect(h2.store.copy(a.name)?.state).toBe('returning')
     expect(h2.store.copy(b.name)?.state).toBe('returning')
-    // Never taken for quiet because Hive restarted: free once their holders are idle.
+    // Never taken for quiet because Combwork restarted: free once their holders are idle.
     w.set.busy.clear()
     await h2.pool.refresh()
     expect(h2.store.copies().map((c) => c.state)).toEqual(['free', 'free'])
   })
 
-  it("this Hive's own lease whose run is over is returned on a look", async () => {
+  it("this Combwork's own lease whose run is over is returned on a look", async () => {
     const w = world()
     const l = await leased(w, { ref: 'run-1' })
     w.set.over.add('run-1')
@@ -371,11 +371,11 @@ describe('copies: the quiescence barrier (#1435)', { timeout: 60_000 }, () => {
 })
 
 describe('copies: operations and clean-up (#1435)', { timeout: 60_000 }, () => {
-  it("a Hive that died mid-reset leaves the copy not ready, never lent; another's look takes it over", async () => {
+  it("a Combwork that died mid-reset leaves the copy not ready, never lent; another's look takes it over", async () => {
     const w = world({ size: 1 })
     const l = await leased(w)
     await w.pool.returnCopy(l.lease.id, 'runEnded')
-    // A reset's row as a dead Hive leaves it: its operation, its lease not freed.
+    // A reset's row as a dead Combwork leaves it: its operation, its lease not freed.
     await w.store.conn.write((db) => {
       db.prepare("UPDATE copies SET op = 'o-dead', op_kind = 'lease', op_pid = 9, op_started = 1009 WHERE name = 'copy-1'").run()
       db.prepare("INSERT INTO copy_leases (id, project, copy, kind, card, revision, profile, pid, started, from_at) VALUES ('c-x', 'p-test', 'copy-1', 'check', 5, ?, 'hive-9', 9, 1009, 't')").run(l.lease.revision)
@@ -480,27 +480,27 @@ describe("copies: HR1's round 1", { timeout: 90_000 }, () => {
       db.prepare("INSERT INTO copy_leases (id, project, copy, kind, card, revision, profile, pid, started, from_at) VALUES ('c-x', 'p-test', 'copy-1', 'check', 5, ?, 'hive-9', 9, 1009, 't')").run(l.lease.revision)
     })
     w.dead.add(9)
-    // Hive 2 takes it over, and dies right after its takeover commits.
+    // Combwork 2 takes it over, and dies right after its takeover commits.
     const b = w.another(2)
     const takeOver = b.store.takeOver.bind(b.store)
     b.store.takeOver = async (...a) => {
       await takeOver(...a)
       w.dead.add(2)
-      throw new Error('Hive 2 ended')
+      throw new Error('Combwork 2 ended')
     }
-    await expect(b.pool.refresh()).rejects.toThrow('Hive 2 ended')
+    await expect(b.pool.refresh()).rejects.toThrow('Combwork 2 ended')
     expect(w.store.copy('copy-1')).toMatchObject({ op: { kind: 'lease', pid: 2 } })
-    // Hive 3 takes it over too, and dies at its last write.
+    // Combwork 3 takes it over too, and dies at its last write.
     const c = w.another(3)
     const fenced = c.store.fenced.bind(c.store)
     c.store.fenced = async () => {
       w.dead.add(3)
-      throw new Error('Hive 3 ended')
+      throw new Error('Combwork 3 ended')
     }
-    await expect(c.pool.refresh()).rejects.toThrow('Hive 3 ended')
+    await expect(c.pool.refresh()).rejects.toThrow('Combwork 3 ended')
     c.store.fenced = fenced
     expect(w.store.copy('copy-1')).toMatchObject({ op: { kind: 'lease', pid: 3 } })
-    // Hive 4 finishes the same recovery: the reset's lease dropped, the copy not ready.
+    // Combwork 4 finishes the same recovery: the reset's lease dropped, the copy not ready.
     await w.another(4).pool.refresh()
     expect(w.store.copy('copy-1')).toMatchObject({ state: 'creating', warmError: 'its reset was interrupted', op: null })
     expect(w.store.lease('c-x')).toMatchObject({ why: 'interrupted', freed: expect.any(String) })
