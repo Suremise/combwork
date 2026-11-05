@@ -12,7 +12,7 @@ import { workspaceOf } from './workspace'
  * checkRetryNotice decides when: once a turn, past Settings → Advanced's "Retry wait: tell the Assistant after"). Never
  * of the Assistant's own session. A rate limit (429) is the service refusing requests as too many for now, never the
  * account's usage limit: said so, with the suggestion that a large conversation sends less from a new one. Only a
- * suggestion: Hive restarts nothing.
+ * suggestion: Combwork restarts nothing.
  */
 const log = createLogger('sessions')
 

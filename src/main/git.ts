@@ -29,10 +29,10 @@ export interface GitResult {
    * takes it for git's own "no" (exit 1: a config key not set, HEAD detached, not an ancestor).
    */
   code: number
-  /** Git couldn't be started: not installed, or not on Hive's PATH (#346). Never an answer about the repository. */
+  /** Git couldn't be started: not installed, or not on Combwork's PATH (#346). Never an answer about the repository. */
   missing?: boolean
   /**
-   * HI-2019: git didn't run to an exit of its own for another reason, as Node or Hive's worker said it (`EAGAIN`, a
+   * HI-2019: git didn't run to an exit of its own for another reason, as Node or Combwork's worker said it (`EAGAIN`, a
    * busy machine; `ERR_GIT_WORKER`, the worker ended; the output bound; ended by a signal): a failure to try again, never
    * git's answer, and never git missing.
    */
@@ -42,7 +42,7 @@ export interface GitResult {
 }
 
 /**
- * What every git command Hive runs starts with. Hive's git calls run in the background, beside the user's and agents'
+ * What every git command Combwork runs starts with. Combwork's git calls run in the background, beside the user's and agents'
  * own git commands, so they never write the index as a side effect (#212): `status` refreshes it opportunistically
  * (taking index.lock, so a `git add` or `commit` at that moment fails with "index.lock: File exists") unless optional
  * locks are off, and `diff` against the working tree does it whatever that says unless autoRefreshIndex is off. Locks a
@@ -96,7 +96,7 @@ export function gitRouted(): boolean {
 }
 
 export function git(cwd: string, args: string[], maxBuffer = 16 * 1024 * 1024, input?: string, opts: GitRunOptions = {}): Promise<GitResult> {
-  // HI-2137: the git Hive starts (Git for Windows' real git rather than its launcher, where it found one).
+  // HI-2137: the git Combwork starts (Git for Windows' real git rather than its launcher, where it found one).
   const run = (a: string[] = args): Promise<GitResult> => gitAs(opts.exe !== undefined ? { exe: opts.exe } : gitExe(), cwd, a, maxBuffer, input, opts)
   return changesWorktrees(args) ? worktreeQueueKey(cwd).then((repo) => oneWorktreeChange(repo, () => worktreeChange(cwd, args, run))) : run()
 }
@@ -116,7 +116,7 @@ export function halfMadeEntry(err: string): string | null {
 /**
  * HI-2349: a worktree change, run again when it failed on another git's half-made entry once that entry is written (or
  * gone), at most worktreeRetry.times. oneWorktreeChange keeps this process's own changes apart (HI-2322); this covers
- * the gits it can't queue: another Hive on the same repository, an agent's or the user's own `git worktree add`. An
+ * the gits it can't queue: another Combwork on the same repository, an agent's or the user's own `git worktree add`. An
  * entry still unwritten after the wait (one a crashed git left) isn't waited for again: git's failure is the answer.
  */
 async function worktreeChange(cwd: string, args: string[], run: (a: string[]) => Promise<GitResult>): Promise<GitResult> {
@@ -247,7 +247,7 @@ async function gitAs(use: GitExe, cwd: string, args: string[], maxBuffer: number
   const notRun = !ranToExit && !missing ? String(errCode ?? err?.signal ?? 'error') : undefined
   const code = err ? (typeof errCode === 'number' ? errCode : -1) : 0
   if (opts.exe === undefined) {
-    // HI-2137: the real git Hive found couldn't start (uninstalled, moved): it never ran, so once more with PATH's,
+    // HI-2137: the real git Combwork found couldn't start (uninstalled, moved): it never ran, so once more with PATH's,
     // whether or not another command found it gone first.
     if (missing && use.exe !== PATH_GIT.exe) {
       gitExeGone(use.exe)

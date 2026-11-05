@@ -15,10 +15,10 @@ export function isTyping(data: string): boolean {
 }
 
 /**
- * What Ctrl+C or Ctrl+V does in an agent's terminal (#1286): Hive's copy (Ctrl+C with a selection) or paste, or the
+ * What Ctrl+C or Ctrl+V does in an agent's terminal (#1286): Combwork's copy (Ctrl+C with a selection) or paste, or the
  * CLI's ('cli': xterm sends it on, Ctrl+C as ^C and Ctrl+V as ^V), which Settings → Advanced can give both keys to.
  * null for any other key, and for Ctrl+C with nothing selected, which goes on as other keys do (to the CLI, unless it
- * is one of Hive's shortcuts).
+ * is one of Combwork's shortcuts).
  */
 export function copyPasteKey(e: { key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean }, toCli: boolean, hasSelection: boolean): 'copy' | 'paste' | 'cli' | null {
   if (!(e.ctrlKey || e.metaKey) || e.altKey) return null
@@ -30,11 +30,11 @@ export function copyPasteKey(e: { key: string; ctrlKey: boolean; metaKey: boolea
 }
 
 /**
- * Whether a key pressed in an agent's pane (`key`, as shortcuts write it: "Ctrl+Shift+P") is one of Hive's shortcuts
+ * Whether a key pressed in an agent's pane (`key`, as shortcuts write it: "Ctrl+Shift+P") is one of Combwork's shortcuts
  * rather than the CLI's: one bound in Hive (`bound`) that the CLI doesn't use itself (`reserved`). With every key going
  * to the CLI (#1292, Settings → Advanced: All keys go to the CLI), only the command palette's shortcut (`palette`)
- * stays Hive's, so every command is still in reach: a two-step one ("Ctrl+K Ctrl+P") by its first key, which starts
- * Hive's chord, then its second while that chord is pending (`pending`: its first key); any other key goes to the CLI.
+ * stays Combwork's, so every command is still in reach: a two-step one ("Ctrl+K Ctrl+P") by its first key, which starts
+ * Combwork's chord, then its second while that chord is pending (`pending`: its first key); any other key goes to the CLI.
  */
 export function appTakesTerminalKey(key: string, o: { allKeysToCli: boolean; palette: string | null | undefined; reserved: ReadonlySet<string>; bound: readonly string[]; pending?: string | null }): boolean {
   const norm = key.toUpperCase()
@@ -47,13 +47,13 @@ export function appTakesTerminalKey(key: string, o: { allKeysToCli: boolean; pal
   return o.bound.includes(norm)
 }
 
-/** A key a CLI's input box takes as a new line rather than a send (HI-1327), which Hive can press for a prompt's line break. */
+/** A key a CLI's input box takes as a new line rather than a send (HI-1327), which Combwork can press for a prompt's line break. */
 export type TypedNewline = 'alt-enter' | 'ctrl-j'
 
 /**
- * Each typed-newline key as Hive writes it into the CLI's terminal, its one source: Alt+Enter as ESC CR, which Windows'
+ * Each typed-newline key as Combwork writes it into the CLI's terminal, its one source: Alt+Enter as ESC CR, which Windows'
  * console delivers as one key (Enter with Alt); Ctrl+J in its console's win32-input-mode (J with Ctrl, pressed then
- * released), since a bare line feed arrives as Ctrl+Enter, which Codex doesn't take (HI-1327's probe). Fixed keys Hive
+ * released), since a bare line feed arrives as Ctrl+Enter, which Codex doesn't take (HI-1327's probe). Fixed keys Combwork
  * presses, never text from a prompt.
  */
 export const TYPED_NEWLINE_KEYS: Readonly<Record<TypedNewline, string>> = {

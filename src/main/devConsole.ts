@@ -5,7 +5,7 @@ import { ConsoleRing, combworkSourceId, makeEvent, sessionSourceId, type Capture
 /**
  * The developer console's capture (#636): rings of events per source, kept only while the console is open on them
  * (#366 decision 4). A source is captured from its first subscriber to its last: before and after, `capture()` returns
- * at once without building its event, and no ring is kept, so a Hive with no console open does no work and holds no
+ * at once without building its event, and no ring is kept, so a Combwork with no console open does no work and holds no
  * memory for it.
  *
  * Subscribers are the console's windows (and, with #638, their recordings). Readers (agents' and the Assistant's hive
@@ -67,7 +67,7 @@ export class DevConsole {
     return this.rings.has(source) || !!this.flight?.(source)
   }
 
-  /** The sources being captured whose ids start so ("hive:" for every workspace's Hive events). */
+  /** The sources being captured whose ids start so ("hive:" for every workspace's Combwork events). */
   capturedLike(prefix: string): string[] {
     return [...this.rings.keys()].filter((s) => s.startsWith(prefix))
   }
@@ -311,7 +311,7 @@ export class DevConsole {
   }
 }
 
-/** Hive's console. */
+/** Combwork's console. */
 export const devConsole = new DevConsole()
 
 export { combworkSourceId, sessionSourceId }

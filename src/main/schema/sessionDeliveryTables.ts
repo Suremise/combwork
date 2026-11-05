@@ -5,7 +5,7 @@ import { QUERIES, V1_0_STEPS } from './v1_0'
 /**
  * Sessions' and deliveries' typed tables (#1211, v1_0.ts's "sessions and deliveries in tables"): a host's records read
  * and written in them, and the 1.0 step that moves `store_rows`' rows into them. A host is the store's scope (a
- * project's id, `assistant`, deliveries also `folder:<name>`). What isn't of Hive's form (sessionDeliveryCodec.ts) is kept aside
+ * project's id, `assistant`, deliveries also `folder:<name>`). What isn't of Combwork's form (sessionDeliveryCodec.ts) is kept aside
  * as it was, under the scope's `setAside` value in `store_meta` (sessions) or with deliveries' `invalid` entries, never
  * lost and never in the table.
  */
@@ -124,15 +124,15 @@ const update = (db: Db, table: string, row: Row): void => {
 
 /**
  * Writes one of a host's saved records as `rec` has it, in its place, only its row or its cards if they changed: `had`,
- * its text as saved (sessionTexts), read in the same write transaction. A record not of Hive's form, or one not saved,
+ * its text as saved (sessionTexts), read in the same write transaction. A record not of Combwork's form, or one not saved,
  * throws (nothing is written).
  */
 export function writeSessionRecord(db: Db, host: string, rec: Rec, had: { row: string; cards: string }): void {
   const id = rec.id as string
   const saved = db.prepare('SELECT ord FROM sessions WHERE host = ? AND id = ?').get(host, id) as { ord: number } | undefined // i18n-ignore: SQL
-  if (!saved) throw new Error(`no session record with the id ${JSON.stringify(id)} to write: nothing was saved`) // i18n-ignore: a mistake in Hive's code, logged
+  if (!saved) throw new Error(`no session record with the id ${JSON.stringify(id)} to write: nothing was saved`) // i18n-ignore: a mistake in Combwork's code, logged
   const r = sessionToRows(host, saved.ord, rec)
-  if (!r) throw new Error(`a session record without the fields Hive keeps (${JSON.stringify(id)}): nothing was saved`) // i18n-ignore: as above
+  if (!r) throw new Error(`a session record without the fields Combwork keeps (${JSON.stringify(id)}): nothing was saved`) // i18n-ignore: as above
   const now = sessionText(r)
   if (now.row !== had.row) update(db, 'sessions', r.row)
   if (now.cards !== had.cards) {
@@ -159,8 +159,8 @@ export function sessionTexts(host: string, recs: Rec[]): Map<string, { row: stri
 }
 
 /**
- * Writes a host's records as `next` has them, only the rows that changed. A record not of Hive's form, or two with one
- * id, throw (a mistake in Hive's code: nothing is written). `had`: the saved records' texts (sessionTexts), when the
+ * Writes a host's records as `next` has them, only the rows that changed. A record not of Combwork's form, or two with one
+ * id, throw (a mistake in Combwork's code: nothing is written). `had`: the saved records' texts (sessionTexts), when the
  * caller read them in the same write transaction before changing them (HI-1803: not read again); else they are read.
  */
 export function writeSessionRecords(db: Db, host: string, next: SessionsChange, had: Map<string, { row: string; cards: string }> = sessionTexts(host, readSessionRecords(db, host))): void {
@@ -171,7 +171,7 @@ export function writeSessionRecords(db: Db, host: string, next: SessionsChange, 
   const delCards = db.prepare('DELETE FROM session_cards WHERE host = ? AND session = ?') // i18n-ignore: SQL
   next.sessions.forEach((rec, i) => {
     const r = sessionToRows(host, i, rec)
-    if (!r) throw new Error(`a session record without the fields Hive keeps (${JSON.stringify(rec.id)}): nothing was saved`) // i18n-ignore: a mistake in Hive's code, logged
+    if (!r) throw new Error(`a session record without the fields Combwork keeps (${JSON.stringify(rec.id)}): nothing was saved`) // i18n-ignore: a mistake in Combwork's code, logged
     const id = rec.id as string
     if (ids.has(id)) throw new Error(`two session records with the id ${id}: nothing was saved`) // i18n-ignore: as above
     ids.add(id)
@@ -203,7 +203,7 @@ export function writeSessionRecords(db: Db, host: string, next: SessionsChange, 
   if (next.deletedUsage) {
     const rows = next.deletedUsage.map((k, i) => {
       const r = keptUsageToRow(host, i, k)
-      if (!r) throw new Error(`a deleted session's usage without the fields Hive keeps (${JSON.stringify(k.id)}): nothing was saved`) // i18n-ignore: a mistake in Hive's code, logged
+      if (!r) throw new Error(`a deleted session's usage without the fields Combwork keeps (${JSON.stringify(k.id)}): nothing was saved`) // i18n-ignore: a mistake in Combwork's code, logged
       return r
     })
     const now = (db.prepare('SELECT * FROM sessions_deleted_usage WHERE host = ? ORDER BY ord, id').all(host) as Row[]).map(rowText) // i18n-ignore: SQL
@@ -220,9 +220,9 @@ export function writeSessionRecords(db: Db, host: string, next: SessionsChange, 
 }
 
 /**
- * Adds a host's records from a file (the move in, the move back of Remove from Hive's export) beside those it has: one
+ * Adds a host's records from a file (the move in, the move back of Remove from Combwork's export) beside those it has: one
  * whose id it has already is left out (the table's wins: it is newer), one the host's deleted list holds too (HI-1736: a
- * session deleted while the file waited to move in, its workspace closed, never comes back), one not of Hive's form kept
+ * session deleted while the file waited to move in, its workspace closed, never comes back), one not of Combwork's form kept
  * aside. Returns how many records it added.
  */
 export function addSessionRecords(db: Db, host: string, f: { sessions?: unknown[]; deleted?: unknown[]; deletedUsage?: unknown[] }): number {
@@ -273,7 +273,7 @@ export function addSessionRecords(db: Db, host: string, f: { sessions?: unknown[
   return added
 }
 
-/** Takes a host's records out of the tables (Remove from Hive's export, once they are in the folder's file). */
+/** Takes a host's records out of the tables (Remove from Combwork's export, once they are in the folder's file). */
 export function removeSessionRecords(db: Db, host: string): void {
   for (const t of ['sessions', 'sessions_deleted', 'sessions_deleted_usage']) db.prepare(`DELETE FROM ${t} WHERE host = ?`).run(host) // i18n-ignore: SQL
 }
@@ -290,7 +290,7 @@ export const readDeliveries = (db: Db, host: string): Rec[] => (db.prepare('SELE
 export const countDeliveries = (db: Db, host: string): number => (db.prepare('SELECT count(*) AS n FROM deliveries WHERE host = ?').get(host) as { n: number }).n // i18n-ignore: SQL
 
 /**
- * Writes a host's deliveries as `records` has them, only the rows that changed. One not of Hive's form, or two with one
+ * Writes a host's deliveries as `records` has them, only the rows that changed. One not of Combwork's form, or two with one
  * id, throw (deliveries.ts writes only what readDelivery reads back: a mistake; nothing is written).
  */
 export function writeDeliveries(db: Db, host: string, records: Rec[]): void {
@@ -299,7 +299,7 @@ export function writeDeliveries(db: Db, host: string, records: Rec[]): void {
   const del = db.prepare('DELETE FROM deliveries WHERE host = ? AND id = ?') // i18n-ignore: SQL
   for (const d of records) {
     const r = deliveryToRow(host, d)
-    if (!r) throw new Error(`a delivery without the fields Hive keeps (${JSON.stringify(d.id)}): nothing was saved`) // i18n-ignore: a mistake in Hive's code, logged
+    if (!r) throw new Error(`a delivery without the fields Combwork keeps (${JSON.stringify(d.id)}): nothing was saved`) // i18n-ignore: a mistake in Combwork's code, logged
     const id = r.id as string
     if (ids.has(id)) throw new Error(`two deliveries with the id ${id}: nothing was saved`) // i18n-ignore: as above
     ids.add(id)
@@ -331,8 +331,8 @@ export class StaleDeliveries extends Error {}
 
 /**
  * Saves only what a transaction changed of a host's deliveries, against the rows as they are committed (#1266: another
- * Hive on the workspace saves its own): `put` the records it made or changed, `removed` the ids it dropped, `base` each
- * known row's text as this writer last read or wrote it. A known row whose committed text isn't its base (another Hive
+ * Combwork on the workspace saves its own): `put` the records it made or changed, `removed` the ids it dropped, `base` each
+ * known row's text as this writer last read or wrote it. A known row whose committed text isn't its base (another Combwork
  * received, acked or cancelled it meanwhile) is a conflict: StaleDeliveries, and nothing is written (the caller's
  * transaction is undone). A new record whose id another writer took is given the next free one (`renamed`). Returns the
  * rows' texts as now written (the writer's new bases) and the renames. In the caller's transaction, under the board's lock.
@@ -356,7 +356,7 @@ export function saveDeliveryChanges(db: Db, host: string, change: { put: Rec[]; 
       d = { ...d, id: `m${top}`, seq: top }
     }
     const r = deliveryToRow(host, d)
-    if (!r) throw new Error(`a delivery without the fields Hive keeps (${JSON.stringify(d.id)}): nothing was saved`) // i18n-ignore: a mistake in Hive's code, logged
+    if (!r) throw new Error(`a delivery without the fields Combwork keeps (${JSON.stringify(d.id)}): nothing was saved`) // i18n-ignore: a mistake in Combwork's code, logged
     const full = withAllColumns(db, r)
     if (now.has(r.id as string)) update(db, 'deliveries', full)
     else insert(db, 'deliveries', r)
@@ -383,7 +383,7 @@ let columns: string[] | null = null
 const deliveryColumns = (db: Db): string[] => (columns ??= (db.prepare('SELECT name FROM pragma_table_info(?)').all('deliveries') as { name: string }[]).map((r) => r.name)) // i18n-ignore: SQL
 
 /**
- * Adds a host's deliveries from a file (the move in) to its table: one not of Hive's form, or whose id it has, goes to
+ * Adds a host's deliveries from a file (the move in) to its table: one not of Combwork's form, or whose id it has, goes to
  * the `invalid` entries kept beside them (as deliveries.ts keeps those it can't read back). Returns how many it added.
  */
 export function addDeliveries(db: Db, host: string, entries: unknown[]): number {
@@ -424,7 +424,7 @@ const STEP = V1_0_STEPS.find((s) => s.name === 'sessions and deliveries in table
 /**
  * The step's `up` (in the 1.0 group's transaction): the tables made, every host's `sessions` and `deliveries` rows of
  * `store_rows` written into them in their order, then those rows deleted. Their values in `store_meta` (`imported`,
- * `next`, `invalid`, `exported`) stay. A row whose JSON can't be read, or not of Hive's form, is kept aside as its text
+ * `next`, `invalid`, `exported`) stay. A row whose JSON can't be read, or not of Combwork's form, is kept aside as its text
  * or value (`setAside`, `invalid`).
  */
 export function moveStoreRows(db: Db): { sessions: number; deliveries: number } {

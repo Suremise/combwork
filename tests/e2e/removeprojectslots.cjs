@@ -24,7 +24,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const identity = ['-c', 'user.name=Hive Slot Test', '-c', 'user.email=slots@example.com']
+const identity = ['-c', 'user.name=Combwork Slot Test', '-c', 'user.email=slots@example.com']
 
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`, shots]) fs.rmSync(d, { recursive: true, force: true })

@@ -17,7 +17,7 @@ import { workspaceOf } from './workspace'
 import { pausedFor } from './teamPause'
 
 /**
- * Resuming agents after a connection drops (HI-1612, SPEC §6.3). Off by default (Settings → Advanced, Hive's "Resume
+ * Resuming agents after a connection drops (HI-1612, SPEC §6.3). Off by default (Settings → Advanced, Combwork's "Resume
  * agents after a connection drops"). An agent whose turn ended on a connection error (its CLI's words, as the failed
  * turn keeps them, found by the CLI's pattern and not by the one for a usage limit, a sign-in or "overloaded") waits
  * for its CLI's API host to answer, checked with a request that never holds main's thread, backing off; once it

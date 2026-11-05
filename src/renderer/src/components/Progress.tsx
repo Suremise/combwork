@@ -55,7 +55,7 @@ type StoreState = Parameters<typeof findProject>[0]
 function whyNotShown(s: StoreState, r: ProgressRun): string | null {
   if (r.source === 'assistant') return s.workspace?.assistant ? null : tr(msg({ id: 'board.progress.noAssistant', defaultMessage: 'The Assistant is not in this workspace.', description: "Why a Progress panel run's agent can't be shown: the run is the Combwork Assistant's, and this workspace has none." }))
   if (r.source === 'api') return tr(msg({ id: 'board.progress.scriptRun', defaultMessage: 'A script reported it, not an agent: there is no agent to show.', description: "Why a Progress panel run's agent can't be shown: a script reported the run." }))
-  // Hive's setup run in a review copy names the agent whose lease held it (HI-1710): shown as that agent's.
+  // Combwork's setup run in a review copy names the agent whose lease held it (HI-1710): shown as that agent's.
   if (r.source === 'combwork' && !r.agentId) return tr(msg({ id: 'board.progress.combworkRun', defaultMessage: 'Combwork’s merge queue ran it, not an agent: there is no agent to show.', description: "Why a Progress panel run's agent can't be shown: Combwork's merge queue ran the run itself (a merge check on a card's merged result; glossary 2.5: merge queue)." }))
   const p = r.projectPath ? findProject(s, r.projectPath) : null
   if (!p) return tr(msg({ id: 'board.progress.projectGone', defaultMessage: 'Its project is no longer in this workspace.', description: "Why a Progress panel run's agent can't be shown: its project was removed from the workspace." }))
@@ -376,7 +376,7 @@ const FIND_RUNS = msg({ id: 'board.runs.search', defaultMessage: 'Find runs', de
 
 /**
  * The Runs tab (#1309): its filters (failures only, a lane, an agent, words to find), what is running now, then every
- * run Hive keeps that ended, by day, each day by card (HI-1701), a run and its retries the same day folded into one line
+ * run Combwork keeps that ended, by day, each day by card (HI-1701), a run and its retries the same day folded into one line
  * that opens to each.
  */
 function RunsTab({ runs, lanes, now, detail, toggle, filter, setFilter }: { runs: ProgressRun[]; lanes: Lane[]; now: number; detail: string | null; toggle: (id: string) => void; filter: RunsFilter; setFilter: (f: RunsFilter) => void }) {
@@ -684,7 +684,7 @@ const RunRow = memo(function RunRow({ run: r, now, open, onToggle }: { run: Prog
         {r.state === 'stopped' && <Icon name="circle-slash" className="progress-stopped" />}
         {look === 'waiting' && <Icon name="clock" className="progress-waiting-icon" />}
         <DetailsToggle run={r} open={open} onToggle={onToggle} />
-        {/* An isolated check (#1435): its processes are its copy's, so Hive can end them all. */}
+        {/* An isolated check (#1435): its processes are its copy's, so Combwork can end them all. */}
         {r.copy && r.source === 'agent' && isOpenRun(r) && (
           <IconButton
             icon="debug-stop"
@@ -873,7 +873,7 @@ function copy(what: 'command' | 'details', text: string): void {
 }
 
 /**
- * Everything Hive has for a run (`runDetails`): what ran (the command, copyable), who, when, how long, its steps, state,
+ * Everything Combwork has for a run (`runDetails`): what ran (the command, copyable), who, when, how long, its steps, state,
  * exit code and the log the reporter named, which opens or shows in its folder (#251); the failure's summary; all of it
  * copyable at once (Copy details, to paste to the Assistant); and its agent, to show.
  */

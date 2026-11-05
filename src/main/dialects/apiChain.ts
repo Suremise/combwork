@@ -1,6 +1,6 @@
 /**
  * The API chain of each workspace (dialects, HI-2443; plans/2026-11-03-dialects-design.md, section 3): what a caller with
- * no session (a script, curl, a viewer) is said Hive's text in, API → Workspace → Default. A session's chain is pinned
+ * no session (a script, curl, a viewer) is said Combwork's text in, API → Workspace → Default. A session's chain is pinned
  * at its launch; this one has no launch, so it follows the files: loaded once, kept, and loaded again when the
  * workspace sees its dialects folder change (workspace.ts's watch). Agent text's resolver is synchronous, so the Agent
  * API makes sure it is loaded before it serves such a caller (`apiChainReady`), and binds the request's workspace for

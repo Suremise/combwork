@@ -1,5 +1,5 @@
 // The repository lock across processes (#1347, SPEC §16.9.3): the real core (repoLockCore.ts) in plain Node children,
-// bundled with esbuild, so two processes contend for one repository's lock as two Hives would. Each child takes the
+// bundled with esbuild, so two processes contend for one repository's lock as two Combworks would. Each child takes the
 // lock, writes what happened to its own file (waiting, held, timedout, released) and holds until told to release.
 import { spawn, type ChildProcess } from 'child_process'
 import { createRequire } from 'module'

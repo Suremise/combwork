@@ -115,7 +115,7 @@ function costOf(card: TaskCard, rows: { provider: ProviderId; session: string; r
   }
   for (const g of groups.values()) {
     if (!mergeSpans(g.spans).length) continue
-    // No session Hive knows of for this agent: what it used is unknown, never $0.
+    // No session Combwork knows of for this agent: what it used is unknown, never $0.
     if (!p?.hasSessions(g.who)) {
       unmatched++
       addPart(g.who.role === 'build' ? build : review, unknownPart())
@@ -241,7 +241,7 @@ export async function cardRoundCosts(ws: WorkspaceService, n: number): Promise<C
       for (const [round, held] of slots) {
         if (!held.length) continue
         let part = emptyPart()
-        // No session Hive knows of for this agent: unknown, as the card's total counts it.
+        // No session Combwork knows of for this agent: unknown, as the card's total counts it.
         if (!p?.hasSessions(g.who)) part = unknownPart()
         else if (sessions.length) for (const [k, shared] of sharedSpans(held, theirs)) addPart(part, scalePart(usedIn(sessions, shared), 1 / k))
         pieces.push({ round, who: g.who, piece: { part, held: held.reduce((a, [x, y]) => a + y - x, 0) } })
@@ -259,7 +259,7 @@ export async function cardRoundCosts(ws: WorkspaceService, n: number): Promise<C
         if (!theirs.length) continue
         const own = left.filter((r) => holdIsSessions(g.who, r, named))
         left = left.filter((r) => !own.includes(r))
-        // Its rows as they are, and unknown beside them for no session Hive knows of (as costOf counts it), so a session
+        // Its rows as they are, and unknown beside them for no session Combwork knows of (as costOf counts it), so a session
         // list that couldn't be read never loses a known charge.
         const part = partOfRows(own)
         give(theirs, p?.hasSessions(g.who) ? part : addPart(part, unknownPart()))

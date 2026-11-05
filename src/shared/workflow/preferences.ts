@@ -1,5 +1,5 @@
 // Card loops and file locks as workflow options (HI-1766): how agents work together, not rules (options.ts
-// PREFERENCE_OPTIONS). Each resolves on its own, Hive's then the workspace's then the project's, so a level's other options
+// PREFERENCE_OPTIONS). Each resolves on its own, Combwork's then the workspace's then the project's, so a level's other options
 // that can't be used (a contradiction falls the rules back to All off) never take a project's loop settings with them.
 // Main reads them with workflow/preferences.ts; the window from the levels it has.
 
@@ -14,7 +14,7 @@ export type Preferences = Required<Pick<WorkflowOptions, PreferenceKey>>
 /** Each preference when no level sets it: as before 1.0's settings (wakes on, 10 rounds, 6 h, 30 min, Block, 12 agents). */
 export const PREFERENCE_DEFAULTS: Preferences = { loopWakes: true, loopRounds: LOOP_ROUNDS, loopWaitHours: LOOP_WAIT_HOURS, loopStepWaitMinutes: LOOP_STEP_WAIT_MINUTES, fileLocks: 'block', maxAgents: AGENT_LIMIT_DEFAULT }
 
-/** The levels a project's preferences come from: Hive's and the workspace's defaults, and its own options. */
+/** The levels a project's preferences come from: Combwork's and the workspace's defaults, and its own options. */
 export interface PreferenceLevels {
   global?: WorkflowDefaults | null
   workspace?: WorkflowDefaults | null
@@ -47,7 +47,7 @@ export function preferencesOf(platform: PlatformId, levels: PreferenceLevels): {
 
 /**
  * A project's preferences as the window knows it (its info: the platform detected, else the one its options name, else
- * None), over Hive's and the workspace's defaults.
+ * None), over Combwork's and the workspace's defaults.
  */
 export function projectInfoPreferences(project: { config: Pick<ProjectConfig, 'workflow' | 'platform'>; platform?: { id: PlatformId } | null }, global: WorkflowDefaults | null | undefined, workspace: WorkflowDefaults | null | undefined): Preferences {
   const platform = project.platform?.id ?? project.config.platform ?? project.config.workflow?.platform ?? 'none'
@@ -130,14 +130,14 @@ export function projectOwnPreferences(platform: PlatformId, cfg: Pick<ProjectCon
 }
 
 /**
- * Settings → Advanced → Agents per project (`hive.agents.perProject`, #562) before HI-2001: Hive's (advanced.json, kept
+ * Settings → Advanced → Agents per project (`hive.agents.perProject`, #562) before HI-2001: Combwork's (advanced.json, kept
  * there as LEGACY_ADVANCED until main moves it) and a workspace's own (workspace.json's `advanced`). Each becomes its
  * level's Maximum agents, for None and Git.
  */
 export const AGENTS_PER_PROJECT = 'cw.agents.perProject'
 
 /**
- * Workflow defaults (Hive's or a workspace's) with old values each platform's lacks: a value a level already sets wins.
+ * Workflow defaults (Combwork's or a workspace's) with old values each platform's lacks: a value a level already sets wins.
  * Pure: the caller writes it where it belongs.
  */
 export function withOldDefaults(levels: WorkflowDefaults | null | undefined, old: Partial<WorkflowOptions>): WorkflowDefaults {
@@ -175,7 +175,7 @@ export function migrateWorkspacePreferences<T extends Record<string, any>>(raw: 
 }
 
 /**
- * Hive's settings as read, Settings → Agents → File locks (`agents.fileLocks`) moved into Hive's workflow defaults for
+ * Combwork's settings as read, Settings → Agents → File locks (`agents.fileLocks`) moved into Combwork's workflow defaults for
  * None and Git where they don't set it. Block, the default saved into every config, is no choice: the default stands.
  */
 export function migrateGlobalFileLocks(settings: { agents?: unknown; workflow?: WorkflowDefaults }): void {

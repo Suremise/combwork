@@ -621,7 +621,7 @@ const prose = (seed, n) => {
   measure('cw_update_task (as Assistant)', tool('cw_update_task', { number: todo[30], comment: 'Noted.' }, 'assistant'), 400)
   // A long title (HI-1872): kept, never refused, the reply's last line suggesting a shorter one; none for a title within
   // the limit, a change without a title, the user's own title (the window's), or with the setting at 0.
-  const LONG = 'Tray: the restart notice stays after Hive restarts, because the update check runs before the window opens'
+  const LONG = 'Tray: the restart notice stays after Combwork restarts, because the update check runs before the window opens'
   const NUDGE = 'Titles over 80 characters are cut in git and on the board: consider a shorter one (the detail belongs in the description).'
   const nudged = (text) => text.split('\n').at(-1) === NUDGE
   const longMade = measure('cw_create_task (a long title)', tool('cw_create_task', { title: LONG, description: prose(700, 600) }), 500)

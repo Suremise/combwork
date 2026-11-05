@@ -14,7 +14,7 @@ export interface QueueReturn {
  * A card the merge queue returned to its builder and that waits for it now (HI-1721), as its facts say: queueStateOf's
  * `returned` (the last entry failed, the card back in Doing or Todo, not submitted since). `at`: when it came back;
  * `text`: the return's wake (what came back and what to do next); `builder`: the agent its cycle started with. Null when
- * it isn't one (merged, queued, never queued, a project whose cards Hive doesn't merge, or not readable).
+ * it isn't one (merged, queued, never queued, a project whose cards Combwork doesn't merge, or not readable).
  */
 export function returnIn(wf: Workflow, n: number): QueueReturn | null {
   try {

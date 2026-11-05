@@ -326,7 +326,7 @@ export const PAGE_HOVER_MS = 600
 export const SWAP_WITH = msg({ id: 'panes.drop.swap', defaultMessage: 'Swap with {agent}', description: "Shown over another agent's pane (or its tile in the Tiles view) while an agent is dragged onto it: dropping swaps the two ({agent}: the other agent's name)." })
 
 /**
- * Ends a drag Hive is tracking when the browser's own end of it can't reach its source: a pane header dragged to another
+ * Ends a drag Combwork is tracking when the browser's own end of it can't reach its source: a pane header dragged to another
  * page is no longer on screen to get `dragend` (Escape, or a drop outside any target). Ended at once by Escape (its
  * keyup: the browser's drag takes the keydown), the button's release with no drop to take it, a dragleave that nothing
  * follows, any drop or drag end in the window, or the mouse moving with no button down.
@@ -485,7 +485,7 @@ function agentMenu(project: ProjectInfo, a: AgentInfo, pick: () => void, usage?:
     ...sessionItems(project, a.live, usage?.session),
     // Its work in the project's Activity tab (#1254); the Assistant has none.
     ...(isAssistantPath(project.path) ? [] : [{ label: tr(msg({ id: 'panes.menu.activity', defaultMessage: 'Activity', description: "Menu item (an agent's menu): opens the project's Activity tab showing this agent's work: its sessions, turns, tool calls and processes." })), icon: 'type-hierarchy', onClick: () => openActivity(project.path, { agentId: a.id }) }]),
-    // Its hooks (HI-982): what its session has and what Hive received; while it runs.
+    // Its hooks (HI-982): what its session has and what Combwork received; while it runs.
     { label: tr(HOOKS), icon: 'plug', disabled: !a.live, onClick: () => set({ hooksFor: { project: project.path, agentId: a.id } }) },
     { label: tr(msg({ id: 'panes.menu.handOver', defaultMessage: 'Hand Over to…', description: "Menu item (an agent's menu): hands its work over to another agent or a new conversation." })), icon: 'arrow-swap', onClick: () => set({ handOverFor: { project: project.path, agentId: a.id } }) },
     ...moveItems(project, a),
@@ -587,7 +587,7 @@ const LOCKS_TITLE_SHARED = msg({ id: 'panes.locks.titleShared', defaultMessage: 
  * - what was left for it and isn't received yet (#530, #647: its deliveries), and Cancel for those still waiting; how
  *   many weren't acked in time;
  * - the files it is editing this turn;
- * - Mark Idle (beside the status too while the header has room) when Hive doesn't know its state (#648);
+ * - Mark Idle (beside the status too while the header has room) when Combwork doesn't know its state (#648);
  * - `narrow` (the header too narrow for its inline marks): what its safety classifier did (#606), from its shield.
  * `sub` opens a menu in the ⋯ menu's place. `alert`: the badge's lines; `warn` when one of them is a warning.
  */
@@ -730,7 +730,7 @@ function addFromTemplateItems(project: ProjectInfo, list: TemplateEntry[]): Menu
     ? all.flatMap((t) => [
         { header: true, label: tr(msg({ id: 'panes.template.heading', defaultMessage: '{template} · {scope, select, combwork {Combwork} workspace {workspace} other {this project}}', description: "A heading in Add Agent from Template: the template's name ({template}) and where it is kept (lower case; Combwork: one of Combwork's own templates, #1436)." }), { template: templateTitle(t), scope: t.scope }) },
         ...t.agents.map((a, i) => ({
-          // Their names as this project's, as main made them with its key (HI-1948: Hive's own are patterns of it, HI-B1);
+          // Their names as this project's, as main made them with its key (HI-1948: Combwork's own are patterns of it, HI-B1);
           // none from main, `{key}` stays.
           label: t.agentNames?.[i] ?? templateAgentNames(t.agents, '{key}')[i],
           icon: 'person-add',
@@ -1365,7 +1365,7 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
           )}
         </span>
       ) : live?.untakenLine ? (
-        // A line Hive typed that its CLI didn't take (#430): the user sees to it, nothing more is typed meanwhile.
+        // A line Combwork typed that its CLI didn't take (#430): the user sees to it, nothing more is typed meanwhile.
         <Tooltip content={tr(msg({ id: 'panes.header.untakenTip', defaultMessage: "Combwork typed this, but its CLI hasn't taken it (it wasn't reading its input): \"{line}\". Click its terminal and press Enter. Combwork types nothing more into it until its CLI takes it.", description: "Tooltip of a pane's status when a line Combwork typed into the agent's CLI wasn't taken ({line}: the line)." }), { line: live.untakenLine.text })}>
           <span className="faint pane-status asks">{tr(msg({ id: 'panes.header.untaken', defaultMessage: "A line Combwork typed wasn't taken", description: "A pane's status: a line Combwork typed into the agent's CLI wasn't taken." }))}</span>
         </Tooltip>
@@ -1375,7 +1375,7 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
           <span className="faint pane-status retrying">{retryWaitText(live, Date.now(), tr)}</span>
         </Tooltip>
       ) : unknownStateText(live, Date.now(), tr) ? (
-        // A running turn Hive has heard nothing of, with no sign of its end (#648): not idle, so nothing is typed into it.
+        // A running turn Combwork has heard nothing of, with no sign of its end (#648): not idle, so nothing is typed into it.
         // Mark idle stays beside it (and in ⋯): the agent is stuck until someone looks.
         <span className="pane-status unknown-state">
           <Tooltip content={tr(msg({ id: 'panes.header.unknownTip', defaultMessage: "Combwork has heard nothing of this agent's turn for a while and sees no sign that it ended: no Stop from its CLI, nothing in its CLI's records, no idle prompt on its screen. Until it hears more, the agent counts as busy and nothing is typed into it. If its terminal shows it waiting at its prompt, mark it idle.", description: "Tooltip of a pane's status when the agent's state is unknown. Stop is the CLI's event: keep it. \"mark it idle\" refers to the Mark idle button beside it." }))}>
@@ -1408,7 +1408,7 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
           </span>
         </Tooltip>
       ) : !live && !failure && a.start && 'waiting' in a.start ? (
-        // Its start waits for its slot (HI-2304): what holds it, in English as Hive says it.
+        // Its start waits for its slot (HI-2304): what holds it, in English as Combwork says it.
         <Tooltip content={a.start.waiting}>
           <span className="faint pane-status asks slot-held">{tr(msg({ id: 'panes.header.slotHeld', defaultMessage: 'Waiting for its slot', description: "A pane's status (HI-2304): Combwork will start or resume the agent in its slot (a worktree Combwork lends it) once the processes another run left running there have ended. The tooltip says what holds it." }))}</span>
         </Tooltip>

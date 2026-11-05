@@ -13,7 +13,7 @@ import { combworkError } from './combworkError'
 
 /**
  * Keeping a project's .combwork (sessions, transcript backups, launch settings: this machine's, not the project's) out of
- * version control (#345). Hive adds it to git's .git/info/exclude, never to a tracked .gitignore, for the repository
+ * version control (#345). Combwork adds it to git's .git/info/exclude, never to a tracked .gitignore, for the repository
  * that holds the project: its own, or one in a folder above it (a workspace kept in git). It does so when a project is
  * set up, at every refresh and before every launch, so a repository made later (`git init`) is covered too. Where it
  * can't (another version control system, none, a folder a sync service copies), the project says so.
@@ -119,8 +119,8 @@ async function gitIgnores(projectPath: string, excludeFile: string): Promise<boo
 
 /**
  * Adds the project's .combwork to the info/exclude of the git repository holding it, if it isn't there, then asks git
- * whether it ignores it now (a line Hive wrote isn't proof: a `.gitignore` rule can bring .combwork back). Returns that, the
- * repository's working folder, whether Hive added the line and whether git confirmed it (`unconfirmed`: git couldn't be
+ * whether it ignores it now (a line Combwork wrote isn't proof: a `.gitignore` rule can bring .combwork back). Returns that, the
+ * repository's working folder, whether Combwork added the line and whether git confirmed it (`unconfirmed`: git couldn't be
  * asked, missing say, #346); null when no git repository holds the project. `readOnly` (HI-2564): asks only, writing
  * nothing (no info folder, no line): a project whose project.json went, which a refresh doesn't set up again. A function
  * is asked at each write, as it is made, so a project.json that goes while this runs stops it too (HR2's round 1).
@@ -155,7 +155,7 @@ export async function ensureCombworkExcluded(projectPath: string, opts: { readOn
     const prefix = text && !text.endsWith('\n') ? '\n' : ''
     await appendFile(f, `${prefix}${EXCLUDE_COMMENT}\n${line}\n`)
   }
-  // Git's own answer; only when git can't be asked, the line Hive found or wrote.
+  // Git's own answer; only when git can't be asked, the line Combwork found or wrote.
   const ignored = await gitIgnores(projectPath, f)
   return { excluded: ignored ?? true, root: found.root, added, ...(ignored === null ? { unconfirmed: true } : {}) }
 }
@@ -176,7 +176,7 @@ function indexOf(folder: string): string | null {
 const trackedCache = new Map<string, { stamp: string; files: string[] | null }>()
 
 /**
- * Files under the project's .combwork that git tracks (#364): committed before Hive excluded it (an exclude rule only keeps
+ * Files under the project's .combwork that git tracks (#364): committed before Combwork excluded it (an exclude rule only keeps
  * untracked files out, so git goes on committing changes to these). `git ls-files` in the project, asked again only
  * when the repository's index changes (a commit, `git rm --cached`), not at every refresh, or with `fresh`. Null when git
  * can't say (not kept: asked again next time).

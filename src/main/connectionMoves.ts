@@ -250,10 +250,10 @@ export async function dismissMovedNotice(ws: WorkspaceService, keys: string[]): 
 const MOVE_FAILED = msg({ id: 'main.connections.moveFailed', defaultMessage: "Combwork couldn't move {project}'s model settings to its agents", description: "A notice's title (HI-1770): moving a project's own model, effort and context settings onto its agents (connections now hold the defaults) failed; it is tried again at the next start. {project} is the project's name." })
 
 
-/** Workspaces migrated since Hive started; an account added or turned on looks at them again (agents waiting for one). */
+/** Workspaces migrated since Combwork started; an account added or turned on looks at them again (agents waiting for one). */
 const looked = new Set<string>()
 
-/** The migration's part of Hive's start (index.ts): at each workspace's open, and when accounts change (agents waiting for one). */
+/** The migration's part of Combwork's start (index.ts): at each workspace's open, and when accounts change (agents waiting for one). */
 export function initConnectionMoves(): void {
   const look = (): void => {
     for (const ws of openWorkspaces()) {

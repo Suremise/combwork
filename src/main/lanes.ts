@@ -43,7 +43,7 @@ const log = createLogger('lanes')
 /**
  * Lanes (#483): the card loops a workspace runs, kept in its `.combwork/lanes.json` beside the board. The builder's card-loop
  * registers its lane (start), the reviewer's joins it by the builder's name, the Assistant can start one when it briefs
- * a pair. Hive follows the board for the rest: a lane is paused while its current card is blocked, ends when every card
+ * a pair. Combwork follows the board for the rest: a lane is paused while its current card is blocked, ends when every card
  * is Done (or its builder ends it after the merge), and is abandoned when its builder or reviewer is removed.
  *
  * Bookkeeping, never a gate: nothing here refuses or holds up work on a card, and a loop with no lane runs as before.
@@ -58,7 +58,7 @@ const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCas
 const KINDS: Record<number, CombworkErrorKind> = { 400: 'invalid', 403: 'forbidden', 404: 'notFound', 409: 'conflict' }
 
 /**
- * A lane change Hive refuses (status: the HTTP status the Agent API answers with). Most come only from agents (cw_lane),
+ * A lane change Combwork refuses (status: the HTTP status the Agent API answers with). Most come only from agents (cw_lane),
  * in English; one the window can meet too (Progress → Lanes: ending a lane) is text, in its language there (#850).
  */
 export class LaneError extends CombworkError {
@@ -79,7 +79,7 @@ const M = {
 }
 
 /**
- * What lanes say to agents (dialects, HI-2435): cw_lane's refusals and replies, the lines Hive delivers to a lane's
+ * What lanes say to agents (dialects, HI-2435): cw_lane's refusals and replies, the lines Combwork delivers to a lane's
  * builder, and the journal's lane facts. Said where they are sent: a refusal in the request's scope, a delivery in its
  * builder's (inDialectOf), and what is stored for any reader (a journal fact, a fact's reason) in the Default.
  * `{card}` is a card's key or number, `{builder}`/`{reviewer}`/`{agent}` an agent's name.
@@ -169,7 +169,7 @@ const readGens = new WeakMap<LaneRecord[], number>()
 const readAs = new WeakMap<LaneRecord[], string>()
 
 /**
- * Workspaces whose lanes were opened (moved in from lanes.json, the first time) since Hive started, by spelling, with the
+ * Workspaces whose lanes were opened (moved in from lanes.json, the first time) since Combwork started, by spelling, with the
  * workspace's place as it entered (#1456).
  */
 const opened = new Map<string, string>()
@@ -526,7 +526,7 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
 const waitStamps = new WeakMap<WorkspaceService, { path: string | null; life: unknown; lanes: Map<string, WaitStamp | undefined> }>()
 const WAIT_STAMPS_MAX = 500
 
-/** Lanes with when each one's wait began (`status.since`), from its stamp; `atLeast` where Hive didn't see it begin. */
+/** Lanes with when each one's wait began (`status.since`), from its stamp; `atLeast` where Combwork didn't see it begin. */
 function withWaitTimes(ws: WorkspaceService, list: LaneInfo[]): LaneInfo[] {
   let c = waitStamps.get(ws)
   if (!c || c.path !== ws.path || c.life !== ws.lifetime) waitStamps.set(ws, (c = { path: ws.path, life: ws.lifetime, lanes: new Map() }))
@@ -807,7 +807,7 @@ async function tellListChanged(ws: WorkspaceService, l: LaneRecord): Promise<voi
   const body = inDialectOf({ projectPath, agentId: l.builder.id }, () => withCardNames(ws, () => say(A.listChanged, { cards: l.cards.map(cardRef).join(', ') })))
   try {
     // agent-protocol: the sender's name, Combwork's own
-    await createDelivery(projectPath, { agentId: l.builder.id, agentName: l.builder.name, kind: 'rebrief', from: { kind: 'combwork', name: 'Combwork' }, body, source: 'lane', ref: l.id }) // i18n-ignore: the sender's name, Hive's own
+    await createDelivery(projectPath, { agentId: l.builder.id, agentName: l.builder.name, kind: 'rebrief', from: { kind: 'combwork', name: 'Combwork' }, body, source: 'lane', ref: l.id }) // i18n-ignore: the sender's name, Combwork's own
     await offerNow(projectPath, l.builder.id)
   } catch (e) {
     log.warn(`telling lane ${l.id}'s builder its list changed`, e)
@@ -965,7 +965,7 @@ const IN_A_TURN: ReadonlySet<string> = new Set(['working', 'starting', 'waiting'
  * card in flight, or it stays first): the start's own edit applies the list. Else what it did, for the reply.
  */
 /**
- * A changed list applied now (HI-1995, `applyNow`; Darren's decision of 29 Oct: two steps Hive already has): when the
+ * A changed list applied now (HI-1995, `applyNow`; Darren's decision of 29 Oct: two steps Combwork already has): when the
  * builder's own card in flight is no longer the new list's first own open card, it is put back first, as `cw_put_back`
  * does (the runtime's put back, through the card's intent path: to Todo, its line and work kept); the start's own edit
  * then applies the list, at once now that no card of the lane is in flight (bound to this lane: one ended or changed in
@@ -1019,7 +1019,7 @@ async function tellReordered(ws: WorkspaceService, l: LaneRecord, put: { putBack
   const body = inDialectOf({ projectPath, agentId: l.builder.id }, () => withCardNames(ws, () => say(A.reordered, { by, card: put.putBack, line: put.line ?? say(A.itsBranch), cards: l.cards.map(cardRef).join(', ') })))
   try {
     // agent-protocol: the sender's name, Combwork's own
-    await createDelivery(projectPath, { agentId: l.builder.id, agentName: l.builder.name, kind: 'rebrief', from: { kind: 'combwork', name: 'Combwork' }, body, source: 'lane', ref: l.id }) // i18n-ignore: the sender's name, Hive's own
+    await createDelivery(projectPath, { agentId: l.builder.id, agentName: l.builder.name, kind: 'rebrief', from: { kind: 'combwork', name: 'Combwork' }, body, source: 'lane', ref: l.id }) // i18n-ignore: the sender's name, Combwork's own
     await offerNow(projectPath, l.builder.id)
   } catch (e) {
     log.warn(`telling lane ${l.id}'s builder of its reorder`, e)
@@ -1123,7 +1123,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     // With rules on, any new list for the builder's running lane is an edit of that lane (HR6's #1270 round 1), so a card
     // in flight is never left behind; with them off, a list sharing no card is another loop, as before 1.0.
     if (was && (was.cards.some((n) => cards.includes(n)) || on)) {
-      // Hive owns the list (#1270, §16.11.1): a change while a card is in flight is queued for the next card boundary,
+      // Combwork owns the list (#1270, §16.11.1): a change while a card is in flight is queued for the next card boundary,
       // never refused; between cards it applies now. With rules off, at once, as before.
       const change = on && !sameList(was.cards, cards) ? listChange((await views(ws, [was]))[0], was.cards, cards) : null
       if (change && change.behind !== null) {
@@ -1349,7 +1349,7 @@ export async function endLane(ws: WorkspaceService, id: string, o: { abandoned?:
     if (o.agent && l.builder.id !== o.agent && l.reviewer?.id !== o.agent) throw new LaneError(403, say(A.endNotOurs))
     if (running(l)) {
       const v = (await views(ws, [l]))[0]
-      // Hive owns the lane (#1270, §16.8.2): with rules enforced, an agent ends it only once its cards are all Done,
+      // Combwork owns the lane (#1270, §16.8.2): with rules enforced, an agent ends it only once its cards are all Done,
       // and only the user and the Assistant abandon it; its merge commit is the cards' facts', not the agent's say-so.
       if (on && o.agent && o.abandoned) throw new LaneError(403, say(A.abandonNotOurs))
       if (on && o.agent && !allDone(v.cards)) throw new LaneError(409, withCardNames(ws, () => say(A.endNotDone, { cards: v.cards.filter((c) => c.column !== 'done' && c.column !== 'gone').map((c) => cardRef(c.number)).join(', ') })))
@@ -1598,7 +1598,7 @@ export async function refresh(ws: WorkspaceService): Promise<void> {
       return
     }
     const done = live.filter((l, i) => allDone(vs[i].cards))
-    // An agent no longer in its project (removed while Hive was closed, or by hand): its lane is abandoned.
+    // An agent no longer in its project (removed while Combwork was closed, or by hand): its lane is abandoned.
     const orphan = live.filter((l) => {
       const n = names.get(l.project.toLowerCase())
       return !!n && (!n.has(l.builder.id) || (!!l.reviewer && !n.has(l.reviewer.id)))

@@ -95,7 +95,7 @@ function menuItems(project: ProjectInfo, a: AgentInfo, settings: AppSettings, vi
   if (live && !live.settingUp) {
     const cur = live.permissionMode
     const asking = live.status === 'waiting'
-    // Started in the CLI's own setting (#1284): Hive doesn't know its mode, so every choice restarts the session.
+    // Started in the CLI's own setting (#1284): Combwork doesn't know its mode, so every choice restarts the session.
     const cliOwn = !!modeOption(provider, cur)?.cliOwn
     return [
       { header: true, label: many ? tr(msg({ id: 'agents.permission.menuAgent', defaultMessage: 'Permission mode — {agent}', description: "The permission mode menu's heading, for one of several agents ({agent}: its name)." }), { agent: a.name }) : tr(msg({ id: 'agents.permission.menu', defaultMessage: 'Permission mode', description: "The permission mode menu's heading." })) },
@@ -197,7 +197,7 @@ export function ModeBadge({ project, a, variant }: { project: ProjectInfo; a: Ag
       ? tr(msg({ id: 'agents.permission.withPlan', defaultMessage: '{mode} · Plan', description: "The permission mode badge of a running session with Plan mode on (Codex): its mode ({mode}: its name), then Plan. Keep it short." }), { mode: modeBadgeLabel(provider, mode, tr) })
       : modeBadgeLabel(provider, mode, tr)
   const kb = commandKeybinding('session.permissionMode')
-  // Shift+Tab still cycles the CLI's modes in one on its own setting, but Hive can't say where it starts (#1284).
+  // Shift+Tab still cycles the CLI's modes in one on its own setting, but Combwork can't say where it starts (#1284).
   const cycles = providerDescriptor(provider).capabilities.liveModeSwitch === 'cycle' && !option?.cliOwn
   const note = a.live && !a.live.modeSwitching && option?.cliNote ? shownText(option.cliNote, option.text?.cliNote, tr) : undefined
   const tip = tr(

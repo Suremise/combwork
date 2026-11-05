@@ -18,7 +18,7 @@ import { CardRoundCostTable } from './CardCost'
 import { Icon, Tooltip } from './ui'
 
 // A card's work (#1224, SPEC §16.4; #1223's work view): the dialog's Work section and the board card's badges. What the
-// card's facts say, in the glossary's words (revision, verdict, check, stale, outside Hive, before 1.0). Revisions are
+// card's facts say, in the glossary's words (revision, verdict, check, stale, outside Combwork, before 1.0). Revisions are
 // shown through the card's project's platform (revisionShort), never by switching on its id.
 
 const M = {
@@ -307,7 +307,7 @@ function RevisionRow({ r, noCode, verdicts, checks, project, folder, short, agen
   )
 }
 
-/** How the window names the rules a move skipped (a rule this Hive has no name for: its id). */
+/** How the window names the rules a move skipped (a rule this Combwork has no name for: its id). */
 export const OVERRIDE_NAMES: OverrideNames = {
   list: (items, type) => fmt.list(items, type),
   ruleName: (r) => (RULE_NAMES[r] ? tr(RULE_NAMES[r]) : r),

@@ -416,7 +416,7 @@ describe("a Codex code-mode script's calls (HI-2240)", () => {
 
   it("a command left running is the script's that started it, ending in a later script or turn (HR1's round 1)", () => {
     // Recorded by Codex 0.166.0 in a scenario run (the Codex test home): script call_da8eb… starts `npm test` through
-    // hive-progress (started_at 15:59:51.791) and returns while it runs; it ends at 16:00:59, during call_a4ddc….
+    // cw-progress (started_at 15:59:51.791) and returns while it runs; it ends at 16:00:59, during call_a4ddc….
     const real = parsed(require('fs').readFileSync(require('path').join(__dirname, 'fixtures', 'codex-0.166.0-delayed-command.jsonl'), 'utf8'))
     const byId = (id: string) => real.find((t) => t.toolUseId === id)!
     const delayed = 'exec-c26e1c16-34dd-4b62-88cc-5917b9fbe5f0'

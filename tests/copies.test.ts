@@ -1,5 +1,5 @@
 // A project's review and check copies (#1435, SPEC §16.10.5, §16.13; src/main/copies.ts): leased at an exact revision
-// and returned; two Hives leasing one copy at once (two processes on one combwork.db); the pool's size from roles; installs
+// and returned; two Combworks leasing one copy at once (two processes on one combwork.db); the pool's size from roles; installs
 // only when the lock files changed; a dirty copy cleaned at its next lease; the quiescence barrier, each condition
 // holding a returned copy back in turn; a restart with a leased and a returning copy; and a real process in a copy held
 // through its return while another lease asks (gate-based: conditions, never time).
@@ -225,7 +225,7 @@ describe('copies: leasing at a revision (#1435)', { timeout: 60_000 }, () => {
     expect(copyPoolSize(1, 0)).toBe(2)
   })
 
-  it('two Hives leasing the one copy at once: one gets it, the other is refused', async () => {
+  it('two Combworks leasing the one copy at once: one gets it, the other is refused', async () => {
     const w = world({ size: 1 })
     const first = await leased(w)
     await w.pool.returnCopy(first.lease.id, 'runEnded')

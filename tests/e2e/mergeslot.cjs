@@ -1,4 +1,4 @@
-// The merge slot (#350) on fake Claude Code agents (fake-claude/), through the real hive tool: two agents claiming at
+// The merge slot (#350) on fake Claude Code agents (fake-claude/), through the real Combwork tool: two agents claiming at
 // once merge one after the other and the second runs its checks once; the waiter's status says who it waits for, and
 // the project's Overview and the Progress panel show the holder and the line; a holder whose session ends frees the
 // slot; a hold that runs out passes on and is reported; the user releases a holder from the Overview; the Merge dialog

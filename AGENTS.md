@@ -1,6 +1,6 @@
 # Combwork — notes for agents
 
-Combwork (named Hive before 1.1) is a Windows desktop app (Electron + TypeScript + React) for running coding agents (Claude Code, Codex) across the projects in a workspace. **You are probably running inside Combwork right now**, developing Combwork itself. The repository, its board project and many code names are still `hive` (`HI-` keys, older `hive/…` branches (new ones are `cw/…`), `combworkGuidance.ts`): name those as they are. History keeps the old name: commits and their `Hive-Card` trailers, and the CHANGELOG's sections before 1.1.0. These notes are for every agent working on this repository, whichever CLI runs it: Codex reads this file, and Claude Code reads it through `CLAUDE.md`. They hold what you'd get wrong here without being told; how-tos needed only for some tasks are in the dev skills (below), and what a check already enforces is a pointer.
+Combwork (named Hive before 1.1) is a Windows desktop app (Electron + TypeScript + React) for running coding agents (Claude Code, Codex) across the projects in a workspace. **You are probably running inside Combwork right now**, developing Combwork itself. The repository and its board project are still `hive` (`HI-` keys, older `hive/…` branches; new ones are `cw/…`): name those as they are. Code names say Combwork since HI-2591; only the upgrade's inputs keep the old names. History keeps the old name: commits and their `Hive-Card` trailers, and the CHANGELOG's sections before 1.1.0. These notes are for every agent working on this repository, whichever CLI runs it: Codex reads this file, and Claude Code reads it through `CLAUDE.md`. They hold what you'd get wrong here without being told; how-tos needed only for some tasks are in the dev skills (below), and what a check already enforces is a pointer.
 
 - Product decisions: [docs/SPEC.md](docs/SPEC.md) — the source of truth. Update it when a decision changes.
 - How the code fits together, and a code map of where each area lives: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
@@ -92,7 +92,7 @@ Combwork is MIT-licensed. `THIRD_PARTY_NOTICES.md` is generated from what ships:
 
 ## Driving the app for verification
 
-How to build, drive the app with Playwright in a throwaway profile, look at screenshots and close what you start is the `verify-combwork-ui` skill. A 1.0 dev build upgrades a workspace's data one way (SPEC §16.17): never open the main checkout (the workspace the installed Hive runs) with one until the 1.0 baseline is installed (#1288).
+How to build, drive the app with Playwright in a throwaway profile, look at screenshots and close what you start is the `verify-combwork-ui` skill. A 1.0 dev build upgrades a workspace's data one way (SPEC §16.17): never open the main checkout (the workspace the installed Combwork runs) with one until the 1.0 baseline is installed (#1288).
 
 **No shell deletes on computed paths** (`rm -rf "$(…)"`, `Remove-Item -Recurse $dir`): Claude Code can't check what they delete, so it asks (unattended, it denies after two minutes). Use a new folder per run instead; a folder that must be reused is emptied with `npm run e2e -- --clear-dir <folder>`.
 

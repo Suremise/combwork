@@ -1,5 +1,5 @@
 // The dialect-only release path (HI-2442, decided 1 Nov on HI-2065; plans/2026-11-03-dialects-design.md, section 7):
-// `npm run release -- --dialects` is a patch release whose only change since the last release is Hive's shipped dialect
+// `npm run release -- --dialects` is a patch release whose only change since the last release is Combwork's shipped dialect
 // files (resources/dialects), with the version and its notes. It has lighter checks than a full release (RELEASING.md,
 // A dialect-only release), so it must prove that nothing else changed: no code, no test, no manifest. These are the
 // rules, pure over what git says (release.mjs asks git; tests/dialectRelease.test.ts gives them fakes).

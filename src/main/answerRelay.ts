@@ -14,13 +14,13 @@ import { workspaceFor, type WorkspaceService } from './workspace'
 
 /**
  * The user's answer to an agent's question, given to the Assistant too (HI-1734): on 25 Oct Darren agreed to move
- * HI-1449 to Done in his answer to HB3's question, Hive told HB3, which can't move a card to Done, and the card sat in
- * Approved for two days. Every answer to an agent's own question that Hive didn't carry out itself (no action clicked)
- * reaches the Assistant as well as the asker, so someone who can act on it has it; Hive never reads consent into the
+ * HI-1449 to Done in his answer to HB3's question, Combwork told HB3, which can't move a card to Done, and the card sat in
+ * Approved for two days. Every answer to an agent's own question that Combwork didn't carry out itself (no action clicked)
+ * reaches the Assistant as well as the asker, so someone who can act on it has it; Combwork never reads consent into the
  * reply's text. Where the card shows something only the user or the Assistant can settle (`need`: an action the
  * question offered, a card in Passed or Approved its agent can't move on, an open proposal, a block), it says so.
  *
- * A delivery to the Assistant (`answer-relay`), checked when it is given: the Assistant's hive tools on and Settings →
+ * A delivery to the Assistant (`answer-relay`), checked when it is given: the Assistant's Combwork tools on and Settings →
  * Assistant → Control letting it change cards; otherwise it is cancelled, and one that ends unread (cancelled, refused,
  * expired) tells the user on the card and in a notice that the Assistant couldn't be told.
  */
@@ -29,7 +29,7 @@ const log = createLogger('answerRelay')
 
 const SOURCE = 'answer-relay'
 const ASSISTANT = 'assistant'
-/** Hive's own deliveries come from it. */
+/** Combwork's own deliveries come from it. */
 const HIVE = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 
 /** The Assistant's line for an answer (relayLine), said in its dialect (agent-facing). */
@@ -59,7 +59,7 @@ const M = {
   title: msg({ id: 'service.answerRelay.title', defaultMessage: '{card}: nobody else has your answer', description: "A notification's title (a banner, a Windows notification): the user answered an agent's question on card {card} (its key, such as HI-12), and the Combwork Assistant, which could act on it, couldn't be told." })
 }
 
-/** Whether the Assistant can be told an answer and act on it now: its hive tools on, and Control letting it change cards. */
+/** Whether the Assistant can be told an answer and act on it now: its Combwork tools on, and Control letting it change cards. */
 export function assistantCanAct(ws: WorkspaceService): boolean {
   return !!ws.path && agentReadsInbox(ws.assistantHome, ASSISTANT) && allows('agents')
 }

@@ -23,7 +23,7 @@ import type { ActionRow } from './workflow/factStore'
 import { openWorkspaces, type WorkspaceService } from './workspace'
 
 /**
- * What Hive tells the user of the work itself (#1266, SPEC §16.11.4), with or without the Assistant: a card's request for
+ * What Combwork tells the user of the work itself (#1266, SPEC §16.11.4), with or without the Assistant: a card's request for
  * the user (the runtime's `notify` action: For you, a "couldn't within the rules"), and what the Assistant's lane watch
  * reports of each running lane (a failed review, a card blocked or stalled, every card passed so the merge is due, the
  * merge stalled). Each is a notice, a pop-up in the window the user is using or a Windows notification, as the user's
@@ -36,8 +36,8 @@ import { openWorkspaces, type WorkspaceService } from './workspace'
  * Windows notification is best effort (shown once its dispatch is counted under a lease that holds; never done without
  * it when that lease expired; repeated at most once after a run that ended uncertainly; SPEC §16.4.5). A lane's events are found by comparing it with what was last told of
  * it, kept with the board (`lane_notice_lanes`, `lane_notice_cards`): in one board change, the marks move on and each
- * lane's notice is written as an action, so a restart tells what it hadn't yet, and two Hives on one workspace tell each
- * event once (the second finds the marks moved on). A lane running when Hive first followed lanes on the board (its
+ * lane's notice is written as an action, so a restart tells what it hadn't yet, and two Combworks on one workspace tell each
+ * event once (the second finds the marks moved on). A lane running when Combwork first followed lanes on the board (its
  * `since`) starts from then; one started later is told from its start.
  */
 
@@ -56,13 +56,13 @@ const M = {
   mergeStalled: msg({ id: 'service.workflowNotice.mergeStalled', defaultMessage: 'Its merge has stalled', description: "A line of a lane's notification: every card passed review, but nobody has started merging the work for a while (its builder is idle or stopped)." })
 }
 
-/** The events Hive tells the user of, as the Assistant's lane watch does by default (§16.11.4), less what it says itself. */
+/** The events Combwork tells the user of, as the Assistant's lane watch does by default (§16.11.4), less what it says itself. */
 const EVENTS: LaneEvent[] = ['failed', 'blocked', 'stalled', 'merge-due', 'paused-merge']
 
 /** How often running lanes are looked at with no change (a stall comes with time), as lane watches are. */
 const TICK_MS = 30_000
 
-/** board_meta's key for when Hive first followed this board's lanes (ISO): lanes running then start from then. */
+/** board_meta's key for when Combwork first followed this board's lanes (ISO): lanes running then start from then. */
 const SINCE = 'lane_notices_since'
 
 /** A notice about a project's work, as the user's notification settings say. */
@@ -82,8 +82,8 @@ async function cardIn(ws: WorkspaceService, n: number): Promise<{ projectPath: s
 }
 
 /**
- * A `notify` action: the card's request for the user. Its text in the language Hive shows when the runtime kept its
- * message (`shown`, #1264: Hive's own requests), else as written (an agent's own words), and in English for the Agent API.
+ * A `notify` action: the card's request for the user. Its text in the language Combwork shows when the runtime kept its
+ * message (`shown`, #1264: Combwork's own requests), else as written (an agent's own words), and in English for the Agent API.
  */
 async function notifyFromAction(a: ActionRow, ws: WorkspaceService, ctx: Parameters<ActionHandler>[2]): Promise<void> {
   const at = await cardIn(ws, a.card)
@@ -98,7 +98,7 @@ async function notifyFromAction(a: ActionRow, ws: WorkspaceService, ctx: Paramet
 }
 
 /**
- * A `comment` action (HI-2087: the merge queue's return): Hive's comment on the card, its English for whoever reads the
+ * A `comment` action (HI-2087: the merge queue's return): Combwork's comment on the card, its English for whoever reads the
  * card and its message for the window, written once (its id the action's).
  */
 async function commentFromAction(a: ActionRow, ws: WorkspaceService): Promise<void> {
@@ -190,7 +190,7 @@ const LOOKS = 4
  * lane), and its mark moved on, in one board change. What it read (the marks, the lanes and their cards) is the board's
  * as it is at that change, or nothing is written (#1266 round 2): its stamp, taken before the read, is checked again
  * under the board's lock, and a look the board changed under is made again. So marks never move back to an older read,
- * and another Hive's look in between is never told again.
+ * and another Combwork's look in between is never told again.
  */
 async function check(ws: WorkspaceService): Promise<void> {
   for (let i = 0; i < LOOKS; i++) if (await look(ws)) return
@@ -219,18 +219,18 @@ async function look(ws: WorkspaceService): Promise<boolean> {
     ws,
     async () => {
       const planned = boardWriteOp(ws, (db): Note[] | false => {
-        // Written since the read (another look, a change, another Hive): the read is stale, and nothing is written.
+        // Written since the read (another look, a change, another Combwork): the read is stale, and nothing is written.
         if (stampOf(ws, db) !== told.stamp) return false
         const notes: Note[] = []
         const since = metaOf(db, SINCE) ?? told.since
         db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO NOTHING').run(SINCE, since) // i18n-ignore: SQL
-        // As the marks are now: what another Hive told since this one read them isn't told again.
+        // As the marks are now: what another Combwork told since this one read them isn't told again.
         const marks = readMarks(db)
         for (const now of nows) {
           const lane = lanes.get(now.id)
           const running = now.mark.state === 'active' || now.mark.state === 'paused'
-          // A lane first seen: one started since Hive began following starts empty (what it came with is told), else from
-          // now; one first seen already ended or abandoned is only marked (#1631: Hive told its round again on every look).
+          // A lane first seen: one started since Combwork began following starts empty (what it came with is told), else from
+          // now; one first seen already ended or abandoned is only marked (#1631: Combwork told its round again on every look).
           const base = marks[now.id] ?? (running && lane && Date.parse(lane.startedAt) > Date.parse(since) ? newLaneBase(now, since) : null)
           const hit = laneHits(base, now, EVENTS, since)
           // Its mark kept once it ends too (#1631): a lane started since with no mark is new to lanesNowIn, and told again.
@@ -326,7 +326,7 @@ function checkSoon(ws: WorkspaceService): void {
 }
 
 let started = false
-/** Wires Hive's own notices of the work (once, at start): its actions, and lanes looked at on every change and tick. */
+/** Wires Combwork's own notices of the work (once, at start): its actions, and lanes looked at on every change and tick. */
 export function initWorkflowNotices(): void {
   if (started) return
   started = true

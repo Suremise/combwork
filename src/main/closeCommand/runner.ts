@@ -1,6 +1,6 @@
-// The close command's runner (HI-1368): a small Node process Hive starts detached (cw-close-runner.js, Hive's own
-// executable with ELECTRON_RUN_AS_NODE=1), which starts the user's command and outlives Hive if it must ("Don't wait",
-// Hive quitting). It reads the command's output as it comes, so the command never blocks on a full pipe, and keeps only
+// The close command's runner (HI-1368): a small Node process Combwork starts detached (cw-close-runner.js, Combwork's own
+// executable with ELECTRON_RUN_AS_NODE=1), which starts the user's command and outlives Combwork if it must ("Don't wait",
+// Combwork quitting). It reads the command's output as it comes, so the command never blocks on a full pipe, and keeps only
 // its last TAIL_BYTES: tail.txt and status.json in the run's folder, each rewritten whole (a temp file, then a rename)
 // at most every WRITE_MS. It never kills or cuts short the command; it ends once the command has. Node built-ins only:
 // it runs outside the asar.
@@ -14,7 +14,7 @@ export const TAIL_BYTES = 64 * 1024
 export const WRITE_MS = 250
 
 /**
- * What Hive asks the runner to run (job.json in the run's folder). Its environment is the runner's own, which Hive gives
+ * What Combwork asks the runner to run (job.json in the run's folder). Its environment is the runner's own, which Combwork gives
  * it (a session command's, as checks get), never written to the folder.
  */
 export interface CloseJob {
@@ -22,7 +22,7 @@ export interface CloseJob {
   cwd: string
 }
 
-/** The run's state as the runner writes it (status.json): what Hive's panel shows. */
+/** The run's state as the runner writes it (status.json): what Combwork's panel shows. */
 export interface RunStatus {
   runnerPid: number
   commandPid: number | null
@@ -85,7 +85,7 @@ const BRIEF = new Set(['EPERM', 'EACCES', 'EBUSY'])
 /**
  * Writes a file whole: a temp file beside it, then a rename, so a reader never sees half of it. A rename Windows refuses
  * for a moment (Defender scanning the new file) is tried again, up to about a second: the final status must land, or
- * Hive would read the run as still going with its runner gone. This runner's own thread waits, never Hive's.
+ * Combwork would read the run as still going with its runner gone. This runner's own thread waits, never Combwork's.
  */
 function writeWhole(file: string, data: string | Buffer): void {
   const temp = `${file}.${process.pid}.tmp`

@@ -7,7 +7,7 @@
 //
 // Its options are the project's resolved ones (rulesets.ts: global → workspace → project), read again at each call
 // here; and whether reconciliation acts on what it observes is the Advanced switch "Workflow rules are enforced"
-// (`cw.workflow.enforce`), read at each use: off, Hive is as P3 left it (facts recorded, nothing refused or moved).
+// (`cw.workflow.enforce`), read at each use: off, Combwork is as P3 left it (facts recorded, nothing refused or moved).
 
 import { resolve as resolvePath } from 'path'
 import { projectAgents } from '../../shared/defaults'
@@ -62,7 +62,7 @@ export function setAgentRunning(fn: ((project: string, agent: string) => boolean
 }
 
 /**
- * What runs a target's queue in this Hive now (queueHost's queueLive: the queue's order, which card reads and refusals
+ * What runs a target's queue in this Combwork now (queueHost's queueLive: the queue's order, which card reads and refusals
  * give agents, #1354). Given by the app as it starts (none in unit tests: nothing runs a queue here).
  */
 let queueLiveOf: ((ws: WorkspaceService, project: string, target: string) => QueueLive) | null = null
@@ -218,7 +218,7 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // A branch rename Repair recorded and hasn't finished (#1305): its new name, which a card on the old line follows.
     pendingRename: async (line) => (await ws.projectConfig(project.path)).pendingBranchRenames?.find((r) => r.from.toLowerCase() === line.toLowerCase())?.to ?? null,
     // A move Repair hasn't recorded (#1343): the workspace's or the project's last folder isn't where it is now.
-    // Its Git repository gone, or another version control found (#1419, S20): what Hive offers in its place is None.
+    // Its Git repository gone, or another version control found (#1419, S20): what Combwork offers in its place is None.
     repositoryGone: () => detect(project.path).platform !== 'git',
     movePending: async () => {
       const moved = (last: string | undefined, now: string): boolean => !!last && !samePlace(last, now)

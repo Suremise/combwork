@@ -49,7 +49,7 @@ export const markOf = (s: ActivityState): AgentState => (s === 'failed' ? 'stall
 /**
  * A project's Activity tab (#1254, HI-1743): what runs now, a tab per running agent, each its current work as a list:
  * its card in progress as a header, then the turn now (its prompt, the tool call under way, or thinking or writing), its
- * subagents and background tasks, and the processes it started (its own CLI and Hive's tool server only when asked).
+ * subagents and background tasks, and the processes it started (its own CLI and Combwork's tool server only when asked).
  * Nothing past: the card is the history. It opens frozen, a snapshot taken then: Refresh takes a new one, Play goes live
  * (what ended fades out, then leaves), Pause freezes again, and the reads since are counted in the pill. Nothing is read
  * or drawn while it is hidden; live changes are taken in about once a second.
@@ -544,7 +544,7 @@ function describe(n: ActivityNode): { icon: string; title: string; sub: string; 
       return { icon: 'run-all', title: n.task.description || tr(M.task, { type: n.task.type ?? 'other' }), sub: tr(M.task, { type: n.task.type ?? 'other' }), state: null }
     case 'process': {
       const started = filetimeMs(n.process.created)
-      // The command as given (HI-1743: a cmd /c wrapper as what it runs); a hive-progress run by its title.
+      // The command as given (HI-1743: a cmd /c wrapper as what it runs); a cw-progress run by its title.
       const title = n.process.run ?? commandText(n.process)
       // Left running by its command, its shell gone (HI-2111): said, with how long and its CPU time.
       if (n.process.orphan) return { icon: 'warning', title, sub: tr(M.orphanFor, { pid: n.process.pid, time: ranFor(started), cpu: durationText(n.process.orphan.cpuMs, tr) }), state: null }

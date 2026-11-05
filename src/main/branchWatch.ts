@@ -200,7 +200,7 @@ function onEvent(e: CombworkEvent): void {
       checkAll(true)
       return
     case 'window-state':
-      // Back to Hive: commits made in a terminal, or a branch switched in the project folder, show up.
+      // Back to Combwork: commits made in a terminal, or a branch switched in the project folder, show up.
       if (e.focused && Date.now() - lastFocusCheck > 10_000) {
         lastFocusCheck = Date.now()
         checkAll()

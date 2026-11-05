@@ -1,7 +1,7 @@
 /**
  * Agents' temp folder (HI-2496): Settings → Advanced → Agents' temp folder, empty by default. When set, each agent and
  * the Assistant launch with TEMP, TMP and TMPDIR pointing at a folder of their own in it, `<root>\<host>\<agent>`, made at
- * launch and kept (resumed sessions read their scratchpads again): Hive never deletes in it. Empty, the launch's
+ * launch and kept (resumed sessions read their scratchpads again): Combwork never deletes in it. Empty, the launch's
  * environment is as before. Provider-specific variables (Claude Code's CLAUDE_CODE_TMPDIR) are their adapters'.
  *
  * It never points inside a workspace's folder, a project, a slot, review copies, the Assistant's home or a workspace's
@@ -28,7 +28,7 @@ const M = {
 /** The variables a launch's temp folder is given in (Windows' two, and POSIX shells' such as Git Bash's). */
 export const TEMP_VARS = ['TEMP', 'TMP', 'TMPDIR'] as const
 
-/** The folder as set (the workspace's own over Hive's), or null: empty, the system Temp. */
+/** The folder as set (the workspace's own over Combwork's), or null: empty, the system Temp. */
 export function agentTempSetting(ws: WorkspaceService | null): string | null {
   const own = ws ? advanced.get<string[]>(AGENT_TEMP_FOLDER_ID, ws.config?.advanced ?? null) : null
   const listed = Array.isArray(own) && own.length ? own : advanced.get<string[]>(AGENT_TEMP_FOLDER_ID, null)

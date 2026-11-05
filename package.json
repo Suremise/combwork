@@ -91,7 +91,7 @@
     "esbuild@0.28.2": true,
     "electron-winstaller@5.4.0": true
   },
-  "//overrides": "#1141: monaco-editor 0.57.0 pins dompurify 3.4.15 (two IN_PLACE advisories). The override fixes npm's copy; the renderer build's cw-monaco-dompurify plugin (electron.vite.config.ts) makes Monaco's own bundled copy Hive's dompurify too. Remove both once Monaco pins 3.4.17 or later (HI-2421: 3.4.16 has advisories too): tests/monacoDompurify.test.ts fails then.",
+  "//overrides": "#1141: monaco-editor 0.57.0 pins dompurify 3.4.15 (two IN_PLACE advisories). The override fixes npm's copy; the renderer build's cw-monaco-dompurify plugin (electron.vite.config.ts) makes Monaco's own bundled copy Combwork's dompurify too. Remove both once Monaco pins 3.4.17 or later (HI-2421: 3.4.16 has advisories too): tests/monacoDompurify.test.ts fails then.",
   "overrides": {
     "monaco-editor": {
       "dompurify": "3.4.17"

@@ -90,7 +90,7 @@ export const windowsProbe: ProcessProbe = {
   }
 }
 
-/** Elsewhere (Hive is Windows-only; a fallback for completeness): a pid alone, nothing listed or ended. */
+/** Elsewhere (Combwork is Windows-only; a fallback for completeness): a pid alone, nothing listed or ended. */
 const otherProbe: ProcessProbe = {
   self: async () => ({ pid: process.pid, started: Math.round(Date.now() - process.uptime() * 1000) }),
   alive: async (pid) => {

@@ -17,7 +17,7 @@ export function valuesReader(values: Record<string, unknown>): AdvancedReader {
   const patterns = new Map<string, { source: string; re: RegExp }>()
   const get = <T>(id: string): T => {
     const def = advancedDef(id)
-    if (!def) throw new Error(`No advanced setting "${id}"`) // i18n-ignore: a programming error (an id Hive's code asks for), for the log
+    if (!def) throw new Error(`No advanced setting "${id}"`) // i18n-ignore: a programming error (an id Combwork's code asks for), for the log
     return (id in values ? values[id] : def.default) as T
   }
   return {
@@ -42,7 +42,7 @@ export const advancedValues: AdvancedReader = {
   pattern: (id) => reader.pattern(id)
 }
 
-/** Whether Hive applies one of its overrides of a CLI (#1167): its off switch (overrideId), on unless turned off. */
+/** Whether Combwork applies one of its overrides of a CLI (#1167): its off switch (overrideId), on unless turned off. */
 export const overrides = (provider: ProviderId, what: string): boolean => advancedValues.get<boolean>(overrideId(provider, what))
 
 /**

@@ -15,7 +15,7 @@ import { cx } from '../util'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 
 /**
- * A workspace (or project) moved to another folder since Hive last opened it (#146): a banner over the main area, and
+ * A workspace (or project) moved to another folder since Combwork last opened it (#146): a banner over the main area, and
  * Repair…, which shows what it will do (worktrees, session folders, Claude Code's conversations and memory, Open
  * Recent), does it on confirmation and says what it did. Main works it all out (workspaceMove.ts).
  */
@@ -391,7 +391,7 @@ function workspaceRows(plan: MovePlan): ItemRow[] {
 
 /**
  * Defender's rows (#1302), one a kind of folder (the workspace, its worktrees): where it was and is, with whether
- * Defender skips each (as the Antivirus panel words it), and what Repair does about Hive's exclusion: moves it (the box
+ * Defender skips each (as the Antivirus panel words it), and what Repair does about Combwork's exclusion: moves it (the box
  * under the table, ticked), leaves it, or nothing; an exclusion of the user's own is named, never changed.
  */
 function defenderRows(d: AvMovePlan, moving: boolean): ItemRow[] {
@@ -403,7 +403,7 @@ function defenderRows(d: AvMovePlan, moving: boolean): ItemRow[] {
     const now = d.now.find((p) => p.kind === kind)
     if (!was && !now) continue
     const is = (list: string[], p?: AvPath): boolean => !!p && list.some((x) => x.toLowerCase() === p.path.toLowerCase())
-    // Hive's exclusion moves for this kind: its old entry, or one of Hive's removed entries covering the new folder.
+    // Combwork's exclusion moves for this kind: its old entry, or one of Combwork's removed entries covering the new folder.
     const mine = is(d.remove, was) || (!!now && is(d.add, now) && covered(now.path, d.remove))
     const theirs = is(d.theirs, was)
     const does = mine ? tr(moving ? T.moveExclusion : T.leaveExclusion) : theirs ? tr(T.theirs) : now?.state === 'excluded' || now?.state === 'added' ? tr(T.nothingToDo) : now?.state === 'not-excluded' ? tr(T.scanned) : tr(T.noneToMove)
@@ -518,7 +518,7 @@ export function MoveRepairDialog() {
       (d) => {
         if (!live) return
         setDefender(d)
-        // Ticked when Hive made the old folders' exclusions: the one administrator prompt comes with Repair.
+        // Ticked when Combwork made the old folders' exclusions: the one administrator prompt comes with Repair.
         if (d?.scan === 'defender' && d.remove.length) setOpts((o) => (o.defender === undefined ? { ...o, defender: true } : o))
       },
       () => live && setDefender(null)

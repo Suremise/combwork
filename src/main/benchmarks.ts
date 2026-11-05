@@ -42,7 +42,7 @@ export const benchIo = { write: writeTextAtomic, renameOnce: (from: string, to: 
 /** A rename for this workspace's work: retried while Windows holds a file, the workspace checked before every attempt. */
 const guardedRename = (ctx: BenchContext, from: string, to: string): Promise<void> => renameRetrying(from, to, 20, () => live(ctx), (a, b) => benchIo.renameOnce(a, b))
 
-/** Index and kept files are read with a cap: they are Hive's, but on disk. */
+/** Index and kept files are read with a cap: they are Combwork's, but on disk. */
 const INDEX_BYTES = 512 * 1024
 const KEPT_BYTES = 4 * 1024 * 1024
 const MAX_SELECTED = 200
@@ -475,7 +475,7 @@ export async function importBenchmark(ctx: BenchContext, scope: CompareScope, fr
   return { entry: await keep(ctx, parsed.artifact) }
 }
 
-/** An entry's facts and its name's kind, so the window says its description (and a name Hive gave it) in its language (#1104). */
+/** An entry's facts and its name's kind, so the window says its description (and a name Combwork gave it) in its language (#1104). */
 const shownFrom = (a: Artifact): Pick<KeptEntry, 'facts' | 'labelKind'> => {
   const facts = factsOf(a)
   return facts ? { facts, ...(a.labelKind ? { labelKind: a.labelKind } : {}) } : {}
@@ -546,10 +546,10 @@ export function adoptBenchmarkOwners(ctx: BenchContext): Promise<void> {
 }
 
 /**
- * The index, with the facts the window describes a scope's comparisons from (#1104) added to those kept before Hive
+ * The index, with the facts the window describes a scope's comparisons from (#1104) added to those kept before Combwork
  * stored them: read from each one's kept file (bounded, through the normalisers, of the scope its entry says) and
  * written to the index once, in its turn and in the workspace it began in. A file that can't be read leaves its entry
- * as it was (its English shown). Names stay as they are: whether Hive gave one can't be known now.
+ * as it was (its English shown). Names stay as they are: whether Combwork gave one can't be known now.
  */
 async function withFacts(ctx: BenchContext, scope: CompareScope): Promise<Index> {
   const index = await readIndex(ctx)

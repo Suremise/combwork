@@ -4,11 +4,11 @@ import { agentRuntime } from '../shared/runtime'
 import type { LiveSessionState } from '../shared/types'
 
 /**
- * Whether an agent can take a line of Hive's now, as far as what it is doing goes (#649): the one place every way into an
+ * Whether an agent can take a line of Combwork's now, as far as what it is doing goes (#649): the one place every way into an
  * agent asks it (deliveries, watches, the typed line's writer). It reads the turn ledger's facts (#648): the CLI running
  * (or, `stalled`, stopped by a refused sign-in), no turn running and none of unknown state (unknown is never idle), no
  * compaction, nobody asked, and, for new work (`free`, `stalled`), no background tasks that will start it again. A watch
- * is Hive's policy on top: `idle` takes a watching agent (a message or a wake; its watch carries on), `free` doesn't (it
+ * is Combwork's policy on top: `idle` takes a watching agent (a message or a wake; its watch carries on), `free` doesn't (it
  * takes no new work). Who holds the composer is the writer's to check (it holds it itself while it types). A state from
  * before the facts reads its status word, as before.
  *
@@ -19,7 +19,7 @@ import type { LiveSessionState } from '../shared/types'
  */
 export function readyFor(st: LiveSessionState | null | undefined, need: DeliveryNeed = 'idle'): boolean {
   if (!st) return false
-  // Its hooks aren't arriving (#1336): Hive can't tell when it is free, nor confirm a line it types.
+  // Its hooks aren't arriving (#1336): Combwork can't tell when it is free, nor confirm a line it types.
   if (st.hooksMissing) return false
   if (!st.runtime) return byStatus(st, need)
   const rt = agentRuntime(st)

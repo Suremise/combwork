@@ -8,7 +8,7 @@ import { placeKey } from './fsutil'
  * only for a workspace a window holds now, admitted as the window opens it and dismissed first as it closes it. Anything
  * else is a transient open (a lease: open, use, close in `finally`, as a store's last save as its workspace closes) or
  * is refused: work still going on for a closed workspace (a read that resumes after the close, a job queued before it)
- * used to open them again, holding the folder until Hive quit, so it couldn't be moved or deleted. Keyed on the
+ * used to open them again, holding the folder until Combwork quit, so it couldn't be moved or deleted. Keyed on the
  * workspace, not on who asks: work of no window's request (a timer, a session's end) is refused as well. By real paths
  * (`placeKey`): a junction, a symlink or an 8.3 short name is the same workspace and the same file, however it is spelt.
  */

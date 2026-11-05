@@ -1,6 +1,6 @@
 /**
- * Hive's translations (#767): one FormatJS core for the main process and the window. Text is written in the code as a
- * message (`msg()`: an id, the English and a note for translators) and shown with `tr()` (not `t`: Hive's code uses
+ * Combwork's translations (#767): one FormatJS core for the main process and the window. Text is written in the code as a
+ * message (`msg()`: an id, the English and a note for translators) and shown with `tr()` (not `t`: Combwork's code uses
  * `t` for times and tasks, and lint forbids shadowing), which formats it in the current language with ICU
  * MessageFormat (plurals, select, named placeholders). The English catalogue `locales/en/<area>.json` is extracted from
  * the code; translators edit `locales/<code>/<area>.json`. A message a language lacks, or one whose translation can't
@@ -8,7 +8,7 @@
  *
  * Text is translated when it is shown, never when a module loads: keep messages (descriptors) in data, and call
  * `tr()` at render or send time, so a change of language reaches it. Agent-facing text stays English and never comes
- * through here: hive-mcp.js and hive-progress.js must not import this module (a unit test checks).
+ * through here: cw-mcp.js and cw-progress.js must not import this module (a unit test checks).
  */
 import { createIntl, createIntlCache, type IntlShape } from '@formatjs/intl'
 import { parse, TYPE, type MessageFormatElement } from '@formatjs/icu-messageformat-parser'
@@ -54,7 +54,7 @@ function build(code: string, locale: string, messages: Catalogue): IntlShape<str
 }
 
 /**
- * Shows Hive in this language from now on, with its translations, formatting dates and numbers for `locale` (a BCP 47
+ * Shows Combwork in this language from now on, with its translations, formatting dates and numbers for `locale` (a BCP 47
  * tag; the language's code by default). Everything formatted after this call uses it, and listeners (the window's
  * store, main's tray) show it again.
  */
@@ -66,7 +66,7 @@ export function setLanguage(code: string, messages: Catalogue, locale = code): v
   for (const l of listeners) l(code)
 }
 
-/** The language Hive shows now (a language's code, or the pseudo-locale). */
+/** The language Combwork shows now (a language's code, or the pseudo-locale). */
 export const language = (): string => current
 
 /** The locale Intl formats with now. */

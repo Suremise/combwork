@@ -17,9 +17,9 @@ import type { WorkspaceService } from '../workspace'
 import { drainWorkspace, type DrainResult } from './drain'
 import { alive, carryRuns, type RunsCarried, planList, pruneRuns, readList, runFolderName, runPrefix, runsCloseCommands, startRun, START_MS } from './runs'
 
-// HI-1368: the close commands as Hive runs them, in the window they belong to. A workspace's runs once it has closed
-// and Hive has finished writing it (the drain); Hive waits for it with a panel (Don't wait, or Close once it failed),
-// then goes on: the switch opens the next workspace, the window closes, Hive quits. When Hive quits, run, the same way,
+// HI-1368: the close commands as Combwork runs them, in the window they belong to. A workspace's runs once it has closed
+// and Combwork has finished writing it (the drain); Combwork waits for it with a panel (Don't wait, or Close once it failed),
+// then goes on: the switch opens the next workspace, the window closes, Combwork quits. When Combwork quits, run, the same way,
 // after every window's.
 
 const log = createLogger('close-command')
@@ -27,7 +27,7 @@ const log = createLogger('close-command')
 /** How often the panel's state is read again while a command runs: a display refresh, not a wait for a condition. */
 const FOLLOW_MS = 250
 
-/** Each window's run its panel shows (by its webContents' id), and how Hive's wait for it ends. */
+/** Each window's run its panel shows (by its webContents' id), and how Combwork's wait for it ends. */
 const shown = new Map<number, { run: CloseCommandRun; end: (how: 'left' | 'dismissed') => void; skip: () => void }>()
 
 /** A window's run, for a window that reloads while its panel is up. */
@@ -36,9 +36,9 @@ export function closeCommandState(win: BrowserWindow): CloseCommandRun | null {
 }
 
 /**
- * The panel's button while Hive waits (closeCommand:dontWait): while its workspace is still closing and being written,
- * Skip the command (it won't run, nor When Hive quits; the close itself finishes and the panel stays until it has, Darren's
- * decision of 28 Oct ~15:30); once the command runs, Don't wait (Hive goes on, the command carries on).
+ * The panel's button while Combwork waits (closeCommand:dontWait): while its workspace is still closing and being written,
+ * Skip the command (it won't run, nor When Combwork quits; the close itself finishes and the panel stays until it has, Darren's
+ * decision of 28 Oct ~15:30); once the command runs, Don't wait (Combwork goes on, the command carries on).
  */
 export function dontWait(win: BrowserWindow, id: string): void {
   const s = shown.get(win.webContents.id)
@@ -47,13 +47,13 @@ export function dontWait(win: BrowserWindow, id: string): void {
   else if (s.run.state === 'running') s.end('left')
 }
 
-/** The panel's Close, on a failed run: Hive goes on. */
+/** The panel's Close, on a failed run: Combwork goes on. */
 export function dismiss(win: BrowserWindow, id: string): void {
   const s = shown.get(win.webContents.id)
   if (s && s.run.id === id && s.run.state === 'failed') s.end('dismissed')
 }
 
-/** Where the runs' folders are: in Hive's profile. */
+/** Where the runs' folders are: in Combwork's profile. */
 const runsRoot = (): string => join(app.getPath('userData'), 'close-commands')
 
 /**
@@ -69,7 +69,7 @@ function runnerScript(): string {
   return app.isPackaged ? p.replace(`app.asar${sep}`, `app.asar.unpacked${sep}`) : p
 }
 
-/** Whether this Hive runs close commands at all (never a test copy, but for the e2e suite's seam). */
+/** Whether this Combwork runs close commands at all (never a test copy, but for the e2e suite's seam). */
 export const closeCommandsRun = (): boolean => runsCloseCommands(process.env, app.isPackaged)
 
 let runs = 0
@@ -78,7 +78,7 @@ function send(win: BrowserWindow | null, run: CloseCommandRun | null): void {
   if (win && !win.isDestroyed()) emitTo(win, { type: 'close-command', run })
 }
 
-/** A panel shown in a window, as Hive waits on what it says: how that wait ends ('gone': its window closed, or none). */
+/** A panel shown in a window, as Combwork waits on what it says: how that wait ends ('gone': its window closed, or none). */
 interface Panel {
   run: CloseCommandRun
   update: (r: Partial<CloseCommandRun>) => void
@@ -134,8 +134,8 @@ function showPanel(win: BrowserWindow | null, run: CloseCommandRun): Panel {
 
 /**
  * What a close or a run came to, for the caller (the log has the detail): 'notDrained', its workspace's close failed;
- * 'leftSaving', the user's Don't wait while Hive was still saving it. Either means its files may not be safely closed,
- * so When Hive quits, run doesn't run after it.
+ * 'leftSaving', the user's Don't wait while Combwork was still saving it. Either means its files may not be safely closed,
+ * so When Combwork quits, run doesn't run after it.
  */
 export type RunOutcome = 'ok' | 'failed' | 'left' | 'skipped' | 'notDrained' | 'leftSaving'
 
@@ -151,7 +151,7 @@ const newRun = (kind: 'workspace' | 'quit', command: string, state: CloseCommand
   ...(workspace ? { workspace } : {})
 })
 
-/** A list's run while Hive follows it, by its panel's id: its folder (for controls) and how its launch failure is settled. */
+/** A list's run while Combwork follows it, by its panel's id: its folder (for controls) and how its launch failure is settled. */
 const following = new Map<string, { dir: string | null; control: (action: ListControl['action'], step: number, attempt: number) => void }>()
 
 /**
@@ -183,7 +183,7 @@ function stepsFrom(panelSteps: CloseCommandStep[], status: ListStatus, from: num
  * goes on to its end, HI-1954/s21). `values()`: the placeholders' values, read again for a Rerun. Never throws.
  */
 export async function runListInWindow(win: BrowserWindow | null, point: NonNullable<CloseCommandRun['point']>, place: string | null, steps: ListStep[], values: () => CommandValues, shownPanel?: Panel): Promise<RunOutcome> {
-  // Kept with the workspace's runs, or When Hive quits' when there is no workspace (a Hive command run by hand from none).
+  // Kept with the workspace's runs, or When Combwork quits' when there is no workspace (a Combwork command run by hand from none).
   const kind = point === 'quit' || !place ? 'quit' : 'workspace'
   const panel = shownPanel ?? showPanel(win, newRun(kind, '', 'running'))
   const id = panel.run.id
@@ -222,7 +222,7 @@ export async function runListInWindow(win: BrowserWindow | null, point: NonNulla
     },
     control: (action, step, attempt) => {
       if (launchFailed && step === from && attempt === 0) {
-        // The launch failed: Hive settles it, the runner never having started.
+        // The launch failed: Combwork settles it, the runner never having started.
         if (action === 'stop') {
           panelSteps = panelSteps.map((p, i) => (i > from ? { ...p, state: 'skipped' } : p))
           show({ awaiting: null })
@@ -330,11 +330,11 @@ async function closeFailed(panel: Panel): Promise<RunOutcome> {
 
 /**
  * A close of one open of a workspace (s11): joined by every later close of that open, and never cancelled or begun again
- * (Darren's decision of 28 Oct ~15:30): Hive always finishes closing it, as it did before close commands. Its saving step
+ * (Darren's decision of 28 Oct ~15:30): Combwork always finishes closing it, as it did before close commands. Its saving step
  * (the close, then the drain) shows in its window's panel as "Waiting for <workspace> to finish saving…"; that step's
- * Skip the command (`skip`) means its command won't run, nor When Hive quits, and ends the drain's wait, never the
+ * Skip the command (`skip`) means its command won't run, nor When Combwork quits, and ends the drain's wait, never the
  * close: the panel stays until the close has finished. A command, once started, and a failure's dismissal wait as long
- * as they take. `wantDrain`: a caller needs it drained (When Hive quits) though it has no command of its own; asked
+ * as they take. `wantDrain`: a caller needs it drained (When Combwork quits) though it has no command of its own; asked
  * before its close has ended, its saving step does it, and `drainedOk` says it did. `showSaving`: brings up its saving
  * step now, for a caller that joins it and needs it drained (a quit joining a window's close).
  */
@@ -352,7 +352,7 @@ const closing = new WeakMap<WorkspaceService, CloseOp>()
 /**
  * Closes a window's workspace for `reason`, running its close command once it has closed and drained, and waiting for
  * it as its panel says. With no command (or none for this reason, or a test copy), it is an ordinary close, unless
- * `drain` (When Hive quits will run after it, HR6's round 1, finding 1): then it is drained all the same, the saving step
+ * `drain` (When Combwork quits will run after it, HR6's round 1, finding 1): then it is drained all the same, the saving step
  * shown, and is 'leftSaving' if the user skipped the command, or 'notDrained' if its close failed. A second call for
  * the same open joins the first (its reason wins), drained as part of it if this one needs that, or after it with a
  * saving step of its own if the first had already closed without one. The close itself is never cancelled.
@@ -460,7 +460,7 @@ async function closeAndRun(ws: WorkspaceService, op: CloseOp, plan: ReturnType<t
 }
 
 /**
- * When Hive quits, run: in `win`, once every window's workspace has closed. `blocked`: one's close failed ('failed': the
+ * When Combwork quits, run: in `win`, once every window's workspace has closed. `blocked`: one's close failed ('failed': the
  * panel says it didn't run) or the user didn't wait for one to finish saving ('left': it doesn't run, quietly).
  */
 export async function runQuitCommand(commands: CommandsCombwork, reason: CloseReason, win: BrowserWindow | null, blocked: 'failed' | 'left' | null): Promise<RunOutcome> {
@@ -480,10 +480,10 @@ export async function runQuitCommand(commands: CommandsCombwork, reason: CloseRe
   return runListInWindow(win, 'quit', null, plan.steps, () => ({ reason }))
 }
 
-/** Whether When Hive quits, run will run for this quit (set, not a test copy, not skipped for an update). */
+/** Whether When Combwork quits, run will run for this quit (set, not a test copy, not skipped for an update). */
 export const quitCommandPlanned = (commands: CommandsCombwork, reason: CloseReason): boolean => 'steps' in planList(commands.onQuit, { combwork: commands.list }, reason, { runs: closeCommandsRun() })
 
-/** Whether a quit has anything to run: a window's workspace with a command, or When Hive quits. */
+/** Whether a quit has anything to run: a window's workspace with a command, or When Combwork quits. */
 export function quitRunsAny(workspaces: WorkspaceService[], commands: CommandsCombwork): boolean {
   if (!closeCommandsRun()) return false
   return commands.onQuit.run.length > 0 || workspaces.some((w) => !!w.path && !!w.config.commands?.onClose.run.length)
@@ -491,7 +491,7 @@ export function quitRunsAny(workspaces: WorkspaceService[], commands: CommandsCo
 
 /**
  * Runs one command by hand (HI-1954: the palette's Run Command, Settings' Run): its panel in this window, as a point's,
- * with its one step, its placeholders the window's workspace's (none: Hive's own commands only make sense without them).
+ * with its one step, its placeholders the window's workspace's (none: Combwork's own commands only make sense without them).
  * A test copy runs one only through the suites' seam, as it runs the points.
  */
 export function runByHand(win: BrowserWindow, ws: WorkspaceService | null, ref: CommandRef): void {
@@ -537,7 +537,7 @@ export async function runOpenCommands(ws: WorkspaceService): Promise<void> {
   }
 }
 
-/** Hive's own commands, as saved (Settings → Commands at Hive's level). */
+/** Combwork's own commands, as saved (Settings → Commands at Combwork's level). */
 const combworkCommands = (): CommandsCombwork => config.settings.commands
 
 /** What a workspace's commands' placeholders stand for now: its folder, its name, why, and its projects by name. */

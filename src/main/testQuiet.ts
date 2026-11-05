@@ -2,7 +2,7 @@ import { appendFileSync } from 'original-fs'
 import { app, screen, type BrowserWindow } from 'electron'
 
 /**
- * Test copies of Hive don't interrupt the person at the desk: their windows open off screen and never take focus, and
+ * Test copies of Combwork don't interrupt the person at the desk: their windows open off screen and never take focus, and
  * Windows notifications, taskbar flashes and the chime don't happen. What would have happened is appended to
  * CW_TEST_NOTIFY_LOG (one JSON line each), so suites can check it. A test copy is an unpackaged build with a test
  * profile (CW_USER_DATA, which every suite, scenario and verification script sets, however it is started), or one
@@ -64,7 +64,7 @@ export function testNotifyLog(entry: { kind: 'notification' | 'flash' | 'chime' 
   try {
     appendFileSync(file, `${JSON.stringify({ at: Date.now(), ...entry })}\n`)
   } catch {
-    // A test log that can't be written mustn't break Hive.
+    // A test log that can't be written mustn't break Combwork.
   }
 }
 

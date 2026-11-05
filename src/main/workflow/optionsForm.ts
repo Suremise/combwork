@@ -139,7 +139,7 @@ export async function workflowForm(ws: WorkspaceService, projectPath: string): P
 
 /**
  * The project's options for agents (`cw_project_status`, lean): the options in force, and which of them the project,
- * the workspace or Hive's settings set (the rest are the platform's all-off). `invalid`: why they work as all-off.
+ * the workspace or Combwork's settings set (the rest are the platform's all-off). `invalid`: why they work as all-off.
  */
 export async function workflowSummary(ws: WorkspaceService, projectPath: string): Promise<Record<string, unknown> | null> {
   const p = ws.info()?.projects.find((x) => x.path.toLowerCase() === projectPath.toLowerCase())
@@ -273,7 +273,7 @@ export class WorkflowRefused extends CombworkError {
 export function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; check?: () => void } = {}): Promise<WorkflowForm> {
   // Checked against the levels as they are now and written in the same turn of workflow writes (#1422), holding the
   // project's repository lock first (#1642 round 5): its target can't move while a clean-up checks a branch against it,
-  // from this Hive or another.
+  // from this Combwork or another.
   return withRepoLocks([projectPath], () => workflowWrite(() => saveWorkflowOptions(ws, projectPath, raw, o)), { quiet: true, project: projectPath })
 }
 
@@ -302,7 +302,7 @@ export async function chooseMerge(ws: WorkspaceService, projectPath: string, raw
  * while the project has the upgrade's mark (`mergeAsk`, kept for good) and the board no recorded choice
  * (`MERGE_CHOICE_KEY`). Its answer, or a save that chooses (changes G6 or G19 as they resolve), is recorded on the board
  * first, as one change of the board (its lock and transaction, which every answer, move and retirement of a request
- * takes, in this Hive or another): the answer's request checked there (still open, of its gate, bound to the card's
+ * takes, in this Combwork or another): the answer's request checked there (still open, of its gate, bound to the card's
  * open entry; else refused, nothing written), the choice recorded with its file write pending, the cards' rules (an
  * answer's: the project's cards in flight; a save's: those ticked and the card waiting with the question), then the
  * request answered as the user, or the question closed. project.json follows once that has committed, and the record
@@ -334,7 +334,7 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
     await saveSeams.beforeBoard?.()
     await boardWrite(ws, async () => {
       if (o.answer) target = await stillAsked(ws, project, o.answer)
-      // Chosen meanwhile (another Hive's answer): this one is refused, as an answered question's is.
+      // Chosen meanwhile (another Combwork's answer): this one is refused, as an answered question's is.
       else if (mergeChoiceOf(ws, project.name)) throw new WorkflowStale()
       // The caller's own check (HI-1502), in the board change that decides the save.
       o.check?.()
@@ -355,7 +355,7 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
   workflowChanged(ws, project.path)
   // Names alone change no card's rules (#1417): nothing to apply to cards in flight, nor any queue to read again.
   if (namesOnly(plan.changed) && !plan.chosen) return workflowForm(ws, project.path)
-  // Whether Hive merges, and into what, may have changed: the windows read the project's queues again (#1356: which
+  // Whether Combwork merges, and into what, may have changed: the windows read the project's queues again (#1356: which
   // show follows the options too), whoever changed them (the window, the Assistant). A queue waiting for the merge
   // question (paused `mergeChoice`) carries on.
   const t = target || (await G.defaultBranch(project.path).catch(() => null))
@@ -432,7 +432,7 @@ async function settleLocked(ws: WorkspaceService, project: { path: string; name:
 export const saveSeams: { beforeBoard?: () => Promise<void>; recorded?: () => Promise<void>; beforeFile?: () => Promise<void> } = {}
 
 // A test copy (an unpackaged build) crashes at one of them when CW_TEST_MERGE_CHOICE_CRASH names it (HI-1697's crash
-// boundaries, tests/e2e/queueupgrade.cjs): Hive gone part way, as a crash leaves it.
+// boundaries, tests/e2e/queueupgrade.cjs): Combwork gone part way, as a crash leaves it.
 const crashAt = app?.isPackaged ? undefined : process.env.CW_TEST_MERGE_CHOICE_CRASH
 if (crashAt === 'recorded' || crashAt === 'beforeFile') saveSeams[crashAt] = () => (exitBy('app.exit', `a test crash at the merge choice's ${crashAt}`, () => app.exit(1)), new Promise<void>(() => undefined))
 

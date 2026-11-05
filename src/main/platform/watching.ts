@@ -48,7 +48,7 @@ export function startObserving(): void {
   }
 }
 
-/** Stops it, closing every watch (Hive quitting; tests). */
+/** Stops it, closing every watch (Combwork quitting; tests). */
 export function stopObserving(): void {
   stop?.()
   stop = null

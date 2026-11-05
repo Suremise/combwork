@@ -1,9 +1,9 @@
 /**
- * The short forms of Hive's replies to agents (the hive MCP tools) and the Agent API's opt-in short views. Every
+ * The short forms of Combwork's replies to agents (the hive MCP tools) and the Agent API's opt-in short views. Every
  * character a tool returns goes into an agent's context and is paid for again on each later turn, so: a change
  * confirms what changed (and what the agent can't know: a new card's number, where a card is now), a listing
  * returns a short row per item, and full detail comes on request. No imports beyond shared code without side
- * effects: hive-mcp.js runs outside the app bundle.
+ * effects: cw-mcp.js runs outside the app bundle.
  */
 import type { LiveSessionState, MergeSlotInfo, StoredText, TaskCard, TaskColumn, TaskDecision } from './types'
 import { storedForAgents } from './taskHistory'
@@ -323,7 +323,7 @@ export function retryWaitsView(st: Pick<LiveSessionState, 'retryWait' | 'retryWa
   return { waits: (done?.waits ?? 0) + 1, seconds: doneSeconds + so, latest: { since: w.since, seconds: so, tries: w.attempt, status: w.status, ...(w.network ? { network: true as const } : {}), ongoing: true, ...(w.retryAt ? { retryAt: w.retryAt } : {}) } }
 }
 
-/** A card's request waiting for the user, as agents read it (TaskView.forYou); `asker` absent: Hive asked. */
+/** A card's request waiting for the user, as agents read it (TaskView.forYou); `asker` absent: Combwork asked. */
 export interface CardRequest {
   request: string
   kind: string
@@ -342,7 +342,7 @@ export interface CardRequest {
 export function cardRequests(items: readonly { request: string; kind: string; gate: string; text: string; shown?: StoredText; asker: string | null; since: string }[], summary = false): CardRequest[] | undefined {
   if (!items.length) return undefined
   return items.map((i) => {
-    // Hive's own request (`shown`, its message as data): said again in the reader's chain, else its English as stored (HI-2464).
+    // Combwork's own request (`shown`, its message as data): said again in the reader's chain, else its English as stored (HI-2464).
     const text = storedForAgents(i.text, i.shown)
     const said = summary ? commentSummary({ text }) : { text }
     return { request: i.request, kind: i.kind, gate: i.gate, ...said, ...(i.asker ? { asker: i.asker } : {}), since: i.since }
@@ -358,7 +358,7 @@ export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'>
   /** With a review going on (TaskCard.review): why it has stalled (its reviewer removed or not running), if it has. */
   reviewStalled?: string
   /**
-   * Who merges it and where it is with the merge queue, when its own rules say Hive merges it (#1354): queued (its
+   * Who merges it and where it is with the merge queue, when its own rules say Combwork merges it (#1354): queued (its
    * position), testing, paused, returned (what came back and what to do), left the queue, merged.
    */
   merge?: string
@@ -406,7 +406,7 @@ export interface TaskRow {
   number: number
   /** Its key (#1219: HI-12), when it has one. */
   key?: string
-  /** How its text names the cards it waits for (#1219: "HI-3 (#12)"), by number, for the hive MCP server (namesOf). */
+  /** How its text names the cards it waits for (#1219: "HI-3 (#12)"), by number, for the combwork MCP server (namesOf). */
   names?: Record<string, string>
   title: string
   column: TaskColumn
@@ -526,10 +526,10 @@ export interface IntentDone {
   warnings?: string[]
   /** What comes next on the card under its rules (#1530, shared/workflow/nextStep.ts). */
   next?: NextStep
-  /** The card watch Hive armed for the agent after its submission or failed verdict in a lane (#1639, main/intentWatch.ts). */
+  /** The card watch Combwork armed for the agent after its submission or failed verdict in a lane (#1639, main/intentWatch.ts). */
   watch?: string
   /**
-   * A lane's builder starting its lane's card itself (HI-2092): what Hive's start of it would have given it, the start
+   * A lane's builder starting its lane's card itself (HI-2092): what Combwork's start of it would have given it, the start
    * prompt's skill line and the lane's brief, on lines of their own after the rest.
    */
   lane?: string
@@ -569,7 +569,7 @@ export interface Refused {
 /** A refusal's three sentences, each on a line, and its rule: what was refused, what to do next, where the rule is changed; then its warnings. */
 export const refusedText = (r: Refused): string => [`${r.message} (${r.rule})`, r.next, ...(r.change ? [r.change] : []), ...(r.warnings ?? []).map((warning) => say(R.warning, { warning }))].join('\n')
 
-// agent-protocol: intent names and the hive tools that take them
+// agent-protocol: intent names and the Combwork tools that take them
 export const INTENT_TOOL: Record<string, string> = { start: 'cw_start_card', submit: 'cw_submit', verdict: 'cw_verdict', 'report merge': 'cw_report_merge', 'put back': 'cw_put_back', 'start review': 'cw_start_review' }
 
 /** At most this many of a list in an intent's reply (start review's files): the rest counted. */
@@ -589,14 +589,14 @@ export function intentText(d: IntentDone): string {
   return [`${d.card}: ${where}.${facts.length ? ` ${facts.join('; ')}` : ''}${d.next ? ` ${nextText(d.next)}` : ''}${d.watch ? ` ${d.watch}` : ''}`, ...(d.warnings ?? []).map((warning) => say(R.warning, { warning })), ...(d.lane ? ['', d.lane] : [])].join('\n')
 }
 
-/** What asking the Hive Assistant on a card did (HI-1866): the card, and the request's id in the Assistant's inbox ('' when it couldn't be given). */
+/** What asking the Combwork Assistant on a card did (HI-1866): the card, and the request's id in the Assistant's inbox ('' when it couldn't be given). */
 export interface AskedAssistant {
   ok: true
   card: string
   delivery: string
 }
 
-/** "HI-12: asked the Hive Assistant (m41 in its inbox). Its answer comes to your inbox." */
+/** "HI-12: asked the Combwork Assistant (m41 in its inbox). Its answer comes to your inbox." */
 export function askedAssistantText(a: AskedAssistant): string {
   if (!a.delivery) return say(R.askedNone, { card: a.card })
   return say(R.asked, { card: a.card, delivery: a.delivery })
@@ -845,7 +845,7 @@ export function projectListText(rows: ProjectRow[]): string {
 }
 
 /**
- * cw_project_status: GET /v1/projects/{id} without what its settings only repeat or keep for Hive's own bookkeeping
+ * cw_project_status: GET /v1/projects/{id} without what its settings only repeat or keep for Combwork's own bookkeeping
  * (HI-1712): `lastPath` (its `path`), the file's `version` and `stepsDone` (one-time steps already taken).
  */
 export function projectStatusReply(p: unknown): unknown {
@@ -946,13 +946,13 @@ export interface SkillRow {
   provider?: string
   plugin?: string
   audience?: 'agents' | 'assistant' | 'all'
-  /** A Hive skill nobody gets (its header is broken or its audience unknown): why. */
+  /** A Combwork skill nobody gets (its header is broken or its audience unknown): why. */
   problem?: string
 }
 
 const SKILL_LEVEL: Record<SkillRow['level'], AgentMsg> = { combwork: R.levelCombwork, machine: R.levelMachine, plugin: R.levelPlugin, local: R.levelLocal }
 
-/** "work-on-card (Hive, for agents): Carry a card…", a line per skill. */
+/** "work-on-card (Combwork, for agents): Carry a card…", a line per skill. */
 export function skillListText(rows: SkillRow[]): string {
   if (!rows.length) return say(R.skillsNone)
   const line = (r: SkillRow): string => {
@@ -1083,7 +1083,7 @@ export interface SettingDetail {
   title: string
   /** "Settings → Sessions → Suggest compacting above". */
   path: string
-  /** Where the user sees it, in the language Hive shows them, when that isn't English (#767). */
+  /** Where the user sees it, in the language Combwork shows them, when that isn't English (#767). */
   shownAs?: string
   scope: string
   project?: string
@@ -1211,7 +1211,7 @@ export interface ConsoleSourceRow {
   /** For display only: cut and masked. */
   label: string
   kind: string
-  /** How a read names it, exactly: { source } for Hive or the Assistant, { agent: <its id>, project: <its project's name> } for an agent. */
+  /** How a read names it, exactly: { source } for Combwork or the Assistant, { agent: <its id>, project: <its project's name> } for an agent. */
   select?: { source?: string; agent?: string; project?: string }
   provider?: string
   /** An open developer console is capturing it now. */
@@ -1234,7 +1234,7 @@ export function consoleSourcesText(page: { total: number; offset: number; source
   return `${rows.join('\n')}${more}`
 }
 
-/** An event in a read: a row, or in full (seq) with its raw payload and what Hive made of it. */
+/** An event in a read: a row, or in full (seq) with its raw payload and what Combwork made of it. */
 export interface ConsoleEventRow {
   seq: number
   at: string
@@ -1514,11 +1514,11 @@ export function connectionsAppliedText(r: ConnectionsAppliedPublic): string {
   return say(R.applied, { project: r.project, changed, restart, skipped, undo: yn(r.changed.length) })
 }
 
-/** How Hive tells an agent of what waits for it, by the carrying-on switch that does it (#1432, shared/inboxSwitches.ts). */
+/** How Combwork tells an agent of what waits for it, by the carrying-on switch that does it (#1432, shared/inboxSwitches.ts). */
 const TELLS: Record<InboxSwitch, AgentMsg> = { checkpoints: R.tellsCheckpoints, stopContinuation: R.tellsStop, idleWakes: R.tellsIdle }
 
 /**
- * cw_message_agent's reply for a message queued (#1497): how Hive tells the agent of it, only by the switches on for it
+ * cw_message_agent's reply for a message queued (#1497): how Combwork tells the agent of it, only by the switches on for it
  * (`tells`, in INBOX_SWITCHES' order), or, with none, that it waits in its inbox.
  */
 export function messageQueuedText(r: { who: string; id: string; tied: string; status: string; queued: number; tells: readonly InboxSwitch[] }): string {

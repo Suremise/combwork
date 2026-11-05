@@ -15,7 +15,7 @@ import { JournalView } from './JournalView'
 import { msg, tr } from '@shared/i18n'
 
 /**
- * The Hive Assistant's view (activity bar): a summary of what it has used, then its modes, its MCP servers (HI-2059:
+ * The Combwork Assistant's view (activity bar): a summary of what it has used, then its modes, its MCP servers (HI-2059:
  * added and removed here, as a project's in its MCP tab), its conversations (the same tree as a project's Sessions tab),
  * its journal (#1033) and the files attached to them (a project's Attachments tab, for its home). Its settings are in
  * Settings → Assistant and its panel.

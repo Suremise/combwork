@@ -1,5 +1,5 @@
 // "How do you work?" (#1423, SPEC §16.3.5): Not now, the step's answer that applies nothing. The project's options stay
-// inherited (the workspace's and Hive's defaults, else all off) and the step isn't offered again for the platform in
+// inherited (the workspace's and Combwork's defaults, else all off) and the step isn't offered again for the platform in
 // force: written under the project's lock, in its turn among workflow writes, with setPresetAsked (the answer goes into
 // `kept` with the platform's options when the project switches away, #1419). Choose saves through the Workflow
 // section's own save, which records `chosen` (optionsForm.ts).
@@ -18,7 +18,7 @@ const log = createLogger('workflow')
 
 /**
  * Not now, for the platform the step was shown for (`shown`): answered without a preset. Nothing changes if it was
- * answered meanwhile, or if the project uses another platform now (a switch meanwhile, another Hive's: that platform's
+ * answered meanwhile, or if the project uses another platform now (a switch meanwhile, another Combwork's: that platform's
  * own question isn't answered for it, HR3's #1423 round 1).
  */
 export function presetNotNow(ws: WorkspaceService, projectPath: string, shown: unknown): Promise<void> {

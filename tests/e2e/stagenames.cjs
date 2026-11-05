@@ -98,7 +98,7 @@ function projectJson(dir, platform, workflow) {
     const headers = (await page.locator('.board-column-label').allTextContents()).join(' | ')
     check('no column says Doing or Passed', !/\bDoing\b|\bPassed\b/.test(headers), headers)
 
-    // The Assistant's own token, as its hive tools use it (it starts as the fake Claude Code).
+    // The Assistant's own token, as its Combwork tools use it (it starts as the fake Claude Code).
     const home = (await inv('workspace:refresh')).assistant.path
     await inv('session:start', home, { agentId: 'assistant' })
     const assistantLive = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === home.toLowerCase() && s.agentId === 'assistant')

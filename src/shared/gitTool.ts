@@ -3,7 +3,7 @@ import { msg, tr } from './i18n'
 import type { Text } from './advanced'
 
 /**
- * Git as Hive found it. `missing`: no git on Hive's PATH (or it failed to start); `old`: older than GIT_MIN; `unknown`:
+ * Git as Combwork found it. `missing`: no git on Combwork's PATH (or it failed to start); `old`: older than GIT_MIN; `unknown`:
  * not checked yet, or `git --version` answered something else. `version` as git gave it (2.45.1), `path` the executable.
  */
 export interface GitTool {
@@ -15,12 +15,12 @@ export interface GitTool {
 }
 
 /**
- * The oldest git Hive works fully with: `git merge-tree --write-tree` (2.38) checks a merge for conflicts before it
+ * The oldest git Combwork works fully with: `git merge-tree --write-tree` (2.38) checks a merge for conflicts before it
  * starts, recognises squash-merged branches (the unmerged counts, Remove All and template cleanup) and is what the
  * merge-ready skill runs. Below it, those fall back as `gitOldText` says.
  */
 export const GIT_MIN = '2.38'
-/** The oldest git Hive's commands run with at all: every call passes `--no-optional-locks` (2.15) and removing a worktree is `git worktree remove` (2.17). */
+/** The oldest git Combwork's commands run with at all: every call passes `--no-optional-locks` (2.15) and removing a worktree is `git worktree remove` (2.17). */
 export const GIT_REQUIRED = '2.17'
 
 export const GIT_DOWNLOAD = 'https://git-scm.com/download/win'
@@ -64,7 +64,7 @@ export function gitStateOf(version: string): GitTool['state'] {
   return compareGitVersions(version, GIT_MIN) < 0 ? 'old' : 'ok'
 }
 
-/** Whether Hive's git commands can't run at all: no git, or one older than GIT_REQUIRED. */
+/** Whether Combwork's git commands can't run at all: no git, or one older than GIT_REQUIRED. */
 export function gitUnusable(t: GitTool | null | undefined): boolean {
   return t?.state === 'missing' || (t?.state === 'old' && !!t.version && compareGitVersions(t.version, GIT_REQUIRED) < 0)
 }

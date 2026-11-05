@@ -7,7 +7,7 @@
 /** Who or what asked a session to stop, as its caller knows it; `stopped` when the caller doesn't say. */
 export type StopCause = 'you' | 'assistant' | 'agent' | 'lane' | 'closed' | 'stopped'
 
-/** Why a session ended, as shown: a stop's cause, Hive quitting, or its CLI ending by itself (cleanly or not). */
+/** Why a session ended, as shown: a stop's cause, Combwork quitting, or its CLI ending by itself (cleanly or not). */
 export type EndWhy = StopCause | 'quit' | 'exited' | 'crashed'
 
 /** An ended run, as the window keeps it: the run, when it started (ordering only) and ended, why, and a crash's code. */
@@ -20,7 +20,7 @@ export interface SessionEnd {
 }
 
 /**
- * Why a run ended, or null for a launch that failed (it keeps its own failed presentation). Hive shutting down comes
+ * Why a run ended, or null for a launch that failed (it keeps its own failed presentation). Combwork shutting down comes
  * first, then a stop asked for, by its cause (none: `stopped`), then the CLI's own exit: 0 is `exited`, any
  * other code `crashed`. A stop is never "by you" unless its caller said so.
  */

@@ -85,7 +85,7 @@ export async function listMcp(places = false): Promise<McpServerInfo[]> {
       if (!def.command && !def.url) throw combworkError(msg({ id: 'content.mcp.listNoCommand', defaultMessage: 'Definition needs a "command" (stdio) or a "url" (http/sse)', description: "Why an MCP server in the workspace can't be used: its definition has neither of the two fields that say what it is. Keep \"command\", \"url\", stdio, http and sse as they are." }))
       out.push({ name, path, def, revision, projects: projectsOf(name), assistant: assistant.has(name), secretWarnings: findSecretWarnings(def), runs: mcpRuns(def) })
     } catch (e) {
-      // Hive's own words are text the window shows in its language; JSON's reader's stay as it gave them.
+      // Combwork's own words are text the window shows in its language; JSON's reader's stay as it gave them.
       out.push({ name, path, def: null, error: (e as Error).message, ...(e instanceof CombworkError ? { errorText: e.text } : {}), projects: projectsOf(name), assistant: assistant.has(name), secretWarnings: [], runs: [] })
     }
   }
@@ -101,7 +101,7 @@ const MCP_DIR_VARIABLE = /\$\{CW_MCP_DIR\}/g
 
 /** Converts a stored definition into the entry written to launch/mcp.json. */
 export function toLaunchDef(def: McpServerDef, mcpDir: string): McpServerDef {
-  // Hive's own fields (its description and tags, HI-2059, and the catalogue it came from, HI-545) aren't the CLIs'.
+  // Combwork's own fields (its description and tags, HI-2059, and the catalogue it came from, HI-545) aren't the CLIs'.
   const { description: _description, tags: _tags, catalog: _catalog, ...rest } = def
   const dir = mcpDir.replace(/\\/g, '/')
   const expand = (v: string): string => v.replace(MCP_DIR_VARIABLE, () => dir)
@@ -127,7 +127,7 @@ export function inTurn<T>(fn: () => Promise<T>): Promise<T> {
 /** workspace.json's #1093 switch, frozen at HI-2059's upgrade: read for projects not yet converted (mcpAdded), never written. */
 const legacyOn = (): unknown => workspace.config.mcp.enabled
 
-/** Where a server is added (HI-2059): a project, by path, or the Hive Assistant. */
+/** Where a server is added (HI-2059): a project, by path, or the Combwork Assistant. */
 export type McpTarget = { project: string } | 'assistant'
 
 /**
@@ -147,7 +147,7 @@ function projectHere(p: string): string {
   return path
 }
 
-/** The Hive Assistant's added servers changed (HI-2059), as a project's (changeProjectNow), in workspace.json. */
+/** The Combwork Assistant's added servers changed (HI-2059), as a project's (changeProjectNow), in workspace.json. */
 async function changeAssistantNow(change: (added: string[]) => string[]): Promise<void> {
   await workspace.saveWorkspaceConfigWith((c) => ({ mcp: { ...c.mcp, assistant: [...new Set(change(assistantMcpAdded(c.mcp)))].sort(), assistantModel: MCP_ADDED_MODEL } }))
 }
@@ -163,7 +163,7 @@ const usable = (def: unknown): def is McpServerDef => !!def && typeof def === 'o
 
 /**
  * Refuses when the server's definition is no longer `expected`, the one the user was shown what it runs from (replaced
- * or edited meanwhile), or isn't one Hive can run, so a server is never added with a definition the user hasn't seen.
+ * or edited meanwhile), or isn't one Combwork can run, so a server is never added with a definition the user hasn't seen.
  */
 export async function checkShown(name: string, expected: McpShown): Promise<void> {
   const path = join(workspace.mcpDir, `${name}.json`)
@@ -176,7 +176,7 @@ export async function checkShown(name: string, expected: McpShown): Promise<void
 const noServer = (name: string): Error => combworkError(msg({ id: 'mcp.error.noServerAdd', defaultMessage: 'The workspace has no MCP server named {name}.', description: 'An error adding a server to a project or the Combwork Assistant. {name} is its name.' }), { name }, { kind: 'notFound' })
 
 /**
- * Adds a workspace server to a project or the Hive Assistant (HI-2059): it runs there from their next session. In a turn
+ * Adds a workspace server to a project or the Combwork Assistant (HI-2059): it runs there from their next session. In a turn
  * with the server's other changes; refused when the target isn't this workspace's, or the definition is no longer
  * `expected`, the one shown (checkShown).
  */
@@ -194,7 +194,7 @@ export function addMcpTo(target: McpTarget, name: string, expected: McpShown): P
   )
 }
 
-/** Removes a server from a project or the Hive Assistant (HI-2059): it no longer runs there, from their next session. */
+/** Removes a server from a project or the Combwork Assistant (HI-2059): it no longer runs there, from their next session. */
 export function removeMcpFrom(target: McpTarget, name: string): Promise<void> {
   if (!validMcpName(name)) return Promise.reject(combworkError(M.invalidName))
   const ws = currentWorkspace()
@@ -285,7 +285,7 @@ async function membershipOf(projectPath: string, name: string): Promise<ProjectC
   )
   if (!exists) return null
   // The current text decides, read before anything that might put a kept copy in its place: a file that doesn't parse
-  // as an object (one partway through a save) is uncertainty. Then Hive's own read must succeed too.
+  // as an object (one partway through a save) is uncertainty. Then Combwork's own read must succeed too.
   const text = await readFile(file, 'utf8').catch((e) => {
     throw unreadable(e)
   })
@@ -305,7 +305,7 @@ async function membershipOf(projectPath: string, name: string): Promise<ProjectC
 }
 
 /**
- * Removed everywhere it is added or remembered, in a turn (HI-2059): every project (hidden ones too) and the Hive
+ * Removed everywhere it is added or remembered, in a turn (HI-2059): every project (hidden ones too) and the Combwork
  * Assistant, so a server added under a name used before (deleted, replaced, or its file removed by hand) starts added
  * nowhere. Every project is read first: one that can't be read refuses it before anything is written (HI-2059 round 1),
  * so the caller changes no definition. A project changed here is converted in the same write (changeProjectNow), so no

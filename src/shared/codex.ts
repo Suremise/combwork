@@ -149,7 +149,7 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
     imagePaste: true,
     // Images (pasted, or its view_image tool) and text; a PDF it can only dump with a shell command (checked with 0.162.1).
     attachments: ['image', 'text'],
-    // Codex rejects permissionDecision "ask" (and then runs the tool), so Hive asks the user itself.
+    // Codex rejects permissionDecision "ask" (and then runs the tool), so Combwork asks the user itself.
     lockAsk: false,
     backgroundSessions: false,
     // Codex isn't told when a background terminal ends: it finds out only by checking during a turn.

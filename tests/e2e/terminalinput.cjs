@@ -1,6 +1,6 @@
 // Settings → Advanced's switches for an agent pane's keys and for what Combwork types (#1286, #966 rows 24 and 29), on a
 // fake Claude Code session (fake-claude/, logging each read of its input), so nothing signs in or spends tokens.
-// 1. Send prompts as typed: a card the user starts on a running agent without hive tools is typed into its CLI. By
+// 1. Send prompts as typed: a card the user starts on a running agent without Combwork tools is typed into its CLI. By
 //    default its prompt goes in on one line (spacing collapsed, line breaks gone); turned on, the paste keeps the
 //    description's line breaks and spacing, and the CLI gets the prompt as written.
 // 2. Ctrl+C and Ctrl+V go to the CLI: by default Ctrl+C over a selection copies it and Ctrl+V pastes the clipboard's
@@ -42,7 +42,7 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(path.join(claudeHome, 'fake-log-input.txt'), '')
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
-  // No hive tools, so a card the user starts on a running agent is typed into its CLI as their input (#650).
+  // No Combwork tools, so a card the user starts on a running agent is typed into its CLI as their input (#650).
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true, port: PORT, provideCombworkMcp: false, allowSessionInput: true }
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
@@ -82,7 +82,7 @@ const check = (name, ok, extra = '') => {
       const dir = path.join(claudeHome, 'projects')
       return fs.existsSync(dir) && fs.readdirSync(dir).some((d) => fs.readdirSync(path.join(dir, d)).some((f) => f.endsWith('.jsonl') && fs.readFileSync(path.join(dir, d, f), 'utf8').includes(text)))
     }
-    /** Starts a card on the agent as the user does from the board: typed into its CLI (no hive tools), its turn then ended. */
+    /** Starts a card on the agent as the user does from the board: typed into its CLI (no Combwork tools), its turn then ended. */
     const startCard = async (title, description) => {
       const card = await inv('tasks:create', { title, description, project: 'alpha' })
       // Combwork keeps an agent it just typed a card into as being given it for a few seconds, refuses one still working on

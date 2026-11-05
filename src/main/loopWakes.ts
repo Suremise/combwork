@@ -25,7 +25,7 @@ import { projectPreferences } from './workflow/preferences'
 import { rulesEnforced } from './workflow/recorder'
 
 /**
- * Hive's loop wakes (#405): a card loop's routine handoffs, delivered by Hive whether or not the agent set a card watch.
+ * Combwork's loop wakes (#405): a card loop's routine handoffs, delivered by Combwork whether or not the agent set a card watch.
  * A card arriving in Review wakes its reviewer; a verdict, the card moved into Passed or Done, and the reviewer's request
  * mid-review (#912) wake its builder (the card's agent). Only for cards with a reviewer (the reviewer of a running lane
  * with the card, else the agent that last reviewed it), so a solo user never sees one; never for the agent that made the
@@ -34,18 +34,18 @@ import { rulesEnforced } from './workflow/recorder'
  *
  * From the facts (#1266): each handoff is a durable `wake` action written with the fact that causes it (recorder.ts for
  * the board's changes, the runtime for its own), run by the actions worker once the change commits. Its delivery carries
- * the action's id, so a wake is made once however often the action runs (a restart, another Hive).
+ * the action's id, so a wake is made once however often the action runs (a restart, another Combwork).
  *
  * A delivery (#649, deliveries.ts: a card event, the latest per agent and card, at most a day), made at once and given
  * by the delivery service as everything is (#650: the doorbell when its agent is idle, a notice in its hooks while it
  * works). Made again just before it is offered or read, from the card and the lane as they are then (#652: what lands
  * with the handoff is in it, with no settle of its own): one no longer due is cancelled. Each one received (read with
- * cw_inbox) is noted in the card's history, as Hive.
+ * cw_inbox) is noted in the card's history, as Combwork.
  */
 
 const log = createLogger('loopWakes')
 
-/** Hive's own deliveries come from it. */
+/** Combwork's own deliveries come from it. */
 // agent-protocol: the sender's name a delivery is labelled with (deliveries name their senders)
 const HIVE = { kind: 'combwork', name: 'Combwork' } as const
 /** The user's answer comes from them, as a decision does (decisionWakes.ts). */
@@ -98,7 +98,7 @@ export async function settled(): Promise<void> {
 
 const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
 
-/** Whether a project lets Hive wake its loops' agents (its workflow option Wake reviewers and builders, HI-1766: on unless off). */
+/** Whether a project lets Combwork wake its loops' agents (its workflow option Wake reviewers and builders, HI-1766: on unless off). */
 export async function wakesOn(ws: WorkspaceService, projectPath: string): Promise<boolean> {
   return projectPreferences(ws, projectPath, await ws.projectConfig(projectPath).catch(() => null)).loopWakes
 }
@@ -188,7 +188,7 @@ const covered = (projectPath: string, agentId: string, card: TaskCard, kind: Loo
 
 /**
  * What a builder's Done wake says comes next in its lane (HI-1990), when its running lane holds the card: the lane's next
- * card, which Hive starts for it once its turn ends (rules on: laneStarts.ts) or which it starts itself (rules off),
+ * card, which Combwork starts for it once its turn ends (rules on: laneStarts.ts) or which it starts itself (rules off),
  * one under way, or none left. Undefined: not a Done wake, or no lane of its holds the card. Read from the board without
  * waiting, as the rest of the wake is decided (an await here let the builder's own watch tell the Done first): a card
  * given to another agent is another lane's, and a paused lane says so (laneNow: the lane view's own reading).
@@ -237,7 +237,7 @@ async function enqueue(ws: WorkspaceService, projectPath: string, card: TaskCard
     const answer = w.kind === 'answer'
     const meta = { n: card.number, kind: w.kind, agentName: to.name, sinceAt: w.since?.at ?? '', sinceId: w.since?.id ?? '', ...textMeta(w.kind, w.text), ...(keepTo ? { to: to.id } : {}), ...(isReturnNote(w.kind, w.text) ? { queueReturn: true } : {}) }
     // The user's answer is an answer from them (#1626: acked, never coalesced into the card's events), each its own (a
-    // later handoff of the card, or another answer, doesn't replace it); the rest, Hive's card events, the latest per card.
+    // later handoff of the card, or another answer, doesn't replace it); the rest, Combwork's card events, the latest per card.
     const ref = answer ? `#${card.number}/answer${action ? `/${action}` : ''}` : `#${card.number}`
     await createDelivery(projectPath, { agentId: to.id, agentName: to.name, kind: answer ? 'answer' : 'card-event', from: answer ? USER : HIVE, card: card.number, body: loopWakeLine({ ...cardChange(card.number, card, kinds), about: await wakeAboutFor(ws, projectPath, card, w.kind, to.id) }, w.kind, w.text), expiresMs: KEEP_MS, source: 'loop', ref, replace: true, meta, ...(action ? { action } : {}) })
     await offerNow(projectPath, to.id)
@@ -276,7 +276,7 @@ async function wakeFromAction(a: ActionRow, from: WorkspaceService): Promise<voi
   // The service itself, not the stand-in (tasks.ts's `workspace`): the wake is tried later, outside this change's call.
   const ws = workspaceFor(projectPath)
   if (!ws?.isProjectPath(projectPath) || !(await wakesOn(ws, projectPath))) return
-  // Made already (a run before a restart, another Hive's): never a second.
+  // Made already (a run before a restart, another Combwork's): never a second.
   if (actionDelivered(projectPath, a.id)) return
   const p = a.payload
   // The reviewer's (the runtime names the pool, `reviewers`, or a lane's reviewer: whoever reviews the card now), else the builder's.
@@ -292,7 +292,7 @@ async function wakeFromAction(a: ActionRow, from: WorkspaceService): Promise<voi
   try {
     await enqueue(ws, projectPath, card, { kind, since, ...(about.text ? { text: about.text } : {}) }, to, a.id)
   } catch (e) {
-    // Another Hive made it meanwhile (the unique row refused this one's): delivered.
+    // Another Combwork made it meanwhile (the unique row refused this one's): delivered.
     if (!actionDelivered(projectPath, a.id)) throw e
   }
 }
@@ -348,7 +348,7 @@ let rolesSeq = 0
 /**
  * What a wake of card n is decided from, as the board has it now (HI-1687), read without waiting: the card's row (its
  * place, builder, reviewer and when it last changed), its newest history entry and fact (a review started, a verdict,
- * the pool's reviewer, someone acting on it), the lanes holding it (their builder, reviewer and state) and Hive's last
+ * the pool's reviewer, someone acting on it), the lanes holding it (their builder, reviewer and state) and Combwork's last
  * write of its project's settings (its agents, its loop wakes). Another card's change leaves it as it is. Null when it
  * can't be read (a board from before 1.0): the strict count of every change stands in.
  */

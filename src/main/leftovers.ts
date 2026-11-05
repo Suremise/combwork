@@ -7,11 +7,11 @@ import type { WorkspaceService } from './workspace'
 
 const log = createLogger('leftovers')
 
-/** A temp file of Hive's atomic writes: `<file>.<pid>-<counter>.tmp` (writeTextAtomic, syncCopy) or `<file>.<pid>-<hex>.tmp` (watches, deliveries). */
+/** A temp file of Combwork's atomic writes: `<file>.<pid>-<counter>.tmp` (writeTextAtomic, syncCopy) or `<file>.<pid>-<hex>.tmp` (watches, deliveries). */
 const TEMP = /^(.+)\.\d+-[0-9a-f]+\.tmp$/i
 /** The copy the project-id migration (#508) kept of a record before first changing it. */
 const BEFORE_IDS = /^(.+)\.before-ids\.bak$/i
-/** A temp file older than this can't be a write still under way, in this Hive or another. */
+/** A temp file older than this can't be a write still under way, in this Combwork or another. */
 export const TEMP_AGE_MS = 24 * 60 * 60 * 1000
 /** A migration's copy is kept a week after it was made (an older Hive's workspace, just migrated, keeps it a while). */
 export const BAK_AGE_MS = 7 * 24 * 60 * 60 * 1000
@@ -29,9 +29,9 @@ export function importedBackup(name: string): { base: string; at: number } | nul
 }
 
 /**
- * One of Hive's stores: a folder (relative to a .combwork) and the files Hive writes there. Only a temp file of one of those
+ * One of Combwork's stores: a folder (relative to a .combwork) and the files Combwork writes there. Only a temp file of one of those
  * files (`temp`), the migration's copy of one it migrated (`bak`), or the backup kept when one moved into the workspace
- * database (`imported`), is ever removed: the same suffix on anything else (the user's notes, attachments, a folder Hive
+ * database (`imported`), is ever removed: the same suffix on anything else (the user's notes, attachments, a folder Combwork
  * doesn't know) is never taken for one.
  */
 export interface Store {
@@ -63,7 +63,7 @@ export const PROJECT_STORES: Store[] = [
 
 /**
  * Whether a store's folder is where it says, inside its .combwork: the .combwork and every folder down to it a real folder, never
- * a link or junction (which would make a folder outside it look like Hive's store).
+ * a link or junction (which would make a folder outside it look like Combwork's store).
  */
 async function plainDir(combwork: string, dir: string): Promise<boolean> {
   let at = combwork
@@ -84,7 +84,7 @@ export interface Swept {
 }
 
 /**
- * Removes what Hive's writes left in its stores (#1016): temp files of its atomic writes a crash left (older than a day)
+ * Removes what Combwork's writes left in its stores (#1016): temp files of its atomic writes a crash left (older than a day)
  * and the project-id migration's `*.before-ids.bak` copies (older than a week). Each root is a .combwork with its stores;
  * only the files each store names are looked at, in that folder only (not its subfolders), and only in a store that is a
  * real folder inside its .combwork, never one reached through a link or junction, and never a link to a file. What can't be removed (held

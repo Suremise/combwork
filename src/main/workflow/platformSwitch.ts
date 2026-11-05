@@ -46,7 +46,7 @@ export function oldRulesLine(c: PlatformSwitchCheck): string | null {
   return parts.length ? `These keep ${c.from}'s rules until they finish: ${parts.join('; ')}.` : null // i18n-ignore: the Assistant's tools (English)
 }
 
-/** Whether a card in flight goes through Hive's merge queue, by its own ruleset (#1356's rule: it carries on after a switch). */
+/** Whether a card in flight goes through Combwork's merge queue, by its own ruleset (#1356's rule: it carries on after a switch). */
 async function queueInFlight(ws: WorkspaceService, projectPath: string): Promise<boolean> {
   const wf = await workflowFor(ws, projectPath)
   if (!wf) return false

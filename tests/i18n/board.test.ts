@@ -236,7 +236,7 @@ describe("a run's name in the Progress panel (#872)", () => {
     expect(all.map((r) => runAgentName(r, tr))).toEqual(['Skript', 'Ein Agent', 'Script', 'Agent', 'Agent'])
     expect(runDetails(script, null, script.startedAt, tr).find((d) => d.text.startsWith('Skript'))).toBeTruthy()
     expect(agentChoices([nameless, named, namedAgent], 'c:\\ws\\alpha', tr).map((c) => c.label)).toEqual(['Agent', 'Ein Agent', 'Script'])
-    // The stored name, which the Agent API and hive-progress give agents, is unchanged.
+    // The stored name, which the Agent API and cw-progress give agents, is unchanged.
     expect([script.agentName, nameless.agentName]).toEqual(['Script', 'Agent'])
   })
 })

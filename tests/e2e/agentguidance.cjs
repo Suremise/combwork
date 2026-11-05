@@ -26,7 +26,7 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 
-/** The hive server of a launch's MCP config, started as its CLI would start it, asked to initialize: its result. */
+/** The combwork server of a launch's MCP config, started as its CLI would start it, asked to initialize: its result. */
 function initialize(def) {
   return requests(def, [{ method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'e2e', version: '1' } } }]).then(([r]) => r?.result ?? null)
 }
@@ -129,7 +129,7 @@ function packagesRequired(entry) {
       const f = path.join(claudeHome, 'fake-launches.jsonl')
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
     }
-    /** A launch's hive server: started, ready, its --mcp-config read while it runs (it holds the server's environment). */
+    /** A launch's combwork server: started, ready, its --mcp-config read while it runs (it holds the server's environment). */
     const combworkServer = async () => {
       const before = launches().length
       await inv('session:start', alpha, { agentId: def.id })

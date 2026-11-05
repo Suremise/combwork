@@ -408,7 +408,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
           const lane = l?.lane ? (lanes.find((x) => x.id === l.lane)?.name ?? l.lane) : ''
           return tr(M.slotLease, { kind: l ? (l.kind === 'carried' ? 'carried' : l.card !== null ? 'card' : 'lane') : 'none', slot: v.name, agent, card, lane })
         }
-        // The worktrees as the user's (agents', slots', unused ones) and Hive's own (HI-1710).
+        // The worktrees as the user's (agents', slots', unused ones) and Combwork's own (HI-1710).
         const theirs = info.worktrees.filter((w) => !w.combwork)
         const combworkCopies = info.worktrees.filter((w) => w.combwork === 'copy')
         const combworkQueue = info.worktrees.filter((w) => w.combwork === 'queue')
@@ -700,7 +700,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                 </div>
               </>
             )}
-            {/* Hive's own worktrees (HI-1710): its review copies and the merge queue's folder, each its group, nothing to remove. */}
+            {/* Combwork's own worktrees (HI-1710): its review copies and the merge queue's folder, each its group, nothing to remove. */}
             {combworkCopies.length > 0 && (
               <>
                 <h2 className="section" data-worktrees="copies">

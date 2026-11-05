@@ -28,7 +28,7 @@ export function removedAgentName(name: string | null | undefined): string {
 }
 
 /**
- * Null for sessions started outside Hive. (The Assistant's conversations aren't labelled: it has one place to run.)
+ * Null for sessions started outside Combwork. (The Assistant's conversations aren't labelled: it has one place to run.)
  * `folders`: the project's slots and retired homes (ProjectInfo.folders), which name a folder by its slot or home.
  */
 export function sessionOrigin(projectPath: string, agents: readonly { id: string; name: string }[], s: Recorded, folders: readonly NamedFolder[] = []): SessionOrigin | null {

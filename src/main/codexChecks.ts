@@ -1,11 +1,11 @@
 // Codex's app server, asked one thing by Hive (HI-1757: a connection's sign-in check, a launch's hook check), owned from
 // before it runs until its end is confirmed, with the merge queue's machinery as it is (#1360: workflow/queueJobs.ts and
-// workflow/launcher.ts, on Hive's process supervisor): a named, kill-on-close job, opened with no journal; a launcher put
+// workflow/launcher.ts, on Combwork's process supervisor): a named, kill-on-close job, opened with no journal; a launcher put
 // in it before it is told to run Codex; the job ended and seen empty by the same supervisor that opened it (its instance
-// and the job by name, asked again across every await). Kill on close is the guarantee: if Hive or its supervisor ends,
+// and the job by name, asked again across every await). Kill on close is the guarantee: if Combwork or its supervisor ends,
 // Windows ends the job's members. With no journal nothing is ever followed outside the job: a process that escapes it is
 // ended by the supervisor at once ("unowned"), unconfirmed, so a check that sees one fails and its connection stays held
-// until Hive restarts. The restart releases that hold without confirming the escaped branch ended: a known limit,
+// until Combwork restarts. The restart releases that hold without confirming the escaped branch ended: a known limit,
 // accepted as a preview limit (the Assistant's answer to HI-1757/r94; the durable recovery is HI-1811, on hold).
 //
 // A failed or unconfirmed end is a failed check, never the answer the server gave, and holds the connection: no other
@@ -26,7 +26,7 @@ const log = createLogger('codex')
 /** A request's answer: its result, or why there is none (a failed check). */
 export type CheckAnswer = { ok: true; result: any } | { ok: false; error: string }
 
-/** How long a launcher gets to close once its job has ended (or Hive gave it up). */
+/** How long a launcher gets to close once its job has ended (or Combwork gave it up). */
 const END_MS = 10_000
 const QUITTING: CheckAnswer = { ok: false, error: 'Combwork is quitting' } // i18n-ignore: for the log
 const ESCAPED: CheckAnswer = { ok: false, error: "a process Codex started left Combwork's job: its end can't be confirmed" } // i18n-ignore: for the log
@@ -36,7 +36,7 @@ export const codexCheckSeams: { host?: JobHost; beforeStart?: () => Promise<void
 
 const host = (): JobHost => codexCheckSeams.host ?? processSupervisor()
 
-/** A check: its connection (the key), its job's name, and while it is Hive's, the job and its supervisor's instance. */
+/** A check: its connection (the key), its job's name, and while it is Combwork's, the job and its supervisor's instance. */
 interface Check {
   key: string
   name: string
@@ -45,7 +45,7 @@ interface Check {
   /** The launcher, until it has closed. */
   child: ChildProcess | null
   closed: boolean
-  /** A process of it the supervisor found outside its job and ended unconfirmed: its pid (held until Hive restarts). */
+  /** A process of it the supervisor found outside its job and ended unconfirmed: its pid (held until Combwork restarts). */
   escaped: number | null
   /** Its work in turn (serial): its end, a later check's retry, the quit's. */
   work: Promise<void>
@@ -103,7 +103,7 @@ export function ownedAppServerRequest(o: Request): Promise<CheckAnswer> {
 
 type Request = { command: string; args: string[]; cwd: string; env: NodeJS.ProcessEnv; method: string; params: unknown; timeoutMs: number }
 
-/** A reserved check, run to its end: each step looks first whether Hive is quitting, before anything starts. */
+/** A reserved check, run to its end: each step looks first whether Combwork is quitting, before anything starts. */
 async function runCheck(c: Check, o: Request): Promise<CheckAnswer> {
   let answer: CheckAnswer = { ok: false, error: "Codex's check didn't run" } // i18n-ignore: for the log
   let unwatch: (() => void) | null = null
@@ -168,7 +168,7 @@ async function askThroughLauncher(c: Check, o: Request): Promise<CheckAnswer> {
   const assigned = !!child.pid && (await c.job!.assign(child.pid, after, before))
   if (!assigned || startError) return { ok: false, error: startError ? `it didn't start: ${(startError as Error).message}` : "its launcher couldn't be put in its job" } // i18n-ignore: for the log
   await codexCheckSeams.afterAssign?.(c.job!)
-  // Never told to run once Hive is quitting: its stdin ended at its end, it ends having run nothing.
+  // Never told to run once Combwork is quitting: its stdin ended at its end, it ends having run nothing.
   if (stopped) return QUITTING
   return new Promise<CheckAnswer>((resolveP) => {
     let buf = ''
@@ -265,7 +265,7 @@ async function endCheck(c: Check): Promise<boolean> {
 /**
  * At quit (HI-1757): nothing starts from here (each step of a check under way looks first, its wait for an answer cut
  * short); the checks under way are awaited to their own end, then each held check's end is tried once more after
- * whatever of its work is under way (serial), bounded. What is left is ended by its job's close as Hive exits.
+ * whatever of its work is under way (serial), bounded. What is left is ended by its job's close as Combwork exits.
  */
 export async function stopCodexChecks(): Promise<void> {
   stopped = true
@@ -276,7 +276,7 @@ export async function stopCodexChecks(): Promise<void> {
   await bounded(Promise.allSettled([...held.values()].filter((c) => c.escaped === null).map((c) => serial(c, () => endCheck(c)).then((gone) => gone && held.get(c.key) === c && held.delete(c.key)))))
 }
 
-/** Tests only: forgets what this file keeps (holds, the quit) as a new Hive would start. */
+/** Tests only: forgets what this file keeps (holds, the quit) as a new Combwork would start. */
 export function resetCodexChecksForTests(): void {
   held.clear()
   running.clear()

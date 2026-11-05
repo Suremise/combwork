@@ -31,7 +31,7 @@ export function SessionCleanup({
   live: (id: string) => boolean
   /** The session whose transcript the tab shows. */
   shown: string | null
-  /** The Hive Assistant's current conversation (null in a project). */
+  /** The Combwork Assistant's current conversation (null in a project). */
   current: string | null
   /** A skip reason in a few words, as the result words it. */
   skipText: (reason: CleanupSkip) => string

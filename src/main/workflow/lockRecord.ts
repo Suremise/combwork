@@ -1,4 +1,4 @@
-// G16's lock records (#1481): the paths each agent takes Hive's file locks on while it works a card, kept with that
+// G16's lock records (#1481): the paths each agent takes Combwork's file locks on while it works a card, kept with that
 // card's facts (`FilesLocked`), so "another agent's files" in a shared folder is known after the lock is released and
 // after a restart. Sessions publish an agent's locks as they change (`lockedFiles` in its `session-status`); this
 // records them on the agent's current card. Each write is queued as the event comes, in order, per project, and an

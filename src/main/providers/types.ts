@@ -19,7 +19,7 @@ export interface LaunchSkill {
 
 /**
  * What a launch gave the session of a skill it asked for: the content hash of the copy the CLI reads (null when there
- * is no copy of Hive's), and why it isn't the skill as asked for, if it isn't. `lasting`: a restart won't change that
+ * is no copy of Combwork's), and why it isn't the skill as asked for, if it isn't. `lasting`: a restart won't change that
  * (a folder of the user's has its name), as opposed to an old copy kept because it was in use.
  */
 export interface SkillDelivery {
@@ -34,7 +34,7 @@ export interface LaunchHooks {
   listing: HookListing
   /** Listed again for the dialog (the CLI's own listing asked now, or its files compared with the launch's); absent: `listing`. */
   now?(): Promise<HookListing>
-  /** Hive's own hook for each event (its form: http, command), by the event's name: what a hook it received came through. */
+  /** Combwork's own hook for each event (its form: http, command), by the event's name: what a hook it received came through. */
   receivers: Readonly<Record<string, string>>
 }
 
@@ -49,7 +49,7 @@ export interface LaunchContext {
   /** Folder the agent works in: the project folder or its worktree. */
   cwd: string
   workspacePath: string
-  /** Hive's id for this launch; hooks carry it (see hookUrl). */
+  /** Combwork's id for this launch; hooks carry it (see hookUrl). */
   runId: string
   /** The session to start (providers with fixed ids) or resume; empty for a new session of a provider that picks its own id. */
   sessionId: string
@@ -64,27 +64,27 @@ export interface LaunchContext {
   /** Hook endpoint for this launch, with its run id (…/hook?run=<runId>). */
   hookUrl: string
   /**
-   * The file holding this launch's hook Authorization header, for hook commands (`curl -H @<file>`): in Hive's user
+   * The file holding this launch's hook Authorization header, for hook commands (`curl -H @<file>`): in Combwork's user
    * data, never the project, so no generated file holds the token (#345). HTTP hooks read `CW_HOOK_TOKEN` instead.
    */
   hookAuthFile: string
   /**
-   * The launch's private folder, in Hive's user data and removed when it ends (#345): for generated files that may hold
+   * The launch's private folder, in Combwork's user data and removed when it ends (#345): for generated files that may hold
    * a secret (Claude Code's settings and MCP config, with the user's and the workspace's servers' own values), which
    * must never be written to the project.
    */
   privateDir: string
-  /** Hive's guidance for the agent (the hive MCP server's instructions), for providers that don't show MCP instructions themselves. */
+  /** Combwork's guidance for the agent (the combwork MCP server's instructions), for providers that don't show MCP instructions themselves. */
   guidance: string
-  /** More instructions for this launch, over the provider's own (the Hive Assistant's role and mode). */
+  /** More instructions for this launch, over the provider's own (the Combwork Assistant's role and mode). */
   instructions?: string
   /**
    * The Workspace notes note as this launch delivers it (#1433: its part for the project, bounded, under its header), on
-   * every provider after Hive's guidance and the launch's instructions; empty or missing: none (switched off, no note).
+   * every provider after Combwork's guidance and the launch's instructions; empty or missing: none (switched off, no note).
    */
   notes?: string
   /**
-   * A resume of a conversation Hive gave instructions of its own at an earlier launch, by any agent (SessionRecord.promptAdded,
+   * A resume of a conversation Combwork gave instructions of its own at an earlier launch, by any agent (SessionRecord.promptAdded,
    * #1433): its prompt is rendered fresh, so instructions given then and not now leave it.
    */
   promptAddedBefore?: boolean
@@ -93,9 +93,9 @@ export interface LaunchContext {
    * buildCommand agree when one changes meanwhile; read with launchOverrides. Missing: each read as it is now.
    */
   overrides?: Readonly<Record<string, boolean>>
-  /** Tools of the hive MCP server this launch may use without asking, for providers that can pre-approve tools. */
+  /** Tools of the combwork MCP server this launch may use without asking, for providers that can pre-approve tools. */
   trustedCombworkTools?: string[]
-  /** The first task, given on the command line so the CLI starts on it (e.g. from the Hive Assistant). */
+  /** The first task, given on the command line so the CLI starts on it (e.g. from the Combwork Assistant). */
   initialPrompt?: string
   env: Record<string, string>
   /**
@@ -110,12 +110,12 @@ export interface LaunchContext {
   /** A 200K context window instead of the model's 1M one (capabilities.contextLimit). */
   use200kContext: boolean
   /**
-   * Hive's record of the skill copies it made in folders (#1431, skillCopies.ts), for CLIs that read copies in the folder
+   * Combwork's record of the skill copies it made in folders (#1431, skillCopies.ts), for CLIs that read copies in the folder
    * (syncAgentsSkills). Missing: nothing is recorded, and no copy is removed but by its marker and content (tests).
    */
   copies?: SkillCopyBook
   /**
-   * Whether another session of Hive's (not this launch's) runs or is starting in `cwd` (#1431): it may be reading Hive's
+   * Whether another session of Combwork's (not this launch's) runs or is starting in `cwd` (#1431): it may be reading Combwork's
    * skill copies there, so the copies of skills this launch no longer gets stay while one does.
    */
   othersHere?: () => boolean
@@ -126,7 +126,7 @@ export interface LaunchContext {
   extraDirs?: string[]
 }
 
-/** One skill copy Hive recorded making in a folder (#1431): its revision is the copy's contentHash, its marker left out. */
+/** One skill copy Combwork recorded making in a folder (#1431): its revision is the copy's contentHash, its marker left out. */
 export interface SkillCopyRecord {
   skill: string
   project: string
@@ -134,7 +134,7 @@ export interface SkillCopyRecord {
 }
 
 /**
- * Hive's record of its skill copies (#1431, the `skill_copies` table): what it made in a folder, at which revision. A
+ * Combwork's record of its skill copies (#1431, the `skill_copies` table): what it made in a folder, at which revision. A
  * failure to read or write it never stops a launch: unrecorded copies are only kept, never removed.
  */
 export interface SkillCopyBook {
@@ -156,7 +156,7 @@ export type ConnectionStatus = { ok: true; loggedIn: boolean; email?: string; or
  * A workspace folder a connection's CLI must trust (HI-1870), as the CLIs look trust up (probed with Claude Code 2.1.311
  * and Codex 0.164.0): `root` is the real path of a Git project's main repository root (the parent of its common git
  * folder, which covers the project, its slots and copies, all worktrees of it), or of a project without Git; null when
- * Hive couldn't resolve it. `short`: Hive launches it by an 8.3 path, which Claude Code doesn't expand.
+ * Combwork couldn't resolve it. `short`: Combwork launches it by an 8.3 path, which Claude Code doesn't expand.
  */
 export interface TrustTarget {
   root: string | null
@@ -190,7 +190,7 @@ export interface CommandSpec {
    * message" under its input, #363): `keys` wait while it does, as for busyTitle. The title can say so later.
    */
   busyScreen?: (screen: string) => boolean
-  /** True once the task has done its job, for a program that stays open afterwards (Codex after its sandbox setup): Hive then closes it. */
+  /** True once the task has done its job, for a program that stays open afterwards (Codex after its sandbox setup): Combwork then closes it. */
   done?: () => boolean
 }
 
@@ -223,22 +223,22 @@ export interface Ask {
   blocking: boolean
   /** What it asks, for the status and the notification ('' when the CLI doesn't say). */
   message: string
-  /** When `message` is Hive's own words (a safeguard prompt, #606), not the CLI's: as the window shows them (#847). */
+  /** When `message` is Combwork's own words (a safeguard prompt, #606), not the CLI's: as the window shows them (#847). */
   text?: Text
   /** The tool call it is about (ToolEnd's `call`), when the CLI says: that call ending answers it. */
   call?: string
 }
 
-/** A provider's hook call, turned into what Hive tracks. */
+/** A provider's hook call, turned into what Combwork tracks. */
 export type HookEvent =
   | { kind: 'start'; source: string | null }
   /**
    * A prompt the CLI took: `text`, what it says (when the CLI reports it), for telling who sent what (#418).
-   * `injected`: one Hive put into the running turn itself (the turn ledger knows it, #648): not a new prompt.
+   * `injected`: one Combwork put into the running turn itself (the turn ledger knows it, #648): not a new prompt.
    * `cli`: one the CLI started by itself (Claude Code's task-notification wake, HI-2410): a turn, never the user's words.
    */
   | { kind: 'prompt'; text?: string | null; injected?: true; cli?: true }
-  /** `resumes`: the tool starts a turn Hive took as over, or one it saw no prompt for (the turn ledger says, #648). */
+  /** `resumes`: the tool starts a turn Combwork took as over, or one it saw no prompt for (the turn ledger says, #648). */
   | { kind: 'toolStart'; resumes?: true }
   /** `call`: which tool call ended, when the CLI says (see Ask.call). */
   | { kind: 'toolEnd'; call?: string }
@@ -260,7 +260,7 @@ export type HookEvent =
   | { kind: 'interrupt' }
   /**
    * The CLI says it is idle at its prompt, waiting for input, with nothing running (Claude Code's idle_prompt
-   * notification, a minute after a turn): no turn is in flight, whatever Hive last saw (#612).
+   * notification, a minute after a turn): no turn is in flight, whatever Combwork last saw (#612).
    */
   | { kind: 'idle' }
   | { kind: 'compactStart'; trigger: string }
@@ -337,7 +337,7 @@ export interface LiveDetails {
   turnEnded?: { turn: string; at: string } | null
   /**
    * For CLIs whose records don't name turns as their hooks do (Copilot): when each of its Stop hooks was answered, as it
-   * recorded them (its agentStop hook.end), in the lines read (ISO). Hive compares them with the Stops it got (#648).
+   * recorded them (its agentStop hook.end), in the lines read (ISO). Combwork compares them with the Stops it got (#648).
    */
   stopsAnswered?: string[]
 }
@@ -393,17 +393,17 @@ export interface SkillRoots {
   /** Installed plugins, whose skills the CLI loads. */
   plugins: string | null
   /**
-   * Folders inside a project the CLI loads skills from (e.g. .claude/skills), the one Hive creates a project's skills in
+   * Folders inside a project the CLI loads skills from (e.g. .claude/skills), the one Combwork creates a project's skills in
    * first; [] for none. Copilot reads several (.github/skills, .agents/skills and .claude/skills).
    */
   local: string[]
-  /** Hive's own copies inside `local`, which aren't the project's skills (folder name prefix). */
+  /** Combwork's own copies inside `local`, which aren't the project's skills (folder name prefix). */
   combworkCopyPrefix: string | null
 }
 
 /**
- * Everything Hive needs from a coding-agent CLI. One adapter per provider, registered in
- * providers/index.ts; the rest of Hive never checks which provider it is talking to.
+ * Everything Combwork needs from a coding-agent CLI. One adapter per provider, registered in
+ * providers/index.ts; the rest of Combwork never checks which provider it is talking to.
  */
 export interface ProviderAdapter {
   readonly id: ProviderId
@@ -434,7 +434,7 @@ export interface ProviderAdapter {
   /**
    * Whether the CLI on a connection's folder (`home`) trusts each of a workspace's folders (HI-1870), as its own files
    * there say, read only: true, false (not trusted, or no record), or null when it can't be told (a file it can't
-   * read, a folder Hive couldn't resolve). Absent: the CLI keeps no trust to tell.
+   * read, a folder Combwork couldn't resolve). Absent: the CLI keeps no trust to tell.
    */
   connectionTrusts?(home: string, targets: readonly TrustTarget[]): Promise<TrustReading[]>
   /** Where a shared folder of an account (capabilities.connections.shared) links to: that folder of the CLI's own home. */
@@ -442,7 +442,7 @@ export interface ProviderAdapter {
   /** Whether a file in an account's folder is one that changes when the CLI signs in or out there: watched, never read. */
   accountLoginFile?(name: string): boolean
   /**
-   * The key Hive presses for a line break in a prompt it types (HI-1327), for the CLI at `version`: one of the
+   * The key Combwork presses for a line break in a prompt it types (HI-1327), for the CLI at `version`: one of the
    * descriptor's `typedNewlines`, as Settings → Advanced chooses it; null: a space (as before). Absent: always a space.
    */
   typedNewline?(version: string | null): TypedNewline | null
@@ -462,7 +462,7 @@ export interface ProviderAdapter {
   accountHeld?(home: string): boolean
   /** A one-time setup task (Codex's Windows sandbox), when the provider has one. */
   setupCommand?(executable: string): CommandSpec
-  /** The CLI's own home (its sign-in and config) as Hive's sessions get it: what a test copy notes beside the CLI (#368). */
+  /** The CLI's own home (its sign-in and config) as Combwork's sessions get it: what a test copy notes beside the CLI (#368). */
   configHome?(): string
   /** What still keeps agents from running, given what locate() found. */
   readiness(info: AgentInstallInfo): ReadinessIssue[]
@@ -478,16 +478,16 @@ export interface ProviderAdapter {
   configuredDefaultModel(home?: string): string | null
   /** Whether a model seen in a transcript is this provider's (to learn the CLI's default). */
   ownsModel(model: string): boolean
-  /** Environment variables to remove from sessions: a parent session's identity when Hive runs inside one. */
+  /** Environment variables to remove from sessions: a parent session's identity when Combwork runs inside one. */
   readonly envToStrip: string[]
 
   // Launch
   /** Prepares the launch (skills, MCP, hooks) and says what it delivered of each skill in ctx.skills, by name. */
   prepareLaunch(ctx: LaunchContext): Promise<Record<string, SkillDelivery>>
-  /** Where this launch's CLI reads a delivered Hive skill (its copy), for measuring what the session got. */
+  /** Where this launch's CLI reads a delivered Combwork skill (its copy), for measuring what the session got. */
   skillCopyPath(ctx: LaunchContext, skill: string): string
   buildCommand(executable: string, ctx: LaunchContext): CommandSpec
-  /** Something the user should know about this launch (a mode the CLI can't fully give there), shown once per agent while Hive runs. */
+  /** Something the user should know about this launch (a mode the CLI can't fully give there), shown once per agent while Combwork runs. */
   launchNotice?(ctx: LaunchContext): { title: string; message: string } | null
   /** Something in a folder agents work in (any provider's) that stops this CLI working there (#509: a stray .codex), or null. */
   folderWarning?(folder: string): { title: string; message: string } | null
@@ -496,13 +496,13 @@ export interface ProviderAdapter {
   normalizeHook(body: Record<string, any>): NormalizedHook
   /**
    * For CLIs whose terminal title says when a person must act (Codex's "Action Required"): a test of a title, for
-   * this version of the CLI, and the launch (its override switches: a title Hive didn't set isn't read). Null (or
+   * this version of the CLI, and the launch (its override switches: a title Combwork didn't set isn't read). Null (or
    * absent) when its title doesn't say: its hooks then tell Hive (see hookStatus).
    */
   titleAttention?(version: string | null, ctx?: Pick<LaunchContext, 'overrides'>): ((title: string) => boolean) | null
   lockReply(decision: LockDecision): Record<string, unknown>
   /**
-   * The reply that puts Hive's fixed notice text before the model at this hook (#650: the CLI's own event name, as the
+   * The reply that puts Combwork's fixed notice text before the model at this hook (#650: the CLI's own event name, as the
    * hook sent it), in the CLI's format: a checkpoint after a tool call (PostToolUse), or carrying the turn on at its Stop
    * (the drain; stopContinues says it does). Null for an event that can't carry one on this CLI, or one not verified to.
    */
@@ -519,11 +519,11 @@ export interface ProviderAdapter {
    */
   readonly startContextAfterCompaction?: 'prompt'
   /**
-   * Whether the turn a drain carries on comes back to Hive as a new prompt hook, with the notice as its prompt (Copilot):
-   * the turn ledger then takes it as Hive's own in the running turn, not a new one.
+   * Whether the turn a drain carries on comes back to Combwork as a new prompt hook, with the notice as its prompt (Copilot):
+   * the turn ledger then takes it as Combwork's own in the running turn, not a new one.
    */
   readonly drainIsPrompt?: boolean
-  /** Whether Hive's reply to a Stop hook makes the CLI carry the turn on (a block, or context it acts on, #648). */
+  /** Whether Combwork's reply to a Stop hook makes the CLI carry the turn on (a block, or context it acts on, #648). */
   stopContinues(reply: Record<string, any>): boolean
   /**
    * For CLIs whose screen shows for sure whether a turn runs (#648, the turn ledger's last check before "state unknown"):
@@ -533,9 +533,9 @@ export interface ProviderAdapter {
   turnScreen?(version: string | null): ((screen: string) => 'idle' | 'working' | null) | null
   /**
    * Whether the CLI is waiting to retry its model request (HI-1972: rate-limited, its connection lost), from its own
-   * records: its newest such wait in conversation `sessionId` recorded since `since` (ms), or null (none, or Hive can't
+   * records: its newest such wait in conversation `sessionId` recorded since `since` (ms), or null (none, or Combwork can't
    * tell). `env` is the launch's environment (where its CLI keeps its records), `transcriptPath` its transcript where
-   * known. Read off main's thread and bounded in time; never changes anything of the CLI's. Absent: Hive can't tell.
+   * known. Read off main's thread and bounded in time; never changes anything of the CLI's. Absent: Combwork can't tell.
    */
   retryWait?(q: { sessionId: string; env: NodeJS.ProcessEnv; transcriptPath?: string; since: number }): Promise<RetryWait | null>
   /** How long a running turn goes without a hook before retryWait is asked (ms); absent: 20 s. */
@@ -544,16 +544,16 @@ export interface ProviderAdapter {
   statusLine?(body: Record<string, any>): LiveDetails
   /**
    * How a launch's CLI will compact by itself, read from its command, environment and the CLI's settings files (never
-   * changed), for the model it runs as (`models`: the id it resolves to, then the choice). Absent: Hive doesn't know.
+   * changed), for the model it runs as (`models`: the id it resolves to, then the choice). Absent: Combwork doesn't know.
    */
   autoCompact?(ctx: LaunchContext, cmd: CommandSpec, models: string[]): AutoCompactSetting
   /**
-   * Where the CLI's settings files turn its hooks off for a launch (#1336: why its hooks don't reach Hive), read now and
-   * never changed: the settings' name in the window's language, or null when none does (or Hive can't tell).
+   * Where the CLI's settings files turn its hooks off for a launch (#1336: why its hooks don't reach Combwork), read now and
+   * never changed: the settings' name in the window's language, or null when none does (or Combwork can't tell).
    */
   hooksOffIn?(ctx: LaunchContext): string | null
   /**
-   * The launch's hooks for its Hooks dialog (HI-982), once its command is built: Hive's own as passed for it, and the CLI's
+   * The launch's hooks for its Hooks dialog (HI-982), once its command is built: Combwork's own as passed for it, and the CLI's
    * others as far as this provider can establish them. Read-only, never changing a hook or a CLI's config. Absent: the
    * dialog lists none.
    */
@@ -570,14 +570,14 @@ export interface ProviderAdapter {
   backgroundTasks?(appended: string, memo: Record<string, unknown>): BackgroundTaskEvent[]
   /**
    * Safeguard stops, and model changes after one (#606), in lines appended to the session's transcript (whole lines).
-   * `memo` is the launch's own, kept between reads (and emptied when the reading starts again). Absent: Hive can't
+   * `memo` is the launch's own, kept between reads (and emptied when the reading starts again). Absent: Combwork can't
    * detect them for this CLI (descriptor.safeguardHelp is null).
    */
   safeguards?(appended: string, memo: Record<string, unknown>): SafeguardEvent[]
   /**
    * Turns the session's transcript identifies in lines appended to it (whole lines; #1371, hooks health): each by the
    * id its hooks carry for it (`turnsJoin: 'id'`), or by the transcript's own id when its hooks carry none (`'time'`),
-   * with when its prompt was written and whether the model took it up. Only turns a person's (or Hive's) prompt began,
+   * with when its prompt was written and whether the model took it up. Only turns a person's (or Combwork's) prompt began,
    * never a sub-agent's, a compaction or a local command. `memo` is kept between reads of one file (emptied when the
    * reading starts again); a turn whose prompt wasn't read (before the reading began, or in a gap) isn't returned.
    */
@@ -637,25 +637,25 @@ export interface ProviderAdapter {
   footerMode?(screen: string, launched?: PermissionMode | null): PermissionMode | null
   /** Whether a running session can switch to a mode without restarting. */
   canSwitchLive(target: PermissionMode, current: PermissionMode | undefined, launched: PermissionMode | null | undefined): boolean
-  /** Terminal output meaning a compaction Hive started was refused or failed (no hook comes). */
+  /** Terminal output meaning a compaction Combwork started was refused or failed (no hook comes). */
   readonly compactFailure: RegExp | null
   /**
    * Terminal output meaning the CLI is waiting for a prompt, for CLIs whose first hook only comes with the
-   * first prompt (Codex creates its thread lazily): until then Hive shows the agent as ready from this.
+   * first prompt (Codex creates its thread lazily): until then Combwork shows the agent as ready from this.
    */
   readonly readyOutput?: RegExp
 
   // Transcripts
   transcriptPath(folder: string, sessionId: string, recorded?: string): Promise<string | null>
-  /** Where to put a transcript restored from Hive's backup so the CLI can resume it; null if it can't be restored. */
+  /** Where to put a transcript restored from Combwork's backup so the CLI can resume it; null if it can't be restored. */
   restorePath(folder: string, sessionId: string, recorded?: string): string | null
   /**
-   * The CLI's sessions run in a folder. `skip`: ids the caller has already (Hive's own sessions), left out before their
-   * files are looked at (HI-1681): a session list asks for every folder its sessions ran in, mostly Hive's own.
+   * The CLI's sessions run in a folder. `skip`: ids the caller has already (Combwork's own sessions), left out before their
+   * files are looked at (HI-1681): a session list asks for every folder its sessions ran in, mostly Combwork's own.
    */
   listSessions(folder: string, skip?: (id: string) => boolean): Promise<ExternalSession[]>
   /**
-   * Whether a transcript (one of the CLI's, or Hive's copy of it) is a sub-session, from its first line; cached by mtime.
+   * Whether a transcript (one of the CLI's, or Combwork's copy of it) is a sub-session, from its first line; cached by mtime.
    * `mtimeMs`: the file's, from a stat the caller has (HI-1681), so it isn't stat'd again.
    */
   subSessionOf(path: string, sessionId: string, mtimeMs?: number): Promise<SubSession | null>
@@ -670,7 +670,7 @@ export interface ProviderAdapter {
   /** Output that means the CLI is asking the user something before it starts (e.g. whether to trust the folder). */
   readonly startupQuestion?: RegExp
   /**
-   * How Hive ends the CLI as a person would, for CLIs that write what Hive reads only as they exit (Copilot's token
+   * How Combwork ends the CLI as a person would, for CLIs that write what Combwork reads only as they exit (Copilot's token
    * totals, #465): the keys it types, one every gapMs, before killing the CLI if it is still running after graceMs.
    * Without it, Stop kills the process. `armed` (HI-2272): what its screen shows once a first key at its prompt has
    * armed the next to exit. With it, Stop types the first key on conditions rather than at a fixed beat (exitKeys.ts):
@@ -678,7 +678,7 @@ export interface ProviderAdapter {
    */
   readonly exitKeys?: { keys: string[]; gapMs: number; graceMs: number; armed?: RegExp }
   /**
-   * The command a person types to end the CLI (Claude Code's /exit, Codex's /quit), which Hive types, then Enter, at a
+   * The command a person types to end the CLI (Claude Code's /exit, Codex's /quit), which Combwork types, then Enter, at a
    * lane's end once its builder's turn is over (HI-1706, sessions.quit), killing it if it is still running after graceMs.
    * Only that end uses it: Stop and restarts don't. A CLI without one is ended there by its exitKeys, or killed.
    */
@@ -700,12 +700,12 @@ export interface ProviderAdapter {
   // Project files
   /** `homes`: the connections' homes on in the project's workspace (HI-1755), whose user memory replaces the CLI's own home's. */
   memorySources(projectPath: string, homes?: readonly { id: string; name: string; home: string }[]): Promise<MemorySource[]>
-  /** Files in the CLI's own folder Hive may show and edit (instructions, memory); false for anything else. */
+  /** Files in the CLI's own folder Combwork may show and edit (instructions, memory); false for anything else. */
   /** `homes`: the connections' homes (HI-1755) to allow in place of the CLI's own home. */
   fileAllowed(path: string, write: boolean, homes?: readonly string[]): boolean
   /** `home`: a connection's home (HI-1755) rather than the CLI's own. */
   skillRoots(home?: string): SkillRoots
-  /** MCP servers a project defines in the CLI's own config, which Hive leaves off until copied to the workspace. */
+  /** MCP servers a project defines in the CLI's own config, which Combwork leaves off until copied to the workspace. */
   projectMcpServers(projectPath: string): Promise<Record<string, McpServerDef>>
 
   /**

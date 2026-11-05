@@ -12,13 +12,13 @@ import { placeOnDisplay } from './windowBounds'
 
 /**
  * The developer console's window (#366, #637): its own window like Chrome DevTools, so it can go on a second screen, one
- * per Hive window and on the workspace that window showed when it opened. It calls only the console's channels (ipc.ts),
+ * per Combwork window and on the workspace that window showed when it opened. It calls only the console's channels (ipc.ts),
  * closes with the window that opened it or when that window leaves its workspace (another opens in it, or it closes), and
  * remembers its size and position.
  */
 
 const consoles = new Map<CombworkWindow, BrowserWindow>()
-/** A console window's page → the Hive window it belongs to. */
+/** A console window's page → the Combwork window it belongs to. */
 const owners = new Map<number, CombworkWindow>()
 /** Each console's workspace (lower case): the one its owner showed when it opened. */
 const workspaces = new Map<BrowserWindow, string>()
@@ -47,12 +47,12 @@ const DEFAULT_BOUNDS: WindowState = { width: 1100, height: 720, maximized: false
  */
 export const CONSOLE_WINDOW_CHANNELS: ReadonlySet<string> = new Set(['console:sources', 'console:options', 'console:subscribe', 'console:snapshot', 'console:record', 'console:stopRecording', 'console:recordings', 'console:showRecording', 'console:captures', 'settings:get', 'app:info'])
 
-/** The Hive window a console window's page belongs to. */
+/** The Combwork window a console window's page belongs to. */
 export function consoleOwner(sender: WebContents): CombworkWindow | null {
   return owners.get(sender.id) ?? null
 }
 
-/** The console window open for a Hive window. */
+/** The console window open for a Combwork window. */
 export function consoleWindowOf(owner: CombworkWindow): BrowserWindow | null {
   const w = consoles.get(owner)
   return w && !w.isDestroyed() ? w : null
@@ -66,7 +66,7 @@ function dark(): boolean {
 /** The smallest a console window can be. */
 const CONSOLE_MIN = { width: 560, height: 320 }
 
-/** Opens the Hive window's console on its workspace, or brings it forward when it is open. */
+/** Opens the Combwork window's console on its workspace, or brings it forward when it is open. */
 export function openConsoleWindow(owner: CombworkWindow): BrowserWindow {
   if (!owner.ws.path) throw new Error(tr(msg({ id: 'main.console.noWorkspace', defaultMessage: "Open a workspace first: the developer console shows a workspace's agents and Combwork's work there.", description: 'An error when the developer console is opened with no workspace open.' })))
   followWorkspaces()
@@ -78,7 +78,7 @@ export function openConsoleWindow(owner: CombworkWindow): BrowserWindow {
     else open.focus()
     return open
   }
-  // Fitted to the display it opens on, as Hive's windows are (#862): saved on a larger one, it would run off this one's edge.
+  // Fitted to the display it opens on, as Combwork's windows are (#862): saved on a larger one, it would run off this one's edge.
   const b = placeOnDisplay({ ...DEFAULT_BOUNDS, ...config.get().consoleWindow }, CONSOLE_MIN, screen)
   const offScreen = testQuiet() ? offScreenOrigin(b.width) : null
   const win = new BrowserWindow({

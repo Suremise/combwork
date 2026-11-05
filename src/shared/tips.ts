@@ -1,5 +1,5 @@
 /**
- * Tips: one sentence or two each about something Hive can do, shown one a day in a card when Hive starts, at the
+ * Tips: one sentence or two each about something Combwork can do, shown one a day in a card when Combwork starts, at the
  * moment they matter (contextual), and all together in Help → Tips…. Adding a tip is adding an entry to TIP_ENTRIES, in
  * id order, with an `order` for where it's shown.
  *
@@ -344,7 +344,7 @@ export const TIP_ENTRIES: Tip[] = [
 /** The tips in the order they're shown: by `order`. */
 export const TIPS: Tip[] = [...TIP_ENTRIES].sort((a, b) => a.order - b.order)
 
-/** What Hive remembers about tips, in the user's profile. */
+/** What Combwork remembers about tips, in the user's profile. */
 export interface TipsState {
   /** Tips shown, in the current round (a round ends when every tip still worth showing was seen). */
   seen: string[]
@@ -374,7 +374,7 @@ export function nextTip(s: TipsState, from: string | null = null, tips: Tip[] = 
   return order.find((t) => !s.seen.includes(t.id)) ?? order[0] ?? null
 }
 
-/** The tip for Hive starting today, unless one showed today already. */
+/** The tip for Combwork starting today, unless one showed today already. */
 export function tipForToday(s: TipsState, now: Date, tips: Tip[] = TIPS): Tip | null {
   return s.shownOn === localDay(now) ? null : nextTip(s, null, tips)
 }

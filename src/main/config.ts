@@ -78,7 +78,7 @@ class ConfigStore {
   }
 
   load(): void {
-    // A damaged file is set aside and its last good copy (.bak) used; only with neither does Hive start fresh.
+    // A damaged file is set aside and its last good copy (.bak) used; only with neither does Combwork start fresh.
     const raw = readKeptJsonSync<Record<string, any> | null>(this.path, null, { holder: this })
     if (!raw || typeof raw !== 'object') {
       this.data = structuredClone(DEFAULT_APP_CONFIG)
@@ -191,7 +191,7 @@ class ConfigStore {
   }
 
   /**
-   * Replaces Hive's workflow defaults for a platform (#1422: Settings → Workflow defaults; the deep merge in updateSettings
+   * Replaces Combwork's workflow defaults for a platform (#1422: Settings → Workflow defaults; the deep merge in updateSettings
    * can't take an option back to inherit). Checked by the caller (workflow/levels.ts).
    */
   setWorkflowDefaults(platform: PlatformId, options: Partial<WorkflowOptions>): AppSettings {
@@ -202,7 +202,7 @@ class ConfigStore {
     return this.data.settings
   }
 
-  /** Replaces Hive's slot defaults (HI-1765: Settings → Workflow defaults, Git): the deep merge can't take one back to inherit. */
+  /** Replaces Combwork's slot defaults (HI-1765: Settings → Workflow defaults, Git): the deep merge can't take one back to inherit. */
   setSlotDefaults(defaults: SlotDefaults): AppSettings {
     const prev = structuredClone(this.data.settings)
     this.data.settings = { ...this.data.settings, slotDefaults: defaults }
@@ -249,7 +249,7 @@ class ConfigStore {
 
   /**
    * Replaces one provider's fallback list of models or effort levels (#125), as the user edited it; null (or an empty
-   * list) goes back to Hive's defaults, which then follow Hive's updates. Entries without a value are dropped, and a
+   * list) goes back to Combwork's defaults, which then follow Combwork's updates. Entries without a value are dropped, and a
    * value given twice keeps its first entry.
    */
   setProviderFallback(provider: string, kind: 'models' | 'efforts', list: (FallbackModel | EffortOption)[] | null): AppSettings {

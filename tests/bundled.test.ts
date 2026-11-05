@@ -467,7 +467,7 @@ describe('a workspace', () => {
       expect(forAgents).toEqual(expect.arrayContaining(['my-own', 'work-on-card', 'review-agent-work', 'merge-ready', 'handover', 'split-work']))
       expect(forAgents).not.toContain('coordinate-agents')
       expect(forAssistant).toEqual(expect.arrayContaining(['coordinate-agents', 'split-work', 'handover', 'pick-up', 'workspace-note']))
-      // use-cw-api is for both (HI-2012): its tools.md has the hive tools' cases.
+      // use-cw-api is for both (HI-2012): its tools.md has the Combwork tools' cases.
       expect(forAgents).toContain('use-cw-api')
       expect(forAssistant).toContain('use-cw-api')
       for (const n of ['my-own', 'work-on-card', 'review-agent-work', 'merge-ready']) expect(forAssistant).not.toContain(n)

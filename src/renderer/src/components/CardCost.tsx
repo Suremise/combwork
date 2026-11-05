@@ -14,7 +14,7 @@ import { Tooltip } from './ui'
  */
 
 /** What a cost is: said with every breakdown (in English until the Performance view, E8d, shows COST_NOTE_TEXT). */
-export const COST_NOTE = 'What its agents used while they held it, as the providers reported it: ≈ is Hive’s estimate, ? or Unknown what isn’t known (never $0).' // i18n-ignore: the Performance view's (E8d converts it to COST_NOTE_TEXT)
+export const COST_NOTE = 'What its agents used while they held it, as the providers reported it: ≈ is Combwork’s estimate, ? or Unknown what isn’t known (never $0).' // i18n-ignore: the Performance view's (E8d converts it to COST_NOTE_TEXT)
 export const COST_NOTE_TEXT = msg({ id: 'board.costs.note', defaultMessage: 'What its agents used while they held it, as the providers reported it: ≈ is Combwork’s estimate, ? or Unknown what isn’t known (never {zero}).', description: "Under a card's cost breakdown (its hover): what the cost is. ≈, ? and Unknown are how costs show: keep ≈ and ?, and use the same word for Unknown as the costs do. {zero} is no cost, as costs show it (\"$0.00\")." })
 
 const BUILDER = msg({ id: 'board.costs.builder', defaultMessage: 'Builder', description: "In a card's cost hover, before what the agent that built it used; and a column of its cost-by-round table (card dialog, Work section). Keep it short." })

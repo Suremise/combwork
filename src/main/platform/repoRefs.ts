@@ -122,7 +122,7 @@ export function isMainGitDir(common: string): boolean {
 }
 
 /**
- * HI-2115's one rule for Hive's git caches (the Assistant's design call after HR3's round 2): only a plain repository's
+ * HI-2115's one rule for Combwork's git caches (the Assistant's design call after HR3's round 2): only a plain repository's
  * answers are reused, anything else is git's every time. Plain: refs in files (no reftable); no replacements, grafts or
  * shallow history (in the repository, or named in the environment); and no `include` or `includeIf` anywhere in the
  * config files given (a plain text search, never parsed): `gitDir`'s `config.worktree` and the common dir's `config`

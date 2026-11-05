@@ -261,7 +261,7 @@ if (toConsole) {
  */
 export function logLine(level: Level, scope: string, message: string, extra?: unknown): string {
   const detail = extra instanceof Error ? ` ${extra.stack ?? extra.message}` : extra !== undefined ? ` ${safeJson(extra)}` : ''
-  // Its time, level and scope are Hive's own; strict masking (keyMatcher.ts) is for what follows them.
+  // Its time, level and scope are Combwork's own; strict masking (keyMatcher.ts) is for what follows them.
   return `${new Date().toISOString()} [${level.toUpperCase()}] [${scope}] ${maskKeys(`${message}${detail}`)}\n`
 }
 
@@ -304,7 +304,7 @@ export function userText(text: unknown): string {
   return `\u2068${String(text).replace(/[\u2068\u2069\r\n]/g, ' ')}\u2069`
 }
 
-/** Flags whose values are Hive's own choices (ids, models, modes), never the user's text. */
+/** Flags whose values are Combwork's own choices (ids, models, modes), never the user's text. */
 const PLAIN_VALUE_FLAGS = new Set(['--session-id', '--resume', 'resume', '--model', '-m', '--effort', '--permission-mode', '-s', '--sandbox', '-a', '--ask-for-approval', '--allowedTools'])
 
 /**

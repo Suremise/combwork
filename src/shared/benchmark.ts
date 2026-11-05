@@ -1,5 +1,5 @@
 /**
- * Comparing two measurements of Hive's own costs (#117): scenario benchmarks (tests/scenarios writes them,
+ * Comparing two measurements of Combwork's own costs (#117): scenario benchmarks (tests/scenarios writes them,
  * "combwork-benchmark/1": controlled runs, each sample with its correctness checks) and Performance exports
  * ("combwork-metrics/1": real use over a range, kept as a summary). Pure, so the app and tests share it. Every file, imported
  * or kept, is read through the same normalisers as untrusted input (nothing is cast and returned as it was). A
@@ -115,7 +115,7 @@ const M = {
   ownNoPart: msg({ id: 'performance.compare.error.ownNoPart', defaultMessage: 'It is the workspace’s own work: it has no project’s part.', description: "Why a Performance export is not imported on a project's Performance page." }),
   noPart: msg({ id: 'performance.compare.error.noPart', defaultMessage: 'It is a workspace export with no part for {project}.', description: "Why a workspace's Performance export is not imported on a project's Performance page. {project} is the project's name." }),
   unknownSchema: msg({ id: 'performance.compare.error.unknownSchema', defaultMessage: 'It isn’t a Combwork benchmark (combwork-benchmark/1) or Performance export (combwork-metrics/1).', description: 'Why a file is not imported to Performance → Compare. Keep combwork-benchmark/1 and combwork-metrics/1 (file formats).' }),
-  // A kept comparison's name and description when Hive made them (#1104): the window says them from its facts.
+  // A kept comparison's name and description when Combwork made them (#1104): the window says them from its facts.
   aboutScenarios: msg({ id: 'performance.compare.about.scenarios', defaultMessage: '{real, select, yes {Model trial {provider} {model} ({effort}, {mode})} other {Fake {provider}}}, fixtures v{fixtures}, {scenarios, plural, one {# scenario} other {# scenarios}} × {repeats, number}, source {head}{real, select, yes {, spent {spent}{unpriced, plural, =0 {} other { + {unpriced, number} unpriced (total unknown)}}} other {}}', description: "What a kept scenario benchmark is, in a line under its name in Performance → Compare. A model trial ran a real model ({provider} the CLI, {model}, its {effort} and permission {mode}); Fake ran Combwork's fake CLI. fixtures v{fixtures} is the version of the test fixtures (keep v); {head} is the git commit the run was made from; {spent} what the trial cost; unpriced trials are ones with no known cost." }),
   aboutExport: msg({ id: 'performance.compare.about.export', defaultMessage: '{from} to {to}: {filters}', description: 'What a kept Performance export is, in a line under its name in Performance → Compare: its range ({from} and {to} are dates and times) and its filters (such as "project agents, all providers").' }),
   aboutExportPart: msg({ id: 'performance.compare.about.exportPart', defaultMessage: '{from} to {to}: {filters} ({part})', description: "What a kept Performance export is, in a line under its name in Performance → Compare, when it is one project's part of a workspace export: its range ({from} and {to} are dates and times), its filters, and {part}, which says it is that part." }),
@@ -196,7 +196,7 @@ export const USAGE_MEASURES: MeasureDef[] = [
   { key: 'costUsd', label: msg({ id: 'performance.compare.measure.costUsd', defaultMessage: 'Cost', description: 'A measure in Performance → Compare: what a session cost, in dollars.' }), unit: 'usd', group: 'provider', tip: msg({ id: 'performance.compare.measureTip.costUsd', defaultMessage: 'API-equivalent; only when every sample on both sides has a cost (≈ when Combwork estimated one).', description: 'Tooltip of the Cost measure in Performance → Compare. Keep ≈ (it marks an estimate).' }) }
 ]
 
-/** A Performance export's summary measures: per hour Hive was recording, so ranges of different lengths compare. */
+/** A Performance export's summary measures: per hour Combwork was recording, so ranges of different lengths compare. */
 export const EXPORT_MEASURES: MeasureDef[] = [
   { key: 'requests', label: msg({ id: 'performance.compare.measure.exportRequests', defaultMessage: 'API requests', description: "A measure in Performance → Compare of exports: requests to Combwork's Agent API." }), unit: 'count', group: 'traffic', tip: msg({ id: 'performance.compare.measureTip.exportRequests', defaultMessage: 'Agent API requests, per hour recorded.', description: 'Tooltip of the API requests measure in Performance → Compare of exports.' }) },
   { key: 'failed', label: msg({ id: 'performance.compare.measure.exportFailed', defaultMessage: 'Failed or cancelled', description: "A measure in Performance → Compare of exports: Agent API requests that failed or were cancelled." }), unit: 'count', group: 'failures', tip: PER_HOUR },
@@ -258,7 +258,7 @@ export interface Sample {
   skipped: number
   checks: Check[]
   failedChecks: string[]
-  /** The session was given other guidance than Hive had when the run started (a stale launch): left out. */
+  /** The session was given other guidance than Combwork had when the run started (a stale launch): left out. */
   stale: boolean
   /** A resumed session: its provider usage is the whole conversation's, so it isn't compared. */
   resumed: boolean
@@ -270,7 +270,7 @@ export interface Sample {
   split?: { subject: Measures; others: Measures }
   /** The harness couldn't split every measure (incomplete coverage): what it couldn't is left out of `split`. */
   splitPartial?: boolean
-  /** Each agent's hive calls in the measured window (HI-2186), the subject first. */
+  /** Each agent's Combwork calls in the measured window (HI-2186), the subject first. */
   agents?: AgentCalls[]
   usage: Measures | null
   /** Whether the usage's cost was Hive's estimate. */
@@ -354,7 +354,7 @@ export interface Artifact {
   scope: CompareScope
   /** Derived from a workspace export: one project's part, explicitly chosen. */
   derived?: string
-  /** The name is one Hive gave it (it came with none): the window says it from its facts (#1104). */
+  /** The name is one Combwork gave it (it came with none): the window says it from its facts (#1104). */
   labelKind?: LabelKind
   run?: BenchmarkRun
   scenarios?: ScenarioResult[]
@@ -391,7 +391,7 @@ function withModeNames(m: Record<string, unknown> | null): Record<string, unknow
 }
 
 /**
- * Measures with what adds up from them: the launch guidance and Hive's context, only when every part they add up is
+ * Measures with what adds up from them: the launch guidance and Combwork's context, only when every part they add up is
  * known (a missing part leaves them unknown).
  */
 function withDerived(m: Measures | null): Measures | null {
@@ -602,7 +602,7 @@ function partTotals(p: unknown, t: Measures, unknown: Set<string>): void {
   }
   for (const kind of ['api', 'mcp', 'guidance', 'catalog'] as const) {
     const v = o[kind]
-    // A report with no tool lists at all (one written by hand, or by a Hive from before they were counted) has none.
+    // A report with no tool lists at all (one written by hand, or by a Combwork from before they were counted) has none.
     if (kind === 'catalog' && v === undefined) continue
     const mark = (...keys: string[]): void => keys.forEach((k) => unknown.add(k))
     if (!Array.isArray(v) || v.length > BENCHMARK_LIMITS.series) {
@@ -713,7 +713,7 @@ export function summaryOf(report: unknown, project?: string): ExportSummary {
   }
 }
 
-/** A kept summary, re-read (Hive wrote it, but the file is on disk). A total it doesn't have is unknown. */
+/** A kept summary, re-read (Combwork wrote it, but the file is on disk). A total it doesn't have is unknown. */
 function readSummary(v: unknown): ExportSummary | null {
   const s = obj(v)
   const totals = s ? readMeasures(s.totals, EXPORT_KEYS) : null
@@ -810,7 +810,7 @@ export function parseArtifact(textValue: string, scope: CompareScope, opts: { us
 }
 
 /**
- * Re-reads a kept artifact through the same normalisers (Hive wrote it, but the file is on disk): a fresh, bounded
+ * Re-reads a kept artifact through the same normalisers (Combwork wrote it, but the file is on disk): a fresh, bounded
  * object, never the one read. Null if it isn't a valid one.
  */
 export function readKept(v: unknown): Artifact | null {
@@ -843,9 +843,9 @@ export interface KeptEntry {
   pinned: boolean
   /** One line saying what it is (provider and model, or the export's range and filters), in English. */
   about: string
-  /** What `about` (and a name Hive gave it) were made from, so the window says them in its language (#1104); none on entries kept before. */
+  /** What `about` (and a name Combwork gave it) were made from, so the window says them in its language (#1104); none on entries kept before. */
   facts?: KeptFacts
-  /** The name is one Hive gave it: the window says it from `facts` (#1104). */
+  /** The name is one Combwork gave it: the window says it from `facts` (#1104). */
   labelKind?: LabelKind
   /** A project's: that project's stable id (#514), so it stays its own whatever the project is called later. */
   owner?: string
@@ -878,11 +878,11 @@ export function aboutOf(a: Artifact): string {
   return `${s.from.slice(0, 16).replace('T', ' ')} to ${s.to.slice(0, 16).replace('T', ' ')}: ${f}${a.derived ? ` (${a.derived})` : ''}`
 }
 
-/** What Hive made a kept comparison's description from (#1104), kept in its index entry: the window says it in its language. */
+/** What Combwork made a kept comparison's description from (#1104), kept in its index entry: the window says it in its language. */
 export type KeptFacts =
   | { kind: 'scenarios'; real: boolean; provider: string; model: string; effort: string; mode: string | null; fixtures: number; scenarios: number; repeats: number; head: string; dirty: boolean; spentUsd: number; unpriced: number }
   | { kind: 'export'; from: string; to: string; filters: ExportSummary['filters']; part: boolean }
-/** The name Hive gave a kept comparison that came with none: a benchmark's, an export's, or a kept Performance view's. */
+/** The name Combwork gave a kept comparison that came with none: a benchmark's, an export's, or a kept Performance view's. */
 export type LabelKind = 'benchmark' | 'export' | 'kept'
 const isLabelKind = (v: unknown): v is LabelKind => v === 'benchmark' || v === 'export' || v === 'kept'
 
@@ -910,7 +910,7 @@ function factsAndLabel(e: Record<string, unknown>): { facts?: KeptFacts; labelKi
   return { ...(facts ? { facts } : {}), ...(facts && isLabelKind(e.labelKind) ? { labelKind: e.labelKind } : {}) }
 }
 
-/** A kept comparison's name as the window shows it: one Hive gave it, said from its facts in the window's language; the user's as written. */
+/** A kept comparison's name as the window shows it: one Combwork gave it, said from its facts in the window's language; the user's as written. */
 export function keptLabel(e: Pick<KeptEntry, 'label' | 'labelKind' | 'facts' | 'scope'>): TextPart {
   const f = e.facts
   if (!e.labelKind || !f) return e.label
@@ -987,7 +987,7 @@ export interface ScenarioComparison {
   subject: 'assistant' | 'agent'
   /** The subject's measures and the other agents' apart (HI-2186), when every usable sample on both sides has them. */
   split: { subject: MeasureDelta[]; others: MeasureDelta[] } | null
-  /** Each agent's hive calls in the measured window, on average a sample (null: unknown), when every sample has them. */
+  /** Each agent's Combwork calls in the measured window, on average a sample (null: unknown), when every sample has them. */
   agents: AgentCallsDelta[] | null
   usage: MeasureDelta[] | null
   /** In English (tests, code); `notesText` is the same for the window. */
@@ -995,7 +995,7 @@ export interface ScenarioComparison {
   notesText: Text[]
 }
 
-/** An agent's hive calls, baseline and run (HI-2186): null where a side can't say (its rows overflowed). */
+/** An agent's Combwork calls, baseline and run (HI-2186): null where a side can't say (its rows overflowed). */
 export interface AgentCallsDelta {
   agent: string
   role: AgentCalls['role']
@@ -1060,7 +1060,7 @@ const avg = (xs: Sample[], f: (s: Sample) => number): number => (xs.length ? xs.
 /** Measures that mean more failures or more work when they grow: a growth is a regression, whatever the size did. */
 const FAILURE_KEYS = ['combworkCallErrors', 'toolErrors', 'apiFailed', 'apiCancelled', 'repeatedCalls', 'combworkCalls']
 
-/** Why a sample is left out: Hive's own reasons as messages, the harness's own words (or an older Hive's) as written. */
+/** Why a sample is left out: Combwork's own reasons as messages, the harness's own words (or an older Hive's) as written. */
 const SAMPLE_PROBLEMS = [M.tooManyChecks, M.invalidCheck, M.checkTwice, M.checksNotList, M.countsDiffer, M.failedNoCheck, M.noCheckRan, M.didntComplete]
 const sampleProblem = (reason: string): TextPart => SAMPLE_PROBLEMS.find((m) => m.defaultMessage === reason) ?? reason
 
@@ -1155,7 +1155,7 @@ function compareScenario(id: string, base: ScenarioResult | undefined, run: Scen
 const SPLIT_SHOWN = new Set(SCENARIO_MEASURES.map((m) => m.key).filter((k) => !NOT_SPLIT.has(k) && k !== 'seconds'))
 
 /**
- * Each agent's hive calls on average a sample, baseline and run (HI-2186), matched by its fixture identity (name and
+ * Each agent's Combwork calls on average a sample, baseline and run (HI-2186), matched by its fixture identity (name and
  * role), the subject first. An agent missing from a sample's rows made no call, unless that sample's rows overflowed:
  * then that side is unknown for it. Null unless every usable sample on both sides listed its agents.
  */
@@ -1220,7 +1220,7 @@ export function compareArtifacts(base: Artifact, run: Artifact): Comparison {
     if (a.guidance && b.guidance && a.guidance === b.guidance) notes.push(M.sameGuidance)
     const realUsage = a.real && b.real
     if (!realUsage) notes.push(M.fakeUsage)
-    // The scripted fakes start a hive server a call (fake-copilot runs the real Copilot CLI, which keeps one).
+    // The scripted fakes start a combwork server a call (fake-copilot runs the real Copilot CLI, which keeps one).
     if ([a, b].some((x) => x.provider === 'fake' || x.provider === 'fake-codex')) notes.push(M.fakePerCall)
     const ids = [...new Set([...base.scenarios.map((s) => s.id), ...run.scenarios.map((s) => s.id)])]
     const scenarios = ids.map((id) =>

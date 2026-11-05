@@ -553,8 +553,8 @@ export class GitPlatform implements PlatformAdapter {
   }
 
   async moveLine(folder: string, to: string, expect: { line: string | null; head: string; target?: string }, go: () => boolean): Promise<true | string | null> {
-    // Under the repository lock (#1347): a merge into the repository, from this Hive or another, isn't moving refs meanwhile.
-    // Another Hive merging past the lock's wait: nothing moved, and the lane waits for the next pass.
+    // Under the repository lock (#1347): a merge into the repository, from this Combwork or another, isn't moving refs meanwhile.
+    // Another Combwork merging past the lock's wait: nothing moved, and the lane waits for the next pass.
     // What the move itself throws (a move part way, not put back) is the caller's, as before.
     let ran = false
     return withRepoLock(folder, () => ((ran = true), G.moveLineLocked(folder, to, expect, go)), { quiet: true, project: this.project }).catch((e: unknown) => {

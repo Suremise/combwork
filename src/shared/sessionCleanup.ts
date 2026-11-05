@@ -2,9 +2,9 @@ import type { SessionListItem } from './types'
 
 /**
  * The Sessions tab's Clean Up… (#895): which of a project's sessions archive or delete takes when they were last
- * active longer ago than an age, and which it leaves alone. Archive takes Hive's own sessions that aren't archived yet;
+ * active longer ago than an age, and which it leaves alone. Archive takes Combwork's own sessions that aren't archived yet;
  * Delete takes every session, archived or not, as the branch actions do. Running sessions, the one open in the tab and
- * the Hive Assistant's current conversation are always left alone. The ids taken go to session:bulk, which checks each
+ * the Combwork Assistant's current conversation are always left alone. The ids taken go to session:bulk, which checks each
  * again (running in another window, files in use) and says what it skipped.
  */
 
@@ -17,7 +17,7 @@ export const CLEANUP_AGES: CleanupAge[] = ['day', 'week', 'month']
 
 /**
  * Why Clean Up leaves an old session alone before asking main: `live`: running; `shown`: its transcript is open in the
- * tab; `current`: the Hive Assistant's current conversation (the one it resumes).
+ * tab; `current`: the Combwork Assistant's current conversation (the one it resumes).
  */
 export type CleanupSkip = 'live' | 'shown' | 'current'
 
@@ -36,7 +36,7 @@ export function lastActive(s: SessionListItem): number | null {
   return null
 }
 
-/** The sessions an action takes regardless of age (the branch actions' rule): archive only Hive's own, not archived yet. */
+/** The sessions an action takes regardless of age (the branch actions' rule): archive only Combwork's own, not archived yet. */
 export function cleanupTakes(s: SessionListItem, action: CleanupAction): boolean {
   return action === 'delete' || (!s.archived && s.source === 'combwork')
 }

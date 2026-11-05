@@ -223,7 +223,7 @@ function ownClaudeHome(name) {
   fs.rmSync(home, { recursive: true, force: true })
   fs.mkdirSync(home, { recursive: true })
   // Made up: shaped like an API key, valid for nothing.
-  const apiKey = `sk-ant-api03-hivetest-${require('crypto').randomBytes(24).toString('hex')}`
+  const apiKey = `sk-ant-api03-cwtest-${require('crypto').randomBytes(24).toString('hex')}`
   fs.writeFileSync(path.join(home, '.claude.json'), JSON.stringify({ hasCompletedOnboarding: true, customApiKeyResponses: { approved: [apiKey.slice(-20)], rejected: [] } }))
   console.log(`Claude Code home: ${home} (CLAUDE_CONFIG_DIR, the suite's own; a made-up API key, no sign-in)`)
   return { home, env: { CLAUDE_CONFIG_DIR: home, ANTHROPIC_API_KEY: apiKey } }

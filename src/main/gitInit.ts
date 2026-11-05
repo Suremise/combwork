@@ -21,7 +21,7 @@ const log = createLogger('gitInit')
 
 /**
  * Initialise repository (#701): makes a project folder that isn't a git repository one, from its Git tab. In order:
- * `git init -b main`; the project's .combwork (and Hive's copies of skills) added to `.git/info/exclude` and git asked
+ * `git init -b main`; the project's .combwork (and Combwork's copies of skills) added to `.git/info/exclude` and git asked
  * whether it ignores .combwork, before anything is staged, so .combwork can never be in the first commit (#345); the starter
  * .gitignore the user chose (never over one the folder has); the identity asked for, saved to this repository's config
  * only; everything staged and committed (an empty commit for an empty folder); then the workspace refreshed, so worktrees

@@ -238,7 +238,7 @@ export async function readServerModels(id: string, request: string): Promise<Lis
     if (res.status === 403) return said({ ok: false, why: 'forbidden', status: 403 }) // i18n-ignore: a reason's code, not text
     if (res.status < 200 || res.status >= 300) return said({ ok: false, why: 'failed', status: res.status }) // i18n-ignore: a reason's code, not text
     if (res.refused === 'tooBig') return said({ ok: false, why: 'tooBig' }) // i18n-ignore: a reason's code, not text
-    // An encoded reply is refused unread: not a listing Hive can read.
+    // An encoded reply is refused unread: not a listing Combwork can read.
     if (res.refused) return said({ ok: false, why: 'shape' }) // i18n-ignore: a reason's code, not text
     let parsed: unknown
     try {
@@ -269,12 +269,12 @@ export async function readServerModels(id: string, request: string): Promise<Lis
 }
 
 // ---------------------------------------------------------------------------
-// Set Up: the CLI's first-run screens, in a terminal of Hive's.
+// Set Up: the CLI's first-run screens, in a terminal of Combwork's.
 // ---------------------------------------------------------------------------
 
 /**
  * Opens the CLI in a server connection's folder, with its server's variables, so the user answers its first-run screens
- * (its theme, its notes) in its own way before an agent starts on it: Hive types nothing and writes none of its files.
+ * (its theme, its notes) in its own way before an agent starts on it: Combwork types nothing and writes none of its files.
  * The key (if any) is masked while the terminal is open. Returns the terminal's key.
  */
 export async function setUpServerConnection(id: string, folder?: string): Promise<string> {

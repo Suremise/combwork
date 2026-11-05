@@ -1,6 +1,6 @@
 /**
- * Hive MCP server (stdio). Launched by Claude Code for sessions started from Hive, using Hive's own
- * executable with ELECTRON_RUN_AS_NODE=1. It exposes the Hive Agent API as MCP tools.
+ * Combwork MCP server (stdio). Launched by Claude Code for sessions started from Combwork, using Combwork's own
+ * executable with ELECTRON_RUN_AS_NODE=1. It exposes the Combwork Agent API as MCP tools.
  *
  * Self-contained on purpose: only Node built-ins, so it runs from the packaged app without extra files.
  *
@@ -300,9 +300,9 @@ const PROJECT = process.env.CW_PROJECT || ''
 
 /** cw_notify's target (HI-1961): an agent's project defaults to this bridge's own (the Assistant has none: it names one). */
 const notifyTargetOf = (t: any): unknown => (t && typeof t === 'object' && t.agent && !t.project && PROJECT ? { ...t, project: PROJECT } : t)
-/** The session's workspace: with several Hive windows open, the API answers for this one. */
+/** The session's workspace: with several Combwork windows open, the API answers for this one. */
 const WORKSPACE = process.env.CW_WORKSPACE || ''
-/** The Hive Assistant's session gets the tools to run agents, as far as its control level allows. */
+/** The Combwork Assistant's session gets the tools to run agents, as far as its control level allows. */
 const ASSISTANT = process.env.CW_ROLE === 'assistant'
 const CONTROL = process.env.CW_ASSISTANT_CONTROL || 'projects'
 /** Settings → Assistant → Control → Change settings: cw_update_setting is offered only then. */
@@ -312,19 +312,19 @@ const JOURNAL = process.env.CW_JOURNAL === '1'
 /** Settings → Agent API → Let agents read the developer console: cw_console is offered only then (#636). */
 const DEV_CONSOLE = process.env.CW_DEV_CONSOLE === '1'
 
-/** Seconds from Hive's environment for this server: a whole number above 0, else the default. */
+/** Seconds from Combwork's environment for this server: a whole number above 0, else the default. */
 const envSeconds = (name: string, fallback: number): number => {
   const n = Number(process.env[name])
   return Number.isInteger(n) && n > 0 ? n : fallback
 }
-/** Settings → Advanced (#367), as Hive gave them at launch: how long a call's reply may take, and the longest waits. */
+/** Settings → Advanced (#367), as Combwork gave them at launch: how long a call's reply may take, and the longest waits. */
 const REPLY_SECONDS = envSeconds('CW_REPLY_SECONDS', REPLY_MS / 1000)
 const CARD_WAIT_MAX = envSeconds('CW_WAIT_MAX_SECONDS', WAIT_MAX_SECONDS)
 const AGENT_WAIT_MAX = envSeconds('CW_AGENT_WAIT_MAX_SECONDS', AGENT_WAIT_MAX_SECONDS)
 
 /**
  * The token from its file, never from a token variable (HI-2262: sessions no longer get it; one a CLI hands on from
- * elsewhere would be another caller's, and for the Assistant the Agent API's, so Hive would take it for someone else).
+ * elsewhere would be another caller's, and for the Assistant the Agent API's, so Combwork would take it for someone else).
  */
 function token(): string {
   try {
@@ -336,7 +336,7 @@ function token(): string {
   return ''
 }
 
-/** Lines Hive adds to a tool call's reply (#357's "new decision" flag), gathered from the call's API replies. */
+/** Lines Combwork adds to a tool call's reply (#357's "new decision" flag), gathered from the call's API replies. */
 const notices = new AsyncLocalStorage<Set<string>>()
 
 /**
@@ -366,7 +366,7 @@ async function api(method: string, path: string, body?: unknown, replyMs?: numbe
   return data
 }
 
-/** How long a wait's reply may take: the wait as Hive will hold it (at most `max`), and a minute to spare. */
+/** How long a wait's reply may take: the wait as Combwork will hold it (at most `max`), and a minute to spare. */
 const waitReplyMs = (seconds: unknown, fallback: number, max: number): number => (Math.min(max, Math.max(1, Number(seconds) || fallback)) + 60) * 1000
 
 const projectArg = {
@@ -390,7 +390,7 @@ const settingsArgs = {
 }
 const workflowRoleArg = { type: 'string', enum: ['builder', 'reviewer', 'either', 'generalist'], description: say(T['arg.workflowRole']) }
 const agentPath = (a: Record<string, any>): string => `/v1/projects/${proj(a)}/agents/${enc(a.agent || '')}`
-/** Which agent is changing a card, for its history (Hive fills in the name). */
+/** Which agent is changing a card, for its history (Combwork fills in the name). */
 const columnArg = { type: 'string', enum: [...COLUMN_IDS] }
 /** The Assistant's override of a card's workflow rules for a move (#1265, SPEC §16.8.4): why, recorded on the card. */
 const overrideArg = { type: 'object', properties: { reason: { type: 'string' } }, required: ['reason'], description: say(T['arg.override']) }
@@ -408,7 +408,7 @@ const numbersArg = (what: string) => ({ type: 'array', items: { type: 'number' }
 const intentCardArg = { type: 'string', description: say(T['arg.card']) }
 
 /**
- * A card's intents (#1267, SPEC §16.8.1), a tool each: the caller says what it did or wants, and Hive moves the card by
+ * A card's intents (#1267, SPEC §16.8.1), a tool each: the caller says what it did or wants, and Combwork moves the card by
  * its workflow's rules. A refusal names the rule, what to do next and who can override. Replies: the card, the stage it
  * left and the one it is in, and what the intent says of it.
  */
@@ -496,7 +496,7 @@ interface Tool {
   run: (args: Record<string, any>) => Promise<unknown>
 }
 
-/** A project's handovers, newest first, as Hive finds them (under its earlier folder names too, #514); none named: every one. */
+/** A project's handovers, newest first, as Combwork finds them (under its earlier folder names too, #514); none named: every one. */
 async function handovers(project?: string): Promise<{ relPath: string }[]> {
   const list = (await api('GET', `/v1/shared/handovers${project ? `?project=${enc(project)}` : ''}`)) as { path: string }[]
   return list.map((h) => ({ relPath: h.path }))
@@ -584,7 +584,7 @@ const tools: Tool[] = [
       required: ['path', 'content']
     },
     run: async (a) => {
-      // Passed on as given: Hive refuses an empty or non-string revision rather than writing unguarded.
+      // Passed on as given: Combwork refuses an empty or non-string revision rather than writing unguarded.
       const body = { content: a.content, append: !!a.append, ...(a.expectedRevision !== undefined ? { expectedRevision: a.expectedRevision } : {}) }
       const r = (await api('PUT', `/v1/shared/file?path=${enc(a.path)}`, body)) as { path: string; revision?: string }
       return noteWrittenText(r.path, String(a.content ?? '').length, !!a.append, r.revision)
@@ -609,7 +609,7 @@ const tools: Tool[] = [
       properties: { title: { type: 'string' }, content: { type: 'string' }, project: projectArg },
       required: ['title', 'content']
     },
-    // Hive writes the header (project, author, session, date) from the agent these tools belong to.
+    // Combwork writes the header (project, author, session, date) from the agent these tools belong to.
     run: async (a) => {
       const r = (await api('POST', '/v1/shared/handovers', { title: a.title, content: a.content, project: a.project || PROJECT, ...(process.env.CW_AGENT_ID ? { agent: process.env.CW_AGENT_ID, agentProject: PROJECT } : {}) })) as { path: string; suggest?: string }
       // Its path in the shared notes, as cw_read_shared_note takes it; for the Assistant with its journal off, once,
@@ -807,7 +807,7 @@ const tools: Tool[] = [
       const r = (await api('POST', `${agentPath(a)}/message`, a.cancel === true ? { cancel: true } : { text: a.text, ...(a.card !== undefined ? { card: a.card } : {}) })) as { id?: string; typed?: boolean; queued?: number; status?: string; tells?: InboxSwitch[]; cancelled?: number; round?: number; card?: number; names?: Record<string, string> }
       const who = a.agent ? String(a.agent) : say(T['messageAgent.reply.theAgent'])
       if (a.cancel === true) return r.cancelled ? say(T['messageAgent.reply.cancelled'], { count: r.cancelled, agent: who }) : say(T['messageAgent.reply.noneWaiting'], { agent: who })
-      // The card as Hive names it (#1219): its key ("HI-12"), whichever way the agent gave it.
+      // The card as Combwork names it (#1219): its key ("HI-12"), whichever way the agent gave it.
       const tied = r.round && r.card ? say(T['messageAgent.reply.tied'], { card: named(r, () => cardRef(r.card!)), round: String(r.round) }) : ''
       if (r.typed) return say(T['messageAgent.reply.told'], { agent: who, id: String(r.id), tied, watching: r.status === 'watching' ? 'yes' : 'no' })
       // Only the ways the carrying-on switches leave on for it (#1497); an older Hive's reply has no tells: all three.
@@ -1199,7 +1199,7 @@ const tools: Tool[] = [
       return say(T['startTask.reply.started'], { card: cardName(r.card), title: r.card.title, added: r.added ? 'yes' : 'no', agent: r.agent, hasProject: r.card.project ? 'yes' : 'no', project: r.card.project ?? '', column: r.card.column })
     }
   },
-  // A card's intents (#1267, SPEC §16.8.1): the caller says what it did, Hive moves the card by its workflow's rules.
+  // A card's intents (#1267, SPEC §16.8.1): the caller says what it did, Combwork moves the card by its workflow's rules.
   ...intentTools(),
 
   {
@@ -1362,36 +1362,36 @@ const tools: Tool[] = [
   }
 ]
 
-/** Agents get Hive's common tools; the Assistant also those its control level allows. */
+/** Agents get Combwork's common tools; the Assistant also those its control level allows. */
 const allowed = new Set(assistantTools(CONTROL, CHANGE_SETTINGS, JOURNAL))
 const offered = tools.filter((t) => (t.name !== 'cw_console' || DEV_CONSOLE) && (ASSISTANT ? (!ASSISTANT_ONLY_TOOLS.includes(t.name) || allowed.has(t.name)) && !AGENT_ONLY_TOOLS.includes(t.name) : !ASSISTANT_ONLY_TOOLS.includes(t.name)))
 /** The offered tools a CLI that defers tools gets in full (HI-2229). */
 const FULL = new Set(alwaysLoaded(ASSISTANT))
 
-// The Assistant's journal rule while its journal is on (#1032): the kinds it may store come from Hive.
+// The Assistant's journal rule while its journal is on (#1032): the kinds it may store come from Combwork.
 const JOURNAL_SCOPE = ASSISTANT && JOURNAL ? (process.env.CW_JOURNAL_SCOPE ?? '').split(',').filter(Boolean) : null
 // The skills the session isn't given (#1431: switched off in Skills), which its instructions don't name.
 const SKILLS_OFF = new Set((process.env.CW_SKILLS_OFF ?? '').split(',').map((n) => n.trim().toLowerCase()).filter(Boolean))
 const INSTRUCTIONS = combworkInstructions(PROJECT, ASSISTANT ? 'assistant' : 'agent', process.env.CW_PROGRESS_COMMANDS !== '0', SKILLS_OFF, JOURNAL_SCOPE)
 
-/** A project agent given Hive's tools without its guidance (#1285: Settings → Advanced, Hive's guidance for agents). */
+/** A project agent given Combwork's tools without its guidance (#1285: Settings → Advanced, Combwork's guidance for agents). */
 const GUIDED = ASSISTANT || process.env.CW_GUIDANCE !== '0'
 
 async function instructions(): Promise<string> {
   if (!GUIDED) return ''
-  // Without a project (the Hive Assistant's session) there is no "latest handover for this project".
+  // Without a project (the Combwork Assistant's session) there is no "latest handover for this project".
   if (!PROJECT) return INSTRUCTIONS
   try {
     const latest = await Promise.race([handovers(PROJECT || undefined), new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 1500))])
     if (latest[0]) return withLatestHandover(INSTRUCTIONS, latest[0].relPath)
   } catch {
-    // Hive not reachable yet: the static instructions still apply.
+    // Combwork not reachable yet: the static instructions still apply.
   }
   return INSTRUCTIONS
 }
 
 /**
- * Tests only (Hive passes CW_TEST_MCP_LOG to this server in development builds): each tool call this server ran, with
+ * Tests only (Combwork passes CW_TEST_MCP_LOG to this server in development builds): each tool call this server ran, with
  * whose it was, whether it worked and its reply's size as the model got it (HI-2186), so tests (tests/scenarios) see what
  * was executed, not what a transcript mentions, and whose work it was. A call that worked keeps the start of its reply
  * (HI-2238): what it said, such as a batch's refusals, read with the call it answered, whichever CLI or script made it.
@@ -1409,7 +1409,7 @@ let testSeq = 0
 
 /**
  * Tests only: a line of the test log. A call's or a list's has an id of its own (this server's pid and a sequence),
- * which a `kind: 'reported'` line names once Hive has taken its metrics report (HI-2186). Returns that id, or nothing
+ * which a `kind: 'reported'` line names once Combwork has taken its metrics report (HI-2186). Returns that id, or nothing
  * when there is no test log.
  */
 function testLine(fields: Record<string, unknown>): string | undefined {
@@ -1446,7 +1446,7 @@ interface CallReport {
   chars: number
   bytes: number
   ms: number
-  /** Tests only: its line in the test log, named again once Hive has taken the report (never sent). */
+  /** Tests only: its line in the test log, named again once Combwork has taken the report (never sent). */
   testId?: string
 }
 const pending: CallReport[] = []
@@ -1468,7 +1468,7 @@ function flushReports(): void {
   const batch = pending.splice(0, REPORT_MAX)
   const calls = batch.map((c) => ({ tool: c.tool, mode: c.mode, ok: c.ok, chars: c.chars, bytes: c.bytes, ms: c.ms }))
   const listed = catalog ? { tools: catalog.tools, toolsBytes: catalog.toolsBytes, toolsChars: catalog.toolsChars, descriptionChars: catalog.descriptionChars, paramChars: catalog.paramChars } : null
-  // Tests only: the test log's lines this report carries, and when it went and when Hive had taken it (HI-2186).
+  // Tests only: the test log's lines this report carries, and when it went and when Combwork had taken it (HI-2186).
   const testIds = [...batch.map((c) => c.testId), catalog?.testId].filter((x): x is string => !!x)
   const sentAt = new Date().toISOString()
   const body = { calls, ...(listed ? { catalog: listed } : {}) }
@@ -1489,7 +1489,7 @@ function flushReports(): void {
       await res.arrayBuffer()
       if (res.ok && testIds.length) testLine({ kind: 'reported', ids: testIds, sentAt, doneAt: new Date().toISOString() })
     })
-    // Hive didn't take it in time (or at all): what is still waiting is dropped too, so a stalled endpoint costs at most
+    // Combwork didn't take it in time (or at all): what is still waiting is dropped too, so a stalled endpoint costs at most
     // one deadline, not one per batch.
     .catch(() => {
       pending.length = 0
@@ -1578,7 +1578,7 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
         const result = await notices.run(said, () => tool.run(args))
         // Compact: indenting JSON makes it about a third bigger for the model, and no easier for it to read.
         text = typeof result === 'string' ? result : JSON.stringify(result)
-        // Hive's flag (a new decision on a card the agent works on) goes after the reply, on its own line.
+        // Combwork's flag (a new decision on a card the agent works on) goes after the reply, on its own line.
         if (said.size) text += `\n${[...said].join('\n')}`
         testId = testLog(tool.name, params?.arguments, null, { mode: modeOf(args), chars: text.length, bytes: Buffer.byteLength(text, 'utf8') }, text)
         reply(id, { content: [{ type: 'text', text }] })
@@ -1604,7 +1604,7 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
 let listed = false
 
 /**
- * Tells Hive once that the CLI has connected these tools (#865): Hive types no line into the session before (a doorbell
+ * Tells Combwork once that the CLI has connected these tools (#865): Combwork types no line into the session before (a doorbell
  * then is a turn that can't call cw_inbox), or until its own bound passes. With the session's own token, which names
  * its launch; on a short deadline of its own, and never a reason not to answer the CLI.
  */
@@ -1623,7 +1623,7 @@ function sayConnected(): void {
     signal: stop.signal
   })
     .then((res) => res.arrayBuffer())
-    // Hive didn't take it: it offers the session its lines once its own bound passes instead.
+    // Combwork didn't take it: it offers the session its lines once its own bound passes instead.
     .catch(() => undefined)
     .finally(() => clearTimeout(deadline))
 }

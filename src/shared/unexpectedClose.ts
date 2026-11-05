@@ -1,5 +1,5 @@
 /**
- * Hive closing unexpectedly (#984): while Hive runs, its profile holds a marker (running.json) saying when it started,
+ * Combwork closing unexpectedly (#984): while Combwork runs, its profile holds a marker (running.json) saying when it started,
  * when it was last seen (a heartbeat) and which agents were running. A normal quit, an update, a restart or Windows
  * ending the session removes it; one still there at the next start is a run that ended some other way (killed, a crash,
  * the power). The pure part: the marker's shape and reading it back.
@@ -29,7 +29,7 @@ export interface RunningAgent {
 export interface RunMarker {
   version: 1
   pid: number
-  /** When that Hive started, and when it last wrote the marker (ISO). */
+  /** When that Combwork started, and when it last wrote the marker (ISO). */
   startedAt: string
   lastSeen: string
   /** The version of Combwork that wrote it (HI-2587: `hive` before 1.1, renamed by the names upgrade at start). */
@@ -58,10 +58,10 @@ export interface LaunchProcesses {
 export const MAX_MARKER_LAUNCHES = 100
 export const MAX_MARKER_PROCESSES = 50
 
-/** The marker's file name, in Hive's profile. */
+/** The marker's file name, in Combwork's profile. */
 export const RUN_MARKER = 'running.json'
 
-/** How often a running Hive says it is still there. */
+/** How often a running Combwork says it is still there. */
 export const HEARTBEAT_MS = 60_000
 
 const str = (v: unknown, max = 2000): v is string => typeof v === 'string' && v.length <= max
@@ -117,7 +117,7 @@ export function projectsOf(agents: readonly RunningAgent[]): string[] {
   return [...seen.values()]
 }
 
-/** A merge an agent held the merge slot for when Hive closed (#984: told in the same notice). */
+/** A merge an agent held the merge slot for when Combwork closed (#984: told in the same notice). */
 export interface LeftMerge {
   agentName: string
   branch: string
@@ -150,7 +150,7 @@ export const resumeFailedLine = (r: ResumeReport): string =>
   tr(msg({ id: 'main.unexpectedClose.failed', defaultMessage: "{n, plural, one {One couldn't resume: {agents}.} other {# couldn't resume: {agents}.}}", description: 'In the notice that Combwork closed unexpectedly, or the report of resuming its agents: the agents that failed to resume ({agents}: their names with why).' }), { n: r.failed.length, agents: fmt.list(r.failed.map((f) => `${f.name} (${f.error})`)) })
 
 /**
- * The notice's line on what the agents started that still runs (#987): how many, and what. A hive-progress run, the test
+ * The notice's line on what the agents started that still runs (#987): how many, and what. A cw-progress run, the test
  * run's whole tree, is one item named by its title (#1008), found among all the marker kept (kept).
  */
 export function stillRunningLine(processes: readonly AgentProcess[], kept: readonly AgentProcess[] = processes): string {
@@ -177,7 +177,7 @@ export interface StopProcesses {
 
 /**
  * The notice's Stop Them (#987): ends what the agents had started that still runs (running), each only while it is still
- * the same process. A hive-progress run goes whole (#1008): from its top (the shell that ran it, while it still runs) and
+ * the same process. A cw-progress run goes whole (#1008): from its top (the shell that ran it, while it still runs) and
  * each of its processes still running, all they started that runs now, listed or not (found among all the marker kept).
  * Replies with how many of those listed were stopped, and what still runs as the same processes after it: those listed,
  * and those of a run's tree it couldn't end, to report and to try again (all of them when it can't say); unverified, the

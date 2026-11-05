@@ -4,7 +4,7 @@ import { msg, tr, type Msg } from '../../../shared/i18n'
 import type { JournalSource } from '../../../shared/journal'
 
 /**
- * A build of Hive as the journal shows it (#1534): Hive stores the build's line and detail in English, which the
+ * A build of Combwork as the journal shows it (#1534): Combwork stores the build's line and detail in English, which the
  * Assistant reads, and the window shows them in the user's language. Any other entry is shown as it was written.
  */
 
@@ -25,7 +25,7 @@ const M = {
   uploadedNote: msg({ id: 'assistant.journal.build.uploadedNote', defaultMessage: 'Uploaded to a draft GitHub release (npm run release).', description: 'In a journal entry for a build of Combwork: it was uploaded as a draft release on GitHub. npm run release is a command: keep it as it is.' })
 }
 
-/** An entry's one line as the window shows it: a build of Hive's in the user's language, any other as written. */
+/** An entry's one line as the window shows it: a build of Combwork's in the user's language, any other as written. */
 export function journalSummary(e: { source: JournalSource; summary: string }): string {
   const b = e.source === 'combwork' ? parseBuildSummary(e.summary) : null
   if (!b) return e.summary

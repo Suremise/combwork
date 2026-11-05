@@ -1,9 +1,9 @@
 // Measures what sessions are actually given about Combwork, from real launches (with the fake CLIs, so it costs nothing):
 // for each provider and role (project agent, the Assistant at each control level), a short catalog (Combwork's own skills)
 // and a long one (40 more skills of the user's), a new session and a resumed one. Counted from the launch itself:
-// - instructions: the hive MCP server's (initialize, with the launch's own environment), and for Codex the developer
+// - instructions: the combwork MCP server's (initialize, with the launch's own environment), and for Codex the developer
 //   instructions on its command line; for the Assistant on Claude Code, its appended system prompt file;
-// - tools: the hive MCP server's tools/list (names, descriptions and schemas), as that launch's server answers it;
+// - tools: the combwork MCP server's tools/list (names, descriptions and schemas), as that launch's server answers it;
 // - skills: each delivered skill's name and description (what the CLI lists; bodies load only when used).
 // Characters and UTF-8 bytes; tokens are estimated at 4 bytes each (no tokenizer is run).
 //
@@ -18,7 +18,7 @@ const bytes = (s) => Buffer.byteLength(s ?? '', 'utf8')
 // The longest a measurement waits for what it is waiting on (the workspace, a turn, a stop): a bound for a hung run.
 const HUNG_MS = 30000
 
-/** The hive MCP server's instructions and tools, started as the launch starts it. */
+/** The combwork MCP server's instructions and tools, started as the launch starts it. */
 function combworkServer(env) {
   return new Promise((resolve, reject) => {
     const p = spawn(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { env: lib.childEnv({ ...env, ELECTRON_RUN_AS_NODE: '1' }) })
@@ -130,7 +130,7 @@ const tomlString = (v) => (v.startsWith('"') ? JSON.parse(v) : v)
           const session = !resumed ? 'new' : launch.args[0] === 'resume' && launch.args[1] === resumed ? 'resumed' : 'resume NOT confirmed'
           const arg = (prefix) => launch.args.find((a) => a.startsWith(prefix))?.slice(prefix.length) ?? ''
           const developer = tomlString(arg('developer_instructions='))
-          // The hive server's environment from its -c mcp_servers.combwork table.
+          // The combwork server's environment from its -c mcp_servers.combwork table.
           const table = arg('mcp_servers.combwork=')
           const env = Object.fromEntries([...table.matchAll(/(CW_\w+|ELECTRON_RUN_AS_NODE)="((?:[^"\\]|\\.)*)"/g)].map((m) => [m[1], JSON.parse(`"${m[2]}"`)]))
           const server = await combworkServer(env)

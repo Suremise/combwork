@@ -106,7 +106,7 @@ export function setCatalogSources(next: McpCatalogSettings): McpCatalogSettings 
   return saved
 }
 
-/** The one-time note for a source Hive doesn't check (14 Oct): said, so not again. */
+/** The one-time note for a source Combwork doesn't check (14 Oct): said, so not again. */
 export function noteCatalogSource(url: string): void {
   config.update((c) => {
     const s = c.settings.mcpCatalogs?.sources.find((x) => x.url === url)
@@ -271,7 +271,7 @@ async function probeFacts(): Promise<PcFacts> {
       (e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? false : null)
     )
   ])
-  // The features Hive can check without elevation: Windows Sandbox, by its program.
+  // The features Combwork can check without elevation: Windows Sandbox, by its program.
   const features: Record<string, boolean> = os === 'windows' ? { 'Windows Sandbox': existsSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsSandbox.exe')) } : {}
   return { os, edition: editionId ? editionOf(editionId) : null, build: build && /^\d+$/.test(build) ? Number(build) : null, features, node, docker }
 }
@@ -349,7 +349,7 @@ function listed(source: string, name: string): McpCatalogServer {
 /**
  * Downloads a catalogue server and checks it (its size and sha256 against the catalogue, its zip as #550 unpacks one,
  * one top folder named after it), for the Install or Update dialog to show what it would run. Refused before any
- * download when this PC doesn't meet a requirement Hive checked. Bound to the workspace that asked: held until the user
+ * download when this PC doesn't meet a requirement Combwork checked. Bound to the workspace that asked: held until the user
  * answers, at most 10 minutes, a few at a time.
  */
 export async function prepareCatalogServer(source: string, name: string): Promise<McpCatalogPrepared> {

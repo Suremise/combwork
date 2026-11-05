@@ -1,5 +1,5 @@
-// Detecting version control (SPEC §16.3.5): a fact, detected, never switched silently. Hive offers a switch; the user
-// confirms it, and it applies from the next card. A project's platform is recorded in its project.json as Hive makes it
+// Detecting version control (SPEC §16.3.5): a fact, detected, never switched silently. Combwork offers a switch; the user
+// confirms it, and it applies from the next card. A project's platform is recorded in its project.json as Combwork makes it
 // (workspace.ts ensureProject), and each refresh compares what detection finds with it (`projectPlatform`).
 
 import { resolve } from 'path'
@@ -31,7 +31,7 @@ export function offer(current: PlatformId, found: Detection): PlatformOffer | nu
 export const foundKey = (d: Detection): string => (d.other ? `other:${d.other}` : d.platform)
 
 /**
- * A project's platform for ProjectInfo: the recorded one (`recorded`, project.json's, as read: a project Hive hasn't
+ * A project's platform for ProjectInfo: the recorded one (`recorded`, project.json's, as read: a project Combwork hasn't
  * recorded yet takes what detection finds), its descriptor's capabilities, the detection, and the offer when they
  * differ. A recorded value that is no platform is said (`invalid`) and detection used meanwhile, with no offer.
  * `found`: what detection found when the user last switched (#1419): while the folder shows that still, the user chose

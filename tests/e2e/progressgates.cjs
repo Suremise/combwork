@@ -67,7 +67,7 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
     for (const a of [builder, reviewer]) await inv('session:start', alpha, { agentId: a.id })
     check('the agents start', !!(await until(async () => (await live(builder.id))?.status === 'ready' && (await live(reviewer.id))?.status === 'ready', HUNG_MS)))
 
-    // Each agent's own token, from its launch, as its hive tools read it.
+    // Each agent's own token, from its launch, as its Combwork tools read it.
     const launchesFile = path.join(claudeHome, 'fake-launches.jsonl')
     const launches = () => {
       const text = fs.existsSync(launchesFile) ? fs.readFileSync(launchesFile, 'utf8') : ''

@@ -1,10 +1,10 @@
 /**
- * What Hive tells an agent that has something to read (#650, plans/2026-10-12-messaging-redesign.md §3.2, §3.5): a
+ * What Combwork tells an agent that has something to read (#650, plans/2026-10-12-messaging-redesign.md §3.2, §3.5): a
  * notice in a hook's reply while it works (a checkpoint, after a tool call), one before its turn ends (the Stop drain), or
- * a short line typed into an idle agent (the doorbell). Each is Hive's own fixed wording with counts by kind, card
+ * a short line typed into an idle agent (the doorbell). Each is Combwork's own fixed wording with counts by kind, card
  * numbers and delivery ids, never a delivery's body, a sender's name or anything a person or an agent wrote: those are
  * fetched with cw_inbox, labelled with their sender, as data. Codex takes hook context as developer messages, so this
- * text must stay code-owned. No imports beyond shared types: hive-mcp.js runs outside the app bundle.
+ * text must stay code-owned. No imports beyond shared types: cw-mcp.js runs outside the app bundle.
  */
 import type { DeliveryKind } from './deliveries'
 import { cardRef } from './projectKeys'
@@ -80,7 +80,7 @@ export function noticeCounts(items: readonly NoticeItem[]): string {
   return agentList(parts)
 }
 
-/** Delivery ids as a notice lists them: only ids Hive made ("m12"), at most 20 (then "and n more"). */
+/** Delivery ids as a notice lists them: only ids Combwork made ("m12"), at most 20 (then "and n more"). */
 function idList(items: readonly NoticeItem[]): string {
   const ids = [...new Set(items.map((i) => i.id).filter((id) => /^m\d{1,12}$/.test(id)))]
   return ids.length > 20 ? say(T.idsMore, { ids: ids.slice(0, 20).join(', '), more: String(ids.length - 20) }) : ids.join(', ')
@@ -101,7 +101,7 @@ export function inboxNotice(at: NoticeAt, items: readonly NoticeItem[]): string 
 
 /**
  * The Assistant's notice before its turn ends with lanes running and no watch covering them (HI-2069), by their builders'
- * names: Hive's fixed text, with names kept to what agent names hold (letters, digits, spaces, `.`, `_`, `-`; at most 40
+ * names: Combwork's fixed text, with names kept to what agent names hold (letters, digits, spaces, `.`, `_`, `-`; at most 40
  * characters, 10 names, then "and n more"), since Codex takes it as a developer message. A name with nothing left of it
  * (an emoji's) is counted among the more, or alone as "1 lane" (HR1's round 1: a lane is never dropped for its name).
  * Empty with no lanes.

@@ -1,10 +1,10 @@
 // Review and check copies in the app (#1435, copies.ts): one pool per open workspace and project, on the workspace's
-// board, keyed by the project's id. Its warming runs are Hive's own, credited to the lease's agent (HI-1710), in jobs on the process
-// supervisor as slots' are (slotsApp.ts); its leases carry this Hive's profile, pid and start.
+// board, keyed by the project's id. Its warming runs are Combwork's own, credited to the lease's agent (HI-1710), in jobs on the process
+// supervisor as slots' are (slotsApp.ts); its leases carry this Combwork's profile, pid and start.
 //
-// Isolated checks (`hive-progress --check <name> --isolated`, SPEC §16.13): the Agent API's resolve leases a check copy
+// Isolated checks (`cw-progress --check <name> --isolated`, SPEC §16.13): the Agent API's resolve leases a check copy
 // at the card's revision and opens the lease's job on the supervisor (`copy-<lease>`, recorded on the lease first);
-// hive-progress starts the command's launcher in the copy and has it put in that job (POST /v1/progress/isolated)
+// cw-progress starts the command's launcher in the copy and has it put in that job (POST /v1/progress/isolated)
 // before it runs anything, so every process of the check is the lease's. Its run's start takes the lease (its ref
 // becomes the run), its finish returns it, and Stop in the Progress panel ends the job (the whole tree). A returned copy
 // is freed through the barrier (copies.ts), which settles the job first. Every 30 s, the pools with copies returning are
@@ -73,7 +73,7 @@ export function copiesFor(ws: WorkspaceService, projectPath: string): Promise<Co
             assigned.delete(id)
             closing.push(j.close().catch(() => undefined))
           }
-          // Its seal goes once its job is gone (HI-1723): after this Hive let its own handle go.
+          // Its seal goes once its job is gone (HI-1723): after this Combwork let its own handle go.
           void Promise.all(closing).then(() => retireSealOf(root, job))
         }
         return ok
@@ -89,11 +89,11 @@ export function copiesFor(ws: WorkspaceService, projectPath: string): Promise<Co
         return s && (s.status === 'working' || s.status === 'waiting' || s.status === 'background') ? `${s.agentName ?? agent} (${s.status})` : null
       },
       leaseOver: (l) => (l.kind === 'review' ? (reviewOver?.(ws, projectPath, l) ?? null) : leaseOver(workspacePath, l)),
-      // Review leases: with review copies on, and workflow rules enforced (off, Hive records facts and leases nothing, #1439).
+      // Review leases: with review copies on, and workflow rules enforced (off, Combwork records facts and leases nothing, #1439).
       reviewOn: () => advanced.get(COPIES_REVIEW) !== false && advanced.get<boolean>(WORKFLOW_ENFORCE) !== false,
       quietWaitMs: () => Math.max(1, Number(advanced.get(COPIES_QUIET_WAIT)) || 10) * 60_000
     })
-    // The seals of jobs settled before this Hive started (HI-1723; the folder slots' jobs share).
+    // The seals of jobs settled before this Combwork started (HI-1723; the folder slots' jobs share).
     sweepSealsOf(root, { once: true })
     return made
   })()
@@ -104,7 +104,7 @@ export function copiesFor(ws: WorkspaceService, projectPath: string): Promise<Co
 
 /**
  * Whether a review lease's review is over (#1439, reviewCopies.ts: its reviewer's review of the card has ended), as this
- * Hive knows; null: can't tell. And what runs after each look at the pools (waiting reviews leasing again).
+ * Combwork knows; null: can't tell. And what runs after each look at the pools (waiting reviews leasing again).
  */
 let reviewOver: ((ws: WorkspaceService, projectPath: string, l: CopyLease) => Promise<boolean | null>) | null = null
 let afterLook: (() => Promise<void>) | null = null
@@ -114,7 +114,7 @@ export function setReviewCopyHooks(h: { over: typeof reviewOver; afterLook: type
 }
 
 /**
- * Whether a check lease's run is over, as this Hive knows: its run ended (or never started within a link's life).
+ * Whether a check lease's run is over, as this Combwork knows: its run ended (or never started within a link's life).
  */
 function leaseOver(workspacePath: string, l: CopyLease): boolean | null {
   if (l.kind !== 'check') return null
@@ -123,17 +123,17 @@ function leaseOver(workspacePath: string, l: CopyLease): boolean | null {
   return Date.now() - Date.parse(l.from) > LINK_TTL_MS
 }
 
-/** An isolated check's agent text (dialects, HI-2447): hive-progress --isolated's waits and refusals. */
+/** An isolated check's agent text (dialects, HI-2447): cw-progress --isolated's waits and refusals. */
 const T = {
-  stillInUse: agentMsg({ id: 'copy.isolated.stillInUse', text: 'a check copy ({copy} is still in use by {by})', note: 'What hive-progress --isolated waits for: a check copy, the one it would get still held. {by} says by what.' }),
+  stillInUse: agentMsg({ id: 'copy.isolated.stillInUse', text: 'a check copy ({copy} is still in use by {by})', note: 'What cw-progress --isolated waits for: a check copy, the one it would get still held. {by} says by what.' }),
   setupFailed: agentMsg({ id: 'copy.isolated.setupFailed', text: "{copy}'s setup failed ({error}), so nothing was run", note: "hive-progress --isolated's refusal: its check copy's setup failed." }),
-  noLease: agentMsg({ id: 'copy.isolated.noLease', text: 'no check copy could be leased', note: "hive-progress --isolated's refusal: no check copy could be lent, for another reason." }),
-  noSupervisor: agentMsg({ id: 'copy.isolated.noSupervisor', text: "Combwork's process supervisor isn't running, so an isolated check can't be run", note: "hive-progress --isolated's refusal: Combwork can't run the check in a job of its own (#1435)." }),
-  noLease2: agentMsg({ id: 'copy.assign.noLease', text: 'no such check copy lease', note: "Why hive-progress's launcher wasn't put in its check copy's job: the lease it named isn't this agent's." }),
-  notOwn: agentMsg({ id: 'copy.assign.notOwn', text: "that process isn't one of this agent's own", note: "Why hive-progress's launcher wasn't put in its check copy's job: the process isn't the agent's (HR1's #1435 round 1)." }),
-  noLauncher: agentMsg({ id: 'copy.assign.noLauncher', text: "its check copy's job takes no launcher now", note: "Why hive-progress's launcher wasn't put in its check copy's job: it has one already, or no job." }),
+  noLease: agentMsg({ id: 'copy.isolated.noLease', text: 'no check copy could be leased', note: "cw-progress --isolated's refusal: no check copy could be lent, for another reason." }),
+  noSupervisor: agentMsg({ id: 'copy.isolated.noSupervisor', text: "Combwork's process supervisor isn't running, so an isolated check can't be run", note: "cw-progress --isolated's refusal: Combwork can't run the check in a job of its own (#1435)." }),
+  noLease2: agentMsg({ id: 'copy.assign.noLease', text: 'no such check copy lease', note: "Why cw-progress's launcher wasn't put in its check copy's job: the lease it named isn't this agent's." }),
+  notOwn: agentMsg({ id: 'copy.assign.notOwn', text: "that process isn't one of this agent's own", note: "Why cw-progress's launcher wasn't put in its check copy's job: the process isn't the agent's (HR1's #1435 round 1)." }),
+  noLauncher: agentMsg({ id: 'copy.assign.noLauncher', text: "its check copy's job takes no launcher now", note: "Why cw-progress's launcher wasn't put in its check copy's job: it has one already, or no job." }),
   returned: agentMsg({ id: 'copy.assign.returned', text: 'its check copy was returned', note: "Why hive-progress's launcher wasn't put in its check copy's job: the copy was given back meanwhile." }),
-  notPut: agentMsg({ id: 'copy.assign.notPut', text: "the check's launcher couldn't be put in its check copy's job", note: "Why hive-progress's launcher wasn't put in its check copy's job: Windows refused it." })
+  notPut: agentMsg({ id: 'copy.assign.notPut', text: "the check's launcher couldn't be put in its check copy's job", note: "Why cw-progress's launcher wasn't put in its check copy's job: Windows refused it." })
 }
 
 /**

@@ -295,11 +295,11 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
   const settings = useStore((s) => s.settings)
   const view = useConnections()
   const offered = !focused && view ? offeredConnections(view, settings) : []
-  // With no agent, the connection a new one gets (decision A: the first usable, its CLI installed); none while Hive is
+  // With no agent, the connection a new one gets (decision A: the first usable, its CLI installed); none while Combwork is
   // still looking for a CLI before it.
   const ready = offered.length ? firstReadyConnection(view, settings, cliReadyOf(providers)) : null
   // The focused agent's provider, else the new agent's (its connection's CLI; Automatic's pick where none is usable),
-  // and what Hive found of its CLI.
+  // and what Combwork found of its CLI.
   const provider = (!focused && connectionCli(view, ready?.id)) || agentProviderOf(focused)
   const info = providers[provider]
   const on = isProviderEnabled(settings, provider)

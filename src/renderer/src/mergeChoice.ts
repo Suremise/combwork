@@ -1,5 +1,5 @@
 // The hand-merge dialogs' first choice (HI-1765): the project's own merge style (Version Control → Workflow, G6), no longer
-// a setting of Hive's. Squash for squash; a merge commit for merge and for rebase (neither dialog offers a rebase), and
+// a setting of Combwork's. Squash for squash; a merge commit for merge and for rebase (neither dialog offers a rebase), and
 // for a project with no workflow, or one whose workflow can't be read.
 import type { MergeStyle } from '@shared/types'
 import { call } from './api'

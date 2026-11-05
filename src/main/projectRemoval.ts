@@ -28,9 +28,9 @@ const log = createLogger('projects')
 
 /**
  * A project leaving Hive (Project → Remove Project…), three ways:
- * - Hide: nothing moves; Hive leaves the folder out until it's restored (Settings → Workspace).
+ * - Hide: nothing moves; Combwork leaves the folder out until it's restored (Settings → Workspace).
  * - Remove from Hive: its workspace files (handovers, cards) are packed into its own .combwork/removed and leave the
- *   workspace, so the folder carries them wherever it goes; Hive offers them back when it sees the folder again.
+ *   workspace, so the folder carries them wherever it goes; Combwork offers them back when it sees the folder again.
  * - Delete: the folder, its worktrees and its handovers go to the Recycle Bin, and its cards are deleted.
  * The CLIs' own transcripts (~/.claude, ~/.codex) are never touched.
  *
@@ -122,7 +122,7 @@ export async function removalInfo(projectPath: string): Promise<ProjectRemovalIn
   }
 }
 
-/** Why Remove from Hive can't go ahead: worktrees with work not merged, or that git can't check. Null when it can. */
+/** Why Remove from Combwork can't go ahead: worktrees with work not merged, or that git can't check. Null when it can. */
 function unmergedWork(worktrees: ProjectRemovalInfo['worktrees']): string | null {
   const held = worktrees.filter((w) => w.ahead || w.dirty || w.error)
   if (!held.length) return null
@@ -179,7 +179,7 @@ export async function removeProject(projectPath: string, how: ProjectRemoval): P
       log.info(`Hid ${userText(name)}`)
       return { warnings: [] }
     }
-    // Its merge queues go with it (#1360): this Hive's runners released, their worktrees and records removed.
+    // Its merge queues go with it (#1360): this Combwork's runners released, their worktrees and records removed.
     await forgetProjectQueues({ store: FactStore.forBoard(ws, { project: name, key: name }), project: p, root: join(ws.worktreesRoot, name), locked: (fn) => boardWrite(ws, async () => fn()) }).catch((e) => log.warn(`removing ${userText(name)}'s merge queue folders`, e))
     const done = how === 'remove' ? await removeFromCombwork(ws, p, info, agents) : await deleteProject(ws, p, info, agents)
     // Its agents' terminals' kept sizes and output go with it (#489); a hidden project keeps them.
@@ -229,14 +229,14 @@ async function removeFromCombwork(ws: WorkspaceService, p: string, info: Project
 async function deleteProject(ws: WorkspaceService, p: string, info: ProjectRemovalInfo, agents: AgentDef[]): Promise<{ warnings: string[] }> {
   const name = basename(p)
   // Its slots, copies and old folders (#1447, HR1's round 1): refused before anything is done if one is outside the
-  // project's worktrees folder or held by one of Hive's steps; the rest go to the Recycle Bin after the folder.
+  // project's worktrees folder or held by one of Combwork's steps; the rest go to the Recycle Bin after the folder.
   const folders = await projectFolders(ws, p)
   // Its id now: its project.json goes with the folder (the slots' rows are kept by it).
   const id = (await ws.projectConfig(p)).id ?? name
   const blocked = (items: string[]): Error => new Error(tr(msg({ id: 'main.removal.deleteBlocked', defaultMessage: "Delete can't go ahead: {folders}. Nothing was deleted.", description: "Why Delete refused (#1447): the project's slots or old folders that stop it ({folders}: each one's name and why, a list). Nothing was changed." }), { folders: fmt.list(items) }))
   const blocks = await deleteBlocks(ws, p, folders)
   if (blocks.size) throw blocked(folders.filter((f) => blocks.has(f.key)).map((f) => `${folderWhat(f.of)} (${blocks.get(f.key)})`))
-  // Then held, in one write against the rows as they are then (HR1's round 2): no step of any Hive begins on the
+  // Then held, in one write against the rows as they are then (HR1's round 2): no step of any Combwork begins on the
   // project's slots or copies, nor makes one, until Delete has finished with them or let them go.
   const token = `d-${randomBytes(8).toString('hex')}`
   const { holder } = await import('./slotsApp')
@@ -336,7 +336,7 @@ async function restoreTarget(dir: string, f: string, text: string): Promise<stri
 }
 
 /**
- * Puts back what Remove from Hive packed: handovers into the shared notes (never over a different note: that one
+ * Puts back what Remove from Combwork packed: handovers into the shared notes (never over a different note: that one
  * keeps its name and the packed one comes back beside it), and the cards: in the workspace it was removed from,
  * the archived ones come back; anywhere else, copies with new numbers. The pack is deleted only once all is back.
  */

@@ -15,7 +15,7 @@ import { WorkspaceService } from './workspace'
 
 const log = createLogger('progress')
 
-/** Where Recent's runs are kept between starts (#352): a file per workspace in Hive's profile. */
+/** Where Recent's runs are kept between starts (#352): a file per workspace in Combwork's profile. */
 const historyDir = (): string => join(app.getPath('userData'), 'progress-history')
 const historyFile = (workspacePath: string): string => join(historyDir(), `${hashText(workspacePath.toLowerCase())}.json`)
 

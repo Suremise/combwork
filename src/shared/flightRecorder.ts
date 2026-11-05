@@ -1,7 +1,7 @@
 import { msg, type Msg } from './i18n/msg'
 
 /**
- * The flight recorder's "something unknown arriving" trigger (#698): a CLI's hook named outside the events Hive knows it
+ * The flight recorder's "something unknown arriving" trigger (#698): a CLI's hook named outside the events Combwork knows it
  * sends, or a hook or (Claude Code) status line with a top-level field outside the fields it knows. Often the first sign
  * that a CLI update changed something. The known lists are each CLI's advanced values (`<cli>.hooks.knownEvents`,
  * `<cli>.hooks.knownFields`, `<cli>.statusLine.knownFields`, shared/advanced.ts, with recorded samples), so a harmless
@@ -16,7 +16,7 @@ const NAME = /^[A-Za-z0-9_.-]{1,64}$/
 const safeName = (k: string): string => (NAME.test(k) ? k : '<name>')
 
 /**
- * What of a CLI's hook or status line Hive doesn't know: its event's name (a hook named outside `known.events`) and its
+ * What of a CLI's hook or status line Combwork doesn't know: its event's name (a hook named outside `known.events`) and its
  * top-level fields outside `known.fields` (sorted, at most 10), each a safe name or `<name>`. Nothing for a list the CLI
  * doesn't have, or a payload that isn't an object.
  */
@@ -42,7 +42,7 @@ export type FlightTrigger = (typeof FLIGHT_TRIGGERS)[number]
 /** The pattern trigger's default: it never matches anything, so it is off until set. */
 export const FLIGHT_PATTERN_OFF = '(?!)'
 
-/** What the notice and the console's list of captures call each trigger, in Hive's language. */
+/** What the notice and the console's list of captures call each trigger, in Combwork's language. */
 export const FLIGHT_TRIGGER_NAME: Record<FlightTrigger, Msg> = {
   safeguard: msg({ id: 'console.flight.trigger.safeguard', defaultMessage: 'a safeguard stop', description: "What the flight recorder caught, in \"Captured {trigger} on {agent}\": a model's safeguards stopped a response or switched the model." }),
   unknown: msg({ id: 'console.flight.trigger.unknown', defaultMessage: 'something unknown from its CLI', description: 'What the flight recorder caught, in "Captured {trigger} on {agent}": the CLI sent a field Combwork doesn\'t know.' }),
@@ -53,7 +53,7 @@ export const FLIGHT_TRIGGER_NAME: Record<FlightTrigger, Msg> = {
 
 /**
  * What a capture says it saw (#698): a message per kind, its names and numbers as values, so the notice and the console's
- * list say it in Hive's language; the capture's file keeps its English beside it (`what`), for maintainers and older Hives.
+ * list say it in Combwork's language; the capture's file keeps its English beside it (`what`), for maintainers and older Combworks.
  */
 export const FLIGHT_WHAT = {
   safeguardStop: msg({ id: 'console.flight.what.safeguardStop', defaultMessage: 'safeguards stopped a response', description: "What the flight recorder saw, after \"saved, redacted:\" in its notice and in the console's list of captures: a model's safeguards stopped one of its responses." }),

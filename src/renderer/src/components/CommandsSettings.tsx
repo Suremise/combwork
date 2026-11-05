@@ -9,8 +9,8 @@ import { basename } from '../util'
 import { IconButton, Modal } from './ui'
 
 /**
- * Settings → Commands, at Hive's level (General) and the workspace's (Workspace), and the points that run them: When
- * this workspace opens, run; When this workspace closes, run; When Hive quits, run (HI-1954, design HI-1954/s15). Only
+ * Settings → Commands, at Combwork's level (General) and the workspace's (Workspace), and the points that run them: When
+ * this workspace opens, run; When this workspace closes, run; When Combwork quits, run (HI-1954, design HI-1954/s15). Only
  * the user saves them, from here; main cleans what it saves and runs them (closeCommand/), showing CloseCommandPanel.
  */
 
@@ -55,7 +55,7 @@ const M = {
 }
 
 /**
- * A scope's commands as this window edits them (Hive's, or a workspace's by its path), shared by every control of that
+ * A scope's commands as this window edits them (Combwork's, or a workspace's by its path), shared by every control of that
  * scope (HR2's round 1: each control's own copy, saving the whole scope, dropped a sibling's pending edit). An edit is a
  * change of the latest value, pending ones included; saves go one after another, in order; the value saved comes back
  * from main and is taken as the shown one only once none of the scope's saves is pending, so a reply or event for an
@@ -261,7 +261,7 @@ function PointPicker({ point, lists, values, update, onChange }: { point: Comman
 
 const runIt = (ref: CommandRef): void => void actions.attempt(tr(M.runFailed), () => call('commands:run', ref))
 
-/** Hive's commands, as saved (settings.commands), and its edit. */
+/** Combwork's commands, as saved (settings.commands), and its edit. */
 function useCombwork(): [CommandsCombwork, (change: (current: CommandsCombwork) => CommandsCombwork) => void] {
   const value = useStore((s) => s.settings?.commands ?? EMPTY_CW)
   // Every window gets settings-changed with what was saved.
@@ -276,7 +276,7 @@ function useWorkspace(): [CommandsWorkspace, (change: (current: CommandsWorkspac
   return useScope(`workspace:${path.toLowerCase()}`, value, (next) => actions.attempt(tr(M.saveFailed), () => call('commands:setWorkspace', path, next)))
 }
 
-/** Settings → General → Commands: Hive's own commands. Deleting one takes it off When Hive quits too. */
+/** Settings → General → Commands: Combwork's own commands. Deleting one takes it off When Combwork quits too. */
 export function CombworkCommands() {
   const [combwork, save] = useCombwork()
   const values = useValues('manual')
@@ -290,7 +290,7 @@ export function CombworkCommands() {
   )
 }
 
-/** Settings → General → When Hive quits, run: Hive's commands, in order. */
+/** Settings → General → When Combwork quits, run: Combwork's commands, in order. */
 export function QuitPoint() {
   const [combwork, save] = useCombwork()
   return <PointPicker point={combwork.onQuit} lists={{ combwork: combwork.list }} values={{ reason: 'quit' }} update onChange={(onQuit) => save((cur) => ({ ...cur, onQuit }))} /> // i18n-ignore: {reason}'s value, as main fills it in

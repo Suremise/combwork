@@ -85,7 +85,7 @@ describe('choosing the profile folder, and moving Hive\'s (HI-2461, HI-2594)', (
     expect(tree(join(p, 'Hive'))).toEqual(['config.json'])
   })
 
-  it("a record that can't be put in Hive's local folder: refused before anything moves", () => {
+  it("a record that can't be put in Combwork's local folder: refused before anything moves", () => {
     const p = tempDir('pf-norecord-')
     mkdirSync(join(p, 'Hive'))
     const fs: ProfileFs = { ...real, write: () => { throw Object.assign(new Error('denied'), { code: 'EACCES' }) } }
@@ -130,7 +130,7 @@ describe('choosing the profile folder, and moving Hive\'s (HI-2461, HI-2594)', (
     }
   })
 
-  it("only ENOENT and ENOTDIR count as missing: Hive's folder is moved then", () => {
+  it("only ENOENT and ENOTDIR count as missing: Combwork's folder is moved then", () => {
     for (const code of ['ENOENT', 'ENOTDIR']) {
       const p = tempDir('pf-missing-')
       mkdirSync(join(p, 'Hive'))

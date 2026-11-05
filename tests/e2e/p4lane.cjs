@@ -1,6 +1,6 @@
 // S54, P4's RC scenario end to end (#1287, SPEC §16.18, §16.19.1), as 1.0 builds it (#1573: §16.10's slots, no worktree
 // agents): "Pair (the agent merges)", the Assistant off, on fake Claude Code agents acting by their own tokens (their
-// hive tools' calls), B1 added in the project folder. The project's options are set through Version Control → Workflow
+// Combwork tools' calls), B1 added in the project folder. The project's options are set through Version Control → Workflow
 // (#1278); a lane is started from the board (#1280), lent a slot that B1 then works in. Card 1: the builder starts it
 // on its line in the slot (the next card's start refused meanwhile: one card at a time), commits, runs the quick check
 // through cw-progress --check (counted), submits; the reviewer starts its review and passes it; the builder merges
@@ -120,7 +120,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     // B1 is started again in the lane's slot (a new conversation, a launch with its own token): read once it runs there.
     check("both agents run, B1 in the lane's slot", !!(await until(async () => (await idleIn(b1.id, lent)) && (await idleIn(r1.id)), HUNG_MS)), JSON.stringify(await live(b1.id)))
 
-    // The agents' own tokens, from their launches, as their hive tools read them (progressgates').
+    // The agents' own tokens, from their launches, as their Combwork tools read them (progressgates').
     const launchesFile = path.join(claudeHome, 'fake-launches.jsonl')
     const launches = () => {
       const text = fs.existsSync(launchesFile) ? fs.readFileSync(launchesFile, 'utf8') : ''

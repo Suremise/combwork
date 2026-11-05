@@ -34,7 +34,7 @@ const log = createLogger('mergeSlots')
 /**
  * The app's merge slots (#350), wired to sessions (a launch's end releases its hold; status notes), Progress (a holder
  * still reporting keeps its hold), the windows (`merge-slots-changed`) and a small record per workspace in the app's
- * data (this machine's state, never the workspace's committed `.combwork`), so a hold Hive closed under is reported when
+ * data (this machine's state, never the workspace's committed `.combwork`), so a hold Combwork closed under is reported when
  * the workspace opens again.
  */
 export const mergeSlots = new MergeSlots({
@@ -44,7 +44,7 @@ export const mergeSlots = new MergeSlots({
   changed: (projectPath) => changed(projectPath),
   note: (a, text, about) => sessions.setMergeSlotNote(a.projectPath, a.agentId, a.runId, text, about),
   warn: (projectPath, title, message) => toast('warning', title, message, undefined, projectPath),
-  // Test builds can shorten a hold, to see one run out (CW_TEST_MERGE_HOLD_MS; never in an installed Hive).
+  // Test builds can shorten a hold, to see one run out (CW_TEST_MERGE_HOLD_MS; never in an installed Combwork).
   ...(!app.isPackaged && Number(process.env.CW_TEST_MERGE_HOLD_MS) > 0 ? { holdMs: Number(process.env.CW_TEST_MERGE_HOLD_MS) } : {})
 })
 
@@ -81,7 +81,7 @@ function changed(projectPath: string): void {
 }
 
 /**
- * Test builds only (CW_TEST_MERGE_SLOT_LOG, never in an installed Hive): each change to a workspace's slots, a JSON
+ * Test builds only (CW_TEST_MERGE_SLOT_LOG, never in an installed Combwork): each change to a workspace's slots, a JSON
  * line with its time, so a scenario sees who held a slot and who waited when, not only the claims made (#374).
  */
 function testLog(workspacePath: string): void {
@@ -168,7 +168,7 @@ async function keepUnplaced(file: string, holds: SlotRecord[]): Promise<void> {
   await writeTextAtomic(kept, JSON.stringify({ version: 1, holds: [...had, ...holds].slice(-MAX_UNPLACED) }, null, 2) + '\n')
 }
 
-/** The record's holds that Hive no longer has, taken from it: kept as it was beside it first (once) when any is placed elsewhere. */
+/** The record's holds that Combwork no longer has, taken from it: kept as it was beside it first (once) when any is placed elsewhere. */
 async function orphansIn(file: string, workspacePath: string | null, place: (h: SlotRecord) => Promise<string | null>): Promise<{ hold: SlotRecord; at: string | null }[]> {
   return withFileLock(file, async () => {
     const raw = await readFile(file, 'utf8').catch(() => null)
@@ -186,7 +186,7 @@ async function orphansIn(file: string, workspacePath: string | null, place: (h: 
 
 /**
  * Tests only (unpackaged builds): CW_TEST_HOLD_MERGE_RECOVERY=<file> holds the recovery until that file exists, so a
- * suite can show what waits for it (#984: the notice that Hive closed unexpectedly).
+ * suite can show what waits for it (#984: the notice that Combwork closed unexpectedly).
  */
 async function testHold(): Promise<void> {
   const file = !app.isPackaged ? process.env.CW_TEST_HOLD_MERGE_RECOVERY : undefined
@@ -196,7 +196,7 @@ async function testHold(): Promise<void> {
 }
 
 /**
- * A workspace opened: holds its record has that Hive no longer has (it closed or crashed while an agent held the slot)
+ * A workspace opened: holds its record has that Combwork no longer has (it closed or crashed while an agent held the slot)
  * are told to the user, since that merge may be half done, and dropped from the record. Each is told in its project
  * now (#508), and so are the holds recorded where the workspace was before it moved (its record is by its folder) when
  * nothing is there now; one whose project can't be known is told in the workspace, and kept beside the record.
@@ -235,7 +235,7 @@ export function startMergeSlots(): void {
   setUserMergeSlot((projectPath, branch, run) => mergeSlots.asUser(projectPath, branch, run))
 }
 
-/** The branch a project folder is on: what Hive's Merge dialog merges into, and the slot a claim names by default. */
+/** The branch a project folder is on: what Combwork's Merge dialog merges into, and the slot a claim names by default. */
 export async function currentBranch(projectPath: string): Promise<string | null> {
   return workspace.branch(projectPath)
 }

@@ -443,7 +443,7 @@ async function movedUnderLock(ws: string, o: MoveOptions & { only?: string }, st
   }
   await excludeMoveLock(ws)
   const id = randomUUID()
-  // The workspace first: a Hive with its board open fails it here, before any project is touched; then its Assistant's
+  // The workspace first: a Combwork with its board open fails it here, before any project is touched; then its Assistant's
   // home (inside the workspace's folder, so looked at after it moved), then the projects.
   let moved = 0
   for (const kind of ['workspace', 'assistant', 'project'] as const) {
@@ -498,7 +498,7 @@ async function runEarly(ws: string, moves: FolderMove[], phase: Phase): Promise<
   else if (phase === 'notes') await rewriteNotes(join(current(ws), 'shared'), moves)
 }
 
-/** Hive's exclude line for a moved project's old folder, in its repository's info/exclude, for the new one. */
+/** Combwork's exclude line for a moved project's old folder, in its repository's info/exclude, for the new one. */
 export async function moveExcludeLine(host: string): Promise<boolean> {
   const found = vcsOf(host)
   if (found?.kind !== 'git') return false

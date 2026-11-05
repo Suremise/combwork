@@ -29,7 +29,7 @@ describe('Assistant settings', () => {
     expect(l.provider).toBe('claude-code')
     expect(l.model).toBe('opus')
     expect(l.effort).toBe('high')
-    // Not Plan: plan mode blocks the hive tools the Assistant works with.
+    // Not Plan: plan mode blocks the Combwork tools the Assistant works with.
     expect(l.permissionMode).toBe('auto')
     const codex = assistantProjectConfig(cfg(), settings({ provider: 'codex' }))
     expect(agentLaunchSettings(codex.agents[0], codex, s).permissionMode).toBe('approve-for-me')

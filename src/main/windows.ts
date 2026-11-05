@@ -7,7 +7,7 @@ import { forgetOwner } from './notify'
 import { contextWorkspace, setWorkspaceFallback, workspaceFor, type WorkspaceService } from './workspace'
 
 /**
- * Hive's windows, like VS Code's: each shows one workspace (or the welcome page), all in one app process,
+ * Combwork's windows, like VS Code's: each shows one workspace (or the welcome page), all in one app process,
  * so settings, the Agent API, the tray, updates and file locks stay single. This module keeps track of
  * them and decides which window each event and terminal's output goes to.
  */

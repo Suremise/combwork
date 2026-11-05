@@ -4,7 +4,7 @@
 // by the caller, and the API can't change or remove one. The card's tile counts them, with a tooltip. GET /v1/tasks/{n}
 // lists them first. Closing the card while a decision is being changed asks first, and waits for one being saved. An agent
 // working on the card hears of a decision recorded meanwhile in its next reply, also from a tool that isn't the board's
-// (its own token; the real hive MCP server adds the line). The dialog's Save keeps everything typed in it (#432): a
+// (its own token; the real combwork MCP server adds the line). The dialog's Save keeps everything typed in it (#432): a
 // decision being written is recorded as the user's, a comment posted, both once each, a change to a decision saved,
 // and a failed save leaves the dialog open with the words, also through Move to Active, whose Try Again writes nothing
 // twice; a decision changed to nothing is refused; Add Decision and Comment stand out while their box has text,
@@ -304,7 +304,7 @@ const check = (name, ok, extra = '') => {
   check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(named), named)
   const status = await asCoder('/v1/projects/alpha')
   check('a decision recorded since: its next reply, from a tool that is not the board, flags it', status.status === 200 && status.notice === `[CW] ${named} has 1 new decision since you last read it: read the card (cw_read_task) at your next checkpoint.`, JSON.stringify(status))
-  // Through the real hive MCP server, as the agent's tools see it: the reply ends with the line.
+  // Through the real combwork MCP server, as the agent's tools see it: the reply ends with the line.
   const viaMcp = JSON.parse(
     execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_project_status', arguments: {} } }) + '\n',

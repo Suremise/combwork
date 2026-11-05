@@ -588,7 +588,7 @@ describe('while the upgrade waits, nothing needing combwork.db starts or writes 
       expect(await inWorkspace(w, () => repairStages(w))).toEqual({ unmarked: 0, repaired: [], failed: 0 })
       metrics.recordApi(metrics.metricsHandle(w), null, { route: '/v1/tasks', method: 'GET', role: 'agent', outcome: 'ok', requestBytes: 1, responseBytes: 1, ms: 1 })
       await metrics.metricsHandle(w)!.store.save()
-      expect(lines.filter((l) => /no such table|readonly database|Could not save the performance metrics|bringing builders|from Hive 0\.9|repairing the stages/i.test(l))).toEqual([])
+      expect(lines.filter((l) => /no such table|readonly database|Could not save the performance metrics|bringing builders|from Combwork 0\.9|repairing the stages/i.test(l))).toEqual([])
       expect(readTable(ws, 'metrics').docs).toEqual([])
       await inWorkspace(w, () => store.upgradeBoard(w))
       expect(store.boardWaits(w)).toBe(false)

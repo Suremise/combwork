@@ -13,7 +13,7 @@ const SHAPES = {
 
 /** What a badge shows inside its outline: white on the colour, or cut out of the single-colour form. */
 const GLYPHS = {
-  // Not Hive's own >_ prompt (its app icon), so no badge reads as Hive's mark.
+  // Not Combwork's own >_ prompt (its app icon), so no badge reads as Combwork's mark.
   tilde: <path d="M4.2 8.9 C5.2 6.6 6.6 6.4 8 7.8 C9.4 9.2 10.8 9.4 11.8 7.1" fill="none" strokeWidth="1.9" strokeLinecap="round" />,
   braces: (
     <path
@@ -27,8 +27,8 @@ const GLYPHS = {
 }
 
 /**
- * Hive's own badge for each provider, keyed by the descriptor's icon: never a provider's logo (#470), but an outline,
- * a glyph and a colour of Hive's, always shown with the provider's name or as its tooltip. A provider without one
+ * Combwork's own badge for each provider, keyed by the descriptor's icon: never a provider's logo (#470), but an outline,
+ * a glyph and a colour of Combwork's, always shown with the provider's name or as its tooltip. A provider without one
  * here shows a neutral terminal icon.
  */
 const BADGES: Record<string, { shape: keyof typeof SHAPES; glyph: keyof typeof GLYPHS; color: string }> = {

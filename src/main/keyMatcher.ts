@@ -62,7 +62,7 @@ function topOf(s: MatchSecret): number {
   return p
 }
 
-/** The ways a key is written where Hive may meet it: as it is, JSON-escaped once and twice, URL-encoded. */
+/** The ways a key is written where Combwork may meet it: as it is, JSON-escaped once and twice, URL-encoded. */
 function forms(key: string): string[] {
   const once = JSON.stringify(key).slice(1, -1)
   const twice = JSON.stringify(once).slice(1, -1)

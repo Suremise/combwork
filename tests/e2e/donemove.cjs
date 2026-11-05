@@ -1,4 +1,4 @@
-// Agents move cards into and out of Done like any other column: an agent's hive tools (the fake Claude Code's
+// Agents move cards into and out of Done like any other column: an agent's Combwork tools (the fake Claude Code's
 // "boardmove N COLUMN", which calls the API as they do) move a card to Done with no question, its history names the
 // agent, and the move is undone from the board (right-click → Move to) or by the agent. The card's prompt asks for
 // Review when the work is done. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.

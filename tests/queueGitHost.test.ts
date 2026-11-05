@@ -637,7 +637,7 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
       runner = await acquire(w)
       setGitToolForTests({ state: 'ok', version: '2.51.0' }, resolved)
       // The launcher's MSYSTEM and its shell tools, seen by an alias through sh.
-      const alias = ['-c', 'alias.hivemsys=!echo "$MSYSTEM $(command -v sed)"', 'hivemsys']
+      const alias = ['-c', 'alias.cwmsys=!echo "$MSYSTEM $(command -v sed)"', 'cwmsys']
       expect(await runner.git(w.project, alias, 'testMerge', { env })).toMatchObject({ ok: true, out: `${resolved.launcherEnv!.msystem} /usr/bin/sed\n` })
       expect(await runner.git(w.project, ['rev-parse', 'HEAD'], 'testMerge', { env, timeoutMs: 60_000 })).toMatchObject({ ok: true })
       await vi.waitFor(() => expect(started().filter((a) => a.toLowerCase() === real.toLowerCase())).toHaveLength(2), { timeout: 10_000, interval: 50 })

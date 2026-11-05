@@ -11,7 +11,7 @@ const log = createLogger('window')
 
 /** A second crash within this long doesn't reload again: it asks, so a page that crashes on load can't loop. */
 export const CRASH_LOOP_MS = 60_000
-/** How long a window may hang before Hive offers to reload it. */
+/** How long a window may hang before Combwork offers to reload it. */
 const HANG_MS = 4000
 
 /** What to do about a window's renderer that has gone: reload it, or ask (it crashed again soon after a reload). */
@@ -100,7 +100,7 @@ const stillRunning = (): string => tr(msg({ id: 'main.window.stillRunning', defa
 export function watchRenderer(entry: CombworkWindow, opts: { quitting: () => boolean; openLogs: () => void; quit: () => void }): void {
   const win = entry.win
   let lastCrashAt: number | null = null
-  // A reload Hive asked for after a hang crashes the page first: not a crash to report.
+  // A reload Combwork asked for after a hang crashes the page first: not a crash to report.
   let expectGone = false
   let hangTimer: NodeJS.Timeout | null = null
   let hangPrompt: AbortController | null = null

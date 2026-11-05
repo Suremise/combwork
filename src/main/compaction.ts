@@ -1,12 +1,12 @@
-/** How long the CLI has to begin a compaction once Hive has submitted its /compact (PreCompact), before Hive stops waiting. */
+/** How long the CLI has to begin a compaction once Combwork has submitted its /compact (PreCompact), before Combwork stops waiting. */
 export const BEGIN_MS = 20_000
 /** How long a begun compaction may take, should the CLI never say it ended. */
 export const LIMIT_MS = 10 * 60_000
 
 /**
- * A compaction Hive asked for (Compact), from the moment it is reserved, through typing its /compact (no limit
+ * A compaction Combwork asked for (Compact), from the moment it is reserved, through typing its /compact (no limit
  * runs yet: a long focus takes a while to type) and its submission, until it is over. The CLI says so with
- * PostCompact; when it doesn't, Hive learns it from the transcript (a compaction more than before), the terminal
+ * PostCompact; when it doesn't, Combwork learns it from the transcript (a compaction more than before), the terminal
  * (the CLI refused or failed it, which sends no hook), or the time limits. `over` is called once, whichever comes
  * first; a hook that ends it (PostCompact, or a prompt that starts a new turn) calls end() and takes care of the
  * status itself. One the CLI began by itself while the agent was idle is watched the same way from its PreCompact
@@ -20,7 +20,7 @@ export class Compaction {
 
   constructor(
     /**
-     * What came before it in the transcript: how many compactions (Hive's own Compact counts them before typing it), or
+     * What came before it in the transcript: how many compactions (Combwork's own Compact counts them before typing it), or
      * when it began (one the CLI began by itself, #1115: counted after its PreCompact, a compaction written meanwhile
      * would pass for an earlier one), so only a compaction recorded since then is this one.
      */
@@ -30,7 +30,7 @@ export class Compaction {
     private readonly over: () => void
   ) {}
 
-  /** Hive submitted the /compact: the CLI has BEGIN_MS to begin it. */
+  /** Combwork submitted the /compact: the CLI has BEGIN_MS to begin it. */
   submitted(): void {
     if (this.done || this.started) return
     clearTimeout(this.timer)

@@ -108,7 +108,7 @@ describe("Copilot: every MCP server's instructions (row 21)", () => {
     await copilot.prepareLaunch(agent)
     const on = copilot.buildCommand('C:\\bin\\copilot.exe', agent)
     expect(on.args).toContain('--allow-all-mcp-server-instructions')
-    // Only the line on the hive tools' names (#1530) is custom then.
+    // Only the line on the Combwork tools' names (#1530) is custom then.
     expect(on.env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBe(join(agent.privateDir, 'instructions'))
     expect(instructions(agent)).toBe(`---\napplyTo: '**'\n---\n${toolNamesLine()}\n`)
 

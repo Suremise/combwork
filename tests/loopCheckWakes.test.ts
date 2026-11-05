@@ -163,7 +163,7 @@ describe('loop agents with no watch, and the loop wakes that reach them (HI-1693
     deliveries.setReadsInboxForTests(() => false)
     await checked(alpha, 'b1', () => s.idle('b1'))
     await vi.waitFor(() => expect(s.flagged('b1')).toEqual([c]), HANG)
-    // Its hive tools back (Settings changed): a loop wake reaches it again, and the mark goes.
+    // Its Combwork tools back (Settings changed): a loop wake reaches it again, and the mark goes.
     deliveries.setReadsInboxForTests(() => true)
     emit({ type: 'settings-changed', settings: config.settings })
     await vi.waitFor(() => expect(s.flagged('b1')).toBeNull(), HANG)

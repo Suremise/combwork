@@ -1,5 +1,5 @@
 /**
- * The locale Hive formats in (#851), for modules that can't import FormatJS: shared/dates.ts is reached by hive-mcp.js,
+ * The locale Combwork formats in (#851), for modules that can't import FormatJS: shared/dates.ts is reached by cw-mcp.js,
  * which may only load Node's built-ins and modules that import nothing. setLanguage() (index.ts) keeps it current;
  * until then it is English. Imports nothing.
  */

@@ -44,9 +44,9 @@ import { agentMsg, inDialectOf, say, type AgentMsg, type DialectSession } from '
 
 /**
  * Wake-on-change watches (#128): an agent registers what it waits for on the board (cw_wait_for_tasks with wake), ends
- * its turn, and Hive types one line into it when a watched card changes, or when its overall limit passes with no change.
+ * its turn, and Combwork types one line into it when a watched card changes, or when its overall limit passes with no change.
  * Nothing runs while it waits. One watch per agent (a new one replaces it), kept in the workspace's .combwork/watches.json so
- * it survives the agent being resumed and Hive restarting; it ends when its line is typed, or when the agent or the user
+ * it survives the agent being resumed and Combwork restarting; it ends when its line is typed, or when the agent or the user
  * cancels it. A watch whose agent isn't running (or is busy, or the user is typing in it) is delivered when the agent is
  * idle again: nothing is typed over its work or the user's.
  *
@@ -238,9 +238,9 @@ const WOKE_CARDS = 100
 /**
  * What watches are doing in the background (#570): the checks the board's events start, deliveries and the settle
  * before each, lane checks, the confirmations that a typed wake was taken, notes on cards. `settled()` resolves once none
- * is left, what one starts meanwhile included, so a test (and Hive's loop wakes, #578) waits for the outcome rather than
+ * is left, what one starts meanwhile included, so a test (and Combwork's loop wakes, #578) waits for the outcome rather than
  * for a quiet spell or a read straight after a call. A wake typed again after its line was cleared (#530) counts while
- * it is being typed (and then confirmed), not while it waits for its agent to be ready: that is the agent's, not Hive's.
+ * it is being typed (and then confirmed), not while it waits for its agent to be ready: that is the agent's, not Combwork's.
  */
 const inFlight = new Set<Promise<unknown>>()
 /** Counts work as in flight until it ends, and returns it (its result or failure as it was). */
@@ -295,7 +295,7 @@ const renameOnce = (from: string, to: string): Promise<void> => (testHooks.renam
 
 /**
  * At most this many watches a workspace (one per agent: up to 24 agents in each of many projects, #562), and this big a file. Both
- * hold for what Hive writes as well as what it reads: a watch that would pass either is refused when it is made.
+ * hold for what Combwork writes as well as what it reads: a watch that would pass either is refused when it is made.
  */
 const MAX_WATCHES = 500
 const MAX_FILE_BYTES = 1024 * 1024
@@ -392,7 +392,7 @@ function load(ws: WorkspaceService): Promise<Store> {
     await testHooks.afterLoad?.()
     if (!open()) throw closedError()
     // Only this workspace's agents, each with the view of the board its own token gives it. A watch handed over as a
-    // delivery follows it (below); one from before #649 that was being typed when Hive stopped is offered once more.
+    // delivery follows it (below); one from before #649 that was being typed when Combwork stopped is offered once more.
     const list: WatchRecord[] = []
     const invalid = read.invalid
     let migrated = false
@@ -412,7 +412,7 @@ function load(ws: WorkspaceService): Promise<Store> {
       else if (!hostedIn(ws, path, rec.projectPath) || (rec.agents && !rec.agents.agents.every((a) => mayWatch(ws, path, rec.projectPath, a.projectPath)))) invalid.push(raw)
       else if (list.some((x) => same(x.projectPath, rec.projectPath) && x.agentId === rec.agentId)) invalid.push(raw)
       else {
-        // Being typed when Hive stopped (from before #649): an attempt, not a receipt. It is handed over once more, made
+        // Being typed when Combwork stopped (from before #649): an attempt, not a receipt. It is handed over once more, made
         // from the cards as they are then, saying it may repeat.
         if (rec.fired?.sending) {
           delete rec.fired.sending
@@ -472,9 +472,9 @@ function load(ws: WorkspaceService): Promise<Store> {
     )
     // Agents already running learn their watch now.
     for (const r of list) sessions.watchChanged(r.projectPath, r.agentId)
-    // Those handed over as deliveries follow what became of them while Hive was closed (#649).
+    // Those handed over as deliveries follow what became of them while Combwork was closed (#649).
     if (list.some((r) => r.fired?.delivery)) inBackground('following wakes', followDelivered(store))
-    // Cards can change while Hive is closed (a pull of .combwork/tasks, a hand edit): check them now, not at the next change.
+    // Cards can change while Combwork is closed (a pull of .combwork/tasks, a hand edit): check them now, not at the next change.
     if (list.length) inBackgroundAfter(0, 'checking watches', () => evaluate(ws))
     return store
   })().finally(() => {
@@ -514,7 +514,7 @@ async function readSaved(path: string, open: () => boolean): Promise<FileRead> {
 
 /**
  * Reads a workspace's watches file from before #1018 (at most MAX_FILE_BYTES), to move it in. No file is null; a file
- * that can't be read (locked, no permission) is an error, never "none". A file too big to be Hive's, or one that isn't
+ * that can't be read (locked, no permission) is an error, never "none". A file too big to be Combwork's, or one that isn't
  * JSON, is set aside (renamed, not deleted) and none are moved in; if it can't be set aside, that is an error too.
  */
 async function readFileOf(path: string, open: () => boolean): Promise<Saved | null> {
@@ -726,7 +726,7 @@ export const savedFileBytes = (watches: object[], invalid: unknown[] = []): numb
 const sizeOf = (empty: number, entries: number[], sum = entries.reduce((a, b) => a + b, 0)): number => (entries.length ? empty + sum + 2 * (entries.length - 1) + 4 : empty)
 
 /**
- * The file's size with every watch at its longest: it must fit, so a watch Hive took can always fire, be typed and end.
+ * The file's size with every watch at its longest: it must fit, so a watch Combwork took can always fire, be typed and end.
  * Measured watch by watch (#321): making the whole file's text for it took seconds at 400 watches, once a pop.
  */
 const budget = (store: Store, list: WatchRecord[], invalid = store.invalid): number => sizeOf(Buffer.byteLength(fileText(store, [], invalid)), list.map((r) => entryBytes(atMost(r))))
@@ -775,7 +775,7 @@ const saveQuietly = (store: Store): Promise<void> =>
   })
 
 /**
- * A watch as Hive reports it (its English `label`: the Agent API's statusMessage and watching, the inbox's offer line).
+ * A watch as Combwork reports it (its English `label`: the Agent API's statusMessage and watching, the inbox's offer line).
  * Its cards are named as its watcher's workspace names them (HI-1688: by key, "Waiting for HI-12 → Review"), whatever
  * work asks: a status read outside any request has no names of its own, and gave `#12`. A project agent's watch names
  * another project's card by its number, as everything that agent reads does (#1219).
@@ -931,7 +931,7 @@ async function lanesLeft(store: Store, old: WatchRecord | undefined, projectPath
  * project's cards; the Assistant: all), and a card outside that is unknown.
  * The board is checked again once the watch is in place, so a change while it was being set up isn't missed.
  * `start` (#1639): a card as an intent of the agent's left it, and when: the watch starts from there, so what others
- * changed since that intent (a verdict given before Hive armed the watch) counts.
+ * changed since that intent (a verdict given before Combwork armed the watch) counts.
  */
 export async function registerWatch(ws: WorkspaceService, projectPath: string, agentId: string, cond: WatchCondition, limitMinutes = WATCH_DEFAULT_LIMIT_MINUTES, start?: { card: TaskCard; at: string }): Promise<WatchResult> {
   const store = await load(ws)
@@ -989,7 +989,7 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
     const from = { seen, ...((told && cond.cards.some((n) => told.has(String(n)))) || cutAny ? { self: self! } : {}) }
     const old = recordOf(store, projectPath, agentId)
     const before = store.list
-    // The limit holds for what Hive writes as for what it reads: replacing an agent's watch is always allowed.
+    // The limit holds for what Combwork writes as for what it reads: replacing an agent's watch is always allowed.
     // agent-protocol: servers.ts gives this reply its status by its words (/card watches/)
     if (!already && !old && store.list.length >= MAX_WATCHES) throw new Error(`This workspace already has ${MAX_WATCHES} card watches, the most Combwork keeps: wait for some to end`)
     const minutes = Math.min(WATCH_MAX_LIMIT_MINUTES, Math.max(1, Math.round(limitMinutes)))
@@ -1028,7 +1028,7 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
 }
 
 /**
- * HI-2197: why a project agent may take no new watch now, or null: Hive is giving it a card in a slot (its own start, the
+ * HI-2197: why a project agent may take no new watch now, or null: Combwork is giving it a card in a slot (its own start, the
  * placement not made yet), which a watch would hold off. Asked under the watches' lock, as each registration writes its
  * watch: a start that makes the placement due then ends the agent's watch under the same lock (endWatchOf), so either
  * the watch is refused or that start ends it. Set by servers.ts (watchGuards.ts); none until then.
@@ -1127,7 +1127,7 @@ export async function endWatchOf(projectPath: string, agentId: string, why: stri
  * What agents did lately (#416), by agentKey: each change to a status that isn't working (its turn ended, it waits for
  * the user, it stopped), with the agent as it was then, numbered in order (`seq`: from the clock, so a number saved in a
  * watch still compares after a restart). The last few for each agent, whether or not anyone watches it yet: a wake's
- * next watch counts what happened in between. In memory: what happened while Hive was closed is read from the agents
+ * next watch counts what happened in between. In memory: what happened while Combwork was closed is read from the agents
  * as they are (agentHits).
  */
 interface Happening {
@@ -1191,9 +1191,9 @@ export function noteAgentStatus(st: LiveSessionState): void {
 }
 
 /**
- * Agents starting to wait for the user (#726: a permission prompt or a question in its pane, the status Hive shows as
+ * Agents starting to wait for the user (#726: a permission prompt or a question in its pane, the status Combwork shows as
  * waiting), numbered on the events' clock, the latest few: a lane watch tells each once, while it still waits. In
- * memory: a wait under way when Hive started is the user's to see (its pane says so).
+ * memory: a wait under way when Combwork started is the user's to see (its pane says so).
  */
 interface WaitStart {
   seq: number
@@ -1389,7 +1389,7 @@ type AgentHit = { agent: WatchedAgent; event: AgentEvent | null; now: AgentNow; 
 
 /**
  * What the agents of an agent watch did since it began: each one's latest event after what the watcher knew (its mark's
- * seq), as the agent was then, and whether it is working again since; failing that (nothing recorded: Hive restarted,
+ * seq), as the agent was then, and whether it is working again since; failing that (nothing recorded: Combwork restarted,
  * or a typed prompt never taken), the agent as it is now, if it isn't working.
  */
 function agentHits(rec: WatchRecord): AgentHit[] {
@@ -1434,7 +1434,7 @@ function noteToldAgents(store: Store, watcher: string, told: Map<string, number>
 export type AgentWatchResult = ({ watching: TaskWatchInfo } | { already: string[] }) & { replaced?: string; dropped?: string[]; lanesLeft?: string[] }
 
 /**
- * Starts (or replaces) an agent's agent watch (#416): Hive types one line into it when one of `cond`'s agents finishes
+ * Starts (or replaces) an agent's agent watch (#416): Combwork types one line into it when one of `cond`'s agents finishes
  * its turn, waits for the user or stops. Agents not working now are the answer at once (as for a card already in the
  * column): the agent's earlier watch ends and each one's state is told. Only agents it may watch (mayWatch); not itself.
  */
@@ -1552,7 +1552,7 @@ async function evaluateUsage(store: Store): Promise<void> {
 export type UsageWatchResult = ({ watching: TaskWatchInfo } | { already: string[] }) & { replaced?: string; lanesLeft?: string[] }
 
 /**
- * Starts (or replaces) an agent's usage watch alone (HI-2195): Hive types one line into it once one of the accounts'
+ * Starts (or replaces) an agent's usage watch alone (HI-2195): Combwork types one line into it once one of the accounts'
  * limits reaches its share. One there already is the answer at once (its earlier watch ends, as for a card already in
  * its column).
  */
@@ -1633,7 +1633,7 @@ async function lanesNow(store: Store, rec: Pick<WatchRecord, 'scope' | 'lanes' |
 }
 
 /**
- * A workspace's lanes as a lane watch sees them (lanesNow), for a follower of its own: Hive's lane notices (#1266, which
+ * A workspace's lanes as a lane watch sees them (lanesNow), for a follower of its own: Combwork's lane notices (#1266, which
  * follow every running lane, and those whose end they haven't told, by their marks).
  */
 export function lanesNowIn(ws: WorkspaceService, laneMarks: Record<string, LaneMark>, since: string): Promise<LaneNow[]> {
@@ -2113,7 +2113,7 @@ async function withdraw(store: Store, rec: WatchRecord, current: () => boolean):
 const settling = new Set<string>()
 
 /**
- * Whether an agent's own card watch tells it of this change to card n (#405: Hive's loop wakes leave it to the watch),
+ * Whether an agent's own card watch tells it of this change to card n (#405: Combwork's loop wakes leave it to the watch),
  * the card being in `column` now: a watch on the card that counts a move into Review (`review`); one that counts a
  * verdict, or a move into the card's column now (`verdict`: a passing one that moved it to Passed; a failed one leaves
  * it in Review, which a watch for Passed doesn't count); one that counts a move into the card's column now (`moved`: a
@@ -2202,7 +2202,7 @@ function toldOf(projectPath: string, agentId: string, n: number): { h: string | 
   return fresh(t) ? { h: t.h, ...(t.hand && fresh(t.hand) ? { hand: t.hand } : {}) } : t.hand && fresh(t.hand) ? { h: null, hand: t.hand } : null
 }
 
-/** Hive's own deliveries come from it. */
+/** Combwork's own deliveries come from it. */
 // agent-protocol: the sender's name a delivery is labelled with (deliveries name their senders)
 const HIVE = { kind: 'combwork', name: 'Combwork' } as const
 
@@ -2313,7 +2313,7 @@ registerSource('watch', {
   }
 })
 
-// A fired watch's line goes first: nothing else of Hive's is typed into its agent until it is handed over.
+// A fired watch's line goes first: nothing else of Combwork's is typed into its agent until it is handed over.
 onLineComing((projectPath, agentId) => !!storeFor(projectPath)?.list.some((x) => x.fired && !x.fired.delivery && same(x.projectPath, projectPath) && x.agentId === agentId))
 
 /** What a received wake told: the agent's next watch starts there (#224, #416, #418, #531, #578). */
@@ -2357,9 +2357,9 @@ function toldBy(store: Store, rec: WatchRecord, told: Told): void {
 }
 
 /**
- * Watches read back handed over as deliveries (#649): one whose delivery was received while Hive was closed has ended;
+ * Watches read back handed over as deliveries (#649): one whose delivery was received while Combwork was closed has ended;
  * one whose delivery ended without that (or is gone) fires again; one still to be received waits for it (offered once
- * more if it was being offered when Hive stopped).
+ * more if it was being offered when Combwork stopped).
  */
 async function followDelivered(store: Store): Promise<void> {
   for (const rec of store.list.filter((r) => r.fired?.delivery)) {
@@ -2381,7 +2381,7 @@ async function followDelivered(store: Store): Promise<void> {
 
 /**
  * Hands a fired watch's line to the delivery service (#649), which types it: once its agent can take a line (ready,
- * finished or watching, nobody typing there, no line of Hive's waiting), so the line is made from the cards as they are
+ * finished or watching, nobody typing there, no line of Combwork's waiting), so the line is made from the cards as they are
  * then. The watch stays (the agent shows watching and takes no other work) until that delivery is received (its line
  * taken by its CLI, or fetched with cw_inbox): then it ends, and what its line told is where the agent's next watch
  * starts, never on "typed". Cancelled or replaced meanwhile, its delivery is cancelled too. A card its line tells about

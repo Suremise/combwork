@@ -81,7 +81,7 @@ the taskbar, then shows them inactive so they draw for screenshots. From then on
 raising or flashing a window keeps it off screen, Windows notifications are dropped, and message boxes answer as
 cancelled. A window already shown when it is reached fails the launch, saying so. Only its tray icon can appear.
 `packaged-progress` and `packaged-mcp` run Combwork.exe as Node and show nothing. Checked in Windows Sandbox (0.9.3, a
-watcher of on-screen windows and the foreground: none from Hive, as the app was then named) and on the host for these suites (the card says how).
+watcher of on-screen windows and the foreground: none from Combwork, as the app was then named) and on the host for these suites (the card says how).
 
 **No update checks** (#1332): a packaged Combwork checks GitHub 30 s after it starts and every 6 hours, and each check
 fetches the release's `latest.yml`, which GitHub counts as a download. A packaged test Combwork never does: 1.0 with
@@ -458,14 +458,14 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
 
 - **When:** on each release candidate, once it is built and before the user installs it (RELEASING.md step 1, the
   release-combwork skill), with the verdict and report folder commented on the release card.
-- **How:** `npm run sandbox-checks -- --installer "<the RC's installer>" --hive "<the main checkout>"
+- **How:** `npm run sandbox-checks -- --installer "<the RC's installer>" --repo "<the main checkout>"
   --report "$env:LOCALAPPDATA\combwork-test\sandbox-reports\<version>-rc<n>"` (`--previous <installer>` for another
-  upgrade start; `--hive` is only where that is looked for, the newest other installer in its `dist`; `--previous-rc
+  upgrade start; `--repo` is only where that is looked for, the newest other installer in its `dist`; `--previous-rc
   <a 1.1 release candidate's installer>` adds scenario 10, the upgrade from that RC, so the names upgrade, HI-2587, is
   checked from 1.0.0 and from an RC alike: pass it for 1.1's release candidates). It drives the
   hive-mcp project's **windows-sandbox MCP server** over stdio as any MCP client does, starting its own copy of it, so
   it needs no MCP registration: `--server <its server.js>` (or `WSB_SERVER`), else the copy Combwork installed from the MCP
-  catalogue in the workspace holding `--hive` (`<workspace>\.combwork\mcp\windows-sandbox`), else a hive-mcp checkout
+  catalogue in the workspace holding `--repo` (`<workspace>\.combwork\mcp\windows-sandbox`), else a combwork-mcp checkout
   beside it (`<hive>\..\mcp\servers\windows-sandbox`). The server keeps its run folders in
   `%LOCALAPPDATA%\combwork-test\sandbox`.
 - **What's where:** the runner (`checks.cjs`) maps this checkout's `tests` folder and `playwright-core` read-only into

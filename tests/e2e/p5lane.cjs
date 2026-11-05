@@ -1,6 +1,6 @@
 // S55, P5's RC scenario end to end (#1358, SPEC §16.18, §16.19.1-2), as 1.0 builds it (#1573: §16.10's slots, no
 // worktree agents): "Pair (Combwork merges)", the Assistant off, on fake Claude Code agents acting by their own tokens (their
-// hive tools' calls), B1 added in the project folder. The project's options are set through Version Control → Workflow
+// Combwork tools' calls), B1 added in the project folder. The project's options are set through Version Control → Workflow
 // (#1355's form: Pair, with G8 strict on); lanes are started from the board, each lent a slot that B1 then works in.
 // The quick check is the project's `typecheck` script, steered from outside the repository (queueFixture.cjs's check),
 // run by the builder through cw-progress --check before each submit (counted) and by the queue on the merged result.

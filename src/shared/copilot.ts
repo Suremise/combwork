@@ -10,7 +10,7 @@ import { agentMsg, say } from './agentText'
 /**
  * GitHub Copilot's side of the shared provider data (the Copilot CLI, `copilot`): its modes, reasoning levels and models.
  * Its footer shows two things, the agent mode (Interactive, Plan, Autopilot: Shift+Tab cycles them) and the approval
- * (Manual Approval, or Allow All), and Hive's modes are the combinations it can tell apart there. The approval is Allow
+ * (Manual Approval, or Allow All), and Combwork's modes are the combinations it can tell apart there. The approval is Allow
  * All when launched with --allow-all, and also once a turn has run in Autopilot: entering it sets Allow All for the rest
  * of the session ("Permission policy: Allow All for this session"), which stays when Shift+Tab leaves Autopilot
  * ("Interactive · Allow All", read as Allow all; #490). Checked with Copilot CLI 1.0.93 (the #403 spike, #490's probes).
@@ -19,7 +19,7 @@ import { agentMsg, say } from './agentText'
 
 export const COPILOT = 'copilot'
 
-// Hive's own tools (the hive MCP server) never ask, in any mode: the adapter pre-approves them.
+// Combwork's own tools (the combwork MCP server) never ask, in any mode: the adapter pre-approves them.
 /** GitHub Copilot's permission modes as agents and the Agent API read them (dialects, HI-2065): said when read (the getters below), so in the reader's dialect. The window has its own messages (`text`). */
 const M = {
   askLabel: agentMsg({ id: 'mode.copilot.ask.label', text: 'Ask', note: "GitHub Copilot's permission mode ask: its name, as agents and the Agent API read it (the window has its own message)." }),
@@ -156,7 +156,7 @@ export function copilotModeFlags(mode: PermissionMode, folder: string): string[]
  * Each mode's footer, by its two parts ("Plan · Manual Approval"), read by each part's first word: in a narrow terminal
  * Copilot wraps its footer item by item ("← open ·Interactive · Manual · / commands" over "sidebar Approval next tab",
  * 1.0.93). The defaults of the advanced settings copilot.footer.<key> (#696), case sensitive. Accept edits has none: its
- * footer is Ask's. Hive has no mode for Assisted approval.
+ * footer is Ask's. Combwork has no mode for Assisted approval.
  */
 export const COPILOT_FOOTER_MODES: readonly FooterModeDef[] = [
   { mode: 'ask', key: 'ask', label: 'Ask', pattern: String.raw`\bInteractive ?· ?Manual\b` }, // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
@@ -241,7 +241,7 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
   permissionModes: withCliOwn(COPILOT_PERMISSION_MODES),
   // Ask, with edits in the agent's folder approved (#468).
   defaultPermissionMode: 'accept-edits',
-  // Reads are approved by Copilot itself, and Hive's own tools are pre-approved (the Assistant's: trustedCombworkTools).
+  // Reads are approved by Copilot itself, and Combwork's own tools are pre-approved (the Assistant's: trustedCombworkTools).
   assistantMode: 'ask',
   effortLevels: [
     { value: 'none', label: 'None', text: EFFORT_TEXT.none }, // i18n-ignore: agent-facing English (text is the window's)

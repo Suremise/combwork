@@ -26,7 +26,7 @@ import { workspace } from './workspace'
 import { advanced, updateSettingsChecked } from './advanced'
 
 /**
- * Hive's settings for the Agent API and the Hive Assistant's settings tools (#186): the catalog's entries with their
+ * Combwork's settings for the Agent API and the Combwork Assistant's settings tools (#186): the catalog's entries with their
  * values, and a change made the way Settings and Project Settings make it (config.updateSettings and the table setters,
  * or the project's config under its lock). Who may change what is decided by the caller (settingsChange in
  * servers.ts), and checked again by its guard at the moment of the change.
@@ -155,7 +155,7 @@ export async function projectOf(projectPath: string | null): Promise<{ path: str
 }
 
 /**
- * The settings as rows: Hive's and the providers', and with a project its settings too (only then: their values are a
+ * The settings as rows: Combwork's and the providers', and with a project its settings too (only then: their values are a
  * project's). `query` keeps those whose id, title, path or text has every word; `scope` one scope.
  */
 export function settingRows(opts: { query?: string; scope?: SettingScope; project?: { config: ProjectConfig } | null }): SettingRow[] {
@@ -174,7 +174,7 @@ export function settingRows(opts: { query?: string; scope?: SettingScope; projec
       const said = agentSetting(e)
       return { row: { id: e.id, title: said.title, value: settingValueText(e, value), ...(changed ? { default: settingValueText(e, def) } : {}), desc: firstSentence(said.desc), ...(e.readOnly ? { readOnly: true as const } : {}) }, advanced: !!e.advanced, level: !!e.workflowLevel || (!!e.slotLevel && e.slotLevel !== 'project'), changed }
     })
-  // Advanced settings (#367) and the workflow defaults at Hive's and the workspace's level (#1422) only when a query asks
+  // Advanced settings (#367) and the workflow defaults at Combwork's and the workspace's level (#1422) only when a query asks
   // or one was changed: the rest are one line each, so a plain listing stays lean.
   if (words.length) return rows.map((r) => r.row)
   const atDefault = rows.filter((r) => r.advanced && !r.changed).length
@@ -187,7 +187,7 @@ export function settingRows(opts: { query?: string; scope?: SettingScope; projec
 }
 
 /**
- * Where the user sees a setting, in the language Hive shows them (#767), when that isn't English: the tools speak
+ * Where the user sees a setting, in the language Combwork shows them (#767), when that isn't English: the tools speak
  * English, so the Assistant can name it as the user reads it ("Ustawienia → Sesje → …"). undefined in English.
  */
 function shownAs(e: SettingEntry): string | undefined {
@@ -242,10 +242,10 @@ export const removedPrices = (provider: ProviderId): string[] => [...(providerSe
 /**
  * Sets a setting to a value as Settings or Project Settings would, and returns what it was and is now. `guard` runs at
  * the moment of the change, with the value as it is then (under the project's lock for a project's setting, or with no
- * wait before Hive's own settings change): it throws to refuse, so a permission withdrawn, or a value changed by
+ * wait before Combwork's own settings change): it throws to refuse, so a permission withdrawn, or a value changed by
  * someone else, while the call waited is noticed. Never a sensitive setting: those stay the user's.
  *
- * A provider's prices: null puts back Hive's, as Settings' Reset to defaults does, the removed shipped models too;
+ * A provider's prices: null puts back Combwork's, as Settings' Reset to defaults does, the removed shipped models too;
  * a table keeps them removed, unless `removed` (Revert's) says which. `removed` in the result is set when they changed.
  */
 export async function applySetting(
@@ -315,7 +315,7 @@ export async function applySetting(
     return { old, new: settingValue(e, config.settings, null, workspace.config) }
   }
   if ('slotLevel' in change) {
-    // A level's slot default (HI-1765), saved as Settings saves it: Hive's at once, the workspace's in its save queue,
+    // A level's slot default (HI-1765), saved as Settings saves it: Combwork's at once, the workspace's in its save queue,
     // the guard in the change's own turn, against the level's value it replaces (HR5's round 1).
     const { level, key, value: v } = change.slotLevel
     const at = (d: SlotDefaults | undefined): unknown => (level === 'global' ? settingValue(e, { ...config.settings, slotDefaults: d }) : settingValue(e, config.settings, null, { ...workspace.config, slotDefaults: d }))
@@ -326,7 +326,7 @@ export async function applySetting(
     })
     return { old, new: at(saved) }
   }
-  // Hive's own settings change at once, with nothing awaited between the guard and the change.
+  // Combwork's own settings change at once, with nothing awaited between the guard and the change.
   const current = (): unknown => settingValue(e, config.settings, null, null, advanced.overrides())
   if ('settings' in change) {
     // Show developer features is kept in advanced.json too: written there first, or refused, with the guard and the

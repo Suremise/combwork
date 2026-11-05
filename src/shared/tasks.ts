@@ -236,7 +236,7 @@ export function startWaitingReason(c: Pick<TaskCard, 'column' | 'archived' | 'ag
 
 /**
  * A Doing card's agent whose start failed (HI-1976): stalled with the failure, which "isn't running" would hide. The
- * failure is the CLI's or Hive's own words (English), shown as they are. In the window's language with tr, else English.
+ * failure is the CLI's or Combwork's own words (English), shown as they are. In the window's language with tr, else English.
  */
 export function startFailedReason(c: Pick<TaskCard, 'column' | 'archived' | 'agent'>, agentNow: StallAgent | null, tr?: Tr): string | null {
   if (c.archived || c.column !== 'doing' || !c.agent || !agentNow || agentNow.running || !agentNow.failed) return null
@@ -254,7 +254,7 @@ function removedText(name: string | null | undefined, tr?: Tr): string {
 const notRunningText = (name: string, tr?: Tr): string =>
   tr ? tr(msg({ id: 'board.stalled.notRunning', defaultMessage: "{agent} isn't running.", description: "Why a card's work or review is stalled: its agent's session isn't running. {agent} is the agent's name." }), { agent: name }) : say(ST.notRunning, { agent: name })
 
-/** An agent as the stall check reads it: its cards left with no live watch, and whether a wake of Hive's waits untaken in its prompt (#777). */
+/** An agent as the stall check reads it: its cards left with no live watch, and whether a wake of Combwork's waits untaken in its prompt (#777). */
 export interface NotWatchingAgent {
   name: string
   project: string
@@ -271,14 +271,14 @@ export function notWatchingAgent<A extends NotWatchingAgent>(card: Pick<TaskCard
 
 /**
  * Why a card in a card loop is stuck (#376): an agent that was looping on it ended its turn with no card watch
- * (`notWatching`, set by Hive after a short grace), so nothing wakes it when the card changes; or (#777) its watch's wake
+ * (`notWatching`, set by Combwork after a short grace), so nothing wakes it when the card changes; or (#777) its watch's wake
  * waits untaken in its prompt (`untaken`: it did watch, and a watch with a wake its CLI never took isn't a live one).
  * Only for cards in play (Doing or Review); null otherwise.
  */
 export function notWatchingReason(card: Pick<TaskCard, 'number' | 'column' | 'archived' | 'project'>, agents: NotWatchingAgent[], tr?: Tr): string | null {
   const a = notWatchingAgent(card, agents)
   if (!a) return null
-  // #777: it did watch the card; its wake, which Hive typed, waits untaken in its prompt (its CLI didn't take the line).
+  // #777: it did watch the card; its wake, which Combwork typed, waits untaken in its prompt (its CLI didn't take the line).
   if (a.untaken) {
     if (tr) return tr(msg({ id: 'board.stalled.wakeUntaken', defaultMessage: "{agent} hasn't taken the wake Combwork typed for {card}: it waits in its prompt.", description: 'Why a card in a card loop is stalled: the agent watched the card, and Combwork typed its wake line into the agent\'s terminal, but the agent\'s CLI never sent it. {agent} is its name, {card} the card\'s name: its key, such as AM-12, or #12 for a card with none.' }), { agent: a.name, card: cardLabel(card) })
     return say(ST.wakeUntaken, { agent: a.name, card: cardName(card) })
@@ -803,13 +803,13 @@ const PROMPT_COMMENT_MAX = 4000
  * What an agent is given when a card is started: the card's own words (title, description, what it depends on), and
  * for more work on a card from Review or Done the feedback it came back with (the latest comment) and the user's note.
  * How to carry a card through is the work-on-card skill's (card-loop's for a running lane's builder; and, briefly,
- * Hive's session contract), so with Hive's tools the prompt only points there; without them the card is all the agent
+ * Combwork's session contract), so with Combwork's tools the prompt only points there; without them the card is all the agent
  * has. from: the column it was started from; note: what to do now; inLane: the agent builds it in a running lane.
  */
 /**
  * A card's start in its own words (#1292, #966 row 30; Settings → Advanced, "A card's start in its own words"): its
- * title, what the user wrote as they started it, and its description, without Hive's wrapper (which card it is on the
- * board, its dependencies and docs to read first, the skill to follow). Hive's wakes and messages stay wrapped.
+ * title, what the user wrote as they started it, and its description, without Combwork's wrapper (which card it is on the
+ * board, its dependencies and docs to read first, the skill to follow). Combwork's wakes and messages stay wrapped.
  */
 export function rawTaskPrompt(card: Pick<TaskCard, 'title' | 'description'>, note?: string): string {
   return [card.title.trim(), note?.trim() ?? '', card.description.trim()].filter(Boolean).join('\n\n')
@@ -818,7 +818,7 @@ export function rawTaskPrompt(card: Pick<TaskCard, 'title' | 'description'>, not
 /** At most this many of a card's attachments named in its start prompt (HI-1700); cw_read_task lists them all. */
 const PROMPT_ATTACHMENTS_MAX = 10
 
-/** The skill a running lane's builder is pointed at as it starts a lane card (HI-2047), by Hive's start or its own (HI-2092). */
+/** The skill a running lane's builder is pointed at as it starts a lane card (HI-2047), by Combwork's start or its own (HI-2092). */
 export const laneBuilderSkill = (): string => say(PR.laneBuilder)
 
 export function taskPrompt(card: TaskCard, withTools: boolean, opts: { from?: TaskColumn; note?: string; context?: ContextLine[]; attachments?: Pick<CardAttachment, 'id' | 'path'>[]; inLane?: boolean } = {}): string {

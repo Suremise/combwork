@@ -1,5 +1,5 @@
 // Per-agent MCP server access (#537): an agent gets all of its project's MCP servers (the default) or only those its
-// settings name. A launch passes only those, for every provider; the built-in hive server isn't affected; templates
+// settings name. A launch passes only those, for every provider; the built-in combwork server isn't affected; templates
 // keep the choice; the Agent API reads it.
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'

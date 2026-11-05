@@ -1,4 +1,4 @@
-// The hive MCP server's Agent API calls (#371): Node's http rather than fetch, whose 300 s limit on a reply's headers
+// The combwork MCP server's Agent API calls (#371): Node's http rather than fetch, whose 300 s limit on a reply's headers
 // cut waits short. Against a fake slow server: a reply whose headers come late still arrives; the call's own deadline
 // is the only limit, and ends the request; errors and the request itself come through as before.
 import { createServer, type IncomingMessage, type Server } from 'http'

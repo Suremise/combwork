@@ -35,8 +35,8 @@ import type { ServerCaps } from '../shared/providers'
 import { treeOf } from './combworkMove'
 
 /**
- * Hive's accounts (HI-980, SPEC §11.2): a CLI login per folder, under `<accounts>\<id>\`, each signed in through the
- * CLI's own sign-in (its login stays in its folder: Hive never reads, stores or passes a token). Each account's folder
+ * Combwork's accounts (HI-980, SPEC §11.2): a CLI login per folder, under `<accounts>\<id>\`, each signed in through the
+ * CLI's own sign-in (its login stays in its folder: Combwork never reads, stores or passes a token). Each account's folder
  * links the CLI's shared folders (Claude Code's `projects\`: transcripts and memory) back to the CLI's own home by a
  * junction, so every account finds every conversation. Removing one removes its junctions first, checks they are gone,
  * and only then deletes the folder, by a walk that stops at any link (never following one into the CLI's home).
@@ -69,7 +69,7 @@ const CONFIRM_ROUNDS = 3
 /**
  * The accounts folder: the installed app's `%LOCALAPPDATA%\Combwork\accounts`, a dev build's `Combwork-Dev`'s, and a
  * test profile's own (under CW_USER_DATA), so no test reaches the user's. The local profile folder is the one this run
- * uses (HI-2461; Hive's old one moved to it before, by the installer or at start: HI-2594).
+ * uses (HI-2461; Combwork's old one moved to it before, by the installer or at start: HI-2594).
  */
 export function accountsRoot(): string {
   // The local folder this run chose first: a test copy's (CW_TEST_PROFILE_CHOOSE) too.
@@ -84,12 +84,12 @@ export const accountFolder = (id: string): string => join(accountsRoot(), id)
 
 const samePath = (a: string, b: string): boolean => resolve(a).toLowerCase() === resolve(b).toLowerCase()
 
-/** Hive's accounts: its folders (never the CLI's own homes: Copilot's sign-in, a test home), in the order. */
+/** Combwork's accounts: its folders (never the CLI's own homes: Copilot's sign-in, a test home), in the order. */
 function list(): Account[] {
   return (config.get().accounts ?? []).filter((a) => !a.home)
 }
 
-/** Hive's accounts (list): what today's screens and the Agent API call connections, until HI-2107 and HI-2108. */
+/** Combwork's accounts (list): what today's screens and the Agent API call connections, until HI-2107 and HI-2108. */
 export const combworkAccounts = (): Account[] => list()
 
 /** Every account, the CLI's own homes too (HI-2106: Copilot's sign-in, a test home), in the order. */
@@ -147,7 +147,7 @@ function assertNotHeld(a: Account): void {
 /** Whether the CLI's sign-in names an organisation, which an identity then needs (HI-1757: Codex's names none). */
 const namesOrgs = (id: ProviderId): boolean => providerDescriptor(id).capabilities.connections?.orgs !== false
 
-/** The provider's account support, or a refusal: one without it can't have accounts in Hive. */
+/** The provider's account support, or a refusal: one without it can't have accounts in Combwork. */
 function support(id: ProviderId): { homeEnv: string; shared: readonly string[]; adapter: ReturnType<typeof provider> } {
   const caps = providerDescriptor(id).capabilities.connections
   const adapter = provider(id)
@@ -177,7 +177,7 @@ const claims = new Map<string, number>()
 
 /**
  * Takes a launch's claim on an account (HI-1755 holds it through the launch's start): taken under the account's lock,
- * so never while a removal runs, and only on an account still there whose folder is the one Hive made. Removal is
+ * so never while a removal runs, and only on an account still there whose folder is the one Combwork made. Removal is
  * refused while one is held. Returns its release.
  */
 export async function claimAccount(id: string): Promise<() => void> {
@@ -254,7 +254,7 @@ function sharedTarget(id: ProviderId, name: string): string {
   return target
 }
 
-/** How a link in an account's folder stands: absent, the junction Hive made, or something else (refused). */
+/** How a link in an account's folder stands: absent, the junction Combwork made, or something else (refused). */
 async function linkState(link: string, target: string): Promise<'absent' | 'ours' | string> {
   let st
   try {
@@ -278,7 +278,7 @@ async function makeFolder(a: Account): Promise<void> {
     await assertRealFolder(dir)
     for (const name of shared) {
       const target = sharedTarget(a.provider, name)
-      // Missing (the CLI never ran here): the empty folder, its home's only change Hive ever makes (Darren, 26 Oct). Not
+      // Missing (the CLI never ran here): the empty folder, its home's only change Combwork ever makes (Darren, 26 Oct). Not
       // its home: refused, rather than made.
       await mkdir(target).catch((e: NodeJS.ErrnoException) => {
         if (e.code === 'EEXIST') return
@@ -373,7 +373,7 @@ async function removeFolder(a: Account): Promise<void> {
   const links = await linksUnder(dir)
   if (links.length) throw new Unsafe(`links Combwork didn't make are in it: ${links.join(', ')}`) // i18n-ignore: for the log
   // Renamed aside, one rename that follows nothing, so no account is ever at its own path half deleted; then deleted
-  // there by the walk. The threat model (the Assistant's call on HI-980, 26 Oct): Hive's own junction, the CLI's
+  // there by the walk. The threat model (the Assistant's call on HI-980, 26 Oct): Combwork's own junction, the CLI's
   // writes and the user's changes before removal began, not another process racing the walk (SPEC §11.2).
   const aside = removingFolder(a.id)
   await rename(dir, aside)
@@ -574,7 +574,7 @@ function savedValues(a: Account, now: LaunchValues, patch: ConnectionPatch): Lau
   for (const k of ['model', 'effort', 'use200kContext', 'permissionMode', 'extraArgs'] as const) if (patch[k] !== undefined) next[k] = patch[k] ?? undefined
   const mode = next.permissionMode as string | undefined
   if (mode && !modeOption(a.provider, mode as LaunchValues['permissionMode'])) throw combworkError(BAD_MODE, { cli: providerDescriptor(a.provider).name, mode }, { kind: 'invalid' })
-  // A bare "--" (#523): Hive passes the task after its own, and a launch refuses it; refused here, before it is saved.
+  // A bare "--" (#523): Combwork passes the task after its own, and a launch refuses it; refused here, before it is saved.
   const argsProblem = typeof next.extraArgs === 'string' ? capturedText((t) => extraArgsProblem(next.extraArgs as string, t)) : null
   // agent-text: extraArgsProblem
   if (argsProblem) throw new CombworkError(argsProblem, { kind: 'invalid' })
@@ -1132,7 +1132,7 @@ export async function setUpPlace(id: string): Promise<ConnectionTrust['setUpIn']
   if (!a || !workspace.path || !onHere(a)) return undefined
   const st = requestTrust(id, workspace.path, projectsFor(a), true)
   const answer = await new Promise<TrustAnswer | null | 'cancelled'>((r) => st.waiters.push(r))
-  // Removed, or its workspace closed, while Hive checked: Set Up opens nowhere (never its own folder instead).
+  // Removed, or its workspace closed, while Combwork checked: Set Up opens nowhere (never its own folder instead).
   if (answer === 'cancelled') throw combworkError(msg({ id: 'main.accounts.setUpCancelled', defaultMessage: "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Combwork checked its folders.", description: "An error opening a connection's Set Up (Settings → Accounts & Connections, HI-1870; {name}, its name): Combwork was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started." }), { name: a.name }, { kind: 'conflict' })
   return answer ? setUpTarget(a, answer.pending) : undefined
 }
@@ -1283,7 +1283,7 @@ export async function confirmAccount(id: string): Promise<{ observed: Connection
 }
 
 /**
- * Opens the account's sign-in: the CLI's own login in a terminal of Hive's, on its folder. Once it ends, the account is
+ * Opens the account's sign-in: the CLI's own login in a terminal of Combwork's, on its folder. Once it ends, the account is
  * checked; its first good login becomes the one accepted. Returns the terminal's key.
  */
 export function signInAccount(id: string): Promise<string> {
@@ -1293,7 +1293,7 @@ export function signInAccount(id: string): Promise<string> {
 /**
  * Opens a sign-in connection's Set Up (HI-1826): the CLI itself on its folder, so the user answers its first-run screens
  * (its theme, its notes), which a browser sign-in (`claude auth login`) leaves unanswered, before an agent starts on it.
- * Hive types nothing and writes none of its files. The terminal is the sign-in's (one of the two at a time), and once it
+ * Combwork types nothing and writes none of its files. The terminal is the sign-in's (one of the two at a time), and once it
  * ends the account is checked as after a sign-in. Returns the terminal's key.
  */
 export function setUpSignInConnection(id: string, folder?: string): Promise<string> {
@@ -1304,7 +1304,7 @@ async function openLoginTerminal(id: string, setUp: boolean, folder?: string): P
   // A server connection has no sign-in: its Set Up opens the CLI instead (serverConnections.ts).
   if (isServer(mustGet(id))) throw combworkError(NO_ACCOUNT, undefined, { kind: 'invalid' })
   // Started under the account's lock, so never while it is being removed: the account checked still there (a removal
-  // before it wins), and its folder still the one Hive made (a folder replaced by a link would take the CLI's login
+  // before it wins), and its folder still the one Combwork made (a folder replaced by a link would take the CLI's login
   // writes elsewhere).
   return locked(id, async () => {
     const a = mustGet(id)
@@ -1333,7 +1333,7 @@ async function openLoginTerminal(id: string, setUp: boolean, folder?: string): P
 }
 
 /**
- * Refuses an account that can't be used now: half removed, or its folder not the one Hive made (missing, or replaced by
+ * Refuses an account that can't be used now: half removed, or its folder not the one Combwork made (missing, or replaced by
  * a link). Called under its lock, before anything is started on it.
  */
 async function assertUsable(a: Account): Promise<void> {
@@ -1486,7 +1486,7 @@ function attach(id: string): void {
         lost(id, e)
       }
     },
-    // Not there, or not the folder Hive made: missing until the accounts folder's watch sees it back.
+    // Not there, or not the folder Combwork made: missing until the accounts folder's watch sees it back.
     () => {
       if (watched.get(id) === w) void checkAccount(id)
     }
@@ -1562,7 +1562,7 @@ export function syncWatches(): void {
   syncRoot()
 }
 
-/** Every watch closed (Hive quitting, tests). */
+/** Every watch closed (Combwork quitting, tests). */
 export function stopAccountWatches(): void {
   for (const id of [...watched.keys()]) unwatch(id)
   syncRoot()
@@ -1954,7 +1954,7 @@ export interface ConnectionHome {
 
 /**
  * The homes of a provider's connections on in a workspace (or, with no workspace given, in every open one), for what
- * Hive shows or allows from a CLI's home; undefined when the provider's sign-in isn't its connections' (it has none, or
+ * Combwork shows or allows from a CLI's home; undefined when the provider's sign-in isn't its connections' (it has none, or
  * the test seam is on), so the CLI's own home is used as before.
  */
 export function connectionHomes(id: ProviderId, cfg?: WorkspaceConfig | null): ConnectionHome[] | undefined {
@@ -1996,13 +1996,13 @@ export function connectionOnHere(id: string, cli: ProviderId, projectPath: strin
 }
 
 /**
- * Connections' part of Hive's start (index.ts; nothing runs as this module loads, which other modules import): a new
+ * Connections' part of Combwork's start (index.ts; nothing runs as this module loads, which other modules import): a new
  * workspace starts with the last-used connections, and the watches follow the open workspaces and their choices.
  */
 /** The connections' one-time order move under way or done (HI-1875 round 1): what depends on the order waits for it. */
 let orderReady: Promise<void> = Promise.resolve()
 
-/** Starts the one-time order move (once, at Hive's start); its failure is logged, the order then as it was. */
+/** Starts the one-time order move (once, at Combwork's start); its failure is logged, the order then as it was. */
 export function startConnectionOrder(): Promise<void> {
   orderReady = migrateConnectionOrder().catch((e) => log.warn("connections: the preference order's one-time move failed", e))
   return orderReady

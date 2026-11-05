@@ -10,9 +10,9 @@ import { useScopedLoad } from '../scopedLoad'
 import { timeAgo } from '../util'
 
 /**
- * Performance's Main process stalls (HI-1135): the main process's recent stalls since Hive started, as combwork.log's "The
+ * Performance's Main process stalls (HI-1135): the main process's recent stalls since Combwork started, as combwork.log's "The
  * main process was busy" lines note them (main/mainStalls.ts), with the step that held the thread and the work that
- * overlapped it. Hive's, not a workspace's: no range or filter applies. Read with the page, and again as it refreshes.
+ * overlapped it. Combwork's, not a workspace's: no range or filter applies. Read with the page, and again as it refreshes.
  */
 
 const M = {
@@ -51,7 +51,7 @@ const workLength = (w: MainStallWork): string => {
   return w.count > 1 ? tr(M.repeated, { n: w.count, length: shown }) : shown
 }
 
-/** A cell's work, a line per label (its fixed name as Hive gives it, how many, and their length), and how many more. */
+/** A cell's work, a line per label (its fixed name as Combwork gives it, how many, and their length), and how many more. */
 function WorkLines({ list, more }: { list: MainStallWork[]; more: number }) {
   if (!list.length) return <span className="faint">{tr(M.none)}</span>
   return (

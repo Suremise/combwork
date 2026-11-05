@@ -55,7 +55,7 @@ const tracker = vi.hoisted(() => ({
   bound: (_run: string, _helper: string): boolean => true,
   reading: () => undefined as void,
   keeperForgotten: [] as string[],
-  /** HI-2313: its keeper's answer now (keeperObservation; by default none), and the Hives it was asked for. */
+  /** HI-2313: its keeper's answer now (keeperObservation; by default none), and the Combworks it was asked for. */
   observe: async (_run: string): Promise<{ helper: string; members: Proc[]; more: number } | null> => null,
   observeAsked: [] as string[],
   /** HI-2309: what the one rule (nothingHolds) says holds nothing: here, processes named as Windows Sandbox's broker. */

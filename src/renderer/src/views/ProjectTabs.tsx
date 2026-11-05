@@ -313,7 +313,7 @@ const S = {
   noMatch: msg({ id: 'project.settings.noMatch', defaultMessage: 'No settings match.', description: "Project Settings when the search finds nothing." })
 }
 
-/** A plan limit's window as the messages select on: the 5-hour and weekly windows Hive knows, else its own label. */
+/** A plan limit's window as the messages select on: the 5-hour and weekly windows Combwork knows, else its own label. */
 export const limitWindow = (l: PlanLimit): string => (l.windowMinutes === 300 ? 'fiveHour' : l.windowMinutes === 7 * 24 * 60 ? 'weekly' : 'other')
 
 // ---------------------------------------------------------------------------
@@ -333,7 +333,7 @@ const LIST_LIMIT_MS = 60_000
  * only on reload(). Only while a view using it is shown.
  */
 const NO_SESSIONS: SessionListItem[] = []
-/** A listing as shown: `othersLoading` while it is Hive's own sessions alone, the others still being read (HI-1681). */
+/** A listing as shown: `othersLoading` while it is Combwork's own sessions alone, the others still being read (HI-1681). */
 type SessionsData = { list: SessionListItem[]; kept: SessionListItem[]; othersLoading?: boolean }
 
 export function useSessions(project: ProjectInfo) {
@@ -368,7 +368,7 @@ export function useSessions(project: ProjectInfo) {
           loadScoped(path, () => bounded)
           return bounded
         }
-        // Nothing shown yet (HI-1681): Hive's own sessions first, from its records, while the sessions its CLIs keep for
+        // Nothing shown yet (HI-1681): Combwork's own sessions first, from its records, while the sessions its CLIs keep for
         // the project's folders are read (seconds on a busy disk with hundreds of them); the whole list follows. Shown
         // only while the whole list's load runs, which alone says how it ended (its time limit too); without deleted
         // sessions' usage meanwhile, which only adds to totals.
@@ -705,7 +705,7 @@ function LastTurn({ c }: { c: CompactionEvent }) {
 
 /**
  * A session's compactions as a data table (newest first, filters, pages). A row opens that compaction in the Sessions
- * tab's transcript, at its divider, when the transcript (or Hive's backup of it) is there to read.
+ * tab's transcript, at its divider, when the transcript (or Combwork's backup of it) is there to read.
  */
 function CompactionHistory({ project, session, compactions }: { project: ProjectInfo; session: SessionListItem; compactions: CompactionEvent[] }) {
   // Its When filter matches the dates as shown, in the current format.
@@ -1102,7 +1102,7 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
   if (shownId === LEFTOVERS_ROOT) return <LeftoversPage project={owner} read={infoRead} selector={selector} listWidth={listWidth} onCompare={(b, h) => choose(compareRoot(b, h))} />
   if (compared) return <ComparePage project={owner} base={compared.base} head={compared.head} lines={compare.lines} selector={selector} listWidth={listWidth} onPick={(b, h) => choose(compareRoot(b, h))} />
 
-  // Not "not a git repository": git can't run, so Hive can't tell (#346). Whichever page is shown.
+  // Not "not a git repository": git can't run, so Combwork can't tell (#346). Whichever page is shown.
   const gitMissing = (problem: string, retry: () => void): React.ReactNode => (
     <div className="empty-state changes-git-missing" style={{ paddingTop: '15vh' }}>
       <Icon name="warning" />
@@ -1128,7 +1128,7 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
   )
 
   // All the unused worktrees, in the main pane (#400): the list and its actions, as the Overview had them. Listing them
-  // reads git for each, which takes a while: the last list shows meanwhile, else a spinner says what Hive is doing.
+  // reads git for each, which takes a while: the last list shows meanwhile, else a spinner says what Combwork is doing.
   if (listingUnused && unusedData?.gitProblem) return gitMissing(unusedData.gitProblem, reloadUnused)
   if (listingUnused) {
     return (
@@ -1454,7 +1454,7 @@ export function ProjectSkillsTab({ project }: { project: ProjectInfo }) {
   const fallback = connectionCli(connections, firstReadyConnection(connections, settings, cliReadyOf(cliFound)).id)
   const shown = providers.find((p) => p.id === remembered) ?? providers.find((p) => p.id === fallback) ?? providers[0]
   const showProvider = (id: ProviderId): void => rememberProjectPref('skillsProvider', key, id)
-  // Hive skills (the workspace's, the same in every project) start open at the top; the provider's skills folded under
+  // Combwork skills (the workspace's, the same in every project) start open at the top; the provider's skills folded under
   // the dropdown. Opening or folding either is remembered for the project (Darren, 5 Oct).
   const fold = useStore((s) => s.skillsFold[key])
   const combworkOpen = fold?.combwork ?? true
@@ -1462,7 +1462,7 @@ export function ProjectSkillsTab({ project }: { project: ProjectInfo }) {
   const setFold = (patch: { combwork?: boolean; provider?: boolean }): void => rememberProjectPref('skillsFold', key, { combwork: combworkOpen, provider: providerOpen, ...patch })
   const setCombworkOpen = (open: boolean): void => setFold({ combwork: open })
   const all = skills ?? []
-  // This project's agents get the Hive skills for them; those for the Assistant alone are left out, and counted.
+  // This project's agents get the Combwork skills for them; those for the Assistant alone are left out, and counted.
   const combwork = all.filter((s) => s.level === 'combwork' && s.audience !== 'assistant')
   const assistantOnly = all.filter((s) => s.level === 'combwork' && s.audience === 'assistant').length
   const current = selected ? all.find((s) => s.path === selected) : undefined

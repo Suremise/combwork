@@ -10,8 +10,8 @@ import { Icon, LoadFailed } from './ui'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 
 /**
- * Antivirus scanning of the workspace (#316; main/antivirus.ts): whether Microsoft Defender scans the folders Hive's work
- * goes through, the exclusions Hive can add (with consent, one UAC prompt) and remove, and Dev Drive. Settings →
+ * Antivirus scanning of the workspace (#316; main/antivirus.ts): whether Microsoft Defender scans the folders Combwork's work
+ * goes through, the exclusions Combwork can add (with consent, one UAC prompt) and remove, and Dev Drive. Settings →
  * Workspace shows it in full; Performance says when scanning likely slows the workspace; the window suggests it once
  * when it matters. Answers for a workspace the window no longer shows are dropped.
  */

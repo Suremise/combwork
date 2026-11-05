@@ -13,7 +13,7 @@ export { beginWork, stallClock, timedStep } from './stallWork'
 
 /**
  * Notes in combwork.log when the main process was busy long enough to be felt (every terminal's typing goes through it), at
- * most once a minute, so pauses can be matched with what Hive was doing (#1109). The delay is Node's event loop delay
+ * most once a minute, so pauses can be matched with what Combwork was doing (#1109). The delay is Node's event loop delay
  * (`monitorEventLoopDelay`: its timer, every 20 ms, catches a block wherever it falls), read every half second. A gap
  * that spans the PC's sleep isn't a stall: the warning waits a few seconds, and a suspend or resume during it drops it
  * (one info line instead). The line names the work that overlapped the stall: IPC calls, Agent API requests, hooks and
@@ -34,7 +34,7 @@ const HELD_PER_STALL = 50
 /** How many a warning names (the rest are counted). */
 const NAMED = 5
 
-// Labels from what a request says: only names Hive knows, so nothing a client sends reaches the log.
+// Labels from what a request says: only names Combwork knows, so nothing a client sends reaches the log.
 const HOOK_EVENTS = new Set(['SessionStart', 'SessionEnd', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'PermissionRequest', 'Notification', 'Stop', 'StopFailure', 'SubagentStop', 'Interrupt', 'ErrorOccurred', 'PreCompact', 'PostCompact'])
 const METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
 /** Agent API requests that wait by design (an event stream, a wait for cards or agents): open for minutes, never a cause. */
@@ -123,7 +123,7 @@ export function stallOf(from: number, to: number, ms: number, cpuMs: number | nu
   return { ms, cpuMs, steps: steps.list, stepsMore: steps.more, work: work.list, workMore: work.more }
 }
 
-/** The stalls kept since Hive started (HI-1135): the last MAIN_STALLS_KEPT, and how many in all. */
+/** The stalls kept since Combwork started (HI-1135): the last MAIN_STALLS_KEPT, and how many in all. */
 const recent: MainStall[] = []
 let stallsSeen = 0
 let watchingSince = Date.now()
@@ -157,7 +157,7 @@ export interface StallDeps {
   defer(fn: () => void, ms: number): void
   warn(line: string): void
   info(line: string): void
-  /** Whether Hive's other threads stopped over [from, to] too (the watchdog's ticks): the whole process paused. */
+  /** Whether Combwork's other threads stopped over [from, to] too (the watchdog's ticks): the whole process paused. */
   pausedAlongside?(from: number, to: number): boolean
   /** Keeps a stall for the Performance view (HI-1135), `end` its end on `now`'s clock: every one, logged or not, but not a pause. */
   record?(stall: Omit<MainStall, 'at'>, end: number): void
@@ -222,7 +222,7 @@ export interface FileWaitDeps {
   slowProbe(): { n: number; start: number; ms: number } | null
   defer(fn: () => void, ms: number): void
   warn(line: string): void
-  /** Whether Hive's other threads stopped over [from, to] too (the watchdog's ticks): the whole process paused. */
+  /** Whether Combwork's other threads stopped over [from, to] too (the watchdog's ticks): the whole process paused. */
   pausedAlongside?(from: number, to: number): boolean
 }
 

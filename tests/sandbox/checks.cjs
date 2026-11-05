@@ -2,25 +2,25 @@
  * Combwork's installer checks in Windows Sandbox (the Sandbox checks, a release step: RELEASING.md, tests/e2e/README.md):
  * fresh install and first run, first run with no CLIs, a CLI appearing while Combwork runs, the upgrade from the previous
  * release, uninstall, a new workspace, a clean install searched for "hive" (HI-2592), and the profile move the installer
- * couldn't make, made by the app at start (HI-2602). Drives the windows-sandbox MCP server (the hive-mcp project's) over stdio, as
+ * couldn't make, made by the app at start (HI-2602). Drives the windows-sandbox MCP server (the combwork-mcp project's) over stdio, as
  * any MCP client does: one Sandbox for scenarios 1, 2, 3, 5 and 6, a second for 4, a third for 9, a fourth for 11. Network off throughout, fake CLIs
  * only, nothing signed in; every command has a timeout. Writes a short report (report.md, report.json) with screenshots
  * to --report. Moved from the hive-mcp repo (servers/windows-sandbox/scenarios/hive-checks.js at c5dee8a, HI-2298).
  *
- *   npm run sandbox-checks -- --installer <Combwork-Setup-x.y.z.exe> [--previous <older installer>] [--hive <Combwork repo>]
+ *   npm run sandbox-checks -- --installer <Combwork-Setup-x.y.z.exe> [--previous <older installer>] [--repo <Combwork repo>]
  *        [--server <windows-sandbox server.js>] [--report <folder>] [--only fresh|upgrade|manual|edges|clean|upgrade-rc|profile-move] [--short <installer>] [--wait-min N]
  *        [--smart-app-control off] [--git <Git for Windows' folder>] [--previous-rc <a 1.1 release candidate's installer>]
  *
  * --previous-rc (HI-2587): a 1.1 release candidate (RC2), partly converted to Combwork's names, for scenario 10: the upgrade
  * from it, run beside 1.0.0's (scenario 4) whenever it is given, so the names upgrade is checked from both.
  *
- * --hive (or CW_REPO; default this checkout) is where --previous is looked for: the newest Combwork-Setup-*.exe or Hive-Setup-*.exe in
- * <hive>\dist other than --installer, so pass the main checkout from a worktree. Both installers must sit under one
+ * --repo (or CW_REPO; default this checkout) is where --previous is looked for: the newest Combwork-Setup-*.exe or Hive-Setup-*.exe in
+ * <repo>\dist other than --installer, so pass the main checkout from a worktree. Both installers must sit under one
  * folder (not a drive root), which is mapped read-only at C:\build. This checkout's tests folder (the scripts in
  * tests\sandbox\inside and the e2e fake CLIs) and its playwright-core are mapped read-only too; Node is this one's folder.
  * --server (or WSB_SERVER) is the server's server.js; by default the copy Combwork installed from the MCP catalogue in the
- * workspace holding <hive> (<workspace>\.combwork\mcp\windows-sandbox), else a hive-mcp checkout beside <hive>
- * (<hive>\..\mcp\servers\windows-sandbox). The server keeps its run folders in %LOCALAPPDATA%\combwork-test\sandbox.
+ * workspace holding <repo> (<workspace>\.combwork\mcp\windows-sandbox), else a combwork-mcp checkout beside <repo>
+ * (<repo>\..\mcp\servers\windows-sandbox). The server keeps its run folders in %LOCALAPPDATA%\combwork-test\sandbox.
  * --git: the clean install's git project (scenario 9) needs Git, which a fresh Windows hasn't got: this machine's Git for
  * Windows is mapped read-only at C:\tools\git (by default the folder of the git.exe on the PATH).
  * Exit code: 0 all checks passed, 1 a check failed (or a Sandbox's cleanup wasn't confirmed), 2 not run (also when the
@@ -55,9 +55,9 @@ const REPO = path.resolve(__dirname, '..', '..')
 const SANDBOX_ROOT = path.join(process.env.LOCALAPPDATA || os.homedir(), 'combwork-test', 'sandbox')
 /** Where the scripts that run inside the Sandbox (tests\sandbox\inside) are there: this checkout's tests folder is mapped at C:\tools\combwork-tests. */
 const INSIDE = 'C:\\tools\\combwork-tests\\sandbox\\inside'
-/** Where the windows-sandbox server.js is looked for without --server or WSB_SERVER: the workspace's installed copy, a hive-mcp checkout beside the repo. */
-function serverCandidates(hive) {
-  return [path.join(hive, '..', '.combwork', 'mcp', 'windows-sandbox', 'server.js'), path.join(hive, '..', 'mcp', 'servers', 'windows-sandbox', 'server.js')]
+/** Where the windows-sandbox server.js is looked for without --server or WSB_SERVER: the workspace's installed copy, a combwork-mcp checkout beside the repo. */
+function serverCandidates(repo) {
+  return [path.join(repo, '..', '.combwork', 'mcp', 'windows-sandbox', 'server.js'), path.join(repo, '..', 'mcp', 'servers', 'windows-sandbox', 'server.js')]
 }
 
 // The installer's name: Combwork-Setup since HI-2458, Hive-Setup before (a previous release's, kept in dist).
@@ -145,10 +145,10 @@ function plan(argv) {
   if (only !== undefined && !KINDS.includes(only)) throw new Error(`--only is ${KINDS.join(' or ')}, not "${only}"`)
   const sac = opt('--smart-app-control')
   if (argv.includes('--smart-app-control') && sac !== 'off') throw new Error(`--smart-app-control takes only "off" (turned off inside the Sandbox; leave it out to keep Windows' setting), not ${sac === undefined ? 'nothing' : `"${sac}"`}`)
-  const hive = path.resolve(opt('--hive', process.env.CW_REPO || REPO))
+  const repo = path.resolve(opt('--repo', process.env.CW_REPO || REPO))
   const serverOpt = opt('--server', process.env.WSB_SERVER)
-  const serverJs = serverOpt ? path.resolve(serverOpt) : serverCandidates(hive).find(f => fs.existsSync(f))
-  if (!serverJs) throw new Error(`No windows-sandbox server found (looked in ${serverCandidates(hive).join(' and ')}): pass --server <its server.js> (or WSB_SERVER), or install it from Combwork's MCP catalogue`)
+  const serverJs = serverOpt ? path.resolve(serverOpt) : serverCandidates(repo).find(f => fs.existsSync(f))
+  if (!serverJs) throw new Error(`No windows-sandbox server found (looked in ${serverCandidates(repo).join(' and ')}): pass --server <its server.js> (or WSB_SERVER), or install it from Combwork's MCP catalogue`)
   if (!fs.existsSync(serverJs)) throw new Error(`--server ${serverJs} doesn't exist: name the windows-sandbox server's server.js`)
   const installer = opt('--installer') && path.resolve(opt('--installer'))
   // The edge cases' second installer (HI-2460): built with CW_TEST_SHORT_LEGACY_WAIT=1, its legacy-mutex wait 20 s.
@@ -165,7 +165,7 @@ function plan(argv) {
   const overOld = ran.includes('upgrade') || ran.includes('manual') || ran.includes('edges') || ran.includes('profile-move')
   if (ran.includes('edges') && (!short || !fs.existsSync(short))) throw new Error('--only edges needs --short <an installer built with CW_TEST_SHORT_LEGACY_WAIT=1>, beside --installer')
   if (!previous && overOld) {
-    const dist = path.join(hive, 'dist')
+    const dist = path.join(repo, 'dist')
     const cands = fs.existsSync(dist) ? fs.readdirSync(dist).filter(f => versionOf(f)).map(f => path.join(dist, f)).filter(f => f.toLowerCase() !== installer.toLowerCase()) : []
     previous = cands.sort((a, b) => cmpVersion(versionOf(b), versionOf(a)))[0]
     if (!previous) throw new Error(`No previous installer in ${dist}: pass --previous`)
@@ -179,7 +179,7 @@ function plan(argv) {
   const guest = f => 'C:\\build\\' + path.relative(root, f)
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '').replace('T', '-')
   return {
-    hive,
+    repo,
     serverJs,
     ran,
     installer,

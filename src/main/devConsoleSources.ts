@@ -9,7 +9,7 @@ import { publicRun } from './apiEvents'
 import type { WorkspaceService } from './workspace'
 
 /**
- * The developer console's sources in a workspace (#636): each of its projects' agents, its Assistant, and Hive itself;
+ * The developer console's sources in a workspace (#636): each of its projects' agents, its Assistant, and Combwork itself;
  * an agent is a source whether it runs or not, so capture can start before it launches.
  */
 export function consoleSources(ws: WorkspaceService): ConsoleSource[] {
@@ -27,10 +27,10 @@ export function consoleSources(ws: WorkspaceService): ConsoleSource[] {
   return rows
 }
 
-/** Each run as last captured, per workspace's Hive source: Progress changes often, and only a run's step or state counts. */
+/** Each run as last captured, per workspace's Combwork source: Progress changes often, and only a run's step or state counts. */
 const runsSeen = new Map<string, Map<string, string>>()
 
-/** Hive's own events the console takes from Hive's event bus: Progress runs as they start, step on and end. */
+/** Combwork's own events the console takes from Combwork's event bus: Progress runs as they start, step on and end. */
 export function initDevConsole(): void {
   onCombworkEvent((e) => {
     if (e.type !== 'progress-changed') return

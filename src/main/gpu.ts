@@ -3,21 +3,21 @@ import { join } from 'path'
 import { HARDWARE_ACCELERATION_OFF, advancedDef, checkAdvanced, parseAdvancedFile } from '../shared/advanced'
 
 /**
- * Hardware acceleration off (#676): for a graphics driver that leaves Hive's window blank, flickering or crashing. It has
+ * Hardware acceleration off (#676): for a graphics driver that leaves Combwork's window blank, flickering or crashing. It has
  * to be decided before the app is ready, so Settings → Advanced's value is read straight from advanced.json here, before
- * the full load (advanced.ts); `--disable-gpu` on Hive's command line does the same for that start only (Chromium takes
+ * the full load (advanced.ts); `--disable-gpu` on Combwork's command line does the same for that start only (Chromium takes
  * the switch too). Terminals then skip xterm's WebGL renderer (AppInfo.gpu).
  */
 
-/** The command-line switch that starts Hive once without the graphics card. */
+/** The command-line switch that starts Combwork once without the graphics card. */
 export const GPU_SWITCH = 'disable-gpu'
 
 export interface GpuAtStart {
-  /** Hive draws without the graphics card this run. */
+  /** Combwork draws without the graphics card this run. */
   off: boolean
   /** Why: Settings → Advanced, or --disable-gpu for this start; null when it's on. */
   why: 'setting' | 'switch' | null
-  /** Settings → Advanced's value as Hive started (a change since offers a restart). */
+  /** Settings → Advanced's value as Combwork started (a change since offers a restart). */
   setting: boolean
 }
 
@@ -63,7 +63,7 @@ export function gpuDiagnostics(run: GpuAtStart, status: Record<string, string>):
   return `- **Graphics**: hardware acceleration ${state}; ${gpuStatusLine(status) || 'no GPU feature status'}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English
 }
 
-/** The arguments a restart starts Hive with: this start's own, without the once-only --disable-gpu. */
+/** The arguments a restart starts Combwork with: this start's own, without the once-only --disable-gpu. */
 export const relaunchArgs = (argv: string[]): string[] => argv.slice(1).filter((a) => a.toLowerCase() !== `--${GPU_SWITCH}`)
 
 /** Electron's GPU feature status in a line for Copy Diagnostics ("gpu_compositing: disabled_software, webgl: …"). */

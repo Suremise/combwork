@@ -88,7 +88,7 @@ async function startCombwork(fx, { port, env = {}, keepOptions = false } = {}) {
   return { app, page, inv, port, card, facts, kinds }
 }
 
-/** The fake agents' launches (fake-launches.jsonl), as their hive tools read their tokens. */
+/** The fake agents' launches (fake-launches.jsonl), as their Combwork tools read their tokens. */
 function launches(fx) {
   const f = path.join(fx.claudeHome, 'fake-launches.jsonl')
   const text = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''

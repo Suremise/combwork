@@ -94,7 +94,7 @@ export function updateSummary(u: UpdateState | null): string {
   }
 }
 
-/** Hive's mark as a line drawing in the text colour (hexagon, prompt and cursor), like the status bar's other icons. */
+/** Combwork's mark as a line drawing in the text colour (hexagon, prompt and cursor), like the status bar's other icons. */
 export function CombworkMark({ className = 'status-hex' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 512 512" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="44" strokeLinecap="round" strokeLinejoin="round">
@@ -112,7 +112,7 @@ export function UpdateStatusItem() {
   if (!info) return null
   const label = `${appName(info.isPackaged)} ${info.version}`
   const open = (): void => set({ updateOpen: true })
-  // A downloaded update Hive won't install (#1647: the installed copy isn't older, or unreadable) isn't offered here.
+  // A downloaded update Combwork won't install (#1647: the installed copy isn't older, or unreadable) isn't offered here.
   if (u && !u.skipped && (u.status === 'available' || u.status === 'downloading' || (u.status === 'ready' && !u.notInstalled))) {
     const version = u.version ?? ''
     const text = u.status === 'available' ? tr(M.itemAvailable, { app: APP_NAME, version }) : u.status === 'downloading' ? tr(M.itemDownloading, { app: APP_NAME, version, percent: Math.round(u.progress?.percent ?? 0) / 100 }) : tr(M.itemReady, { version })

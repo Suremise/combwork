@@ -18,8 +18,8 @@ import { REPO_LOCK_FILE } from './repoLockCore'
 const log = createLogger('repoLock')
 
 /**
- * The repository lock, as Hive's merges and ref moves take it (#1347, SPEC §16.9.3): across processes (repoLockCore.ts),
- * and within this one by withFileLock on the same file, so this Hive never waits on itself. Taken by the Git view's
+ * The repository lock, as Combwork's merges and ref moves take it (#1347, SPEC §16.9.3): across processes (repoLockCore.ts),
+ * and within this one by withFileLock on the same file, so this Combwork never waits on itself. Taken by the Git view's
  * folder actions (gitRepo.ts), a worktree's merge (the Merge dialog, agents' merges: projectAgents.ts) and the line
  * updater's move (gitPlatform.ts); later the merge queue's advance. Held for seconds: never across a test merge or merge
  * checks. No off switch: it is data safety (§16.6.4). Its takes and releases run in the lock's worker (HI-1680,
@@ -111,7 +111,7 @@ export function useLockWorker(file: string | null): void {
   thread = new LockThread()
 }
 
-/** How long a merge waits for another Hive's (Settings → Advanced). */
+/** How long a merge waits for another Combwork's (Settings → Advanced). */
 export const REPO_LOCK_WAIT = 'cw.merge.lockWaitSeconds'
 /** How long a wait goes before the user is told who holds the lock. */
 const NOTICE_AFTER_MS = 1000
@@ -126,7 +126,7 @@ const profile = (): string => {
 }
 
 /**
- * The repository's common git dir (its worktrees share it), absolute and real (one spelling for this Hive's own lock,
+ * The repository's common git dir (its worktrees share it), absolute and real (one spelling for this Combwork's own lock,
  * however the folder was reached); throws when git can't say. Read from `.git` with no git process where it says
  * (HI-1970: every line move asked it), else git's answer.
  */
@@ -170,7 +170,7 @@ export async function withRepoLock<T>(folder: string, fn: () => Promise<T>, opts
         // Released before the next take in this process begins (withFileLock is held until then).
         await thread.ask({ type: 'release', dir, token: got.token })
       } catch (e) {
-        // Left behind, the row is this process's own: the next take here replaces it, and another Hive does once this one ends.
+        // Left behind, the row is this process's own: the next take here replaces it, and another Combwork does once this one ends.
         log.warn(`releasing the repository lock of ${userText(folder)}`, e)
       }
     }
@@ -201,7 +201,7 @@ export async function withNamedLock<T>(dir: string, file: string, fn: () => Prom
 
 /**
  * Runs fn holding the repository locks of several folders' repositories (#1642 round 5: a workflow options write, which
- * can change the target of every project it reaches, taken as Clean Up Merged Branches takes it, across Hives): each
+ * can change the target of every project it reaches, taken as Clean Up Merged Branches takes it, across Combworks): each
  * repository once, always in the same order (its git folder's path), so no two takers wait on each other. A folder in
  * no repository takes none. Taken before the turn of workflow writes, as everything that takes both does.
  */

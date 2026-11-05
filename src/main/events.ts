@@ -61,7 +61,7 @@ export function setToastTeller(t: ToastTeller): void {
 }
 
 /**
- * Hive's own message, by its level (warning or error: a warning, else a result; shared/notify.ts), told by tell():
+ * Combwork's own message, by its level (warning or error: a warning, else a result; shared/notify.ts), told by tell():
  * a pop-up in the window the user is using, else in the one `source` (a path) names, else the last focused.
  * `target`: what a click on it opens (HI-1961: an agent's pane, a card). `offer`: what its buttons act on, so taking
  * or losing it resolves this entry alone (main/notify.ts resolveOffer). Returns it (nothing shown when routed nowhere).
@@ -71,7 +71,7 @@ export function toast(level: ToastLevel, title: string, message?: string, action
     const told = teller({ level, title, message, actions, source, target, ...extra })
     return told.entry ?? { id: told.id, level, title, message, actions, ...(target ? { target } : {}), source, timestamp: new Date().toISOString() }
   }
-  // Before notify.ts has loaded (never in Hive itself): straight to the windows.
+  // Before notify.ts has loaded (never in Combwork itself): straight to the windows.
   const t: ToastMessage = { id: extra?.id ?? randomUUID(), level, title, message, actions, ...(target ? { target } : {}), source, timestamp: new Date().toISOString() }
   emit({ type: 'toast', toast: t })
   return t

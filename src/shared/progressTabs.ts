@@ -105,12 +105,12 @@ export function runGroupLabel(g: RunGroup, name: string | null, tr: Tr, title: s
   )
 }
 
-/** A run of Hive's merge queue (a merge check or install on a card's merged result), not a slot's or a copy's setup. */
+/** A run of Combwork's merge queue (a merge check or install on a card's merged result), not a slot's or a copy's setup. */
 const isQueueRun = (r: ProgressRun): boolean => r.source === 'combwork' && runAgentKey(r) === CW_RUNS
 
 /**
  * A card's runs on a day (HI-1701): its runs and their retries folded as before, the merge queue's checks folded into
- * one more (`queue`), newest first. `card` null: the runs for no card (Hive's own, scripts), the day's Other.
+ * one more (`queue`), newest first. `card` null: the runs for no card (Combwork's own, scripts), the day's Other.
  */
 export interface CardRuns {
   key: string
@@ -238,7 +238,7 @@ export function runMatches(r: ProgressRun, f: RunsFilter, words: (r: ProgressRun
 }
 
 /**
- * The Runs tab's Agent filter's value for a run's agent: its agent, or for Hive's own runs who in Hive ran it (#1356: the
+ * The Runs tab's Agent filter's value for a run's agent: its agent, or for Combwork's own runs who in Combwork ran it (#1356: the
  * filter has "Hive (merge queue)"; #1446: "Hive (slot slot-b)", one each; HI-1710: a copy's, its lease's agent, else "Hive (review copies)"); null for the
  * Assistant and scripts, which the filter doesn't offer.
  */

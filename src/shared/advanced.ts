@@ -1,19 +1,19 @@
 /**
- * Advanced settings (#367): the details Hive relies on that a CLI update can break, or that only power users change,
- * gathered as named, documented defaults. A CLI's prompt text, the field names it sends, the timeouts Hive gives its
- * hooks and the hive MCP server: when one changes, an override in Settings → Advanced (or advanced.json) fixes it
- * without a Hive release. Data only, never code: patterns, names, numbers. Each value is checked before it is used, and
+ * Advanced settings (#367): the details Combwork relies on that a CLI update can break, or that only power users change,
+ * gathered as named, documented defaults. A CLI's prompt text, the field names it sends, the timeouts Combwork gives its
+ * hooks and the combwork MCP server: when one changes, an override in Settings → Advanced (or advanced.json) fixes it
+ * without a Combwork release. Data only, never code: patterns, names, numbers. Each value is checked before it is used, and
  * one that doesn't check out falls back to the default with a warning.
  *
- * A CLI's value (CLI-facing: what Hive reads from it, or gives it) carries samples from recorded fixtures
+ * A CLI's value (CLI-facing: what Combwork reads from it, or gives it) carries samples from recorded fixtures
  * (tests/fixtures/advanced and the other recordings; tests/advanced.test.ts checks each sample is in its fixture): for one
- * Hive reads, what the CLI sent, which the default must read; for one Hive gives the CLI, the CLI taking it (its hooks
+ * Combwork reads, what the CLI sent, which the default must read; for one Combwork gives the CLI, the CLI taking it (its hooks
  * arriving, its own listing of the value). An override is tried against the same samples: one that no longer reads them
  * is kept (that's the point when the CLI changed) and says so. A CLI's override records the CLI version it was made for,
  * and is flagged once another version is installed.
  *
  * Pure data and helpers: no React, no Node (Settings, the main process and the Assistant's settings tools share it).
- * Their text is messages (#767): Settings shows it in the user's language, and the Assistant's tools, Hive's log and
+ * Their text is messages (#767): Settings shows it in the user's language, and the Assistant's tools, Combwork's log and
  * its errors read the English.
  */
 import { createIntl, createIntlCache } from '@formatjs/intl'
@@ -30,7 +30,7 @@ import { WORKSPACE_NOTES_MAX } from './workspaceNotes'
 
 /**
  * Text as data (#767): a message, or a message with its values (a value can be text of its own, formatted in the same
- * language). The window shows it in the user's language (`shownText`); the Assistant's tools, Hive's log and its
+ * language). The window shows it in the user's language (`shownText`); the Assistant's tools, Combwork's log and its
  * errors read its English (`englishText`), so what the Assistant is told never follows the user's language. The
  * settings catalogue's rows hold their text this way too.
  */
@@ -100,7 +100,7 @@ const englishSaid = (m: AgentMsg, values?: Record<string, string | number>): str
 const IN_ENGLISH: Formatter = {
   one: englishOne,
   said: englishSaid,
-  // Hive's English is British: "A, B and C", as the tools always said it.
+  // Combwork's English is British: "A, B and C", as the tools always said it.
   list: (items, type) => new Intl.ListFormat('en-GB', { type, style: type === 'unit' ? 'short' : 'long' }).format(items),
   upper: (s) => s.toLocaleUpperCase('en'),
   agents: true
@@ -115,7 +115,7 @@ const IN_AGENTS: Formatter = {
 const AS_SHOWN: Formatter = { one: (m, values) => tr(m, values), said: englishSaid, list: (items, type) => fmt.list(items, type), upper: (s) => s.toLocaleUpperCase(language()), agents: false }
 
 /**
- * Text in the Default's English, whatever language Hive shows or dialect a reader has: the log, a comparison, and what
+ * Text in the Default's English, whatever language Combwork shows or dialect a reader has: the log, a comparison, and what
  * is stored once for any reader and rendered for each when read. What an agent is told is `agentText`.
  */
 export const englishText = (t: TextPart): string => formatText(t, IN_ENGLISH)
@@ -129,13 +129,13 @@ export const agentText = (t: TextPart): string => formatText(t, IN_AGENTS)
 
 /**
  * An English field kept beside its text as data (`statusMessage` and `statusText`, #845), as an agent reads it where it
- * is sent: said again in the reader's chain when one is in force and the English is that text's Default (Hive's own
+ * is sent: said again in the reader's chain when one is in force and the English is that text's Default (Combwork's own
  * words, not a CLI's that took its place), else as kept. So with no chain, exactly the field (dialects, HI-2440).
  */
 export const agentField = <T extends string | null | undefined>(english: T, text: TextPart | null | undefined): T =>
   typeof english === 'string' && text !== null && text !== undefined && currentChain() && englishText(text) === english ? (agentText(text) as T) : english
 
-/** Text in the language Hive shows now (call it when the text is rendered, never when a module loads). */
+/** Text in the language Combwork shows now (call it when the text is rendered, never when a module loads). */
 export const shownText = (t: TextPart): string => formatText(t, AS_SHOWN)
 
 /** What a value is: a regular expression's source (its flags are fixed), a piece of text, a field name, a list of names, a whole number, on or off, one of a few choices. */
@@ -147,12 +147,12 @@ export interface AdvancedChoice {
   label: Text
 }
 
-/** Where a value is listed: Hive's own, or one CLI's. */
+/** Where a value is listed: Combwork's own, or one CLI's. */
 export type AdvancedGroup = 'cw' | ProviderId
 
 /**
- * A recording of the CLI: for a value Hive reads, the text a pattern or text must find, or the field names a field is
- * looked up among; for a value Hive gives the CLI, text showing the CLI took it (`shows` says what).
+ * A recording of the CLI: for a value Combwork reads, the text a pattern or text must find, or the field names a field is
+ * looked up among; for a value Combwork gives the CLI, text showing the CLI took it (`shows` says what).
  */
 export interface AdvancedSample {
   /** The recorded fixture it is taken from (a path from the repository's root). */
@@ -163,7 +163,7 @@ export interface AdvancedSample {
   text?: string
   /** The fields the CLI sent where this one is looked up (a field). */
   fields?: string[]
-  /** For a value Hive gives the CLI: what the recording shows of it taking the value. */
+  /** For a value Combwork gives the CLI: what the recording shows of it taking the value. */
   shows?: string
   /** What was recorded, where it isn't the group's CLI (HI-1773: "Ollama", a server a preset reaches); `version` is its. */
   source?: string
@@ -196,24 +196,24 @@ export interface AdvancedDef {
   max?: number
   /** A number's unit, for the list. */
   unit?: string
-  /** One of Hive's settings shown here and kept in advanced.json too, under its own key ("advanced.showDeveloperFeatures"). */
+  /** One of Combwork's settings shown here and kept in advanced.json too, under its own key ("advanced.showDeveloperFeatures"). */
   setting?: string
   /** A workspace can set its own (Settings → Advanced, This workspace). */
   workspace?: boolean
-  /** Who takes a change: at once, sessions started afterwards, or Hive when it next starts (Settings offers a restart). */
+  /** Who takes a change: at once, sessions started afterwards, or Combwork when it next starts (Settings offers a restart). */
   applies: 'now' | 'sessions' | 'restart'
   samples?: AdvancedSample[]
-  /** An off switch for one of Hive's overrides of the CLI's own behaviour (overrideId). */
+  /** An off switch for one of Combwork's overrides of the CLI's own behaviour (overrideId). */
   override?: boolean
 }
 
-/** Hive draws without the graphics card (#676): read from advanced.json before the app is ready (main/gpu.ts). */
+/** Combwork draws without the graphics card (#676): read from advanced.json before the app is ready (main/gpu.ts). */
 export const HARDWARE_ACCELERATION_OFF = 'cw.disableHardwareAcceleration'
 
-/** Hive writes a heap snapshot as its main process nears its memory limit (#1005): read from advanced.json at start (main/memory.ts). */
+/** Combwork writes a heap snapshot as its main process nears its memory limit (#1005): read from advanced.json at start (main/memory.ts). */
 export const HEAP_SNAPSHOT_NEAR_LIMIT = 'cw.heapSnapshotNearLimit'
 
-/** Agents resume by themselves after Hive restarts for an update (HI-1707): read by main's restartResume. */
+/** Agents resume by themselves after Combwork restarts for an update (HI-1707): read by main's restartResume. */
 export const RESUME_AFTER_UPDATE = 'cw.restart.resumeAfterUpdate'
 /** How long an agent resumed after a restart has to be ready, in seconds (HI-1707): read by main's restartResume. */
 export const RESTART_READY_SECONDS = 'cw.restart.resumeReadySeconds'
@@ -225,11 +225,11 @@ export const OUTAGE_NOT_CONNECTION = 'cw.outage.notConnection'
 /** The first check for the connection, in seconds, and the longest between two (HI-1612): backing off from one to the other. */
 export const OUTAGE_CHECK_FIRST_SECONDS = 'cw.outage.checkFirstSeconds'
 export const OUTAGE_CHECK_MOST_SECONDS = 'cw.outage.checkMostSeconds'
-/** How long Hive waits for the connection before it gives up, in minutes (HI-1612). */
+/** How long Combwork waits for the connection before it gives up, in minutes (HI-1612). */
 export const OUTAGE_WAIT_MINUTES = 'cw.outage.waitMinutes'
 /** The resumes in an hour after which a turn ending on a connection error again stops them (HI-1612). */
 export const OUTAGE_RESUMES_PER_HOUR = 'cw.outage.resumesPerHour'
-/** The address Hive checks for a CLI's connection (HI-1612): its API host. */
+/** The address Combwork checks for a CLI's connection (HI-1612): its API host. */
 export const outageCheckUrlId = (provider: ProviderId): string => `cw.outage.checkUrl.${provider}`
 /** A CLI's words for a turn that its connection's failure ended (HI-1612): `<provider>.outage.connectionError`. */
 export const outagePatternId = (provider: ProviderId): string => `${provider}.outage.connectionError`
@@ -249,7 +249,7 @@ export const FOCUSED_PICK_SECONDS = 'cw.focused.pickSeconds'
 /** Whether the merge queue asks before updating a target checked out in a folder (#1351, OP-40): read by main's queueHost. */
 export const QUEUE_CHECKED_OUT_TARGET = 'cw.queue.checkedOutTarget'
 
-/** Whether Hive removes a project's idle slots beyond its pool after a day (#1429, SPEC §16.10.2): read by main's slotsApp. */
+/** Whether Combwork removes a project's idle slots beyond its pool after a day (#1429, SPEC §16.10.2): read by main's slotsApp. */
 export const SLOTS_REMOVE_IDLE = 'cw.slots.removeIdle'
 
 /** Whether an agent's worktree adopted as a slot at the 1.0 upgrade is renamed to a slot's name once free (#1441). */
@@ -272,7 +272,7 @@ export const LANES_GENTLE_END = 'cw.lanes.gentleEnd'
 
 /** The longest a lane's end waits for its builder's turn to end, in minutes (HI-1706): read by main's slotsApp. */
 export const LANES_END_WAIT_MINUTES = 'cw.lanes.endWaitMinutes'
-/** The longest Hive keeps trying to start a lane's busy agent in its new conversation, in minutes (HI-2034): read by main's laneStarts. */
+/** The longest Combwork keeps trying to start a lane's busy agent in its new conversation, in minutes (HI-2034): read by main's laneStarts. */
 export const LANES_FRESH_START_WAIT_MINUTES = 'cw.lanes.freshStartWaitMinutes'
 /**
  * Whether the Assistant, ending a turn while lanes run with no watch covering them, is told so before it finishes
@@ -311,22 +311,22 @@ export const COPIES_QUIET_WAIT = 'cw.copies.quietWaitMinutes'
 /** HI-2340: how long a None project's whole-project read (its worker's scan) may take before it is stopped. */
 export const NONE_BASELINE_SECONDS = 'cw.none.baselineSeconds'
 
-/** Ctrl+C and Ctrl+V in an agent's pane go to its CLI rather than Hive's copy and paste (#1286, #966 row 24): read by TerminalView. */
+/** Ctrl+C and Ctrl+V in an agent's pane go to its CLI rather than Combwork's copy and paste (#1286, #966 row 24): read by TerminalView. */
 export const CTRL_CV_TO_CLI = 'cw.terminal.ctrlCVToCli'
 
-/** Successful builds of Hive itself (npm run dist, npm run release) go into the journal as Hive's facts (#1534): read by main's buildFacts. */
+/** Successful builds of Combwork itself (npm run dist, npm run release) go into the journal as Combwork's facts (#1534): read by main's buildFacts. */
 export const JOURNAL_BUILDS = 'cw.journal.builds'
 
 /** Past this many characters, an agent's card title gets a nudge to shorten it (HI-1872; 0: none): read by main's titleNudge. */
 export const CARD_TITLE_NUDGE = 'cw.cards.titleNudgeChars'
 
-/** The Assistant gets Hive's start view at each start and compaction (#1286, #966 row 28): read by main's startContext. */
+/** The Assistant gets Combwork's start view at each start and compaction (#1286, #966 row 28): read by main's startContext. */
 export const ASSISTANT_START_VIEW = 'cw.assistant.startView'
 
-/** Hive types a prompt as it was written, line breaks and spacing kept (#1286, #966 row 29): read by sendPrompt. */
+/** Combwork types a prompt as it was written, line breaks and spacing kept (#1286, #966 row 29): read by sendPrompt. */
 export const PROMPT_AS_TYPED = 'cw.prompt.asTyped'
 
-/** Hive clears the CLI's input with Ctrl+U before it types there (#1286, #966 row 29): every Ctrl+U of sessions.ts. */
+/** Combwork clears the CLI's input with Ctrl+U before it types there (#1286, #966 row 29): every Ctrl+U of sessions.ts. */
 export const PROMPT_CLEAR_DRAFT = 'cw.prompt.clearDraft'
 
 /**
@@ -335,23 +335,23 @@ export const PROMPT_CLEAR_DRAFT = 'cw.prompt.clearDraft'
  */
 export const ALL_KEYS_TO_CLI = 'cw.terminal.allKeysToCli'
 
-/** What Hive does with a CLI's OSC 52 clipboard writes: allow (as before), ask each time, or block (#1292, #966 row 27). */
+/** What Combwork does with a CLI's OSC 52 clipboard writes: allow (as before), ask each time, or block (#1292, #966 row 27). */
 export const OSC52_POLICY = 'cw.terminal.osc52'
 
-/** A card started on an agent is typed as its own words, without Hive's wrapper (#1292, #966 row 30): taskStart's prompt. */
+/** A card started on an agent is typed as its own words, without Combwork's wrapper (#1292, #966 row 30): taskStart's prompt. */
 export const RAW_CARD_START = 'cw.prompt.rawCardStart'
 
 /**
- * The Hive Assistant got every server on in the workspace (#1284, #966 row 7), until HI-1472 gave it a choice of its own
+ * The Combwork Assistant got every server on in the workspace (#1284, #966 row 7), until HI-1472 gave it a choice of its own
  * per server in each workspace: no longer listed, but kept in advanced.json (LEGACY_ADVANCED) so a workspace opened
  * later still moves an "on" to its own choices (workspace.ts's migrateAssistantMcp).
  */
 export const ASSISTANT_OTHER_MCP = 'cw.assistant.otherMcpServers'
 
-/** Project agents get Hive's guidance with Hive's tools (#1285, #966 row 13): index.ts's combworkGuidance and the hive MCP server. */
+/** Project agents get Combwork's guidance with Combwork's tools (#1285, #966 row 13): index.ts's combworkGuidance and the combwork MCP server. */
 export const CW_GUIDANCE = 'cw.guidance'
 
-/** Hive delivers the Workspace notes note at each launch (#1433, #873): main's workspaceNotes.ts. */
+/** Combwork delivers the Workspace notes note at each launch (#1433, #873): main's workspaceNotes.ts. */
 export const DELIVER_WORKSPACE_NOTES = 'cw.notes.deliverWorkspaceNotes'
 
 /** How much of the Workspace notes note a launch delivers at most, in bytes (#1433): main's workspaceNotes.ts and the note's editor. */
@@ -365,32 +365,32 @@ export const CARD_ATTACHMENT_FOLDERS_ID = 'cw.cards.attachmentFolders'
 export const AGENT_TEMP_FOLDER_ID = 'cw.agents.tempFolder'
 
 /**
- * Where Hive removes its skill copies (.agents/skills/cw-*) once no agent of Hive's works in the folder (#1431, #966 row
+ * Where Combwork removes its skill copies (.agents/skills/cw-*) once no agent of Combwork's works in the folder (#1431, #966 row
  * 15): `slots` in every folder but the project folder, `everywhere`, or `never`. Read by main's skillCopies.ts.
  */
 export const SKILLS_REMOVE_IDLE_COPIES = 'cw.skills.removeIdleCopies'
 
 /**
- * Whether right-click goes to a provider's CLI rather than Hive's copy/paste (#737): `<provider>.mouse.rightClickToCli`,
- * an advanced value for a CLI that handles the mouse itself. A provider without one keeps Hive's.
+ * Whether right-click goes to a provider's CLI rather than Combwork's copy/paste (#737): `<provider>.mouse.rightClickToCli`,
+ * an advanced value for a CLI that handles the mouse itself. A provider without one keeps Combwork's.
  */
 export const rightClickToCliId = (provider: string): string => `${provider}.mouse.rightClickToCli`
 
 /**
- * The off switch for one of Hive's overrides of a CLI's own behaviour (#966, #1167; Darren's principle on #737: every
- * one has a switch): `<provider>.override.<what>`, a boolean marked `override`, on by default (what Hive does today).
- * Off, Hive leaves that part to the CLI and the user's own config, which Hive never writes either way. Its description
- * says what Hive loses without the override, and its samples show the CLI documenting the flag or variable Hive sets.
+ * The off switch for one of Combwork's overrides of a CLI's own behaviour (#966, #1167; Darren's principle on #737: every
+ * one has a switch): `<provider>.override.<what>`, a boolean marked `override`, on by default (what Combwork does today).
+ * Off, Combwork leaves that part to the CLI and the user's own config, which Combwork never writes either way. Its description
+ * says what Combwork loses without the override, and its samples show the CLI documenting the flag or variable Combwork sets.
  */
 export const overrideId = (provider: ProviderId, what: string): string => `${provider}.override.${what}`
 
 /**
- * How long Hive waits for a provider's CLI to draw a line it typed before pressing Enter anyway (#600):
+ * How long Combwork waits for a provider's CLI to draw a line it typed before pressing Enter anyway (#600):
  * `<provider>.prompt.drawnSeconds`, for a provider whose capabilities say `enterOnceDrawn`.
  */
 export const drawnWaitId = (provider: string): string => `${provider}.prompt.drawnSeconds`
 
-/** The advanced.json format: written first in the file, so an older or newer Hive can tell. */
+/** The advanced.json format: written first in the file, so an older or newer Combwork can tell. */
 export const ADVANCED_FORMAT = 1
 
 const MAX_PATTERN = 500
@@ -411,14 +411,14 @@ export const foldersText = (folders: readonly string[]): string => folders.join(
 
 const FIX = 'tests/fixtures'
 
-/** A CLI's value (not Hive's own): it needs recorded samples, and an override records the CLI version it was made for. */
+/** A CLI's value (not Combwork's own): it needs recorded samples, and an override records the CLI version it was made for. */
 export const cliFacing = (d: AdvancedDef): boolean => d.group !== 'cw'
 
-/** Recordings of each CLI taking Hive's hooks (configured with the default timeouts) and sending them. */
+/** Recordings of each CLI taking Combwork's hooks (configured with the default timeouts) and sending them. */
 const HOOKS_TAKEN: Record<string, AdvancedSample> = {
-  'claude-code': { from: `${FIX}/turns-claude-2.1.296.json`, version: '2.1.296', text: '"hook_event_name": "PreToolUse"', shows: "Claude Code sending Hive's hooks, PreToolUse too" }, // i18n-ignore: a CLI's recorded text (#367)
-  codex: { from: `${FIX}/turns-codex-0.162.1.json`, version: '0.162.1', text: '"hook_event_name": "PreToolUse"', shows: "Codex running Hive's hooks (trusted, so their timeouts match the hashes Hive gave it), PreToolUse too" }, // i18n-ignore: a CLI's recorded text (#367)
-  copilot: { from: `${FIX}/console/copilot.json`, version: '1.0.105', text: '"name": "PreToolUse"', shows: "Copilot sending Hive's hooks from its launch plugin, PreToolUse too" } // i18n-ignore: a CLI's recorded text (#367)
+  'claude-code': { from: `${FIX}/turns-claude-2.1.296.json`, version: '2.1.296', text: '"hook_event_name": "PreToolUse"', shows: "Claude Code sending Combwork's hooks, PreToolUse too" }, // i18n-ignore: a CLI's recorded text (#367)
+  codex: { from: `${FIX}/turns-codex-0.162.1.json`, version: '0.162.1', text: '"hook_event_name": "PreToolUse"', shows: "Codex running Combwork's hooks (trusted, so their timeouts match the hashes Combwork gave it), PreToolUse too" }, // i18n-ignore: a CLI's recorded text (#367)
+  copilot: { from: `${FIX}/console/copilot.json`, version: '1.0.105', text: '"name": "PreToolUse"', shows: "Copilot sending Combwork's hooks from its launch plugin, PreToolUse too" } // i18n-ignore: a CLI's recorded text (#367)
 }
 
 /** Each CLI's footer in each mode, from screens recorded in it (#696). */
@@ -438,7 +438,7 @@ const FOOTER_SAMPLES: Record<string, AdvancedSample> = {
 /** Every advanced value as written, in the order Settings lists them (by group). Agents read their titles and descriptions too (the settings tools, HI-2441). */
 // agent-text: SOURCES
 const SOURCES: readonly AdvancedSource[] = [
-  // Hive's own
+  // Combwork's own
   {
     id: 'cw.showDeveloperFeatures',
     group: 'cw',
@@ -449,7 +449,7 @@ const SOURCES: readonly AdvancedSource[] = [
     setting: 'advanced.showDeveloperFeatures',
     applies: 'now'
   },
-  // HI-2004: a session's terminal named as what it is, xterm.js, whatever Hive was opened from (the Start menu gave the
+  // HI-2004: a session's terminal named as what it is, xterm.js, whatever Combwork was opened from (the Start menu gave the
   // CLIs no TERM or WT_SESSION, Windows Terminal its WT_SESSION, so Claude Code drew ">" or "❯" by the launch path).
   {
     id: TERMINAL_TYPE,
@@ -874,7 +874,7 @@ const SOURCES: readonly AdvancedSource[] = [
     default: true,
     applies: 'now'
   },
-  // An agent's branch after a squash merge (#1271, SPEC §16.19.2): Hive moves it between a lane's cards, or asks first.
+  // An agent's branch after a squash merge (#1271, SPEC §16.19.2): Combwork moves it between a lane's cards, or asks first.
   {
     id: 'cw.workflow.updateAgentBranch',
     group: 'cw',
@@ -888,7 +888,7 @@ const SOURCES: readonly AdvancedSource[] = [
     default: true,
     applies: 'now'
   },
-  // The repository lock (#1347, SPEC §16.9.3): how long a merge waits for another Hive's. A live holder is never taken over.
+  // The repository lock (#1347, SPEC §16.9.3): how long a merge waits for another Combwork's. A live holder is never taken over.
   {
     id: 'cw.merge.lockWaitSeconds',
     group: 'cw',
@@ -901,7 +901,7 @@ const SOURCES: readonly AdvancedSource[] = [
     unit: 's',
     applies: 'now'
   },
-  // How long one of the merge queue's checks may run (#1349, SPEC §16.9.1 step 8): past it, Hive ends it and counts it as transient.
+  // How long one of the merge queue's checks may run (#1349, SPEC §16.9.1 step 8): past it, Combwork ends it and counts it as transient.
   {
     id: QUEUE_CHECK_MINUTES,
     group: 'cw',
@@ -1188,8 +1188,8 @@ const SOURCES: readonly AdvancedSource[] = [
     unit: 's',
     applies: 'now'
   },
-  // Switches for what Hive does with the pane's keys and with what it types (#1286, #966 rows 24, 28, 29): Hive's own
-  // handling, the same for every CLI, so one row each. Each defaults to what Hive did before.
+  // Switches for what Combwork does with the pane's keys and with what it types (#1286, #966 rows 24, 28, 29): Combwork's own
+  // handling, the same for every CLI, so one row each. Each defaults to what Combwork did before.
   {
     id: CTRL_CV_TO_CLI,
     group: 'cw',
@@ -1272,7 +1272,7 @@ const SOURCES: readonly AdvancedSource[] = [
     default: true,
     applies: 'now'
   },
-  // The three terminal switches Darren chose (#1292, #966 rows 26, 27, 30; #1120 point 5): each as Hive did by default.
+  // The three terminal switches Darren chose (#1292, #966 rows 26, 27, 30; #1120 point 5): each as Combwork did by default.
   {
     id: ALL_KEYS_TO_CLI,
     group: 'cw',
@@ -1317,7 +1317,7 @@ const SOURCES: readonly AdvancedSource[] = [
     default: false,
     applies: 'now'
   },
-  // Hive's guidance for project agents (#1285, #966 row 13), separate from giving them Hive's tools. The Assistant's role
+  // Combwork's guidance for project agents (#1285, #966 row 13), separate from giving them Combwork's tools. The Assistant's role
   // and its own guidance have no switch (row 14): without them it is no Assistant, only an agent.
   {
     id: CW_GUIDANCE,
@@ -1412,8 +1412,8 @@ const SOURCES: readonly AdvancedSource[] = [
     workspace: true,
     applies: 'sessions'
   },
-  // Hive's skill copies for Codex and Copilot outlive their sessions (#1431, #966 row 15): a CLI run on its own in the
-  // folder would still see them. Removed by default where Hive's own folders are (slots), kept in the project folder.
+  // Combwork's skill copies for Codex and Copilot outlive their sessions (#1431, #966 row 15): a CLI run on its own in the
+  // folder would still see them. Removed by default where Combwork's own folders are (slots), kept in the project folder.
   {
     id: SKILLS_REMOVE_IDLE_COPIES,
     group: 'cw',
@@ -1433,8 +1433,8 @@ const SOURCES: readonly AdvancedSource[] = [
     default: 'slots',
     applies: 'now'
   },
-  // Carrying on (#1432, #966 row 16; shared/inboxSwitches.ts): how Hive gets an agent to read its inbox, one switch each,
-  // apart from whether it can read one (its hive tools). None drops an item: off, it stays in the inbox.
+  // Carrying on (#1432, #966 row 16; shared/inboxSwitches.ts): how Combwork gets an agent to read its inbox, one switch each,
+  // apart from whether it can read one (its Combwork tools). None drops an item: off, it stays in the inbox.
   {
     id: INBOX_SWITCH_ID.checkpoints,
     group: 'cw',
@@ -1518,7 +1518,7 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [
       { from: `${FIX}/signin-claude-2.1.291.json`, version: '2.1.291', text: 'authentication_failed' }, // i18n-ignore: a CLI's recorded text (#367)
-      // A server connection's key refused (HI-1772): after its retries, the same error; Hive says the key was refused.
+      // A server connection's key refused (HI-1772): after its retries, the same error; Combwork says the key was refused.
       { from: `${FIX}/advanced/stopfailure-server-401-claude-2.1.311.json`, version: '2.1.311', text: 'authentication_failed', shows: "A server connection's key refused (401), after Claude Code's 10 retries" } // i18n-ignore: a CLI's recorded text (#367)
     ]
   },
@@ -1537,7 +1537,7 @@ const SOURCES: readonly AdvancedSource[] = [
       { from: `${FIX}/advanced/stopfailure-connection-claude-2.1.312.json`, version: '2.1.312', text: "API Error: Can't reach the API server — check your internet or DNS (ENOTFOUND)" } // i18n-ignore: a CLI's recorded text (#367)
     ]
   },
-  // A lane's end (HI-1706): the command Hive types to end Claude Code as a person would, and how long it waits for the exit.
+  // A lane's end (HI-1706): the command Combwork types to end Claude Code as a person would, and how long it waits for the exit.
   {
     id: 'claude-code.exit.command',
     group: 'claude-code',
@@ -1561,7 +1561,7 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/exit-claude-2.1.310.json`, version: '2.1.310', text: '"exitCode": 0', shows: 'Claude Code exiting by itself 1.9 s after /exit and Enter' }] // i18n-ignore: a CLI's recorded text (#367)
   },
-  // Accounts (HI-980): what Hive reads from `claude auth status --json` in an account's folder, never a token.
+  // Accounts (HI-980): what Combwork reads from `claude auth status --json` in an account's folder, never a token.
   {
     id: 'claude-code.accounts.statusSeconds',
     group: 'claude-code',
@@ -1837,7 +1837,7 @@ const SOURCES: readonly AdvancedSource[] = [
     max: 600,
     unit: 's',
     applies: 'now',
-    samples: [{ from: `${FIX}/advanced/retry-claude-2.1.312.jsonl`, version: '2.1.312', text: 'api_error', shows: "Claude Code's transcript entry for a try it makes again, which Hive looks for once a session has been quiet this long" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/retry-claude-2.1.312.jsonl`, version: '2.1.312', text: 'api_error', shows: "Claude Code's transcript entry for a try it makes again, which Combwork looks for once a session has been quiet this long" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'claude-code.hooks.timeoutSeconds',
@@ -1932,13 +1932,13 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.claude-code.screen.input.title', defaultMessage: 'Screen: input box', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.claude-code.screen.input.desc', defaultMessage: "Claude Code's input box, between two rules, its first group what it holds after its prompt mark. Combwork reads it to tell that a line it typed is gone from the input (a screen of the CLI's took it), and then types it again. Wrong, such a line stays held, and nothing more is typed into the agent until you press Enter there.", description: 'What the advanced setting "Screen: input box" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1959). A rule: a horizontal line drawn across the terminal.' }),
     kind: 'pattern',
-    // Its prompt mark is ">" where the terminal doesn't say it shows Unicode (no TERM or WT_SESSION: a Hive started from the Start menu).
+    // Its prompt mark is ">" where the terminal doesn't say it shows Unicode (no TERM or WT_SESSION: a Combwork started from the Start menu).
     default: String.raw`^─{3,}[^\n]*\n[❯>][  ]?([^\n]*(?:\n(?!─{3,})[^\n]*)*)\n(?=─{3,})`,
     flags: 'm',
     applies: 'now',
     samples: [
-      { from: `${FIX}/advanced/input-ascii-claude-2.1.312.txt`, version: '2.1.312', text: `${'─'.repeat(113)} demo ─\n> a draft typed and left there, long enough to wrap onto rows of its own hive wake line typed and not sent\n${'─'.repeat(120)}`, shows: "Its input box where the terminal doesn't say it shows Unicode: \">\" its prompt mark, and the session's name in its top rule" }, // i18n-ignore: a CLI's recorded text (#367)
-      { from: `${FIX}/advanced/input-claude-2.1.312.txt`, version: '2.1.312', text: `${'─'.repeat(120)}\n❯ hive wake line typed and not sent\n${'─'.repeat(120)}` }] // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/input-ascii-claude-2.1.312.txt`, version: '2.1.312', text: `${'─'.repeat(113)} demo ─\n> a draft typed and left there, long enough to wrap onto rows of its own Combwork wake line typed and not sent\n${'─'.repeat(120)}`, shows: "Its input box where the terminal doesn't say it shows Unicode: \">\" its prompt mark, and the session's name in its top rule" }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/input-claude-2.1.312.txt`, version: '2.1.312', text: `${'─'.repeat(120)}\n❯ Combwork wake line typed and not sent\n${'─'.repeat(120)}` }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'claude-code.prompt.clearKeySeconds',
@@ -1991,7 +1991,7 @@ const SOURCES: readonly AdvancedSource[] = [
     kind: 'boolean',
     default: true,
     applies: 'sessions',
-    samples: [{ from: `${FIX}/advanced/memory-connection-claude-2.1.312.txt`, version: '2.1.312', text: 'memory saved without asking', shows: "Claude Code on a home whose projects folder is a junction, saving an auto memory with Hive's autoMemoryDirectory and asking without it" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/memory-connection-claude-2.1.312.txt`, version: '2.1.312', text: 'memory saved without asking', shows: "Claude Code on a home whose projects folder is a junction, saving an auto memory with Combwork's autoMemoryDirectory and asking without it" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'claude-code.memory.setting',
@@ -2166,7 +2166,7 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [{ from: `${FIX}/codex-0.159.jsonl`, version: '0.159.0', fields: ['used_percent', 'window_minutes', 'resets_at'] }]
   },
-  // Connections (HI-1757): what Hive asks Codex's app server in a connection's CODEX_HOME, never a token.
+  // Connections (HI-1757): what Combwork asks Codex's app server in a connection's CODEX_HOME, never a token.
   {
     id: 'codex.accounts.statusSeconds',
     group: 'codex',
@@ -2278,7 +2278,7 @@ const SOURCES: readonly AdvancedSource[] = [
     kind: 'list',
     default: ['activity', 'project-name'],
     applies: 'sessions',
-    samples: [{ from: `${FIX}/codex-startup-0.160.0.json`, version: '0.160.0', text: ']0;⠹ hive-codex-setup', shows: "Codex's title with its activity spinner, from the title items Hive gave its setup task" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/codex-startup-0.160.0.json`, version: '0.160.0', text: ']0;⠹ hive-codex-setup', shows: "Codex's title with its activity spinner, from the title items Combwork gave its setup task" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'codex.hooks.timeoutSeconds',
@@ -2306,7 +2306,7 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'sessions',
     samples: [HOOKS_TAKEN['codex']]
   },
-  // What Hive asks Codex's app server for a launch's hooks (HI-982: the Hooks dialog; the hook hashes it trusts at launch).
+  // What Combwork asks Codex's app server for a launch's hooks (HI-982: the Hooks dialog; the hook hashes it trusts at launch).
   {
     id: 'codex.hooks.listMethod',
     group: 'codex',
@@ -2328,7 +2328,7 @@ const SOURCES: readonly AdvancedSource[] = [
     max: 120,
     unit: 's',
     applies: 'now',
-    samples: [{ from: `${FIX}/advanced/hooks-list-codex-0.164.0.txt`, version: '0.164.0', text: 'hooks/list', shows: "Codex's app server taking the request Hive sends for a session's hooks (its source: not a run)" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/hooks-list-codex-0.164.0.txt`, version: '0.164.0', text: 'hooks/list', shows: "Codex's app server taking the request Combwork sends for a session's hooks (its source: not a run)" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   // Codex waiting to retry its model request (HI-1972): its only record is a row of its log database, read by these.
   {
@@ -2362,10 +2362,10 @@ const SOURCES: readonly AdvancedSource[] = [
     max: 600,
     unit: 's',
     applies: 'now',
-    samples: [{ from: `${FIX}/advanced/retry-log-codex-0.164.0.txt`, version: '0.164.0', text: 'retrying sampling request', shows: "Codex's log entry saying it waits to retry, which Hive looks for once a session has been quiet this long" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/retry-log-codex-0.164.0.txt`, version: '0.164.0', text: 'retrying sampling request', shows: "Codex's log entry saying it waits to retry, which Combwork looks for once a session has been quiet this long" }] // i18n-ignore: a CLI's recorded text (#367)
   },
-  // How long Hive waits for Codex to render a session's prompt (#1285): it reads the developer_instructions Hive's guidance
-  // follows from it. Past it, Hive adds none of its guidance rather than replace instructions it couldn't read.
+  // How long Combwork waits for Codex to render a session's prompt (#1285): it reads the developer_instructions Combwork's guidance
+  // follows from it. Past it, Combwork adds none of its guidance rather than replace instructions it couldn't read.
   {
     id: 'codex.promptInput.timeoutSeconds',
     group: 'codex',
@@ -2377,7 +2377,7 @@ const SOURCES: readonly AdvancedSource[] = [
     max: 120,
     unit: 's',
     applies: 'sessions',
-    samples: [{ from: `${FIX}/advanced/help-codex-0.163.0-prompt-input.txt`, version: '0.163.0', text: 'Render the model-visible prompt input list as JSON', shows: "Codex's help for the command Hive runs, offline, to read a session's developer_instructions" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/help-codex-0.163.0-prompt-input.txt`, version: '0.163.0', text: 'Render the model-visible prompt input list as JSON', shows: "Codex's help for the command Combwork runs, offline, to read a session's developer_instructions" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'codex.mcp.toolTimeoutSeconds',
@@ -2390,7 +2390,7 @@ const SOURCES: readonly AdvancedSource[] = [
     max: 3600,
     unit: 's',
     applies: 'sessions',
-    samples: [{ from: `${FIX}/advanced/mcp-list-codex-0.162.1.json`, version: '0.162.1', text: '"tool_timeout_sec": 900.0', shows: "Codex reading the hive server's tool_timeout_sec from Hive's -c override (codex mcp list --json)" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/mcp-list-codex-0.162.1.json`, version: '0.162.1', text: '"tool_timeout_sec": 900.0', shows: "Codex reading the combwork server's tool_timeout_sec from Hive's -c override (codex mcp list --json)" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'codex.mcp.startupTimeoutSeconds',
@@ -2403,7 +2403,7 @@ const SOURCES: readonly AdvancedSource[] = [
     max: 300,
     unit: 's',
     applies: 'sessions',
-    samples: [{ from: `${FIX}/advanced/mcp-get-codex-0.163.0-native-hive.json`, version: '0.163.0', text: '"startup_timeout_sec": 10.0', shows: "Codex taking the hive server's startup_timeout_sec from Hive's -c override over a native server named hive with its own (codex mcp get hive --json)" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/mcp-get-codex-0.163.0-native-hive.json`, version: '0.163.0', text: '"startup_timeout_sec": 10.0', shows: "Codex taking the combwork server's startup_timeout_sec from Hive's -c override over a native server named hive with its own (codex mcp get hive --json)" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: drawnWaitId('codex'),
@@ -2416,9 +2416,9 @@ const SOURCES: readonly AdvancedSource[] = [
     max: 60,
     unit: 's',
     applies: 'now',
-    samples: [{ from: `${FIX}/advanced/drawn-codex-0.163.0.txt`, version: '0.163.0', text: '› [CW] New in your inbox: 1 message (m1). Call cw_inbox to read it.', shows: "Codex showing a line Combwork typed in its prompt, before Enter: what Combwork waits to see (the doorbell's text since HI-2463; the screen recorded with 0.163.0 had Hive's)" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/drawn-codex-0.163.0.txt`, version: '0.163.0', text: '› [CW] New in your inbox: 1 message (m1). Call cw_inbox to read it.', shows: "Codex showing a line Combwork typed in its prompt, before Enter: what Combwork waits to see (the doorbell's text since HI-2463; the screen recorded with 0.163.0 had Combwork's)" }] // i18n-ignore: a CLI's recorded text (#367)
   },
-  // A line break in a prompt Hive types into Codex (HI-1327): a key its input box takes as a new line, or a space.
+  // A line break in a prompt Combwork types into Codex (HI-1327): a key its input box takes as a new line, or a space.
   {
     id: 'codex.prompt.newlineKey',
     group: 'codex',
@@ -2462,7 +2462,7 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [{ from: `${FIX}/screen-codex-0.162.1-working.txt`, version: '0.162.1', text: 'tab to queue message' }] // i18n-ignore: a CLI's recorded text (#367)
   },
-  // A lane's end (HI-1706): the command Hive types to end Codex as a person would, and how long it waits for the exit.
+  // A lane's end (HI-1706): the command Combwork types to end Codex as a person would, and how long it waits for the exit.
   {
     id: 'codex.exit.command',
     group: 'codex',
@@ -2628,7 +2628,7 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/signin-error-copilot-1.0.95.jsonl`, version: '1.0.95', text: 'Authentication failed with provider at http://127.0.0.1:50713/v1 (HTTP 401).' }] // i18n-ignore: a CLI's recorded text (#367)
   },
-  // A question's text (HI-1945): from 1.0.104 the question's Notification says only "Information requested", so Hive
+  // A question's text (HI-1945): from 1.0.104 the question's Notification says only "Information requested", so Combwork
   // takes the question from the asking tool's PreToolUse.
   {
     id: 'copilot.question.tool',
@@ -2745,7 +2745,7 @@ const SOURCES: readonly AdvancedSource[] = [
     max: 60,
     unit: 's',
     applies: 'now',
-    samples: [{ from: `${FIX}/console/copilot.json`, version: '1.0.105', text: '"type": "session.shutdown"', shows: "Copilot stopped by Hive, writing its token totals (session.shutdown) and exiting by itself (exit code 0)" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/console/copilot.json`, version: '1.0.105', text: '"type": "session.shutdown"', shows: "Copilot stopped by Combwork, writing its token totals (session.shutdown) and exiting by itself (exit code 0)" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'copilot.exit.armed',
@@ -2757,7 +2757,7 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/exit-armed-copilot-1.0.105.txt`, version: '1.0.105', text: 'ctrl+c again to exit' }] // i18n-ignore: a CLI's recorded text (#367)
   },
-  // Terminals behave the same in every pane (#737): right-click is Hive's, and this hands it to Copilot instead.
+  // Terminals behave the same in every pane (#737): right-click is Combwork's, and this hands it to Copilot instead.
   {
     id: rightClickToCliId('copilot'),
     group: 'copilot',
@@ -2770,10 +2770,10 @@ const SOURCES: readonly AdvancedSource[] = [
     kind: 'boolean',
     default: false,
     applies: 'now',
-    samples: [{ from: `${FIX}/advanced/mouse-copilot-1.0.95.json`, version: '1.0.95', text: '"mouseTracking": "?1003h ?1006h"', shows: 'Copilot turning on mouse tracking as Hive starts it (without --no-mouse), which a passed right-click reaches' }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/mouse-copilot-1.0.95.json`, version: '1.0.95', text: '"mouseTracking": "?1003h ?1006h"', shows: 'Copilot turning on mouse tracking as Combwork starts it (without --no-mouse), which a passed right-click reaches' }] // i18n-ignore: a CLI's recorded text (#367)
   },
   // The same for Claude Code and Codex (#1167). Codex tracks the mouse since 0.163; Claude Code (2.1.305) doesn't at its
-  // prompt, so a right-click passed to it does nothing there, but Hive's copy/paste can still be turned off.
+  // prompt, so a right-click passed to it does nothing there, but Combwork's copy/paste can still be turned off.
   {
     id: rightClickToCliId('claude-code'),
     group: 'claude-code',
@@ -2800,9 +2800,9 @@ const SOURCES: readonly AdvancedSource[] = [
     kind: 'boolean',
     default: false,
     applies: 'now',
-    samples: [{ from: `${FIX}/advanced/mouse-codex-0.163.0.json`, version: '0.163.0', text: '"mouseTracking": "?1003h ?1006h"', shows: 'Codex turning on mouse tracking as Hive starts it, which a passed right-click reaches' }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/mouse-codex-0.163.0.json`, version: '0.163.0', text: '"mouseTracking": "?1003h ?1006h"', shows: 'Codex turning on mouse tracking as Combwork starts it, which a passed right-click reaches' }] // i18n-ignore: a CLI's recorded text (#367)
   },
-  // Off switches for Hive's overrides of the CLIs' own behaviour (#966, #1167): on is what Hive does today.
+  // Off switches for Combwork's overrides of the CLIs' own behaviour (#966, #1167): on is what Combwork does today.
   {
     id: overrideId('claude-code', 'promptSnapshotOff'),
     group: 'claude-code',
@@ -2816,7 +2816,7 @@ const SOURCES: readonly AdvancedSource[] = [
     default: true,
     applies: 'sessions',
     override: true,
-    samples: [{ from: `${FIX}/advanced/help-claude-2.1.305.txt`, version: '2.1.305', text: '--system-prompt-snapshot <on|off>', shows: "Claude Code's help for the flag Hive passes on the Assistant's resumes" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/help-claude-2.1.305.txt`, version: '2.1.305', text: '--system-prompt-snapshot <on|off>', shows: "Claude Code's help for the flag Combwork passes on the Assistant's resumes" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: overrideId('codex', 'terminalTitle'),
@@ -2831,7 +2831,7 @@ const SOURCES: readonly AdvancedSource[] = [
     default: true,
     applies: 'sessions',
     override: true,
-    samples: [{ from: `${FIX}/codex-startup-0.160.0.json`, version: '0.160.0', text: ']0;⠹ hive-codex-setup', shows: "Codex's title with its activity spinner, from the title items Hive gave it" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/codex-startup-0.160.0.json`, version: '0.160.0', text: ']0;⠹ hive-codex-setup', shows: "Codex's title with its activity spinner, from the title items Combwork gave it" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: overrideId('copilot', 'noAutoUpdate'),
@@ -2847,8 +2847,8 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'sessions',
     override: true,
     samples: [
-      { from: `${FIX}/advanced/help-copilot-1.0.100.txt`, version: '1.0.100', text: '--no-auto-update', shows: "Copilot's help for the flag Hive passes" }, // i18n-ignore: a CLI's recorded text (#367)
-      { from: `${FIX}/advanced/help-copilot-1.0.100.txt`, version: '1.0.100', text: '`COPILOT_AUTO_UPDATE`: set to "false"', shows: "Copilot's help for the variable Hive sets" } // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/help-copilot-1.0.100.txt`, version: '1.0.100', text: '--no-auto-update', shows: "Copilot's help for the flag Combwork passes" }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/help-copilot-1.0.100.txt`, version: '1.0.100', text: '`COPILOT_AUTO_UPDATE`: set to "false"', shows: "Copilot's help for the variable Combwork sets" } // i18n-ignore: a CLI's recorded text (#367)
     ]
   },
   {
@@ -2864,9 +2864,9 @@ const SOURCES: readonly AdvancedSource[] = [
     default: true,
     applies: 'sessions',
     override: true,
-    samples: [{ from: `${FIX}/advanced/help-copilot-1.0.100.txt`, version: '1.0.100', text: '--allow-all-mcp-server-instructions', shows: "Copilot's help for the flag Hive passes" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/help-copilot-1.0.100.txt`, version: '1.0.100', text: '--allow-all-mcp-server-instructions', shows: "Copilot's help for the flag Combwork passes" }] // i18n-ignore: a CLI's recorded text (#367)
   },
-  // Hive's tools pre-approved (#1281, #966 row 3): CLI trust only. What a session may do with them is the Agent API's and
+  // Combwork's tools pre-approved (#1281, #966 row 3): CLI trust only. What a session may do with them is the Agent API's and
   // Control's either way, and whether it has them at all is the workspace's MCP settings.
   {
     id: overrideId('claude-code', 'preApproveCombworkTools'),
@@ -2881,11 +2881,11 @@ const SOURCES: readonly AdvancedSource[] = [
     default: true,
     applies: 'sessions',
     override: true,
-    samples: [{ from: `${FIX}/advanced/help-claude-2.1.305.txt`, version: '2.1.305', text: '--allowedTools, --allowed-tools <tools...>', shows: "Claude Code's help for the flag Hive passes the Assistant's tools in" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/help-claude-2.1.305.txt`, version: '2.1.305', text: '--allowedTools, --allowed-tools <tools...>', shows: "Claude Code's help for the flag Combwork passes the Assistant's tools in" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   // Only the workspace's MCP servers (#1281, #966 rows 4–6). Off, the CLI's own load beside them, and the workspace's
-  // (Hive's hive among them) still win over the CLI's own of the same name: each CLI checked (Claude Code 2.1.305,
-  // Copilot 1.0.100 natively; Codex by Hive's table, outrankNativeCombwork).
+  // (Combwork's hive among them) still win over the CLI's own of the same name: each CLI checked (Claude Code 2.1.305,
+  // Copilot 1.0.100 natively; Codex by Combwork's table, outrankNativeCombwork).
   {
     id: overrideId('claude-code', 'mcpIsolation'),
     group: 'claude-code',
@@ -2899,9 +2899,9 @@ const SOURCES: readonly AdvancedSource[] = [
     default: true,
     applies: 'sessions',
     override: true,
-    samples: [{ from: `${FIX}/advanced/help-claude-2.1.305.txt`, version: '2.1.305', text: 'Only use MCP servers from --mcp-config,', shows: "Claude Code's help for the flag Hive passes" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/help-claude-2.1.305.txt`, version: '2.1.305', text: 'Only use MCP servers from --mcp-config,', shows: "Claude Code's help for the flag Combwork passes" }] // i18n-ignore: a CLI's recorded text (#367)
   },
-  // Hive's status line in place of the user's (#1285, #966 row 12). Off, theirs shows again, chained after Hive's.
+  // Combwork's status line in place of the user's (#1285, #966 row 12). Off, theirs shows again, chained after Combwork's.
   {
     id: overrideId('claude-code', 'statusLine'),
     group: 'claude-code',
@@ -2915,7 +2915,7 @@ const SOURCES: readonly AdvancedSource[] = [
     default: true,
     applies: 'sessions',
     override: true,
-    samples: [{ from: `${FIX}/advanced/statusline-claude-2.1.296.json`, version: '2.1.296', text: '"context_window"', shows: "Claude Code's status line input, which Hive's command reads and passes on to yours" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/statusline-claude-2.1.296.json`, version: '2.1.296', text: '"context_window"', shows: "Claude Code's status line input, which Combwork's command reads and passes on to yours" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: overrideId('copilot', 'mcpIsolation'),
@@ -2931,8 +2931,8 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'sessions',
     override: true,
     samples: [
-      { from: `${FIX}/advanced/help-copilot-1.0.100.txt`, version: '1.0.100', text: 'Disable all built-in MCP servers (currently:', shows: "Copilot's help for the flag Hive passes" }, // i18n-ignore: a CLI's recorded text (#367)
-      { from: `${FIX}/advanced/help-copilot-1.0.100.txt`, version: '1.0.100', text: 'Disable a specific MCP server (can be used multiple times)', shows: "Copilot's help for the flag Hive passes for each of the user's servers" } // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/help-copilot-1.0.100.txt`, version: '1.0.100', text: 'Disable all built-in MCP servers (currently:', shows: "Copilot's help for the flag Combwork passes" }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/help-copilot-1.0.100.txt`, version: '1.0.100', text: 'Disable a specific MCP server (can be used multiple times)', shows: "Copilot's help for the flag Combwork passes for each of the user's servers" } // i18n-ignore: a CLI's recorded text (#367)
     ]
   },
   {
@@ -2978,7 +2978,7 @@ const SOURCES: readonly AdvancedSource[] = [
     default: true,
     applies: 'sessions',
     override: true,
-    samples: [{ from: `${FIX}/advanced/help-copilot-1.0.100.txt`, version: '1.0.100', text: 'Tools the CLI has permission to use; will not prompt for', shows: "Copilot's help for the flag Hive pre-approves its tools with" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/help-copilot-1.0.100.txt`, version: '1.0.100', text: 'Tools the CLI has permission to use; will not prompt for', shows: "Copilot's help for the flag Combwork pre-approves its tools with" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: overrideId('copilot', 'stripGitHubTokens'),
@@ -3143,7 +3143,7 @@ export function checkAdvanced(def: AdvancedDef, raw: unknown): { value: string |
       if (def.paths) {
         // Folders (HI-2480): semicolons apart, as Windows lists paths (a comma can be in a folder's name). An empty list is
         // only the default as written ([]): text with no folder is refused, and Settings' empty box resets instead. A
-        // workspace's [] counts as Hive's list (extraFolders), as its emptied box does.
+        // workspace's [] counts as Combwork's list (extraFolders), as its emptied box does.
         if (Array.isArray(raw) && !raw.length) return { value: [] }
         // Split on ";" alone (HI-2538): a comma, or a %NAME% after one, can be in a folder's name, so it is never a separator.
         const folders = Array.isArray(raw) ? raw.map((x) => (typeof x === 'string' ? x.trim() : x)).filter((x) => x !== '') : typeof raw === 'string' ? folderList(raw) : null
@@ -3234,7 +3234,7 @@ export interface MadeFor {
 export interface AdvancedState {
   /** advanced.json's full path. */
   file: string
-  /** Why advanced.json couldn't be read as it is now (not JSON, not an object): Hive keeps what it read before. */
+  /** Why advanced.json couldn't be read as it is now (not JSON, not an object): Combwork keeps what it read before. */
   fileError: string | null
   /** `fileError` as the window shows it (#850); `fileError` is its English. */
   fileErrorText?: Text | null
@@ -3242,20 +3242,20 @@ export interface AdvancedState {
   values: Record<string, unknown>
   /** For a CLI-facing override: the CLI version it was made for. */
   madeFor: Record<string, MadeFor>
-  /** Ids in advanced.json that this Hive doesn't know (a typo, or a newer Hive's): kept, not used. */
+  /** Ids in advanced.json that this Combwork doesn't know (a typo, or a newer Combwork's): kept, not used. */
   unknown: string[]
   /** The open workspace's own values (workspace.json), for the values a workspace can set; null without one. */
   workspace: Record<string, unknown> | null
-  /** Each CLI's installed version, as Hive last found it. */
+  /** Each CLI's installed version, as Combwork last found it. */
   cli: Partial<Record<ProviderId, string | null>>
-  /** What each value that applies when Hive restarts was when this Hive started: one changed since offers a restart. */
+  /** What each value that applies when Combwork restarts was when this Combwork started: one changed since offers a restart. */
   atStart?: Record<string, unknown>
 }
 
 /** One value as Settings lists it. */
 export interface AdvancedRow {
   def: AdvancedDef
-  /** What Hive uses now (for this workspace, when it has its own). */
+  /** What Combwork uses now (for this workspace, when it has its own). */
   value: string | number | string[] | boolean
   /** advanced.json's override, as written (undefined: none). */
   override: unknown
@@ -3362,7 +3362,7 @@ const FILE_PROBLEM = {
 }
 const fileProblem = (t: Text): { error: string; errorText: Text } => ({ error: englishText(t), errorText: t })
 
-/** advanced.json read: its overrides and versions, or why it can't be used (then Hive keeps what it had). */
+/** advanced.json read: its overrides and versions, or why it can't be used (then Combwork keeps what it had). */
 export function parseAdvancedFile(text: string): { values: Record<string, unknown>; madeFor: Record<string, MadeFor>; unknown: string[] } | { error: string; errorText: Text } {
   let raw: unknown
   try {

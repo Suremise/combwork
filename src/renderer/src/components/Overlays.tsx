@@ -731,14 +731,14 @@ export function ShortcutsDialog() {
 }
 
 /**
- * After Provider Setup's install found the CLI (#472). Installers say to restart the terminal; Hive looked again on the
+ * After Provider Setup's install found the CLI (#472). Installers say to restart the terminal; Combwork looked again on the
  * PATH a new process gets, so neither it nor new agents need a restart. Running agents keep the PATH they started with.
  */
 function installedText(name: string): string {
   return tr(msg({ id: 'shell.setup.installed', defaultMessage: "{provider} is installed and Combwork has found it: agents you start now can use it, without restarting Combwork (the installer's advice to restart your terminal is for terminals already open). Agents already running get the new PATH when they restart.", description: "Provider Setup, after an install found the coding agent's CLI. {provider} is its name; PATH is a Windows setting: keep it." }), { provider: name })
 }
 
-/** An install that ended without Hive finding the CLI. */
+/** An install that ended without Combwork finding the CLI. */
 function installNotFoundText(name: string): string {
   return tr(msg({ id: 'shell.setup.notFound', defaultMessage: "The install ended, but Combwork can't find {provider}. If the installer reported an error, it's shown below; if it says it worked, Check again, or set {provider}'s path in Settings → {provider}.", description: "Provider Setup, after an install ended without Combwork finding the CLI. {provider} is its name; Check again is the dialog's button." }), { provider: name })
 }
@@ -797,7 +797,7 @@ function GitSetupRow() {
 
 /** Installing, updating, signing in to and setting up each provider's CLI, one tab per provider. */
 /**
- * The CLI version this Hive release was tested with, against the installed one (#365): a quiet tick when they match,
+ * The CLI version this Combwork release was tested with, against the installed one (#365): a quiet tick when they match,
  * else a calm note (a newer CLI usually works; nothing is blocked).
  */
 function TestedLine({ tested, installed }: { tested: TestedCli; installed: string | null }) {
@@ -863,10 +863,10 @@ export function AgentSetupDialog() {
     const after = next?.[tab]
     if (!kind || !after || after.checking) return
     const left = kind === 'update' ? after.updateAvailable || !!after.updateRetry : (after.readiness ?? []).some((r) => task.issues.includes(r.id))
-    // An install that ended without Hive finding the CLI: its terminal stays, with what to do next.
+    // An install that ended without Combwork finding the CLI: its terminal stays, with what to do next.
     if (left && kind === 'install' && !after.found) setFinished({ ok: false, text: installNotFoundText(p.name) })
     if (left) return
-    // Installers say to restart the terminal (#472): Hive looked again on the PATH a new process gets, so it needn't.
+    // Installers say to restart the terminal (#472): Combwork looked again on the PATH a new process gets, so it needn't.
     const what: Record<ProviderTask, string> = {
       install: installedText(p.name),
       update: tr(msg({ id: 'shell.setup.updated', defaultMessage: '{provider} is up to date.', description: "Provider Setup after an update. {provider} is the coding agent's name." }), { provider: p.name }),
@@ -1054,7 +1054,7 @@ const STOPPING: Partial<Record<SessionStatus, Msg>> = {
 }
 
 /**
- * Asks what to do with running sessions and unsaved files when Hive quits. Main waits for
+ * Asks what to do with running sessions and unsaved files when Combwork quits. Main waits for
  * app:quitDecision; unsaved files are saved (or discarded) here first.
  */
 export function QuitDialog() {
@@ -1214,7 +1214,7 @@ export function QuitDialog() {
   )
 }
 
-/** Shown if the window is opened while Hive waits for agents to finish before quitting. */
+/** Shown if the window is opened while Combwork waits for agents to finish before quitting. */
 export function QuitPendingBanner() {
   const pending = useStore((s) => s.quitPending)
   if (!pending) return null

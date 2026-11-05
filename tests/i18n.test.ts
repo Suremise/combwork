@@ -281,7 +281,7 @@ describe("main's language", () => {
 })
 
 describe('agent-facing scripts never load the translations', () => {
-  // hive-mcp.js and hive-progress.js run outside the asar with Node built-ins and Combwork's own chunks only (AGENTS.md):
+  // cw-mcp.js and cw-progress.js run outside the asar with Node built-ins and Combwork's own chunks only (AGENTS.md):
   // a shared module they import that imports a package the build leaves in node_modules would break them, and
   // agent-facing text stays English. The one package they reach is agent text's formatter, intl-messageformat, which the
   // build bundles into the chunks (electron.vite.config.ts, HI-2433); never the window's translations. msg.ts and

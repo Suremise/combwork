@@ -5,9 +5,9 @@ import type { LiveSessionState, ProviderId } from '../shared/types'
 import type { LiveDetails } from './providers/types'
 
 /**
- * The developer console's summary lines (#636): what came in and what Hive made of it, in Hive's own words. Never the
+ * The developer console's summary lines (#636): what came in and what Combwork made of it, in Combwork's own words. Never the
  * CLI's or anyone's text: values go through safeWord(), which keeps numbers and identifiers only and says the rest is
- * text; Hive's own names (agents, projects) through combworkName() as the event is kept.
+ * text; Combwork's own names (agents, projects) through combworkName() as the event is kept.
  */
 
 export function hookSummary(name: string, tool: unknown, event: string, status: string, actions: string[], replied: boolean): string {
@@ -34,7 +34,7 @@ export const statusLineSummary = (d: LiveDetails): string => `status line → ${
 /** At most this many of a read's newest records go into its event (each redacted, the event bounded). */
 const RECORDS = 10
 
-/** A transcript read: its newest records as they were written, next to the details Hive read from them. */
+/** A transcript read: its newest records as they were written, next to the details Combwork read from them. */
 export function transcriptEvent(provider: ProviderId, chunk: string, d: LiveDetails): CapturedEvent {
   const lines = chunk.split('\n').filter((l) => l.trim())
   const newest = lines.slice(-RECORDS).map((l) => {
@@ -49,7 +49,7 @@ export function transcriptEvent(provider: ProviderId, chunk: string, d: LiveDeta
 }
 
 /**
- * Option names the CLIs Hive runs take (Claude Code's, Codex's, Copilot's): a launch keeps an argument only when it is
+ * Option names the CLIs Combwork runs take (Claude Code's, Codex's, Copilot's): a launch keeps an argument only when it is
  * exactly one of these. A name from this list is never someone's text; anything else (an option's value, inline after
  * `=` or the next argument, even one that begins with a dash, and positionals) is only counted.
  */

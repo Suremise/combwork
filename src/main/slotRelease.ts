@@ -2,8 +2,8 @@
  * Release Slot for the Agent API and the Assistant's cw_release_slot (#1561): the two releases the window offers in an
  * agent's ⋯, by slot name. A carried slot (#1441: an agent's adopted worktree, kept for it under a carried lease) stops
  * being kept for it; a held writer (#1506: a run that is over still holding the slot, its processes not known to have
- * ended) is cleared once the caller confirms the slot and run it was shown, ending the processes Hive lists first when
- * asked. The refusals are the window's own (`releaseHeldWriter`: its run live here, its Hive still running or not
+ * ended) is cleared once the caller confirms the slot and run it was shown, ending the processes Combwork lists first when
+ * asked. The refusals are the window's own (`releaseHeldWriter`: its run live here, its Combwork still running or not
  * known, the writer no longer that run), and a release racing a claim has one outcome (its write is fenced by the run).
  */
 import { agentMsg, say } from '../shared/agentText'
@@ -56,7 +56,7 @@ export interface Released {
   kind: ReleaseKind
   slot: string
   agent: { id: string; name: string }
-  /** A held writer's: whether the processes Hive listed were ended first. */
+  /** A held writer's: whether the processes Combwork listed were ended first. */
   ended?: boolean
 }
 
@@ -80,7 +80,7 @@ export async function releasableSlots(projectPath: string): Promise<Releasable> 
 
 /**
  * Releases `slot`: its carried lease (`carried`), or its held writer (`writer`), which needs `confirm` naming the slot
- * and the run the user was shown, and with `end` ends what Hive lists of that run's processes first. `kind` may be left
+ * and the run the user was shown, and with `end` ends what Combwork lists of that run's processes first. `kind` may be left
  * out when the slot has only one of them. `guard`: the Assistant's change boundary (Control, its session), run again just
  * before processes are ended and inside the write that ends the lease or clears the writer, so a change it no longer
  * allows by then changes nothing.

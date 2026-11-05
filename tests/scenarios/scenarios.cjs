@@ -1,7 +1,7 @@
 // The scenarios: what a user asks an agent or the Assistant, what's in the workspace first, and what must be true after.
 // Checks look at what happened, never at wording:
 // - skills read (a successful read showing the skill);
-// - hive tool calls the server ran (with whether they worked);
+// - Combwork tool calls the server ran (with whether they worked);
 // - the board, notes and files afterwards.
 // Each has a `fake` prompt for the fake CLIs (Claude Code's and Codex's), which act the scenario out with their scripted
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
@@ -21,12 +21,12 @@ const LONG_DESIGN = (() => {
 })()
 
 /**
- * The subject's hive tool calls, by tool, refused ones too (each has ok, error and args): for checks where an attempt
+ * The subject's Combwork tool calls, by tool, refused ones too (each has ok, error and args): for checks where an attempt
  * is the fault ("didn't X") or that read refusals. A check that it did something counts only accepted calls, `ran`
  * (HI-2229: a model guessing a deferred tool's arguments makes refused calls).
  */
 const called = (o, tool) => o.combworkCalls.filter((c) => c.tool === tool)
-/** A hive call's arguments (logged as JSON text), or {} when they can't be read. */
+/** A Combwork call's arguments (logged as JSON text), or {} when they can't be read. */
 const argsOf = (x) => {
   try {
     return typeof x.args === 'string' ? JSON.parse(x.args) : (x.args ?? {})
@@ -34,7 +34,7 @@ const argsOf = (x) => {
     return {}
   }
 }
-/** A fake builder's watch for its card's verdict, as card-loop starts it (a hive tool call through the real server). */
+/** A fake builder's watch for its card's verdict, as card-loop starts it (a Combwork tool call through the real server). */
 const verdictWatch = (n) => `cw cw_wait_for_tasks {"cards":["#${n}"],"changes":["verdict","column","comment"],"column":"passed","wake":true}`
 const ran = (o, tool) => called(o, tool).filter((c) => c.ok)
 /**
@@ -2283,7 +2283,7 @@ module.exports.SCENARIOS = [
       const onDoc = o.tools.filter((t) => !t.isError && !/cw_/.test(t.name) && t.input.includes('DESIGN.md'))
       // A read of the whole file: the Read tool without a range, or a shell command that prints it all.
       const whole = onDoc.filter((t) => (/^Read$/i.test(t.name) ? !/\b(limit|offset)\b/.test(t.input) : /bash|shell|powershell|exec|command/i.test(t.name) && /\b(cat|type|Get-Content|gc|more|less)\b/i.test(t.input) && !/-(TotalCount|Tail|First|Head)\b|\| *(head|Select-Object|Select-String|findstr|grep)/i.test(t.input)))
-      // Only part of it: the hive tools by section (any CLI), or a range or search (Claude Code reads lines, #817's card).
+      // Only part of it: the Combwork tools by section (any CLI), or a range or search (Claude Code reads lines, #817's card).
       const hive = ran(o, 'cw_doc_outline').length + ran(o, 'cw_read_section').length
       return [
         ['read only part of it: its outline and section, or a range', hive > 0 || (onDoc.length > 0 && whole.length === 0), `${o.combworkCalls.map((x) => x.tool).join(',')} | ${onDoc.map((t) => t.name).join(',')}`],
@@ -3250,7 +3250,7 @@ module.exports.SCENARIOS = [
       const trees = worktreesOf(c)
       const made = trees.filter((t) => !c.trees.includes(t))
       // Its first conversation (where it read work-on-card and started the card) is replaced by the slot's: the checks
-      // read the hive calls, the repository and the card, which span both.
+      // read the Combwork calls, the repository and the card, which span both.
       return [
         ['started it with cw_start_card', ran(o, 'cw_start_card').length > 0, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
         ['Combwork lent the card a slot (its Started fact)', !!slot, JSON.stringify(started?.data)],
@@ -3636,7 +3636,7 @@ module.exports.SCENARIOS = [
       const made = worktreesOf(c).filter((t) => !c.trees.includes(t))
       const calls = o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
       // Its first conversation (card-loop read, the lane, the start) is replaced by the slot's (the work, the submission):
-      // the checks read the hive calls, the repository and the card, which span both, not the skills its transcript shows.
+      // the checks read the Combwork calls, the repository and the card, which span both, not the skills its transcript shows.
       return [
         ['registered its lane: the card, Implementer reviewing', !!lane && lane.reviewer?.name === 'Implementer', JSON.stringify((o.lanes ?? []).map((l) => [l.builder?.name, l.reviewer?.name, l.cards?.map((x) => x.number)]))],
         ['started it with cw_start_card, and Combwork lent the card a slot', ran(o, 'cw_start_card').length > 0 && !!slot, calls],
@@ -3958,7 +3958,7 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await c.card('w', { title: 'Export the report', description: 'Add an export of the report. Open question for the user: CSV or JSON?', agent: 'implementer', column: 'doing' })
       // Coder reviews it in a card loop and waits for it to arrive in Review (a card watch): it takes no new task meanwhile.
-      // Its watch is made with its own token, as its hive tool makes it (#1545: a fake's typed command reached no real CLI).
+      // Its watch is made with its own token, as its Combwork tool makes it (#1545: a fake's typed command reached no real CLI).
       await coderTask(c)
       const watch = await c.as('coder', 'POST', '/v1/tasks/wait', { cards: [c.cards.w], column: 'review', wake: true })
       if (watch.status !== 200 || !watch.body?.watching) throw new Error(`setup: Coder's watch on #${c.cards.w}: ${watch.status} ${JSON.stringify(watch.body)}`)
@@ -4445,7 +4445,7 @@ const DEPLOY_FACTS = /staging\.example\.com|deploy:staging|ALPHA_ENV=staging/
 const DEPLOY_CARD_FACT = 'docs/DEPLOY.md, its Staging section'
 /**
  * HI-2239's read policy (Darren's decision, 31 Oct: simplify). A file was read when Claude Code's `Read` worked on its
- * exact absolute path and gave back its facts; Combwork's own reads are the hive calls' (cw_read_section, cw_list_tasks,
+ * exact absolute path and gave back its facts; Combwork's own reads are the Combwork calls' (cw_read_section, cw_list_tasks,
  * each paired with its own reply: callsWithReplies). A shell command (or a Codex script) that may have read it is
  * unobservable: never credited, and never blamed (shellLookups: the check is left out, and the run records it).
  */
@@ -4469,7 +4469,7 @@ const readOf = (t, target, facts) => {
  */
 const shellLookups = (o, name) => (o.tools ?? []).filter((t) => SHELL_TOOLS.test(t.name) && String(t.input ?? '').toLowerCase().includes(name.toLowerCase()))
 /**
- * A hive tool's successful calls with their own replies (HR1, HI-2239 round 2): Combwork's log of the calls (exact
+ * A Combwork tool's successful calls with their own replies (HR1, HI-2239 round 2): Combwork's log of the calls (exact
  * arguments) and the transcript's replies, in order, paired one to one; when their counts differ the pairing isn't known,
  * and none is given.
  */

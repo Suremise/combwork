@@ -7,11 +7,11 @@ import { readyFor } from './readiness'
 import { sessions } from './sessions'
 
 /**
- * The writer of Hive's lines into an agent's terminal (#649: what the delivery service types with, moved out of
+ * The writer of Combwork's lines into an agent's terminal (#649: what the delivery service types with, moved out of
  * watches.ts): one line at a time per agent, only while it can take one (readiness.ts), nobody types there and no line of
- * Hive's waits to be taken; checked before each piece and before Enter; then confirmed taken (#376, #430). It holds
+ * Combwork's waits to be taken; checked before each piece and before Enter; then confirmed taken (#376, #430). It holds
  * sessions' composer reservation (`sendPrompt`'s), which the CLI controls (compaction) take too. The delivery service
- * (deliveries.ts) is its only caller for lines of Hive's own.
+ * (deliveries.ts) is its only caller for lines of Combwork's own.
  */
 
 // Its log lines are the wakes' as they always were (e2e suites read them).
@@ -44,11 +44,11 @@ export async function settled(): Promise<void> {
 }
 export const inFlightNow = (): boolean => inFlight.size > 0
 
-/** Agents Hive is typing a line into now (one at a time each). */
+/** Agents Combwork is typing a line into now (one at a time each). */
 const writing = new Set<string>()
 
 /**
- * Told when Hive is done with an agent's line (HI-2191): its typing over, or its check that the CLI took it. Neither
+ * Told when Combwork is done with an agent's line (HI-2191): its typing over, or its check that the CLI took it. Neither
  * changes the agent's status, so what waits on `whyNoLine` for these (a slot's placement) looks again by it.
  */
 const freed = new Set<(projectPath: string, agentId: string) => void>()
@@ -66,16 +66,16 @@ function tellFreed(projectPath: string, agentId: string): void {
   }
 }
 
-/** Whether an agent has a line of Hive's being made that goes first (watches.ts: a fired watch whose line isn't made yet). */
+/** Whether an agent has a line of Combwork's being made that goes first (watches.ts: a fired watch whose line isn't made yet). */
 let lineComing: (projectPath: string, agentId: string) => boolean = () => false
 export function onLineComing(fn: (projectPath: string, agentId: string) => boolean): void {
   lineComing = fn
 }
 
-/** Whether another line of Hive's has an agent now: one being typed, or a watch's being made (#1432: Deliver Now waits for it). */
+/** Whether another line of Combwork's has an agent now: one being typed, or a watch's being made (#1432: Deliver Now waits for it). */
 export const lineBusy = (projectPath: string, agentId: string): boolean => writing.has(agentKey(projectPath, agentId)) || lineComing(projectPath, agentId)
 
-/** Why Hive could not type a line into an agent now (whyNoLine), in the reply of the call that wanted it: said in its caller's dialect. */
+/** Why Combwork could not type a line into an agent now (whyNoLine), in the reply of the call that wanted it: said in its caller's dialect. */
 const T = {
   notRunning: agentMsg({ id: 'inbox.noLine.notRunning', text: "it isn't running", note: 'Why Combwork could not type a line (a delivery given now, Deliver Now) into an agent, in the reply of the call that wanted it: the agent named.' }),
   typing: agentMsg({ id: 'inbox.noLine.typing', text: 'Combwork is already typing a line into it', note: 'Why Combwork could not type a line into an agent now, in the reply of the call that wanted it.' }),
@@ -93,7 +93,7 @@ const T = {
 }
 
 /**
- * Whether a line of Hive's could be typed into an agent now (typeLine's own conditions, before it asks what is wanted):
+ * Whether a line of Combwork's could be typed into an agent now (typeLine's own conditions, before it asks what is wanted):
  * it can take one (`need`), nobody types there, no earlier line is waiting there, no line is being typed and none of a
  * watch's is being made. Null when it could; else why not, as the reply of a call that wanted it now says it.
  */
@@ -112,7 +112,7 @@ export function whyNoLine(projectPath: string, agentId: string, need: DeliveryNe
   if (sessions.launchTaskWaiting(projectPath, agentId)) return say(T.launchTask)
   // A doorbell before its hive tools have connected is a turn that can't read the inbox (#865: a resumed Claude Code).
   if (sessions.combworkToolsWaiting(projectPath, agentId)) return say(T.toolsWaiting)
-  // Its folder being changed under it (#646: a Git switch or pull): no turn of Hive's starts there until that is done.
+  // Its folder being changed under it (#646: a Git switch or pull): no turn of Combwork's starts there until that is done.
   const changing = folderChanging(st.cwd)
   if (changing) return say(T.folder, { what: changing })
   if (lineComing(projectPath, agentId)) return say(T.wakeFirst)
@@ -125,7 +125,7 @@ export const canTypeLine = (projectPath: string, agentId: string, need: Delivery
  * typed at while the confirmation runs, and `settled` once that has ended; `taken` once its CLI took it (not a receipt:
  * the doorbell carries no text), never for a launch that ended first; `lost` when that launch ended (or another began)
  * before its CLI took it; `left` when the user typed into it before its CLI took it (#652 round 1 finding 2), so it is
- * theirs now and never submitted by Hive. What it names doesn't decide whether it may still be submitted (#652): Hive's
+ * theirs now and never submitted by Combwork. What it names doesn't decide whether it may still be submitted (#652): Combwork's
  * lines are the doorbell, fixed words and ids, whose Enter again gives nothing that may no longer be given (cw_inbox
  * checks each delivery as it is read), or the user's own task.
  */
@@ -134,7 +134,7 @@ export interface LineFollow {
   /**
    * Whether what the line rang for has been read since it was typed (#1514): the CLI took it, whether or not a prompt was
    * seen. Codex takes a line typed while a turn runs (its compaction at a turn's start) as queued input, with no
-   * UserPromptSubmit: on 23 Oct RR2 read m157 eight seconds after it was typed, and Hive still pressed Enter again and
+   * UserPromptSubmit: on 23 Oct RR2 read m157 eight seconds after it was typed, and Combwork still pressed Enter again and
    * marked the line not taken, which then blocked every prompt until the user pressed Enter on an empty composer.
    */
   read?: () => boolean
@@ -147,7 +147,7 @@ export interface LineFollow {
 }
 
 /**
- * Types a line of Hive's into an agent: only while it can take one (`need`), nobody types there, no earlier line is
+ * Types a line of Combwork's into an agent: only while it can take one (`need`), nobody types there, no earlier line is
  * waiting there; one at a time per agent; checked to be taken (#376). `wanted` is asked again before every piece and
  * before Enter. Whether it was typed (false: try again later).
  */
@@ -231,7 +231,7 @@ async function confirming(projectPath: string, agentId: string, before: { runId:
   }
   const first = await waitTaken()
   if (first) return first
-  // Enter again, once, when that is safe (the same launch, idle, nobody typing there, Hive not typing): waited for a
+  // Enter again, once, when that is safe (the same launch, idle, nobody typing there, Combwork not typing): waited for a
   // while rather than given up at once (#430). Never a third Enter.
   let retried = false
   for (let end = Date.now() + 6 * takeMs(); ; ) {
@@ -246,8 +246,8 @@ async function confirming(projectPath: string, agentId: string, before: { runId:
       end += Date.now() - held
       continue
     }
-    // The user has typed into the prompt since Hive's line began (#652 round 1 finding 2: any pause, 0 included): it is
-    // their draft, never submitted or cleared by Hive, and nothing more is typed into the agent until a prompt is sent.
+    // The user has typed into the prompt since Combwork's line began (#652 round 1 finding 2: any pause, 0 included): it is
+    // their draft, never submitted or cleared by Combwork, and nothing more is typed into the agent until a prompt is sent.
     if (sessions.userTypedOverLine(projectPath, agentId)) {
       sessions.leaveToUser(projectPath, agentId, before.runId)
       log.info(`Left the line typed into ${userText(agentId)} to the user, who has typed there since`)

@@ -27,7 +27,7 @@ import { pausedFor } from './teamPause'
 import { dataFolder } from './combworkFolder'
 
 /**
- * Restarts announced and resumed (HI-1707, shared/restartResume.ts). As Hive closes for an update, an install or a
+ * Restarts announced and resumed (HI-1707, shared/restartResume.ts). As Combwork closes for an update, an install or a
  * restart, the agents that were working, watching or in a running lane are recorded and told; at the next start they
  * resume in their conversations one at a time, each after the last is ready (Darren's decision), with a note of where
  * they were. An ordinary quit records them too, and the next start offers to resume them. The record (restart.json in
@@ -58,7 +58,7 @@ const queuedAt = new Map<string, number>()
 let pumping = false
 let stopping = false
 /**
- * Bumped as Hive starts closing (stopRestartRecovery, recordClosing): an attempt that began before it starts nothing and
+ * Bumped as Combwork starts closing (stopRestartRecovery, recordClosing): an attempt that began before it starts nothing and
  * changes nothing after it, so the closing snapshot (which put the attempt's entry back to pending) stands.
  */
 let generation = 0
@@ -162,7 +162,7 @@ export function isResuming(projectPath: string, agentId: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// As Hive closes: the snapshot, and the agents told.
+// As Combwork closes: the snapshot, and the agents told.
 // ---------------------------------------------------------------------------
 
 /** How an agent being stopped counts: working, waiting, with background tasks, or watching (a card loop). */
@@ -221,7 +221,7 @@ export async function enrich(base: readonly RestartEntry[]): Promise<RestartEntr
 }
 
 /**
- * Hive is closing (quitNow): its agents recorded, before they are stopped. Every running conversation is written at
+ * Combwork is closing (quitNow): its agents recorded, before they are stopped. Every running conversation is written at
  * once; then, within `snapshotMs`, narrowed to those working, watching or in a lane, with their cards and lanes. One
  * that takes longer keeps every conversation (an idle agent resumed is a lesser harm than a working one lost). For an
  * update, an install or a restart they are told too, best effort, within `tellMs` (a line in each one's inbox: an idle
@@ -284,13 +284,13 @@ export function adoptInstalledRun(agents: readonly RunningAgent[], from: string,
 const workspaceValues = (ws: WorkspaceService | undefined): Record<string, unknown> | null => ws?.config?.advanced ?? null
 
 /**
- * Whether an entry resumes on its own: Hive last closed for an update, an install or a restart (the record's policy),
- * with Resume agents after an update on for the entry's workspace (its own value, else Hive's).
+ * Whether an entry resumes on its own: Combwork last closed for an update, an install or a restart (the record's policy),
+ * with Resume agents after an update on for the entry's workspace (its own value, else Combwork's).
  */
 const auto = (ws: WorkspaceService | undefined): boolean => policy() !== 'quit' && advanced.get<boolean>(RESUME_AFTER_UPDATE, workspaceValues(ws)) !== false
 
 /**
- * Once Hive's window is up: entries already offered (or held) are offered again in one notice, and the queue started.
+ * Once Combwork's window is up: entries already offered (or held) are offered again in one notice, and the queue started.
  * Each pending entry is decided once its workspace is ready (pump): queued to resume, or offered.
  */
 export async function startRestartRecovery(): Promise<void> {
@@ -381,7 +381,7 @@ export async function dismissOffered(): Promise<number> {
   return offered.length
 }
 
-/** Hive is quitting: no more starts from the queue, and an attempt under way changes nothing (it stays pending). */
+/** Combwork is quitting: no more starts from the queue, and an attempt under way changes nothing (it stays pending). */
 export function stopRestartRecovery(): void {
   stopping = true
   generation++
@@ -516,7 +516,7 @@ function followWorkspaces(): void {
 /** The statuses of an agent that has taken its first prompt (a resume's note). */
 const TOOK_NOTE = new Set(['working', 'finished', 'waiting', 'background'])
 
-/** How long a resumed agent has to be ready (Settings → Advanced, its workspace's own value or Hive's). */
+/** How long a resumed agent has to be ready (Settings → Advanced, its workspace's own value or Combwork's). */
 const readyMs = (ws: WorkspaceService): number => readyMsForTests ?? Math.max(10, Number(advanced.get<number>(RESTART_READY_SECONDS, workspaceValues(ws))) || 90) * 1000
 
 /** Waits for a condition, polled, up to `ms`. */
@@ -533,7 +533,7 @@ async function until(fn: () => boolean, ms: number): Promise<boolean> {
  * One agent: checked again just before it starts (its workspace ready, the agent still there and not running, its
  * conversation still its last, no slot hold), after every await too; started in its conversation with its note, and
  * waited for until it is ready. Not ready in time: its launch stopped, and confirmed gone, before the next one starts.
- * `gen`: the queue's generation; Hive closing meanwhile cancels it ('cancelled': nothing changed), a workspace closing
+ * `gen`: the queue's generation; Combwork closing meanwhile cancels it ('cancelled': nothing changed), a workspace closing
  * puts it back to pending.
  */
 /** A resume refused as it spawns because its team is paused now (HI-2081): pending again, not failed. */
@@ -541,7 +541,7 @@ class TeamPausedNow extends Error {}
 
 async function resumeOne(e: RestartEntry, gen: number): Promise<'done' | 'cancelled'> {
   const cancelled = (): boolean => gen !== generation || stopping
-  // Its workspace closed (not Hive): back to pending, for when it opens again.
+  // Its workspace closed (not Combwork): back to pending, for when it opens again.
   const closed = (): 'done' => {
     setState(e, 'pending')
     return 'done'
@@ -587,7 +587,7 @@ async function resumeOne(e: RestartEntry, gen: number): Promise<'done' | 'cancel
   if (again) return skip(again)
   const ms = readyMs(ws)
   // Ready once it has taken its note (its first prompt): seen working, or past a turn, in any status change of this
-  // launch. Not `ready` (a resumed conversation's transcript is there before its CLI is, and Hive's fallback reads that
+  // launch. Not `ready` (a resumed conversation's transcript is there before its CLI is, and Combwork's fallback reads that
   // as ready), nor `watching` (a watch the conversation had shows as it starts). Everything after the start is about
   // this launch only (its runId): a session the user started meanwhile is never counted, waited for or stopped as it.
   let runId: string | null = null
@@ -612,14 +612,14 @@ async function resumeOne(e: RestartEntry, gen: number): Promise<'done' | 'cancel
       if (err instanceof TeamPausedNow || (err instanceof Error && err.cause instanceof TeamPausedNow)) return closed()
       throw err
     }
-    // Its launch ending meanwhile (stopped by the user, or its CLI exited), Hive closing, or its workspace closing end
+    // Its launch ending meanwhile (stopped by the user, or its CLI exited), Combwork closing, or its workspace closing end
     // the wait too.
     ready = await until(() => took || TOOK_NOTE.has(mine()?.status ?? 'stopped') || !mine() || cancelled() || !openWorkspaceOf(e), ms)
     ready &&= took || TOOK_NOTE.has(mine()?.status ?? 'stopped')
   } finally {
     off()
   }
-  // Hive closing: its sessions stop with it, and the closing snapshot has this agent; nothing here changes the record.
+  // Combwork closing: its sessions stop with it, and the closing snapshot has this agent; nothing here changes the record.
   if (cancelled()) return 'cancelled'
   if (ready) {
     setState(e, 'resumed')
@@ -729,7 +729,7 @@ let checking = false
 let checkAgain = false
 
 /**
- * Watches Hive's profile for the installer's request (and checks once now: one left from an earlier process is removed,
+ * Watches Combwork's profile for the installer's request (and checks once now: one left from an earlier process is removed,
  * never acted on). A request for this process and copy, fresh and whole, is taken (renamed), acknowledged, and
  * `onRequest` called, once.
  */

@@ -52,11 +52,11 @@ nsis:
   uninstallerIcon: build/icon.ico
   artifactName: Combwork-Setup-${version}.${ext}
   deleteAppDataOnUninstall: false
-  # Hive's languages (#767), so the installer, which follows Windows' display language without asking, never speaks one
+  # Combwork's languages (#767), so the installer, which follows Windows' display language without asking, never speaks one
   # the app doesn't. electron-builder's NSIS messages come in all of them (one or two of its own fall back to English).
   installerLanguages: [en_US, de_DE, es_ES, fr_FR, ja_JP, pl_PL, pt_BR, zh_CN]
   # No resources/elevate.exe (#385): electron-updater only runs it for per-machine installs (or if starting the
-  # installer fails with EACCES), and Hive's per-user installer needs no administrator rights.
+  # installer fails with EACCES), and Combwork's per-user installer needs no administrator rights.
   packElevateHelper: false
   # Gives ALL APPLICATION PACKAGES read access to the install folder (installer.nsh).
   include: build/installer.nsh

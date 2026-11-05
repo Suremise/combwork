@@ -1,6 +1,6 @@
 // A typed prompt's line breaks for Codex (HI-1327), on the fake Codex, which takes Alt+Enter (ESC CR) as a new line in
 // its prompt and Enter as a send, as Codex 0.164's editor does. A card the user starts on a running Codex agent without
-// hive tools is typed into its CLI:
+// Combwork tools is typed into its CLI:
 // 1. with Send prompts as typed on and Typed prompts: line breaks at its default (Automatic: Alt+Enter only with a Codex
 //    version it was tried with; the fake says 0.160.0), the prompt goes in on one line, as before;
 // 2. with Alt+Enter chosen (any version), Codex records the prompt as written, its line breaks, blank lines and indentation kept, in
@@ -40,7 +40,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
   cfg.settings.providers.codex.executablePath = path.join(__dirname, 'fake-codex', 'fake-codex.cmd')
-  // No hive tools, so a card the user starts on a running agent is typed into its CLI (#650).
+  // No Combwork tools, so a card the user starts on a running agent is typed into its CLI (#650).
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true, port: PORT, provideCombworkMcp: false, allowSessionInput: true }
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))

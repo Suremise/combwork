@@ -18,7 +18,7 @@ import { OriginText } from './OriginText'
  * options: these aren't rules but the project's slot and copy settings (project.json `slots` and `copies`), each saved
  * as it is changed. With cards built in slots (G11): the setup and archive scripts and the files copied into a new slot,
  * each showing where its value comes from when unset (the setup command from before 1.0; the copied files as they
- * inherit, HI-1765: the workspace's, Hive's, the default), and the slots in use or ready. With any G11: the review and check copies' pool size and whether reviewers review
+ * inherit, HI-1765: the workspace's, Combwork's, the default), and the slots in use or ready. With any G11: the review and check copies' pool size and whether reviewers review
  * in them (Settings → Advanced's switch).
  */
 
@@ -94,7 +94,7 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
     void call('copies:list', project.path).then(setCopies, () => setCopies([]))
     void call('slots:copyOf', project.path).then(setCopyNow, () => setCopyNow(null))
   }, [project.path])
-  // Hive's slot defaults are the settings' (a change there reaches every project's tab); the workspace's come with it.
+  // Combwork's slot defaults are the settings' (a change there reaches every project's tab); the workspace's come with it.
   const levels = useStore((s) => s.settings?.slotDefaults)
   const wsLevels = useStore((s) => s.workspace?.config.slotDefaults)
   useEffect(reload, [reload, project.config, levels, wsLevels])
@@ -265,15 +265,15 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
 }
 
 /**
- * A level's copied files (HI-1765), in Settings → Workflow defaults (Git: Hive's) and Settings → Workspace's workflow
- * defaults: its own patterns, none, or inherit (the workspace's: Hive's; Hive's: the default), saved as it is changed.
+ * A level's copied files (HI-1765), in Settings → Workflow defaults (Git: Combwork's) and Settings → Workspace's workflow
+ * defaults: its own patterns, none, or inherit (the workspace's: Combwork's; Combwork's: the default), saved as it is changed.
  * Its projects inherit it in Version Control → Slots and copies.
  */
 export function SlotCopyLevel({ level }: { level: WorkflowLevel }) {
   const workspacePath = useStore((s) => s.workspace?.path ?? '')
   const [form, setForm] = useState<SlotLevelForm | null>(null)
   const [shown, setShown] = useState(0)
-  // Read again when either level changes, from here or elsewhere (the settings tool, another window: HR5's round 1): Hive's
+  // Read again when either level changes, from here or elsewhere (the settings tool, another window: HR5's round 1): Combwork's
   // come with the settings, the workspace's with the workspace. Only the latest read or save counts.
   const levels = useStore((s) => s.settings?.slotDefaults)
   const wsLevels = useStore((s) => s.workspace?.config.slotDefaults)
@@ -296,7 +296,7 @@ export function SlotCopyLevel({ level }: { level: WorkflowLevel }) {
     const next = await actions.attempt(tr(T.saveFailed), () => call('slots:setLevelDefault', level, 'copy', value))
     if (next && n === latest.current) setForm(next)
     else if (!next) setShown((x) => x + 1)
-    // The projects' tabs read it again: Hive's comes with the settings, the workspace's with the workspace.
+    // The projects' tabs read it again: Combwork's comes with the settings, the workspace's with the workspace.
     if (level === 'workspace') await actions.refreshWorkspace()
   }
   if (!form) return null

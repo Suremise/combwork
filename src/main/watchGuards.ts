@@ -14,7 +14,7 @@ const T = {
 }
 
 /**
- * The card Hive is about to give an agent in a slot (a start of its own, its placement not made yet), or null. A watch
+ * The card Combwork is about to give an agent in a slot (a start of its own, its placement not made yet), or null. A watch
  * the agent set meanwhile would hold that placement off ("waiting on cards") with nothing to wake it.
  */
 export async function placementComing(ws: WorkspaceService, projectPath: string, agentId: string): Promise<{ key: string; slot: string } | null> {
@@ -27,7 +27,7 @@ export async function placementComing(ws: WorkspaceService, projectPath: string,
   return null
 }
 
-/** Why an agent's watch is refused while Hive is giving it a card in a slot, or null. */
+/** Why an agent's watch is refused while Combwork is giving it a card in a slot, or null. */
 export async function watchWhilePlaced(ws: WorkspaceService, projectPath: string, agentId: string): Promise<string | null> {
   const due = await placementComing(ws, projectPath, agentId)
   return due ? say(T.whilePlaced, { card: due.key, slot: due.slot }) : null

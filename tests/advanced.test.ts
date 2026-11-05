@@ -704,7 +704,7 @@ describe('the adapters and the hive MCP server use them', () => {
       if (before === undefined) delete process.env.CODEX_HOME
       else process.env.CODEX_HOME = before
     }
-    // The hive MCP server's reply timeout and waits, kept a minute under Codex's tool timeout.
+    // The combwork MCP server's reply timeout and waits, kept a minute under Codex's tool timeout.
     await advanced.set('cw.mcp.replySeconds', 600)
     await advanced.set('cw.wait.cardMaxSeconds', 3000)
     expect(mcpAdvancedEnv()).toEqual({ CW_REPLY_SECONDS: '600', CW_WAIT_MAX_SECONDS: '1740', CW_AGENT_WAIT_MAX_SECONDS: '600' })

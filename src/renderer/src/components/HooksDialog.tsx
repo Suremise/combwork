@@ -7,8 +7,8 @@ import { groupFired, type HookNote, type SessionHooks } from '@shared/hooks'
 import { Icon, IconButton, LoadFailed, Modal } from './ui'
 
 /**
- * An agent's Hooks dialog (HI-982): what its launch has (Hive's own as passed, and the CLI's others, each saying how sure
- * Hive is) and what Hive received, read when it opens and on Refresh. Read-only: nothing here changes a hook. An answer
+ * An agent's Hooks dialog (HI-982): what its launch has (Combwork's own as passed, and the CLI's others, each saying how sure
+ * Combwork is) and what Combwork received, read when it opens and on Refresh. Read-only: nothing here changes a hook. An answer
  * for a launch that has since ended or restarted is said to be one, never shown as the current launch's.
  */
 export function HooksDialog() {

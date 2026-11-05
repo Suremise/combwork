@@ -59,7 +59,7 @@ const M = {
 
 export const QUEUE_MERGES = msg({ id: 'agents.mergeDialog.queueMerges', defaultMessage: 'Combwork merges {card} through the merge queue. Merge anyway merges it here instead.', description: "Why Merge is disabled in the Merge dialog: the branch's card ({card}: its key) is merged by Combwork's merge queue under its rules. Glossary 2.5: merge queue." })
 
-/** The card on the branch when Hive merges it (#1357, OP-13): where it stands in the queue. */
+/** The card on the branch when Combwork merges it (#1357, OP-13): where it stands in the queue. */
 export function QueueCardNote({ c }: { c: BranchQueueCard }) {
   const where =
     c.where === 'testing'
@@ -104,7 +104,7 @@ export function confirmLineMerge(card: NonNullable<MergeBranch['card']>, branch:
  * branch carried into the slots, any other local branch) and a target, not an agent's worktree; merged as an agent's
  * merge is (one at a time, holding the target's merge slot, #350). A line whose card isn't Done is that card's work: it
  * says so, with a link to the card, and merges only after a confirmation (main checks it again); the card is then
- * marked merged outside the rules (§16.4.4). A card Hive's merge queue merges takes Merge anyway, as an agent's does.
+ * marked merged outside the rules (§16.4.4). A card Combwork's merge queue merges takes Merge anyway, as an agent's does.
  */
 export function BranchMergeDialog() {
   useLanguage()

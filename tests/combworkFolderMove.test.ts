@@ -71,7 +71,7 @@ describe('movedContextRef', () => {
 describe('movedExcludeText', () => {
   const ours = '# Hive project metadata (added by Hive)\n/.hive/\n'
 
-  it("replaces Hive's own line, under its comment, keeping every other line", () => {
+  it("replaces Combwork's own line, under its comment, keeping every other line", () => {
     expect(movedExcludeText(`build/\n${ours}*.log\n`, '/.hive/', '/.combwork/', true)).toBe('build/\n# Combwork project metadata (added by Combwork)\n/.combwork/\n*.log\n')
   })
 

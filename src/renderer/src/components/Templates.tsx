@@ -223,7 +223,7 @@ async function saveEdit(key: string, d: TemplateDraft): Promise<TemplateEntry> {
   bump()
   return saved
 }
-/** Where a listed template is, to name it in a call: its scope as listed (Hive's own too, #1436), a project's with its project. */
+/** Where a listed template is, to name it in a call: its scope as listed (Combwork's own too, #1436), a project's with its project. */
 const refOf = (t: TemplateEntry): TemplateRef => (t.scope === 'project' ? { scope: 'project', project: t.project, file: t.file } : { scope: t.scope, file: t.file })
 /** A layout's name ("Two columns"), and inside a sentence ("two columns layout"). */
 export const layoutText = (l: PageLayout): string => tr(M.layout, { layout: l })
@@ -339,7 +339,7 @@ function partnerOf(t: Pick<TemplateEntry, 'pairs'>, name: string): string | unde
 }
 
 /**
- * A template whose names are patterns (Hive's own, one saved with "Use the project key in names") as a project would
+ * A template whose names are patterns (Combwork's own, one saved with "Use the project key in names") as a project would
  * get it (#1123 names, #1440): its agents' and pairs' names made with that project's key (`{key}-B{n}` as HI-B1), so what
  * is shown is what loading makes; with no project, or its key not known, `{key}` stays (`{key}-B1`), never a guessed
  * key. Any other template as it is. Only for showing: the editor changes the template as it is kept.
@@ -587,7 +587,7 @@ function TemplateEditor({ t, project, onDone }: { t: TemplateEntry; project?: Pr
           </thead>
           <tbody>
             {agents.map((a, i) => {
-              // A CLI this Hive doesn't know can't be chosen in the dialog: edited only once it is replaced.
+              // A CLI this Combwork doesn't know can't be chosen in the dialog: edited only once it is replaced.
               const known = !a.provider || isKnownProvider(a.provider)
               return (
                 <tr key={`${i}|${a.name}`} data-agent={a.name}>
@@ -622,12 +622,12 @@ export function TemplateDetail({ t: entry, project, onGone, onSelect }: { t: Tem
   const [editing, setEditing] = useState(() => changed(get().templateEdits[editKey(entry)]))
   const selectedProject = useStore((s) => s.selectedProject)
   useStore((s) => s.projectKeys)
-  // Hive's own shown with the names this project (or the one selected) would get.
+  // Combwork's own shown with the names this project (or the one selected) would get.
   const t = asLoaded(entry, project?.path ?? selectedProject)
   // Duplicate offers the other place first: a project's into the workspace, the workspace's into a project.
   const otherPlace = t.scope === 'project' ? '' : (project?.path ?? selectedProject ?? projectsNow()[0]?.path ?? '')
   const unknown = unknownProviders(t.agents)
-  // Hive's own (#1436): loaded, duplicated and exported, never changed where they are.
+  // Combwork's own (#1436): loaded, duplicated and exported, never changed where they are.
   const readOnly = t.scope === 'combwork'
   const description = templateDescription(t)
   // The editor has the template as it is kept (#1440: its patterns, never the names they make here).

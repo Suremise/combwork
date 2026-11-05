@@ -1,7 +1,7 @@
-// A project's slot pool (#1429, SPEC §16.10.1–16.10.2): the worktrees Hive lends to a card or a lane (a dispatch lease)
+// A project's slot pool (#1429, SPEC §16.10.1–16.10.2): the worktrees Combwork lends to a card or a lane (a dispatch lease)
 // and gets back when it ends, kept ready between loans. Slots and leases are typed rows of combwork.db (schema/v1_0.ts,
 // SLOTS_STEP): at most one open lease per slot, and one open dispatch lease and one carried lease per agent, by partial
-// unique indexes, so two Hives (or processes) lending at once can't both get one slot, however their code races; the
+// unique indexes, so two Combworks (or processes) lending at once can't both get one slot, however their code races; the
 // second is refused ("slot-b is in use by HI-B1 for AM-12").
 //
 // Operations. Whatever changes a slot outside one write (warming it for a lease, removing it) is an operation that owns
@@ -22,7 +22,7 @@
 //   a process in it; then it is marked so and another is tried), made it if new (a detached worktree at the target's
 //   head, the project's copied files, its setup as one of Hive's runs, "Hive (slot slot-b)"), recreated it if gone, and
 //   installed again when its lock files changed. A failed setup leaves it not ready, with the run's log: lending skips
-//   it. The same card asking again gets its lease only once the slot is ready (`warming` while another Hive warms it).
+//   it. The same card asking again gets its lease only once the slot is ready (`warming` while another Combwork warms it).
 // - A carried lease (#1441: an agent's migrated worktree) protects its slot: never lent to anyone else, nor cleaned up,
 //   while it is open, even while its agent holds a dispatch lease elsewhere. Adopting one is refused while the slot has
 //   an operation or a job, or when its recorded folder is another.
@@ -176,7 +176,7 @@ export interface SlotWriter {
   started: number
 }
 
-/** What settled a gone Hive's writer (agentFolders.ts' GoneEvidence), or false: not settled. */
+/** What settled a gone Combwork's writer (agentFolders.ts' GoneEvidence), or false: not settled. */
 export type GoneSettled = false | { readonly run: string; readonly helper: string | null }
 
 export interface SlotLease {
@@ -303,7 +303,7 @@ export async function lockHash(folder: string): Promise<string | null> {
 
 /**
  * A project's slot options now: project.json's `slots`, else its setup from before 1.0 (`worktreeSetup`); its copy as it
- * inherits (shared/slotDefaults.ts: the project's, its workspace's, Hive's, the default; HI-1765), `levels` those above.
+ * inherits (shared/slotDefaults.ts: the project's, its workspace's, Combwork's, the default; HI-1765), `levels` those above.
  */
 export function slotOptionsOf(cfg: Pick<ProjectConfig, 'slots' | 'worktreeSetup' | 'worktreeCopy'>, levels: SlotLevels): SlotOptionsNow {
   return {
@@ -313,7 +313,7 @@ export function slotOptionsOf(cfg: Pick<ProjectConfig, 'slots' | 'worktreeSetup'
   }
 }
 
-/** The slot defaults above a workspace's projects (HI-1765): Hive's (`settings`), and that workspace's own, as they are now. */
+/** The slot defaults above a workspace's projects (HI-1765): Combwork's (`settings`), and that workspace's own, as they are now. */
 export const slotLevelsOf = (settings: Pick<AppSettings, 'slotDefaults'>, ws: { config: WorkspaceConfig }): SlotLevels => ({ global: settings.slotDefaults, workspace: ws.config.slotDefaults })
 
 // --- The store.
@@ -662,7 +662,7 @@ export class SlotStore {
 
   /**
    * Why takeWrittenSlot wouldn't take the slot now, in words for the start's wait (agent-facing), or null when it would:
-   * the same conditions, read without writing (HI-1787: a dry start advertised a slot another Hive's run held, which the
+   * the same conditions, read without writing (HI-1787: a dry start advertised a slot another Combwork's run held, which the
    * real start then refused).
    */
   writtenNotTakeable(slot: string, agent: string, run: string, holder: { pid: number; started: number }): string | null {
@@ -812,7 +812,7 @@ export class SlotStore {
   }
 
   /**
-   * A writer whose run has ended (or whose Hive is gone) cleared, only while it is still that run. Whether it was.
+   * A writer whose run has ended (or whose Combwork is gone) cleared, only while it is still that run. Whether it was.
    * `guard` runs in the write first (#1561: the Assistant's Control and session, still allowing it): a throw changes nothing.
    */
   async clearWriter(name: string, run: string, guard?: () => void): Promise<boolean> {
@@ -932,7 +932,7 @@ export class SlotStore {
    * taken only while the row is as the plan saw it (that open lease, that folder, no operation, job or writer) and `to`
    * is no other slot's folder nor reserved by a rename, and its intent recorded (board_meta `slot_recreate:`), so a
    * recovery finishes or puts back the recreation, never ending the lease as a lend's interrupted warming would. Null: the
-   * slot changed since (another Hive relinked or reassigned it, a resume claimed it).
+   * slot changed since (another Combwork relinked or reassigned it, a resume claimed it).
    */
   async startRecreate(name: string, expect: { lease: string; folder: string }, token: string, holder: Holder, to: string, line: string): Promise<RecreateIntent | null> {
     return this.conn.write((db) => {
@@ -1002,7 +1002,7 @@ export interface LeaseRequest {
   slot?: string
 }
 
-/** One of Hive's runs for a slot: its setup, an install, its archive command, in the job recorded for it. */
+/** One of Combwork's runs for a slot: its setup, an install, its archive command, in the job recorded for it. */
 export interface SlotRun {
   /** The slot's name (or the copy's, with `of: 'copy'`: #1435's copies run theirs the same way). */
   slot: string
@@ -1080,19 +1080,19 @@ export interface PoolDeps {
   ended?: (lease: SlotLease, slot: Slot) => void
   /**
    * Whether a writer's run is over and its processes are known to have ended (#1434): only then does a refresh clear it
-   * (a release that couldn't be written). A writer of a Hive that is gone is cleared only as `writerGone` says.
+   * (a release that couldn't be written). A writer of a Combwork that is gone is cleared only as `writerGone` says.
    */
   writerOver?: (w: SlotWriter) => boolean | Promise<boolean>
   /** Told once a refresh has cleared such a writer (HI-2303): its run's records go. */
   overCleared?: (run: string) => void
   /**
-   * Whether a writer of a Hive that has gone is settled (HI-1886): its run's processes were seen to end (kept in Hive's
+   * Whether a writer of a Combwork that has gone is settled (HI-1886): its run's processes were seen to end (kept in Combwork's
    * profile, or by its keeper, HI-2055). Otherwise it stays held until the user releases the slot. `settles` gives what
    * settled it (false: not settled), which only that attempt's clear carries: `still`, checked inside the clear's write,
    * throws when it no longer holds (a revoked helper); `cleared`, told once a refresh has cleared it, is given it too.
    */
   writerGone?: { settles: (w: SlotWriter, slot: string) => GoneSettled | Promise<GoneSettled>; cleared: (run: string, evidence: Exclude<GoneSettled, false>) => void; still?: (evidence: Exclude<GoneSettled, false>) => () => void }
-  /** Removes Hive's own unchanged skill copies from a folder (skillCopies.ts removeCopiesIn), before a slot goes (#1500). */
+  /** Removes Combwork's own unchanged skill copies from a folder (skillCopies.ts removeCopiesIn), before a slot goes (#1500). */
   removeSkillCopies?: (folder: string) => Promise<unknown>
   /** A rename's steps (#1441); none: slots aren't renamed. */
   renamer?: SlotRenamer
@@ -1346,7 +1346,7 @@ export class SlotPool {
         const taken = await this.store.take(req, { size, root: this.deps.root, target, token, holder, skip })
         if (!taken.ok) return held && taken.refusal.why === 'noSlot' ? { ok: false, refusal: held } : taken
         if (taken.again) {
-          // Its lease already: handed over only once the slot is ready (another Hive may be warming it).
+          // Its lease already: handed over only once the slot is ready (another Combwork may be warming it).
           const s = taken.slot
           if (s.op) return { ok: false, refusal: { why: 'warming', slot: s.name } }
           if (s.state !== 'lent' || s.job || s.warmError) return { ok: false, refusal: { why: 'notReady', slot: s.name, state: s.state, error: s.warmError } }
@@ -1379,12 +1379,12 @@ export class SlotPool {
     return this.store.handOff(carried, req, also, check)
   }
 
-  /** The slot an agent's own run still writes in, taken over by its next card or lane (HI-1762, SlotStore.takeWrittenSlot), held by this Hive. */
+  /** The slot an agent's own run still writes in, taken over by its next card or lane (HI-1762, SlotStore.takeWrittenSlot), held by this Combwork. */
   async takeWrittenSlot(slot: string, req: { card?: number; lane?: string; agent: string }, run: string, also?: (db: DatabaseSync, lease: SlotLease, was: string) => void): Promise<SlotLease | null> {
     return this.store.takeWrittenSlot(slot, req, run, await this.deps.holder.self(), also)
   }
 
-  /** Why takeWrittenSlot wouldn't take it now (SlotStore.writtenNotTakeable), held by this Hive; null: it would. */
+  /** Why takeWrittenSlot wouldn't take it now (SlotStore.writtenNotTakeable), held by this Combwork; null: it would. */
   async writtenNotTakeable(slot: string, agent: string, run: string): Promise<string | null> {
     return this.store.writtenNotTakeable(slot, agent, run, await this.deps.holder.self())
   }
@@ -1449,7 +1449,7 @@ export class SlotPool {
   /**
    * A slot no operation, lease or writer holds, looked at: ready, dirty or gone. Otherwise left to its holder. The look
    * and its detach are a settle operation (HI-2170: a warm-kind one with no lease), taken in one write while the slot is
-   * free and as it was read, so another look of it (this pool's or another Hive's, a finished card's slot question)
+   * free and as it was read, so another look of it (this pool's or another Combwork's, a finished card's slot question)
    * sees it busy while its files may change, and one settle runs at a time. `looked` is told when its state changed.
    */
   private async settle(name: string): Promise<void> {
@@ -1536,7 +1536,7 @@ export class SlotPool {
   }
 
   /**
-   * A Delete's reservation of the project's slots and copies whose holder is gone (#1447: its Hive ended mid-Delete):
+   * A Delete's reservation of the project's slots and copies whose holder is gone (#1447: its Combwork ended mid-Delete):
    * released whole in one write, the rows as they were (a folder already in the Recycle Bin is then seen gone).
    */
   private async releaseStaleDelete(): Promise<void> {
@@ -1550,7 +1550,7 @@ export class SlotPool {
   }
 
   /**
-   * A slot's writer of a Hive that has gone, settled by what was kept of its run (HI-1886): cleared and drained when
+   * A slot's writer of a Combwork that has gone, settled by what was kept of its run (HI-1886): cleared and drained when
    * `writerGone` says so. True when it was settled.
    */
   private async settleGone(s: Slot): Promise<boolean> {
@@ -1572,7 +1572,7 @@ export class SlotPool {
     return true
   }
 
-  /** The slots' writers of Hives that have gone, settled where they may be (HI-1886): as the pool is made, and hourly. */
+  /** The slots' writers of Combworks that have gone, settled where they may be (HI-1886): as the pool is made, and hourly. */
   async settleGoneWriters(): Promise<void> {
     for (const s of this.store.slots()) {
       if (this.closed) return
@@ -1644,7 +1644,7 @@ export class SlotPool {
         const recreating = was.kind === 'warm' ? this.store.recreateOf(s.name) : null
         if (recreating) {
           const made = await this.madeOn(recreating)
-          // Git can't say: left as it is (its operation now this Hive's, looked at again at the next refresh).
+          // Git can't say: left as it is (its operation now this Combwork's, looked at again at the next refresh).
           if (made === null) return void log.warn(`Slot ${userText(s.name)}'s recreation, cut short: git can't say whether it was made; left for the next look`)
           await this.store.endRecreate(s.name, token, recreating, made)
           return
@@ -1667,7 +1667,7 @@ export class SlotPool {
           const at = await this.deps.renamer.where(intent.from, intent.to, intent.tree)
           if (at === null) return void log.warn(`Slot ${userText(s.name)}'s rename, cut short: git can't say where it is; left for the next look`)
           // Not moved yet: given up (renamed again by a later pass, if still free); moved: finished, or put back; somewhere
-          // else (git moved it inside another worktree, and Hive stopped before putting it back): put back, then given up.
+          // else (git moved it inside another worktree, and Combwork stopped before putting it back): put back, then given up.
           if (at === 'from') await this.store.abandonRename(s.name, token, intent)
           else if (at === 'to') await this.carryOut(s.name, token, intent, 'to', () => true)
           else if (await this.deps.renamer.back(intent.from, intent.to, intent.tree).catch(() => false)) await this.store.abandonRename(s.name, token, intent)
@@ -1926,7 +1926,7 @@ export class SlotPool {
         const r = await git(this.deps.project, ['worktree', 'add', intent.to, intent.line])
         if (!r.ok) return await giveUp(r.err.trim() || 'git worktree add failed') // agent-protocol: the log's reason (Repair logs it), never an agent's
         // From here git may have made it (HR1's round 2): its operation and intent stay unless this records the result,
-        // so a recovery (this Hive's next look, its token no longer running) finishes it from what git says.
+        // so a recovery (this Combwork's next look, its token no longer running) finishes it from what git says.
         added = true
         const made = await this.madeOn(intent)
         if (made !== true) return `git ${made === null ? "couldn't say whether" : "doesn't list"} ${intent.to} on ${intent.line}: Combwork looks again` // agent-protocol: the log's reason (Repair logs it), never an agent's
@@ -2063,7 +2063,7 @@ export class SlotPool {
           // The archive command may have left files or processes: the guards again.
           kept = await this.guard(slot)
           if (kept) return await keep(kept)
-          // Hive's skill copies are git-ignored, so the guards don't count them (#1500): its own unchanged ones go first,
+          // Combwork's skill copies are git-ignored, so the guards don't count them (#1500): its own unchanged ones go first,
           // and a `cw-*` folder left (an edited copy, or the user's own) keeps the slot.
           await this.deps.removeSkillCopies?.(slot.folder)
           const copies = await combworkSkillFolders(slot.folder)

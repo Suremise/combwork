@@ -3,16 +3,16 @@ import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync
 import { basename, join } from 'path'
 
 /**
- * The workspace presence marker (#1207, SPEC §16.17): from 1.0 every Hive with a workspace open keeps
+ * The workspace presence marker (#1207, SPEC §16.17): from 1.0 every Combwork with a workspace open keeps
  * `.combwork/open/<profile>.json` (its pid and a heartbeat), removed as it closes. A marker whose heartbeat is older than
- * STALE_MS, or whose process is gone, is stale (a Hive that crashed). Migrations and the merge queue's lock read it as a
- * second sign that another Hive has the workspace open, beside SQLite's lock (a 0.9 Hive writes none).
+ * STALE_MS, or whose process is gone, is stale (a Combwork that crashed). Migrations and the merge queue's lock read it as a
+ * second sign that another Combwork has the workspace open, beside SQLite's lock (a 0.9 Hive writes none).
  */
 
 export const PRESENCE_DIR = 'open'
 /** How often an open workspace's marker is written again. */
 export const HEARTBEAT_MS = 30_000
-/** A heartbeat older than this is a Hive that stopped without removing its marker. */
+/** A heartbeat older than this is a Combwork that stopped without removing its marker. */
 export const STALE_MS = 3 * HEARTBEAT_MS
 
 export interface PresenceMarker {
@@ -110,7 +110,7 @@ export function othersPresent(combworkDir: string, ownId: string, now = Date.now
       if (typeof m.pid !== 'number' || !Number.isFinite(beat) || now - beat > STALE_MS || !alive(m.pid)) continue
       out.push(m as PresenceMarker)
     } catch {
-      // Being written, or not a marker: not a Hive's.
+      // Being written, or not a marker: not a Combwork's.
     }
   }
   return out

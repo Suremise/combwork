@@ -127,7 +127,7 @@ export const AREAS = [
   { paths: ['src/main/agentProcesses.ts', 'src/main/processSupervisor.ts', 'src/main/launchGate.ts'], suites: ['leftovers-claude', 'leftovers-codex'] },
   // The Agent API for apps that show Combwork (#620): viewer tokens, the discovery file, the event stream's events.
   { paths: ['src/main/apiEvents.ts', 'src/shared/assistantActivity.ts', 'src/main/activityTargets.ts', 'src/main/apiDiscovery.ts', 'src/main/viewerTokens.ts', 'src/main/notices.ts', 'src/main/progressService.ts', 'src/main/mergeSlots.ts'], suites: ['viewer'] },
-  // The developer console (#636): capture, its rings and redaction, the agents' reads and the hive tool's replies.
+  // The developer console (#636): capture, its rings and redaction, the agents' reads and the Combwork tool's replies.
   { paths: ['src/main/devConsole.ts', 'src/main/devConsoleSources.ts', 'src/main/devConsoleWords.ts', 'src/shared/devConsole.ts', 'tests/e2e/devconsole.cjs', 'src/main/mergeSlotHost.ts', 'src/main/watches.ts', 'src/main/sessions.ts', 'src/main/servers.ts'], suites: ['devconsole', 'replysize'] },
   { paths: ['src/main/consoleWindow.ts', 'src/renderer/src/ConsoleApp.tsx', 'src/renderer/src/styles/console.css', 'src/renderer/src/main.tsx', 'src/shared/consoleView.ts', 'src/shared/devConsole.ts', 'src/main/devConsole.ts', 'src/main/devConsoleSources.ts', 'src/renderer/src/components/TitleBar.tsx', 'tests/e2e/consolewindow.cjs'], suites: ['consolewindow'] },
   { paths: ['src/main/consoleRecorder.ts', 'src/shared/consoleFixtures.mts', 'src/shared/devConsole.ts', 'src/main/devConsole.ts', 'src/main/providers/copilot/adapter.ts', 'src/main/providers/copilot/events.ts', 'src/main/screenRecognition.ts', 'tests/fixtures/console/copilot.json', 'scripts/consoleFixture.mjs', 'tests/e2e/contract-copilot.cjs'], suites: ['contract-copilot', 'devconsole'] },
@@ -136,10 +136,10 @@ export const AREAS = [
   { paths: ['src/main/consoleWindow.ts', 'src/renderer/src/ConsoleApp.tsx', 'src/renderer/src/styles/console.css', 'src/shared/devConsole.ts', 'src/main/devConsole.ts', 'src/main/ipc.ts', 'src/shared/advanced.ts', 'src/main/advanced.ts', 'src/shared/redact.ts', 'tests/e2e/consoletext.cjs'], suites: ['consoletext'] },
   // The developer console's flight recorder (#698): its triggers, captures and notices.
   { paths: ['src/main/flightRecorder.ts', 'src/shared/flightRecorder.ts', 'src/main/consoleRecorder.ts', 'tests/e2e/flightrecorder.cjs'], suites: ['flightrecorder'] },
-  // Advanced settings (#367): the list, advanced.json, the workspace's own values, and what uses them (the hive MCP server's waits).
+  // Advanced settings (#367): the list, advanced.json, the workspace's own values, and what uses them (the combwork MCP server's waits).
   { paths: ['src/main/advanced.ts', 'src/shared/advanced.ts', 'src/renderer/src/advanced.ts', 'src/renderer/src/components/AdvancedSettings.tsx', 'src/main/diagnostics.ts', 'src/shared/settingsCatalog.ts', 'tests/fixtures/advanced/', 'tests/e2e/advanced.cjs'], suites: ['advanced'] },
   { paths: ['src/main/advanced.ts'], suites: ['replysize', 'assistantsettings'] },
-  // The hive tools' description limits (HI-2012): replysize checks them.
+  // The Combwork tools' description limits (HI-2012): replysize checks them.
   { paths: ['tests/e2e/toolLimits.cjs'], suites: ['replysize'] },
   { paths: ['src/main/journal.ts', 'src/main/journalService.ts', 'src/main/walCheckpoint.ts', 'src/main/walCheckpointWorker.ts','src/shared/journal.ts', 'src/renderer/src/components/JournalSettings.tsx', 'tests/e2e/journal.cjs'], suites: ['journal', 'replysize'] },
   { paths: ['src/main/startView.ts', 'src/shared/startView.ts'], suites: ['journal', 'assistantcompact', 'assistantresume'] },
@@ -158,7 +158,7 @@ export const AREAS = [
   { paths: ['src/main/metrics.ts', 'src/main/metricsUsage.ts', 'src/shared/metrics.ts', 'src/shared/metricsView.ts', 'src/renderer/src/views/Performance.tsx'], suites: ['performance', 'perfcompare', 'bridgereport', 'perftable', 'cardcost'] },
   // A launch's side of the workflow for its metrics (HI-2049): replysize checks each real launch's guidance and tool list carry it.
   { paths: ['src/main/launchSides.ts', 'src/shared/workflow/roles.ts'], suites: ['replysize'] },
-  // The hive tool list's parts as the bridge measures them (HI-2063): replysize checks a real launch's, bridgereport the bridge's reports.
+  // The Combwork tool list's parts as the bridge measures them (HI-2063): replysize checks a real launch's, bridgereport the bridge's reports.
   { paths: ['src/shared/toolListSize.ts'], suites: ['replysize', 'bridgereport'] },
   { paths: ['src/main/branchWatch.ts', 'src/main/git.ts', 'src/main/worktrees.ts'], suites: ['unmerged', 'agents', 'changes', 'paneheader', 'claude-real', 'wsmove', 'wtrecreate', 'removeall', 'gitmissing', 'unusedwt', 'changespicker', 'gitview'] },
   // git.ts's processes, started off main's thread (HI-1783): git.ts's suites.

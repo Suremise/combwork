@@ -1,6 +1,6 @@
 /**
- * Pausing the team before an update (HI-2081, SPEC §16.10.9): a workspace's hold on Hive's own automation (lane starts,
- * loop and watch wakes, the reviewer pool's hand-outs, the new conversations Hive starts by itself, the merge queue's
+ * Pausing the team before an update (HI-2081, SPEC §16.10.9): a workspace's hold on Combwork's own automation (lane starts,
+ * loop and watch wakes, the reviewer pool's hand-outs, the new conversations Combwork starts by itself, the merge queue's
  * next entry), and what still runs before it is safe to install. hive-mcp.js and the window read it too: it imports only
  * the agent text module and the notices' prefix, which need no Node module.
  */
@@ -27,7 +27,7 @@ export interface ParkedItem {
   state: Exclude<ParkedState, 'parked'>
   /** What it is, in English (agent-facing and logged): "working", "npm run e2e (Progress run, 4 min)". */
   what: string
-  /** For the window: the user's own words it names (a run's title, a process's command, a slot's name), never Hive's. */
+  /** For the window: the user's own words it names (a run's title, a process's command, a slot's name), never Combwork's. */
   label?: string
   /** What the window shows it as: a code and its values, worded there. */
   kind: 'working' | 'starting' | 'background' | 'run' | 'process' | 'writer' | 'merge' | 'copy' | 'status' | 'scan'
@@ -71,17 +71,17 @@ const T = {
 }
 
 /**
- * The line each running agent is given once per pause (its delivery's source `team-pause`, ref the pause's id): Hive's own
+ * The line each running agent is given once per pause (its delivery's source `team-pause`, ref the pause's id): Combwork's own
  * words, true to what the hold does (HR1's s8 check): no card starts or events, while a message or an answer still comes.
  * Said per agent, in its dialect (main/teamPause.ts sets the scope).
  */
 export const teamPauseLine = (): string => NOTICE_PREFIX + say(T.pausing)
 
-/** The delivery sources a pause holds (Hive's own wakes and hand-outs); the rest (messages, decisions, notices) still go. */
+/** The delivery sources a pause holds (Combwork's own wakes and hand-outs); the rest (messages, decisions, notices) still go. */
 export const PAUSE_HELD_SOURCES: readonly string[] = ['loop', 'watch', 'pool-review']
 
 /**
- * Whether a pause holds a delivery (HI-2081): one of Hive's own wakes or hand-outs, but never the user's answer to an
+ * Whether a pause holds a delivery (HI-2081): one of Combwork's own wakes or hand-outs, but never the user's answer to an
  * agent's question (a `loop` delivery of kind `answer`: their own act, which may be what the agent needs to park).
  */
 export const pauseHolds = (r: { source?: string | null; kind: string }): boolean => !!r.source && PAUSE_HELD_SOURCES.includes(r.source) && !(r.source === 'loop' && r.kind === 'answer')

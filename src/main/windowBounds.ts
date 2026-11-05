@@ -35,7 +35,7 @@ export function onScreen(b: WindowState, displays: Displays): boolean {
 }
 
 /**
- * Saved bounds as a window opens with them, Hive's windows and the developer console's alike (#812, #862): fitted to the
+ * Saved bounds as a window opens with them, Combwork's windows and the developer console's alike (#812, #862): fitted to the
  * display their corner is on, else to the primary one with no position, where the window is centred.
  */
 export function placeOnDisplay(b: WindowState, min: { width: number; height: number }, displays: Displays): WindowState {

@@ -10,15 +10,15 @@ import type { CardState } from './facts'
  * - `review`: a reviewer's verdict is next (or another reviewer's, for a quorum);
  * - `user`: the user's OK or acceptance, asked under For you;
  * - `merge`: its builder merges it and reports the merge (the agent merges, or merges aren't checked);
- * - `queue`: Hive's merge queue merges it;
+ * - `queue`: Combwork's merge queue merges it;
  * - `done`: nothing more.
  */
 export type NextStep = { step: 'intents'; intents: string[] } | { step: 'review' | 'user' | 'merge' | 'queue' | 'done' }
 
 /**
- * The step a card has next, from its state and the ruleset it works under. The user is next only while Hive has asked
+ * The step a card has next, from its state and the ruleset it works under. The user is next only while Combwork has asked
  * them (a review by you, your OK after a reviewer agent or before merging, open under For you): what the options would
- * want but Hive didn't ask (the rules not enforced) isn't waited for.
+ * want but Combwork didn't ask (the rules not enforced) isn't waited for.
  */
 export function nextStep(s: CardState, r: Ruleset): NextStep | null {
   const asked = s.requests.some((q) => q.gate === 'review' || q.gate === 'okBefore')

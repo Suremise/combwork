@@ -149,7 +149,7 @@ export function reportPlanUsage(provider: ProviderId, report: PlanUsage, reporte
     if (level === null) continue
     config.update((cfg) => (cfg.planWarnings[key] = { resetsAt: l.resetsAt, level }))
     const { title, body, apiTitle, apiTitleText } = planNotice(provider, l, level, connection?.name)
-    // Told once (HI-2320): a pop-up in the window you are using (kept in its bell), a Windows notification with Hive in
+    // Told once (HI-2320): a pop-up in the window you are using (kept in its bell), a Windows notification with Combwork in
     // the background (its bell row kept quietly), or nothing (notifications off).
     tell({ kind: 'usage', level: level >= 95 ? 'error' : 'warning', title, message: body, apiTitle, apiTitleText })
   }

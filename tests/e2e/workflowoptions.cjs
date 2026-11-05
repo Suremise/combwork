@@ -335,7 +335,7 @@ async function theForm(page, app, inv) {
     check('…G6 offers Merge commit, Squash and Rebase and fast-forward', JSON.stringify(styles) === JSON.stringify(['Merge commit', 'Squash', 'Rebase and fast-forward']), JSON.stringify(styles))
     await row('style').locator('select').selectOption('rebase')
     await themes('rebase', row('style'))
-    await themes('hivemerges', row('mergeChecks'))
+    await themes('cwmerges', row('mergeChecks'))
     // File locks (HI-1766) stays with each card in a slot: agents can still share the project folder outside one.
     check('File locks is shown with slots too, saying where it applies', (await row('folder').locator('select').inputValue()) === 'slots' && (await row('fileLocks').locator('[data-note="file-locks"]').count()) === 1)
     await themes('filelocks-slots', row('fileLocks'))

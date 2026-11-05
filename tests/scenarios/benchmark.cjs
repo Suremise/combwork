@@ -79,7 +79,7 @@ function metricsTotals(r, role) {
 
 /**
  * A scenario's measures (#117): what Combwork's parts did between the snapshot before the launch and the one after the turn
- * (exact bytes and characters, calls, launches, the skill service's work), the hive calls the server ran (and how many
+ * (exact bytes and characters, calls, launches, the skill service's work), the Combwork calls the server ran (and how many
  * repeated one already made), and the session's own provider usage (a new session: its total is the scenario's; null
  * when the provider reported none).
  */
@@ -134,7 +134,7 @@ function roleMeasures(before, after, role) {
 }
 
 /**
- * Tool-call measures from the hive servers' test log (HI-2186): `calls` (each { ok, direct, mode, chars, bytes }) and
+ * Tool-call measures from the combwork servers' test log (HI-2186): `calls` (each { ok, direct, mode, chars, bytes }) and
  * `lists` (each server's tool list, { bytes, chars }), those of the measured window. A size is known only when every
  * call (or list) it sums logged it.
  */
@@ -154,7 +154,7 @@ function logMeasures(calls, lists) {
 /** What Combwork itself records as a tool call (its start view, src/main/metrics.ts START_VIEW_METRIC): in no server's log. */
 const CW_OWN_CALLS = new Set(['session start view'])
 
-/** The hive tool calls the servers reported, Combwork's own records left out. */
+/** The Combwork tool calls the servers reported, Combwork's own records left out. */
 function servedCalls(r) {
   let n = 0
   for (const part of [...Object.values(r?.projects ?? {}), ...(r?.workspace ? [r.workspace] : [])]) for (const m of part.mcp ?? []) if (!CW_OWN_CALLS.has(m.tool)) n += m.count
@@ -190,14 +190,14 @@ function placeOf(x, reports, { before, after }) {
  * snapshots, not as many others. A call it can't place (a report that overlapped a snapshot, one not on record, a log
  * from before HI-2186 without ids), or a window whose counts still differ from the metrics', leaves the log unused
  * (`split: 'partial'`): unknown, never guessed. A fake's board move straight to the API (`direct`) ran no server and is
- * in no metric: a hive call of the window when logged between the snapshots' requests.
+ * in no metric: a Combwork call of the window when logged between the snapshots' requests.
  *
  * - The Assistant as subject: Combwork's metrics by caller role, the Assistant's and project agents', every measure (with
  *   complete coverage only, else neither part).
  * - An agent as subject: its tool calls, replies and tool lists from the log, by agent, and the others' the same way.
  *   Its API and launch measures are unknown: Combwork's metrics don't say which agent a request or launch was.
  *
- * Also `agents`: each agent's hive calls (and tool lists) in the window, by its fixture name, the subject first.
+ * Also `agents`: each agent's Combwork calls (and tool lists) in the window, by its fixture name, the subject first.
  */
 function splitOf(before, after, observed, subject) {
   const snaps = subject.snapshots
@@ -225,7 +225,7 @@ function splitOf(before, after, observed, subject) {
 }
 
 /**
- * Each agent's hive calls in the window, by its identity in the fixture (its name in the roster, the Assistant, or
+ * Each agent's Combwork calls in the window, by its identity in the fixture (its name in the roster, the Assistant, or
  * `unattributed` for an agent the roster doesn't have), never by when its calls came: the subject first, then by name.
  * Past AGENT_ROWS, the rest in one `overflow` row (`agents`: how many), so the rows' calls always add up to the log's.
  */

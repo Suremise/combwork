@@ -84,15 +84,15 @@ const ERR = {
  */
 
 /**
- * Who changes a card: the user (Hive's window), the Hive Assistant, or an agent or script through the Agent API.
+ * Who changes a card: the user (Combwork's window), the Combwork Assistant, or an agent or script through the Agent API.
  * `self` is the agent whose call it is (its project's folder name and id); scripts have none. `scope` confines a
  * project agent to its project's cards: others are "unknown" to it, as if they didn't exist.
  */
 export type TaskActor = { kind: 'user' } | { kind: 'assistant' } | { kind: 'agent'; name: string; self?: { project: string; agentId: string }; scope?: string }
 
-/** Hive itself starting a lane's next card on its builder (HI-1990, laneStarts.ts): its start goes through the card's rules. */
+/** Combwork itself starting a lane's next card on its builder (HI-1990, laneStarts.ts): its start goes through the card's rules. */
 // agent-protocol: who did it, as cards' history stores it: Combwork's own name (HI-2463)
-export const CW_LANE_START: TaskActor = { kind: 'agent', name: 'Combwork' } // i18n-ignore: who did it, as cards' history and agents name Hive
+export const CW_LANE_START: TaskActor = { kind: 'agent', name: 'Combwork' } // i18n-ignore: who did it, as cards' history and agents name Combwork
 
 /** The project an actor is confined to on the board (a project agent's own), or null for the whole workspace. */
 export const scopeOf = (a: TaskActor): string | null => (a.kind === 'agent' && a.scope !== undefined ? a.scope : null)
@@ -372,7 +372,7 @@ const keptDecisions = new WeakMap<WorkspaceService, { path: string; stamp: strin
  * The live cards that have decisions, each with its decision generation read with it (#1216), with only what a
  * decision notice reads of them (boardStore's DECISION_FIELDS: no title, description, comments, links or key): kept,
  * and read again only for the cards a change touched (decisionChanges, HI-1789: decision notices read them on every
- * hive tool reply after a board change, a dozen agents' changes a minute). Each read touches only those cards and the
+ * Combwork tool reply after a board change, a dozen agents' changes a minute). Each read touches only those cards and the
  * kept ones (still live), never the whole board. A decision's generation is recorded in the change that writes the
  * card's decisions (recorder.ts), so it moves only with the card's revision. Read whole after the board was opened
  * again or a project's name or id changed (a card's project is named by them); on a board waiting for its 1.0 upgrade,
@@ -682,7 +682,7 @@ async function saveCard(ws: WorkspaceService, n: number, card: TaskCard, before?
   else delete card.key
 }
 
-/** A card's fields in Hive's order, with its project and id as given (the rest as they were). */
+/** A card's fields in Combwork's order, with its project and id as given (the rest as they were). */
 function withProject(raw: Record<string, unknown>, project: string, projectId: string): Record<string, unknown> {
   const { number, title, description, project: _was, projectId: _id, ...rest } = raw
   return { number, title, description, project, projectId, ...rest }
@@ -837,12 +837,12 @@ export function addSetAsideCard(ws: WorkspaceService, file: string): Promise<Tas
     const n = hasCard(ws, was) ? await nextNumber(ws) : was
     const now = new Date().toISOString()
     const c = clean(raw, n, ids)
-    // Every field the older Hive stored is kept (#1044 round 1: its own fields, past holds for its cost), Hive's own
+    // Every field the older Hive stored is kept (#1044 round 1: its own fields, past holds for its cost), Combwork's own
     // fields as read (round 2: one of the wrong type gets its safe default, as on any read, so it can't stop the card
     // coming back; the original stays in the Recycle Bin): but its number, place, history and date. A review under way
     // there isn't one here (saveCard ends its reviewer's hold).
     const { review: _review, ...known } = c
-    // Hive's optional fields only as read: one left out as broken isn't kept from the stored card either.
+    // Combwork's optional fields only as read: one left out as broken isn't kept from the stored card either.
     const { agentName: _a, review: _r, archivedFor: _f, archivedBatch: _b, decisions: _d, held: _h, ...stored } = raw
     const card = {
       ...stored,
@@ -922,7 +922,7 @@ function withProblems(card: TaskCard, problems: ContextProblem[]): void {
 }
 
 /**
- * What a card's context references came to when it was started (#819), recorded on it as Hive: the problems, or none.
+ * What a card's context references came to when it was started (#819), recorded on it as Combwork: the problems, or none.
  * No history line: the card shows them while they last. `checked`: the card as the check was made for it (its Start's:
  * its references, project, agent and column), compared under the board's lock with the card as it is: one changed
  * meanwhile in any of those, archived, or gone (deleted) keeps what it has, and the reply is false, so its Start stops
@@ -1235,10 +1235,10 @@ function reviewerMovesBack(ws: WorkspaceService, card: TaskCard, actor: TaskActo
 /** A message within a history line's values: a CLI's sentence (providerMessage) or the workflow's (a request's, #1266). */
 const lineMessage = (id: string): Msg | null => providerMessage(id) ?? workflowMessage(id)
 
-/** A history line's English, from its message and values: what agents read and Hive's own code matches (`what`). */
+/** A history line's English, from its message and values: what agents read and Combwork's own code matches (`what`). */
 const englishSaid = (s: StoredText): string => {
   const t = storedLineText(s, agentEnglish, lineMessage)
-  if (t === null) throw new Error(`No history line ${s.id}`) // i18n-ignore: a mistake in Hive's code, never shown
+  if (t === null) throw new Error(`No history line ${s.id}`) // i18n-ignore: a mistake in Combwork's code, never shown
   return t
 }
 
@@ -1289,7 +1289,7 @@ export function agentColumns(m: Msg, values?: TextValues): Text {
 /**
  * A stored line or comment for an agent (dialects, HI-2440): said again in the reader's chain where the chain overrides
  * a message it names (its own, or one stored inside its values), whatever wording the English had when it was stored:
- * with no such override, a line reads exactly as stored. An id this Hive doesn't know (storedLineText's null) reads as
+ * with no such override, a line reads exactly as stored. An id this Combwork doesn't know (storedLineText's null) reads as
  * stored too. A comment whose agents' English is worded apart from its window message (`agent`, HI-2087's return) is
  * said again from its own data: as stored unless the chain changes what it says.
  */
@@ -1325,7 +1325,7 @@ function checkedNumbers(numbers: unknown[]): number[] {
   return nums
 }
 
-/** Who can return a failed card for review: its own agent (its hive tools, or the Agent API with its token) or the user. */
+/** Who can return a failed card for review: its own agent (its Combwork tools, or the Agent API with its token) or the user. */
 const returnsCard = (actor: TaskActor, card: TaskCard): boolean => actor.kind === 'user' || (actor.kind === 'agent' && !!card.agent && actor.self?.agentId === card.agent)
 
 export async function createTask(...args: Parameters<typeof createTaskLocked>): Promise<TaskCard> {
@@ -1439,7 +1439,7 @@ async function createTaskLocked(
  * changes once the user brings it back.
  */
 /**
- * Changes a card. `comment` is the same call's comment (the hive tools' and PATCH's): saved with the change in one write,
+ * Changes a card. `comment` is the same call's comment (the Combwork tools' and PATCH's): saved with the change in one write,
  * so nothing that reads the card meanwhile (a card watch waking its agent, the board) sees the move without it.
  */
 export async function updateTask(...args: Parameters<typeof updateTaskLocked>): Promise<TaskCard> {
@@ -1540,8 +1540,8 @@ interface AgentGate {
  * workspace's token).
  */
 async function agentGateOf(ws: WorkspaceService, n: number, patch: TaskPatch, actor: TaskActor): Promise<AgentGate | null> {
-  // Hive starting a lane's next card on its builder (HI-1990, laneStarts.ts): its start for that agent, as an agent's move
-  // giving a card to another is, and the put back undoing it; nothing else of Hive's.
+  // Combwork starting a lane's next card on its builder (HI-1990, laneStarts.ts): its start for that agent, as an agent's move
+  // giving a card to another is, and the put back undoing it; nothing else of Combwork's.
   const laneStart = actor === CW_LANE_START
   if (actor.kind !== 'agent' || (!actor.self && !laneStart)) return null
   if (laneStart && (patch.review !== undefined || (patch.column === 'doing' ? !patch.agent : patch.column !== 'todo'))) return null
@@ -1751,7 +1751,7 @@ async function moveThroughRules(g: Gate, n: number, patch: TaskPatch, actor: Tas
 
 async function moveThrough(g: Gate, n: number, patch: TaskPatch, actor: TaskActor, opts: Parameters<typeof updateTaskLocked>[3] = {}): Promise<TaskCard> {
   // The window's change (`ask`: IPC tasks:update, #1275) never skips a rule unasked: its moves go through tasks:move,
-  // which asks; one that would skip a rule here is refused with the rules it names. Hive's own calls for the user (a
+  // which asks; one that would skip a rule here is refused with the rules it names. Combwork's own calls for the user (a
   // card's Start) confirm as before.
   const { ask, ...rest } = opts
   const r = await moveDecidedAgain(g, n, patch, actor, rest, !ask)
@@ -2094,7 +2094,7 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
   }
   if (!action) {
     const card = await answerIt()
-    // Not carried out by Hive: the Assistant has it too (HI-1734), when an agent asked: every answer, a bare Approve or
+    // Not carried out by Combwork: the Assistant has it too (HI-1734), when an agent asked: every answer, a bare Approve or
     // Decline too (HR1's round 1), with how the user answered and what they wrote, each whole.
     if (req.gate === 'ask' && req.asker) await relayToAssistant(ws, card, req, { outcome, ...(reply ? { reply } : {}), ...(decision ? { decision } : {}) }, wf)
     return card
@@ -2131,7 +2131,7 @@ export function checkDecisionAnswers(actor: TaskActor, answers: unknown, wrong: 
 
 /**
  * A decision the user made answers some of a card's open requests (HI-1932, Darren's decision of 28 Oct: the Assistant
- * records it naming the requests it answers, and Hive closes them). The user's or the Assistant's only, never an
+ * records it naming the requests it answers, and Combwork closes them). The user's or the Assistant's only, never an
  * agent's: no agent closes its own request. `answers`: 1 to DECISION_ANSWERS_MAX request ids (duplicates once), with a
  * non-empty decision and nothing else. Each must be an open request a decision may answer (`decisionAnswers`), checked
  * here and again under the write: any that isn't refuses all of it, the decision included. The decision (its id fixed
@@ -2179,9 +2179,9 @@ async function decideAndAnswer(n: number, patch: TaskPatch, actor: TaskActor, op
 }
 
 /**
- * HI-1734: the user's answer to an agent's question that Hive didn't carry out, given to the Assistant too
+ * HI-1734: the user's answer to an agent's question that Combwork didn't carry out, given to the Assistant too
  * (answerRelay.ts), with what only someone other than its agent can do on the card as it is now, if anything: an action
- * the question offered; an open no-code or review-skip proposal (Hive's own after a pass with nothing to merge too); a
+ * the question offered; an open no-code or review-skip proposal (Combwork's own after a pass with nothing to merge too); a
  * card in Passed its agent can't move on (it doesn't merge it); a block. Read from the card's state, never from the answer's text.
  */
 async function relayToAssistant(ws: WorkspaceService, card: TaskCard, req: Request, answer: { outcome: 'approved' | 'declined' | 'answered'; reply?: string; decision?: string }, wf: Workflow): Promise<void> {
@@ -2434,7 +2434,7 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
       const asked = await commentNote(ws, card, patch, actor, said, comment)
       if (asked) said.push(asked)
     }
-    // What changed, in the history's words (English), for a caller that confirms it (the hive tools' short replies).
+    // What changed, in the history's words (English), for a caller that confirms it (the Combwork tools' short replies).
     opts.said?.push(...said.map(englishSaid))
     if (!said.length && !reordered && !reviewed && !comment) {
       // Nothing of the card's own to save, but a runtime write (an intent's facts, HI-2420) may be in this transaction:
@@ -2571,7 +2571,7 @@ async function reviewChange(card: TaskCard, patch: TaskPatch, actor: TaskActor, 
 }
 
 /**
- * Notes on a card something Hive did about it without changing it (#420: an agent's watch on it ended), as Hive: English
+ * Notes on a card something Combwork did about it without changing it (#420: an agent's watch on it ended), as Combwork: English
  * text (kept as it is), or a message of the card history's (shared/taskHistory.ts), which the window shows in its language.
  */
 export async function noteOnCard(n: number, what: string | StoredText, ws: WorkspaceService = workspace): Promise<void> {
@@ -2584,7 +2584,7 @@ export async function noteOnCard(n: number, what: string | StoredText, ws: Works
 }
 
 /**
- * A comment from Hive itself on a card (#606: its agent's model changed after a safeguard stop), for whoever reads the
+ * A comment from Combwork itself on a card (#606: its agent's model changed after a safeguard stop), for whoever reads the
  * card. `still`: whether the card, as it is in the change, is still the one meant (its column, project and agent may
  * have changed since it was chosen). True when it was written. `said`: English text, or a message of the card history's
  * (shared/taskHistory.ts), kept as its English (`text`) and as data (`appText`, #846) for the window to show in its language.
@@ -2610,7 +2610,7 @@ export type CleanupLeft = 'gone' | 'unarchived' | 'moved' | 'hidden' | 'policy' 
 
 /**
  * The clean-up of an archived card's attachments (HI-1842, cardAttachmentCleanup.ts): its planned files to the Recycle
- * Bin and their rows, with a comment of Hive's saying how many, which and why, in one change of the board, refused when
+ * Bin and their rows, with a comment of Combwork's saying how many, which and why, in one change of the board, refused when
  * the run's workspace is no longer open (`alive`, checked again once the lock is held). In the change, the card is
  * checked again: still on the board, archived and in the planned project, that project still shown (not hidden or
  * removed), and still due under the project's setting as it is now (`days`, read here); then each file
@@ -2755,7 +2755,7 @@ function commentText(comment: string): string {
   return t
 }
 
-/** Adds a comment, at `at` (its change's one time) or as a change of its own; one Hive writes itself can carry its text as data (`appText`) beside its English. */
+/** Adds a comment, at `at` (its change's one time) or as a change of its own; one Combwork writes itself can carry its text as data (`appText`) beside its English. */
 function addComment(c: TaskCard, by: string, t: string, appText?: StoredText, id?: string, at = changeTime(c)): void {
   c.comments = [...c.comments, { at, by, text: t, ...(appText ? { appText } : {}), id: id ?? entryId() }].slice(-MAX_COMMENTS)
   c.updatedAt = at
@@ -2783,7 +2783,7 @@ export async function commentTask(n: number, comment: string, actor: TaskActor, 
 }
 
 /**
- * An agent's request for the Hive Assistant on a card (HI-1866, assistantAsk.ts): written as its comment, with a history
+ * An agent's request for the Combwork Assistant on a card (HI-1866, assistantAsk.ts): written as its comment, with a history
  * line, in one change of the board. `check` sees the card as it is in the change (another project's is unknown first) and
  * throws to refuse it, so a refused request writes nothing.
  */
@@ -3212,7 +3212,7 @@ async function archiveOldDoneUnbatched(ws: WorkspaceService, now: number): Promi
 }
 
 // ---------------------------------------------------------------------------
-// A project leaving Hive: its cards are archived (Hide, Remove) or deleted (Delete), and come back on Restore.
+// A project leaving Combwork: its cards are archived (Hide, Remove) or deleted (Delete), and come back on Restore.
 // ---------------------------------------------------------------------------
 
 export async function projectCards(ws: WorkspaceService, project: string): Promise<TaskCard[]> {

@@ -22,7 +22,7 @@ export const B3 = agentActor('B3')
 export const R1 = agentActor('R1')
 export const R2 = agentActor('R2')
 
-const ID = ['-c', 'user.name=Hive Test', '-c', 'user.email=test@hive.invalid']
+const ID = ['-c', 'user.name=Combwork Test', '-c', 'user.email=test@hive.invalid']
 
 /**
  * HI-2025 (Darren's decision): the bound of a merge-queue test whose work is 65 to 110 git processes (Combwork's own git per

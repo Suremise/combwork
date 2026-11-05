@@ -111,7 +111,7 @@ export const BOARD_MIGRATIONS: Migration[] = [
   },
   {
     // #1207: the first step of the 1.0 upgrade (SPEC §16.17). The group's steps run as one, asked first, with the file
-    // locked to this Hive and a copy of the 0.9 board kept; P3's tables follow it, each the next version, in the group.
+    // locked to this Combwork and a copy of the 0.9 board kept; P3's tables follow it, each the next version, in the group.
     version: 3,
     name: '1.0 upgrade',
     group: UPGRADE_GROUP_ID,
@@ -212,7 +212,7 @@ export const BOARD_MIGRATIONS: Migration[] = [
     }
   },
   {
-    // #1360: the merge queue's runner, one per project and target across Hives, its processes and its worktrees
+    // #1360: the merge queue's runner, one per project and target across Combworks, its processes and its worktrees
     // (workflow/queueRunner.ts), and a queue pause's process.
     version: 14,
     name: QUEUE_RUNNERS_STEP.name,
@@ -231,7 +231,7 @@ export const BOARD_MIGRATIONS: Migration[] = [
     }
   },
   {
-    // #1353: who paused a merge queue (the user, the Assistant; none: Hive's own pause) and when.
+    // #1353: who paused a merge queue (the user, the Assistant; none: Combwork's own pause) and when.
     version: 16,
     name: QUEUE_PAUSE_BY_STEP.name,
     group: UPGRADE_GROUP_ID,
@@ -277,7 +277,7 @@ export const BOARD_MIGRATIONS: Migration[] = [
     }
   },
   {
-    // #1431: which skill copies Hive made in which folder (skillCopies.ts), so a clean-up removes only its own.
+    // #1431: which skill copies Combwork made in which folder (skillCopies.ts), so a clean-up removes only its own.
     version: 21,
     name: SKILL_COPIES_STEP.name,
     group: UPGRADE_GROUP_ID,
@@ -685,7 +685,7 @@ function boardOf(path: string, transient = false): Board {
 }
 
 /**
- * Before a workspace's open first uses its board (HI-2199): while its file, as a Hive that ended without quitting left
+ * Before a workspace's open first uses its board (HI-2199): while its file, as a Combwork that ended without quitting left
  * it, can't be opened yet (another process still maps its `-shm`), waits for that, bounded (untilOpenable), so the board
  * opens once it can instead of failing for the rest of the session. At once for a board open already or a file closed
  * cleanly; ended when `signal` (the open's lifetime) aborts.
@@ -705,7 +705,7 @@ export async function untilBoardOpenable(path: string, signal: AbortSignal): Pro
 /**
  * Opens a workspace's board, its file migrated: the 1.0 group (#1207) only when `upgrade` (the user said yes) or a test
  * copy's pre-answer, else the board opens read-only until it is upgraded. Throws as openDb does (DbInUseError: another
- * Hive has the file open), and when another profile's presence marker is fresh, nothing changed either way.
+ * Combwork has the file open), and when another profile's presence marker is fresh, nothing changed either way.
  */
 function openBoard(path: string, upgrade: boolean): Board {
   const key = keyOf(path)
@@ -772,7 +772,7 @@ function openBoard(path: string, upgrade: boolean): Board {
   }
 }
 
-/** Whether a board's file takes writes: not saved by a newer Hive, nor waiting for its upgrade. */
+/** Whether a board's file takes writes: not saved by a newer Combwork, nor waiting for its upgrade. */
 const writable = (db: Db): boolean => db.newer === null && !db.pending
 
 /** The folder of the board's copies (db.ts keeps the newest three, and the 1.0 group's copy for good). */
@@ -782,7 +782,7 @@ const FAMILY = DB_FILE.replace(/\.db$/, '')
 /** Where Restore the 0.9 Board Backup keeps the 1.0 file it replaces: never pruned either. */
 const RESTORE_FAMILY = `${FAMILY}-before-restore`
 
-/** Another profile's Hive has the workspace open, by its presence marker (a 1.0 Hive; a 0.9 one shows by SQLite's lock). */
+/** Another profile's Combwork has the workspace open, by its presence marker (a 1.0 Hive; a 0.9 one shows by SQLite's lock). */
 class OtherCombworkError extends Error {
   constructor() {
     super('another Combwork has the workspace open (its presence marker is fresh)') // i18n-ignore: for the log; the user sees M.inUse
@@ -826,7 +826,7 @@ const packaged = (): boolean => {
 let ownPresence: string | null = null
 const presenceId = (): string => (ownPresence ??= profileId(userDataOf()))
 
-/** Writes this Hive's presence marker in a workspace's .combwork (its heartbeat); a failure only means one heartbeat fewer. */
+/** Writes this Combwork's presence marker in a workspace's .combwork (its heartbeat); a failure only means one heartbeat fewer. */
 function markPresent(combwork: string): void {
   try {
     writePresence(combwork, presenceId(), { pid: process.pid, profile: basename(userDataOf()), appVersion: appVersion(), startedAt })
@@ -844,10 +844,10 @@ const userDataOf = (): string => {
   }
 }
 
-/** How often each open board looks for another process's changes (a dev Hive, a script on the same workspace). */
+/** How often each open board looks for another process's changes (a dev Combwork, a script on the same workspace). */
 export const POLL_MS = 1000
 
-/** Another connection (another process) committed: the board is told, once. Hive's own writes don't change the writer's data_version. */
+/** Another connection (another process) committed: the board is told, once. Combwork's own writes don't change the writer's data_version. */
 function pollOther(key: string): void {
   const b = boards.get(key)
   if (!b) return
@@ -899,7 +899,7 @@ export function noteLanesSaved(path: string): void {
 /**
  * Closes a workspace's board (it closed, or its file is replaced): the stub's next number brought up to date for older
  * versions. Every board of that folder, however it was spelt as it opened (#1402: one opened through a junction or an
- * 8.3 name, by deliveries say, would otherwise hold the folder until Hive quits). The folder is `place`, its real
+ * 8.3 name, by deliveries say, would otherwise hold the folder until Combwork quits). The folder is `place`, its real
  * location as its window opened it, else as this spelling's board opened: never what the spelling resolves to now, so a
  * junction removed or pointed at another workspace since neither keeps this one's boards open nor closes another's.
  */
@@ -911,7 +911,7 @@ export function closeBoard(path: string, place?: string): void {
   for (const [k, b] of [...boards]) if (k === key || (others && b.place === at)) closeOne(k, b)
 }
 
-/** Closes the board under that spelling only (a lease's own, Hive quitting). */
+/** Closes the board under that spelling only (a lease's own, Combwork quitting). */
 function closeOne(key: string, b: Board): void {
   if (boards.get(key) !== b) return
   boards.delete(key)
@@ -928,7 +928,7 @@ function closeOne(key: string, b: Board): void {
   else b.db.close()
 }
 
-/** Closes every board (Hive quits). */
+/** Closes every board (Combwork quits). */
 export function closeAllBoards(): void {
   for (const [k, b] of [...boards]) closeOne(k, b)
 }
@@ -1104,7 +1104,7 @@ function readConn(ws: WorkspaceService): { b: Board; db: Db['reader'] } {
 
 /**
  * A read of several statements on one snapshot of the board (#1209 round 1, HR4's finding): a card is its row and its
- * child rows, read by separate statements, and another process (another Hive, a script) committing between them must
+ * child rows, read by separate statements, and another process (another Combwork, a script) committing between them must
  * never give a card neither of them saved, nor a child query that picks other cards than its parent's. Inside a change
  * (or a read already holding one) it runs on that transaction; else it opens a read transaction on the reader, whose
  * snapshot every statement of `fn` sees, and ends it after. `fn` is synchronous: nothing else uses the reader meanwhile.
@@ -1147,7 +1147,7 @@ export function adoptionCardNow(ws: WorkspaceService, n: number): AdoptionCard |
 
 /**
  * Marks cards as from before 1.0 (#1218, SPEC §16.4.1: no facts), inside boardWrite: each only while it is as the
- * adoption classified it (its project, column and archived state), has no facts and isn't marked yet, so a card a Hive
+ * adoption classified it (its project, column and archived state), has no facts and isn't marked yet, so a card a Combwork
  * has meanwhile started, adopted or moved is left alone. `marked`: how many it marked; `changed`: those it left that are
  * still neither marked nor started (classified again from fresh data by the adoption's next run).
  */
@@ -1273,7 +1273,7 @@ function readSnapshot<T>(ws: WorkspaceService, fn: (b: Board, db: Db['reader']) 
 function writeOp<T>(ws: WorkspaceService, op: (b: Board) => T): T {
   const path = pathOf(ws)
   const state = writing.getStore()
-  if (!state || !state.open || state.key !== keyOf(path)) throw new Error('A board write outside boardWrite') // i18n-ignore: a mistake in Hive's code, never shown
+  if (!state || !state.open || state.key !== keyOf(path)) throw new Error('A board write outside boardWrite') // i18n-ignore: a mistake in Combwork's code, never shown
   const b = boardOf(path)
   if (state.lost) throw state.lost
   if (!b.db.writer.isTransaction) throw (state.lost = lostChange())
@@ -1428,7 +1428,7 @@ function cardFields(db: Db['reader'], keys: string[], sel: { where?: string; arg
 }
 
 /**
- * The fields a card's cost needs (cardCosts.ts): its holds, and for a card from before Hive kept them its history with
+ * The fields a card's cost needs (cardCosts.ts): its holds, and for a card from before Combwork kept them its history with
  * the agent and reviewer it has now (holdsFromHistory names them by those: HR1's #1210 round 1 finding).
  */
 const COST_FIELDS = ['title', 'project', 'projectId', 'column', 'archived', 'held', 'history', 'agent', 'agentName', 'review']
@@ -1868,11 +1868,11 @@ export const inBoardWrite = (workspacePath: string): boolean => inWrite(keyOf(wo
 /** The board's file (for the log, diagnostics and tests). */
 export const boardFile = (workspacePath: string): string => join(workspacePath, CW_DIR, DB_FILE)
 
-/** Whether the board is shown read-only: saved by a newer Hive, or waiting for its upgrade to 1.0. */
+/** Whether the board is shown read-only: saved by a newer Combwork, or waiting for its upgrade to 1.0. */
 export const boardReadOnly = (ws: WorkspaceService): boolean => (ws.path ? !writable(boardOf(ws.path).db) : false)
 
 // ---------------------------------------------------------------------------
-// The 1.0 upgrade (#1207, SPEC §16.17): asked first, the file locked to this Hive, the 0.9 copy kept, and a way back.
+// The 1.0 upgrade (#1207, SPEC §16.17): asked first, the file locked to this Combwork, the 0.9 copy kept, and a way back.
 // ---------------------------------------------------------------------------
 
 /** The board's state for the window: why it is read-only, and the copy kept from before its upgrade to 1.0. */
@@ -1970,7 +1970,7 @@ export function assertUpgraded(workspacePath: string): void {
 /** A copy's time as its name has it (`2026-10-20T14-06-21-256Z`), as ISO. */
 const isoOf = (at: string): string => at.replace(/T(\d\d)-(\d\d)-(\d\d)-(\d{3})Z$/, 'T$1:$2:$3.$4Z')
 
-/** The user's errors for another Hive on the file (SQLite's lock or a fresh presence marker). */
+/** The user's errors for another Combwork on the file (SQLite's lock or a fresh presence marker). */
 const inUse = (e: unknown): boolean => e instanceof DbInUseError || e instanceof OtherCombworkError
 
 const upgradedListeners = new Set<(ws: WorkspaceService) => void>()
@@ -1986,8 +1986,8 @@ export function onBoardUpgraded(fn: (ws: WorkspaceService) => void): () => void 
 
 /**
  * Upgrades the board to 1.0, the user having said yes: under the board's lock (no change of it under way), the board
- * closed and opened again with the 1.0 group approved, which db.ts runs with the file locked to this Hive, after a copy
- * kept for good, in one transaction. Another Hive with the workspace open: refused, nothing changed, and the board opens
+ * closed and opened again with the 1.0 group approved, which db.ts runs with the file locked to this Combwork, after a copy
+ * kept for good, in one transaction. Another Combwork with the workspace open: refused, nothing changed, and the board opens
  * read-only again. Replies with the kept copy's file.
  */
 export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: string | null }> {
@@ -2041,7 +2041,7 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
 /**
  * Help → Restore the 0.9 Board Backup… (SPEC §16.17): the board as it is now copied aside first (kept for good), then the
  * copy made before its upgrade to 1.0 put back in its place, and the board opened again: read-only in this Hive (its
- * upgrade waiting again), writable for a 0.9 Hive. Nothing is deleted. Refused while another Hive has the workspace open:
+ * upgrade waiting again), writable for a 0.9 Hive. Nothing is deleted. Refused while another Combwork has the workspace open:
  * it would go on with the 1.0 file under the copy put back. Replies with the copy of the 1.0 board.
  */
 export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: () => number): Promise<{ saved: string; restored: string }> {
@@ -2062,7 +2062,7 @@ export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: ()
     // before the close, so nothing opens it again between the close and the copy.
     await checkpointsReleased(file)
     // As they are after that wait: still a window's (#1395, HR6's round 3: closed meanwhile, nothing is changed), and no
-    // agent or other Hive on it.
+    // agent or other Combwork on it.
     assertAdmitted(file)
     if (agentsRunning() > 0) throw combworkError(M.stopAgentsFirst, undefined, { kind: 'conflict' })
     if (othersPresent(combwork, presenceId()).length) throw combworkError(M.inUse, undefined, { kind: 'conflict' })

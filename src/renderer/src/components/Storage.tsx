@@ -136,7 +136,7 @@ const storageColumns = (): DataColumn<StorageRow>[] => [
 
 /**
  * Measuring walks every file of every worktree, so the page abandons a call it no longer waits for (a newer one, the page
- * closed) and Hive stops measuring what nothing else waits for. `start` sends the call with its request; the earlier
+ * closed) and Combwork stops measuring what nothing else waits for. `start` sends the call with its request; the earlier
  * one is abandoned after it, so a measurement both wait for carries on. `current` says whether a call is still the latest.
  */
 export function useStorageRequests(): <T>(start: (request: string) => Promise<T>) => { result: Promise<T>; current: () => boolean } {
@@ -157,7 +157,7 @@ export function useStorageRequests(): <T>(start: (request: string) => Promise<T>
   }, [])
 }
 
-/** Project Settings → Storage (and the Assistant's in Settings → Workspace): what Hive keeps, Refresh, Clean Up… and Purge…. */
+/** Project Settings → Storage (and the Assistant's in Settings → Workspace): what Combwork keeps, Refresh, Clean Up… and Purge…. */
 export function StorageView({ path }: { path: string }) {
   const [data, setData] = useState<ProjectStorage | null>(null)
   const [error, setError] = useState<string | null>(null)

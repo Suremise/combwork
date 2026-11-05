@@ -115,7 +115,7 @@ describe('Copilot launch', () => {
     expect(COPILOT_ENV_STRIP).toEqual(['GH_TOKEN', 'GITHUB_TOKEN'])
     expect(env?.COPILOT_GITHUB_TOKEN).toBe('github_pat_x')
     expect(env).toMatchObject({ PATH: 'C:\\Windows', CW_HOOK_TOKEN: 'tok123', COPILOT_HOOK_ALLOW_LOCALHOST: '1', COPILOT_AUTO_UPDATE: 'false' })
-    // Its custom instructions: the hive tools' names (#1530).
+    // Its custom instructions: the Combwork tools' names (#1530).
     expect(env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBe(join(ctx.privateDir, 'instructions'))
     // The token never goes on the command line.
     expect(args.join(' ')).not.toContain('tok123')
@@ -127,7 +127,7 @@ describe('Copilot launch', () => {
     expect(allow({ permissionMode: 'plan' })).toEqual(['--allow-tool=combwork'])
     expect(allow({ trustedCombworkTools: [] })).toEqual([])
     expect(allow({ trustedCombworkTools: ['cw_read_task'] })).toEqual(['--allow-tool=combwork(cw_read_task)'])
-    // No hive server, nothing to approve.
+    // No combwork server, nothing to approve.
     expect(allow({ mcpServers: {} })).toEqual([])
   })
 

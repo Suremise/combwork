@@ -1,4 +1,4 @@
-// A batch card change (cw_update_tasks, #417): the request, checked, and the Hive Assistant's turn for it. The Agent
+// A batch card change (cw_update_tasks, #417): the request, checked, and the Combwork Assistant's turn for it. The Agent
 // API's route turns a refusal into its status; the rules live here, so the tests reach them without the API.
 import { COLUMN_CHOICES, isTaskColumn } from '../shared/tasks'
 import * as assistant from './assistantControl'

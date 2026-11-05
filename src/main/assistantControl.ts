@@ -18,8 +18,8 @@ import { recordTestToken } from './testQuiet'
 import { assistantHomeIn } from './combworkFolder'
 
 /**
- * What the Hive Assistant may do through the Agent API, and what it did. Each workspace's Assistant gets its own
- * token for each launch (in a file its hive MCP server reads), so the API knows a call is the Assistant's and
+ * What the Combwork Assistant may do through the Agent API, and what it did. Each workspace's Assistant gets its own
+ * token for each launch (in a file its combwork MCP server reads), so the API knows a call is the Assistant's and
  * applies Settings → Assistant → Control instead of Settings → Agent API, scoped to its workspace.
  */
 
@@ -114,7 +114,7 @@ export function allows(need: AssistantControl): boolean {
 /**
  * Records something the Assistant did (or was refused), in its panel's list and combwork.log: `act`, its kind and targets
  * (#763; a refusal, the kind it tried); with `more`, the setting it changed (for Undo),
- * the line without what it quotes (`brief`), or a refusal's `reason` as the event stream says it (Hive's own words,
+ * the line without what it quotes (`brief`), or a refusal's `reason` as the event stream says it (Combwork's own words,
  * never the error's text: "Failed" when not given).
  */
 export function record(workspacePath: string, act: ActivityTarget, text: string, error?: string, more: { setting?: AssistantSettingChange; brief?: string; reason?: string } = {}): AssistantAction {
@@ -203,7 +203,7 @@ export function newTurn(workspacePath: string): void {
 }
 
 /**
- * The user's message the Assistant's changes now belong to (#1282): the latest it was sent, or, with none since Hive
+ * The user's message the Assistant's changes now belong to (#1282): the latest it was sent, or, with none since Combwork
  * started (a change made before its first message here), one begun now.
  */
 export function currentTurn(workspacePath: string): AssistantTurn {
@@ -260,7 +260,7 @@ export function stopQuestion(o: { agent: string; project: string; status: string
 // window: a question of the window's; its English is the log's and the event stream's notification title
 const questionEnglish = (t: NonNullable<AssistantQuestion['text']>): Pick<AssistantQuestion, 'title' | 'message' | 'yes' | 'no'> => ({ title: englishText(t.title), message: englishText(t.message), yes: englishText(t.yes), no: englishText(t.no) })
 
-/** A question as the window shows it now: its text in the language Hive shows, or its English with none. */
+/** A question as the window shows it now: its text in the language Combwork shows, or its English with none. */
 const shown = (q: AssistantQuestion, field: 'title' | 'message' | 'yes' | 'no'): string => (q.text ? shownText(q.text[field] as Text) : q[field])
 
 const toldQuestions = new Set<string>()
@@ -269,7 +269,7 @@ const QUESTION_ANSWERED = msg({ id: 'main.assistantQuestion.answered', defaultMe
 /**
  * A question of the Assistant's, while its panel is hidden in the window that asks (HI-2320): told once as a
  * notification that needs you, through the one routing table (a pop-up in the window in use, a Windows notification
- * with Hive in the background, as the settings say), with Yes and No while it waits. The window decides that its panel
+ * with Combwork in the background, as the settings say), with Yes and No while it waits. The window decides that its panel
  * is hidden; main tells it. Returns whether it was told now.
  */
 export function tellQuestion(workspacePath: string, id: string): boolean {

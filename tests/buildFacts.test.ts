@@ -87,7 +87,7 @@ describe('a build fact', () => {
     const e = { source: 'combwork' as const, summary: buildFactSummary(f), detail: buildFactDetail(f) }
     // Stored in English as agents read it; the window says it in the user's language (here English: the same line).
     expect(journalSummary(e)).toBe(e.summary)
-    // An old entry's "Built Hive …" (before HI-2581) is shown as written (Darren's decision: one name, no reading of two).
+    // An old entry's "Built Combwork …" (before HI-2581) is shown as written (Darren's decision: one name, no reading of two).
     const old = e.summary.replace(' Combwork ', ' Hive ')
     expect(journalSummary({ ...e, summary: old })).toBe(old)
     expect(journalSummary({ ...e, source: 'assistant' })).toBe(e.summary)

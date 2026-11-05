@@ -1,8 +1,8 @@
 // A doorbell only once the hive tools are there (#865): a resumed Claude Code is ready at its SessionStart before its
-// hive MCP server has connected, and a doorbell then is a turn that can't call cw_inbox. The launch's hive server
+// combwork MCP server has connected, and a doorbell then is a turn that can't call cw_inbox. The launch's combwork server
 // tells Combwork when the CLI has connected it (POST /v1/launch/connected, with the launch's own token); until then Combwork
 // types no line into the session, at most Settings → Advanced → "hive tools: wait to connect" from when it became ready.
-// On fake Claude Code (fake-claude/), which connects the real hive server as it starts, or holds it back while
+// On fake Claude Code (fake-claude/), which connects the real combwork server as it starts, or holds it back while
 // fake-mcp-hold-<agent> is in its home until the test makes fake-mcp-go-<agent>:
 // 1. Resumed with its connection held: a message waits (no doorbell), and once it connects, one doorbell rings and the
 //    message is read. A task given while held waits too (round 3: it was refused), and is given once it connects.
@@ -92,7 +92,7 @@ const check = (name, ok, extra = '') => {
     check('a message for a fresh launch is given', m0.status === 200 && !!(await until(() => delivery(m0.body?.id)?.state === 'acked' || delivery(m0.body?.id)?.state === 'received', HUNG_MS)), JSON.stringify(m0))
     const bellsFresh = bells().length
 
-    // --- 1. Resumed, with its hive server's connection held back.
+    // --- 1. Resumed, with its combwork server's connection held back.
     await inv('session:stop', alpha, builder.id)
     check('the builder stops', !!(await until(async () => !(await live(builder.id)), HUNG_MS)))
     hold()

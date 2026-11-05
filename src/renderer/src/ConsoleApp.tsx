@@ -12,8 +12,8 @@ import { cx } from './util'
 import './styles/console.css'
 
 /**
- * The developer console window (#366, #637): pick a source (an agent's session, the Assistant or Hive itself) and watch
- * what comes in next to what Hive made of it. Capture runs while this window watches a source (#636); pause stops the
+ * The developer console window (#366, #637): pick a source (an agent's session, the Assistant or Combwork itself) and watch
+ * what comes in next to what Combwork made of it. Capture runs while this window watches a source (#636); pause stops the
  * list moving (capture goes on, and resuming fills in from the ring), clear hides what came before. Record writes the
  * source's events from then on to a file in main (#638), redacted unless the user ticks text for that recording. While
  * Settings → Advanced → Developer console: show text is on (#699), main sends this window the text too (never secrets):
@@ -29,7 +29,7 @@ function applyTheme(s: AppSettings | null): void {
 
 const NO_SOURCES: ConsoleSource[] = []
 
-// The window's own words (#1104). The events it lists (names, kinds, summaries, payloads) are Hive's records, as
+// The window's own words (#1104). The events it lists (names, kinds, summaries, payloads) are Combwork's records, as
 // recordings save them: they stay English.
 const M = {
   source: msg({ id: 'console.source', defaultMessage: 'Source', description: "The developer console's source picker (accessible name): which agent's session, the Assistant or Combwork itself it watches." }),
@@ -85,13 +85,13 @@ const M = {
   showCapture: msg({ id: 'console.showCapture', defaultMessage: 'Show in folder', description: "A link beside a capture in the developer console's list: shows its file in File Explorer." })
 }
 
-/** What a capture saw, in Hive's language when its file says it as a message this Hive knows; else its English. */
+/** What a capture saw, in Combwork's language when its file says it as a message this Combwork knows; else its English. */
 const whatOf = (c: ConsoleRecordingInfo['capture']): string => {
   const w = readFlightWhat(c?.whatText)
   return w ? tr(FLIGHT_WHAT[w.id] as Msg, w.values as never) : (c?.what ?? '')
 }
 
-/** What the console's list calls a capture's trigger: one Hive knows, in its language; another as its file says it. */
+/** What the console's list calls a capture's trigger: one Combwork knows, in its language; another as its file says it. */
 const triggerName = (t: string): string => (Object.hasOwn(FLIGHT_TRIGGER_NAME, t) ? tr(FLIGHT_TRIGGER_NAME[t as FlightTrigger]) : t)
 
 const bold = (chunks: ReactNode[]): ReactNode => <b>{chunks}</b>

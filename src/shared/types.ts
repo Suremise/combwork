@@ -32,7 +32,7 @@ import type { StageId } from './workflow/facts'
 import type { StageDef } from './workflow/compile'
 
 /**
- * Text read by both the window and agents (#845, E10a of #677). Hive's services throw a `CombworkError` (main/combworkError.ts
+ * Text read by both the window and agents (#845, E10a of #677). Combwork's services throw a `CombworkError` (main/combworkError.ts
  * has the whole contract). What they store or return as data keeps its English field, which agents, the log, old
  * records and any code matching it go on reading, and gains its text as data beside it: a `…Text` field (a `Text`,
  * shared/advanced.ts, or a `StoredText` in a file). The window shows the `…Text` in the user's language and falls back
@@ -50,15 +50,15 @@ export interface CombworkErrorData {
 /**
  * Text kept in a file (#845): a message's id and its values, never its English or its note, so a record stays small and
  * a later change to the English reaches it. The window formats it with its area's message of that id, and shows the
- * English field beside it for an id it doesn't know (a record from a newer Hive). Values are names and numbers, the
+ * English field beside it for an id it doesn't know (a record from a newer Combwork). Values are names and numbers, the
  * same in every language: a word the message chooses (a column, a verdict) is a `select` key, never English.
  */
 export interface StoredText {
   id: string
-  /** A value can be a message of its own (#866: a CLI's sentence in a comment Hive writes), formatted in the same language. */
+  /** A value can be a message of its own (#866: a CLI's sentence in a comment Combwork writes), formatted in the same language. */
   values?: Record<string, string | number | StoredText>
   /**
-   * On Hive's comment whose English for agents is worded apart from this message (HI-2087: the queue's return): what
+   * On Combwork's comment whose English for agents is worded apart from this message (HI-2087: the queue's return): what
    * that English is said from, so a reader's dialect says it again when it is read (HI-2440): the renderer's name
    * (`storedAgentRenderer`, shared/taskHistory.ts) and its data, kept as JSON.
    */
@@ -78,7 +78,7 @@ export type WindowTextField =
   | 'notFilteredText'
 
 export type ThemeSetting = 'dark' | 'light' | 'system'
-/** A coding-agent CLI Hive can run ("claude-code", "codex"). See src/shared/providers.ts. */
+/** A coding-agent CLI Combwork can run ("claude-code", "codex"). See src/shared/providers.ts. */
 export type ProviderId = string
 /** A permission mode id from the agent's provider (e.g. Claude Code's "auto", Codex's "approve-for-me"). */
 export type PermissionMode = string
@@ -93,7 +93,7 @@ export type BannerPosition = 'top-left' | 'top-center' | 'top-right' | 'bottom-l
 export interface Notice {
   id: string
   kind: 'finished' | 'waiting' | 'notice'
-  /** In the language Hive shows (#796). */
+  /** In the language Combwork shows (#796). */
   title: string
   /** The title in English, for the Agent API (agent-facing text stays English), when `title` is a translated one. */
   apiTitle?: string
@@ -104,13 +104,13 @@ export interface Notice {
   projectPath: string | null
   /** The agent waiting, for a waiting banner to close once it is answered. */
   agentId?: string
-  /** A banner's button (#1437): a command of the window's, with its arguments; its label in the language Hive shows. */
+  /** A banner's button (#1437): a command of the window's, with its arguments; its label in the language Combwork shows. */
   action?: { label: string; command: string; args?: unknown[] }
 }
 export type CacheTtlSetting = 'auto' | '5m' | '1h'
 
 export type QuitConfirm = 'working' | 'always' | 'never'
-/** What Hive does when an agent edits a file another agent in the same folder is editing. */
+/** What Combwork does when an agent edits a file another agent in the same folder is editing. */
 export type FileLockMode = 'off' | 'warn' | 'block' | 'ask'
 export type MergeStyle = 'squash' | 'merge'
 /** How the Session tab arranges the agents of one page. */
@@ -132,7 +132,7 @@ export interface QuitSession {
   projectPath: string
   project: string
   status: SessionStatus
-  /** The agent's name (none for the Hive Assistant). */
+  /** The agent's name (none for the Combwork Assistant). */
   agent?: string
   /** The agent's id, to find its card. */
   agentId?: string
@@ -157,20 +157,20 @@ export type KeybindingOverrides = Record<string, string | null>
 export interface AppSettings {
   /** The user's changes to the default keyboard shortcuts. */
   keybindings: KeybindingOverrides
-  /** Hive's own commands (HI-1954, Settings → Commands at Hive's level) and When Hive quits, run. */
+  /** Combwork's own commands (HI-1954, Settings → Commands at Combwork's level) and When Combwork quits, run. */
   commands: CommandsCombwork
   /** The MCP catalogues the MCP view lists servers from (HI-545, Settings → MCP Catalogues). */
   mcpCatalogs: McpCatalogSettings
   /** The global default workflow options (SPEC §16.6.6), under each workspace's and project's own; absent: all off. */
   workflow?: WorkflowDefaults
-  /** The one-time steps settled in Hive's own defaults (HI-1997's `workflow.commitMessageDefault`), each saved with its change. */
+  /** The one-time steps settled in Combwork's own defaults (HI-1997's `workflow.commitMessageDefault`), each saved with its change. */
   stepsDone?: string[]
-  /** Hive's default slot options for Git projects (HI-1765), under each workspace's and project's own (`slots`). */
+  /** Combwork's default slot options for Git projects (HI-1765), under each workspace's and project's own (`slots`). */
   slotDefaults?: SlotDefaults
   updates: {
     checkAutomatically: boolean
     downloadAutomatically: boolean
-    /** auto: a downloaded update installs when Hive quits. manual: only with Restart and Update. */
+    /** auto: a downloaded update installs when Combwork quits. manual: only with Restart and Update. */
     install: UpdateInstallMode
     prerelease: boolean
   }
@@ -182,7 +182,7 @@ export interface AppSettings {
     reopenLastWorkspace: boolean
     /** When to ask before quitting while sessions run. Older configs stored a boolean (migrated on load). */
     confirmOnQuit: QuitConfirm
-    /** A tip when Hive starts (at most one a day), and at the moments a tip helps. Help → Tips… has them all. */
+    /** A tip when Combwork starts (at most one a day), and at the moments a tip helps. Help → Tips… has them all. */
     showTips: boolean
     /** Keep Windows from sleeping while agents work: only on mains power, always, or never. */
     keepAwake: KeepAwakeSetting
@@ -190,18 +190,18 @@ export interface AppSettings {
     progressPanel: boolean
     /**
      * Agents run long commands (about 30 s or more) through cw-progress without being asked, so they show in the
-     * panel: Hive's session guidance says so. Off, or with the panel off: only when the user asks. New sessions.
+     * panel: Combwork's session guidance says so. Off, or with the panel off: only when the user asks. New sessions.
      */
     progressCommands: boolean
     /** How dates show everywhere in Hive (session names, lists, tooltips, exports): 2026-10-04 by default. */
     dateFormat: DateFormat
     /** How times show with them: 24-hour (14:05) by default. */
     timeFormat: TimeFormat
-    /** How Hive names the user to the Hive Assistant (#426): "User replied to B1 on #399". "User" by default. */
+    /** How Combwork names the user to the Combwork Assistant (#426): "User replied to B1 on #399". "User" by default. */
     userName: string
-    /** The language Hive shows (#767): 'auto' (Windows' display languages) or a language's code (de, pl…). */
+    /** The language Combwork shows (#767): 'auto' (Windows' display languages) or a language's code (de, pl…). */
     language: string
-    /** HI-1368's When Hive quits, run, as saved before HI-1954: read once into `commands`, then dropped. */
+    /** HI-1368's When Combwork quits, run, as saved before HI-1954: read once into `commands`, then dropped. */
     onQuit?: CloseCommandSetting
   }
   appearance: {
@@ -217,7 +217,7 @@ export interface AppSettings {
   /** The provider Add Agent's quick add uses unless the project says otherwise. */
   defaultProvider: ProviderId
   /**
-   * 0.9's order of the providers (HI-1965), which its Automatic picked from. No list follows it since HI-2139 (Hive's
+   * 0.9's order of the providers (HI-1965), which its Automatic picked from. No list follows it since HI-2139 (Combwork's
    * order): kept read-only in config.json, as defaultProvider is, for the migration's reading of a 0.9 launch
    * (connectionDefaults.ts' legacyAutoProvider) in workspaces not opened yet. Never written.
    */
@@ -247,17 +247,17 @@ export interface AppSettings {
   sessions: {
     backupTranscripts: boolean
     /**
-     * How long Hive keeps its backups of sessions the CLI still has (#1110): after this many days without activity they
-     * go to the Recycle Bin; 'off' keeps them. A session whose only copy is Hive's is never touched.
+     * How long Combwork keeps its backups of sessions the CLI still has (#1110): after this many days without activity they
+     * go to the Recycle Bin; 'off' keeps them. A session whose only copy is Combwork's is never touched.
      */
     backupRetention: BackupRetention
     cacheTtl: CacheTtlSetting
     confirmStop: boolean
     /** Context size (tokens) above which Compact is highlighted. 0 never highlights. */
     compactSuggestTokens: number
-    /** A running session's transcript over this many MB is flagged (footer, notification): long ones slow the CLI and Hive. 0 never. */
+    /** A running session's transcript over this many MB is flagged (footer, notification): long ones slow the CLI and Combwork. 0 never. */
     transcriptWarnMB: number
-    /** How many transcripts' usage Hive keeps, in memory and in usage-cache.json, so a restart doesn't read them again. */
+    /** How many transcripts' usage Combwork keeps, in memory and in usage-cache.json, so a restart doesn't read them again. */
     usageCacheSize: number
     /** The Sessions tab's transcript of a running session follows new messages without a Refresh. */
     followTranscripts: boolean
@@ -267,9 +267,9 @@ export interface AppSettings {
     defaultView: SessionView
     /** The order of the Tiles view's tiles (#976): the panes' order (urgent tiles highlighted where they are) or by urgency. */
     tileOrder: TileOrder
-    /** Hive counts what its Agent API, tools, guidance and skill service cost (aggregates only), per workspace. */
+    /** Combwork counts what its Agent API, tools, guidance and skill service cost (aggregates only), per workspace. */
     recordPerformance: boolean
-    /** After Hive closed unexpectedly (#984), resume the agents that were running at the next start: off, only the notice. */
+    /** After Combwork closed unexpectedly (#984), resume the agents that were running at the next start: off, only the notice. */
     resumeAfterUnexpectedClose: boolean
   }
   agentApi: {
@@ -277,10 +277,10 @@ export interface AppSettings {
     port: number
     provideCombworkMcp: boolean
     allowSessionInput: boolean
-    /** Agents and the Hive Assistant may read the developer console through the hive tools (#636): their own sessions; the Assistant its workspace's. */
+    /** Agents and the Combwork Assistant may read the developer console through the Combwork tools (#636): their own sessions; the Assistant its workspace's. */
     devConsole: boolean
   }
-  /** The Hive Assistant's defaults (each workspace's Assistant Settings can override them). */
+  /** The Combwork Assistant's defaults (each workspace's Assistant Settings can override them). */
   assistant: AssistantSettings
   agents: {
     /** How long a background task an agent started counts as running if it never reports its end, in minutes. */
@@ -304,7 +304,7 @@ export interface AppSettings {
 
 export type AssistantPanelSide = 'right' | 'left'
 
-/** The Hive Assistant's defaults: its provider, its mode and, per provider, its model, effort, mode and arguments. */
+/** The Combwork Assistant's defaults: its provider, its mode and, per provider, its model, effort, mode and arguments. */
 export interface AssistantSettings {
   /** '' follows the default provider. */
   provider: ProviderId | ''
@@ -313,7 +313,7 @@ export interface AssistantSettings {
   /** What the Assistant may do beyond looking (see AssistantControl). */
   control: AssistantControl
   /**
-   * Whether it may change Hive's settings when the user asks (cw_update_setting), whatever its control level. It can
+   * Whether it may change Combwork's settings when the user asks (cw_update_setting), whatever its control level. It can
    * always read and explain them; sensitive ones, and its own Control, are never its to change (#186).
    */
   changeSettings: boolean
@@ -337,16 +337,16 @@ export interface AssistantSettings {
 }
 
 /**
- * How far the Hive Assistant may act: only look and advise; also run the agents (add, change, start, stop and
+ * How far the Combwork Assistant may act: only look and advise; also run the agents (add, change, start, stop and
  * prompt them); or that and create projects. It never removes agents, discards worktrees or deletes projects.
  */
 export type AssistantControl = 'look' | 'agents' | 'projects'
 
-/** Something the Hive Assistant did (or tried), for the list in its panel and combwork.log. */
+/** Something the Combwork Assistant did (or tried), for the list in its panel and combwork.log. */
 /** Also its kind and targets (#763, assistantActivity.ts): what the event stream gives viewers instead of the line. */
 /**
  * What kind of change of the Assistant's undo works on (#1282, SPEC §16.14): a card's fields (or a card it made), a lane
- * record, an agent's settings, a Hive setting, an agent it started (stopped by undo), or one that can't be undone
+ * record, an agent's settings, a Combwork setting, an agent it started (stopped by undo), or one that can't be undone
  * (`final`: a prompt or comment sent, a project made), which says why.
  */
 export type AssistantChangeKind = 'card' | 'lane' | 'agent' | 'setting' | 'started' | 'final'
@@ -412,7 +412,7 @@ export interface AssistantAction extends Partial<ActivityTarget> {
   ok: boolean
   /** Why it failed or was refused, in full (its panel). */
   error?: string
-  /** Why, as the event stream says it (#763): Hive's own short words, never the error's text (publicReason). */
+  /** Why, as the event stream says it (#763): Combwork's own short words, never the error's text (publicReason). */
   reason?: string
   /** A setting it changed (#186): old → new, which Undo puts back. */
   setting?: AssistantSettingChange
@@ -423,7 +423,7 @@ export interface AssistantAction extends Partial<ActivityTarget> {
   groupAt?: string
 }
 
-/** A setting the Hive Assistant changed, as its activity list shows it and Revert undoes it. */
+/** A setting the Combwork Assistant changed, as its activity list shows it and Revert undoes it. */
 export interface AssistantSettingChange {
   /** The settings catalog's id (settingsCatalog.ts). */
   id: string
@@ -440,7 +440,7 @@ export interface AssistantSettingChange {
   newText: string
 }
 
-/** A question the Hive Assistant's action is waiting on (e.g. stopping a busy agent), shown as a card in its panel. */
+/** A question the Combwork Assistant's action is waiting on (e.g. stopping a busy agent), shown as a card in its panel. */
 export interface AssistantQuestion {
   id: string
   /** In English: the log, and the Agent API's event stream when it is told as a notification. */
@@ -448,7 +448,7 @@ export interface AssistantQuestion {
   message: string
   yes: string
   no: string
-  /** The same, as the window shows it in the language Hive shows (#845, HI-2449): what the panel and its notification say. */
+  /** The same, as the window shows it in the language Combwork shows (#845, HI-2449): what the panel and its notification say. */
   text?: { title: Text; message: Text; yes: Text; no: Text }
 }
 
@@ -462,7 +462,7 @@ export interface AssistantProviderSettings {
   use200kContext: '' | 'on' | 'off'
 }
 
-/** A mode the Hive Assistant can take: a Markdown file of instructions in the workspace's .combwork/modes. */
+/** A mode the Combwork Assistant can take: a Markdown file of instructions in the workspace's .combwork/modes. */
 export interface ModeInfo {
   /** The file name without .md. */
   id: string
@@ -470,11 +470,11 @@ export interface ModeInfo {
   description: string
   /** An emoji or short mark shown beside the name. */
   icon: string
-  /** The file; for a bundled mode missing from the workspace, its copy in Hive's installation. */
+  /** The file; for a bundled mode missing from the workspace, its copy in Combwork's installation. */
   path: string
-  /** Modes that ship with Hive: the workspace copy matches Hive's, was changed, or isn't in the workspace. */
+  /** Modes that ship with Combwork: the workspace copy matches Combwork's, was changed, or isn't in the workspace. */
   bundled?: 'same' | 'changed' | 'missing'
-  /** A changed copy of an older version of Hive's: reverting it also brings in this version's. */
+  /** A changed copy of an older version of Combwork's: reverting it also brings in this version's. */
   updateAvailable?: true
 }
 
@@ -496,16 +496,16 @@ export interface ProviderSettings {
   enableDangerousMode: boolean
   extraArgs: string
   checkUpdatesOnLaunch: boolean
-  /** Let sessions move into the CLI's own background service (capabilities.backgroundSessions). Off: Hive turns it off. */
+  /** Let sessions move into the CLI's own background service (capabilities.backgroundSessions). Off: Combwork turns it off. */
   allowBackgroundSessions: boolean
   /** Run sessions with a 200K context window instead of the model's 1M one (capabilities.contextLimit). */
   use200kContext: boolean
   /**
    * Where a session's cost comes from when the provider reports one (capabilities.reportsCost, #436): the CLI's own
-   * report (the truth, from its own price table: Hive never recomputes it), or Hive's estimate from the price table.
+   * report (the truth, from its own price table: Combwork never recomputes it), or Combwork's estimate from the price table.
    */
   costSource: 'reported' | 'prices'
-  /** The user's price overrides by model id; missing models use the prices Hive ships. */
+  /** The user's price overrides by model id; missing models use the prices Combwork ships. */
   prices: Record<string, ModelPrice>
   /** Shipped prices the user removed from the table (a model of their own in `prices` wins). */
   pricesRemoved?: string[]
@@ -533,7 +533,7 @@ export interface FallbackModel {
 
 /**
  * A model as the provider's CLI describes it (Claude Code's initialize reply, codex debug models). A field the CLI
- * doesn't report is absent, and Hive falls back for it.
+ * doesn't report is absent, and Combwork falls back for it.
  */
 export interface CatalogModel {
   /** What to pass to the CLI (an alias such as "opus", or a model id). */
@@ -573,7 +573,7 @@ export interface WindowState {
 }
 
 export interface AppConfig {
-  /** 7 since working modes replaced the shipped personas (#259); 6 since notices show in Hive while it is focused; 3 since the Assistant uses the agents' model and effort (0.3.0); 2 since providers (0.2.0); 1 was Claude Code only. */
+  /** 7 since working modes replaced the shipped personas (#259); 6 since notices show in Combwork while it is focused; 3 since the Assistant uses the agents' model and effort (0.3.0); 2 since providers (0.2.0); 1 was Claude Code only. */
   version: 9
   settings: AppSettings
   recentWorkspaces: string[]
@@ -585,7 +585,7 @@ export interface AppConfig {
   window: WindowState
   /** The developer console window's size and place (#637). */
   consoleWindow?: WindowState
-  /** The windows open when Hive last quit, each with its workspace (null: the welcome page), reopened at start. */
+  /** The windows open when Combwork last quit, each with its workspace (null: the welcome page), reopened at start. */
   windows?: (WindowState & { workspace: string | null })[]
   /** Per workspace (lowercased path): the last project rename (#514, `.combwork/project-names.json`'s number) its view preferences and Working on follow. */
   renamesApplied?: Record<string, number>
@@ -598,7 +598,7 @@ export interface AppConfig {
    */
   profileMoves?: ProfileMove[]
   /**
-   * Antivirus scanning (#316), this machine's: the exclusions Hive added (resolved paths), Defender's list as last read
+   * Antivirus scanning (#316), this machine's: the exclusions Combwork added (resolved paths), Defender's list as last read
    * with administrator rights, and per workspace (lowercased path) the last suggestion (its folders, when and how many
    * times; a plain string is #316's form, the folders only) and "Don't ask again".
    */
@@ -636,7 +636,7 @@ export interface AppConfig {
     progressFilter?: Record<string, { project: string; agent?: string }>
     /** Each workspace's running lanes in the order the user put them in the Progress panel (#568), by workspace path in lower case: lane ids. */
     laneOrder?: Record<string, string[]>
-    /** The tab each remembered row of tabs last showed (HI-1837: Settings → Version Control's Hive or workspace defaults…), by the row's key. */
+    /** The tab each remembered row of tabs last showed (HI-1837: Settings → Version Control's Combwork or workspace defaults…), by the row's key. */
     tabs?: Record<string, string>
   }
   /** Per provider: the model last seen in a session started without a model choice (the CLI's own default). */
@@ -660,7 +660,7 @@ export interface AppConfig {
   /** Highest warning shown per "provider:limit", and for which reset period. */
   planWarnings: Record<string, { resetsAt: string | null; level: number }>
   /**
-   * The accounts Hive keeps (HI-980; HI-2106), in one order for all CLIs (decision A): a CLI's first account on in a
+   * The accounts Combwork keeps (HI-980; HI-2106), in one order for all CLIs (decision A): a CLI's first account on in a
    * workspace is what a launch falls back to there. Before HI-2106 they were `connections`, with their defaults.
    */
   accounts?: Account[]
@@ -734,14 +734,14 @@ export interface ConnectionObserved {
   plan?: string | null
   /** When its sign-in expires, as the CLI says (HI-2528: Claude Code's `loginExpiresAt`); absent when it doesn't. */
   loginExpiresAt?: string
-  /** A check that failed (a timeout, output Hive couldn't read), in English for the log; the last good identity is kept. */
+  /** A check that failed (a timeout, output Combwork couldn't read), in English for the log; the last good identity is kept. */
   error?: string
-  /** Its folder isn't there, or isn't a folder Hive made (replaced from outside). */
+  /** Its folder isn't there, or isn't a folder Combwork made (replaced from outside). */
   missing?: boolean
 }
 
 /**
- * An account (HI-2106, HI-2105's design): a CLI login Hive keeps (HI-980) or a server it reaches (HI-1772), in a folder of
+ * An account (HI-2106, HI-2105's design): a CLI login Combwork keeps (HI-980) or a server it reaches (HI-1772), in a folder of
  * its own under the accounts folder (`<accounts>\<id>\`), linked to the CLI's home by a junction for what all accounts
  * share; or (`home: 'cli'`) the CLI's own home and sign-in. `accepted` is who the user took it on as; `observed` the
  * latest check: they differ when its login changed (a /login typed in a pane), which the user answers. Agents don't
@@ -752,15 +752,15 @@ export interface Account {
   id: string
   provider: ProviderId
   /**
-   * Where it gets its model (Darren, 27 Oct ~08:55): `signIn`, a login folder of Hive's signed in through the CLI's own
+   * Where it gets its model (Darren, 27 Oct ~08:55): `signIn`, a login folder of Combwork's signed in through the CLI's own
    * sign-in; `server`, a server it reaches by a base URL, with a key or none (HI-1772: DeepSeek, Ollama…), in a folder of
-   * Hive's too. Absent in a record from before it: signIn.
+   * Combwork's too. Absent in a record from before it: signIn.
    */
   kind?: 'signIn' | 'server'
   /** A server account's server (HI-1772). Its key is never here: only in the key store (keyStore.ts). */
   server?: ServerConnection
   /**
-   * `cli`: no folder of Hive's but the CLI's own home and sign-in, made by Hive and never removed (HI-2106): Copilot's one
+   * `cli`: no folder of Combwork's but the CLI's own home and sign-in, made by Combwork and never removed (HI-2106): Copilot's one
    * PC-wide sign-in (decision C), and a test copy's CLI test home (the test seam, connectionSeam.ts).
    */
   home?: 'cli'
@@ -936,7 +936,7 @@ export interface WorkspaceConfig {
   /** Where the workspace was last opened (#146): a different folder now means it was moved, and Repair… is offered. */
   lastPath?: string
   /**
-   * The folder Hive's profile keeps this workspace's records by (HI-2007: its window's pin, its close command's runs),
+   * The folder Combwork's profile keeps this workspace's records by (HI-2007: its window's pin, its close command's runs),
    * set once they have all followed it here. Apart from lastPath, which stays where Repair needs it until Repair is done:
    * moved again before that, the records are found where they went.
    */
@@ -953,7 +953,7 @@ export interface WorkspaceConfig {
     enabled: string[]
     model?: 2
     /**
-     * The servers added for the Hive Assistant (HI-1472, HI-2059: its view's MCP servers), as a project's. Absent until
+     * The servers added for the Combwork Assistant (HI-1472, HI-2059: its view's MCP servers), as a project's. Absent until
      * set or moved from the old Advanced switch; before `assistantModel` 3, #1093's meaning (assistantMcpAdded).
      */
     assistant?: string[]
@@ -963,11 +963,11 @@ export interface WorkspaceConfig {
     droppedNotice?: number
   }
   /**
-   * The Hive skills the workspace's agents aren't given (#1431, Skills → Delivered to agents), by name: every other skill
+   * The Combwork skills the workspace's agents aren't given (#1431, Skills → Delivered to agents), by name: every other skill
    * for their audience is delivered. A project can switch off more (ProjectConfig.skillDelivery), never one on again.
    */
   skillDelivery?: SkillDeliveryChoice
-  /** Project folders Hive leaves out (Hide, or Remove from Hive while the folder is still in the workspace), by folder name. */
+  /** Project folders Combwork leaves out (Hide, or Remove from Combwork while the folder is still in the workspace), by folder name. */
   hiddenProjects?: HiddenProject[]
   /** Agent names two projects share from before names were unique (#702), lower case: each said once, while it lasts. */
   flaggedAgentNames?: string[]
@@ -981,7 +981,7 @@ export interface WorkspaceConfig {
   workflow?: WorkflowDefaults
   /** The one-time steps settled in this workspace's own defaults (HI-1997's `workflow.commitMessageDefault`), each in the same write as its change. */
   stepsDone?: string[]
-  /** The workspace's default slot options (HI-1765), between Hive's and each project's own. */
+  /** The workspace's default slot options (HI-1765), between Combwork's and each project's own. */
   slotDefaults?: SlotDefaults
   /** HI-1368's When this workspace closes, run, as saved before HI-1954: read once into `commands`, then dropped. */
   onClose?: CloseCommandSetting
@@ -1003,25 +1003,25 @@ export interface CustomCommand {
   needed?: boolean
 }
 
-/** A command a point runs: Hive's or the workspace's, by id. */
+/** A command a point runs: Combwork's or the workspace's, by id. */
 export interface CommandRef {
   scope: 'combwork' | 'workspace'
   id: string
 }
 
-/** A point's commands, in the order they run. `onUpdate`: close and quit run them too when Hive restarts for an update. */
+/** A point's commands, in the order they run. `onUpdate`: close and quit run them too when Combwork restarts for an update. */
 export interface CommandPoint {
   run: CommandRef[]
   onUpdate?: boolean
 }
 
-/** Hive's commands and When Hive quits, run (its commands only). */
+/** Combwork's commands and When Combwork quits, run (its commands only). */
 export interface CommandsCombwork {
   list: CustomCommand[]
   onQuit: CommandPoint
 }
 
-/** A workspace's commands and its points, which may pick Hive's commands too. */
+/** A workspace's commands and its points, which may pick Combwork's commands too. */
 export interface CommandsWorkspace {
   list: CustomCommand[]
   onOpen: CommandPoint
@@ -1029,13 +1029,13 @@ export interface CommandsWorkspace {
 }
 
 /**
- * A command Hive runs as a workspace closes, or as Hive quits (HI-1368), waiting for it with a panel. An object, not a
+ * A command Combwork runs as a workspace closes, or as Combwork quits (HI-1368), waiting for it with a panel. An object, not a
  * bare string, so it can later be one of a workspace's named commands without a migration.
  */
 export interface CloseCommandSetting {
   /** The command, run by cmd.exe; `{workspace}`, `{name}` and `{reason}` are filled in. Empty: nothing runs. */
   command: string
-  /** Run it too when Hive restarts to install an update (skipped by default). */
+  /** Run it too when Combwork restarts to install an update (skipped by default). */
   onUpdate: boolean
 }
 
@@ -1045,14 +1045,14 @@ export type CloseReason = 'window' | 'switch' | 'quit' | 'update'
 /** A close command's run as its panel shows it (HI-1368): the `close-command` event's and closeCommand:state's. */
 export interface CloseCommandRun {
   id: string
-  /** 'workspace': this window's workspace's; 'quit': When Hive quits, run. */
+  /** 'workspace': this window's workspace's; 'quit': When Combwork quits, run. */
   kind: 'workspace' | 'quit'
   /** The command as it runs, its placeholders filled in. */
   command: string
   startedAt: string
   /**
    * saving: its workspace isn't closed and written yet (the spinner, Skip the command, which skips its command and When
-   * Hive quits, the close itself always finishing); running: the command (the spinner, Don't wait); failed: its exit
+   * Combwork quits, the close itself always finishing); running: the command (the spinner, Don't wait); failed: its exit
    * code (or why), Close; ok and left: the panel goes.
    */
   state: 'saving' | 'running' | 'ok' | 'failed' | 'left'
@@ -1067,7 +1067,7 @@ export interface CloseCommandRun {
   failure?: 'drain' | 'spawn' | 'runner'
   /** The error, for 'spawn' (the system's text). */
   error?: string
-  /** Which point runs it (HI-1954): a workspace opening or closing, Hive quitting, or by hand. */
+  /** Which point runs it (HI-1954): a workspace opening or closing, Combwork quitting, or by hand. */
   point?: 'open' | 'close' | 'quit' | 'manual'
   /** Its commands, in the order they run (HI-1954); `command`, `lines` and `exitCode` above are the current step's. */
   steps?: CloseCommandStep[]
@@ -1091,7 +1091,7 @@ export interface CloseCommandStep {
 }
 
 /**
- * Slot options a level (Hive's, a workspace's) gives the Git projects under it (HI-1765). `copy`: the git-ignored files
+ * Slot options a level (Combwork's, a workspace's) gives the Git projects under it (HI-1765). `copy`: the git-ignored files
  * copied into each new slot and review copy, glob patterns, comma separated or one per line; left out, the level
  * inherits; an empty string is none.
  */
@@ -1099,7 +1099,7 @@ export interface SlotDefaults {
   copy?: string
 }
 
-/** A project folder Hive leaves out of the workspace, until it's restored in Settings → Workspace. */
+/** A project folder Combwork leaves out of the workspace, until it's restored in Settings → Workspace. */
 export interface HiddenProject {
   name: string
   /** hidden: everything left where it is. removed: its workspace files were packed into the folder's .combwork/removed. */
@@ -1129,7 +1129,7 @@ export interface TaskComment {
   /** "You", "Assistant", or an agent ("Agent 2 (Claude Code) in hive"). */
   by: string
   text: string
-  /** A comment Hive wrote itself (#845): its text as data, for the window; `text` is its English. */
+  /** A comment Combwork wrote itself (#845): its text as data, for the window; `text` is its English. */
   appText?: StoredText
   /** Unique on the card (#224): what a card watch counts its view of the card by. Comments from before have none. */
   id?: string
@@ -1138,7 +1138,7 @@ export interface TaskComment {
 export interface TaskHistoryEntry {
   at: string
   by: string
-  /** In English, always (#845): agents read it, and Hive's own code matches it. */
+  /** In English, always (#845): agents read it, and Combwork's own code matches it. */
   what: string
   /** What happened as data (#845), for the window to show in the user's language: entries from before have none. */
   whatText?: StoredText
@@ -1203,7 +1203,7 @@ export interface TaskCard {
   /** Who held it when (#602): its agent while in Doing, its reviewer while reviewing. What its cost is worked out from. */
   held?: TaskHold[]
   /**
-   * Who archived it: the user, Hive after its days in Done (Settings → Board), or its project being hidden or
+   * Who archived it: the user, Combwork after its days in Done (Settings → Board), or its project being hidden or
    * removed (restoring the project brings those back).
    */
   archivedFor?: 'user' | 'done' | 'project-hidden' | 'project-removed'
@@ -1226,7 +1226,7 @@ export interface TaskCard {
  * later (Undo, "Unarchive this batch"), each card where it was.
  */
 /**
- * The board's state for the window (#1207): why it is read-only (saved by a newer Hive, or waiting for its upgrade to 1.0,
+ * The board's state for the window (#1207): why it is read-only (saved by a newer Combwork, or waiting for its upgrade to 1.0,
  * which the user is asked for), and when the copy kept from before its upgrade to 1.0 was made (Help → Restore the 0.9
  * Board Backup… puts it back), if there is one.
  */
@@ -1333,7 +1333,7 @@ export interface TaskDecision {
 
 /**
  * An agent holding a card for a while (TaskCard.held): its builder (its agent, while the card is in Doing) or its
- * reviewer (from its review's start to its verdict). Kept by Hive as the card changes (cardCosts.ts trackHolds); a
+ * reviewer (from its review's start to its verdict). Kept by Combwork as the card changes (cardCosts.ts trackHolds); a
  * card from before has them worked out from its history once, by the agents' names.
  */
 export interface TaskHold {
@@ -1355,7 +1355,7 @@ export interface TaskReview {
   since: string
 }
 
-/** What a change to a card may set (the board's own fields: number, history and dates are Hive's). */
+/** What a change to a card may set (the board's own fields: number, history and dates are Combwork's). */
 export interface TaskPatch {
   /**
    * An agent reviewing the card (in Review): "start" marks it as reviewing it, "passed" or "failed" ends the review
@@ -1389,7 +1389,7 @@ export interface TaskPatch {
    * a decision and no other field; only the user's or the Assistant's (never an agent's).
    */
   answers?: string[]
-  /** HI-1932, set by Hive itself: the id the decision is recorded with (the one its answers name). */
+  /** HI-1932, set by Combwork itself: the id the decision is recorded with (the one its answers name). */
   decisionId?: string
   /**
    * A column move across workflow rules (#1265, SPEC §16.8.4), with why: the Assistant's, required when its move skips
@@ -1429,7 +1429,7 @@ export interface ProjectRemovalInfo {
   worktrees: { agent: string; path: string; branch: string; ahead: number; dirty: number; error?: string }[]
   /**
    * Its slots, copies and retired homes (#1447), with what removing the project would do to each: `kept`, why it would
-   * stay (the guarded clean-up's reason, or a home's, or a folder Hive didn't make), or null: removed.
+   * stay (the guarded clean-up's reason, or a home's, or a folder Combwork didn't make), or null: removed.
    */
   folders?: { of: ProjectFolderOf; path: string; kept: string | null; blocksDelete?: string }[]
 }
@@ -1452,7 +1452,7 @@ export type WorkflowDefaults = Partial<Record<PlatformId, Partial<Omit<WorkflowO
 
 /**
  * A project's workflow options as project.json keeps them (SPEC §16.6.6): the options it sets itself (an option it
- * doesn't set inherits the workspace's, then Hive's, then the platform's all-off), and the preset they started from.
+ * doesn't set inherits the workspace's, then Combwork's, then the platform's all-off), and the preset they started from.
  */
 export interface ProjectWorkflow {
   platform: PlatformId
@@ -1472,7 +1472,7 @@ export interface ProjectWorkflow {
    */
   mergeAsk?: true
   /**
-   * HI-1997: Git's commit message (G19) set to Hive's by a choice, not left by a preset: set by `writeWorkflow` when a
+   * HI-1997: Git's commit message (G19) set to Combwork's by a choice, not left by a preset: set by `writeWorkflow` when a
    * write changes it to 'combwork', kept while it stays so. The one-time switch to the branch's own keeps such a project's.
    */
   commitMessageChosen?: true
@@ -1495,7 +1495,7 @@ export type WorkflowOptionOrigin = 'platform' | 'global' | 'workspace' | 'projec
 /** The Workflow section of Project Settings (#1278): the project's options, what they inherit, and the presets on offer. */
 export interface WorkflowForm {
   platform: PlatformId
-  /** A level's defaults (#1422: Hive's, the workspace's) rather than a project's options. */
+  /** A level's defaults (#1422: Combwork's, the workspace's) rather than a project's options. */
   level?: WorkflowLevel
   /** The preset the project's options started from (null: none chosen). */
   preset: PresetId | null
@@ -1505,7 +1505,7 @@ export interface WorkflowForm {
   options: WorkflowOptions
   origins: Record<keyof WorkflowOptions, WorkflowOptionOrigin>
   invalid: string | null
-  /** What each option would be without the project's own value (the workspace's, Hive's, or all-off), and from where. */
+  /** What each option would be without the project's own value (the workspace's, Combwork's, or all-off), and from where. */
   inherited: WorkflowOptions
   inheritedOrigins: Record<keyof WorkflowOptions, WorkflowOptionOrigin>
   /** The presets offered, in order, each with its options for this project; `needs`: shown unavailable, with why. */
@@ -1536,7 +1536,7 @@ export type WorkflowProblem = OwnWorkflowProblem | { kind: 'inheritor'; project:
  */
 export type OwnWorkflowProblem = { kind: 'contradiction'; id: Contradiction } | ({ kind: 'stageName' } & StageNameProblem) | { kind: 'bad'; why: string }
 
-/** The levels of workflow defaults the window edits (#1422): Hive's (config) and the workspace's (workspace.json). */
+/** The levels of workflow defaults the window edits (#1422): Combwork's (config) and the workspace's (workspace.json). */
 export type WorkflowLevel = 'global' | 'workspace'
 
 /**
@@ -1574,9 +1574,9 @@ export interface PlatformSwitchCheck {
   refused: SwitchRefusal | null
   lanes: { id: string; name: string | null; builder: string }[]
   inFlight: { number: number; title: string }[]
-  /** None chosen for a folder that is a Git repository: Hive then records no commits or merges for its cards. */
+  /** None chosen for a folder that is a Git repository: Combwork then records no commits or merges for its cards. */
   gitFolder: boolean
-  /** A card in flight goes through Hive's merge queue (its ruleset's): the queue carries on, and stays shown. */
+  /** A card in flight goes through Combwork's merge queue (its ruleset's): the queue carries on, and stays shown. */
   queue: boolean
 }
 
@@ -1600,7 +1600,7 @@ export interface ProjectConfig {
    * workspace's settings are moved to #1093's model, then emptied.
    */
   mcp: { disabled: string[]; enabled: string[]; model?: 3 }
-  /** The Hive skills this project's agents aren't given (#1431, its Skills tab → Delivered to agents), over the workspace's. */
+  /** The Combwork skills this project's agents aren't given (#1431, its Skills tab → Delivered to agents), over the workspace's. */
   skillDelivery?: SkillDeliveryChoice
   chime: 'inherit' | 'on' | 'off'
   /** This project's own Suggest a fresh start (#1437), over Settings → Notifications'. */
@@ -1646,7 +1646,7 @@ export interface ProjectConfig {
   /** Where the project folder was last opened (#146), as workspace.json's lastPath. */
   lastPath?: string
   /**
-   * The folder Hive's profile keeps this project's view preferences by (HI-2008), set once they have followed it here:
+   * The folder Combwork's profile keeps this project's view preferences by (HI-2008), set once they have followed it here:
    * apart from lastPath, which stays where Repair needs it until Repair is done, as workspace.json's profileAt.
    */
   profileAt?: string
@@ -1667,13 +1667,13 @@ export interface ProjectConfig {
    */
   setupPending?: string[]
   /**
-   * Workspace parts other than the workspace's own that Hive has given this project's worktree branches
+   * Workspace parts other than the workspace's own that Combwork has given this project's worktree branches
    * (cw/<part>/<project>/<agent>, #703 round 3: when a branch from before was in the way of its own): with its own,
-   * the only ones Hive takes for this project's. Added when Hive first makes a branch in one; never removed.
+   * the only ones Combwork takes for this project's. Added when Combwork first makes a branch in one; never removed.
    */
   branchSpaces?: string[]
   /**
-   * The project's version control platform (SPEC §16.3), recorded from detection when Hive makes its project.json and
+   * The project's version control platform (SPEC §16.3), recorded from detection when Combwork makes its project.json and
    * never switched silently: a different detection later is offered (ProjectInfo's `platform.offer`).
    */
   platform?: PlatformId
@@ -1704,7 +1704,7 @@ export interface ProjectConfig {
   worktreeSetup: string
   /**
    * The project's slot options (#1429, SPEC §16.10.2): the setup command run in a new slot (and again when its lock
-   * files change), the archive command run before Hive removes one, and the git-ignored files copied into a new one.
+   * files change), the archive command run before Combwork removes one, and the git-ignored files copied into a new one.
    * Each left out reads today's `worktreeSetup`, none, and `worktreeCopy` (which stay as they are, for 0.9.3).
    */
   slots?: SlotOptions
@@ -1728,7 +1728,7 @@ export interface SlotView {
   lease: { id: string; kind: 'card' | 'lane' | 'carried'; agent: string; card: number | null; lane: string | null } | null
   /**
    * The session run writing in it now (#1434): its agent and the lease it started under, until it has exited. `held`
-   * (#1506): its run is over but its processes aren't known to have ended (nor its Hive running), so only Release Slot…
+   * (#1506): its run is over but its processes aren't known to have ended (nor its Combwork running), so only Release Slot…
    * frees it.
    */
   writer: { agent: string; lease: string; held: boolean } | null
@@ -1739,13 +1739,13 @@ export interface HeldWriter {
   slot: string
   agent: string
   run: string
-  /** The Hive holding it: this one (`self`), or another and whether that one still runs (null: can't be told). */
+  /** The Combwork holding it: this one (`self`), or another and whether that one still runs (null: can't be told). */
   combwork: { pid: number; self: boolean; alive: boolean | null }
   /** Its run is still live in this Hive (its session, or the processes it left still followed): Release is refused. */
   live: boolean
   /**
-   * What Hive lists of the processes its run left running: its leftovers (the agent's ⋯ lists them), or, its Hive gone,
-   * the agent's processes that the notice that Hive closed unexpectedly lists and that still run. Null: not known.
+   * What Combwork lists of the processes its run left running: its leftovers (the agent's ⋯ lists them), or, its Combwork gone,
+   * the agent's processes that the notice that Combwork closed unexpectedly lists and that still run. Null: not known.
    */
   processes: { list: AgentProcess[]; more: number; from: 'leftovers' | 'restart' } | null
   /** Every process listed is Windows' own idle broker (HI-2309: a Sandbox's, none running): releasing it is safe. */
@@ -1802,7 +1802,7 @@ export interface AgentDef {
   use200kContext?: boolean
   /** Session to resume for this agent. */
   lastSessionId?: string
-  /** The Hive Assistant only: this workspace's mode, over Settings → Assistant. */
+  /** The Combwork Assistant only: this workspace's mode, over Settings → Assistant. */
   mode?: string
   /** A note on what the agent is for (free text, #126; shown as Note since #1430): saved in templates. */
   role?: string
@@ -1815,7 +1815,7 @@ export interface AgentDef {
   pairedWith?: string
   /**
    * Only these of the project's MCP servers (#537, shared/agentMcp.ts), saved in templates; absent: all of them. The
-   * built-in hive server is given whatever this says.
+   * built-in combwork server is given whatever this says.
    */
   mcpServers?: string[]
   /**
@@ -1826,7 +1826,7 @@ export interface AgentDef {
   connection?: string
   /**
    * Its "Dialect" setting (dialects, HI-2443): the file of its CLI's dialects folder that fills its chain's model slot,
-   * by its path there ("claude-code/Opus 5.5 v2.json"), for an A/B test or a model Hive can't identify. Absent: Auto (the
+   * by its path there ("claude-code/Opus 5.5 v2.json"), for an A/B test or a model Combwork can't identify. Absent: Auto (the
    * model file whose `model` is the real model ID it runs). Applies at its next launch; changing its CLI clears it.
    */
   dialect?: string
@@ -1844,11 +1844,11 @@ export interface LaunchDialect {
   layers: { layer: 'model' | 'cli' | 'workspace'; file: string | null }[]
   /** A hash of the texts it overrides; '' when it overrides none (it speaks the Default). */
   hash: string
-  /** Hive's guidance revision as said in this chain: the Default's (`guidance`) unless the chain changes its text. */
+  /** Combwork's guidance revision as said in this chain: the Default's (`guidance`) unless the chain changes its text. */
   guidance: string
-  /** The real model ID it launched with, which Auto matches by; absent when Hive couldn't name it. */
+  /** The real model ID it launched with, which Auto matches by; absent when Combwork couldn't name it. */
   model?: string
-  /** Hive couldn't name the model, so Auto left the model slot empty ("model unknown"); never with a file picked. */
+  /** Combwork couldn't name the model, so Auto left the model slot empty ("model unknown"); never with a file picked. */
   modelUnknown?: true
   /** The file the agent picked, when it did (its Dialect setting). */
   pick?: string
@@ -1911,7 +1911,7 @@ export interface TemplateLoadWorkflow {
   /** The template's usable sections, and those it had that can't be used (said). */
   sections: PlatformId[]
   dropped: PlatformId[]
-  /** The section used (Hive's own: its preset as this project's form offers it), or null. */
+  /** The section used (Combwork's own: its preset as this project's form offers it), or null. */
   section: TemplateWorkflow | null
   overlay: TemplateWorkflowOverlay | null
   /** It has only a Git section and the project has no version control: its workflow needs Git first. */
@@ -1945,7 +1945,7 @@ export interface AgentInfo extends AgentDef {
 
 /**
  * An agent's start as the stall check reads it (HI-1977): under way, why it failed, or why it waits (HI-2304: its slot
- * held by what another run left running there; English, as Hive says it).
+ * held by what another run left running there; English, as Combwork says it).
  */
 export type AgentStart = { starting: true } | { failed: string } | { waiting: string }
 
@@ -2069,7 +2069,7 @@ export interface WorktreeCheck {
 
 /**
  * A git worktree of a project that no agent of it works in (#353): kept when its agent was removed, or made outside
- * Hive. `check` is the merged-and-clean check (#291's `worktreeCheck`; git failing counts as not removable).
+ * Combwork. `check` is the merged-and-clean check (#291's `worktreeCheck`; git failing counts as not removable).
  */
 export interface UnusedWorktree {
   path: string
@@ -2081,12 +2081,12 @@ export interface UnusedWorktree {
   /** Its last commit: when (ISO) and its subject. */
   lastCommit?: { at: string; subject: string }
   /**
-   * Who made it (#476): a Hive agent's (the agent whose session last ran there, when one did; else it is in Hive's
+   * Who made it (#476): a Combwork agent's (the agent whose session last ran there, when one did; else it is in Combwork's
    * worktrees folder), or not Hive (an agent's own `git worktree add`, a CLI subagent's isolation, the user's).
    */
   origin?: UnusedWorktreeOrigin
   /**
-   * What it is to Hive's pools (#1450): a free slot beyond the pool's size (`slot`), a slot left with changes and no
+   * What it is to Combwork's pools (#1450): a free slot beyond the pool's size (`slot`), a slot left with changes and no
    * lease (`dirtySlot`), a carried folder whose lease ended (`carried`), or a retired home no conversation resumes in
    * any more (`home`), or a merge queue's folder its queue no longer needs, or one named as the queue names them that it
    * has no record of (`queue`, #1644; one its queue uses is never listed). Absent: a worktree no agent works in, as before. A slot's kinds are removed only through the
@@ -2173,7 +2173,7 @@ export interface SessionRecord {
   connection?: { id: string; name: string }
   /**
    * A run of it was on a server connection (HI-1772), kept once set: its CLI's own cost reports price the server's model
-   * as a Claude model, so they are never counted (`withoutCostReports`): Hive's estimate by the real model id only.
+   * as a Claude model, so they are never counted (`withoutCostReports`): Combwork's estimate by the real model id only.
    */
   serverRan?: true
   /** A run of it was on a server on this PC; one ran anywhere else (HI-1772): each kept once set. Free: the first alone. */
@@ -2213,24 +2213,24 @@ export interface SessionRecord {
    */
   titleAtRename?: string | null
   /**
-   * What it used, saved when Clean Up removed Hive's backup of it (the CLI still had the transcript): totals keep
+   * What it used, saved when Clean Up removed Combwork's backup of it (the CLI still had the transcript): totals keep
    * counting it once the CLI's copy is gone too.
    */
   keptUsage?: SessionUsage
   /**
-   * Safeguard stops Hive saw only on the CLI's screen (its prompt about one, #606), so Performance counts them (usage()
+   * Safeguard stops Combwork saw only on the CLI's screen (its prompt about one, #606), so Performance counts them (usage()
    * adds the unmatched ones to SessionUsage.safeguards): the transcript may never record them.
    */
   screenStops?: ScreenStop[]
   /** A session the CLI started for another one (e.g. a Codex guardian review), kept when it was adopted. */
   sub?: SubSession
   /**
-   * A Hive Assistant conversation's mode (its id) it was last given: the one it started in, or the last one Hive
+   * A Combwork Assistant conversation's mode (its id) it was last given: the one it started in, or the last one Combwork
    * told it. A resume in another mode (or with none recorded) tells it the mode once (#334).
    */
   mode?: string
   /**
-   * Hive gave this conversation instructions of its own at a launch (#1433: the Assistant's role and mode, the Workspace
+   * Combwork gave this conversation instructions of its own at a launch (#1433: the Assistant's role and mode, the Workspace
    * notes note). Never cleared: a resume of it renders its system prompt fresh, whichever agent resumes it and whatever
    * that launch gives, so instructions switched off or emptied since leave it (Claude Code keeps a conversation's first).
    */
@@ -2261,10 +2261,10 @@ export type SessionBulkAction = 'archive' | 'unarchive' | 'delete'
 
 /**
  * Why a bulk action left a session alone: `live`: running (in any window); `in-use`: its files are in use (its CLI
- * still writing its transcript, or another program holding the CLI's transcript or Hive's copy open); `reading`: Hive
- * is reading its transcript (an export, a search); `open`: its transcript is open in a Hive window (the window asking
+ * still writing its transcript, or another program holding the CLI's transcript or Combwork's copy open); `reading`: Combwork
+ * is reading its transcript (an export, a search); `open`: its transcript is open in a Combwork window (the window asking
  * closes its own view first);
- * `external`: started outside Hive, so Hive has nothing of it to archive; `failed`: anything else (`message` says what).
+ * `external`: started outside Combwork, so Combwork has nothing of it to archive; `failed`: anything else (`message` says what).
  */
 export type SessionSkipReason = 'live' | 'in-use' | 'reading' | 'open' | 'external' | 'failed'
 
@@ -2284,7 +2284,7 @@ export interface SessionBulkProgress {
 
 /** background: the agent's turn has ended, but it has background tasks that will start it again when they end. */
 /**
- * `watching`: its turn has ended and it waits on cards (a wake-on-change watch, #128): Hive types one line to wake it
+ * `watching`: its turn has ended and it waits on cards (a wake-on-change watch, #128): Combwork types one line to wake it
  * when a watched card changes. It runs nothing meanwhile, but it isn't idle: nothing else is given to it.
  */
 /**
@@ -2297,11 +2297,11 @@ export type SessionStatus = 'stopped' | 'starting' | 'ready' | 'working' | 'wait
 export interface RuntimeFacts {
   /** The CLI's process: starting (not at its prompt yet), running, stopped by a refused sign-in, or stopped. */
   lifecycle: 'starting' | 'running' | 'signin' | 'stopped'
-  /** Work that isn't a turn's own: compacting its conversation (by itself, mid-turn or idle, or Hive's Compact). */
+  /** Work that isn't a turn's own: compacting its conversation (by itself, mid-turn or idle, or Combwork's Compact). */
   maintenance: 'compacting' | null
   /** A person is asked: the agent waits for them, or a question waits beside its work. */
   attention: 'waiting' | 'question' | null
-  /** Its input: held by a line Hive is typing, has just typed or is confirming, or one it didn't take; else free. */
+  /** Its input: held by a line Combwork is typing, has just typed or is confirming, or one it didn't take; else free. */
   composer: 'held' | 'free'
 }
 
@@ -2334,7 +2334,7 @@ export interface TaskWatchInfo {
   /** "Waiting for #12 → Review", "Waiting for B6 to finish". */
   label: string
   since: string
-  /** When Hive wakes it to say nothing changed (ISO). */
+  /** When Combwork wakes it to say nothing changed (ISO). */
   limitAt: string
 }
 
@@ -2354,7 +2354,7 @@ export interface InboxSummary {
   overdue: number
 }
 
-/** LiveSessionState.hooksMissing (#1336): since when, what showed it, and why when Hive can tell. */
+/** LiveSessionState.hooksMissing (#1336): since when, what showed it, and why when Combwork can tell. */
 export interface HooksMissing {
   since: string
   /** start: no hook since its start; prompt: none after a prompt its CLI took; transcript: none for a turn its transcript shows it took (#1371). */
@@ -2409,11 +2409,11 @@ export interface LiveSessionState {
   slot?: string
   /** The provider's session id. Empty until the provider reports it, for providers that choose it themselves. */
   sessionId: string
-  /** The mode the session is actually in: from launch, Hive's live switches, Shift+Tab in the terminal (its footer) and hooks. */
+  /** The mode the session is actually in: from launch, Combwork's live switches, Shift+Tab in the terminal (its footer) and hooks. */
   permissionMode?: PermissionMode
   /**
    * The mode the CLI itself last showed (its footer, a hook, its transcript); absent until it has shown one. The
-   * mode Hive shows (permissionMode) starts as the one asked for at launch, so this says it was seen (#234).
+   * mode Combwork shows (permissionMode) starts as the one asked for at launch, so this says it was seen (#234).
    */
   modeObserved?: PermissionMode
   /** The session's name in Hive (renamable in the Sessions tab and the agent's footer). */
@@ -2425,24 +2425,24 @@ export interface LiveSessionState {
    * given this launch's startedAt), which names it until it has a name, as in the Sessions tab (#630).
    */
   sessionCreatedAt?: string
-  /** What the agent is doing, in one word: a projection of its runtime's fields (agentRuntime) and Hive's policy (watching). */
+  /** What the agent is doing, in one word: a projection of its runtime's fields (agentRuntime) and Combwork's policy (watching). */
   status: SessionStatus
   /** When the status last changed (ISO): how long an agent has been waiting or finished. */
   statusSince?: string
   /**
-   * In English, or the CLI's own words (#845): agents read it, and Hive's code compares it. `statusText` is Hive's own
+   * In English, or the CLI's own words (#845): agents read it, and Combwork's code compares it. `statusText` is Combwork's own
    * text as the window shows it (none when the message is the CLI's).
    */
   statusMessage?: string
   statusText?: Text
   /**
-   * Its CLI's latest turn as Hive's turn ledger knows it (#648): running, over, or unknown, when a running turn has been
+   * Its CLI's latest turn as Combwork's turn ledger knows it (#648): running, over, or unknown, when a running turn has been
    * silent for a while (`silentSince`) with no sign of its end. Unknown isn't idle: nothing is typed into it, and the user
    * can Mark idle. `id`: the CLI's own turn id, when it names turns.
    */
   turn?: { state: 'running' | 'over' | 'unknown'; id?: string; silentSince?: string }
   /**
-   * Its CLI is waiting to retry its model request in the running turn (HI-1972: Codex's log after a 429), as Hive last
+   * Its CLI is waiting to retry its model request in the running turn (HI-1972: Codex's log after a 429), as Combwork last
    * read it: shown as its status while `retryAt` is ahead (retryWaitCurrent), cleared by its next hook or the turn's end.
    * With no `retryAt` (HI-1973: Copilot doesn't say), it stands until one of those.
    */
@@ -2450,7 +2450,7 @@ export interface LiveSessionState {
   /** The retry waits this launch has finished (HI-1996); absent until one has. retryWait is the one under way. */
   retryWaited?: RetryWaited
   /**
-   * Facts of its runtime besides its turn and background tasks, each set where Hive learns it, never read back from the
+   * Facts of its runtime besides its turn and background tasks, each set where Combwork learns it, never read back from the
    * status word (#648; shared/runtime.ts agentRuntime() gathers them all, and the labels are projected from them).
    */
   runtime?: RuntimeFacts
@@ -2468,7 +2468,7 @@ export interface LiveSessionState {
   /**
    * Its last turn ended on an error (#1632: a failed stop, such as Claude Code's StopFailure on an API connection
    * error), with what the CLI said and when: it needs you until its next turn starts. Its status stays as the turn's
-   * end made it (finished), so Hive still prompts and wakes it as an idle agent.
+   * end made it (finished), so Combwork still prompts and wakes it as an idle agent.
    */
   /** `message`: the CLI's words, '' when it said none (the window says the turn ended on an error). */
   failedTurn?: { message: string; since: string }
@@ -2503,13 +2503,13 @@ export interface LiveSessionState {
   /** Its conversation ran only on servers on this PC (HI-1772): free, its cost a known $0, shown as "free (local)". */
   costFree?: boolean
   /**
-   * What it was given at launch (GET /v1/projects/{name}): Hive's guidance revision, the content hash of each Hive skill's
+   * What it was given at launch (GET /v1/projects/{name}): Combwork's guidance revision, the content hash of each Combwork skill's
    * copy it reads, and why a skill isn't as asked for (a folder of the user's has its name, an old copy kept while in use),
    * and the dialect chain it speaks (HI-2443).
    */
   /**
    * `dialect`: its chain where a dialect is set (a text overridden, or a file picked); on the Default, only
-   * `{ modelUnknown: true }` where Hive couldn't name its model (decision Q4); absent otherwise.
+   * `{ modelUnknown: true }` where Combwork couldn't name its model (decision Q4); absent otherwise.
    */
   launched?: { guidance: string; skills: Record<string, string>; problems?: Record<string, string>; dialect?: LaunchDialect | { modelUnknown: true } }
   /** Finished or waiting since its pane was last on screen in a focused window (the renderer marks it seen). */
@@ -2522,21 +2522,21 @@ export interface LiveSessionState {
    */
   notWatching?: number[]
   /**
-   * A line Hive typed (a wake) that its CLI hasn't taken, even after Enter again (#430): the CLI wasn't reading its input.
+   * A line Combwork typed (a wake) that its CLI hasn't taken, even after Enter again (#430): the CLI wasn't reading its input.
    * Shown in its pane until the CLI takes it or the user types there; nothing more is typed into it meanwhile.
    */
   untakenLine?: { since: string; text: string }
   /**
-   * Its input takes no keys (HI-2191): keys Hive typed went unanswered while its input box read empty, so something on its
+   * Its input takes no keys (HI-2191): keys Combwork typed went unanswered while its input box read empty, so something on its
    * screen takes them. Nothing is typed into it until it is seen to take keys again; its pane offers Try again (`since`
    * names this block).
    */
   inputBlocked?: { since: string }
   /**
    * Its CLI's hooks aren't reaching Hive (#1336), this launch: none came within a while of its start (a CLI that sends one
-   * then), or none after a prompt its CLI went to work on (its screen or its records show it). Hive's status for it may be
-   * wrong, so it shows as unknown and nothing is typed into it; any hook clears it. `why` when Hive can tell: Hive
-   * refused its hooks (their token), its settings turn hooks off (`offIn`: where), or it is newer than Hive was tested with.
+   * then), or none after a prompt its CLI went to work on (its screen or its records show it). Combwork's status for it may be
+   * wrong, so it shows as unknown and nothing is typed into it; any hook clears it. `why` when Combwork can tell: Combwork
+   * refused its hooks (their token), its settings turn hooks off (`offIn`: where), or it is newer than Combwork was tested with.
    */
   hooksMissing?: HooksMissing
   /**
@@ -2548,7 +2548,7 @@ export interface LiveSessionState {
    * Its last turn stopped because its CLI's sign-in was refused, and it hasn't carried on since (#309): the CLI's
    * message and when. Status `signin` until the CLI is signed in again, then `ready`; Resume (n) carries it on.
    */
-  signIn?: { message: string; since: string; /** Hive's own message as the window shows it (#845), when `message` isn't the CLI's. */ messageText?: Text }
+  signIn?: { message: string; since: string; /** Combwork's own message as the window shows it (#845), when `message` isn't the CLI's. */ messageText?: Text }
   /**
    * Its CLI's safety classifier stopped a response this launch, or its model changed after one (#606): when, the model,
    * the names of its last tool calls before it (never their input nor what was stopped), and whether it waits on the
@@ -2566,9 +2566,9 @@ export interface LiveSessionState {
   costUsd?: number
   /** The model's context window in tokens, as the provider reports it for the running session (Claude Code's status line). */
   contextWindow?: number
-  /** costUsd was estimated by Hive from token counts, not reported by the provider. */
+  /** costUsd was estimated by Combwork from token counts, not reported by the provider. */
   costEstimated?: boolean
-  /** A live permission-mode change Hive has asked for and is waiting to see confirmed. */
+  /** A live permission-mode change Combwork has asked for and is waiting to see confirmed. */
   modeSwitching?: PermissionMode
   /** Codex's Plan mode, which is separate from its permission preset. */
   planMode?: boolean
@@ -2603,7 +2603,7 @@ export interface ProjectInfo {
   folders?: NamedFolder[]
   /** MCP servers defined in the project's own config (.mcp.json, .codex/config.toml) that are not deployed to the workspace. */
   unmanagedMcp: string[]
-  /** The folder holds what Remove from Hive packed (handovers, board cards), which Hive offers to restore. */
+  /** The folder holds what Remove from Combwork packed (handovers, board cards), which Combwork offers to restore. */
   removedData?: RemovedData | null
   /** Whether its .combwork is kept out of version control (#345); absent for the Assistant's home. */
   combworkVcs?: CombworkVcs
@@ -2613,8 +2613,8 @@ export interface ProjectInfo {
 
 /**
  * Whether a project's .combwork (this machine's sessions, transcript backups and launch settings) is kept out of version
- * control (#345). `excluded`: in the info/exclude of the git repository holding it (Hive adds it there itself);
- * `not-excluded`: a git repository Hive couldn't add it to; `other-vcs`: another system (`vcs` names it), which Hive
+ * control (#345). `excluded`: in the info/exclude of the git repository holding it (Combwork adds it there itself);
+ * `not-excluded`: a git repository Combwork couldn't add it to; `other-vcs`: another system (`vcs` names it), which Combwork
  * doesn't configure; `none`: no version control holds the folder. `sync` names a sync service whose folder holds it
  * (OneDrive, Dropbox), which copies .combwork whatever version control does.
  */
@@ -2632,11 +2632,11 @@ export interface WorkspaceInfo {
   config: WorkspaceConfig
   projects: ProjectInfo[]
   /**
-   * The Hive Assistant, the workspace's overseer: a session host like a project (its home is .combwork/assistant,
+   * The Combwork Assistant, the workspace's overseer: a session host like a project (its home is .combwork/assistant,
    * never listed as a project) with one agent, working in the workspace folder.
    */
   assistant: ProjectInfo | null
-  /** Moved since Hive last opened it, with something to repair (#146): the banner offers Repair…. */
+  /** Moved since Combwork last opened it, with something to repair (#146): the banner offers Repair…. */
   moved?: WorkspaceMoved | null
 }
 
@@ -2736,7 +2736,7 @@ export interface MoveBranch {
  * original: the project is still at its old folder too (a copy), which keeps the worktree.
  */
 /**
- * A folder Hive keeps for a project besides an agent's 0.9 worktree (#1447), as Repair and project removal name it: a
+ * A folder Combwork keeps for a project besides an agent's 0.9 worktree (#1447), as Repair and project removal name it: a
  * slot (its lease's agent and the cards it held, by key; `carried`: an agent's adopted worktree), a review or check copy,
  * or a reviewer's retired home (its agent).
  */
@@ -2800,7 +2800,7 @@ export interface MoveOptions {
   /** Missing worktrees to make again (on their branch, or new from their base). */
   recreate?: string[]
   /**
-   * Move Hive's Defender exclusions from the moved workspace's old folders to its new ones (#1302): one administrator
+   * Move Combwork's Defender exclusions from the moved workspace's old folders to its new ones (#1302): one administrator
    * prompt, at the end. Only when true (the dialog's box): a Repair asked for otherwise never prompts.
    */
   defender?: boolean
@@ -2849,34 +2849,34 @@ export interface SkillInfo {
   name: string
   description: string
   level: SkillLevel
-  /** The skill's folder. For a bundled skill missing from the workspace: its folder in Hive's installation. */
+  /** The skill's folder. For a bundled skill missing from the workspace: its folder in Combwork's installation. */
   path: string
   /** Plugin name for plugin skills. */
   plugin?: string
   /**
-   * Hive skills that ship with Hive: the workspace copy matches this version of Hive's ('same'), was edited
-   * ('changed'), or isn't in the workspace ('missing'). Untouched copies of older versions are updated by Hive.
+   * Combwork skills that ship with Combwork: the workspace copy matches this version of Combwork's ('same'), was edited
+   * ('changed'), or isn't in the workspace ('missing'). Untouched copies of older versions are updated by Combwork.
    */
   bundled?: 'same' | 'changed' | 'missing'
-  /** A changed copy of an older version of Hive's: reverting it also brings in this version's. */
+  /** A changed copy of an older version of Combwork's: reverting it also brings in this version's. */
   updateAvailable?: true
-  /** Hive skills: who gets it (SKILL.md's metadata.audience): project agents (the default), the Assistant, or both. */
+  /** Combwork skills: who gets it (SKILL.md's metadata.audience): project agents (the default), the Assistant, or both. */
   audience?: SkillAudience
-  /** Hive skills: its header is broken or its audience unknown, so nobody gets it until it's fixed (why, in English). */
+  /** Combwork skills: its header is broken or its audience unknown, so nobody gets it until it's fixed (why, in English). */
   problem?: string
   /** `problem` as the window shows it (#845). */
   problemText?: Text
 }
 
-/** Who a Hive skill is for. */
+/** Who a Combwork skill is for. */
 export type SkillAudience = 'agents' | 'assistant' | 'all'
 
-/** Hive skills switched off for agents (#1431): their names (a hand-edited file may hold anything: skillDelivered reads it). */
+/** Combwork skills switched off for agents (#1431): their names (a hand-edited file may hold anything: skillDelivered reads it). */
 export interface SkillDeliveryChoice {
   off: string[]
 }
 
-/** Where a new skill goes: the workspace's Hive skills, or a provider's local skills folder in a project. */
+/** Where a new skill goes: the workspace's Combwork skills, or a provider's local skills folder in a project. */
 export type SkillTarget = { kind: 'combwork' } | { kind: 'local'; projectPath: string; provider: ProviderId }
 
 export interface McpServerDef {
@@ -2887,9 +2887,9 @@ export interface McpServerDef {
   url?: string
   headers?: Record<string, string>
   description?: string
-  /** Words to find it by in the MCP view and the Add server picker (HI-2059): Hive's, never given to the CLIs. */
+  /** Words to find it by in the MCP view and the Add server picker (HI-2059): Combwork's, never given to the CLIs. */
   tags?: string[]
-  /** The MCP catalogue it was installed from (HI-545): Hive's, never given to the CLIs. */
+  /** The MCP catalogue it was installed from (HI-545): Combwork's, never given to the CLIs. */
   catalog?: McpCatalogOrigin
   [key: string]: unknown
 }
@@ -2898,12 +2898,12 @@ export interface McpServerInfo {
   name: string
   path: string
   def: McpServerDef | null
-  /** In English, or the reason a read failed as Node gave it; `errorText` is Hive's own as the window shows it (#845). */
+  /** In English, or the reason a read failed as Node gave it; `errorText` is Combwork's own as the window shows it (#845). */
   error?: string
   errorText?: Text
   /** The projects it is added to (HI-2059), by path, hidden ones too: it runs in them. The window's only, never an agent's. */
   projects: string[]
-  /** Added for the Hive Assistant (HI-1472, HI-2059): it runs for it. */
+  /** Added for the Combwork Assistant (HI-1472, HI-2059): it runs for it. */
   assistant: boolean
   secretWarnings: string[]
   /** What it runs, shown before it is enabled (#550): the command or URL, folder, environment and header names. */
@@ -2947,7 +2947,7 @@ export interface McpCatalogRequires {
   apps?: string[]
 }
 
-/** A server an MCP catalogue offers (HI-545, catalog.json v1), as Hive checked it. */
+/** A server an MCP catalogue offers (HI-545, catalog.json v1), as Combwork checked it. */
 export interface McpCatalogServer {
   name: string
   version: string
@@ -2958,7 +2958,7 @@ export interface McpCatalogServer {
   zip: { url: string; sha256: string; size: number }
 }
 
-/** One requirement of a catalogue server checked on this PC: met, not met, or not something Hive can check. */
+/** One requirement of a catalogue server checked on this PC: met, not met, or not something Combwork can check. */
 export interface McpCatalogCheck {
   kind: 'os' | 'edition' | 'build' | 'feature' | 'node' | 'docker' | 'app'
   label: string
@@ -2981,9 +2981,9 @@ export interface McpCatalogSourcePage {
   url: string
   name: string
   ours: boolean
-  /** Its servers aren't checked by Hive, and the one-time note about it hasn't been shown yet. */
+  /** Its servers aren't checked by Combwork, and the one-time note about it hasn't been shown yet. */
   noteDue: boolean
-  /** Why it can't be used (not read, not a catalogue Hive reads), in the window's language. */
+  /** Why it can't be used (not read, not a catalogue Combwork reads), in the window's language. */
   error?: string
   skipped: number
   total: number
@@ -2991,7 +2991,7 @@ export interface McpCatalogSourcePage {
   rows: McpCatalogRow[]
 }
 
-/** Hive's MCP catalogue sources (HI-545): ours first (on unless turned off), then the user's, each on or off. */
+/** Combwork's MCP catalogue sources (HI-545): ours first (on unless turned off), then the user's, each on or off. */
 export interface McpCatalogSettings {
   oursOn: boolean
   sources: { url: string; on: boolean; noted?: boolean }[]
@@ -3013,7 +3013,7 @@ export interface McpCatalogPrepared {
   nameTaken: boolean
 }
 
-/** Where an installed catalogue server came from (HI-545): Hive's own field in its definition, never a CLI's. */
+/** Where an installed catalogue server came from (HI-545): Combwork's own field in its definition, never a CLI's. */
 export interface McpCatalogOrigin {
   source: string
   name: string
@@ -3042,7 +3042,7 @@ export interface CompactionEvent {
   lastOutputTokens?: number
 }
 
-/** How a session's CLI was set to compact by itself (#242), as far as Hive could read at launch. */
+/** How a session's CLI was set to compact by itself (#242), as far as Combwork could read at launch. */
 export interface AutoCompactSetting {
   /** 'off': auto-compaction is turned off; a number: the auto-compact window it was set to (tokens); null: the CLI's own default. */
   window: number | 'off' | null
@@ -3050,7 +3050,7 @@ export interface AutoCompactSetting {
   percent?: number
   /** Where that comes from, in words ("CLAUDE_CODE_AUTO_COMPACT_WINDOW", "autoCompactWindow in Claude Code's settings.json"); null for the default. */
   source: string | null
-  /** Why this is only as far as Hive can tell (sources it can't read: always for the default, #273; for any answer when a settings file couldn't be read or which are read isn't known, #333), shown with it. */
+  /** Why this is only as far as Combwork can tell (sources it can't read: always for the default, #273; for any answer when a settings file couldn't be read or which are read isn't known, #333), shown with it. */
   estimate?: string
 }
 
@@ -3086,12 +3086,12 @@ export interface SessionUsage {
   lastActivity: string | null
   userMessages: number
   lastPrompt: string | null
-  /** API-equivalent cost for the session (USD): reported by the provider, else estimated by Hive; null if unknown. */
+  /** API-equivalent cost for the session (USD): reported by the provider, else estimated by Combwork; null if unknown. */
   costUsd: number | null
   costEstimated: boolean
   /**
    * Tokens used after the provider last reported the cost (Claude Code writes it only at some turns' ends):
-   * Hive adds its estimate for them to the reported cost.
+   * Combwork adds its estimate for them to the reported cost.
    */
   costUnreported?: Pick<SessionUsage, 'inputTokens' | 'outputTokens' | 'cacheWriteTokens' | 'cacheReadTokens'>
   /**
@@ -3101,7 +3101,7 @@ export interface SessionUsage {
   costFree?: true
   /** The session's usage by local day (YYYY-MM-DD in this computer's time zone), for periods (see usageDays.ts). */
   days?: Record<string, DayUsage>
-  /** From the parser: each cost report's increase and the tokens it covered by day. Hive turns them into day costs and removes them. */
+  /** From the parser: each cost report's increase and the tokens it covered by day. Combwork turns them into day costs and removes them. */
   costReports?: { costUsd: number; days: Record<string, UsageTokens> }[]
   /**
    * From the parser: the usage over time (usageTimeline.ts), for cost per card (#602). Kept in usage-cache.json with the
@@ -3110,12 +3110,12 @@ export interface SessionUsage {
   timeline?: UsageTimeline
   /**
    * Responses the CLI's safety classifier stopped (#606), by the model each was on ('' when the CLI didn't say): absent
-   * when none, or for a CLI Hive can't detect them in (shared/safeguards.ts).
+   * when none, or for a CLI Combwork can't detect them in (shared/safeguards.ts).
    */
   safeguards?: Record<string, number>
   /**
    * Of those, the CLI's records of stops it may have asked about first (SafeguardEvent.asked), per turn (its prompt's id):
-   * a stop Hive saw on screen in that turn (SessionRecord.screenStops) is one of them, not another (withScreenStops).
+   * a stop Combwork saw on screen in that turn (SessionRecord.screenStops) is one of them, not another (withScreenStops).
    */
   safeguardsAsked?: Record<string, number>
 }
@@ -3142,7 +3142,7 @@ export interface DayUsage extends UsageTokens {
   requests: number
   prompts: number
   compactions: number
-  /** The day's API-equivalent cost: its share of the reported cost, else Hive's estimate; null when no price is known. */
+  /** The day's API-equivalent cost: its share of the reported cost, else Combwork's estimate; null when no price is known. */
   costUsd: number | null
   costEstimated: boolean
 }
@@ -3166,7 +3166,7 @@ export interface KeptUsage {
   usage: SessionUsage
 }
 
-/** What Hive keeps for a project or the Assistant (Project Settings → Storage), in bytes. */
+/** What Combwork keeps for a project or the Assistant (Project Settings → Storage), in bytes. */
 export interface ProjectStorage {
   path: string
   name: string
@@ -3206,7 +3206,7 @@ export interface CleanupOptions {
   archivedAttachmentsDays: number | null
   /** Attachments of deleted sessions, and of launches that never got a session id. */
   orphanAttachments: boolean
-  /** Hive's backups of archived sessions the CLI still has. */
+  /** Combwork's backups of archived sessions the CLI still has. */
   archivedBackupsDays: number | null
   /** Backups of archived sessions the CLI no longer has: the session is deleted (its usage still counts). */
   goneBackups: boolean
@@ -3231,8 +3231,8 @@ export interface CleanupResult {
 export type PurgeTarget = { kind: 'session'; projectPath: string; sessionId: string } | { kind: 'project'; projectPath: string } | { kind: 'workspace' }
 
 /**
- * One thing Purge… removes, of Hive's only: a session's backup (an active or archived copy), each of its attachments, a
- * leftover file of a backup (a deleted session's, or half made: .spare, .tmp), each attachment of a session Hive no longer
+ * One thing Purge… removes, of Combwork's only: a session's backup (an active or archived copy), each of its attachments, a
+ * leftover file of a backup (a deleted session's, or half made: .spare, .tmp), each attachment of a session Combwork no longer
  * has, or old usage kept on a session's record (keptUsage) or for a deleted one (deletedUsage), from before the usage
  * history (#1106): those are records, not files (no path).
  */
@@ -3244,7 +3244,7 @@ export interface PurgeItem {
   host: string
   /** The project's name, for the workspace's preview. */
   hostName: string
-  /** The host is the Hive Assistant's home. */
+  /** The host is the Combwork Assistant's home. */
   assistant?: boolean
   path?: string
   bytes: number
@@ -3252,7 +3252,7 @@ export interface PurgeItem {
   mtimeMs?: number
   sessionId?: string
   label: string
-  /** A backup that is its session's last copy (the CLI no longer has its transcript): the session is deleted from Hive with it. */
+  /** A backup that is its session's last copy (the CLI no longer has its transcript): the session is deleted from Combwork with it. */
   lastCopy?: boolean
 }
 
@@ -3260,7 +3260,7 @@ export interface PurgePreview {
   /** The preview's own id: storage:purge applies it, as it was listed (main keeps it a while). */
   id: string
   items: PurgeItem[]
-  /** Leftover files kept because they may be a session's only copy (Hive stopped while it deleted or moved it). */
+  /** Leftover files kept because they may be a session's only copy (Combwork stopped while it deleted or moved it). */
   recoverable: number
   /** Sessions left alone because they are running or starting (whose things aren't listed). */
   running: number
@@ -3269,7 +3269,7 @@ export interface PurgePreview {
 export interface PurgeResult {
   removed: number
   bytes: number
-  /** Sessions deleted from Hive because their last copy went. */
+  /** Sessions deleted from Combwork because their last copy went. */
   deleted: number
   /** Listed items (their keys) that no longer qualified or couldn't be removed, with why. */
   skipped: { key: string; reason: string }[]
@@ -3300,14 +3300,14 @@ export interface SessionListItem extends Partial<SessionRecord> {
 }
 
 /**
- * The workspace's usage for the Workspace Overview: each project's sessions (Hive's own, deleted ones included) and the
+ * The workspace's usage for the Workspace Overview: each project's sessions (Combwork's own, deleted ones included) and the
  * Assistant's, with their usage by day, from the usage history (#1106).
  */
 export interface WorkspaceUsage {
   workspacePath: string
   projects: { name: string; path: string; items: SessionListItem[] }[]
   assistant: SessionListItem[]
-  /** Projects left out: hidden, or removed from Hive. */
+  /** Projects left out: hidden, or removed from Combwork. */
   hidden: number
   /** The usage history's import of the sessions the workspace had (#1106): while it runs, the figures are partial. */
   history: UsageHistoryProgress
@@ -3372,7 +3372,7 @@ export type TranscriptItem = TranscriptItemBase &
      * A note in the conversation: the CLI's own (an API error, a sign-in or usage limit, an interruption), or what it
      * relays (`from`): a background task's summary, or a command's output with no command (#342).
      */
-    | { kind: 'notice'; text: string; level: 'info' | 'error'; from?: 'task' | 'command'; /** Hive's own notice as data (#797): `text` is its English, the window is sent it in its language. */ message?: Text }
+    | { kind: 'notice'; text: string; level: 'info' | 'error'; from?: 'task' | 'command'; /** Combwork's own notice as data (#797): `text` is its English, the window is sent it in its language. */ message?: Text }
   )
 
 export interface Transcript {
@@ -3454,7 +3454,7 @@ export interface AgentInstallInfo {
   loggedIn: boolean | null
   /** How it is signed in (Claude Code's "claude.ai", Copilot's "GitHub CLI"…), when the CLI says. */
   authMethod: string | null
-  /** The account it is signed in as, when the CLI says without Hive reading a secret (Copilot, #452). */
+  /** The account it is signed in as, when the CLI says without Combwork reading a secret (Copilot, #452). */
   account?: string | null
   /** Short notes Provider Setup shows under the sign-in (Copilot's Free plan runs Auto only). */
   notes?: string[]
@@ -3464,7 +3464,7 @@ export interface AgentInstallInfo {
   /** No CLI found, but an editor extension with its own copy is installed. */
   editorExtensionOnly?: boolean
   /**
-   * The model the CLI uses when Hive passes none: its own settings, else the model last seen answering
+   * The model the CLI uses when Combwork passes none: its own settings, else the model last seen answering
    * in such a session. Null until known.
    */
   defaultModel?: string | null
@@ -3476,7 +3476,7 @@ export interface AgentInstallInfo {
   configuredEffort?: EffortLevel | null
   /** Per model: the effort seen in sessions started without an effort choice (observedDefaultEffort). */
   observedEfforts?: Record<string, EffortLevel>
-  /** The version this Hive release was tested with and how the installed one compares (#365); null when the release names none. */
+  /** The version this Combwork release was tested with and how the installed one compares (#365); null when the release names none. */
   tested?: TestedCli | null
 }
 
@@ -3485,7 +3485,7 @@ export interface ProviderUpdateRetry {
   label: string
 }
 
-/** A coding agent CLI's version this Hive release was tested with (resources/tested-clis.json, #365). */
+/** A coding agent CLI's version this Combwork release was tested with (resources/tested-clis.json, #365). */
 export interface TestedCli {
   version: string
   /** When the real tier ran against it (YYYY-MM-DD). */
@@ -3499,7 +3499,7 @@ export interface ReadinessIssue {
   /** error: agents can't start; warning: they can, with limits; info: nice to know. */
   level: 'error' | 'warning' | 'info'
   message: string
-  /** Button: a provider task Hive runs in a terminal. */
+  /** Button: a provider task Combwork runs in a terminal. */
   action?: { label: string; task: ProviderTask }
   /** Shown in Provider Setup with the button: what the task will ask and how to choose (paragraphs, `code` allowed). */
   detail?: string[]
@@ -3514,7 +3514,7 @@ export interface FileEntry {
   isDir: boolean
   size: number
   modified: string
-  /** Ignored by git, or Hive's own .combwork folder — shown dimmed. */
+  /** Ignored by git, or Combwork's own .combwork folder — shown dimmed. */
   ignored: boolean
 }
 
@@ -3543,7 +3543,7 @@ export interface SessionAttachmentGroup {
   sessionId: string
   name: string | null
   archived: boolean
-  /** The provider the session ran in, when Hive has its record: how its attachments are labelled. */
+  /** The provider the session ran in, when Combwork has its record: how its attachments are labelled. */
   provider: ProviderId | null
   attachments: SessionAttachment[]
 }
@@ -3569,7 +3569,7 @@ export interface Attached {
   copied: boolean
 }
 
-/** A kept attachment's content for the Attachments tab's viewer: text (shown with Hive's previewers), or not text. */
+/** A kept attachment's content for the Attachments tab's viewer: text (shown with Combwork's previewers), or not text. */
 export interface AttachmentContent {
   kind: 'text' | 'binary' | 'too-large'
   text: string
@@ -3614,7 +3614,7 @@ export type EntryCondition =
 
 export type UpdateStatus = 'disabled' | 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'up-to-date' | 'error'
 
-/** Hive's own updates (electron-updater, GitHub Releases). */
+/** Combwork's own updates (electron-updater, GitHub Releases). */
 export interface UpdateState {
   status: UpdateStatus
   /** The running version. */
@@ -3685,15 +3685,15 @@ export interface AppInfo {
   userData: string
   logsPath: string
   isPackaged: boolean
-  /** The language Hive shows, with its translations. */
+  /** The language Combwork shows, with its translations. */
   language: LanguageInfo
   /** Hardware acceleration this run (#676): off (Settings → Advanced, or --disable-gpu for this start), and why. */
   gpu: { off: boolean; why: 'setting' | 'switch' | null }
 }
 
-/** The language Hive shows (#767), as main chose it, for the window. */
+/** The language Combwork shows (#767), as main chose it, for the window. */
 export interface LanguageInfo {
-  /** Hive's language now: a language's code, or the pseudo-locale (en-XA). */
+  /** Combwork's language now: a language's code, or the pseudo-locale (en-XA). */
   code: string
   /** The locale dates and numbers are formatted with (en-GB, pl-PL). */
   locale: string
@@ -3791,7 +3791,7 @@ export type CombworkEvent =
   | { type: 'tasks-changed'; workspacePath: string }
   /** Quitting needs the user's decision: the renderer shows the quit dialog and answers with app:quitDecision. */
   | { type: 'quit-request'; sessions: QuitSession[]; unsaved: string[]; /** Anything but 'app' stops only this window's workspace's sessions. */ scope?: QuitScope }
-  /** Hive is waiting for working agents to finish before quitting (or stopped waiting). */
+  /** Combwork is waiting for working agents to finish before quitting (or stopped waiting). */
   | { type: 'quit-pending'; pending: boolean; working: number }
   /** This window's close command (HI-1368): the panel shows it while it runs or failed; null: none (the panel goes). */
   | { type: 'close-command'; run: CloseCommandRun | null }
@@ -3805,10 +3805,10 @@ export type CombworkEvent =
   | { type: 'dialects-changed' }
   /** A workspace's Assistant journal changed (#1033: its browser reads it again). */
   | { type: 'journal-changed'; workspacePath: string }
-  /** The Hive Assistant acted, or asks the user something (its home's path names the window). */
+  /** The Combwork Assistant acted, or asks the user something (its home's path names the window). */
   | { type: 'assistant-activity'; projectPath: string; action: AssistantAction }
   | { type: 'assistant-questions'; projectPath: string; questions: AssistantQuestion[] }
-  /** An agent was added by the Hive Assistant: the view doesn't move to it. */
+  /** An agent was added by the Combwork Assistant: the view doesn't move to it. */
   | { type: 'agent-added'; projectPath: string; agentId: string }
   /**
    * An agent's start changed (HI-1977): under way, failed with why, or neither (null), as its AgentInfo's `start`; `seq`,
@@ -3829,7 +3829,7 @@ export type CombworkEvent =
   /** The agent no longer waits for you: its waiting banner closes, in whichever window shows it. */
   | { type: 'notice-resolved'; projectPath: string; agentId: string }
   | { type: 'update-state'; state: UpdateState }
-  /** The language Hive shows changed (Settings → General → Language): every window shows it. */
+  /** The language Combwork shows changed (Settings → General → Language): every window shows it. */
   | { type: 'language-changed'; language: LanguageInfo }
   /** A workspace's progress runs changed (all of them, newest first): for in-process listeners (the Agent API's stream, the developer console). */
   | { type: 'progress-changed'; workspacePath: string; runs: ProgressRun[] }
@@ -3853,7 +3853,7 @@ export type CombworkEvent =
   | { type: 'console-events'; events: ConsoleEvent[]; /** Events that didn't fit the window's queue since the last batch (it fell behind). */ dropped?: number }
 
 /**
- * A lane (#483): a builder and a reviewer taking a project's cards in order (the card-loop skill), as Hive keeps it.
+ * A lane (#483): a builder and a reviewer taking a project's cards in order (the card-loop skill), as Combwork keeps it.
  * Bookkeeping, never a gate: a loop runs the same without one. `paused` while its current card is blocked; `ended` when
  * every card is Done or its builder ends it after the merge; `abandoned` when its builder or reviewer is removed, or it
  * is ended unmerged. Times are ISO.
@@ -3867,7 +3867,7 @@ export interface LaneCard {
   title: string
   /**
    * gone: archived, deleted or moved to another project. unrecorded: the lane ended without a record of where its cards
-   * were (it ended before Hive kept one, or the record was damaged): not known, and never the board's now.
+   * were (it ended before Combwork kept one, or the record was damaged): not known, and never the board's now.
    */
   column: TaskColumn | 'gone' | 'unrecorded'
   blocked: string | null
@@ -3943,7 +3943,7 @@ export interface LaneInfo {
  * Why a lane waits (#1270): its card blocked or On Hold, a request for you (For you), the round limit reached, a card
  * passed but not merged yet (merging: in the merge queue), its pass gone stale (submit again), no reviewer on a card in
  * Review, or a list change queued after the card in flight. The first four and the merge pause the lane, as does `hooks`
- * (#1336): its builder's or reviewer's hooks aren't arriving, so Hive can't tell what it does and types nothing into it.
+ * (#1336): its builder's or reviewer's hooks aren't arriving, so Combwork can't tell what it does and types nothing into it.
  * `checkCopy` (#1435): its card's review or isolated check waits for a review or check copy to be free. `slot` (#1438):
  * the lane has no slot yet (every one is lent), so its builder can't start; it pauses the lane until one is free.
  * `preparing` (#1446): its slot is being prepared (G15's warming: its setup or an install), which doesn't pause it.
@@ -4015,7 +4015,7 @@ export interface LaneStatus {
   freshWhy?: string
   /** preparing (#1446): the slot being prepared; slot (HI-2466), and startWait `refused` (HI-2468): the free slot it was refused as held. */
   slot?: string
-  /** slot (HI-2466), and startWait `refused` (HI-2468): what holds that free slot, a session or a process (a file or folder in it open); Hive tries again until it is free. */
+  /** slot (HI-2466), and startWait `refused` (HI-2468): what holds that free slot, a session or a process (a file or folder in it open); Combwork tries again until it is free. */
   held?: 'session' | 'process' | 'broker' | 'left' | 'lastRun'
   /** startWait `refused`, held `left` (HI-2468): the first program by name that `heldBy`'s last run left running in the slot. */
   program?: string
@@ -4028,8 +4028,8 @@ export interface LaneStatus {
   /** held `broker` (HI-2467): whether no Sandbox runs (true) or one does (false); absent: not known. */
   idle?: boolean
   /**
-   * When this wait began (HI-1926, epoch ms): when Hive first saw this reason for this card (and ask), kept while they
-   * stay the same. `atLeast`: Hive didn't see it begin (it was already waiting when this Hive first listed the lane), so
+   * When this wait began (HI-1926, epoch ms): when Combwork first saw this reason for this card (and ask), kept while they
+   * stay the same. `atLeast`: Combwork didn't see it begin (it was already waiting when this Combwork first listed the lane), so
    * it has waited at least that long.
    */
   since?: number
@@ -4037,8 +4037,8 @@ export interface LaneStatus {
 }
 
 /**
- * Who reported a progress run: a project agent (by its token), the Hive Assistant, a script with the workspace token, or
- * Hive itself (its merge queue's checks, #1349: no agent and no token reports them).
+ * Who reported a progress run: a project agent (by its token), the Combwork Assistant, a script with the workspace token, or
+ * Combwork itself (its merge queue's checks, #1349: no agent and no token reports them).
  */
 export type ProgressSource = 'agent' | 'assistant' | 'api' | 'combwork'
 
@@ -4088,7 +4088,7 @@ export interface ProgressRun {
   /** Its agent's name, "Hive Assistant", or "Script". */
   agentName: string
   /**
-   * `agentName` is a name Hive gave the run, not one its caller has (#872): "Script" for an Agent API script, "Agent"
+   * `agentName` is a name Combwork gave the run, not one its caller has (#872): "Script" for an Agent API script, "Agent"
    * for a kept run with no name, "Hive (slot <name>)" for a slot's warming (#1429, its `slot`). The window shows it in its
    * language; the Agent API leaves this out (publicRun).
    */
@@ -4127,7 +4127,7 @@ export interface ProgressRun {
   summary: string | null
   /** The user dismissed it: listed under Recent only. */
   dismissed: boolean
-  /** When the user saw it failed or stale (the panel open, Hive focused): it folds into Recent a few seconds later. */
+  /** When the user saw it failed or stale (the panel open, Combwork focused): it folds into Recent a few seconds later. */
   seenAt: number | null
   /** How long it was expected to take in all (ms), from its first estimate; null without one. */
   expectedMs: number | null
@@ -4141,7 +4141,7 @@ export interface ProgressRun {
    */
   titleFromCommand?: true
   /**
-   * The card it ran for (its number, #1220): named (`hive-progress --card`, `card`), or the reporting agent's card in
+   * The card it ran for (its number, #1220): named (`cw-progress --card`, `card`), or the reporting agent's card in
    * Doing when it has one and named none. Absent for a run with no card.
    */
   card?: number
@@ -4155,16 +4155,16 @@ export interface ProgressRun {
   folder?: string
   /** A finished run for a card (#1222): how it counted as a check of the card's revision (its `CheckRan`). */
   counts?: RunCheck
-  /** Hive's own run (#1349): nothing was installed before the merge checks (no setup command and no lock file). */
+  /** Combwork's own run (#1349): nothing was installed before the merge checks (no setup command and no lock file). */
   noInstall?: true
-  /** Hive's own install run (#1349): the setup command as written, after node_modules was removed (Hive has no clean form of it). */
+  /** Combwork's own install run (#1349): the setup command as written, after node_modules was removed (Combwork has no clean form of it). */
   installAsWritten?: true
-  /** Hive's own failed merge check or install that counts as temporary (#1362): why, and the network error code that said so. */
+  /** Combwork's own failed merge check or install that counts as temporary (#1362): why, and the network error code that said so. */
   transient?: TransientFailure
-  /** Hive's own run warming a slot (#1429: its setup, an install, its archive script): the slot's name. */
+  /** Combwork's own run warming a slot (#1429: its setup, an install, its archive script): the slot's name. */
   slot?: string
   /**
-   * A review or check copy (#1435): Hive's own run warming it, or an agent's isolated check run in it (its details name
+   * A review or check copy (#1435): Combwork's own run warming it, or an agent's isolated check run in it (its details name
    * it, and it can be stopped from the panel: its processes are in the copy's job).
    */
   copy?: string

@@ -14,14 +14,14 @@ import type { Tr } from './tasks'
  */
 
 type Settings = Pick<AppSettings, 'providers'> | null | undefined
-/** What Hive knows of a provider's models (its install info), when it knows anything. */
+/** What Combwork knows of a provider's models (its install info), when it knows anything. */
 export type ModelInfo = Pick<AgentInstallInfo, 'catalog' | 'configuredEffort' | 'observedEfforts' | 'defaultModel'> | null | undefined
 type Info = ModelInfo
 
 const text = (v: unknown): v is string => typeof v === 'string' && v.trim() !== ''
 
 /**
- * What Hive knows of a connection's models (HI-1770), by its kind, never its CLI: a sign-in connection's are its CLI's
+ * What Combwork knows of a connection's models (HI-1770), by its kind, never its CLI: a sign-in connection's are its CLI's
  * (its catalogue, as without connections); a server connection's its own list (HI-1772), each with the aliases it
  * stands in for, none taking an effort, its default the one standing in for Opus (else Sonnet, else its first).
  */
@@ -205,7 +205,7 @@ export function catalogModel(info: Info, model: string | null | undefined): Cata
   return models.find((m) => modelKey(m.value) === k) ?? models.find((m) => m.resolved && modelKey(m.resolved) === k)
 }
 
-/** What a model can do, as far as Hive knows. */
+/** What a model can do, as far as Combwork knows. */
 export interface ModelCaps {
   /** The effort levels to offer with it. */
   efforts: EffortOption[]
@@ -221,7 +221,7 @@ export interface ModelCaps {
 
 /**
  * A model's capabilities: its own effort levels and default effort where the CLI reports them, else the fallbacks.
- * `model` is what would run (null: the CLI's default model, when Hive knows it).
+ * `model` is what would run (null: the CLI's default model, when Combwork knows it).
  */
 export function modelCaps(provider: ProviderId, model: string | null | undefined, info: Info, settings: Settings): ModelCaps {
   const m = catalogModel(info, model || info?.defaultModel)
@@ -268,7 +268,7 @@ export const baseModelId = modelKey
 const aliasKey = (m: string): string => m.trim().toLowerCase().replace(/\[[^\]]*\]$/, '')
 
 /**
- * Whether a model choice is one of the CLI's aliases that Hive can't resolve now (HI-2523): a word the CLI resolves
+ * Whether a model choice is one of the CLI's aliases that Combwork can't resolve now (HI-2523): a word the CLI resolves
  * itself (its descriptor's `modelAliases`, or an alias its catalogue lists) with no model ID the catalogue gives for it.
  * Such a launch's model is unknown for dialects. Any other word ("gemma") is a model ID of its own.
  */
@@ -283,8 +283,8 @@ export function isUnresolvedAlias(provider: ProviderId, info: Info, model: strin
 
 /**
  * The real model ID a launch runs, which picks its dialect's model file (dialects, HI-2439): the choice (else the CLI's
- * default, when Hive knows it) with an alias resolved through the CLI's catalogue ("opus" → "claude-opus-5-5"), a full
- * ID as it is. Null when Hive can't name it: no choice and no known default, or an alias of the CLI the catalogue
+ * default, when Combwork knows it) with an alias resolved through the CLI's catalogue ("opus" → "claude-opus-5-5"), a full
+ * ID as it is. Null when Combwork can't name it: no choice and no known default, or an alias of the CLI the catalogue
  * doesn't resolve (`isUnresolvedAlias`; the launch record says "model unknown"). A word that isn't one of the CLI's
  * aliases ("gemma") is a model ID like any other (HI-2523). Never the friendly name: names are for display.
  */
@@ -297,13 +297,13 @@ export function dialectModelId(provider: ProviderId, info: Info, chosen: string 
   return id || null
 }
 
-/** A model ID for a dialect file, as the dialog saves it (HI-2523), and what Hive made of what was typed. */
+/** A model ID for a dialect file, as the dialog saves it (HI-2523), and what Combwork made of what was typed. */
 export interface DialectModel {
   /** What the file claims: the typed ID, trimmed, unless the CLI recognises it (below). */
   model: string
   /** The typed text was a recognised alias or form, and `model` differs from it ("Saved as claude-opus-5-5"). */
   normalised: boolean
-  /** One of the CLI's aliases Hive can't resolve now: agents running it show as model unknown, so it wouldn't match. */
+  /** One of the CLI's aliases Combwork can't resolve now: agents running it show as model unknown, so it wouldn't match. */
   unresolvedAlias: boolean
 }
 

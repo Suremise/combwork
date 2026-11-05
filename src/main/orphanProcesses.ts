@@ -22,7 +22,7 @@ import { createLogger, userText } from './logger'
  *
  * An orphan seen at two looks that has run for ORPHAN_MS is shown: Activity marks it (its CPU time too) with End It, a
  * notice says so once, and the agent is told once, at its next tool call or turn's end (inboxNotices), so it can end
- * it; Hive doesn't. Pause the team counts every orphan as not parked (teamParked.ts). ORPHAN_NOTICE turns off the notice
+ * it; Combwork doesn't. Pause the team counts every orphan as not parked (teamParked.ts). ORPHAN_NOTICE turns off the notice
  * and the agent's line.
  */
 
@@ -147,7 +147,7 @@ export function startOrphanWatch(): void {
   timer.unref?.()
 }
 
-/** Hive quitting. */
+/** Combwork quitting. */
 export function stopOrphanWatch(): void {
   if (timer) clearInterval(timer)
   timer = null

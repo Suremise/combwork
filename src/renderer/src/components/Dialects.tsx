@@ -202,7 +202,7 @@ const NO_ROWS: DialectRow[] = []
 const NO_USAGE: DialectUsage[] = []
 const ROWS_PER_PAGE = 200
 
-/** The catalogue, read once a run (it is this Hive's, the same for every workspace). */
+/** The catalogue, read once a run (it is this Combwork's, the same for every workspace). */
 let catalogueRead: Promise<DialectCatalogue> | null = null
 function useCatalogue(): DialectCatalogue | null {
   const [c, setC] = useState<DialectCatalogue | null>(null)
@@ -781,7 +781,7 @@ function DialectTexts({ view, file, catalogue, changeFile }: { view: DialectFile
     return t.id.toLowerCase().includes(q) || shown.toLowerCase().includes(q) || t.text.toLowerCase().includes(q)
   }
   const overrides = file ? Object.keys(file.texts).length : 0
-  // Outdated overrides first, whatever the filter: those of an id this Hive no longer has show only here.
+  // Outdated overrides first, whatever the filter: those of an id this Combwork no longer has show only here.
   const outdated = view.outdated.filter((p) => !q || p.id.toLowerCase().includes(q))
   const areas = catalogue.areas.map((area) => ({ area, texts: catalogue.texts.filter((t) => t.area === area && !outdatedIds.has(t.id) && matches(t)) })).filter((a) => a.texts.length)
   const searching = !!q || show !== 'all'

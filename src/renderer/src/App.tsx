@@ -338,7 +338,7 @@ function handleEvent(e: CombworkEvent): void {
       const before = get().assistantQuestions
       set({ assistantQuestions: e.questions })
       // With the panel hidden, the question comes as a notification the user can answer: main tells it once, as the
-      // routing table says (HI-2320: a pop-up, or a Windows notification with Hive in the background), and its entry
+      // routing table says (HI-2320: a pop-up, or a Windows notification with Combwork in the background), and its entry
       // says Answered once the question no longer waits.
       if (!get().assistantOpen) {
         for (const q of e.questions.filter((x) => !before.some((b) => b.id === x.id))) void call('assistant:tellQuestion', q.id).catch(() => undefined)
@@ -365,7 +365,7 @@ function handleEvent(e: CombworkEvent): void {
 }
 
 let tasksTimer: number | undefined
-/** Reads the board again shortly (one change can come as several events: Hive's own and the folder watcher's). */
+/** Reads the board again shortly (one change can come as several events: Combwork's own and the folder watcher's). */
 /** What this window's agents left running (#507), replacing what the store had (another workspace's). */
 async function loadLeftovers(): Promise<void> {
   const all = await call('session:leftovers').catch(() => [])

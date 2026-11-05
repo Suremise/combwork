@@ -88,7 +88,7 @@ function readSddl(target: string): string | null {
     try {
       rmSync(out, { force: true })
     } catch {
-      // A file left in the temp folder mustn't stop Hive starting.
+      // A file left in the temp folder mustn't stop Combwork starting.
     }
   }
 }
@@ -143,7 +143,7 @@ if ($env:CW_DIALOG_SNAPSHOT) {
 `
 
 /**
- * What Hive tells the user when it can't start from its folder: about the folder, or about the file in it that Electron
+ * What Combwork tells the user when it can't start from its folder: about the folder, or about the file in it that Electron
  * checks, when that is what still lacks the entry (a file that doesn't inherit the folder's permissions).
  */
 export function cantStartMessage(dir: string, file?: string): { title: string; text: string; command: string; buttons: { copy: string; copied: string; close: string } } {
@@ -166,7 +166,7 @@ export function cantStartMessage(dir: string, file?: string): { title: string; t
   }
 }
 
-/** How the message reaches the user: Windows' tools in Hive, stand-ins in tests. */
+/** How the message reaches the user: Windows' tools in Combwork, stand-ins in tests. */
 export interface MessageTools {
   quiet: boolean
   /** The PowerShell window: whether it showed (or, given a picture to draw, drew it). */
@@ -195,7 +195,7 @@ const windowsMessages = (): MessageTools => ({
 })
 
 /**
- * Tells the user Hive can't start, with the command that fixes it: a window with a Copy Command button, or if that
+ * Tells the user Combwork can't start, with the command that fixes it: a window with a Copy Command button, or if that
  * can't be shown (PowerShell missing or locked down), Electron's error box (Ctrl+C copies its text). Electron's other
  * dialogs only work once it is ready, which is too late. A quiet test copy only records it, and draws the window to
  * CW_TEST_DIALOG_SNAPSHOT, if set, without showing it.
@@ -216,26 +216,26 @@ export function tellCantStart(dir: string, file?: string, tools: MessageTools = 
   }
 }
 
-/** What checkInstallDir works with: Windows' tools in Hive, stand-ins in tests. */
+/** What checkInstallDir works with: Windows' tools in Combwork, stand-ins in tests. */
 export interface InstallDirTools {
   /** A file's or folder's DACL as SDDL, or null if it can't be read. */
   read(path: string): string | null
   exists(path: string): boolean
   /** Adds an ALL APPLICATION PACKAGES entry (FOLDER_GRANT or FILE_GRANT): icacls's exit code, null if it didn't finish. */
   grant(path: string, entry: string): number | null
-  /** Tells the user Hive can't start: about the folder, or the file in it that still lacks the entry. */
+  /** Tells the user Combwork can't start: about the folder, or the file in it that still lacks the entry. */
   tell(dir: string, file?: string): void
   exit(code: number): void
 }
 
 /**
- * The main area's translations, in the bundle (#796): the install folder's message shows before Hive is ready, when it
+ * The main area's translations, in the bundle (#796): the install folder's message shows before Combwork is ready, when it
  * hasn't loaded any (they load, a file at a time, once it is).
  */
 const MAIN_TEXT = import.meta.glob<Catalogue>(['../../locales/*/main.json', '!../../locales/en/main.json'], { eager: true, import: 'default' })
 
 /**
- * The language Hive would start in, before it has chosen it (chooseStartLanguage) or loaded its translations: --lang
+ * The language Combwork would start in, before it has chosen it (chooseStartLanguage) or loaded its translations: --lang
  * (CW_LANG in an unpackaged build), else the setting in config.json, else Windows' display languages.
  */
 export function setLanguageBeforeReady(): void {
@@ -258,7 +258,7 @@ const windowsTools: InstallDirTools = {
 }
 
 /**
- * The folder Hive runs from, and whether Hive may change its permissions: only its own installed folder. A development
+ * The folder Combwork runs from, and whether Combwork may change its permissions: only its own installed folder. A development
  * or test copy runs from node_modules' Electron, which it never changes; CW_TEST_INSTALL_DIR gives it a test folder
  * of its own to check and change instead (unpackaged builds only).
  */
@@ -269,7 +269,7 @@ export function installDirTarget(): { dir: string; mayChange: boolean } {
 }
 
 /**
- * Electron refuses to start (a deliberate crash, with nothing on screen) when its sandbox can't read the folder Hive
+ * Electron refuses to start (a deliberate crash, with nothing on screen) when its sandbox can't read the folder Combwork
  * runs from: when the folder's permissions have an entry for an AppContainer package but none for ALL APPLICATION
  * PACKAGES. It checks after the main script's first synchronous run, so this runs there (on Windows), first. It reads
  * the permissions of the file Electron checks (the folder's, if that file isn't there) and in that state adds the

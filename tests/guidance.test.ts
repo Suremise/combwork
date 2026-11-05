@@ -1,6 +1,6 @@
 // What sessions are told about Combwork holds together: the always-present contract names skills that exist and reach
 // that role, keeps the boundaries a session needs without its skills, and stays short; the bundled skills are valid
-// (frontmatter, audience, links, the skills and hive tools they name, for their audience); the Combwork development
+// (frontmatter, audience, links, the skills and Combwork tools they name, for their audience); the Combwork development
 // skills are the same for both providers.
 import { execFileSync } from 'child_process'
 import { existsSync, readdirSync, readFileSync } from 'fs'
@@ -17,7 +17,7 @@ import type { Finisher, ReviewBy } from '../src/shared/workflow/options'
 const ROOT = join(__dirname, '..')
 const SKILLS = join(ROOT, 'resources', 'skills')
 /**
- * What the hive tools say (HI-2434): their descriptions, replies and errors are agent messages in cw-mcp.ts, read here
+ * What the Combwork tools say (HI-2434): their descriptions, replies and errors are agent messages in cw-mcp.ts, read here
  * from their catalogue (id → English, both roles' and every Control level's); the server's source for the code that
  * says them (`T['<id after tool.>']`).
  */
@@ -38,7 +38,7 @@ for (const name of readdirSync(SKILLS)) {
   const others = entries.filter((e) => !(e.isFile() && e.name.endsWith('.md'))).map((e) => e.name)
   catalog.set(name, { audience: fm.audience!, description: fm.description ?? '', skill, refs, others, text: [skill, ...refs.values()].join('\n\n') })
 }
-/** Every hive tool the MCP server defines. */
+/** Every Combwork tool the MCP server defines. */
 const TOOLS = [...readFileSync(join(ROOT, 'src', 'main', 'mcp', 'cw-mcp.ts'), 'utf8').matchAll(/(?:name: |\bintent\(\s*)'(cw_\w+)'/g)].map((m) => m[1])
 const skillsNamed = (text: string): string[] => [...text.matchAll(/\b([a-z]+(?:-[a-z]+)+) skill/g)].map((m) => m[1])
 const toolsNamed = (text: string): string[] => [...new Set([...text.matchAll(/\bcw_[a-z_]+/g)].map((m) => m[0]))]
@@ -120,7 +120,7 @@ describe('the session contract', () => {
 
   it('stays short: the procedures are in the skills', () => {
     // Measured for #102 (2,007 characters before): a guard against procedure creeping back in, not a target. #167's
-    // hive-progress line added about 180, #170's On Hold, Passed and Done-means-merged about 80, #476's worktree
+    // cw-progress line added about 180, #170's On Hold, Passed and Done-means-merged about 80, #476's worktree
     // boundary about 160, #509's scratch rule about 220, #613's stop-what-you-start line about 260, #650's inbox line
     // about 280 (and 160 for the Assistant's), #817's long-documents line about 110 (both), #1129's Done in the project
     // folder about 35. #1529 (P8) held the agent's at its 1.0.0 size (2,656 characters, 2,787 with a handover): the
@@ -244,7 +244,7 @@ describe('the bundled skills', () => {
     }
     // Every session sees the name and description of each skill for it (agents', or the Assistant's): together they stay small.
     // HI-686's generalist skill added about 120 to the agents' (the shortest description the rules above allow says it).
-    // HI-2012 gave the Assistant use-cw-api (the hive tools' detail, moved out of their descriptions): about 190 more.
+    // HI-2012 gave the Assistant use-cw-api (the Combwork tools' detail, moved out of their descriptions): about 190 more.
     for (const [role, max] of [['agent', 2100], ['assistant', 2200]] as const) expect([...catalog.values()].filter((s) => skillFor(s.audience, role)).reduce((n, s) => n + s.description.length, 0), role).toBeLessThan(max)
   })
 
@@ -622,7 +622,7 @@ describe('the other bundled skills follow the gates (#1526)', () => {
     for (const [name, size] of Object.entries(BEFORE)) {
       const { text, skill } = catalog.get(name)!
       for (const [rule, re] of GATE_RULES) expect(text, `${name}: ${rule}`).not.toMatch(re)
-      // use-cw-api's tools.md is the hive tools' detail, moved out of their descriptions (HI-2012) and read only
+      // use-cw-api's tools.md is the Combwork tools' detail, moved out of their descriptions (HI-2012) and read only
       // when needed: its SKILL.md stays at its size plus the pointer to it, and tools.md has a bound of its own.
       if (name === 'use-cw-api') expect(skill.replace(/\r/g, '').length, name).toBeLessThanOrEqual(size + 250)
       else expect(text.replace(/\r/g, '').length, name).toBeLessThanOrEqual(size)

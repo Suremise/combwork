@@ -185,14 +185,14 @@ function throughCombwork(real: string): { combwork: string; next: string | undef
 
 /**
  * The folders the user listed in Settings → Advanced → Card attachments: more folders (HI-2480), the workspace's own list
- * over Hive's: each full path, a %VARIABLE% at its start filled in from the environment (one that isn't set, or that
+ * over Combwork's: each full path, a %VARIABLE% at its start filled in from the environment (one that isn't set, or that
  * doesn't give a full path, leaves the folder out). Checked as a file's other allowed folders are, after the protected ones.
  */
 /** For tests: the temp folder attachableSource accepts (a test's own files are all in its run's temp folder). */
 export const attachTestHooks: { temp: string | null } = { temp: null }
 
 export function extraFolders(ws: WorkspaceService): string[] {
-  // A workspace's empty list is Hive's list, as Settings' emptied box for the workspace is (round 2: one meaning).
+  // A workspace's empty list is Combwork's list, as Settings' emptied box for the workspace is (round 2: one meaning).
   const own = advanced.get<string[]>(CARD_ATTACHMENT_FOLDERS_ID, ws.config?.advanced ?? null)
   const listed = Array.isArray(own) && own.length ? own : advanced.get<string[]>(CARD_ATTACHMENT_FOLDERS_ID, null)
   if (!Array.isArray(listed)) return []
@@ -274,7 +274,7 @@ export interface Staging {
 /** Staging folders of operations running in this Hive (lower-cased paths), from before they are made until disposed of. */
 const liveStaging = new Set<string>()
 
-/** Whether another process (another Hive on the workspace) is running: its staging may be in use. */
+/** Whether another process (another Combwork on the workspace) is running: its staging may be in use. */
 const otherAlive = (pid: unknown): boolean => {
   if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false
   try {
@@ -670,7 +670,7 @@ async function ownFileIn(dir: string, name: string): Promise<boolean> {
   return !!st && !st.isSymbolicLink() && st.isFile() && insideReal(p, [dir])
 }
 
-/** An attachment's id, as Hive makes them (12 hex digits). */
+/** An attachment's id, as Combwork makes them (12 hex digits). */
 const ATTACHMENT_ID = /^[0-9a-f]{12}$/
 
 /** A trash operation's record, checked: its kind, a card's number, and for a removal each file's id and plain name. Null when it isn't one. */
@@ -692,7 +692,7 @@ function trashRecord(v: unknown): { kind: 'remove'; card: number; files: { id: s
 /**
  * Settles one host's cards folder (recoverCardAttachments), its whole chain checked first (`.combwork`, `attachments`,
  * `cards`: real folders of the host's own, never through a link) and each step again before it is used. A record that
- * isn't one Hive writes (a path in a name, an id or number it never makes) is left as it is, and logged: nothing it
+ * isn't one Combwork writes (a path in a name, an id or number it never makes) is left as it is, and logged: nothing it
  * names is touched. A file it names must be a plain file in its own operation's folder, and, put back, the one its row
  * names.
  */
@@ -769,7 +769,7 @@ async function recoverHost(ws: WorkspaceService, host: string, root: string, out
       await finishTrash(dir)
     }
   }
-  // Staging no operation of this Hive's is using (it registers its own from before it is made), nor another Hive's
+  // Staging no operation of this Combwork's is using (it registers its own from before it is made), nor another Combwork's
   // still running.
   const stagingRoot = join(root, STAGING)
   if (await ownFolderNow(host, stagingRoot)) {

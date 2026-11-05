@@ -162,7 +162,7 @@ export async function applyRenames(ws: WorkspaceService, j: NameJournal, open: (
   // (Each window applies them in order: a key cleared, then the value moved there.)
   for (const e of events.filter((x) => x.value === null)) emit({ type: 'ui-pref-changed', ...e })
   for (const e of events.filter((x) => x.value !== null)) emit({ type: 'ui-pref-changed', ...e })
-  // Hide or Remove from Hive: one write of workspace.json, with its number.
+  // Hide or Remove from Combwork: one write of workspace.json, with its number.
   // The settings change only once saved: a save that fails leaves them (and their number) as they were, so the next
   // run follows those renames again.
   const hiddenTo = ws.config.renamesApplied ?? 0

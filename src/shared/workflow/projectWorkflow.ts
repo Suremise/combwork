@@ -1,6 +1,6 @@
 // The one writer of project.json's `workflow` (SPEC §16.6.6, #1417): the form's Save, presets and Paste and the
 // Assistant's settings tool set a project's platform, preset and options through it, and every other field of `workflow`
-// (`kept` for the other platforms, #1419; `presetAsked`, #1423; a field a later Hive adds) stays as it was. Those fields
+// (`kept` for the other platforms, #1419; `presetAsked`, #1423; a field a later Combwork adds) stays as it was. Those fields
 // are written by helpers beside this one (`setKept` for a switch of platform, `setPresetAsked` for the answer), never by
 // replacing the object.
 
@@ -12,8 +12,8 @@ export type WorkflowWrite = Pick<ProjectWorkflow, 'platform' | 'preset' | 'optio
 
 /**
  * `workflow` with its platform, preset and options set, and every other field of `current` kept. Git's commit message
- * (G19, HI-1997) set to Hive's by this write, rather than left as it was, is marked chosen (`commitMessageChosen`); the
- * mark stays while it is Hive's, and goes with it.
+ * (G19, HI-1997) set to Combwork's by this write, rather than left as it was, is marked chosen (`commitMessageChosen`); the
+ * mark stays while it is Combwork's, and goes with it.
  */
 export function writeWorkflow(current: ProjectWorkflow | null | undefined, next: WorkflowWrite): ProjectWorkflow {
   const { commitMessageChosen: was, ...rest } = current ?? {}

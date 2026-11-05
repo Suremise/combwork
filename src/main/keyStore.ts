@@ -10,7 +10,7 @@ import { addKeyFingerprint, resetCoverage } from './keyCoverage'
 import { createLogger } from './logger'
 
 /**
- * Server connections' keys (HI-1772), the only place Hive keeps one: `connection-keys.json` in Hive's profile, each key
+ * Server connections' keys (HI-1772), the only place Combwork keeps one: `connection-keys.json` in Combwork's profile, each key
  * encrypted with Electron's safeStorage (DPAPI on Windows, bound to the user), beside what isn't secret (its version,
  * the origin it was saved for, its last 4 characters). This file is the only record of a key: config.json names none,
  * so restoring config from its backup can't bring one back. Each change is one atomic write, with no .bak (a backup would

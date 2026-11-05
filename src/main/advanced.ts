@@ -16,18 +16,18 @@ import { readAdvancedFrom } from './advancedValues'
 const log = createLogger('advanced')
 
 /**
- * Advanced settings (#367): Hive's overridable defaults (shared/advanced.ts), with the user's overrides in
+ * Advanced settings (#367): Combwork's overridable defaults (shared/advanced.ts), with the user's overrides in
  * %APPDATA%\Combwork\advanced.json. Settings → Advanced and the Assistant's settings tools change them through set(); the file
- * can also be edited by hand, and Hive reads it again when it changes (a file it can't read as it is keeps what Hive had,
+ * can also be edited by hand, and Combwork reads it again when it changes (a file it can't read as it is keeps what Combwork had,
  * and says why). Code asks for a value with get(), pattern() or regExpOf(): an override that doesn't check out falls back
  * to the default (warned once in the log). Before load() (unit tests), every value is its default.
  *
- * A CLI's override records the CLI version it was made for (the installed one when it was set, or when Hive first learns
- * it; a value edited by hand, the one installed when Hive reads it, written back to the file so a restart keeps it);
+ * A CLI's override records the CLI version it was made for (the installed one when it was set, or when Combwork first learns
+ * it; a value edited by hand, the one installed when Combwork reads it, written back to the file so a restart keeps it);
  * Settings flags it once another version is installed, until the user keeps it for that one.
  */
 export class AdvancedStore {
-  /** Hive's profile folder, where advanced.json is (a test's own folder in unit tests). */
+  /** Combwork's profile folder, where advanced.json is (a test's own folder in unit tests). */
   private folder: string | null = null
   private values: Record<string, unknown> = {}
   private madeFor: Record<string, MadeFor> = {}
@@ -35,7 +35,7 @@ export class AdvancedStore {
   private fileError: string | null = null
   /** `fileError` as text for the window (#850). */
   private fileErrorText: Text | null = null
-  /** The file's text as Hive last read or wrote it: a change from elsewhere is one that differs. */
+  /** The file's text as Combwork last read or wrote it: a change from elsewhere is one that differs. */
   private text: string | null = null
   private loaded = false
   private watcher: FSWatcher | null = null
@@ -43,7 +43,7 @@ export class AdvancedStore {
   /** A read is current only until a newer read, load, saved value or stop supersedes it (HI-2454). */
   private readVersion = 0
   private cli: Partial<Record<ProviderId, string | null>> = {}
-  /** The values that apply when Hive restarts, as this Hive started with them (read before the app was ready). */
+  /** The values that apply when Combwork restarts, as this Combwork started with them (read before the app was ready). */
   private atStart: Record<string, unknown> = {}
   private warned = new Set<string>()
   private patterns = new Map<string, { source: string; re: RegExp }>()
@@ -57,7 +57,7 @@ export class AdvancedStore {
     return join(this.folder ?? app.getPath('userData'), 'advanced.json')
   }
 
-  /** Reads advanced.json at startup (none: no overrides) and follows changes to it. `folder`: Hive's profile folder. */
+  /** Reads advanced.json at startup (none: no overrides) and follows changes to it. `folder`: Combwork's profile folder. */
   load(folder = app.getPath('userData')): void {
     this.stop()
     this.folder = folder
@@ -73,7 +73,7 @@ export class AdvancedStore {
     this.follow()
   }
 
-  /** advanced.json's text taken in: its overrides, or why not (keeping what Hive had). */
+  /** advanced.json's text taken in: its overrides, or why not (keeping what Combwork had). */
   private take(text: string | null): boolean {
     if (text === this.text && this.loaded && text !== null) return false
     this.text = text
@@ -191,10 +191,10 @@ export class AdvancedStore {
     for (const fn of [...this.listeners]) fn()
   }
 
-  /** The value Hive uses: the override if it checks out (else the default, warned once), or the workspace's own when given. */
+  /** The value Combwork uses: the override if it checks out (else the default, warned once), or the workspace's own when given. */
   get<T extends string | number | string[] | boolean>(id: string, workspaceValues?: Record<string, unknown> | null): T {
     const def = advancedDef(id)
-    if (!def) throw new Error(`No advanced setting "${id}"`) // i18n-ignore: a programming error (an id Hive's code asks for), for the log
+    if (!def) throw new Error(`No advanced setting "${id}"`) // i18n-ignore: a programming error (an id Combwork's code asks for), for the log
     const row = advancedRow(def, { values: this.values, madeFor: this.madeFor, workspace: workspaceValues ?? null, cli: this.cli })
     if (row.problem && !this.warned.has(id)) {
       this.warned.add(id)
@@ -224,7 +224,7 @@ export class AdvancedStore {
     return { file: this.loaded ? this.path : '', fileError: this.fileError, fileErrorText: this.fileErrorText, values: { ...this.values }, madeFor: { ...this.madeFor }, unknown: [...this.unknown], workspace: workspaceValues ? { ...workspaceValues } : null, cli: { ...this.cli }, atStart: { ...this.atStart } }
   }
 
-  /** What the values that apply at a restart were when Hive started: Settings offers a restart once one differs. */
+  /** What the values that apply at a restart were when Combwork started: Settings offers a restart once one differs. */
   startedWith(values: Record<string, unknown>): void {
     this.atStart = { ...values }
   }
@@ -290,7 +290,7 @@ export class AdvancedStore {
   }
 
   /**
-   * Removes every override (Settings → Advanced → Reset all settings), keeping ids this Hive doesn't know. Refused while
+   * Removes every override (Settings → Advanced → Reset all settings), keeping ids this Combwork doesn't know. Refused while
    * the file can't be read, which it would overwrite.
    */
   /** A setting no longer listed but kept in advanced.json (LEGACY_ADVANCED), as the file has it: undefined when unset. */
@@ -317,7 +317,7 @@ export class AdvancedStore {
   private async write(values: Record<string, unknown>, madeFor: Record<string, MadeFor>): Promise<void> {
     const text = advancedFileText(values, madeFor)
     try {
-      // Unless the file changed since Hive read it (an edit in an editor): that edit is read instead, and this refused.
+      // Unless the file changed since Combwork read it (an edit in an editor): that edit is read instead, and this refused.
       await writeTextUnlessChanged(this.path, text, this.text ?? '')
     } catch (e) {
       if ((e as Error).message === 'CONFLICT') {
@@ -334,7 +334,7 @@ export class AdvancedStore {
   }
 
   /**
-   * The installed version of a CLI, as Hive found it. An override made before Hive knew the version takes this one, in
+   * The installed version of a CLI, as Combwork found it. An override made before Combwork knew the version takes this one, in
    * memory at once and in the file in its turn (two CLIs found together both get theirs).
    */
   noteCli(provider: ProviderId, version: string | null): void {
@@ -405,7 +405,7 @@ export function waitMaxSeconds(kind: 'cards' | 'agents'): number {
   return Math.max(30, Math.min(own, advanced.number('codex.mcp.toolTimeoutSeconds') - 60))
 }
 
-/** What the hive MCP server needs of the advanced settings, as its environment (it runs outside Hive: Node built-ins only). */
+/** What the combwork MCP server needs of the advanced settings, as its environment (it runs outside Combwork: Node built-ins only). */
 export function mcpAdvancedEnv(): Record<string, string> {
   return {
     CW_REPLY_SECONDS: String(advanced.number('cw.mcp.replySeconds')),
@@ -415,7 +415,7 @@ export function mcpAdvancedEnv(): Record<string, string> {
 }
 
 /**
- * Hive's settings shown among the advanced values and kept in advanced.json too (`setting`: Show developer features,
+ * Combwork's settings shown among the advanced values and kept in advanced.json too (`setting`: Show developer features,
  * whose key stays settings.advanced.showDeveloperFeatures): the file and the setting are one value, the file's. The
  * setting follows the file (a hand edit, the advanced list), never the other way (HI-2418: following both ways, each
  * write could turn the other back); whatever changes the setting changes the file first, in the same turn
@@ -443,7 +443,7 @@ export function bindAdvancedSettings(cfg: { settings: AppSettings; updateSetting
     }
   }
   // The first start: the setting as it is in its turn is the file's, unless the file says by then (its write then
-  // reaches the setting through fromFile). Refused (a file Hive can't read), the setting stays until the file says.
+  // reaches the setting through fromFile). Refused (a file Combwork can't read), the setting stays until the file says.
   if (migrating.size)
     void advanced
       .transact(async () => {
@@ -463,7 +463,7 @@ export function bindAdvancedSettings(cfg: { settings: AppSettings; updateSetting
 }
 
 /**
- * Resets a section of Hive's settings (Settings → Reset), any of its values kept in advanced.json too removed from the
+ * Resets a section of Combwork's settings (Settings → Reset), any of its values kept in advanced.json too removed from the
  * file first, in one turn as updateSettingsChecked does: refused, nothing reset, when the file can't take it.
  */
 export function resetSettingsChecked(section: string, reset: () => AppSettings): Promise<AppSettings> {
@@ -476,10 +476,10 @@ export function resetSettingsChecked(section: string, reset: () => AppSettings):
 }
 
 /**
- * A change to Hive's settings that may include one kept in advanced.json too (Show developer features): that value is
- * written to the file first, and a refusal (a file Hive can't read, an edit made meanwhile) refuses the whole change,
+ * A change to Combwork's settings that may include one kept in advanced.json too (Show developer features): that value is
+ * written to the file first, and a refusal (a file Combwork can't read, an edit made meanwhile) refuses the whole change,
  * nothing changed; then the change is made as `update` (config.updateSettings) makes it. Settings and the Assistant's
- * settings tools change Hive's settings through this.
+ * settings tools change Combwork's settings through this.
  */
 export async function updateSettingsChecked(patch: SettingsPatch, update: (patch: SettingsPatch) => AppSettings, hooks?: ChangeHooks): Promise<AppSettings> {
   const bound = ADVANCED_DEFS.filter((d) => d.setting).flatMap((d) => {

@@ -1,9 +1,9 @@
-// Reviewing a card through an agent's own hive tools: the card stays in Review with the agent that did the work, the
+// Reviewing a card through an agent's own Combwork tools: the card stays in Review with the agent that did the work, the
 // board shows "Reviewing: <reviewer>" and the reviewer's strip tab shows the card (with an eye); a second reviewer is
 // refused; the reviewer's session ending stops the review; a verdict ends it (the card staying in Review, or going to
-// Done with it); the reviewer's session records the card as reviewed. Also what the agents' hive tools say about
+// Done with it); the reviewer's session records the card as reviewed. Also what the agents' Combwork tools say about
 // reviewing, from the MCP server as an agent's mcp.json starts it. The agents run the fake Claude Code (fake-claude/),
-// whose "boardreview N ACTION [COLUMN]" calls the hive tools' API with its own token. Dev build, throwaway profile,
+// whose "boardreview N ACTION [COLUMN]" calls the Combwork tools' API with its own token. Dev build, throwaway profile,
 // workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -24,7 +24,7 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 
-/** Starts the hive MCP server as an agent's mcp.json says, and returns its answers to `msgs`. */
+/** Starts the combwork MCP server as an agent's mcp.json says, and returns its answers to `msgs`. */
 function mcp(config, msgs) {
   return new Promise((resolve, reject) => {
     const p = spawn(config.command, config.args ?? [], { env: lib.childEnv(config.env) })
@@ -105,7 +105,7 @@ function mcp(config, msgs) {
   const c = await inv('tasks:create', { title: 'Lean replies', project: 'alpha', agent: coder.id, column: 'review' })
   const n = c.number
 
-  // --- The reviewer starts its review with its own hive tools.
+  // --- The reviewer starts its review with its own Combwork tools.
   const started = await say(reviewer.id, `boardreview ${n} start`)
   check('the hive tools take review start', started?.status === 200 && started.body?.changes?.includes('Started reviewing'), JSON.stringify(started))
   const r1 = await card(n)
@@ -159,7 +159,7 @@ function mcp(config, msgs) {
   const rec = sessionsOf(alpha).sessions.find((s) => s.id === sid)
   check("the reviewer's session records the card as reviewed", !!rec?.cards?.some((x) => x.number === n && x.review === true), JSON.stringify(rec?.cards))
 
-  // --- What the agents' hive tools say, from the MCP server as the reviewer's mcp.json starts it.
+  // --- What the agents' Combwork tools say, from the MCP server as the reviewer's mcp.json starts it.
   // In the launch's private folder in Combwork's user data, not the project (#345).
   const mcpFile = path.join(lib.launchDir(userData, (await live(reviewer.id)).runId), 'mcp.json')
   const server = JSON.parse(fs.readFileSync(mcpFile, 'utf8')).mcpServers.combwork

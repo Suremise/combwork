@@ -1,4 +1,4 @@
-// The canary dialect over hive-progress's text and its run links' refusals (dialects, HI-2438, card 5; design section 2,
+// The canary dialect over cw-progress's text and its run links' refusals (dialects, HI-2438, card 5; design section 2,
 // check 4): every word the wrapper prints, and every refusal of what a run names, comes through the catalogue.
 import { afterEach, describe, expect, it } from 'vitest'
 import { canaryProblems, canaryTexts } from '../src/shared/agentText/canary'

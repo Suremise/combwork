@@ -47,14 +47,14 @@ export function upgradedGitignore(text: string): string | null {
  * folder's move; HI-2462's; HI-2580's, naming `hive.db`): a README that is exactly one of them (either line ending) is
  * Combwork's own, never edited, and becomes `now` (WORKSPACE_README). Any other is the user's, left as it is.
  */
-// i18n-ignore: a README committed with the workspace, in English, as Hive wrote it
+// i18n-ignore: a README committed with the workspace, in English, as Combwork wrote it
 const README_HI2462 = `# .combwork
 
 This folder is managed by [Hive](https://github.com/) and is meant to be committed.
 
 - \`shared/\` — notes, instructions and handovers shared across AI sessions and projects.
-- \`skills/\` — Hive skills (one folder per skill, each with a \`SKILL.md\`). Every agent in every project gets them.
-- \`mcp/\` — MCP server definitions (one \`<name>.json\` per server). Add them to projects in Hive.
+- \`skills/\` — Combwork skills (one folder per skill, each with a \`SKILL.md\`). Every agent in every project gets them.
+- \`mcp/\` — MCP server definitions (one \`<name>.json\` per server). Add them to projects in Combwork.
 - \`workspace.json\` — the workspace's settings, among them the MCP servers added for the Hive Assistant (a project's are in its \`.combwork/project.json\`).
 - \`hive.db\` — the task board (Hive's database). It is this machine's, like the Assistant's sessions: \`.gitignore\` keeps it out of git.
 - \`usage.db\` — what each session used (the usage history the Overviews read). It is this machine's too, kept out of git.

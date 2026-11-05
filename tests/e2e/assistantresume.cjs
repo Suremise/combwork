@@ -79,7 +79,7 @@ const mode = ({ name, word: w }) =>
   /**
    * Where it was told a mode (#650: Combwork's doorbell, then its cw_inbox read, whose result has the notice): one per read
    * that gave it, as the doorbell that began that read's turn. Counted by reads, not doorbells: a doorbell its turn
-   * couldn't read (a resumed CLI whose hive tools hadn't connected yet, under load) is rung again (#650), and both
+   * couldn't read (a resumed CLI whose Combwork tools hadn't connected yet, under load) is rung again (#650), and both
    * doorbells precede the one read that told it (#863).
    */
   const toldAt = (list, m) =>
@@ -136,7 +136,7 @@ const mode = ({ name, word: w }) =>
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Alt+I')
   await lib.until(async () => (await panel.locator('.assistant-header').count()) === 1, 5000)
-  // Combwork's log as each launch starts: ask() types its question once that launch's hive tools connected, as Combwork types
+  // Combwork's log as each launch starts: ask() types its question once that launch's Combwork tools connected, as Combwork types
   // nothing before (#1148: a question typed into a just-started Claude Code wasn't taken).
   let launchMark = lib.combworkLogLines(userData).length
   await inv('session:start', home, { agentId: 'assistant' })

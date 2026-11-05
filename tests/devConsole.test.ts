@@ -234,7 +234,7 @@ describe('DevConsole', () => {
     c.capture([A1], build)
     expect(build).not.toHaveBeenCalled()
     expect(c.stats()).toEqual({ sources: 0, events: 0, textEvents: 0, bytes: 0, subscribers: 0, queued: 0, flightSources: 0, flightEvents: 0, flightBytes: 0 })
-    // Reading (what the hive tools do) starts nothing.
+    // Reading (what the Combwork tools do) starts nothing.
     expect(c.events(A1)).toEqual([])
     expect(c.capturing(A1)).toBe(false)
   })
@@ -441,7 +441,7 @@ describe('DevConsole', () => {
       noSecrets(backlog)
       // The same seqs as the redacted ring: one list, two copies.
       expect(backlog.map((e) => e.seq)).toEqual(c.events(A1).map((e) => e.seq))
-      // A reader (the hive tools), and a window without text, get the redacted ring.
+      // A reader (the Combwork tools), and a window without text, get the redacted ring.
       expect(JSON.stringify(c.events(A1))).not.toContain(MARK)
       expect(JSON.stringify(c.eventsFor('other', A1))).not.toContain(MARK)
       // A new subscription with text gets the kept text back with the rest.

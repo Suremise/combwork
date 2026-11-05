@@ -1,19 +1,19 @@
 /**
  * Errors read by two audiences (#845, E10a of #677): a service's error reaches the window (IPC), which shows it in the
- * user's language, and agents (the Agent API, hive tools, wakes), which always read English. So a service throws a
+ * user's language, and agents (the Agent API, Combwork tools, wakes), which always read English. So a service throws a
  * `CombworkError`: its text as data (a message and its values, `Text` from shared/advanced.ts), with its English as the
  * error's `message`.
  *
  * The contract, for every service that converts its errors (E10b–f, #842):
  * - **Throw** `combworkError(msg({ id: '<area>.<name>', defaultMessage, description }), values)`, or `new CombworkError(text)` for
  *   text built with `withValues`/`listOf`/`linesOf`. Its `message` is the Default's English, formatted at once:
- *   `errorStatus()`'s patterns, Hive's log and every `catch` that reads `.message` see exactly what they saw before.
+ *   `errorStatus()`'s patterns, Combwork's log and every `catch` that reads `.message` see exactly what they saw before.
  *   Where the window's words change and agents' must not (#910), the text is `forAgents(text, agent)`: the window shows
  *   `text`, and agents read `agent`, an agent message (`saidText`) or the message with agents' values.
  * - **The window** gets it in its language: IPC (`ipc.ts`) formats `text` when a call fails (`shownError()`). Electron
  *   sends the renderer only an error's message, so the window gets formatted text, never the descriptor.
  * - **The Agent API** answers with `agentError()` (servers.ts `apiErrorReply`): its text in the caller's dialect
- *   (dialects, HI-2440: each message's override in the request's chain, else its English), whatever language Hive shows.
+ *   (dialects, HI-2440: each message's override in the request's chain, else its English), whatever language Combwork shows.
  * - **An error inside another error's text** (a cause, a value): pass `errorText(e)` as the value, not `e.message`, so it
  *   follows the outer one's language: the descriptor of a CombworkError, the message of any other error (Node's, a CLI's).
  * - **`kind`** (optional) gives the Agent API's status at once (`invalid` 400, `forbidden` 403, `notFound` 404, `conflict`
@@ -68,16 +68,16 @@ export function errorText(e: unknown): TextPart {
   return e instanceof Error ? e.message : String(e)
 }
 
-/** An error in the language Hive shows: what the window is told (IPC). */
+/** An error in the language Combwork shows: what the window is told (IPC). */
 export const shownError = (e: unknown): string => shownText(errorText(e))
 
 /**
- * A failed IPC call's error as the window gets it (ipc.ts): a CombworkError formatted in the language Hive shows (Electron
+ * A failed IPC call's error as the window gets it (ipc.ts): a CombworkError formatted in the language Combwork shows (Electron
  * sends the page only the message), anything else as it is.
  */
 export const windowError = (e: unknown): unknown => (e instanceof CombworkError ? new Error(shownError(e), { cause: e }) : e)
 
-/** An error in English, whatever language Hive shows or dialect a reader has: the log's. */
+/** An error in English, whatever language Combwork shows or dialect a reader has: the log's. */
 export const englishError = (e: unknown): string => englishText(errorText(e))
 
 /**

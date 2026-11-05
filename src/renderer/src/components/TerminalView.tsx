@@ -51,7 +51,7 @@ function makeRoomForWebgl(key: string): void {
 /**
  * Disposes a terminal's WebGL renderer and gives its context back at once. Disposing alone leaves the context alive
  * until garbage collection, so a batch of new sessions (Start New (All), #293) piled up contexts until Chromium dropped
- * the window's oldest live one: the Hive Assistant's, which went black and then drew again.
+ * the window's oldest live one: the Combwork Assistant's, which went black and then drew again.
  */
 function disposeWebgl(webgl: WebglAddon, canvases: HTMLCanvasElement[]): void {
   webgl.dispose()
@@ -493,7 +493,7 @@ export function TerminalView({
     const { signal } = listeners
     host.current!.addEventListener('focusin', () => onFocusRef.current?.(), { signal })
     host.current!.addEventListener('mousedown', () => onFocusRef.current?.(), { signal })
-    // Right-click is Hive's copy/paste (below), in every pane (#737). Keep the button from xterm, which would otherwise
+    // Right-click is Combwork's copy/paste (below), in every pane (#737). Keep the button from xterm, which would otherwise
     // report it to programs that track the mouse: Codex pasted on right-click too, so everything was pasted twice.
     // Settings → Advanced can pass it to a CLI that handles the mouse itself instead (rightClickToCliRef).
     for (const type of ['mousedown', 'mouseup'] as const) {
@@ -558,7 +558,7 @@ export function TerminalView({
       return true
     })
 
-    // Files dropped from Explorer or Hive's Files/Attachments tabs are attached (#387): their paths are pasted, each copied
+    // Files dropped from Explorer or Combwork's Files/Attachments tabs are attached (#387): their paths are pasted, each copied
     // into the session's .combwork/attachments first when it comes from outside the session's folder or is an image.
     host.current!.addEventListener('dragover', (e) => {
       if (!carriesFiles(e.dataTransfer)) return

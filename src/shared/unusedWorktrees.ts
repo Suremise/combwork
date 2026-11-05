@@ -1,4 +1,4 @@
-// What Hive says about unused worktrees (#353): shared by the window and its tests. Window text, in the language Hive
+// What Combwork says about unused worktrees (#353): shared by the window and its tests. Window text, in the language Combwork
 // shows (main's for lostLines, which main words for the removal's confirmation); reuseNote is also the Agent API's, so
 // it words its text in English unless given the window's tr().
 import type { UnusedWorktree, WorktreeReuse } from './types'
@@ -59,7 +59,7 @@ export function unusedState(w: UnusedWorktree): string {
   return parts.length ? parts.join(' · ') : (c.reason ?? tr(M.notChecked))
 }
 
-/** Who made it, in a few words (#476): "was B4" (the Hive agent that worked there), "made by Hive", "not made by Hive". */
+/** Who made it, in a few words (#476): "was B4" (the Combwork agent that worked there), "made by Hive", "not made by Hive". */
 export function originLabel(w: Pick<UnusedWorktree, 'origin'>): string {
   const o = w.origin
   if (!o) return ''
@@ -73,7 +73,7 @@ export function unusedName(w: Pick<UnusedWorktree, 'branch' | 'slot'>): string {
   return w.branch ?? tr(M.detached)
 }
 
-/** What it is to Hive's pools, in a few words (#1450), or '' for a worktree no agent works in. */
+/** What it is to Combwork's pools, in a few words (#1450), or '' for a worktree no agent works in. */
 export function kindLabel(w: Pick<UnusedWorktree, 'kind'>): string {
   switch (w.kind) {
     case 'slot':

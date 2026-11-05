@@ -16,9 +16,9 @@ import { transaction, type Migration } from './db'
  * Real tables, each value a typed column (Darren, 20 Oct: "proper tables, not JSON in a database"); the parser's saved
  * state is the one blob (a parser's own fields, taken up as they were):
  * - `usage_sessions`: a row a session. `source`: read from its `transcript`, a `kept` usage imported from before, or an
- *   `external` session (started outside Hive: kept for the Sessions list, never counted in totals). Who it was (provider,
+ *   `external` session (started outside Combwork: kept for the Sessions list, never counted in totals). Who it was (provider,
  *   agent, name, folder); where it was read (`path`, the size and modified time read, the offset read to); the parser's
- *   saved state (`state` at `state_offset`, its shape and the Hive version that saved it); the holds its card rows were
+ *   saved state (`state` at `state_offset`, its shape and the Combwork version that saved it); the holds its card rows were
  *   shared out by (`holds_key`); and what isn't a sum of its rows (title, model, CLI version, context, activity…).
  * - `usage_rows`: its rows (shared/usageLedger.ts LedgerRow), keyed by session, day, model, card and role; what every
  *   usage view adds up.
@@ -293,7 +293,7 @@ export interface SessionWrite extends SessionMeta {
 
 /**
  * Records a session: everything it has in the history replaced by this, in one transaction. `expect`: the offset and
- * file it was read from as found then (null: not recorded yet); when another writer (another Hive on this workspace)
+ * file it was read from as found then (null: not recorded yet); when another writer (another Combwork on this workspace)
  * recorded it meanwhile, nothing is written and it says so (false), so a reader that started from an older point never
  * writes over a newer one.
  */
@@ -415,11 +415,11 @@ export function replaceRows(db: DatabaseSync, scope: string, session: string, ro
 
 /**
  * A session's who (agent, name, folder) brought up to date, its usage as it was: a record renamed, an agent renamed, a
- * session started outside Hive adopted (its source then `transcript`). Written only when it changed.
+ * session started outside Combwork adopted (its source then `transcript`). Written only when it changed.
  */
 export function updateMeta(db: DatabaseSync, m: SessionMeta, source: 'transcript' | 'external'): void {
   const v = [m.agentId ?? null, m.agentName ?? null, m.name ?? null, m.cwd ?? null]
-  // An external session stays one only while no record has it: a record's job makes it Hive's.
+  // An external session stays one only while no record has it: a record's job makes it Combwork's.
   const src = source === 'transcript' ? "CASE WHEN source = 'external' THEN 'transcript' ELSE source END" : 'source' // i18n-ignore: SQL
   db.prepare(`UPDATE usage_sessions SET agent_id = ?, agent_name = ?, name = ?, cwd = ?, source = ${src} WHERE scope = ? AND session = ? AND (agent_id IS NOT ? OR agent_name IS NOT ? OR name IS NOT ? OR cwd IS NOT ? OR source <> ${src})`).run(...v, m.scope, m.session, ...v) // i18n-ignore: SQL
 }
@@ -654,11 +654,11 @@ export const vacuumsIncrementally = (db: DatabaseSync): boolean => (db.prepare('
 /**
  * Gives the file's free pages back to the disk (HI-1648). A file made before this, with auto_vacuum off, is vacuumed
  * whole once, which turns it to incremental (the whole file written again: once); after that only its free pages go.
- * Then the WAL is checkpointed, truncating it, so the file shrinks now rather than when Hive closes it. Whether it was
+ * Then the WAL is checkpointed, truncating it, so the file shrinks now rather than when Combwork closes it. Whether it was
  * the whole vacuum.
  */
 export function giveSpaceBack(db: DatabaseSync): boolean {
-  if (db.isTransaction) throw new Error('giveSpaceBack inside a transaction') // i18n-ignore: a mistake in Hive's code, logged
+  if (db.isTransaction) throw new Error('giveSpaceBack inside a transaction') // i18n-ignore: a mistake in Combwork's code, logged
   const whole = !vacuumsIncrementally(db)
   if (whole) db.exec('PRAGMA auto_vacuum = INCREMENTAL; VACUUM')
   else db.exec('PRAGMA incremental_vacuum')

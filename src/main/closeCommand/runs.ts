@@ -9,28 +9,28 @@ import type { RunStatus } from './runner'
 import type { ListJob, ListStatus, ListStep } from './listRunner'
 import { resolvePoint, type CommandReason } from '../../shared/commands'
 
-// HI-1368: a close command's run, as Hive starts and follows it. Hive starts the runner (cw-close-runner.js) detached,
-// with no pipe to it; the runner starts the command and keeps its folder's status.json and tail.txt (runner.ts). Hive
+// HI-1368: a close command's run, as Combwork starts and follows it. Combwork starts the runner (cw-close-runner.js) detached,
+// with no pipe to it; the runner starts the command and keeps its folder's status.json and tail.txt (runner.ts). Combwork
 // reads those, bounded, for the panel; it never holds the command or its output.
 
-/** How much of the tail Hive reads for the panel: its end only, never the whole file. */
+/** How much of the tail Combwork reads for the panel: its end only, never the whole file. */
 export const READ_TAIL_BYTES = 16 * 1024
 /** The panel's lines: the last few, each cut short. */
 export const PANEL_LINES = 8
 export const LINE_CHARS = 400
 /**
- * Runs kept per workspace, all its points' and by-hand runs together, and for When Hive quits: the newest; one still
+ * Runs kept per workspace, all its points' and by-hand runs together, and for When Combwork quits: the newest; one still
  * running is never removed. 10 since a run holds a point's whole list (HI-1954), 5 before.
  */
 export const KEEP_RUNS = 10
 /** How long a runner may take to write its first status before the run counts as not started. */
 export const START_MS = 10_000
 
-/** Why a close command doesn't run: none set, a test copy of Hive, or Hive restarting for an update without the tick. */
+/** Why a close command doesn't run: none set, a test copy of Combwork, or Combwork restarting for an update without the tick. */
 export type Skip = 'none' | 'test' | 'update'
 
 /**
- * Whether this Hive runs close commands: never a test copy, whether quiet or shown (HR6's s8 point 3: a test profile is
+ * Whether this Combwork runs close commands: never a test copy, whether quiet or shown (HR6's s8 point 3: a test profile is
  * CW_USER_DATA, or CW_TEST_QUIET=1 for a packaged one), but for an unpackaged build's CW_TEST_RUN_ON_CLOSE=1, the
  * e2e suite's seam.
  */
@@ -77,7 +77,7 @@ export function runPrefix(kind: 'workspace' | 'quit', place: string | null): str
 /** A run's folder name: what it is for, then when (sortable); startRun makes it unique. */
 export const runFolderName = (prefix: string, at: Date): string => `${prefix}${at.toISOString().replace(/[:.]/g, '-')}`
 
-/** What starting a runner needs: Hive's executable as Node, the runner's script, the command's environment. */
+/** What starting a runner needs: Combwork's executable as Node, the runner's script, the command's environment. */
 export interface StartDeps {
   exec: string
   script: string
@@ -87,7 +87,7 @@ export interface StartDeps {
 
 /**
  * Starts the runner for a command in a new folder under `root`: detached, hidden, with no pipe to Hive (so nothing of
- * it breaks when Hive stops waiting or exits). Throws as spawn does; a later failure shows in the folder (no status).
+ * it breaks when Combwork stops waiting or exits). Throws as spawn does; a later failure shows in the folder (no status).
  */
 export function startRun(root: string, folder: string, command: string | ListJob, cwd: string, deps: StartDeps): string {
   mkdirSync(root, { recursive: true })
@@ -112,13 +112,13 @@ export function startRun(root: string, folder: string, command: string | ListJob
   return dir
 }
 
-/** A run as Hive reads it: its status (null: none written yet, or unreadable) and the tail's last lines. */
+/** A run as Combwork reads it: its status (null: none written yet, or unreadable) and the tail's last lines. */
 export interface RunRead {
   status: RunStatus | null
   lines: string[]
 }
 
-/** A list's run as Hive reads it (HI-1954): its status (null: none yet, or unreadable) and its current step's last lines. */
+/** A list's run as Combwork reads it (HI-1954): its status (null: none yet, or unreadable) and its current step's last lines. */
 export interface ListRead {
   status: ListStatus | null
   lines: string[]

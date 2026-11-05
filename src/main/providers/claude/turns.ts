@@ -13,7 +13,7 @@ const MAX_OWNERS = 50_000
  * Claude Code's turns in transcript lines (#1371, checked against 2.1.306): a turn is its prompt's `promptId`, which its
  * hooks carry as `prompt_id`. Every user entry has it (the prompt, tool results, meta and local command entries); an
  * assistant entry has none and belongs to the turn of the entry its `parentUuid` names, as do the attachment and system
- * entries in the chain. A turn counts from its prompt: a person's (or Hive's typed) prompt, never a meta entry, a
+ * entries in the chain. A turn counts from its prompt: a person's (or Combwork's typed) prompt, never a meta entry, a
  * compaction's summary, a tool result, a task notification's wake (its hooks aren't certain) or a side conversation's
  * (`isSidechain`). It is worked once a main-chain assistant entry belongs to it: a local command has none.
  */

@@ -17,7 +17,7 @@ const M = {
   argument: msg({ id: 'assistant.mcpSecret.argument', defaultMessage: 'An argument starting "{start}…" looks like a literal secret.', description: "A warning on an MCP server's definition: one of its command's arguments looks like a password or token. {start} is its first characters." })
 }
 
-/** Flags values that look like literal secrets rather than ${ENV} references (window text: in Hive's language). */
+/** Flags values that look like literal secrets rather than ${ENV} references (window text: in Combwork's language). */
 export function findSecretWarnings(def: McpServerDef): string[] {
   const warnings: string[] = []
   const check = (where: 'env' | 'header', key: string, raw: unknown): void => {

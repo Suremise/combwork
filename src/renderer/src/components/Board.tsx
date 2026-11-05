@@ -61,7 +61,7 @@ function useBoardFold(): BoardFold {
 }
 
 /**
- * Changes this workspace's board fold (a view preference in Hive's own settings, never in the cards' files): shown at
+ * Changes this workspace's board fold (a view preference in Combwork's own settings, never in the cards' files): shown at
  * once, and saved by main as a change to what is saved now, so another window's folds (of its workspace) are never
  * written over with what this window read earlier. Folded cards no longer on the board, archived ones included, are
  * dropped (once the board has been read).
@@ -156,7 +156,7 @@ function cardStall(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | 
     // loopStepWait's own first tests, before the project's options are worked out for it (HI-1806: for every card).
     if (c.archived || c.blocked || !c.agent || (c.column !== 'doing' && c.column !== 'review' && c.column !== 'passed')) return null
     const project = cardAgent(projects, c).project
-    // The project's Design check wait (its workflow option, HI-1766), over Hive's and the workspace's.
+    // The project's Design check wait (its workflow option, HI-1766), over Combwork's and the workspace's.
     const st = get()
     const bound = (project ? projectInfoPreferences(project, st.settings?.workflow, st.workspace?.config.workflow).loopStepWaitMinutes : LOOP_STEP_WAIT_MINUTES) * 60_000
     const step = loopStepWaitReason(c, watchers, bound, Date.now(), tr)
@@ -202,7 +202,7 @@ function cardBusy(c: TaskCard, projects: ProjectInfo[], assistant: ProjectInfo |
     if (agent?.live) return tr(BUSY.working, { agent: agent.name })
   }
   if (c.review) return tr(BUSY.reviewing, { agent: c.review.agentName })
-  // HI-2153: a watch on a card in Done waits for nothing more (Hive ends it): nobody is on it for that.
+  // HI-2153: a watch on a card in Done waits for nothing more (Combwork ends it): nobody is on it for that.
   if (c.column === 'done') return null
   for (const p of assistant ? [...projects, assistant] : projects) {
     const a = p.agents.find((x) => x.live?.watch?.cards.includes(c.number))
@@ -1767,9 +1767,9 @@ export function BoardPanel() {
 
 // ---------------------------------------------------------------------------
 /**
- * A line of a card's history, or a comment Hive wrote, as the window shows it (#846): from its message and values, in the
+ * A line of a card's history, or a comment Combwork wrote, as the window shows it (#846): from its message and values, in the
  * window's language (a batch's name worded as the archive's picker words it); its English for an entry from before, or
- * one whose message this Hive doesn't know.
+ * one whose message this Combwork doesn't know.
  */
 function storedLine(english: string, stored: StoredText | undefined): string {
   if (!stored) return english
@@ -1778,7 +1778,7 @@ function storedLine(english: string, stored: StoredText | undefined): string {
   return storedLineText(shown, (m, values) => tr(m, values), (id) => providerMessage(id) ?? workflowMessage(id)) ?? english
 }
 
-/** Who wrote a history line or a comment, as stored (English: "You", "Assistant", "Repair"), in the window's language; Hive and agents' names as they are. */
+/** Who wrote a history line or a comment, as stored (English: "You", "Assistant", "Repair"), in the window's language; Combwork and agents' names as they are. */
 const byText = (by: string): string => (Object.hasOwn(BY_TEXT, by) ? tr(BY_TEXT[by]) : by)
 /** Who added a card, as board.dialog.added selects it: the user, the Assistant, Repair, or an agent (other, by name). */
 const ADDED_BY: Record<string, string> = { You: 'you', Assistant: 'assistant', Repair: 'repair' }
@@ -1811,7 +1811,7 @@ export function TaskDialog() {
   // A new card's Review: Skip (#1625), and the user's optional note on why.
   const [skipReview, setSkipReview] = useState(false)
   const [skipNote, setSkipNote] = useState('')
-  // Why the board takes no changes (#1230): its 1.0 upgrade waits, or a newer Hive saved it. The card can be read, not changed.
+  // Why the board takes no changes (#1230): its 1.0 upgrade waits, or a newer Combwork saved it. The card can be read, not changed.
   const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
   const ro = !!readOnly
   const isNew = open !== null && typeof open === 'object'
@@ -2286,7 +2286,7 @@ export function TaskDialog() {
               readOnly={ro}
               onChange={(e) => setContext(e.target.value)}
             />
-            {/* Each reference opens its section in Hive's viewer (#818). */}
+            {/* Each reference opens its section in Combwork's viewer (#818). */}
             {splitDocRefs(context).some((r) => parseDocRef(r)) && (
               <div className="task-context-links">
                 {splitDocRefs(context)

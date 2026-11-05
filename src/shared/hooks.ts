@@ -1,7 +1,7 @@
 /**
- * An agent's hooks, as its Hooks dialog shows them (HI-982): what its launch loaded, each row saying how sure Hive is,
- * and what Hive observed of the hooks it received (its reply, and what the turn ledger made of each), kept in memory per
- * launch and bounded. Read-only: Hive never edits, enables or turns off a hook here.
+ * An agent's hooks, as its Hooks dialog shows them (HI-982): what its launch loaded, each row saying how sure Combwork is,
+ * and what Combwork observed of the hooks it received (its reply, and what the turn ledger made of each), kept in memory per
+ * launch and bounded. Read-only: Combwork never edits, enables or turns off a hook here.
  */
 
 /** How many hooks a launch keeps for its dialog (the newest). */
@@ -14,15 +14,15 @@ export const HOOK_TEXT_MAX = 4096
 export const HOOK_SHORT_MAX = 300
 
 /**
- * Where a hook comes from: Hive's own (passed for this launch), the CLI's settings scopes (managed, the command line's,
+ * Where a hook comes from: Combwork's own (passed for this launch), the CLI's settings scopes (managed, the command line's,
  * the project's, its local file, the user's or a connection's home), or a plugin.
  */
 export type HookSource = 'combwork' | 'managed' | 'cli' | 'project' | 'local' | 'user' | 'plugin' | 'other'
 
 /**
- * How sure Hive is of a hook: `passed`, Hive passed it for this launch; `trusted`, `untrusted`, `modified`, as the CLI
+ * How sure Combwork is of a hook: `passed`, Combwork passed it for this launch; `trusted`, `untrusted`, `modified`, as the CLI
  * itself lists it now (Codex's trust); `unverified`, configured but nothing says the CLI loaded it; `disabled`, a
- * setting turns it off; `notLoaded`, the launch's arguments leave its file out; `unsupported`, a form Hive doesn't know
+ * setting turns it off; `notLoaded`, the launch's arguments leave its file out; `unsupported`, a form Combwork doesn't know
  * (shown with its type); `unknown`, the CLI couldn't say.
  */
 export type HookStatus = 'passed' | 'trusted' | 'untrusted' | 'modified' | 'unverified' | 'disabled' | 'notLoaded' | 'unsupported' | 'unknown'
@@ -34,20 +34,20 @@ export interface HookRow {
   file?: string
   /** Its form as the CLI takes it (command, http, prompt…). */
   type: string
-  /** Its command or URL, Hive's authentication left out, cut to HOOK_TEXT_MAX. */
+  /** Its command or URL, Combwork's authentication left out, cut to HOOK_TEXT_MAX. */
   command: string
   truncated?: boolean
   matcher?: string
   status: HookStatus
   /** Why it has its status (the setting that disables it, the argument that leaves it out), when there is one. */
   why?: string
-  /** Hive receives what it runs (one of Hive's hooks); a user's hook never is. */
+  /** Combwork receives what it runs (one of Combwork's hooks); a user's hook never is. */
   observed: boolean
 }
 
 /**
- * Something the listing says beside its rows: a file Hive couldn't read (never "no hooks"), one changed since the launch
- * read it, the CLI couldn't be asked, one source with more hooks than listed, or a CLI that may load hooks Hive doesn't read.
+ * Something the listing says beside its rows: a file Combwork couldn't read (never "no hooks"), one changed since the launch
+ * read it, the CLI couldn't be asked, one source with more hooks than listed, or a CLI that may load hooks Combwork doesn't read.
  */
 export type HookNote =
   | { kind: 'unreadable'; file: string; why: string }
@@ -59,7 +59,7 @@ export type HookNote =
   | { kind: 'unsure'; what: string; why: string }
 
 /**
- * A launch's hooks: `basis` says where the rows other than Hive's come from: `cli`, the CLI's own listing, asked now with
+ * A launch's hooks: `basis` says where the rows other than Combwork's come from: `cli`, the CLI's own listing, asked now with
  * the launch's settings (its session read its config when it started); `launch`, its settings files as read at launch.
  */
 export interface HookListing {
@@ -68,29 +68,29 @@ export interface HookListing {
   notes: HookNote[]
 }
 
-/** Hive's reply to a hook it received: nothing, context, a lock decision (allowed, warned, asked, blocked), or an error. */
+/** Combwork's reply to a hook it received: nothing, context, a lock decision (allowed, warned, asked, blocked), or an error. */
 export type HookResponse = 'none' | 'context' | 'allowed' | 'warned' | 'asked' | 'blocked' | 'error'
 
-/** What the turn ledger made of it: applied, carried on by Hive, ignored (with why), or not reached (an error first). */
+/** What the turn ledger made of it: applied, carried on by Combwork, ignored (with why), or not reached (an error first). */
 export type HookLedger = 'applied' | 'continued' | 'ignored' | 'none'
 
-/** A hook Hive received, as it observed it: never a claim about any other hook the CLI ran for that event. */
+/** A hook Combwork received, as it observed it: never a claim about any other hook the CLI ran for that event. */
 export interface HookFired {
   at: number
   /** The event as the CLI named it. */
   event: string
-  /** Which of Hive's hooks it came through (its form), by the launch's authenticated route. */
+  /** Which of Combwork's hooks it came through (its form), by the launch's authenticated route. */
   receiver: string
   response: HookResponse
   /** A block's reason, an error's step and message. */
   why?: string
   ledger: HookLedger
   ledgerWhy?: string
-  /** How long Hive took to handle it (not how long any hook command took). */
+  /** How long Combwork took to handle it (not how long any hook command took). */
   ms: number
 }
 
-/** An agent's hooks for its dialog: its launch (runId), what it loaded and what Hive received. */
+/** An agent's hooks for its dialog: its launch (runId), what it loaded and what Combwork received. */
 export interface SessionHooks {
   runId: string
   provider: string
@@ -124,7 +124,7 @@ export function clip(text: string, max: number): { text: string; truncated: bool
 }
 
 /**
- * A command or URL with Hive's authentication material left out: a bearer token, the run id in Hive's hook URL and the
+ * A command or URL with Combwork's authentication material left out: a bearer token, the run id in Combwork's hook URL and the
  * path of the launch's auth file (`secrets`: values to hide wherever they appear).
  */
 export function withoutCombworkAuth(text: string, secrets: readonly string[] = []): string {
@@ -135,7 +135,7 @@ export function withoutCombworkAuth(text: string, secrets: readonly string[] = [
 }
 
 /**
- * A lock block live now, as Activity shows it (HI-982): an agent's edit Hive's file lock blocked (or asked the user
+ * A lock block live now, as Activity shows it (HI-982): an agent's edit Combwork's file lock blocked (or asked the user
  * about), while that decision stands. `key` is the block's identity: its launch, tool call, file and holder's launch.
  */
 export interface ActivityHookBlock {

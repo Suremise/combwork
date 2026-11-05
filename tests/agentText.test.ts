@@ -1,4 +1,4 @@
-// Agent text (dialects, HI-2065; plans/2026-11-03-dialects-design.md, sections 2 and 6): the ICU formatter hive-mcp.js
+// Agent text (dialects, HI-2065; plans/2026-11-03-dialects-design.md, sections 2 and 6): the ICU formatter cw-mcp.js
 // can load, say() and its chains (scopes, the resolver hook, the process's dialect file), and the canary dialect over the
 // session contract, the first area extracted (card 1). Later extraction cards add their builders to the canary here.
 import { afterEach, describe, expect, it, vi } from 'vitest'

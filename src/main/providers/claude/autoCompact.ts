@@ -17,7 +17,7 @@ import { fmt, msg, tr, type Msg } from '../../../shared/i18n'
  * block over it, the higher scope winning (#273). Checked with Claude Code 2.1.291 in a test home: a settings file's
  * `env` beats the launch environment; the project's beats the user's; a `--settings` file or inline JSON beats the
  * project's; and of several `--settings` flags only the last is read. Managed settings are the highest scope (the
- * documented order: managed, command line, local, project, user). Policies Hive can't read (Windows registry policies,
+ * documented order: managed, command line, local, project, user). Policies Combwork can't read (Windows registry policies,
  * an organisation's server-managed settings) could still change it, so a default is labelled an estimate.
  */
 
@@ -54,13 +54,13 @@ export interface SettingsScope {
   /** Its name after "in" ("autoCompactWindow in the project's .claude/settings.json"). */
   label: string
   /**
-   * The clause saying Hive can't be sure of it, its `unsure` as `{unsure}`: a settings file's own, so a language joins
+   * The clause saying Combwork can't be sure of it, its `unsure` as `{unsure}`: a settings file's own, so a language joins
    * its name and the reason its own way (#917: no space after a Chinese name, one after a file name); else `label`
    * and `unsure` as providers.autoCompact.unsureScope joins them.
    */
   clause?: Msg
   json: unknown
-  /** Why Hive can't tell what it gives (it couldn't read it, or can't tell whether Claude Code does), after its label (#333). */
+  /** Why Combwork can't tell what it gives (it couldn't read it, or can't tell whether Claude Code does), after its label (#333). */
   unsure?: string
   /** Which scope it is, and its file (HI-982: an agent's Hooks dialog), where it has one. */
   kind?: 'managed' | 'cli' | 'local' | 'project' | 'user'
@@ -69,7 +69,7 @@ export interface SettingsScope {
   notJson?: true
 }
 
-/** Why a default is an estimate: what Hive can't read could still change it (#273). */
+/** Why a default is an estimate: what Combwork can't read could still change it (#273). */
 const UNREAD = msg({ id: 'providers.autoCompact.unreadReason', defaultMessage: "managed policies Combwork can't read (such as Windows registry policies or your organisation's server-managed settings) could change it", description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: why its default is an estimate. A clause, in a list of such reasons (providers.autoCompact.estimate)." })
 /** A setting labelled an estimate, with why: clauses, joined as the language joins a list. */
 const ESTIMATE = msg({ id: 'providers.autoCompact.estimate', defaultMessage: 'an estimate: {unsure}', description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: it is an estimate, in brackets after the window. {unsure} lists why, clauses joined as a list (\"managed policies Combwork can't read … could change it and Claude Code's settings.json couldn't be read (EACCES)\")." })
@@ -128,13 +128,13 @@ function envSwitch(v: string | undefined): boolean | undefined {
 }
 
 /**
- * The auto-compaction a launch gets: from its environment and arguments (what Hive passes), the settings files
+ * The auto-compaction a launch gets: from its environment and arguments (what Combwork passes), the settings files
  * (`scopes`, highest first) and the models it runs as (`models`, first first: the model the session reports once it
  * does; until then the id the choice resolves to, then the choice). DISABLE_COMPACT (all compaction) and
  * DISABLE_AUTO_COMPACT turn it off over everything; DISABLE_AUTO_COMPACT set off overrides `autoCompactEnabled` too.
  */
 export function autoCompactOf(args: readonly string[], launchEnv: Record<string, string | undefined>, scopes: readonly SettingsScope[], models: readonly string[]): AutoCompactSetting {
-  // What a scope Hive can't be sure of holds could change any answer (its env block is over the launch's): an estimate (#333).
+  // What a scope Combwork can't be sure of holds could change any answer (its env block is over the launch's): an estimate (#333).
   // Whole clauses, each saying what it is about, joined as a list after the default's own reason.
   const unsure = scopes
     .filter((s) => s.unsure)
@@ -144,7 +144,7 @@ export function autoCompactOf(args: readonly string[], launchEnv: Record<string,
   return reasons.length ? { ...result, estimate: tr(ESTIMATE, { unsure: fmt.list(reasons) }) } : result
 }
 
-/** The setting as far as Hive can read it: `unread` when it is Claude Code's default, which what Hive can't read could change. */
+/** The setting as far as Combwork can read it: `unread` when it is Claude Code's default, which what Combwork can't read could change. */
 function autoCompactRead(args: readonly string[], launchEnv: Record<string, string | undefined>, scopes: readonly SettingsScope[], models: readonly string[]): AutoCompactSetting & { unread?: true } {
   // The variables as Claude Code reads them: a settings file's env block over the launch environment.
   const { env, from } = effectiveEnv(launchEnv, scopes)
@@ -178,7 +178,7 @@ function autoCompactRead(args: readonly string[], launchEnv: Record<string, stri
       ? { window: null, source: tr(msg({ id: 'providers.autoCompact.autoIn', defaultMessage: '{key}: "auto" in {scope}', description: 'Where Claude Code\'s auto-compaction setting comes from, in the context tooltip of an agent\'s footer: a settings file sets it to auto. {key} is the setting as written (autoCompactWindow), {scope} the file. "auto" is its value: keep it.' }), { key: w.key, scope: s.label }), ...percent }
       : { window: w.value, source: tr(msg({ id: 'providers.autoCompact.keyIn', defaultMessage: '{key} in {scope}', description: "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file sets it. {key} is the setting as written (autoCompactWindow), {scope} the file." }), { key: w.key, scope: s.label }), ...percent }
   }
-  // Nothing Hive can read sets it: Claude Code's default, as far as Hive can tell.
+  // Nothing Combwork can read sets it: Claude Code's default, as far as Combwork can tell.
   return { window: null, source: pctOnly, ...percent, unread: true }
 }
 
@@ -189,7 +189,7 @@ export const SETTINGS_FILE_LIMIT = 2 * 1024 * 1024
 export const SETTINGS_READ_CHUNK = 64 * 1024
 
 /**
- * A settings file's JSON, null when it's missing or isn't JSON (Claude Code skips such a file too); `unsure` when Hive
+ * A settings file's JSON, null when it's missing or isn't JSON (Claude Code skips such a file too); `unsure` when Combwork
  * couldn't read it: not a regular file, over the limit or unreadable (#333). Opened only after a stat says it's a
  * regular file within the limit, so a device name, a pipe or a huge file never holds up the main process; then the
  * opened file is checked again and read to its end, a chunk at a time and never past a byte over the limit, since it
@@ -290,14 +290,14 @@ export function settingSources(args: readonly string[]): { sources: ReadonlySet<
   return { sources: new Set(names as SettingSource[]) }
 }
 
-/** Arguments with which Hive can't tell which settings files Claude Code reads (they leave out customizations). */
+/** Arguments with which Combwork can't tell which settings files Claude Code reads (they leave out customizations). */
 const UNSURE_MODES = ['--safe-mode', '--bare']
 
 /**
  * The settings scopes Claude Code reads for a session, highest first: managed (Windows), the command line's (the last
  * `--settings` in the user's arguments), the folder's .claude/settings.local.json and .claude/settings.json, then the
  * user's settings in its config folder; the last three only as far as `--setting-sources` and `--restricted` allow
- * (settingSources). Arguments that leave Hive unsure what it reads come last, as scopes holding nothing.
+ * (settingSources). Arguments that leave Combwork unsure what it reads come last, as scopes holding nothing.
  */
 export function settingsScopes(cwd: string, configDir: string, args: readonly string[] = []): SettingsScope[] {
   const programFiles = process.env.ProgramFiles || 'C:\\Program Files'

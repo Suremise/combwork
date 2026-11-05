@@ -12,7 +12,7 @@ import { presentWindow, showOsNotification, testNotifyLog } from './testQuiet'
 const log = createLogger('notify')
 
 /**
- * Hive's one way to tell the user something from main (HI-2320): `tell()` routes an entry once (shared/notify.ts
+ * Combwork's one way to tell the user something from main (HI-2320): `tell()` routes an entry once (shared/notify.ts
  * notifyRoute), picks the one window that owns it, and sends it there alone, as a pop-up (kept in that window's bell),
  * a quiet bell row beside a Windows notification, or a bell row only. Entries with buttons are registered under their
  * offer, so taking or losing that offer resolves exactly them (`resolveOffer`), never a newer offer's.
@@ -20,7 +20,7 @@ const log = createLogger('notify')
 
 /** What tell() needs of the windows, given by index.ts (windows.ts and workspace.ts would make a cycle here). */
 export interface NotifyHost {
-  /** The Hive window the user is using (visible, not minimised, focused), or null with Hive in the background. */
+  /** The Combwork window the user is using (visible, not minimised, focused), or null with Combwork in the background. */
   focused: () => (FocusedCombwork & { win: BrowserWindow }) | null
   /** The window to own an entry when none is focused: the one showing its project's workspace, else the last focused. */
   fallback: (projectPath: string | null, source?: string) => BrowserWindow | null
@@ -28,7 +28,7 @@ export interface NotifyHost {
   workspaceOf: (projectPath: string) => string | null
   /** A project's folder as its workspace has it, when `path` is one (a toast's source: its link), else null. */
   projectAt?: (path: string) => string | null
-  /** The Hive window whose IPC request is being served now, or null (HI-2355: ipc.ts requestingWindow). */
+  /** The Combwork window whose IPC request is being served now, or null (HI-2355: ipc.ts requestingWindow). */
   requester?: () => BrowserWindow | null
 }
 
@@ -46,7 +46,7 @@ export interface TellSpec {
   kind: NotifyKind
   /** Its look (icon, colour); by default from its kind. */
   level?: ToastLevel
-  /** In the language Hive shows. */
+  /** In the language Combwork shows. */
   title: string
   message?: string
   /** The title in English, for the Agent API's stream (#796), when `title` is translated. */
@@ -80,7 +80,7 @@ export interface Told {
 
 const DEFAULT_LEVEL: Record<NotifyKind, ToastLevel> = { needsYou: 'info', finished: 'success', work: 'info', usage: 'warning', warning: 'warning', result: 'info', transcript: 'warning', update: 'info', quit: 'info', tip: 'info' } // i18n-ignore: levels, not text
 
-/** The kinds that answer the request they were made in (HI-2355): Hive's own messages, told in the window that asked. */
+/** The kinds that answer the request they were made in (HI-2355): Combwork's own messages, told in the window that asked. */
 const ANSWERS_REQUESTS: ReadonlySet<NotifyKind> = new Set(['result', 'warning'])
 
 /** The Agent API's kind for an entry it hears of (#620: finished, waiting, or another notice). */
@@ -112,7 +112,7 @@ export function tell(spec: TellSpec): Told {
   const sourceProject = !projectPath && spec.source && /[\\/]/.test(spec.source) ? (host.projectAt?.(spec.source) ?? null) : null
   const linked = projectPath ?? sourceProject
   const target = spec.target ?? (linked ? { kind: 'project' as const, projectPath: linked, project: projectName(linked) } : undefined)
-  // Its owner (s19's rules): Hive's own result or warning answering a window's request goes to that window, even if
+  // Its owner (s19's rules): Combwork's own result or warning answering a window's request goes to that window, even if
   // another has the focus by then (HI-2355); otherwise the window in use; with none, its workspace's (or source's).
   // Agents' kinds never follow a request: a request's context can carry into later callbacks (a session it started).
   const requester = ANSWERS_REQUESTS.has(spec.kind) ? (host.requester?.() ?? null) : null
@@ -137,7 +137,7 @@ export function tell(spec: TellSpec): Told {
     const notice: Notice = { id, kind: apiKind(spec.kind), title: spec.title, ...(spec.apiTitle && spec.apiTitle !== spec.title ? { apiTitle: spec.apiTitle } : {}), ...(spec.apiTitleText !== undefined ? { apiTitleText: spec.apiTitleText } : {}), body: spec.message ?? '', projectPath, ...(spec.agentId ? { agentId: spec.agentId } : {}) }
     tellListeners({ type: 'notice', notice, ...(route === 'windows' ? { windows: true as const } : {}) })
   }
-  // Hive has closed: its windows are closing, so a Windows notification alone. No window to own it (none open yet): the
+  // Combwork has closed: its windows are closing, so a Windows notification alone. No window to own it (none open yet): the
   // event router's choice, as before.
   if (spec.kind !== 'quit') {
     if (owner && !owner.isDestroyed()) emitTo(owner, { type: 'toast', toast: entry })
@@ -151,7 +151,7 @@ function projectName(p: string): string {
   return p.split(/[\\/]/).filter(Boolean).pop() ?? p
 }
 
-/** The Windows notification (HI-2320: only with no Hive window focused): its click shows its owner window and opens its target. */
+/** The Windows notification (HI-2320: only with no Combwork window focused): its click shows its owner window and opens its target. */
 function showWindows(entry: ToastMessage, projectPath: string | null, spec: TellSpec): void {
   if (!Notification.isSupported()) return
   // Agents' notices chime in the window (or not, per the chime settings): their Windows notification is silent.
@@ -296,7 +296,7 @@ export function resetOffers(): void {
   askSeq.clear()
 }
 
-// main's toast() (events.ts) is told here: Hive's own messages by their level; `source` (a path) names the window
+// main's toast() (events.ts) is told here: Combwork's own messages by their level; `source` (a path) names the window
 // that owns one when none is focused. (A unit test's mock of events.ts may leave it out: toast() then sends as before.)
 const installTeller = (): void => setToastTeller((t) =>
   tell({

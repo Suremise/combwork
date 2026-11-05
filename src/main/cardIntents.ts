@@ -133,7 +133,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
       case 'retryMerge':
         return w.retryMerge(named, intent.reason, by, intent.guard)
       default:
-        throw new Error(`not an intent here: ${intent.kind}`) // i18n-ignore: a mistake in Hive's code, never shown
+        throw new Error(`not an intent here: ${intent.kind}`) // i18n-ignore: a mistake in Combwork's code, never shown
     }
   }
 
@@ -173,8 +173,8 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
         // A design's or a follow-up's comment names it first (#1382, #1467): its first line is what a watch's wake and
         // latestComment show, so the reviewer has the id its answer names whichever way it is woken. A design's history line
         // keeps when its check is due, which the stall check reads (shared/tasks.ts' pendingStep); an answer's says what it checked.
-        const asks = intent.step === 'design' ? 'Design' : intent.step === 'followUp' ? 'Follow-up' : null // i18n-ignore: Hive's line atop an agent's comment, agent-facing
-        const comment = asks && step?.design ? `${asks} ${step.design}, for the reviewer's check (an answer names ${step.design}):\n\n${intent.text}` : intent.text // i18n-ignore: Hive's line atop an agent's comment, agent-facing
+        const asks = intent.step === 'design' ? 'Design' : intent.step === 'followUp' ? 'Follow-up' : null // i18n-ignore: Combwork's line atop an agent's comment, agent-facing
+        const comment = asks && step?.design ? `${asks} ${step.design}, for the reviewer's check (an answer names ${step.design}):\n\n${intent.text}` : intent.text // i18n-ignore: Combwork's line atop an agent's comment, agent-facing
         return { opts: { keepAgent, comment, note: [loopStepNote(intent.step, intent.text, step?.until, step?.of)] } }
       }
       default:
@@ -204,7 +204,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
 
 /**
  * A running lane's builder starting one of its lane's cards itself (HI-2092: Codex took its next card rather than end its
- * turn for Hive's start), outside a slot: the reply gives it what Hive's start would have (the start prompt's card-loop
+ * turn for Combwork's start), outside a slot: the reply gives it what Combwork's start would have (the start prompt's card-loop
  * line, and the lane's brief), so the lane's instructions reach it either way. Null for any other start. Agent-facing.
  */
 async function laneStartWords(ws: WorkspaceService, project: string, agentId: string, n: number, key: string): Promise<string | null> {

@@ -406,11 +406,11 @@ function helpers(h) {
     const agentChoices = () => x.panel.locator('select[aria-label="Agent"] option').allInnerTexts().catch(() => [])
     // HI-1710: the copy's set-up run is its reviewer's (no "Combwork (copy …)" entry), and no entry is listed twice.
     const hives = ['Combwork (slot slot-a)', 'Combwork (slot slot-b)']
-    const hivesNamed = async () => {
+    const combworkNamed = async () => {
       const now = await agentChoices()
       return hives.every((c) => now.includes(c)) && !now.some((c) => c.startsWith('Combwork (copy')) && new Set(now).size === now.length
     }
-    check("the Runs tab's Agent filter names the slots' runs as Combwork's, and the copy's as its reviewer's", !!(await until(hivesNamed, HUNG_MS)), JSON.stringify(await agentChoices()))
+    check("the Runs tab's Agent filter names the slots' runs as Combwork's, and the copy's as its reviewer's", !!(await until(combworkNamed, HUNG_MS)), JSON.stringify(await agentChoices()))
     await x.shoot('runs', x.panel)
 
     // --- Passed: the queue merges it into main, checked out in the project folder, while the reviewer is idle there (S42).

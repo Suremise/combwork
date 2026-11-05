@@ -12,12 +12,12 @@ import { config } from './config'
 import { agentProvider } from '../shared/providers'
 
 /**
- * The record undo is built on (#1282, SPEC §16.14): each change the Hive Assistant makes, with what it replaced and what
+ * The record undo is built on (#1282, SPEC §16.14): each change the Combwork Assistant makes, with what it replaced and what
  * it wrote, field by field, in combwork.db's `assistant_changes` and `assistant_change_values` (schema/v1_0.ts), grouped by
  * the user's message it came from (assistantControl's turn) and kept KEEP_DAYS days. A change the Assistant makes runs
  * inside `recordingChanges` (servers.ts' assistantChange, its batches): a card it changes is recorded as the card is
  * saved, in the same transaction (tasks.ts' saveCard calls noteCard), one change per card; a lane, an agent's settings,
- * a Hive setting or an agent it started by the route that made it (noteChange); and what can't be undone (a prompt, a
+ * a Combwork setting or an agent it started by the route that made it (noteChange); and what can't be undone (a prompt, a
  * comment, a project made) with why, so the window can say so. Undoing them is assistantUndo.ts'.
  */
 
@@ -123,7 +123,7 @@ function finalsOf(before: TaskCard | null, after: TaskCard): string[] {
  * A card saved inside one of the Assistant's changes (tasks.ts' saveCard, in the board change's transaction): what it
  * changed of the card's fields, as one change per card (a batch's cards each their own); a new card, as made by it, with
  * the last entry of its history as the change left it (`target`: what came after it is someone else's). What of it undo
- * can't put back is a change of its own, final, with why. Only the Assistant's own saves count, not Hive's or another
+ * can't put back is a change of its own, final, with why. Only the Assistant's own saves count, not Combwork's or another
  * actor's inside the same call.
  */
 export function noteCard(ws: WorkspaceService, before: TaskCard | null, after: TaskCard): void {
@@ -168,7 +168,7 @@ export function noteCard(ws: WorkspaceService, before: TaskCard | null, after: T
 }
 
 /**
- * Records one of the Assistant's changes that isn't a card's (a lane, an agent's settings, a Hive setting, an agent it
+ * Records one of the Assistant's changes that isn't a card's (a lane, an agent's settings, a Combwork setting, an agent it
  * started), or one that can't be undone (`final`: why), in the change running here. Its own board change. Returns its id,
  * or null outside one of the Assistant's changes.
  */

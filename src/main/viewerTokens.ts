@@ -10,7 +10,7 @@ import { combworkError } from './combworkError'
 /**
  * The Agent API's read-only viewer tokens (#620): made and revoked by the user in Settings → Agent API, each named for
  * the app it is for ("Apiary"). A viewer reads and follows the workspace like the workspace token (every GET and the
- * event stream) and changes nothing: the API refuses its every other request. Kept beside the workspace token in Hive's
+ * event stream) and changes nothing: the API refuses its every other request. Kept beside the workspace token in Combwork's
  * profile (`agent-api-viewers.json`), never in a project.
  */
 const MAX_VIEWERS = 20

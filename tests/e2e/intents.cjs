@@ -1,11 +1,11 @@
 // A card's intents over the Agent API (#1267, SPEC §16.8.1), each caller with its own token: a builder and a reviewer
-// (fake Claude Code agents, their own tokens as their hive tools use them) and the Combwork Assistant through Settings →
+// (fake Claude Code agents, their own tokens as their Combwork tools use them) and the Combwork Assistant through Settings →
 // Assistant → Control. An agent's plain number is refused naming the card's key alone (S48); start, submit, start
 // review, the reviewer's request (which ends the builder's wait for its verdict, #1272) and a failed verdict move the
 // card by its workflow (the card stays its builder's); the builder can't review its own card; a second reviewer can't
 // start a review another's running session has in progress, and can once that session stops (HI-2487); ask the user leaves it
 // where it is; missing arguments are 400; the Assistant's intent is refused at Look and advise and runs at Control
-// agents; and an agent's hive tool (cw_start_card) runs the start intent. Dev build, throwaway profile, workspace and
+// agents; and an agent's Combwork tool (cw_start_card) runs the start intent. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -68,13 +68,13 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     for (const a of [builder, reviewer, second]) await inv('session:start', alpha, { agentId: a.id })
     check('the agents start', !!(await until(async () => (await live(builder.id))?.status === 'ready' && (await live(reviewer.id))?.status === 'ready' && (await live(second.id))?.status === 'ready', HUNG_MS)))
 
-    // Each agent's own token, from its launch (by its session id) as its hive tools read it.
+    // Each agent's own token, from its launch (by its session id) as its Combwork tools read it.
     const launchesFile = path.join(claudeHome, 'fake-launches.jsonl')
     const launches = () => {
       const text = fs.existsSync(launchesFile) ? fs.readFileSync(launchesFile, 'utf8') : ''
       return text.slice(0, text.lastIndexOf('\n') + 1).split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l))
     }
-    /** An agent's hive server as its launch has it (command and environment), or null. */
+    /** An agent's combwork server as its launch has it (command and environment), or null. */
     const combworkOf = async (id) => {
       const sessionId = (await live(id))?.sessionId
       const launch = await until(() => launches().findLast((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
@@ -233,8 +233,8 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     check("…and the Assistant's idle session is woken and reads it, whole, as the builder's request", !!(await until(() => asks().slice(asksBefore).some((t) => t.includes("Builder (alpha) asks you on ") && t.includes('<<<Please put this card On Hold: the user said so.>>>')), HUNG_MS)), JSON.stringify(asks().slice(asksBefore)))
     await inv('session:stop', home, 'assistant')
 
-    // An agent's hive tool: cw_start_card runs the start intent. Called through cw-mcp.js with the builder's own
-    // hive server settings (from its launch), not typed into its pane, where Combwork's own wakes may be typed meanwhile.
+    // An agent's Combwork tool: cw_start_card runs the start intent. Called through cw-mcp.js with the builder's own
+    // combwork server settings (from its launch), not typed into its pane, where Combwork's own wakes may be typed meanwhile.
     const builderCombwork = await combworkOf(builder.id)
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_start_card', arguments: { card: key } } }) + '\n',

@@ -1,7 +1,7 @@
 // The durable actions' worker (SPEC §16.4.5, #1215): an action is written in the same transaction as the facts that cause
 // it, so nothing outside happens for a change that rolled back; once a change commits, this runs the workspace's pending
 // actions in the order written, and at start (a workspace opened) any a crash left pending. However often an action is
-// run (a crash between its effect and its mark, a close, two runs at once, another Hive's), its effect is kept to once
+// run (a crash between its effect and its mark, a close, two runs at once, another Combwork's), its effect is kept to once
 // in one of three ways (#1266, SPEC §16.4.5):
 // - **Delivered**: a handler that makes a delivery gives it the action's id, and the delivery's row (unique per action,
 //   `deliveries.action`) is the record that it was made. The handler runs again until the action is marked, and finds
@@ -175,7 +175,7 @@ function change<T>(at: RunOf, fn: () => T): Promise<T | null> {
 
 async function drain(at: RunOf): Promise<void> {
   const { ws } = at
-  // A board that takes no writes (waiting for its upgrade, or a newer Hive's): nothing can be marked.
+  // A board that takes no writes (waiting for its upgrade, or a newer Combwork's): nothing can be marked.
   if (!at.alive() || boardReadOnly(ws)) return
   const pending = boardRead(ws, (db) => pendingActionsOf(db))
   for (const a of pending) {
@@ -185,7 +185,7 @@ async function drain(at: RunOf): Promise<void> {
     // A repeatable one another claim holds (tried again when its lease passes), or a run here is on: left, with no board
     // change (each one would start another run).
     if (once === 'repeatable' && !boardRead(ws, (db) => free(db, ws, a.id))) continue
-    // Each action as it is now: another run (another Hive's, or ours) may have marked it meanwhile. A claimed one is
+    // Each action as it is now: another run (another Combwork's, or ours) may have marked it meanwhile. A claimed one is
     // marked done here, by the run that finds it pending; a repeatable one is leased here, by the one claim that wins its
     // lease (one with two uncertain dispatches already is done: never a third); only that run goes on with it.
     const token = once === 'repeatable' ? `${PROCESS}/${randomUUID()}` : ''
@@ -302,7 +302,7 @@ function free(db: DatabaseSync, ws: WorkspaceService, id: number): boolean {
   return true
 }
 
-/** Per workspace file, a run asked for when another Hive's lease passes (one at a time: the earliest). */
+/** Per workspace file, a run asked for when another Combwork's lease passes (one at a time: the earliest). */
 const retries = new Map<string, { at: number; timer: ReturnType<typeof setTimeout> }>()
 function retryAt(ws: WorkspaceService, at: number): void {
   if (!ws.path) return
@@ -320,7 +320,7 @@ function retryAt(ws: WorkspaceService, at: number): void {
 
 /**
  * The pending actions this process could take now (a look at the pending index, cheap when there are none): not one
- * another Hive's lease holds (its retry is timed), nor one a run here is on. So a run's own board changes (a mark, a
+ * another Combwork's lease holds (its retry is timed), nor one a run here is on. So a run's own board changes (a mark, a
  * dispatch) never start another run for nothing.
  */
 function takeable(db: DatabaseSync, ws: WorkspaceService): boolean {

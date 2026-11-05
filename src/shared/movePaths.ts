@@ -51,7 +51,7 @@ export function rebaseAny(p: string, moves: PathMove[]): string | null {
 
 /**
  * Where an agent's worktree may be now, most likely first: moved along inside its project or the workspace, moved
- * along in the workspace's worktrees folder beside it (`<workspace>.worktrees`, where Hive creates them), or still
+ * along in the workspace's worktrees folder beside it (`<workspace>.worktrees`, where Combwork creates them), or still
  * where it was. The first that is a worktree folder wins.
  */
 export function worktreeCandidates(old: string, workspace: PathMove, project: PathMove): string[] {

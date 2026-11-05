@@ -2,7 +2,7 @@ import type { TestedCli } from './types'
 import { msg, tr } from './i18n'
 
 /**
- * The CLI versions this Hive release was tested with (#365), in words, for Provider Setup, Copy Diagnostics and the
+ * The CLI versions this Combwork release was tested with (#365), in words, for Provider Setup, Copy Diagnostics and the
  * Agent API: the versions side by side, and a note when the installed one isn't the tested one. Calm on purpose: a
  * newer CLI usually works, so nothing is blocked.
  */

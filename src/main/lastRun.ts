@@ -25,7 +25,7 @@ import { inWorkspace, openWorkspaces, workspaceOf } from './workspace'
 import { dataFolder } from './combworkFolder'
 
 /**
- * Hive closing unexpectedly (#984, shared/unexpectedClose.ts): the marker in the profile while Hive runs, and at the next
+ * Combwork closing unexpectedly (#984, shared/unexpectedClose.ts): the marker in the profile while Combwork runs, and at the next
  * start the notice of a run that ended without quitting (when it was last seen, what was running, what the agents had
  * started that still runs with Stop Them (#987), a crash dump of it, a merge left half done), the Assistant told, and the
  * agents resumed only if Settings → Sessions says so. Nothing is stopped unless the user says so.
@@ -73,7 +73,7 @@ async function startupDone(): Promise<void> {
 let toResume: RunningAgent[] = []
 /**
  * What the agents had started that still ran as the notice was given, for its Stop Them (#987; those that end go), with
- * all the marker kept of it (the hive-progress runs among them, #1008), and the ids of a run's children Stop Them could
+ * all the marker kept of it (the cw-progress runs among them, #1008), and the ids of a run's children Stop Them could
  * neither end nor check (#1028: said by every click after, never tried again).
  */
 const leftovers = new LeftoverStops({ endTrees: endTreesExactly, endExact: endProcessesExactly, stillRunning: stillRunningOf })
@@ -165,7 +165,7 @@ class NotWanted extends Error {}
 /**
  * Writes a marker whole beside its file, without holding the main process up (#1111: it was written synchronously on
  * every status change), then renames it into place, so a reader never sees half of one. The rename is tried again while
- * the marker is held for a moment (HI-2201: a reader or a virus scanner had it open, the write that had a hive-progress
+ * the marker is held for a moment (HI-2201: a reader or a virus scanner had it open, the write that had a cw-progress
  * run's processes failed with EPERM, and the marker missed them until the next heartbeat). `wanted` is asked just before
  * each rename, with nothing awaited between: a marker removed meanwhile (Hive quitting) is never put back. So each try is
  * synchronous, in the guard's turn (HR2's round 1: an asynchronous rename, started after the guard, could finish after
@@ -222,7 +222,7 @@ export function startRunMarker(): void {
     if (e.type === 'session-exit' || e.type === 'session-status' || e.type === 'workspace-changed') writeSoon()
   })
   onLaunchProcessJoined(writeSoon)
-  // Windows ending the session is a clean end too: Hive may be ended without quitting after it.
+  // Windows ending the session is a clean end too: Combwork may be ended without quitting after it.
   const watch = (w: BrowserWindow): void => void w.on('session-end', () => endRunMarker('Windows is ending the session')) // i18n-ignore: why, for combwork.log
   for (const w of BrowserWindow.getAllWindows()) watch(w)
   app.on('browser-window-created', (_e, w) => watch(w))
@@ -244,7 +244,7 @@ export function endRunMarker(why: string): void {
 }
 
 /**
- * A merge slot hold Hive closed under (mergeSlotHost.ts): told in the notice when the last run closed unexpectedly and
+ * A merge slot hold Combwork closed under (mergeSlotHost.ts): told in the notice when the last run closed unexpectedly and
  * the notice isn't out yet. False when it isn't (the caller tells it on its own).
  */
 export function addLeftMerge(m: LeftMerge): boolean {
@@ -359,7 +359,7 @@ async function tellAssistants(c: UnexpectedClose, r: ResumeReport | null, still:
 }
 
 /**
- * Once Hive's window is up: the notice of the last run's unexpected close, if there was one. With Settings → Sessions →
+ * Once Combwork's window is up: the notice of the last run's unexpected close, if there was one. With Settings → Sessions →
  * Resume agents after an unexpected close on, the agents are resumed first and the notice says so; off (the default),
  * the notice offers Resume All and nothing resumes on its own. The Assistant is told either way.
  */
@@ -409,7 +409,7 @@ export async function stopLeftAfterClose(): Promise<number> {
   const u = left.unverified.length
   if (n) log.warn(`Couldn't stop ${n} process(es) the agents had started before Combwork closed unexpectedly`)
   if (u && tried) log.warn(`${u} process(es) a test run had started may still run: Windows let Combwork neither end nor check them (ids ${left.unverified.join(', ')})`)
-  // A test run's child Hive could neither end nor check may still run: never a success (#1008), on any click (#1028).
+  // A test run's child Combwork could neither end nor check may still run: never a success (#1008), on any click (#1028).
   if (!n && !u && !tried) return 0
   const ids = fmt.list(left.unverified.map(String))
   if (n && u) throw combworkError(msg({ id: 'main.unexpectedClose.notStoppedNorChecked', defaultMessage: "{n, plural, one {# process is still running: Windows didn't let Combwork end it; Stop Them in the notice tries again.} other {# processes are still running: Windows didn't let Combwork end them; Stop Them in the notice tries again.}} {u, plural, one {Another, started by a test run, may still be running: Windows let Combwork neither end nor check it, so Combwork can't find it again. Look for process ID {ids} in Task Manager's Details.} other {# others, started by a test run, may still be running: Windows let Combwork neither end nor check them, so Combwork can't find them again. Look for process IDs {ids} in Task Manager's Details.}}", description: "Stopping the processes the agents had started before Combwork closed unexpectedly failed for some. {n} is how many still run, which Stop Them (the notice's button) tries again; {u} is how many more, started by a test run, Windows let Combwork neither end nor check, so Combwork can't tell them from other processes any more: {ids} lists their process IDs (\"4242, 4250\"), to look for in Task Manager's Details tab." }), { n, u, ids })

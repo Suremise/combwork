@@ -127,7 +127,7 @@ const linkTo =
   )
 
 /**
- * The price table for a provider's models: Hive's prices (editable defaults), with the user's changes, added and removed
+ * The price table for a provider's models: Combwork's prices (editable defaults), with the user's changes, added and removed
  * models (#125), and the models the CLI lists (#436): one with no price marked to enter one, a priced one it no longer
  * lists greyed. A provider that doesn't report costs says where to check its prices.
  */
@@ -245,18 +245,18 @@ function PriceTable({ provider }: { provider: ProviderId }) {
 
 /**
  * An editable list for a provider's fallback (models or effort levels): value, name and, for models, Older. Any edit
- * stores the whole list as the user's; Reset to defaults removes it, so Hive's own list (and its updates) applies again.
+ * stores the whole list as the user's; Reset to defaults removes it, so Combwork's own list (and its updates) applies again.
  */
 function FallbackRows<T extends FallbackModel | EffortOption>({ provider, kind, rows, edited, valueLabel, newLabel, placeholder, open: startOpen }: { provider: ProviderId; kind: 'models' | 'efforts'; rows: T[]; edited: boolean; valueLabel: string; newLabel: string; placeholder: string; open: boolean }) {
   const [adding, setAdding] = useSettingsDraft(`fallback:${provider}:${kind}`)
-  // Folded while the CLI's answer is in use and the list is Hive's own: it is only used without one.
+  // Folded while the CLI's answer is in use and the list is Combwork's own: it is only used without one.
   const [open, setOpen] = useState(startOpen)
   useEffect(() => {
     if (startOpen) setOpen(true)
   }, [startOpen])
   const save = (next: T[] | null): Promise<void> => actions.attempt(tr(msg({ id: 'settings.fallback.saveFailed', defaultMessage: 'Could not save the list', description: "An error's title: saving a provider's fallback list of models or effort levels failed." })), () => call('settings:setProviderFallback', provider, kind, next)).then((s) => void (s && set({ settings: s })))
   const change = (i: number, patch: Partial<FallbackModel>): void => void save(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)))
-  // A level's name as Hive ships it is shown in the window's language (#889), as the pickers show it; one the user gave stays theirs.
+  // A level's name as Combwork ships it is shown in the window's language (#889), as the pickers show it; one the user gave stays theirs.
   const shownName = (r: T): string => {
     const shipped = kind === 'efforts' ? providerDescriptor(provider).effortLevels.find((e) => e.value === r.value && e.label === r.label) : undefined
     return shipped?.text ? tr(shipped.text) : r.label
@@ -354,7 +354,7 @@ function EffortFallbackTable({ provider }: { provider: ProviderId }) {
   )
 }
 
-/** A row's value: Hive's settings. */
+/** A row's value: Combwork's settings. */
 const getValue = (s: AppSettings, def: SettingDef): unknown => settingValue(def, s, null)
 
 const defaultValue = (def: SettingDef): unknown => settingDefault(def)
@@ -634,7 +634,7 @@ function McpCatalogSources() {
   )
 }
 
-/** Hive's modes, for choosing a default before a workspace is open. */
+/** Combwork's modes, for choosing a default before a workspace is open. */
 const SHIPPED_MODES = [
   { id: 'coordinator', name: 'Coordinator', icon: '🧭', bundled: 'same' as const }, // i18n-ignore: the shipped modes' names, as their files name them (modeName shows them translated)
   { id: 'planner', name: 'Planner', icon: '🗺️', bundled: 'same' as const }, // i18n-ignore: the shipped modes' names, as their files name them (modeName shows them translated)
@@ -743,7 +743,7 @@ function ColumnColors() {
 }
 
 /**
- * Settings → General → Language (#767): Automatic, then each of Hive's languages by its own name, those drafted by AI
+ * Settings → General → Language (#767): Automatic, then each of Combwork's languages by its own name, those drafted by AI
  * marked, with the chosen one's note in its own words under the list. What a language hasn't translated yet shows in
  * English.
  */
@@ -847,7 +847,7 @@ function ApiToken() {
   )
 }
 
-/** Settings → Agent API → Viewer tokens (#620): read-only tokens for apps that show Hive, made and revoked here. */
+/** Settings → Agent API → Viewer tokens (#620): read-only tokens for apps that show Combwork, made and revoked here. */
 function ViewerTokens() {
   const api = useStore((s) => s.api)
   const [name, setName] = useSettingsDraft('viewers:name')
@@ -1000,7 +1000,7 @@ const WORKSPACE_DEFAULTS_NAMED = msg({ id: 'settings.workflow.workspaceDefaultsN
 const WORKFLOW_TABS_LABEL = msg({ id: 'settings.workflow.tabs', defaultMessage: 'Workflow defaults', description: "Accessible name of Settings → Version Control's tabs: Combwork defaults and the open workspace's (HI-1837)." })
 
 /**
- * Settings → Version Control's two levels as tabs (HI-1837): Hive defaults and the open workspace's, each its own form
+ * Settings → Version Control's two levels as tabs (HI-1837): Combwork defaults and the open workspace's, each its own form
  * and Save…, the tab last chosen shown. Both forms stay mounted while the section is shown, so switching (or a search
  * offering only one tab) keeps each draft; a tab with one says so. `rows` are the section's rows the search shows.
  */

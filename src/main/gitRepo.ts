@@ -122,7 +122,7 @@ export function gitSays(r: GitResult): string {
   return shownText(gitSaid(r))
 }
 
-/** gitSays as text: git's own lines as they came, Hive's words (it gave up, an exit code alone) as a message. */
+/** gitSays as text: git's own lines as they came, Combwork's words (it gave up, an exit code alone) as a message. */
 export function gitSaid(r: GitResult): TextPart {
   if (r.timedOut) return withValues(M.gaveUp, { minutes: NETWORK_MS / 60_000 })
   const lines = `${r.err}\n${r.out}`
@@ -194,7 +194,7 @@ const summaries = new Map<string, KeptSummary>()
 
 /**
  * HI-2135: how many folders' summaries are kept: the most recently read, the oldest dropped first, so the folders of a
- * long session (projects removed, slots and review copies gone, other workspaces) aren't kept for as long as Hive runs.
+ * long session (projects removed, slots and review copies gone, other workspaces) aren't kept for as long as Combwork runs.
  * A folder dropped is read with git again the next time, as one never read is.
  */
 const SUMMARIES_MAX = 200
@@ -212,7 +212,7 @@ export function forgetSummaries(): void {
   summaries.clear()
 }
 
-/** Tests: how many folders' summaries are kept at most (null: as Hive keeps them), and how many are kept now. */
+/** Tests: how many folders' summaries are kept at most (null: as Combwork keeps them), and how many are kept now. */
 export function summariesForTests(max?: number | null): number {
   if (max !== undefined) summariesMax = max ?? SUMMARIES_MAX
   return summaries.size
@@ -229,7 +229,7 @@ interface KeyBasis {
  * upstream's commits, the packed refs, and every config file git reads there (remotes and upstreams can come from any):
  * those its last read named, the repository's own, and the global ones whether they exist yet or not. The status bar
  * reads the summary again at each usage change of the project's agents (several a second while lanes build): the same
- * key is git's same answer. Only for a plain repository (plainRepo, the one rule of Hive's git caches), every one of
+ * key is git's same answer. Only for a plain repository (plainRepo, the one rule of Combwork's git caches), every one of
  * those config files free of includes: null otherwise, as where the files can't say (no `.git` of its own, a branch or
  * an upstream whose commit isn't read from them) or config is given in the environment.
  */
@@ -280,7 +280,7 @@ async function fileParts(gitDir: string): Promise<Pick<GitRepoSummary, 'state' |
 /**
  * The config files `git config --list --show-origin -z` read in `root` (each entry its origin, then its key and value),
  * as absolute paths; null when an entry came from elsewhere than a file or the command line (a blob, standard input),
- * which no file's change would show. The command line's are Hive's own (GIT_PREFIX), the same at every read; config
+ * which no file's change would show. The command line's are Combwork's own (GIT_PREFIX), the same at every read; config
  * given in the environment (also said as the command line's) isn't kept at all (summaryKey).
  */
 export function configOrigins(out: string, root: string): string[] | null {
@@ -629,7 +629,7 @@ function scrubText(t: TextPart, secrets: string[]): TextPart {
 
 /**
  * The project's agents working in its folder now (#1451: their current folder, `currentFolder`: a running session's, else
- * where a new conversation would start), with their sessions' status. One with input of Hive's still on its way (#646
+ * where a new conversation would start), with their sessions' status. One with input of Combwork's still on its way (#646
  * round 1: a prompt or launch task given and not taken yet, or a line typed and not taken) counts as working: its CLI may
  * start that turn any moment, and the folder's fence can't take back what is in its input.
  */
@@ -659,7 +659,7 @@ function folderSlots(projectPath: string): FolderSlot[] {
 /**
  * Switching branch or pulling moves the ground under the agents working in the folder and under a merge into its
  * branch: refused while one works there or the merge slot is held or waited for, saying why. The change itself runs
- * holding the slot of the branch it leaves and the repository lock (repoLock.ts, across Hives), so a merge can't start in the middle. An agent may
+ * holding the slot of the branch it leaves and the repository lock (repoLock.ts, across Combworks), so a merge can't start in the middle. An agent may
  * start working while it waits for them, so it is checked again once they are held, right before git runs (nothing is
  * awaited between that check and starting git).
  */
@@ -668,8 +668,8 @@ async function changeFolder<T>(projectPath: string, action: GitFolderAction, bra
   if (why) throw new CombworkError(why)
   const locked = (): Promise<T> =>
     withRepoLock(projectPath, () =>
-      // The folder is fenced from here to git's end (#646): no line of Hive's is typed into its agents and none starts
-      // there meanwhile, so no turn of Hive's begins between this last check and git changing the files.
+      // The folder is fenced from here to git's end (#646): no line of Combwork's is typed into its agents and none starts
+      // there meanwhile, so no turn of Combwork's begins between this last check and git changing the files.
       // i18n-ignore: what changes the folder, for the log and an agent's reply (agent-facing, English)
       changingFolder(projectPath, `a Git ${action}`, async () => {
         // The slot is this action's own now (asUser refuses when anyone else holds or waits for it); without a branch to
@@ -776,7 +776,7 @@ export async function setRemoteUrl(projectPath: string, name: string, url: strin
   }, [url])
 }
 
-/** Fetches every remote: the only way ahead/behind changes (Hive never fetches by itself). */
+/** Fetches every remote: the only way ahead/behind changes (Combwork never fetches by itself). */
 export async function fetchAll(projectPath: string): Promise<string> {
   projectPath = workspace.assertProject(projectPath)
   return oneAtATime(projectPath, async () => {
@@ -821,7 +821,7 @@ export async function pull(projectPath: string): Promise<string> {
   })
 }
 
-/** A push's refusal, naming the branch: Hive never forces, so the user pulls or merges first. */
+/** A push's refusal, naming the branch: Combwork never forces, so the user pulls or merges first. */
 const rejected = (to: string, branch: string): CombworkError => refusal(msg({ id: 'service.gitRepo.rejected', defaultMessage: "{to} has commits {branch} hasn't, so the push was refused (Combwork never forces a push). Pull first, or merge them in a terminal.", description: "An error pushing the branch {branch} in the Git view: the remote branch {to} has commits it hasn't, so the remote refused." }), { to, branch })
 
 /** Pushes the branch to its upstream, or to `remote` (setting it as the upstream) when it has none. Never forced. */
@@ -1136,7 +1136,7 @@ export async function deleteBranches(projectPath: string, items: BranchAt[], unm
             notes.push(kept('unmerged', branch, now.target))
             continue
           }
-          // Removed only at the commit checked (round 4): a git outside Hive's lock that moved it meanwhile makes git
+          // Removed only at the commit checked (round 4): a git outside Combwork's lock that moved it meanwhile makes git
           // refuse, and its new commits stay. Then checked out anywhere after all (taken around the lock): put back at
           // that commit, kept. Its config goes only once it is gone for good.
           const r = await git(projectPath, ['update-ref', '-d', `refs/heads/${branch}`, sha])
@@ -1235,9 +1235,9 @@ export async function deleteRemoteBranches(projectPath: string, remote: string, 
 
 /**
  * A clean-up's one hold (#1642 rounds 3 and 5), from each branch's last check through its deletion (a remote's push
- * included): the repository's lock, across Hives, which slot preparation, merges, branch switches and every workflow
+ * included): the repository's lock, across Combworks, which slot preparation, merges, branch switches and every workflow
  * options write that can move the project's target take (`withRepoLocks`: the project's, a level's, a setting's tool,
- * a platform switch), then this Hive's turn of workflow writes. In that order everywhere, so none waits on another.
+ * a platform switch), then this Combwork's turn of workflow writes. In that order everywhere, so none waits on another.
  */
 function guarded<T>(projectPath: string, fn: () => Promise<T>): Promise<T> {
   return withRepoLock(projectPath, () => workflowWrite(fn), { project: projectPath })
@@ -1394,7 +1394,7 @@ export async function updateBranch(projectPath: string, branch: string, how: Bra
 
 async function updateLocked(projectPath: string, branch: string, how: BranchUpdateHow): Promise<string> {
   const place = await branchFolder(projectPath, branch)
-  // The folder fenced from the last check to git's end (#646): no Hive line typed into its agents, none started there.
+  // The folder fenced from the last check to git's end (#646): no Combwork line typed into its agents, none started there.
   // i18n-ignore: what changes the folder, for the log and an agent's reply (agent-facing, English)
   const fenced = <T>(fn: () => Promise<T>): Promise<T> => (place.folder ? changingFolder(place.folder, 'a Git update from the target', fn) : fn())
   return fenced(async () => {

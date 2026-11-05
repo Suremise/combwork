@@ -1,4 +1,4 @@
-// The hive tool list's size as the bridge reports it (HI-2063): its characters, and of them the tools' descriptions and
+// The Combwork tool list's size as the bridge reports it (HI-2063): its characters, and of them the tools' descriptions and
 // their parameters' descriptions, each as the list's JSON has it.
 import { describe, expect, it } from 'vitest'
 import { toolListSize } from '../src/shared/toolListSize'

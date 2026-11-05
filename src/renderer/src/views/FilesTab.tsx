@@ -989,7 +989,7 @@ const spanDay = (t: number): string => {
 const dayKey = (iso: string): string => new Date(iso).toDateString()
 
 /**
- * A project's Attachments tab, and the Hive Assistant's Attachments (`assistant`: its home's .combwork/attachments, grouped by
+ * A project's Attachments tab, and the Combwork Assistant's Attachments (`assistant`: its home's .combwork/attachments, grouped by
  * conversation): what was pasted or dropped into sessions, with filters by kind. Clicking a group's name opens that
  * session's transcript.
  */
@@ -1349,7 +1349,7 @@ function PanePanel({ assistant, idBase, selected, children }: { assistant: boole
 /** The filters' names, plural. */
 const ATTACHMENT_FILTER_LABEL: Record<AttachmentKind, Msg> = { image: M.images, pdf: M.pdfs, text: M.text, file: M.other }
 
-/** A kept attachment's own name, without the time Hive put in front of it ("2026-10-12_09-30-00_report.pdf" is "report.pdf"). */
+/** A kept attachment's own name, without the time Combwork put in front of it ("2026-10-12_09-30-00_report.pdf" is "report.pdf"). */
 const shownName = (name: string): string => name.replace(/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_/, '')
 
 /**

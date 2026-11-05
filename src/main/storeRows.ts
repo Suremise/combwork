@@ -89,7 +89,7 @@ export async function writeStore<T>(workspacePath: string, store: StoreName, sco
  */
 export async function withStoreLock<T>(workspacePath: string, store: StoreName, scope: string, fn: (db: ReturnType<typeof workspaceDb>['writer']) => Promise<T>): Promise<T> {
   const path = resolve(workspacePath)
-  if (inBoardWrite(path)) throw new Error(`The ${store} were saved inside a change of the board`) // i18n-ignore: a mistake in Hive's code, never shown
+  if (inBoardWrite(path)) throw new Error(`The ${store} were saved inside a change of the board`) // i18n-ignore: a mistake in Combwork's code, never shown
   // Under way from here, its wait for the lock included (HI-1368: a close command waits for it).
   const written = beginWrite(path)
   try {
@@ -111,7 +111,7 @@ type Writer = ReturnType<typeof workspaceDb>['writer']
  */
 export async function saveTable(workspacePath: string, store: StoreName, scope: string, write: (db: Writer) => void, meta: Record<string, string | null> = {}, guard?: () => void): Promise<void> {
   const path = resolve(workspacePath)
-  if (inBoardWrite(path)) throw new Error(`The ${store} were saved inside a change of the board`) // i18n-ignore: a mistake in Hive's code, never shown
+  if (inBoardWrite(path)) throw new Error(`The ${store} were saved inside a change of the board`) // i18n-ignore: a mistake in Combwork's code, never shown
   // Under way from here, its wait for the lock included (HI-1368: a close command waits for it).
   await countedWrite(path, () => saveTableLocked(path, store, scope, write, meta, guard))
 }
@@ -141,7 +141,7 @@ export function storeValue(db: Writer | ReturnType<typeof workspaceDb>['reader']
 export interface StoreTable<T> {
   count(db: Writer, scope: string): number
   /**
-   * In the move's transaction: writes the file's entries (those not of Hive's form kept aside), keeping any the table has
+   * In the move's transaction: writes the file's entries (those not of Combwork's form kept aside), keeping any the table has
    * already (by id); returns how many it wrote.
    */
   put(db: Writer, scope: string, got: T): number

@@ -4,7 +4,7 @@ import { utf8Bytes } from './metrics'
 /**
  * Workspace notes (#1433, #873, SPEC §16.10.7): one shared note per workspace for what is true of this machine (a
  * full-path command, a local tool's version), which no committed file should hold. It lives in the workspace's
- * git-excluded `.combwork/shared`, and Hive delivers it inline at each launch, after the session contract, to every agent
+ * git-excluded `.combwork/shared`, and Combwork delivers it inline at each launch, after the session contract, to every agent
  * on every CLI, in whichever folder it works (a slot, a worktree, the project folder): a git-ignored file in the project
  * reaches only some of them. A `## <project name>` section is that project's alone; the rest is everyone's.
  */
@@ -31,7 +31,7 @@ const heading = (line: string): string | null => /^ {0,3}#{1,2}[ \t]+(.+?)(?:[ \
 
 /**
  * The part of the note one project's agents get: everything outside the projects' sections, and its own section
- * (`## <name>`, its name as the workspace lists it, any case). With `project` null (the Hive Assistant), the whole note.
+ * (`## <name>`, its name as the workspace lists it, any case). With `project` null (the Combwork Assistant), the whole note.
  * A heading that names no project of the workspace is everyone's.
  */
 export function notesFor(text: string, project: string | null, projects: readonly string[]): string {

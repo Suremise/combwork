@@ -305,7 +305,7 @@ lands while the advance waits for the repository lock stops it; Resume reads the
 
 **The queue in the Progress panel** (#1356, SPEC §16.13's P5 line): the window reads every project's `queue:list` with
 the window's extra targets (`queueViews(…, window)`: the targets its cards in flight under Combwork merges merge into, and the
-current options' target, as `inFlight` and `hiveMerges`) through `queueSource.ts`, again on `queue-changed`, and on
+current options' target, as `inFlight` and `combworkMerges`) through `queueSource.ts`, again on `queue-changed`, and on
 `tasks-changed` (a card starting or finishing changes which queues show). `shared/progressQueue.ts` decides from that
 model which queues show and what their cards say (the estimate from Combwork's runs, the returns until seen, Pulse's line,
 the announcements); `ProgressQueue.tsx` draws the queue's card (reused by #1357), the Merges tab's list beside the merge
@@ -818,7 +818,7 @@ given** (`decisionGenerations`), and the receipt records that generation, never 
 changed back to earlier words is still a later generation), once, in a change of its own, while the workspace (and the
 card's project) is still the one it was for. The actor is the change's
 (`recording`/`recordingAs`, an AsyncLocalStorage set by every tasks.ts entry point that takes one): `user`,
-`assistant`, `agent:<id>`, or `hive` for Combwork's own; a move's cause `user` from the window, `intent` from an agent's
+`assistant`, `agent:<id>`, or `combwork` for Combwork's own; a move's cause `user` from the window, `intent` from an agent's
 or the Assistant's tools and the API, `derived` for Combwork's. **Platform reads are made before the change** ("The one path": slow reads outside `boardWrite`):
 `updateTask`, `updateTasks` and `createTask` plan which cards a change may start or submit from the board's columns
 (`cardHeads`, no document read) and read their folders with git (`platform/git.ts`: branch, head, merge base with the

@@ -7,7 +7,7 @@ import { resolveAsks } from './notify'
 const CLOSED = msg({ id: 'main.quit.closed', defaultMessage: 'Combwork has closed', description: 'A notice after Combwork quit without asking, its sessions stopped.' })
 const CLOSED_BODY = msg({ id: 'main.quit.closedBody', defaultMessage: '{n, plural, one {# session was stopped. Resume it from Combwork next time; nothing was lost.} other {# sessions were stopped. Resume them from Combwork next time; nothing was lost.}}', description: 'The notice after Combwork quit: how many sessions it stopped.' })
 
-/** The notice after Hive quit without asking: in the language shown, its title in English for the Agent API too. */
+/** The notice after Combwork quit without asking: in the language shown, its title in English for the Agent API too. */
 export function closedNotice(stopped: number): { title: string; body: string; apiTitle: string; apiTitleText: Text } {
   // agent-stored: agentField says the events stream's title again in each caller's dialect, from apiTitleText (apiEvents.ts, HI-2465)
   return { title: tr(CLOSED), body: tr(CLOSED_BODY, { n: stopped }), apiTitle: englishText(CLOSED), apiTitleText: CLOSED }

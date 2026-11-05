@@ -2,7 +2,7 @@
 // slot and per agent kept by SQLite's own indexes (two processes on one combwork.db lending one slot at once), carried slots
 // protected, dirty slots not lent, the pool's size and idle removal, every guard of a removal, setup and installs as
 // runs, a failed setup, names, a slot gone from disk, and the options read from today's worktree settings. And the
-// operations that own a slot while it changes (HR1's round 1): two pools on one combwork.db as two Hives (each its own
+// operations that own a slot while it changes (HR1's round 1): two pools on one combwork.db as two Combworks (each its own
 // connection and holder process), commands held at a gate, a holder that dies, jobs that can't be emptied.
 import { spawn, spawn as nodeSpawn, type ChildProcess } from 'child_process'
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs'
@@ -328,7 +328,7 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
     expect(await w.pool.lend({ agent: 'a2', card: 1 })).toEqual({ ok: false, refusal: { why: 'inUse', slot: 'slot-a', agent: 'a1', card: 1, lane: null } })
   })
 
-  it('two Hives lending one slot at once: one gets it, the other is refused "slot-a is in use"', async () => {
+  it('two Combworks lending one slot at once: one gets it, the other is refused "slot-a is in use"', async () => {
     const w = world()
     const r = await lent(w, { agent: 'a0', card: 1 })
     await w.pool.release(r.lease.id, 'done')

@@ -109,7 +109,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     const laneNow = async () => (await inv('lanes:list')).find((l) => l.id === lane?.id)
     check('both agents run', !!(await until(async () => !!(await live(b1.id)) && !!(await live(r1.id)), HUNG_MS)))
 
-    // The agents' own tokens, from their launches, as their hive tools read them (progressgates').
+    // The agents' own tokens, from their launches, as their Combwork tools read them (progressgates').
     const launchesFile = path.join(claudeHome, 'fake-launches.jsonl')
     const launches = () => {
       const text = fs.existsSync(launchesFile) ? fs.readFileSync(launchesFile, 'utf8') : ''

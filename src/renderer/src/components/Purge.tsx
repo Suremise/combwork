@@ -77,7 +77,7 @@ const purgeColumns = (workspace: boolean): DataColumn<PurgeItem>[] => [
 ]
 
 /**
- * Purge… (#1138): everything Hive keeps for a session, a project or the workspace, listed with its size first, then
+ * Purge… (#1138): everything Combwork keeps for a session, a project or the workspace, listed with its size first, then
  * removed exactly as listed (main plans it again and skips what changed), to the Recycle Bin or permanently.
  * `beforeApply` runs just before (the Sessions tab closes its view of the session, which counts as in use).
  */

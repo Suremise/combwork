@@ -18,7 +18,7 @@ export function cardBusy(ws: WorkspaceService, c: TaskCard): string | null {
     if (st) return name ? tr(BUSY.working, { agent: name }) : tr(BUSY.workingUnnamed)
   }
   if (c.review) return tr(BUSY.reviewing, { agent: c.review.agentName })
-  // HI-2153: a watch on a card in Done waits for nothing more (Hive ends it): nobody is on it for that.
+  // HI-2153: a watch on a card in Done waits for nothing more (Combwork ends it): nobody is on it for that.
   if (c.column === 'done') return null
   for (const st of sessions.liveStates()) {
     if (workspaceFor(st.projectPath) !== ws || !sessions.watchFor(st.projectPath, st.agentId)?.cards.includes(c.number)) continue

@@ -2,8 +2,8 @@
  * The ICU MessageFormat agent text is written in (dialects, HI-2065), formatted by FormatJS's `intl-messageformat` in
  * English, tags off (`<` is text: agent text has no markup): the same grammar the extractor checks the catalogue and a
  * dialect's texts with (scripts/agentTextExtract.mjs, FormatJS's parser with the same options), so what passes the
- * schema formats. hive-mcp.js and hive-progress.js run outside the asar and can't load a package from node_modules:
- * intl-messageformat and its parser are bundled into Hive's chunks for them (electron.vite.config.ts, HI-2433).
+ * schema formats. cw-mcp.js and cw-progress.js run outside the asar and can't load a package from node_modules:
+ * intl-messageformat and its parser are bundled into Combwork's chunks for them (electron.vite.config.ts, HI-2433).
  */
 import { IntlMessageFormat } from 'intl-messageformat'
 

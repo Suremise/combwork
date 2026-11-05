@@ -12,7 +12,7 @@ import { trash } from './trash'
 
 /**
  * The Combwork Assistant's modes: Markdown files in the workspace's .combwork/modes (a header with name,
- * description and icon, then the character and focus). Hive ships four (resources/modes), kept up to date in
+ * description and icon, then the character and focus). Combwork ships four (resources/modes), kept up to date in
  * each workspace like the bundled skills (bundled.ts).
  */
 
@@ -67,7 +67,7 @@ export async function deleteMode(id: string): Promise<void> {
   if (existsSync(path)) await trash(path)
 }
 
-/** Puts back a bundled mode as this version of Hive ships it; the workspace's copy goes to the Recycle Bin. */
+/** Puts back a bundled mode as this version of Combwork ships it; the workspace's copy goes to the Recycle Bin. */
 export async function restoreMode(id: string): Promise<ModeInfo> {
   const src = join(bundledModesDir(), `${id}.md`)
   if (!validId(id) || !existsSync(src)) throw combworkError(msg({ id: 'content.mode.notBundled', defaultMessage: '"{mode}" isn\'t one of Combwork\'s modes.', description: "An error restoring a mode Combwork ships: Combwork ships no mode called {mode}." }), { mode: id }, { kind: 'notFound' })
@@ -77,7 +77,7 @@ export async function restoreMode(id: string): Promise<ModeInfo> {
   return { ...(await info(dest, id)), bundled: 'same' }
 }
 
-/** A mode's name, summary and instructions: the workspace's file, else Hive's copy, else none. */
+/** A mode's name, summary and instructions: the workspace's file, else Combwork's copy, else none. */
 export async function readMode(id: string): Promise<{ id: string; name: string; summary?: string; body: string } | null> {
   if (!validId(id)) return null
   for (const dir of [workspace.modesDir, bundledModesDir()]) {
@@ -90,7 +90,7 @@ export async function readMode(id: string): Promise<{ id: string; name: string; 
 }
 
 /**
- * What the Assistant is told at launch, after Hive's session contract (combworkInstructions): who it is, the workspace,
+ * What the Assistant is told at launch, after Combwork's session contract (combworkInstructions): who it is, the workspace,
  * what Control lets it do, and then its mode's character and focus. A mode can't change what it may do.
  */
 export async function assistantInstructions(modeIdValue: string, control: AssistantControl = 'projects', changeSettings = false): Promise<{ text: string; mode: string; modeId: string; modeText: string }> {

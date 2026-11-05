@@ -69,7 +69,7 @@ const check = (name, ok, extra = '') => {
     for (const [p, a] of Object.values(agents)) await inv('session:start', p, { agentId: a.id })
     check('the agents start', !!(await lib.until(async () => (await Promise.all(Object.values(agents).map(live))).every((l) => l?.status === 'ready'), HUNG_MS)))
 
-    // Each agent's own token, from its launch, as its hive tools read it (intents.cjs).
+    // Each agent's own token, from its launch, as its Combwork tools read it (intents.cjs).
     const launchesFile = path.join(claudeHome, 'fake-launches.jsonl')
     const launches = () => {
       const text = fs.existsSync(launchesFile) ? fs.readFileSync(launchesFile, 'utf8') : ''

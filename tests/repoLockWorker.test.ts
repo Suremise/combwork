@@ -84,7 +84,7 @@ describe("the repository lock's worker (HI-1680)", () => {
     const first = new Worker(bundle)
     const got = (await ask(first, { id: 1, type: 'take', dir, profile: 'test', waitMs: 10_000, noticeAfterMs: 1000 })) as { token: string }
     await first.terminate()
-    // Its row stays this process's (a live holder to other Hives) until the release by its token.
+    // Its row stays this process's (a live holder to other Combworks) until the release by its token.
     expect(repoLockHolder(dir)?.token).toBe(got.token)
     const second = new Worker(bundle)
     try {

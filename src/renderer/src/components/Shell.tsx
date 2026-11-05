@@ -268,7 +268,7 @@ function shortLimit(l: PlanLimit): string {
 }
 
 /**
- * Each enabled provider's plan limits, as Hive keeps them from its sessions' reports (the highest in each reset period,
+ * Each enabled provider's plan limits, as Combwork keeps them from its sessions' reports (the highest in each reset period,
  * #383): one item per provider. A limit whose reset has passed with no new report is left out, not shown as it was.
  * A CLI with accounts (HI-1756; HI-2107) shows one item per account a session of this window's workspace runs on, by its
  * name now, all of them in the one order of accounts across every CLI (HI-2119), each that login's own limits; its
@@ -386,7 +386,7 @@ function ProviderStatusItems() {
   )
 }
 
-/** Git, only when it can't run or is older than Hive needs (#346): every worktree, merge and Changes view depends on it. */
+/** Git, only when it can't run or is older than Combwork needs (#346): every worktree, merge and Changes view depends on it. */
 function GitStatusItem() {
   const git = useStore((s) => s.gitTool)
   if (!git || git.state === 'ok' || git.state === 'unknown') return null

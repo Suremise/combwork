@@ -26,7 +26,7 @@ const busy = (a: AgentInfo | undefined): boolean => !!a?.live && BUSY.has(a.live
 /** Who may build and who may review, by their role in the workflow (#1430): either-role agents are in both lists. */
 const builders = (p: ProjectInfo | null): AgentInfo[] => p?.agents.filter((a) => buildsWork(agentWorkflowRole(a))) ?? []
 const reviewers = (p: ProjectInfo | null, builder: string): AgentInfo[] => p?.agents.filter((a) => a.id !== builder && reviewsWork(agentWorkflowRole(a))) ?? []
-/** The reviewer list's Pool choice (#1443): never an agent's id, which Hive makes. */
+/** The reviewer list's Pool choice (#1443): never an agent's id, which Combwork makes. */
 const POOL = '*pool'
 /**
  * A builder's reviewer to start with: the one it is paired with (#1436's `pairedWith`, by name), else the pool where the

@@ -21,7 +21,7 @@
   !define CW_LOCAL_BUILD
 !endif
 
-; A local build's installer waits for another installer of Hive to finish, then installs, so it is the last (#1647).
+; A local build's installer waits for another installer of Combwork to finish, then installs, so it is the last (#1647).
 ; Every installer electron-builder makes for this app (the published releases' too) holds the mutex named ${APP_GUID}
 ; (from appId) from its .onInit until it exits, and one that finds it held quits (ALLOW_ONLY_ONE_INSTALLER_INSTANCE,
 ; silently under /S). On 23 Oct a running 0.9.2 ran its downloaded 0.9.3 release installer as it quit (--updated /S),
@@ -49,7 +49,7 @@ LangString combworkInstallerBusy 2052 "另一个 Combwork 安装程序仍在运�
     System::Call 'kernel32::OpenMutexW(i 0x00100001, i 0, w "${APP_GUID}") i.r1 ?e'
     Pop $0
     ${If} $1 = 0
-      ; Only "no such mutex" (ERROR_FILE_NOT_FOUND) means no installer of Hive runs: any other error is a failure.
+      ; Only "no such mutex" (ERROR_FILE_NOT_FOUND) means no installer of Combwork runs: any other error is a failure.
       ${If} $0 <> 2
         StrCpy $4 "fail"
       ${EndIf}
@@ -104,7 +104,7 @@ LangString combworkInstallerBusy 2052 "另一个 Combwork 安装程序仍在运�
 ; 1. Hive Desktop's installer identity is held too: its mutex (1.0's APP_GUID, from appId com.hive.desktop) taken and
 ;    kept until this installer exits, so a 1.0 installer or updater started meanwhile finds it held and quits; one
 ;    running now is waited for (at most CW_LEGACY_WAIT_MS). WAIT_ABANDONED counts as taken. electron-builder's
-;    uninstaller never takes its installer's mutex (ALLOW_ONLY_ONE_INSTALLER_INSTANCE is the installer's), so Hive
+;    uninstaller never takes its installer's mutex (ALLOW_ONLY_ONE_INSTALLER_INSTANCE is the installer's), so Combwork
 ;    Desktop's uninstaller, run below, isn't held up by it. Any failing call: nothing changed (exit 4).
 ; 2. hiveUpgrade.ps1: the apps of both installations asked to close (askToClose.ps1, HI-1707: they record their
 ;    agents and resume them at the next start) and checked to have exited, Hive Desktop removed with its data kept, and

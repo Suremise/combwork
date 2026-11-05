@@ -43,7 +43,7 @@ export function forgetMoves(): void {
   moves.clear()
 }
 
-/** A folder Hive may keep attachments in: a real folder (not a link), really inside the host. */
+/** A folder Combwork may keep attachments in: a real folder (not a link), really inside the host. */
 async function isOwnFolder(host: string, p: string): Promise<boolean> {
   const st = await lstat(p).catch(() => null)
   return !!st && !st.isSymbolicLink() && st.isDirectory() && insideReal(p, [host])
@@ -143,7 +143,7 @@ async function moveOldFolder(host: string): Promise<void> {
       const target = await freeName(to, f, (i) => ` (moved${i > 1 ? ` ${i}` : ''})`)
       try {
         // A renamed file's new name is on disk before it moves: if recording it fails, it stays at its old path (where
-        // old links find it first); if the move then fails or Hive stops, the record is unused while the old path is.
+        // old links find it first); if the move then fails or Combwork stops, the record is unused while the old path is.
         if (target !== join(to, f)) await recordRenamed(dest, `${d}/${f}`, `${d}/${target.slice(to.length + 1)}`)
         await rename(join(from, f), target)
         moved++

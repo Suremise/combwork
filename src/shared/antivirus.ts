@@ -1,15 +1,15 @@
 /**
- * Antivirus scanning of a workspace (#316): whether Microsoft Defender scans the folders Hive's work goes through, and
- * the exclusions Hive can offer. Pure: main (main/antivirus.ts) runs the read-only probe and the elevated changes and
+ * Antivirus scanning of a workspace (#316): whether Microsoft Defender scans the folders Combwork's work goes through, and
+ * the exclusions Combwork can offer. Pure: main (main/antivirus.ts) runs the read-only probe and the elevated changes and
  * gives their output here; the renderer shows the status. Only Windows has anything to check: elsewhere the status is
  * "not applicable".
  *
  * The folders are worked out per workspace (computed in main, always resolved absolute paths): the workspace root (its
- * projects live in it), its worktrees folder once it exists, and Hive's test area for people developing Hive. Nothing
+ * projects live in it), its worktrees folder once it exists, and Combwork's test area for people developing Combwork. Nothing
  * broader is ever offered (a drive, a share, the home folder or the profile, or a folder holding one of them), and
- * Hive only ever removes the exclusions it added itself.
+ * Combwork only ever removes the exclusions it added itself.
  *
- * Its sentences are window text, worked out in the language Hive shows (main's for a change's outcome).
+ * Its sentences are window text, worked out in the language Combwork shows (main's for a change's outcome).
  */
 import { tr, type Msg } from './i18n'
 import { msg } from './i18n/msg'
@@ -45,7 +45,7 @@ export type AvPathKind = 'workspace' | 'worktrees' | 'tests'
 
 /**
  * Whether Defender skips a folder: excluded or not (seen in Defender's list), unknown (Defender hides its list from
- * processes without administrator rights), or added by Hive and not seen since (the list is hidden).
+ * processes without administrator rights), or added by Combwork and not seen since (the list is hidden).
  */
 export type AvPathState = 'excluded' | 'not-excluded' | 'unknown' | 'added'
 
@@ -59,13 +59,13 @@ export type AvDevDrive = 'trusted' | 'untrusted' | 'refs' | 'no' | 'unknown'
 export type AvScan =
   /** Not Windows: nothing to check. */
   | 'not-applicable'
-  /** A test copy of Hive without a fixture: it never asks Defender (tests stub it). */
+  /** A test copy of Combwork without a fixture: it never asks Defender (tests stub it). */
   | 'test-copy'
   /** The status couldn't be read (PowerShell failed or took too long). */
   | 'unavailable'
   /** Microsoft Defender is the active antivirus. */
   | 'defender'
-  /** Another antivirus is active instead: Hive can't manage it. */
+  /** Another antivirus is active instead: Combwork can't manage it. */
   | 'other'
   /** No active antivirus was found. */
   | 'none'
@@ -74,12 +74,12 @@ export interface AvPath {
   path: string
   kind: AvPathKind
   state: AvPathState
-  /** Hive added this exclusion (so Remove may take it away again). */
+  /** Combwork added this exclusion (so Remove may take it away again). */
   addedByCombwork: boolean
   /** Defender lists this folder itself, not only a folder holding it (known only when its list is: #1302). */
   listed?: boolean
   devDrive: AvDevDrive
-  /** Why Hive won't offer to exclude it (too broad, or its real location couldn't be established). */
+  /** Why Combwork won't offer to exclude it (too broad, or its real location couldn't be established). */
   unsafe?: string
 }
 
@@ -101,16 +101,16 @@ export interface AntivirusStatus {
   /** Why it couldn't be read (scan 'unavailable'). */
   error?: string
   /**
-   * Whether scanning likely slows this workspace in a way Hive can help with: Defender with real-time protection on,
-   * and a folder Hive may offer that isn't known to be excluded nor on a trusted Dev Drive in performance mode.
+   * Whether scanning likely slows this workspace in a way Combwork can help with: Defender with real-time protection on,
+   * and a folder Combwork may offer that isn't known to be excluded nor on a trusted Dev Drive in performance mode.
    */
   slowed: boolean
   /** The folders an offer is about (the slowed ones), as a key: an offer is made once for each set. */
   offerKey: string
   /**
-   * Hive's own exclusions of folders that no longer exist (#1389: a workspace moved without Repair moving them, its
-   * prompt declined, a folder deleted): those Defender lists (`excluded`), or with its list hidden every one Hive
-   * recorded (`added`, unconfirmed). Remove Hive's Exclusions… takes them away with the workspace's.
+   * Combwork's own exclusions of folders that no longer exist (#1389: a workspace moved without Repair moving them, its
+   * prompt declined, a folder deleted): those Defender lists (`excluded`), or with its list hidden every one Combwork
+   * recorded (`added`, unconfirmed). Remove Combwork's Exclusions… takes them away with the workspace's.
    */
   gone?: AvGone[]
 }
@@ -196,7 +196,7 @@ export function covered(path: string, exclusions: string[]): boolean {
   })
 }
 
-/** Whether an exclusion list has this exact entry (what Hive may remove: never a parent someone else added). */
+/** Whether an exclusion list has this exact entry (what Combwork may remove: never a parent someone else added). */
 export const listed = (path: string, exclusions: string[]): boolean => exclusions.some((e) => normPath(e) === normPath(path))
 
 const driveOf = (p: string): string | null => /^([a-z]):/i.exec(p)?.[1].toUpperCase() ?? null
@@ -227,7 +227,7 @@ export function unsafeFolder(path: string, guarded: string[]): string | null {
   return null
 }
 
-/** Hive's test area is offered only to people developing Hive: a dev or test build, or a workspace holding Hive's repository. */
+/** Combwork's test area is offered only to people developing Combwork: a dev or test build, or a workspace holding Combwork's repository. */
 export const testsEligible = (opts: { packaged: boolean; holdsCombwork: boolean }): boolean => !opts.packaged || opts.holdsCombwork
 
 /**
@@ -248,7 +248,7 @@ export function folderPlan(input: { root: string | null; rootUnresolved?: string
   return out
 }
 
-/** What Hive last read with administrator rights: the exclusion list, and each drive's Dev Drive state. */
+/** What Combwork last read with administrator rights: the exclusion list, and each drive's Dev Drive state. */
 export interface AdminCheck {
   at: string
   exclusions: string[]
@@ -256,7 +256,7 @@ export interface AdminCheck {
 }
 
 /**
- * Hive's exclusions of folders that are gone (#1389), from those it recorded whose folder doesn't exist (`missing`):
+ * Combwork's exclusions of folders that are gone (#1389), from those it recorded whose folder doesn't exist (`missing`):
  * the workspace's own folders left out; with Defender's list known, only those it lists itself (exact entries: what
  * Remove can take away), else every one, unconfirmed.
  */
@@ -271,7 +271,7 @@ export function goneExclusions(missing: string[], folders: { path: string }[], k
 }
 
 /**
- * The status of a workspace's folders, from the probe. `added`: the exclusions Hive added; `adminCheck`: what was last
+ * The status of a workspace's folders, from the probe. `added`: the exclusions Combwork added; `adminCheck`: what was last
  * read with administrator rights, used while the live list is hidden (and for Dev Drives, which only it can confirm);
  * `missing`: those of `added` whose folder no longer exists.
  */
@@ -316,7 +316,7 @@ export function statusOf(workspacePath: string, probe: AvProbe, folders: { path:
   }
 }
 
-/** Hive's last suggestion for a workspace (#348): the folders it was about, when, and how many times for them. */
+/** Combwork's last suggestion for a workspace (#348): the folders it was about, when, and how many times for them. */
 export interface AvOffer {
   offerKey: string
   /** For the wording (a reminder from the second) and diagnostics: never a limit. */
@@ -390,7 +390,7 @@ export function emptyStatus(workspacePath: string, scan: 'not-applicable' | 'tes
 }
 
 /**
- * What an elevated change does: add or remove exclusions, read the list with administrator rights, or move Hive's
+ * What an elevated change does: add or remove exclusions, read the list with administrator rights, or move Combwork's
  * exclusions from a moved workspace's old folders to its new ones (#1302: remove the old, add the new, in one run).
  */
 export type AvAction = 'add' | 'remove' | 'check' | 'move'
@@ -432,7 +432,7 @@ export function changeOutcome(action: AvAction, launch: { started: boolean; erro
     if (/^[a-z]$/i.test(drive) && v) devDrives[drive.toUpperCase()] = v
   }
   const extra = { ...(exclusions ? { exclusions } : {}), ...(Object.keys(devDrives).length ? { devDrives } : {}) }
-  // A move asks for both (#1302): `requested` the new folders to add, `removing` Hive's old entries to take away.
+  // A move asks for both (#1302): `requested` the new folders to add, `removing` Combwork's old entries to take away.
   const removing = action === 'move' ? (pathList(r.removing) ?? []) : action === 'remove' ? requested : []
   const adding = action === 'remove' ? [] : requested
   // What actually changed, as Defender lists it afterwards (unknown when it wasn't read: nothing claimed).
@@ -468,8 +468,8 @@ export const DEV_DRIVE_URL = 'https://learn.microsoft.com/windows/dev-drive/'
 
 /**
  * Defender and a moved workspace (#1302): its old folders (where it and its worktrees were) and its new ones, each with
- * whether Defender skips it, and what Repair would change: Hive's own exclusions of the old folders removed (`remove`,
- * exact entries Hive added) and the new folders that would lose Hive's cover (`add`), in one administrator prompt. Exclusions the user made of the old folders (`theirs`) are only
+ * whether Defender skips it, and what Repair would change: Combwork's own exclusions of the old folders removed (`remove`,
+ * exact entries Combwork added) and the new folders that would lose Combwork's cover (`add`), in one administrator prompt. Exclusions the user made of the old folders (`theirs`) are only
  * named, never changed. Null fields when Defender isn't the active antivirus: there's nothing to move.
  */
 export interface AvMovePlan {
@@ -482,7 +482,7 @@ export interface AvMovePlan {
   now: AvPath[]
   remove: string[]
   /**
-   * The new folders the move may exclude: the safe ones of a kind that had one of Hive's, and any one Hive's removed
+   * The new folders the move may exclude: the safe ones of a kind that had one of Combwork's, and any one Combwork's removed
    * entries cover now (moved inside the old folder). Candidates, whatever they show now: the elevated run adds only
    * those Defender's live list, once the removals are made, doesn't cover (so an administrator read gone stale, or the
    * old exclusion covering the new folder, never leaves it scanned).
@@ -493,8 +493,8 @@ export interface AvMovePlan {
 
 /**
  * The plan from a status read with the old folders among its paths (`oldPaths`, as given: they needn't exist any
- * more). Never broader than Hive's own: only the entries Hive added are removed, and only folders Hive may offer (not
- * unsafe: a drive, a share, the home folder…) are added, and only where Hive's cover would otherwise be lost.
+ * more). Never broader than Combwork's own: only the entries Combwork added are removed, and only folders Combwork may offer (not
+ * unsafe: a drive, a share, the home folder…) are added, and only where Combwork's cover would otherwise be lost.
  */
 export function defenderMovePlan(status: AntivirusStatus, oldPaths: string[]): AvMovePlan {
   const isOld = (p: AvPath): boolean => oldPaths.some((o) => normPath(o) === normPath(p.path))
@@ -504,7 +504,7 @@ export function defenderMovePlan(status: AntivirusStatus, oldPaths: string[]): A
   const base = { scan: status.scan, exclusionsFrom: status.exclusionsFrom, ...(status.adminCheckedAt ? { adminCheckedAt: status.adminCheckedAt } : {}), old, now }
   if (status.scan !== 'defender') return { ...base, remove: [], add: [], theirs: [] }
   // Only an entry for the old folder itself is stale: one for a folder holding it (D:\Development) may cover the new
-  // folder too, and isn't Hive's to remove nor the user's to be told about. With the list hidden, Hive's own count.
+  // folder too, and isn't Combwork's to remove nor the user's to be told about. With the list hidden, Combwork's own count.
   const mine = old.filter((p) => p.addedByCombwork && (p.listed || p.state === 'added'))
   const moved = new Set(mine.map((p) => p.kind))
   const remove = mine.map((p) => p.path)

@@ -641,7 +641,7 @@ export const STATUS_TEXT: Readonly<Record<SessionStatus | 'idle', string>> = Obj
 
 /**
  * What an agent is doing, in words: projected from its runtime's facts (#648: asking, compacting, silent with its state
- * unknown, working…); when no turn runs, Hive's policy words: what its watch waits for, its status message, finished or
+ * unknown, working…); when no turn runs, Combwork's policy words: what its watch waits for, its status message, finished or
  * ready, with any background tasks it is running.
  */
 /** A server connection's refused key (HI-1772), where a sign-in connection's agent needs sign-in. */
@@ -660,7 +660,7 @@ export function statusText(live: Pick<LiveSessionState, 'status' | 'statusMessag
     // Waiting on cards: what for, in the window's words and its card names ("Waiting for HI-12 → Review", HI-1679: never
     // the watch's `label`, the English agents read).
     if (live.status === 'watching' && live.watch) return watchStatus(live.watch)
-    // Hive's own words in the window's language (#847), or the CLI's as they came.
+    // Combwork's own words in the window's language (#847), or the CLI's as they came.
     if (live.statusMessage) return shownStatusMessage(live)!
     // At the merge slot (#350): waiting for it, or merging.
     if (live.mergeSlot) return shownMergeSlot(live)!
@@ -732,7 +732,7 @@ export function SafeguardMark({ live }: { live: Pick<LiveSessionState, 'safeguar
 export function signInNote(live: Pick<LiveSessionState, 'status' | 'signIn' | 'provider' | 'launchedConnection'> | null | undefined): string | null {
   if (!live?.signIn) return null
   const d = providerDescriptor(live.provider)
-  // Hive's own message in the window's language (#847), else what the CLI said, as it said it.
+  // Combwork's own message in the window's language (#847), else what the CLI said, as it said it.
   const message = live.signIn.messageText ? shownText(live.signIn.messageText) : live.signIn.message
   const said = message.length > 160 ? `${message.slice(0, 160)}…` : message
   // On a server connection (HI-1772): its key was refused, replaced in Settings → Accounts & Connections (no sign-in).
@@ -851,7 +851,7 @@ export function useBackdrop(): () => boolean {
   return useCallback(() => backdrops[backdrops.length - 1] === me.current, [])
 }
 
-/** Where a moved dialog may go: its header wholly in the window, below Hive's title bar (whose native buttons would cover its ×). */
+/** Where a moved dialog may go: its header wholly in the window, below Combwork's title bar (whose native buttons would cover its ×). */
 function clampOffset(dialog: HTMLElement, offset: { x: number; y: number }, want: { x: number; y: number }): { x: number; y: number } {
   const header = dialog.querySelector('.dialog-header')
   if (!header) return want
@@ -1052,7 +1052,7 @@ export function Modal({
 }
 
 marked.setOptions({ gfm: true, breaks: false })
-// GitHub-style heading ids, so the docs' #links work in Hive as they do on GitHub; a heading's explicit id
+// GitHub-style heading ids, so the docs' #links work in Combwork as they do on GitHub; a heading's explicit id
 // (`<a id="git"></a>`, #1535) is its id instead, and its empty anchor is dropped.
 marked.use({
   renderer: {
@@ -1073,7 +1073,7 @@ export interface MarkdownCards {
 
 /**
  * Wraps the card references in rendered Markdown's text in links (`cw-card:N`), never inside a link, code or a code
- * block. Done on the sanitized HTML, whose text nodes only gain links of Hive's own scheme.
+ * block. Done on the sanitized HTML, whose text nodes only gain links of Combwork's own scheme.
  */
 function linkCards(html: string, cards: MarkdownCards): string {
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html')

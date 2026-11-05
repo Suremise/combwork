@@ -1,4 +1,4 @@
-// The task board: cards added in the Board view and through the Agent API (as an agent's hive tools would), Done kept
+// The task board: cards added in the Board view and through the Agent API (as an agent's Combwork tools would), Done kept
 // for the user, dragging between columns, column colours (Settings → Board), Start on a new agent (the fake Claude Code gets the card as its prompt),
 // a project's Tasks tab, archiving; and Project → Remove Project… (Hide, restored from Settings → Workspace, and
 // Delete). Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR. Delete sends a small test folder to the

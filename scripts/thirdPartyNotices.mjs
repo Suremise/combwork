@@ -1,4 +1,4 @@
-// THIRD_PARTY_NOTICES.md's content, made in memory: the licence of every package that ships inside Hive — the main
+// THIRD_PARTY_NOTICES.md's content, made in memory: the licence of every package that ships inside Combwork — the main
 // process's runtime dependencies and the libraries bundled into the renderer — with their full texts, then the installer's
 // components. scripts/licenses.mjs writes it (or, with --check, compares it with the committed file), and
 // tests/licenses.test.ts checks the committed file is up to date (#386). Build-only tools (vite, electron-builder, sharp…)
@@ -10,14 +10,14 @@ import { licenceText } from './licenseText.mjs'
 // Bundled into the renderer by Vite (devDependencies because they are compiled in, not installed).
 export const RENDERER = ['react', 'react-dom', '@xterm/xterm', '@xterm/addon-fit', '@xterm/addon-web-links', '@xterm/addon-webgl', 'monaco-editor', 'dompurify', 'marked', 'zustand', '@vscode/codicons']
 
-// Packages offered under a choice of licences, and the one Hive takes (Darren's call, #185), said where each is listed.
+// Packages offered under a choice of licences, and the one Combwork takes (Darren's call, #185), said where each is listed.
 const CHOSEN = { dompurify: 'Apache-2.0' }
 // What a package's own licence field leaves out, from its licence files (#185).
 const NOTES = { '@vscode/codicons': 'code MIT (LICENSE-CODE); the Git logo icon CC-BY-3.0 (Jason Long)' }
 
 const declaredLicence = (meta) =>
   typeof meta.license === 'string' ? meta.license : meta.license?.type ?? (Array.isArray(meta.licenses) ? meta.licenses.map((l) => l.type ?? l).join(' OR ') : 'see licence text')
-/** Its licence as published, and the one Hive uses when it has a choice ("(MPL-2.0 OR Apache-2.0), used under Apache-2.0"). */
+/** Its licence as published, and the one Combwork uses when it has a choice ("(MPL-2.0 OR Apache-2.0), used under Apache-2.0"). */
 const licenceOf = (meta) =>
   `${declaredLicence(meta)}${CHOSEN[meta.name] ? `, used under ${CHOSEN[meta.name]}` : ''}${NOTES[meta.name] ? `; ${NOTES[meta.name]}` : ''}`
 

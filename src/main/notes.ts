@@ -171,7 +171,7 @@ async function readOwners(file: string): Promise<Record<string, string>> {
 }
 
 /**
- * Records that a handover is a project's (by its id) as Hive writes it: `write` creates the file, in the record's lock
+ * Records that a handover is a project's (by its id) as Combwork writes it: `write` creates the file, in the record's lock
  * once the record has been read (#1600), so a record still being saved by something else refuses the handover before
  * there is any file to take back.
  */
@@ -292,7 +292,7 @@ async function sessionsByProject(ws: WorkspaceService): Promise<Map<string, stri
 }
 
 /**
- * A project's handovers, newest first (#514): those whose owner is its id, recorded as Hive wrote them or worked out
+ * A project's handovers, newest first (#514): those whose owner is its id, recorded as Combwork wrote them or worked out
  * once for older ones (adoptHandovers). A renamed project keeps its own, and a project that takes a name some other
  * project had never gets that one's. No project: every handover.
  */
@@ -319,7 +319,7 @@ export async function createHandover(project: string, title: string, content: st
   const dir = join(at.shared, 'handovers')
   await mkdir(dir, { recursive: true })
   stillOpen(at)
-  // The same slug as hive-mcp's, which finds a project's handovers by this prefix.
+  // The same slug as cw-mcp's, which finds a project's handovers by this prefix.
   const projectSlug = project.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
   let file = join(dir, `${date}-${projectSlug ? projectSlug + '-' : ''}${slug}.md`)
   const header = handoverHeader(title, project, by, new Date())
@@ -360,7 +360,7 @@ export async function readNote(abs: string): Promise<{ content: string; revision
 }
 
 /**
- * Writes or appends to a note. Locked from read to write (the same lock as Hive's editors' saves), so two agents
+ * Writes or appends to a note. Locked from read to write (the same lock as Combwork's editors' saves), so two agents
  * appending at once both keep their text, and with `expectedRevision` the check and the write can't be split by
  * another write: the second of two writers that read the same text is refused rather than dropping the first's change.
  */

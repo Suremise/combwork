@@ -108,7 +108,7 @@ export function ReadOnlyPreview({ root, abs, name, text }: { root: string; abs: 
 
 type Mode = 'edit' | 'preview' | 'split'
 
-// Unsaved edits survive switching files, tabs and projects while Hive is open.
+// Unsaved edits survive switching files, tabs and projects while Combwork is open.
 interface Draft {
   text: string
   base: FileContent

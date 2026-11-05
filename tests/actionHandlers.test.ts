@@ -800,7 +800,7 @@ describe('notices (#1266, §16.11.4)', () => {
     expect(st.notices).toHaveLength(1)
   })
 
-  it('two followers of one board (two Hives) tell an event once', async () => {
+  it('two followers of one board (two Combworks) tell an event once', async () => {
     const { w, ws, alpha } = await open()
     const st = fake(alpha, { b1: 'working', r1: 'working' })
     const c = await inReview(w)
@@ -809,7 +809,7 @@ describe('notices (#1266, §16.11.4)', () => {
     notices.noticeTestHooks.hold = true
     try {
       await inWorkspace(w, () => tasks.updateTask(c, { blocked: 'Which greeting?' }, b1))
-      // Two looks at once, each reading the marks before either writes (as two Hives would; Combwork opens a workspace once
+      // Two looks at once, each reading the marks before either writes (as two Combworks would; Combwork opens a workspace once
       // per process): the second's board change finds the marks the first moved on.
       await Promise.all([notices.checkLanesNow(w), notices.checkLanesNow(w)])
     } finally {
@@ -901,7 +901,7 @@ describe('writers at once (#1266 round 3)', () => {
     expect((store.workspaceDb(ws).reader.prepare('SELECT state FROM deliveries WHERE id = ?').get(own.id) as { state: string }).state).toBe('received')
   })
 
-  it('two independent workers (two Hives) never run a repeatable action at once; one whose Combwork ended runs once its lease passes', async () => {
+  it('two independent workers (two Combworks) never run a repeatable action at once; one whose Combwork ended runs once its lease passes', async () => {
     const { w, ws } = await open()
     const c = await newCard(w)
     await settled()

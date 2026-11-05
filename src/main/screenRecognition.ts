@@ -1,8 +1,8 @@
 import type { PermissionMode } from '../shared/types'
 
 /**
- * What Hive recognises on a CLI's screen in one launch, for the developer console (#638): the first time its prompt shows
- * (the adapter's `readyOutput`) and the first mode its footer shows (`footerMode`). Whatever the agent's status is: Hive
+ * What Combwork recognises on a CLI's screen in one launch, for the developer console (#638): the first time its prompt shows
+ * (the adapter's `readyOutput`) and the first mode its footer shows (`footerMode`). Whatever the agent's status is: Combwork
  * acts on the prompt only while it is starting, and a transcript or hook can make it ready first, so the console's
  * status markers come and go with timing; these say only whether the screen was recognised, which is what a CLI's
  * contract holds (a changed prompt or footer is never recognised). Pure, so it is unit tested.

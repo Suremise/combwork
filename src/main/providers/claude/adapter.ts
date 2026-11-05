@@ -80,12 +80,12 @@ const EDIT_TOOL = new RegExp(`^(?:${EDIT_TOOLS})$`)
  */
 const PROMPT_SNAPSHOT_SINCE = '2.1.267'
 
-/** The version whose screens claudeTurnScreen was checked against (#648, screens recorded in #645's spike and in Hive). */
+/** The version whose screens claudeTurnScreen was checked against (#648, screens recorded in #645's spike and in Combwork). */
 const TURN_SCREEN_SINCE = '2.1.296'
 
 /**
  * What Claude Code's screen shows of its turn (2.1.296), from the status line above its input line ("❯", or ">" as it
- * draws it in Hive's terminals): 'idle' when it says the last turn is done ("✻ Worked for 12s · done 16:52", the
+ * draws it in Combwork's terminals): 'idle' when it says the last turn is done ("✻ Worked for 12s · done 16:52", the
  * spinner's past tense) and nothing below offers to interrupt; 'working' while its spinner runs ("✢ Embellishing…", or
  * "esc to interrupt"); else null (a dialog, a recap, no input line: not sure). Earlier turns' lines above are history.
  */
@@ -105,7 +105,7 @@ export function claudeHome(): string {
   return process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')
 }
 
-/** The fields Hive reads from `claude auth status --json` (HI-980), as Settings → Advanced names them. */
+/** The fields Combwork reads from `claude auth status --json` (HI-980), as Settings → Advanced names them. */
 export interface AuthStatusFields {
   loggedIn: string
   email: string
@@ -145,7 +145,7 @@ export function parseClaudeAuthStatus(stdout: string, f: AuthStatusFields): Conn
   const signedIn = o[f.loggedIn]
   if (typeof signedIn !== 'boolean') return { ok: false, error: `its status had no "${f.loggedIn}"` } // i18n-ignore: for the log
   const str = (k: string): string | undefined => (typeof o[k] === 'string' && o[k] ? (o[k] as string) : undefined)
-  // Its sign-in's expiry (HI-2528), only as a time Hive can read: anything else is no expiry, never a guess.
+  // Its sign-in's expiry (HI-2528), only as a time Combwork can read: anything else is no expiry, never a guess.
   const expires = f.loginExpires ? str(f.loginExpires) : undefined
   const loginExpiresAt = expires && !Number.isNaN(Date.parse(expires)) ? new Date(expires).toISOString() : undefined
   return { ok: true, loggedIn: signedIn, email: str(f.email), orgId: str(f.orgId), plan: str(f.plan) ?? null, ...(loginExpiresAt ? { loginExpiresAt } : {}) }
@@ -216,7 +216,7 @@ export function appendedInstructions(ctx: LaunchContext): string {
 export class ClaudeCodeAdapter implements ProviderAdapter {
   readonly id = CLAUDE_CODE
   readonly descriptor = CLAUDE_DESCRIPTOR
-  /** If Hive itself was started from inside a Claude Code session, don't leak that session's identity. User configuration such as CLAUDE_CODE_GIT_BASH_PATH is kept. */
+  /** If Combwork itself was started from inside a Claude Code session, don't leak that session's identity. User configuration such as CLAUDE_CODE_GIT_BASH_PATH is kept. */
   readonly envToStrip = ['CLAUDECODE', 'CLAUDE_PID', 'CLAUDE_AGENT_SDK_VERSION', 'CLAUDE_CODE_ENTRYPOINT', 'CLAUDE_CODE_CHILD_SESSION', 'CLAUDE_CODE_SESSION_ID', 'CLAUDE_CODE_SESSION_ATTENDED', 'CLAUDE_CODE_MESSAGING_SOCKET', 'CLAUDE_CODE_MESSAGING_TOKEN', 'CLAUDE_CODE_SSE_PORT', 'CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING', 'MCP_CONNECTION_NONBLOCKING']
   readonly compactFailure = /not enough messages to compact|error during compaction|compaction failed/i
   // Before a folder's first session: "Is this a project you created or one you trust? … trust this folder" (#367: an
@@ -272,7 +272,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     }
     for (const c of await this.candidates()) {
       if (!existsSync(c.path)) continue
-      // Hive requires the standalone CLI. Editor extensions bundle their own copy that moves on every
+      // Combwork requires the standalone CLI. Editor extensions bundle their own copy that moves on every
       // extension update and can't be updated with `claude update`, so it is never used — even if set manually.
       if (EDITOR_EXTENSION_PATH.test(c.path)) {
         info.rejected!.push(c.path)
@@ -440,14 +440,14 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     return join(projectPath, CW_DIR, `launch-${agentId}`)
   }
 
-  /** Rebuilds the agent's launch folder with exactly the session's Hive skills, MCP servers and Hive's hooks. */
+  /** Rebuilds the agent's launch folder with exactly the session's Combwork skills, MCP servers and Combwork's hooks. */
   skillCopyPath(ctx: LaunchContext, skill: string): string {
     return join(this.launchDir(ctx.projectPath, ctx.agentId), 'plugin', 'skills', skill)
   }
 
   async prepareLaunch(ctx: LaunchContext): Promise<Record<string, SkillDelivery>> {
     const started = performance.now()
-    // A --settings of the user's is read first: one Hive can't read stops the launch before anything changes (#330).
+    // A --settings of the user's is read first: one Combwork can't read stops the launch before anything changes (#330).
     const theirs = await userSettings(ctx.extraArgs, ctx.cwd)
     const dir = this.launchDir(ctx.projectPath, ctx.agentId)
     const pluginDir = join(dir, 'plugin')
@@ -534,39 +534,39 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       }
       // Every tool's start and end, so the turn ledger sees each call begin (#648: a tool after a turn's Stop carries it on,
       // a tool end with no start since is late news). PreToolUse answers an edit with a lock decision, so it gets a longer
-      // timeout; if Hive doesn't answer, the edit goes ahead. Any other tool is answered at once.
+      // timeout; if Combwork doesn't answer, the edit goes ahead. Any other tool is answered at once.
       if (ev === 'PreToolUse') hooks[ev] = [{ matcher: '*', hooks: [{ ...hook, timeout: advanced.number('claude-code.hooks.preToolUseTimeoutSeconds') }] }]
       else hooks[ev] = [ev === 'PostToolUse' ? { matcher: '*', hooks: [hook] } : { hooks: [hook] }]
     }
-    // The status line forwards Claude Code's status JSON (model, effort, cost, plan limits) to Hive and
+    // The status line forwards Claude Code's status JSON (model, effort, cost, plan limits) to Combwork and
     // prints nothing, so no line is added to the terminal. Switched off (#1285), the user's own runs after it, given the
-    // same JSON, and shows its output: Hive still reads the status.
+    // same JSON, and shows its output: Combwork still reads the status.
     const scopes = settingsScopes(ctx.cwd, ctx.env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs)
     const own = launchOverrides(ctx.overrides, CLAUDE_CODE, 'statusLine') ? null : ownStatusLine(scopes)
     const statusLine = combworkStatusLine((echo) => hookForwardCommand(`${ctx.hookUrl}&statusline${echo ? '&echo' : ''}`, ctx.hookAuthFile, timeout), own)
     // On a connection, its auto memory written without asking, as without one (HI-1899): the home's `projects` is a link,
     // so Claude Code is given the memory folder by its resolved path. Not where something else names the folder.
     const home = ctx.env.CLAUDE_CONFIG_DIR
-    // The launch's environment as Claude Code has it (its settings' env blocks too), and a settings file Hive can't read,
+    // The launch's environment as Claude Code has it (its settings' env blocks too), and a settings file Combwork can't read,
     // may name one too, or another home: none then.
     const field = advanced.get<string>('claude-code.memory.setting')
     const env = effectiveEnv(ctx.env, scopes).env
     const named = MEMORY_ENV_OVERRIDES.some((v) => env[v]) || (env.CLAUDE_CONFIG_DIR ?? '') !== (home ?? '') || scopes.some((s) => s.unsure !== undefined || (s.json && typeof s.json === 'object' && (s.json as Record<string, unknown>)[field] != null))
     const memoryDir = home && !named && advanced.get<boolean>('claude-code.memory.realPath') ? await connectionMemoryDir(home, () => memoryBase(ctx.cwd)) : null
-    // What Hive passed, for the agent's Hooks dialog (HI-982: launchHooks).
+    // What Combwork passed, for the agent's Hooks dialog (HI-982: launchHooks).
     keepBounded(this.hooksByRun, ctx.runId, hooks)
-    // The user's --settings merged in: Hive passes only this file (#330).
+    // The user's --settings merged in: Combwork passes only this file (#330).
     const settings = mergeLaunchSettings({ hooks, statusLine }, theirs, { url: ctx.hookUrl, envVar: 'CW_HOOK_TOKEN' })
     if (memoryDir) settings[field] = memoryDir
     // Its offer to teach auto mode about the environment, turned off for this launch when the user said so (HI-1959,
-    // Settings → Advanced): the skill's override in Hive's settings file, never where their own --settings name it.
+    // Settings → Advanced): the skill's override in Combwork's settings file, never where their own --settings name it.
     if (!advanced.get<boolean>('claude-code.autoModeSetup.offer')) {
       const overrides = settings.skillOverrides && typeof settings.skillOverrides === 'object' ? (settings.skillOverrides as Record<string, unknown>) : {}
       if (!(AUTO_MODE_SETUP in overrides)) settings.skillOverrides = { ...overrides, [AUTO_MODE_SETUP]: 'off' }
     }
     await writeJsonAtomic(join(ctx.privateDir, 'settings.json'), settings)
     await writeJsonAtomic(join(dir, 'sync.json'), { launchedAt: new Date().toISOString(), hashes })
-    // Instructions for this launch (the Hive Assistant's, and the Workspace notes note, #1433) are appended to Claude Code's
+    // Instructions for this launch (the Combwork Assistant's, and the Workspace notes note, #1433) are appended to Claude Code's
     // system prompt from a file.
     const appended = appendedInstructions(ctx)
     if (appended) await writeFile(join(dir, 'instructions.md'), appended)
@@ -605,7 +605,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     const appended = !!appendedInstructions(ctx)
     if (appended) args.push('--append-system-prompt-file', join(dir, 'instructions.md'))
     // A resumed conversation gets this launch's instructions (the Assistant's current mode, the notes as they are now), not
-    // the ones it started with: a newer Claude Code would keep sending those. So does one Hive appended to at an earlier
+    // the ones it started with: a newer Claude Code would keep sending those. So does one Combwork appended to at an earlier
     // launch, by any agent, and appends nothing to now (the notes switched off or emptied, #1433: SessionRecord.promptAdded):
     // it gets none. Not where the user's own arguments choose, nor with the switch off (#1167).
     const refresh = appended || ctx.promptAddedBefore === true
@@ -620,7 +620,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     // Claude Code takes a first message as its last argument and starts on it.
     if (ctx.initialPrompt) args.push(...taskArgs(executable, ctx.initialPrompt))
     const s = toSpawnable(executable, args)
-    // Agent view (← on an empty prompt) moves the session into Claude Code's background service, out of Hive's
+    // Agent view (← on an empty prompt) moves the session into Claude Code's background service, out of Combwork's
     // reach: Stop would only close the terminal and the session would keep running. Off unless the user allows it.
     const env = { ...ctx.env }
     if (!ctx.allowBackgroundSessions) env.CLAUDE_CODE_DISABLE_AGENT_VIEW = '1'
@@ -636,13 +636,13 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
 
   autoCompact(ctx: LaunchContext, cmd: CommandSpec, models: string[]): AutoCompactSetting {
     const env = cmd.env ?? ctx.env
-    // The user's own arguments (Hive passes no --autocompact; cmd.args may be wrapped for cmd).
+    // The user's own arguments (Combwork passes no --autocompact; cmd.args may be wrapped for cmd).
     return autoCompactOf(ctx.extraArgs, env, settingsScopes(ctx.cwd, env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs), models)
   }
 
   /**
    * The settings that turn Claude Code's hooks off (#1336): the first scope, highest first, that sets disableAllHooks,
-   * if it sets it on; or managed settings allowing only their own hooks (allowManagedHooksOnly), which Hive's aren't.
+   * if it sets it on; or managed settings allowing only their own hooks (allowManagedHooksOnly), which Combwork's aren't.
    */
   hooksOffIn(ctx: LaunchContext): string | null {
     const scopes = settingsScopes(ctx.cwd, ctx.env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs)
@@ -652,11 +652,11 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     return deciding && obj(deciding.json)!.disableAllHooks === true ? deciding.label : null
   }
 
-  /** Hive's hooks as each launch's prepareLaunch built them (HI-982), until launchHooks takes them. */
+  /** Combwork's hooks as each launch's prepareLaunch built them (HI-982), until launchHooks takes them. */
   private hooksByRun = new Map<string, Record<string, unknown[]>>()
 
   /**
-   * The launch's hooks (HI-982): Hive's as passed (off where a setting turns hooks off: hooksOffIn), then each settings
+   * The launch's hooks (HI-982): Combwork's as passed (off where a setting turns hooks off: hooksOffIn), then each settings
    * scope's as read now, at launch: configured, their loading unverified, since Claude Code doesn't say which it loaded.
    * Listed again, the rows stay the launch's, with each file whose hooks changed since then said to have changed.
    */
@@ -912,7 +912,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   /**
    * The folders of ~/.claude/projects holding a folder's transcripts, where Claude Code files them first (#493): it
    * names the folder by Node's realpath of its cwd (`claudeSpelling`), so a session started through a junction is under
-   * the real path's name; then Hive's spelling and the real, long path (one started by another name, or an older CLI's).
+   * the real path's name; then Combwork's spelling and the real, long path (one started by another name, or an older CLI's).
    * Last, those named by an 8.3 short spelling of the folder, which no other spelling of it gives: found by the cwd
    * their transcripts record (`shortNamed`). Kept per folder while the projects folder is unchanged and no folder that
    * may be its 8.3 name is waiting for a cwd (HI-1681): a list looks up hundreds of sessions in a dozen folders, and each

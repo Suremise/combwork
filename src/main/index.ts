@@ -142,9 +142,9 @@ const log = createLogger('main')
 let quitting = false
 
 // Development builds use their own profile (and Agent API port, see servers.ts) so they can run
-// alongside the installed Hive — e.g. while developing Hive from a session inside Hive.
+// alongside the installed Combwork — e.g. while developing Combwork from a session inside Combwork.
 // CW_USER_DATA overrides the profile folder for tests. The installed app's is set too: Electron would name it after
-// productName. The profile folders are Combwork's (HI-2461), which the installer moves Hive's to (HI-2460); where it
+// productName. The profile folders are Combwork's (HI-2461), which the installer moves Combwork's to (HI-2460); where it
 // hasn't, the names upgrade moves them here (profileFolders.ts), and a move it can't make refuses the start.
 const profileLines: string[] = []
 const chooseProfiles = (roamingParent: string, localParent: string, packaged: boolean): void => {
@@ -215,14 +215,14 @@ if (unconverted.length) {
 // --disable-gpu for this start.
 const gpu = startGpu(app.getPath('userData'), app.commandLine.hasSwitch(GPU_SWITCH))
 if (gpu.off) app.disableHardwareAcceleration()
-// A heap snapshot as the main process nears its memory limit (#1005): Settings → Advanced's value as Hive starts.
+// A heap snapshot as the main process nears its memory limit (#1005): Settings → Advanced's value as Combwork starts.
 const heapSnapshots = advancedAtStart(app.getPath('userData'), HEAP_SNAPSHOT_NEAR_LIMIT)
 advanced.startedWith({ [HARDWARE_ACCELERATION_OFF]: gpu.setting, [HEAP_SNAPSHOT_NEAR_LIMIT]: heapSnapshots })
 
-// Before Electron's own check of the install folder, which crashes Hive with nothing on screen (installDir.ts).
+// Before Electron's own check of the install folder, which crashes Combwork with nothing on screen (installDir.ts).
 if (process.platform === 'win32') checkInstallDir()
 
-// One Hive process, with a window per workspace (like VS Code): starting Hive again brings it forward.
+// One Combwork process, with a window per workspace (like VS Code): starting Combwork again brings it forward.
 // A quiet test copy's windows are off screen (testQuiet): Chromium mustn't take them for covered and stop drawing them.
 if (testQuiet()) app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
 
@@ -239,7 +239,7 @@ if (!app.requestSingleInstanceLock()) {
 startCrashDumps()
 
 // Windows ties the taskbar icon and notification name/icon to this ID. Dev and test builds run as
-// electron.exe, so they get their own ID; sharing it made Windows show Electron's icon for Hive.
+// electron.exe, so they get their own ID; sharing it made Windows show Electron's icon for Combwork.
 // Combwork's (HI-2460): Hive Desktop's was com.hive.desktop (.dev), which its installer removes.
 const APP_ID = app.isPackaged ? 'it.surmise.combwork' : 'it.surmise.combwork.dev'
 app.setAppUserModelId(APP_ID)
@@ -289,11 +289,11 @@ function titleBarColors(): { color: string; symbolColor: string } {
   return dark ? { color: '#1f1f1f', symbolColor: '#cccccc' } : { color: '#f3f3f3', symbolColor: '#333333' }
 }
 
-/** The smallest a Hive window can be. */
+/** The smallest a Combwork window can be. */
 const WINDOW_MIN = { width: 900, height: 560 }
 
 /**
- * Opens a Hive window, with its own workspace service. `workspacePath` opens that workspace in it;
+ * Opens a Combwork window, with its own workspace service. `workspacePath` opens that workspace in it;
  * `bounds` places it (a restored window), else it goes over the last focused one, offset like VS Code's.
  */
 function createWindow(opts: { workspacePath?: string | null; bounds?: WindowState; hidden?: boolean } = {}): CombworkWindow {
@@ -390,7 +390,7 @@ function createWindow(opts: { workspacePath?: string | null; bounds?: WindowStat
   win.on('close', (e) => {
     if (quitting || entry.closing) return
     e.preventDefault()
-    // The last window: the tray keeps Hive running, or closing it quits (as before there were several).
+    // The last window: the tray keeps Combwork running, or closing it quits (as before there were several).
     if (combworkWindows().length <= 1) {
       if (config.settings.general.closeToTray) win.hide()
       else void requestQuit()
@@ -413,7 +413,7 @@ function createWindow(opts: { workspacePath?: string | null; bounds?: WindowStat
     emit({ type: 'windows-changed', count: combworkWindows().length })
   })
 
-  // Links open in the user's browser, never inside Hive.
+  // Links open in the user's browser, never inside Combwork.
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url)
     return { action: 'deny' }
@@ -430,7 +430,7 @@ function createWindow(opts: { workspacePath?: string | null; bounds?: WindowStat
 
   if (opts.workspacePath) {
     const path = opts.workspacePath
-    // At start, the notice that Hive closed unexpectedly waits for it (#984).
+    // At start, the notice that Combwork closed unexpectedly waits for it (#984).
     startupStep(inWorkspace(entry.ws, () => entry.ws.open(path)).catch((e) => log.warn(`Could not reopen ${userText(path)}`, e)))
   }
   return entry
@@ -463,7 +463,7 @@ function saveWindowsSoon(): void {
   }, 500)
 }
 
-/** The windows to open at start: those open when Hive last quit, else one window with the last workspace. */
+/** The windows to open at start: those open when Combwork last quit, else one window with the last workspace. */
 function windowsToRestore(): { workspacePath: string | null; bounds?: WindowState }[] {
   const c = config.get()
   const reopen = config.settings.general.reopenLastWorkspace
@@ -485,15 +485,15 @@ function windowsToRestore(): { workspacePath: string | null; bounds?: WindowStat
 
 // ---------------------------------------------------------------------------
 // Quitting, and closing one window. Stopping a session loses nothing (it can be resumed), but stopping an
-// agent that is working interrupts it — so by default Hive only asks when that would happen, in its own dialog.
+// agent that is working interrupts it — so by default Combwork only asks when that would happen, in its own dialog.
 // ---------------------------------------------------------------------------
 
 let pendingQuit = false
 /** Restart and Update was chosen: install the downloaded update instead of just quitting. */
 let installOnQuit = false
-/** Restart Hive was chosen (#676: a value that applies when Hive restarts): start again after quitting. */
+/** Restart Combwork was chosen (#676: a value that applies when Combwork restarts): start again after quitting. */
 let relaunchOnQuit = false
-/** An installer asked Hive to close for an install (HI-1707): the quit records its agents as an install's. */
+/** An installer asked Combwork to close for an install (HI-1707): the quit records its agents as an install's. */
 let quitReason: RestartReason | null = null
 
 /** The running sessions of every window, or of one workspace. */
@@ -553,7 +553,7 @@ function ask(e: CombworkWindow, req: { sessions: QuitSession[]; unsaved: string[
 
 /**
  * Quitting, asking first as Confirm on quit and unsaved files say. `intent` is Restart and Update's ('update') or
- * Restart Hive's ('restart'): it belongs to this request only (HI-2427), set for the quit once it goes ahead.
+ * Restart Combwork's ('restart'): it belongs to this request only (HI-2427), set for the quit once it goes ahead.
  */
 async function requestQuit(opts: { force?: boolean; intent?: 'update' | 'restart' } = {}): Promise<void> {
   const forUpdate = opts.intent === 'update'
@@ -716,7 +716,7 @@ let finishingPendingQuit: Promise<void> | null = null
 /**
  * A pending quit going ahead (the last agent finished, or Quit Now while it waits; HI-2336): a window reopened during
  * the wait may hold edits made since the quit was asked for, so each window with unsaved files asks about them first,
- * as quitting does (save or discard). Cancel there keeps Hive running (the pending quit is cancelled). Once at a time.
+ * as quitting does (save or discard). Cancel there keeps Combwork running (the pending quit is cancelled). Once at a time.
  */
 function finishPendingQuit(): Promise<void> {
   if (finishingPendingQuit) {
@@ -750,8 +750,8 @@ async function quitNow(tellUser: boolean): Promise<void> {
   // Restart and Update's notice says Installing only now (HI-2425): a quit cancelled before this kept its button.
   if (installOnQuit) markInstalling()
   const stopped = sessions.liveCount()
-  // Quitting without a dialog (or after waiting): say where the sessions went, as a Windows notification when no Hive
-  // window is focused (HI-2320: its windows are closing, so never a pop-up; nothing while you are looking at Hive).
+  // Quitting without a dialog (or after waiting): say where the sessions went, as a Windows notification when no Combwork
+  // window is focused (HI-2320: its windows are closing, so never a pop-up; nothing while you are looking at Combwork).
   if (tellUser && stopped > 0) {
     const { title, body, apiTitle, apiTitleText } = closedNotice(stopped)
     tell({ kind: 'quit', title, message: body, apiTitle, apiTitleText, onWindowsClick: () => undefined })
@@ -759,7 +759,7 @@ async function quitNow(tellUser: boolean): Promise<void> {
   // The slots' passes (#1628): none starts as the sessions stop (no builder placed), and one running ends before the
   // boards close (will-quit); what it didn't get to is the next start's.
   const slotsQuiet = quitSlotCards()
-  // The agents that were working, watching or in a lane (HI-1707): recorded for the next start, and told when Hive is
+  // The agents that were working, watching or in a lane (HI-1707): recorded for the next start, and told when Combwork is
   // restarting for an update, an install or a restart (an ordinary quit is offered back at the next start instead).
   stopRestartRecovery()
   stopWatchingRestartRequests()
@@ -769,19 +769,19 @@ async function quitNow(tellUser: boolean): Promise<void> {
   await quitLeftovers()
   // The stopped runs' slot writers released before the workspaces close (HI-1801): their outcomes are known by now.
   await sessions.writersSettled(3000)
-  // The merge queues' runners: their processes ended and their leases given up, so another Hive can run them at once.
+  // The merge queues' runners: their processes ended and their leases given up, so another Combwork can run them at once.
   await releaseQueueRunners()
   // Codex's checks (HI-1757): those under way settled, each held one's end tried once more (bounded); what is left ends
-  // with its job (kill on close) as Hive exits.
+  // with its job (kill on close) as Combwork exits.
   await stopCodexChecks().catch((e) => log.warn("ending Codex's checks as Combwork closes", e))
   await slotsQuiet
   await usageHistory.stop()
   await progress.saveNow().catch(() => undefined)
   await flushMetrics().catch(() => undefined)
-  // The close commands (HI-1368), each window's and then When Hive quits, waited for as their panels say.
+  // The close commands (HI-1368), each window's and then When Combwork quits, waited for as their panels say.
   await closeCommandsOnQuit(reason === 'update' ? 'update' : 'quit').catch((e) => log.warn('running the close commands as Combwork quits', e))
   await config.flush()
-  // Apps that find Hive by its discovery file stop looking for this one (#620).
+  // Apps that find Combwork by its discovery file stop looking for this one (#620).
   await clearDiscovery()
   // A downloaded update installs here, at the end of the quit, never for one cancelled (#1647: only over an older copy).
   if (installOnQuit) installNow(true)
@@ -793,16 +793,16 @@ async function quitNow(tellUser: boolean): Promise<void> {
 }
 
 /**
- * The close commands as Hive quits (HI-1368): only when a window's workspace or When Hive quits has one; otherwise the
+ * The close commands as Combwork quits (HI-1368): only when a window's workspace or When Combwork quits has one; otherwise the
  * quit goes on as before, its databases closed by will-quit. Every window's workspace closes at once, each command run
- * in its window once its saving step is done, then When Hive quits in the last one used: not run if a workspace's close
+ * in its window once its saving step is done, then When Combwork quits in the last one used: not run if a workspace's close
  * failed, or the user didn't wait for one to finish saving (its Don't wait, the only way past a saving step).
  */
 async function closeCommandsOnQuit(reason: CloseReason): Promise<void> {
   const entries = combworkWindows()
   const global = config.settings.commands
   if (!quitRunsAny(entries.map((e) => e.ws), global)) return
-  // When Hive quits runs only once every workspace has closed and drained, theirs with a command or not (HR6's round 1).
+  // When Combwork quits runs only once every workspace has closed and drained, theirs with a command or not (HR6's round 1).
   // No timer: each window's saving step shows, and its Don't wait is the user's (Darren's decision, 28 Oct ~14:15).
   const drain = quitCommandPlanned(global, reason)
   const outcomes = await Promise.all(entries.map((e) => closeWithCommand(e.ws, reason, e.win, { drain }).catch((err): RunOutcome => (log.warn("closing a window's workspace as Combwork quits", err), 'notDrained'))))
@@ -810,10 +810,10 @@ async function closeCommandsOnQuit(reason: CloseReason): Promise<void> {
   await runQuitCommand(global, reason, last?.win ?? null, outcomes.includes('notDrained') ? 'failed' : outcomes.includes('leftSaving') ? 'left' : null)
 }
 
-/** Starts Hive again once this one has quit, as it was started but for the once-only --disable-gpu. */
+/** Starts Combwork again once this one has quit, as it was started but for the once-only --disable-gpu. */
 function relaunch(): void {
   const args = relaunchArgs(process.argv)
-  // A test copy records it instead: a copy of Hive its suite didn't start would outlive the run.
+  // A test copy records it instead: a copy of Combwork its suite didn't start would outlive the run.
   const record = !app.isPackaged ? process.env.CW_TEST_RELAUNCH_LOG : undefined
   if (record) appendFileSync(record, `${JSON.stringify({ args })}
 `)
@@ -821,9 +821,9 @@ function relaunch(): void {
 }
 
 /**
- * Hive quitting: what agents left running (#507), the sessions just stopped included, is ended as Settings → Agents
+ * Combwork quitting: what agents left running (#507), the sessions just stopped included, is ended as Settings → Agents
  * says, or after asking in a window still shown; otherwise (a quit with no window shown, or to install an update) it
- * keeps running, and stays listed in Hive's profile for the next start to offer again (#614). Test copies ask only with
+ * keeps running, and stays listed in Combwork's profile for the next start to offer again (#614). Test copies ask only with
  * CW_TEST_ASK_LEFTOVERS=1.
  */
 async function quitLeftovers(): Promise<void> {
@@ -853,7 +853,7 @@ async function quitLeftovers(): Promise<void> {
     if (end || asking) await settleAllLeftovers(end ? 'end' : 'keep')
   }
   // The runs seen ended, the stopped launches' jobs looked at until empty (at most 5 s), kept (HI-1886): the next start
-  // settles their slot writers if their releases aren't written before Hive exits.
+  // settles their slot writers if their releases aren't written before Combwork exits.
   await recordEndedLaunches().catch((e) => log.warn('keeping the ended runs for their slot writers as Combwork quits', e))
   await leftoversSaved()
   stopOrphanWatch()
@@ -861,7 +861,7 @@ async function quitLeftovers(): Promise<void> {
 }
 
 /**
- * What agents left running before Hive last closed without asking, or crashed (#614): those still running as the same
+ * What agents left running before Combwork last closed without asking, or crashed (#614): those still running as the same
  * processes are listed again and offered as when an agent stops, or ended, with Settings → Agents → End them.
  */
 async function offerRestoredLeftovers(): Promise<void> {
@@ -995,7 +995,7 @@ onBoardNotice((path, n) => {
 
 onCorruptFile((file, aside, restored) => (reportsReady ? showCorrupt(file, aside, restored) : void corruptReports.push([file, aside, restored])))
 
-/** What Hive's windows may use: the clipboard (paste, copy). Everything else web pages can ask for is refused. */
+/** What Combwork's windows may use: the clipboard (paste, copy). Everything else web pages can ask for is refused. */
 const ALLOWED_PERMISSIONS = new Set(['clipboard-read', 'clipboard-sanitized-write'])
 
 app.whenReady().then(async () => {
@@ -1007,9 +1007,9 @@ app.whenReady().then(async () => {
   await startI18n(config.settings)
   // Advanced settings (#367): advanced.json's overrides, followed as it changes.
   advanced.load()
-  // Agents per project from before HI-2001: Maximum agents in Hive's workflow defaults now.
+  // Agents per project from before HI-2001: Maximum agents in Combwork's workflow defaults now.
   await migrateAgentsPerProject()
-  // HI-1997: Hive's own workflow defaults' commit message from a preset, switched once to the branch's own.
+  // HI-1997: Combwork's own workflow defaults' commit message from a preset, switched once to the branch's own.
   await settleGlobalCommitMessage()
   // Show developer features is one of them too, kept under its settings key: the file and the setting stay one value.
   bindAdvancedSettings(config)
@@ -1044,7 +1044,7 @@ app.whenReady().then(async () => {
   // The last run's marker (#984): still there, it ended without quitting; then this run's own.
   // The agents a restart or quit recorded (HI-1707), read first: the unexpected-close notice leaves those to it.
   loadRestartRecord()
-  // A team pause is this run's only (HI-2156): what an earlier build saved of one goes, and Hive starts unpaused.
+  // A team pause is this run's only (HI-2156): what an earlier build saved of one goes, and Combwork starts unpaused.
   clearSavedPauses()
   checkLastRun()
   startRunMarker()
@@ -1053,7 +1053,7 @@ app.whenReady().then(async () => {
   startOutageResume()
   // An agent waiting long to retry its model request: the Assistant told (HI-1973).
   startRetryNotice()
-  // An installer asking Hive to close for an install (installer.nsh): the agents are recorded and told, then Hive quits.
+  // An installer asking Combwork to close for an install (installer.nsh): the agents are recorded and told, then Combwork quits.
   watchRestartRequests(() => {
     quitReason = 'install'
     void quitNow(false)
@@ -1083,11 +1083,11 @@ app.whenReady().then(async () => {
     sessions.binDir = dir
     if (!dir) log.warn("Couldn't write the cw-progress command into Combwork's bin folder; sessions start without it")
   })
-  /** Tests only (development builds): where the hive MCP servers log the calls they ran (tests/scenarios). */
+  /** Tests only (development builds): where the combwork MCP servers log the calls they ran (tests/scenarios). */
   const testMcpLog = (): Record<string, string> => (!app.isPackaged && process.env.CW_TEST_MCP_LOG ? { CW_TEST_MCP_LOG: process.env.CW_TEST_MCP_LOG } : {})
   sessions.combworkMcp = (projectPath, agentId): McpServerDef | null => {
     const s = config.settings.agentApi
-    // The Hive Assistant always has Hive's tools, with its own token and its control level (Settings → Assistant).
+    // The Combwork Assistant always has Combwork's tools, with its own token and its control level (Settings → Assistant).
     if (workspace.isAssistantHome(projectPath)) {
       const url = assistantApiUrl()
       const ws = workspaceOf(projectPath).path
@@ -1130,11 +1130,11 @@ app.whenReady().then(async () => {
         CW_PROJECT: workspace.isAssistantHome(projectPath) ? '' : basename(projectPath),
         // With several windows, the API answers the session's tools for its own workspace.
         CW_WORKSPACE: workspaceOf(projectPath).path ?? '',
-        // Which agent's tools these are: Hive names it as the author of the handovers it writes.
+        // Which agent's tools these are: Combwork names it as the author of the handovers it writes.
         ...(agentId ? { CW_AGENT_ID: agentId } : {}),
         // Whether its instructions tell it to run long commands through cw-progress unasked.
         CW_PROGRESS_COMMANDS: wrapsLongCommands(config.settings.general) ? '1' : '0',
-        // Whether it gives Hive's guidance as its instructions (#1285: Settings → Advanced, Hive's guidance for agents).
+        // Whether it gives Combwork's guidance as its instructions (#1285: Settings → Advanced, Combwork's guidance for agents).
         CW_GUIDANCE: advanced.get<boolean>(CW_GUIDANCE) ? '1' : '0',
         CW_DEV_CONSOLE: s.devConsole === true ? '1' : '0',
         // Its reply timeout and wait caps (#367: Settings → Advanced).
@@ -1143,13 +1143,13 @@ app.whenReady().then(async () => {
       }
     }
   }
-  // The hive MCP server's instructions, for providers that don't show MCP instructions to the model (Codex).
+  // The combwork MCP server's instructions, for providers that don't show MCP instructions to the model (Codex).
   initWatches()
   initLoopWakes()
   initLoopCheck()
   initDeliveries()
   initReviewsOnOpen()
-  // Hive's skill copies in folders no session of Hive's works in (#1431), as each workspace opens.
+  // Combwork's skill copies in folders no session of Combwork's works in (#1431), as each workspace opens.
   initSkillCopies((folder) => sessions.runningIn(folder))
   initInboxNotices()
   // What agents' commands leave running while they run (HI-2111).
@@ -1167,7 +1167,7 @@ app.whenReady().then(async () => {
         const journal = journalSettingsOf(workspaceOf(projectPath))
         return combworkInstructions('', 'assistant', true, undefined, journal.enabled ? journal.scope : null)
       }
-      // Hive's tools without its guidance (#1285, #966 row 13): the Assistant above always has its own.
+      // Combwork's tools without its guidance (#1285, #966 row 13): the Assistant above always has its own.
       if (!advanced.get<boolean>(CW_GUIDANCE)) return ''
       const project = basename(projectPath)
       const latest = (await handoversFor(workspace, project))[0]
@@ -1179,7 +1179,7 @@ app.whenReady().then(async () => {
   sessions.startContext = async (state, source) => {
     if (!workspace.isAssistantHome(state.projectPath)) return null
     const view = await assistantStartView(workspaceOf(state.projectPath), sessions.liveStates(), source)
-    // Tests only (development builds): each view Hive gave, whatever the CLI does with it (tests/scenarios).
+    // Tests only (development builds): each view Combwork gave, whatever the CLI does with it (tests/scenarios).
     if (view && !app.isPackaged && process.env.CW_TEST_START_VIEW_LOG) await appendFile(process.env.CW_TEST_START_VIEW_LOG, JSON.stringify({ at: new Date().toISOString(), provider: state.provider, source, text: view }) + '\n').catch(() => undefined)
     return view
   }
@@ -1239,7 +1239,7 @@ app.whenReady().then(async () => {
   initConnectionMoves()
   initUsageMoves()
 
-  // Hook auth files of an earlier run of Hive: their tokens died with it (#345).
+  // Hook auth files of an earlier run of Combwork: their tokens died with it (#345).
   await clearHookAuth()
   // A launch's side of the workflow for its metrics (HI-2049): before the Agent API or a window can start an agent.
   startLaunchSides()
@@ -1279,7 +1279,7 @@ app.whenReady().then(async () => {
   // Review and check copies (#1435): returning ones looked at again every 30 s, idle ones tidied every hour.
   startCopies()
   startReviewCopies()
-  // The queue's order as agents read it (#1354): this Hive's entry testing now, at its step.
+  // The queue's order as agents read it (#1354): this Combwork's entry testing now, at its step.
   setQueueLive(queueLive)
   // An agent's branch brought up to date between a lane's cards after a squash merge (#1271, SPEC §16.19.2), once the
   // agent is idle: in a turn (working, starting, asking a permission, its background tasks running) or given a prompt
@@ -1444,5 +1444,5 @@ app.on('will-quit', () => {
 })
 
 app.on('window-all-closed', () => {
-  // Hive lives in the tray; quitting is explicit.
+  // Combwork lives in the tray; quitting is explicit.
 })

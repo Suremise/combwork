@@ -62,7 +62,7 @@ const pending = new Map<string, Promise<unknown>>()
  * otherwise both feed the same new bytes to the parser and duplicate messages.
  */
 async function parsed(projectPath: string, sessionId: string): Promise<Entry> {
-  // A project, or the Hive Assistant's home (its conversations are browsed the same way).
+  // A project, or the Combwork Assistant's home (its conversations are browsed the same way).
   projectPath = workspace.assertSessionHost(projectPath)
   // The id becomes part of a file name, so only accept plain ids (UUIDs).
   assertSessionId(sessionId)
@@ -90,7 +90,7 @@ async function parseNow(projectPath: string, sessionId: string, key: string): Pr
   // told apart by its identity, and read whole again when that changes.
   const stamp = isGz(path) ? `${st.size}:${st.mtimeMs}:${st.ino}` : ''
   let e = cache.get(key)
-  // A different file (the provider deleted it and Hive's backup is used), a shorter one or another compressed one means
+  // A different file (the provider deleted it and Combwork's backup is used), a shorter one or another compressed one means
   // start again.
   if (!e || e.path !== path || (isGz(path) ? stamp !== e.stamp : size < e.parser.offset)) {
     const id = await sessions.sessionProvider(projectPath, sessionId)
@@ -128,7 +128,7 @@ async function parseNow(projectPath: string, sessionId: string, key: string): Pr
 }
 
 function forDisplay(item: TranscriptItem): TranscriptItem {
-  // Hive's own notices in the language the window shows (#797); the cache keeps them as data.
+  // Combwork's own notices in the language the window shows (#797); the cache keeps them as data.
   if (item.kind === 'notice') return item.message ? { ...item, text: shownNotice(item) } : item
   if (item.kind !== 'tool') return item
   return { ...item, tool: toolForDisplay(item.tool) }

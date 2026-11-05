@@ -108,7 +108,7 @@ const rich = (m: Msg, values: Record<string, string> = {}): React.ReactNode[] =>
 export function WelcomeView() {
   const recent = useStore((s) => s.recent)
   const recentMenu = useContextMenu()
-  // Whether each folder is there now (#144): when shown, and when Hive comes back to the front (a folder deleted meanwhile).
+  // Whether each folder is there now (#144): when shown, and when Combwork comes back to the front (a folder deleted meanwhile).
   useEffect(() => {
     void actions.loadRecent()
     const again = (): void => void actions.loadRecent()
@@ -517,7 +517,7 @@ function McpServerView({ selected }: { selected: string | null }) {
 // Docs
 // ---------------------------------------------------------------------------
 
-/** The built-in hive server's tools, as a table (the tools' names are theirs; what they do is window text). */
+/** The built-in combwork server's tools, as a table (the tools' names are theirs; what they do is window text). */
 function combworkToolsTable(): string {
   const tools: [string, Msg][] = [
     ['cw_list_projects', M.toolListProjects],

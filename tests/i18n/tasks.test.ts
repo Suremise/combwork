@@ -162,7 +162,7 @@ describe("a card's history: English as stored, its line as data for the window",
       'Brought back from the archive',
       'Told Agent 1 of 1 new decision'
     ])
-    // The hive tools' short replies confirm the change in the history's English.
+    // The Combwork tools' short replies confirm the change in the history's English.
     expect(said).toEqual(history.slice(1, 9).map((h) => h.what))
     // Each line Combwork's board wrote is also data, which formats back to the same English…
     for (const h of history.slice(0, -1)) {

@@ -21,14 +21,14 @@ import type { WorkspaceService } from './workspace'
  * of its own to recover: a template whose bytes the backup already has is copied already; a copy is written under a
  * temporary name of its own (never a template's, removed by the copy that made it) and published at the first free name
  * by a link that never replaces a file (a copy that won't overwrite where links can't be made), so a rerun or two runs at
- * once (two Hives) never lose or change anything, never touch each other's temporary files, and copy each template once.
+ * once (two Combworks) never lose or change anything, never touch each other's temporary files, and copy each template once.
  * A temporary file left by a crash is harmless (no template's name, never listed or read) and left alone. A folder or
  * file that can't be read (other than gone) stops the run unmarked, for the next open.
  */
 
 const log = createLogger('templates')
 
-/** board_meta's mark: how many templates this Hive copied (`0`: none), once every folder was read and copied. */
+/** board_meta's mark: how many templates this Combwork copied (`0`: none), once every folder was read and copied. */
 const MARK = 'templates.v09'
 /** board_meta's notice to say once in the window: `due`, then `said`. */
 const NOTICE = 'templates.v09.notice'

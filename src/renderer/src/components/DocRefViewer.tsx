@@ -32,7 +32,7 @@ export const problemLines = (problems: readonly ContextProblem[]): string[] =>
   problems.map((p) => `${p.ref}: ${tr(PROBLEM, { why: p.problem, closest: p.closest?.length ? fmt.list(p.closest.map((s) => `#${s}`)) : 'none' })}`) // i18n-ignore: a reference and its message, joined
 
 /**
- * A card's Read first reference (#818), read: the section (the whole document when it names no heading) in Hive's
+ * A card's Read first reference (#818), read: the section (the whole document when it names no heading) in Combwork's
  * Markdown, with a button to open its file in the Files tab at the heading, or a shared note in Shared Notes.
  */
 export function DocRefViewer({ projectPath, docRef, onClose, onOpen }: { projectPath: string | null; docRef: string; onClose: () => void; onOpen?: (go: () => void) => void }) {

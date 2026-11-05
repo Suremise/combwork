@@ -1,7 +1,7 @@
 // The folder contract (#1434, SPEC §16.10.3; shared/agentFolders.ts and main/agentFolders.ts): where each kind of agent
 // starts a new conversation and whether a conversation may resume where it was made, automatically (Resume All,
 // startup: `canResumeNow`) or by the user's own Resume (`canResumeByUser`); a session bound to its lease and rebound only
-// inside the lease change's own write (one transaction: an injected failure changes neither, two Hives at once: one
+// inside the lease change's own write (one transaction: an injected failure changes neither, two Combworks at once: one
 // wins and the other reads the result); old session rows read as before; Resume All never taking a free slot; the
 // refusals' words.
 import { DatabaseSync } from 'node:sqlite'
@@ -342,13 +342,13 @@ describe("a slot's writer: claimed in one write with the resume authority, held 
     expect(await b.store.finalizeEndRev('l1', 'head-3')).toBe(false)
   })
 
-  it('a lease that changed before the write: the claim decides from combwork.db as it is then (two Hives at once: one writer)', async () => {
+  it('a lease that changed before the write: the claim decides from combwork.db as it is then (two Combworks at once: one writer)', async () => {
     const b = board()
     // The lease ended between the facts read and the write: a new conversation has no slot of its own any more.
     await b.store.end('l1', 'done')
     expect(await refusal(claim(b.store, { run: 'run-1' }))).toEqual({ is: 'changed', slot: 'slot-b' })
     expect(writerOf(b.store)).toBeNull()
-    // Lent again to b1 (#13): two starts of it at once (two Hives), one writer.
+    // Lent again to b1 (#13): two starts of it at once (two Combworks), one writer.
     b.db.prepare("INSERT INTO slot_leases (id, project, slot, kind, card, agent, from_at) VALUES ('l2', 'p1', 'slot-b', 'card', 13, 'b1', '2026-10-23T09:00:00.000Z')").run()
     const two = await Promise.all([refusal(claim(b.store, { run: 'run-a' })), refusal(claim(b.other(), { run: 'run-b' }))])
     expect(two.filter((r) => r === null)).toHaveLength(1)

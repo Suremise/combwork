@@ -25,7 +25,7 @@
 // overwritten). Results go to %LOCALAPPDATA%\combwork-test\scenarios\results (the newest 30 fake runs and, counted apart,
 // the newest 30 model trials are kept, besides those a card cites and those a run still writes into: runner.json,
 // HI-2234, HI-2236): results.json
-// (every scenario's checks, skills read, hive calls, versions, usage, measures), benchmark.json (combwork-benchmark/1: the
+// (every scenario's checks, skills read, Combwork calls, versions, usage, measures), benchmark.json (combwork-benchmark/1: the
 // Performance page compares two) and summary.md; results.json is written as each trial ends (#1457: a run cut short keeps
 // what it had). Run in a Combwork agent's session it shows in the Progress panel, a step per trial (--no-progress: not).
 // With a fake provider a failed check fails the run (exit 1); model
@@ -164,7 +164,7 @@ if (pool) {
     await queue.finish(`got ${resource} after ${after}`)
   }
 }
-// What runs inside this run's test Hives (an agent's own test run) has this run's slot as credit, and its parent's
+// What runs inside this run's test Combworks (an agent's own test run) has this run's slot as credit, and its parent's
 // (HI-2070): carried into their sessions (runContext CARRIED), so CPU work inside a model trial still asks for a CPU slot.
 process.env.E2E_RUN_SLOTS = creditFor(pool)
 

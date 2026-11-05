@@ -1,5 +1,5 @@
 /**
- * One notification system (HI-2320): every message Hive shows is one entry, of one kind, routed once by the table
+ * One notification system (HI-2320): every message Combwork shows is one entry, of one kind, routed once by the table
  * below, to a pop-up in one window (kept in that window's bell), a Windows notification (its bell row kept quietly), the
  * bell only, or nowhere. No path makes a second copy: main's tell() (main/notify.ts) and the window's pushToast are the
  * only two ways in, and an entry is one id.
@@ -12,7 +12,7 @@ export type { NotifyKind }
 /** Where an entry goes: a pop-up (and its window's bell), a Windows notification (and a quiet bell row), the bell alone, or nowhere. */
 export type NotifyRoute = 'popup' | 'windows' | 'bell' | 'none'
 
-/** The Hive window you are using: the workspace it holds and the project it shows. */
+/** The Combwork window you are using: the workspace it holds and the project it shows. */
 export interface FocusedCombwork {
   workspacePath: string | null
   projectPath: string | null
@@ -20,25 +20,25 @@ export interface FocusedCombwork {
 
 type Gates = Pick<AppSettings['notifications'], 'desktopNotifications' | 'notifyOnFinished' | 'notifyOnWaiting' | 'bannerScope'>
 
-/** The kinds Windows notifications are for while no Hive window is focused, and the Agent API's stream hears of. */
+/** The kinds Windows notifications are for while no Combwork window is focused, and the Agent API's stream hears of. */
 const AWAY: ReadonlySet<NotifyKind> = new Set(['needsYou', 'finished', 'work', 'usage', 'quit'])
 /** The kinds Settings → Notifications' master switch (`desktopNotifications`) turns off. */
 const GATED: ReadonlySet<NotifyKind> = AWAY
 /** The kinds *Show pop-ups about agents for* (`bannerScope`) applies to. */
 const SCOPED: ReadonlySet<NotifyKind> = new Set(['needsYou', 'finished', 'work'])
 
-/** Whether a kind goes to Windows notifications while Hive is in the background (else it waits in its window). */
+/** Whether a kind goes to Windows notifications while Combwork is in the background (else it waits in its window). */
 export const toldWhenAway = (kind: NotifyKind): boolean => AWAY.has(kind)
 
 const samePath = (a: string | null, b: string | null): boolean => !!a && !!b && a.toLowerCase() === b.toLowerCase()
 
 /**
  * Where an entry goes now (the truth table of SPEC §14 Notifications; first match wins):
- * 1. The master switch off: nowhere for the agent kinds, usage and quit; Hive's own messages still pop up.
+ * 1. The master switch off: nowhere for the agent kinds, usage and quit; Combwork's own messages still pop up.
  * 2. That kind off (finished, needs you): nowhere.
- * 3. No Hive window focused: a Windows notification for the agent kinds, usage and quit; the rest pop up in their
+ * 3. No Combwork window focused: a Windows notification for the agent kinds, usage and quit; the rest pop up in their
  *    window, their clock paused until it is focused. A tip waits for a quiet moment instead.
- * 4. A window focused: Hive has closed has nowhere to go; the agent kinds left out by the scope (*Only in the bell*,
+ * 4. A window focused: Combwork has closed has nowhere to go; the agent kinds left out by the scope (*Only in the bell*,
  *    another workspace's, another project's) go to the bell only; everything else pops up. A notice about no project
  *    passes every scope.
  * Chimes are not routed: they follow the chime settings whatever the route.

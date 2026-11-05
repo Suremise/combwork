@@ -1,5 +1,5 @@
-// Hive's own agent templates (#1436, OP-19; Darren's 19 Oct decision on #1123: templates from 0.9 are wiped and Hive
-// ships these instead). Read-only, listed under the Hive scope; Duplicate… copies one into the workspace or a project to
+// Combwork's own agent templates (#1436, OP-19; Darren's 19 Oct decision on #1123: templates from 0.9 are wiped and Combwork
+// ships these instead). Read-only, listed under the Combwork scope; Duplicate… copies one into the workspace or a project to
 // change it. They suggest a CLI per role and never a connection or model (HI-2109, decision G): the user picks
 // connections when one is loaded. Names are patterns of the project's key
 // (`{key}-B{n}`, #1123 names, #1440), made where the template is loaded (HI-B1…); the layout fits the count.
@@ -11,7 +11,7 @@ import type { ReviewerMode } from './workflow/roles'
 import { preset } from './workflow/options'
 import { templateWorkflowOf, type TemplateWorkflows } from './workflow/templateOptions'
 
-/** One of Hive's templates: its file name in the Hive scope (how calls name it), its name and description as messages. */
+/** One of Combwork's templates: its file name in the Combwork scope (how calls name it), its name and description as messages. */
 export interface CombworkTemplate {
   file: string
   name: Msg
@@ -30,7 +30,7 @@ function combwork(file: string, name: Msg, description: Msg, layout: PageLayout,
 }
 
 /**
- * A preset as a template's sections (HI-1910: Hive's own carry their preset's), for None and Git, with its reviewer
+ * A preset as a template's sections (HI-1910: Combwork's own carry their preset's), for None and Git, with its reviewer
  * mode on Git (Team 6 + pool's pool) and its size as Maximum agents (HI-2001: the team the template is). Its checks are
  * the preset's for no project (none): loading it into a project makes them that project's (the plan reads the preset as
  * the project's form offers it, `combworkSections`).
@@ -43,7 +43,7 @@ export function presetWorkflow(id: SuggestedPreset, reviewerMode?: ReviewerMode,
   }
 }
 
-/** Hive's templates, in the order they are listed. */
+/** Combwork's templates, in the order they are listed. */
 export const CW_TEMPLATES: readonly CombworkTemplate[] = [
   combwork(
     'solo.json',
@@ -100,11 +100,11 @@ export const CW_TEMPLATES: readonly CombworkTemplate[] = [
   )
 ]
 
-/** One of Hive's templates by its file name, or undefined. */
+/** One of Combwork's templates by its file name, or undefined. */
 export const combworkTemplate = (file: string): CombworkTemplate | undefined => CW_TEMPLATES.find((t) => t.file === file)
 
 /**
- * A listed template's name and description as the window shows them: Hive's own in the window's language now (main
+ * A listed template's name and description as the window shows them: Combwork's own in the window's language now (main
  * listed them in its own, which a change of language leaves behind), any other as saved.
  */
 export function templateTitle(t: { scope: string; file: string; name: string }): string {

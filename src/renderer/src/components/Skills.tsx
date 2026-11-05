@@ -16,7 +16,7 @@ import { skillOff } from '@shared/skillDelivery'
 import { skillLinkTarget } from '@shared/skillLinks'
 
 /**
- * Skills in Hive: the workspace's Hive skills (given to project agents, the Assistant or both, as each one's
+ * Skills in Combwork: the workspace's Combwork skills (given to project agents, the Assistant or both, as each one's
  * metadata.audience says; edited in the Skills view), and, per
  * provider in a project, its local skills (editable in the project) and the user's own and plugin skills
  * (view only). Shared by the Skills view and the project's Skills tab.
@@ -114,7 +114,7 @@ const AUDIENCE_LABEL: Record<SkillAudience, Msg> = {
 
 export const SKILL_ICON: Record<SkillLevel, string> = { combwork: 'sparkle', machine: 'account', plugin: 'extensions', local: 'folder' }
 
-/** Over the Hive skills view and a Hive skill being edited there: these skills steer the agents. */
+/** Over the Combwork skills view and a Combwork skill being edited there: these skills steer the agents. */
 export function CombworkSkillsWarning() {
   return (
     <div className="banner warn skills-warning" role="note">
@@ -127,15 +127,15 @@ export function CombworkSkillsWarning() {
 const bold = (c: React.ReactNode[]): React.ReactNode => <strong>{c}</strong>
 const code = (c: React.ReactNode[]): React.ReactNode => <code>{c}</code>
 
-/** Who gets a Hive skill (SKILL.md's metadata.audience; none means the project agents), as a badge's tooltip says it. */
+/** Who gets a Combwork skill (SKILL.md's metadata.audience; none means the project agents), as a badge's tooltip says it. */
 const AUDIENCE_TIP: Record<SkillAudience, Msg> = {
   agents: msg({ id: 'assistant.skills.audienceAgentsTip', defaultMessage: "For the project agents: every agent in every project of this workspace gets it. The Assistant doesn't. This is the default; to change it, set <code>audience</code> under <code>metadata:</code> in its SKILL.md's header (<code>assistant</code>, or <code>all</code> for both).", description: 'Tooltip on Project agents. Keep the <code> tags and what is inside them (audience, metadata:, assistant, all) as they are, and SKILL.md.' }),
   assistant: msg({ id: 'assistant.skills.audienceAssistantTip', defaultMessage: "For the Assistant only (<code>audience: assistant</code> in its SKILL.md's header). Project agents don't get it.", description: 'Tooltip on Assistant. Keep the <code> tags and audience: assistant inside them as they are, and SKILL.md.' }),
   all: msg({ id: 'assistant.skills.audienceAllTip', defaultMessage: "For both the project agents (every agent in every project) and the Assistant (<code>audience: all</code> in its SKILL.md's header).", description: 'Tooltip on Agents + Assistant. Keep the <code> tags and audience: all inside them as they are, and SKILL.md.' })
 }
 
-/** A Hive skill nobody gets, because its header can't be read or names an audience Hive doesn't know: why, and how to fix it. */
-/** Why nobody gets a Hive skill, in the window's language (#849): its header's problem as text, else main's English. */
+/** A Combwork skill nobody gets, because its header can't be read or names an audience Combwork doesn't know: why, and how to fix it. */
+/** Why nobody gets a Combwork skill, in the window's language (#849): its header's problem as text, else main's English. */
 export const skillProblem = (s: Pick<SkillInfo, 'problem' | 'problemText'>): string | undefined => (s.problemText ? shownText(s.problemText) : s.problem)
 
 export function ProblemBadge({ problem, small }: { problem: string; small?: boolean }) {
@@ -148,7 +148,7 @@ export function ProblemBadge({ problem, small }: { problem: string; small?: bool
   )
 }
 
-/** A Hive skill's audience as a badge, with what it means. */
+/** A Combwork skill's audience as a badge, with what it means. */
 export function AudienceBadge({ audience, small }: { audience: SkillAudience | undefined; small?: boolean }) {
   const a = audience ?? 'agents'
   return (
@@ -247,19 +247,19 @@ async function copyToWorkspace(s: SkillInfo): Promise<void> {
   if (!r) return
   // A project's own skill: its copy there stays, said in a sentence of its own after the notice's.
   const local = s.level === 'local' ? [tr(M.stillLocal, agentsOf(s))] : []
-  // Copied, but its header can't be read or names no audience Hive knows: nobody gets it until that's fixed.
+  // Copied, but its header can't be read or names no audience Combwork knows: nobody gets it until that's fixed.
   if (r.problem) notify('warning', tr(M.copiedNobody, { name: s.name }), [tr(M.copiedNobodyDetail, { problem: skillProblem(r) ?? '' }), ...local].join(' '))
   else notify('success', tr(M.copied, { name: s.name }), [tr(M.copiedDetail, { audience: r.audience ?? 'agents' }), ...local].join(' '))
   bump()
 }
 
-/** Opens a Hive skill for editing in the Skills view (from a project, where Hive skills are view only). */
+/** Opens a Combwork skill for editing in the Skills view (from a project, where Combwork skills are view only). */
 export function editInWorkspace(s: SkillInfo): void {
   set({ selectedSkill: s.path, skillEdit: s.path })
   showView('skills')
 }
 
-/** A skill's description as the window shows it: one Hive ships in the window's language while its copy has Hive's words (#1104). */
+/** A skill's description as the window shows it: one Combwork ships in the window's language while its copy has Combwork's words (#1104). */
 export function skillDescription(s: SkillInfo): string {
   const shipped = shippedSkillDescription(s)
   return shipped ? tr(shipped) : s.description
@@ -307,7 +307,7 @@ const DELIVERY = {
 }
 
 /**
- * A Hive skill's Delivered to agents switch (#1431): in the workspace (no `projectPath`), or in one project, where a skill
+ * A Combwork skill's Delivered to agents switch (#1431): in the workspace (no `projectPath`), or in one project, where a skill
  * the workspace has off shows off and can't be turned on.
  */
 export function DeliveredSwitch({ skill, projectPath }: { skill: SkillInfo; projectPath?: string }) {
@@ -326,7 +326,7 @@ export function DeliveredSwitch({ skill, projectPath }: { skill: SkillInfo; proj
 
 /**
  * A skill's SKILL.md, previewed, with what can be done to it. `where` is 'workspace' (the Skills view, where
- * Hive skills are edited) or 'project' (where Hive skills are view only and local skills are edited).
+ * Combwork skills are edited) or 'project' (where Combwork skills are view only and local skills are edited).
  */
 export function SkillDetail({ skill, where: place, projectPath, onDeleted, onRestored }: { skill: SkillInfo; where: 'workspace' | 'project'; projectPath?: string; onDeleted?: () => void; onRestored?: (s: SkillInfo) => void }) {
   const workspace = useStore((s) => s.workspace)

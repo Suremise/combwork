@@ -9,7 +9,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-// A fake's hive tool call took 20 s under a loaded machine (#667).
+// A fake's Combwork tool call took 20 s under a loaded machine (#667).
 const HUNG_MS = 60000
 
 const userData = path.join(lib.WORK, 'agentwatch-profile')

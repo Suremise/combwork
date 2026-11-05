@@ -8,9 +8,9 @@ const MONACO_DOMPURIFY = /[\\/]monaco-editor[\\/]esm[\\/]vs[\\/]base[\\/]browser
 const MONACO_SANITIZE = /[\\/]monaco-editor[\\/]esm[\\/]vs[\\/]base[\\/]browser[\\/]domSanitize\.js$/
 
 /**
- * Monaco's DOMPurify is Hive's (#1141). monaco-editor 0.57.0 bundles its own copy of DOMPurify 3.4.15 (two IN_PLACE
+ * Monaco's DOMPurify is Combwork's (#1141). monaco-editor 0.57.0 bundles its own copy of DOMPurify 3.4.15 (two IN_PLACE
  * advisories: Monaco doesn't sanitise in place, but the copy ships) and never imports the dompurify package it lists, so
- * package.json's override alone wouldn't change what ships. Its one import, from vs/base/browser/domSanitize.js, is Hive's
+ * package.json's override alone wouldn't change what ships. Its one import, from vs/base/browser/domSanitize.js, is Combwork's
  * dompurify (3.4.17 since HI-2421, the same library two patches on) instead, and a build that would still take Monaco's
  * copy fails. The dev server's pre-bundled Monaco keeps its copy (development only). Remove this and the override once
  * Monaco bundles 3.4.17 or later: tests/monacoDompurify.test.ts fails then to say so.
@@ -85,9 +85,9 @@ export default defineConfig({
       monacoDompurify(),
       {
         // Codicons' base rule (.codicon[class*='codicon-'] { font: 16px/1 codicon }) comes twice: from
-        // @vscode/codicons at start, and from Monaco when an editor first loads. As plain CSS it ties with Hive's own
+        // @vscode/codicons at start, and from Monaco when an editor first loads. As plain CSS it ties with Combwork's own
         // icon sizes (.activity-btn .codicon …), so whichever loaded last won and every shell icon fell to 16px. Both
-        // copies go in a cascade layer, below Hive's (unlayered) styles: Hive's icon rules win whatever loads when.
+        // copies go in a cascade layer, below Combwork's (unlayered) styles: Combwork's icon rules win whatever loads when.
         name: 'cw-codicons-layer',
         enforce: 'pre',
         transform(code: string, id: string) {

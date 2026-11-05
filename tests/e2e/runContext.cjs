@@ -1,7 +1,7 @@
 // The run context (#203): everything a test run, and each suite in it, has of its own, so runs never assume they are
 // alone on the machine or inherit whatever environment they were started from.
 //
-// - The environment, here: every child a test starts (a suite, a test copy of Combwork, the hive MCP server, the
+// - The environment, here: every child a test starts (a suite, a test copy of Combwork, the combwork MCP server, the
 //   cw-progress wrapper) gets an environment built from an allowlist (ALLOW: Windows' own variables, the user's
 //   folders, the network's proxy and certificates) plus what the context sets itself (a profile, quiet, ports, the
 //   suite's folders, CLI homes). Nothing else from the parent: not the variables of the Combwork session it was started
@@ -132,7 +132,7 @@ function baseEnv(parent = process.env) {
 }
 
 /**
- * A child that is part of Combwork but not a copy of it (the hive MCP server, the cw-progress wrapper, a bridge): the
+ * A child that is part of Combwork but not a copy of it (the combwork MCP server, the cw-progress wrapper, a bridge): the
  * allowlist and `vars` (the Agent API URL and token it should use, ELECTRON_RUN_AS_NODE where Electron runs it as Node).
  */
 function childEnv(vars = {}, parent = process.env) {

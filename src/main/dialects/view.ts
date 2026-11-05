@@ -18,7 +18,7 @@ const AREAS = import.meta.glob<unknown>('../../../agent-text/catalogue/*.json', 
 
 let catalogue: DialectCatalogue | null = null
 
-/** The catalogue of agent texts this Hive was built with, by area: the Default every file shows beneath it. */
+/** The catalogue of agent texts this Combwork was built with, by area: the Default every file shows beneath it. */
 export function dialectCatalogue(): DialectCatalogue {
   if (catalogue) return catalogue
   const schema = agentTextSchema()
@@ -47,7 +47,7 @@ function kindOf(path: string): DialectKind {
 /** The workspace's shipped dialect files, as ids ("claude-code/Opus 5.5"). */
 const shippedIds = async (): Promise<Set<string>> => new Set((await bundledIds('dialects').catch(() => [])).map((id) => id.toLowerCase()))
 
-/** A loaded file as a row: what it matches, its counts and its state against what Hive ships. */
+/** A loaded file as a row: what it matches, its counts and its state against what Combwork ships. */
 async function rowOf(dir: string, f: LoadedDialect, shipped: ReadonlySet<string>): Promise<DialectRow> {
   const place = placeOf(f.path)
   const kind = kindOf(f.path)
@@ -75,7 +75,7 @@ async function rowOf(dir: string, f: LoadedDialect, shipped: ReadonlySet<string>
   }
 }
 
-/** The Workspace file before anything is saved in it: Hive never makes it unasked, and the first Save does. */
+/** The Workspace file before anything is saved in it: Combwork never makes it unasked, and the first Save does. */
 const EMPTY_WORKSPACE: LoadedDialect = { path: WORKSPACE_FILE, name: 'Workspace', texts: {}, outdated: [], on: true } // i18n-ignore: the file's own name field, written into it at its first Save (each file shows its own)
 
 /**

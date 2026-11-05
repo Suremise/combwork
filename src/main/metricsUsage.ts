@@ -137,8 +137,8 @@ export { METRICS_EXPORT_SCHEMA }
 
 /**
  * A report as an export file (Performance → Export): the report itself, made with the page's filters, with what a
- * reader needs to read it: schema, Hive's version, units, and (also in the report) the filters, what they couldn't
- * narrow, the coverage (when Hive was recording) and what isn't measured. `sanitize`: project names become project-1,
+ * reader needs to read it: schema, Combwork's version, units, and (also in the report) the filters, what they couldn't
+ * narrow, the coverage (when Combwork was recording) and what isn't measured. `sanitize`: project names become project-1,
  * project-2… (the same name the same number) and the workspace's path is left out.
  */
 export function metricsExport(r: MetricsReport, appVersion: string, sanitize: boolean): Record<string, unknown> {

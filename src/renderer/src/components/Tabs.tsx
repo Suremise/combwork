@@ -6,7 +6,7 @@ import { Icon, Tooltip } from './ui'
 
 /**
  * Tabs (HI-1837): a row of tabs switching between separate pages or forms of one view, such as Settings → Version
- * Control's Hive and workspace defaults or a project's Version Control sections. A segmented control picks a value or a
+ * Control's Combwork and workspace defaults or a project's Version Control sections. A segmented control picks a value or a
  * filter for the same view (None · Git, Files | Commits, Today / 7 days…) and stays one: the two look different on
  * purpose. Each tab can carry an icon, a count and an unsaved mark; the keyboard moves along them (arrows, Home, End,
  * roving focus), and with `fold` the tabs not selected fold to their icons when the row is short of room.

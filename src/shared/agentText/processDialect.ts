@@ -1,9 +1,9 @@
 /**
- * The process-wide dialect of hive-mcp.js and hive-progress.js (dialects, HI-2065): one process serves one session, so
- * its chain is the process's. Hive writes the session's resolved texts (only the overrides, merged down the chain) to a
+ * The process-wide dialect of cw-mcp.js and cw-progress.js (dialects, HI-2065): one process serves one session, so
+ * its chain is the process's. Combwork writes the session's resolved texts (only the overrides, merged down the chain) to a
  * file in the launch's private folder and names it in `CW_DIALECT_FILE`, with `CW_DIALECT` the chain's hash.
  * Importing this loads it, before the entry's own code renders any text: each entry imports it first. With no file, or
- * one that can't be read, the process speaks the Default (silently: hive-progress's output is the user's command's).
+ * one that can't be read, the process speaks the Default (silently: cw-progress's output is the user's command's).
  * Node's fs: these scripts run as plain Node, outside the asar.
  */
 import { readFileSync } from 'fs'

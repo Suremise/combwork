@@ -62,7 +62,7 @@ export function messageGroups(changes: readonly AssistantChangeGroup[], actions:
 }
 
 /**
- * The line the Assistant's panel said a change with, while this window has it (its actions are kept while Hive runs): the
+ * The line the Assistant's panel said a change with, while this window has it (its actions are kept while Combwork runs): the
  * action of its kind in its message recorded nearest the change (just after it, or a setting's just before), the one
  * that made it.
  */

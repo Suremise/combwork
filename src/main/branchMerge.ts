@@ -2,7 +2,7 @@
 // carried slot's branch, any local branch) and a target, not an agent's worktree, and merges as an agent's merge does
 // (one at a time, holding the target's merge slot, #350). A line whose card isn't Done is that card's work: the dialog
 // says so and merges only once the user has confirmed it for that card (main checks again here), and the merge is then
-// observed as one done outside the rules (§16.4.4). A card Hive's merge queue merges is refused here as for an agent's
+// observed as one done outside the rules (§16.4.4). A card Combwork's merge queue merges is refused here as for an agent's
 // merge (ipc.ts, Merge anyway). Reads only #1429's slots and leases and #1434's folder facts, never an agent's worktree.
 
 import { basename } from 'path'

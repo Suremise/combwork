@@ -21,14 +21,14 @@ const log = createLogger('skills')
 /** Combwork's copies of workspace skills in a project folder (Codex's .agents/skills) carry this marker file. */
 const OWN_COPY_MARKER = COPY_MARKER
 
-/** What a SKILL.md's header says: its name, description and (Hive skills) audience, or why it can't be read. */
+/** What a SKILL.md's header says: its name, description and (Combwork skills) audience, or why it can't be read. */
 export interface SkillHeader {
   name?: string
   description?: string
   audience?: SkillAudience
   /**
-   * The header is broken (not closed, not YAML, not a mapping) or its audience isn't one Hive knows. A Hive skill with a
-   * problem is given to nobody until it is fixed, rather than to a recipient Hive would have to guess.
+   * The header is broken (not closed, not YAML, not a mapping) or its audience isn't one Combwork knows. A Combwork skill with a
+   * problem is given to nobody until it is fixed, rather than to a recipient Combwork would have to guess.
    */
   problem?: string
   /** `problem` as the window shows it (#849). */
@@ -42,7 +42,7 @@ function problemOf(m: Msg, values?: TextValues): { problem: string; problemText:
   return { problem: englishText(text), problemText: text }
 }
 
-/** Why a Hive skill's header can't be used (SkillInfo.problem), and the skills' refusals, in the window's language (#849). */
+/** Why a Combwork skill's header can't be used (SkillInfo.problem), and the skills' refusals, in the window's language (#849). */
 const M = {
   notClosedWithin: msg({ id: 'content.skill.notClosedWithin', defaultMessage: "its header isn't closed within its first {kb} KB", description: "Why nobody gets a Combwork skill: its SKILL.md header (front matter, between --- lines) doesn't end within its first {kb} KB. It follows \"Nobody gets this skill until its header is fixed:\", so it starts in lower case." }),
   notClosed: msg({ id: 'content.skill.notClosed', defaultMessage: "its header isn't closed (no line with --- after it)", description: "Why nobody gets a Combwork skill: its SKILL.md header (front matter) starts with a --- line but no --- line ends it. Keep ---. It starts in lower case (it follows a colon)." }),
@@ -57,7 +57,7 @@ const M = {
 const AUDIENCES: readonly string[] = ['agents', 'assistant', 'all']
 
 /**
- * Reads `name`, `description` and Hive's `metadata.audience` from a SKILL.md's YAML frontmatter (the Agent Skills
+ * Reads `name`, `description` and Combwork's `metadata.audience` from a SKILL.md's YAML frontmatter (the Agent Skills
  * format), with a YAML parser (js-yaml, its core schema: plain data, no custom types), so comments, flow mappings,
  * quoting and block scalars mean what YAML says. Only those fields are taken, each only if it has the right type. No
  * audience means the project agents; one that isn't agents, assistant or all is a problem, not a default. `truncated`:
@@ -89,7 +89,7 @@ export function parseSkillFrontmatter(text: string, truncated = false): SkillHea
   const meta = d.metadata
   if (meta === undefined || meta === null) return out
   if (typeof meta !== 'object' || Array.isArray(meta)) return { ...out, ...problemOf(M.metadata) }
-  // Absent: the default. Present but empty (null, ~, nothing after the colon) is an audience Hive doesn't know.
+  // Absent: the default. Present but empty (null, ~, nothing after the colon) is an audience Combwork doesn't know.
   if (!Object.hasOwn(meta, 'audience')) return out
   const audience = (meta as Record<string, unknown>).audience
   const a = typeof audience === 'string' ? audience.trim().toLowerCase() : undefined
@@ -100,7 +100,7 @@ export function parseSkillFrontmatter(text: string, truncated = false): SkillHea
   return { ...out, audience: a as SkillAudience }
 }
 
-/** Whether a Hive skill reaches a session: project agents get skills for agents (the default), the Assistant those for it. */
+/** Whether a Combwork skill reaches a session: project agents get skills for agents (the default), the Assistant those for it. */
 export function skillFor(audience: SkillAudience | undefined, role: 'agent' | 'assistant'): boolean {
   const a = audience ?? 'agents'
   return a === 'all' || (role === 'assistant' ? a === 'assistant' : a === 'agents')
@@ -138,7 +138,7 @@ async function readSkill(dir: string, level: SkillInfo['level'], plugin?: string
   const fm = await headerOf(join(dir, 'SKILL.md'), parseSkillFrontmatter).catch(() => null)
   if (!fm) return null
   const s: SkillInfo = { name: fm.name || basename(dir), description: fm.description ?? '', level, path: dir, plugin }
-  // A Hive skill whose header can't be read, or whose audience isn't one Hive knows, has no audience: nobody gets it,
+  // A Combwork skill whose header can't be read, or whose audience isn't one Combwork knows, has no audience: nobody gets it,
   // and `problem` says why. Other skills only lend their name and description, so a broken header just leaves those out.
   if (level === 'combwork') {
     if (fm.problem) Object.assign(s, { problem: fm.problem }, fm.problemText ? { problemText: fm.problemText } : {})
@@ -147,7 +147,7 @@ async function readSkill(dir: string, level: SkillInfo['level'], plugin?: string
   return s
 }
 
-/** Entries of a skills folder Hive looks at (the workspace's, a provider's): past this it uses the first it lists, and says so in its log. */
+/** Entries of a skills folder Combwork looks at (the workspace's, a provider's): past this it uses the first it lists, and says so in its log. */
 export const MAX_SKILL_FOLDERS = 1000
 const warnedFull = new Set<string>()
 
@@ -178,7 +178,7 @@ async function findSkills(root: string, level: SkillInfo['level'], maxDepth: num
 /**
  * Machine skills read lately, by the homes they were read from (HI-1755: each workspace's connections' own). Entries
  * last 30 seconds and at most MACHINE_CACHE_MAX are kept, the least recently used going first (HI-1782): a set of
- * homes no longer asked for (a connection turned off, a workspace closed) is let go rather than kept until Hive quits.
+ * homes no longer asked for (a connection turned off, a workspace closed) is let go rather than kept until Combwork quits.
  */
 const machineCache = new Map<string, { at: number; skills: SkillInfo[] }>()
 const MACHINE_CACHE_MS = 30_000
@@ -246,7 +246,7 @@ export function bundledSkillsDir(): string {
 }
 
 /**
- * The workspace's Hive skills. `withMissing` adds the bundled skills the workspace doesn't have (for the Skills
+ * The workspace's Combwork skills. `withMissing` adds the bundled skills the workspace doesn't have (for the Skills
  * view); `role` keeps only those for project agents or the Assistant (SKILL.md's metadata.audience).
  */
 export async function combworkSkills(withMissing = false, role?: 'agent' | 'assistant'): Promise<SkillInfo[]> {
@@ -268,7 +268,7 @@ export async function combworkSkills(withMissing = false, role?: 'agent' | 'assi
     if (!e.isDirectory() || e.name.startsWith('.')) continue
     const s = await readSkill(join(workspace.skillsDir, e.name), 'combwork')
     if (!s) continue
-    // The folder name is the identity Hive uses for copies and invocation.
+    // The folder name is the identity Combwork uses for copies and invocation.
     s.name = e.name
     if (bundled.has(e.name)) Object.assign(s, await bundledStatus('skills', e.name, s.path))
     out.push(s)
@@ -288,7 +288,7 @@ export async function combworkSkills(withMissing = false, role?: 'agent' | 'assi
 export const SKILL_FILES_LIMITS = { files: 200, entries: 2000, depth: 8 }
 
 /**
- * A skill folder's files (relative paths with /, in code-point order), skipping Hive's copy marker and never
+ * A skill folder's files (relative paths with /, in code-point order), skipping Combwork's copy marker and never
  * following a link. `truncated`: there may be more than `files` (over a limit); each can still be read by its path.
  */
 export async function skillFiles(dir: string, lim = SKILL_FILES_LIMITS): Promise<{ files: string[]; truncated: boolean }> {
@@ -319,7 +319,7 @@ export async function skillFiles(dir: string, lim = SKILL_FILES_LIMITS): Promise
 
 /**
  * A skill's files for its page (HI-2011: SKILL.md and the reference files it links), only for a skill the Skills view
- * or the project's skills tab lists (the workspace's Hive skills, or `projectPath`'s): any other folder is refused, so
+ * or the project's skills tab lists (the workspace's Combwork skills, or `projectPath`'s): any other folder is refused, so
  * the window can't list a folder that isn't a skill it shows. Bounded as skillFiles is, saying when it stopped short.
  */
 export async function listedSkillFiles(dir: string, projectPath?: string): Promise<{ files: string[]; truncated: boolean }> {
@@ -337,7 +337,7 @@ function localDir(projectPath: string, id: ProviderId): string {
 }
 
 /**
- * Skills in the project's own folders for each provider (e.g. .claude/skills), without Hive's copies there. A folder
+ * Skills in the project's own folders for each provider (e.g. .claude/skills), without Combwork's copies there. A folder
  * several CLIs read (Copilot also reads .claude/skills and .agents/skills) is listed once, for the first provider.
  */
 export async function localSkills(projectPath: string): Promise<SkillInfo[]> {
@@ -358,7 +358,7 @@ export async function localSkills(projectPath: string): Promise<SkillInfo[]> {
   return out.sort((a, b) => a.name.localeCompare(b.name))
 }
 
-/** Every skill: the workspace's Hive skills, each provider's user and plugin skills, and the project's local skills if given. */
+/** Every skill: the workspace's Combwork skills, each provider's user and plugin skills, and the project's local skills if given. */
 export async function listSkills(projectPath?: string): Promise<SkillInfo[]> {
   // The asking workspace's: the project's, else the current work's (HI-1755: its connections' skills only).
   const ws = projectPath ? workspaceOf(projectPath) : workspace
@@ -495,7 +495,7 @@ export async function addSkillFromFile(file: string, name: string, targets: Skil
   return writeSkill(name, files, targets)
 }
 
-/** Whether a folder is a skill Hive may delete: a Hive skill in the workspace, or a local skill in a project. */
+/** Whether a folder is a skill Combwork may delete: a Combwork skill in the workspace, or a local skill in a project. */
 async function deletableSkill(dir: string): Promise<boolean> {
   if (!workspace.path) return false
   const parent = dirname(resolve(dir)).toLowerCase()
@@ -508,14 +508,14 @@ async function deletableSkill(dir: string): Promise<boolean> {
   return false
 }
 
-/** Moves a Hive or local skill folder to the Recycle Bin. */
+/** Moves a Combwork or local skill folder to the Recycle Bin. */
 export async function deleteSkill(dir: string): Promise<void> {
   if (!(await deletableSkill(dir)) || !existsSync(join(dir, 'SKILL.md'))) throw combworkError(msg({ id: 'content.skill.cantDelete', defaultMessage: "Only Combwork skills and a project's local skills can be deleted in Combwork.", description: "An error deleting a skill Combwork doesn't manage (a CLI's own, from the user's profile or a plugin)." }), undefined, { kind: 'forbidden' })
   if (existsSync(join(dir, OWN_COPY_MARKER))) throw combworkError(msg({ id: 'content.skill.isCopy', defaultMessage: "That's Combwork's own copy of a workspace skill; delete the skill in the workspace instead.", description: "An error deleting a skill in a project's folder that is Combwork's copy of a workspace skill (Combwork puts it there for a coding agent)." }), undefined, { kind: 'forbidden' })
   await trash(dir)
 }
 
-/** Puts back a bundled skill as this version of Hive ships it: the workspace copy (edited) goes to the Recycle Bin. */
+/** Puts back a bundled skill as this version of Combwork ships it: the workspace copy (edited) goes to the Recycle Bin. */
 export async function restoreBundledSkill(name: string): Promise<SkillInfo> {
   if (!(await bundledIds('skills')).includes(name)) throw combworkError(msg({ id: 'content.skill.notBundled', defaultMessage: '"{name}" isn\'t one of Combwork\'s bundled skills.', description: 'An error restoring a skill Combwork ships: Combwork ships no skill called {name}.' }), { name }, { kind: 'notFound' })
   const dest = join(workspace.skillsDir, name)
@@ -525,7 +525,7 @@ export async function restoreBundledSkill(name: string): Promise<SkillInfo> {
   return { ...s, name, bundled: 'same' }
 }
 
-/** Deploys a Local or Machine skill into the workspace so Hive can manage it. */
+/** Deploys a Local or Machine skill into the workspace so Combwork can manage it. */
 export async function copySkillToWorkspace(skillPath: string): Promise<SkillInfo> {
   const name = basename(skillPath)
   if (!validSkillName(name)) throw combworkError(msg({ id: 'content.skill.cantCopyName', defaultMessage: '"{name}" can\'t be a Combwork skill name: use letters, numbers, "-" and "_" (rename the folder first).', description: "An error copying a skill into the workspace: its folder's name {name} can't be a Combwork skill's name." }), { name }, { kind: 'invalid' })

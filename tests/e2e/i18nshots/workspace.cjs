@@ -189,7 +189,7 @@ async function docs(ctx) {
   return windowShot()
 }
 
-/** The built-in hive MCP server's page: what it is and its tools. */
+/** The built-in combwork MCP server's page: what it is and its tools. */
 async function mcpBuiltIn(ctx) {
   await ctx.command('view.mcp')
   await (await shown(ctx, ctx.page.locator('.sidebar .row.tall', { has: ctx.page.locator('.codicon-hubot') }), 'the built-in server')).first().click()

@@ -51,10 +51,10 @@ export const GIT_FAILED = M.gitFailed
 /** Why git couldn't do something: git can't run, else the first line of what it said, else `fallback` (the command that failed). */
 const gitWhy = (err: string, command: string): TextPart => gitProblemData(gitTool()) ?? (err.split(/\r?\n/)[0] || { m: M.gitFailed, values: { command } })
 
-/** Git's own message when it gave one, as it came; else Hive's words that `command` failed. */
+/** Git's own message when it gave one, as it came; else Combwork's words that `command` failed. */
 const gitError = (err: string, command: string): Error => (err ? new Error(err) : combworkError(M.gitFailed, { command }))
 
-/** Where Hive creates worktrees: next to the workspace, so the project's own tools don't scan them and they aren't taken for projects. */
+/** Where Combwork creates worktrees: next to the workspace, so the project's own tools don't scan them and they aren't taken for projects. */
 export function worktreesRoot(workspacePath: string): string {
   return join(dirname(workspacePath), `${basename(workspacePath)}.worktrees`)
 }
@@ -113,7 +113,7 @@ export async function listWorktreesOrNull(cwd: string): Promise<{ path: string; 
  * What one operation reads of a project's repository, each read once (#732: a template's plan or load read the same
  * things once per agent): the branch checked out in the project folder, its worktrees, its local branches, its main
  * branch, branches' commits and worktrees' uncommitted files. After the operation makes or removes a worktree or branch
- * itself, `changed()`, so the next read of any of them is fresh; the project folder's branch is kept (nothing Hive does
+ * itself, `changed()`, so the next read of any of them is fresh; the project folder's branch is kept (nothing Combwork does
  * there moves it). A read that fails isn't kept: the next asks git again. Functions that take one read afresh without it.
  */
 export class RepoReads {
@@ -176,7 +176,7 @@ export class RepoReads {
  * A branch name git can make: wanted, else wanted-2, wanted-3… `taken`: names to avoid too (a plan's earlier ones). Not
  * one that exists, nor one a branch is inside (cw/ws/x while cw/ws/x/y exists), case aside: on Windows git keeps
  * branches as files, so cw/Work/… and cw/work/… would be the same one (#703). A branch it would be inside (cw/ws for
- * cw/ws/alpha/b1) can't be numbered away: refused, saying which (`branchSpace` keeps Hive's own clear of that).
+ * cw/ws/alpha/b1) can't be numbered away: refused, saying which (`branchSpace` keeps Combwork's own clear of that).
  */
 export async function uniqueBranch(cwd: string, wanted: string, taken: ReadonlySet<string> = new Set(), reads?: RepoReads): Promise<string> {
   const existing = [...new Set([...(await (reads ? reads.branchesStrict().catch(() => []) : localBranches(cwd))), ...taken].map((b) => b.toLowerCase()))]
@@ -292,7 +292,7 @@ export async function branchStatus(projectPath: string, wt: WorktreeRef, reads?:
 }
 
 /**
- * The repository's main branch, which a worktree must be merged into before Hive deletes it unasked (#291, #289): the
+ * The repository's main branch, which a worktree must be merged into before Combwork deletes it unasked (#291, #289): the
  * local branch origin/HEAD names, else main, else master. Not the project folder's current branch, which can be any
  * feature branch and change at any time. Null: none of them, or git couldn't say (`primaryBranchStrict` tells them apart).
  */
@@ -341,7 +341,7 @@ export async function worktreeCheck(projectPath: string, wt: WorktreeRef, reads?
   const unusable = (reason: () => string): WorktreeCheck => ({ removable: false, into, reason: gitProblemText(gitTool()) ?? reason() })
   if (!into) return unusable(() => tr(msg({ id: 'worktrees.why.noMain', defaultMessage: 'the repository has no main branch (main or master) to check it against', description: "Why Combwork keeps a worktree (it can't tell it is merged): the repository has no main branch. main and master are branch names: keep them. A clause, lower case." })))
   const listed = await (reads ? reads.worktrees() : listWorktrees(projectPath))
-  // By real paths (#389): git lists the long name, while Hive may have been given a short (8.3) one, a junction or a symlink.
+  // By real paths (#389): git lists the long name, while Combwork may have been given a short (8.3) one, a junction or a symlink.
   if (samePlace(wt.path, projectPath) || !listed.some((l) => samePlace(l.path, wt.path) && l.branch === wt.branch)) return unusable(() => tr(msg({ id: 'worktrees.why.notListed', defaultMessage: "git doesn't list it as a worktree on {branch}", description: "Why Combwork keeps a worktree: git doesn't list it as one of the project's worktrees on its branch {branch}. A clause, lower case." }), { branch: wt.branch }))
   if (!existsSync(wt.path)) return { removable: false, into, reason: tr(msg({ id: 'worktrees.why.folderMissing', defaultMessage: 'its folder is missing', description: "Why Combwork doesn't remove a worktree: its folder is gone. A clause, lower case." })) }
   // Both commits, so what is checked is fixed: the deletion is guarded against either branch moving afterwards.

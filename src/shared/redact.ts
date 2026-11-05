@@ -11,7 +11,7 @@ export interface RedactContext {
   folders: string[]
   /** Names to remove wherever they appear as a word: projects, agents, branches, workspaces. */
   names: { name: string; as: string }[]
-  /** Hive's own folder (a development build's checkout): becomes <combwork>, so its stack traces keep their file names. */
+  /** Combwork's own folder (a development build's checkout): becomes <combwork>, so its stack traces keep their file names. */
   app?: string
 }
 
@@ -24,7 +24,7 @@ const folderRe = (p: string): RegExp => new RegExp(escape(p.replace(/[\\/]+$/, '
 // or quoted (`password=`, `--api-key`, `"password":`, `'api key':`), masks everything after it to the end of that string.
 // No parsing of quotes, escapes, continuations, options or JSON: a secret's value can't leave a fragment behind, and no
 // container can hide one, when nothing after its name is kept. Losing what follows a secret (the flags after it, a JSON
-// object's other fields) is the accepted cost. A payload Hive holds as an object is masked by its keys instead
+// object's other fields) is the accepted cost. A payload Combwork holds as an object is masked by its keys instead
 // (devConsole.ts's redactPayload), not here. Names are found by a single pass of direct character checks, no regex: each
 // character is looked at a bounded number of times, so it is linear on any input (round 5 found quadratic regexes).
 // ---------------------------------------------------------------------------
@@ -210,7 +210,7 @@ export function maskSecrets(text: string): string {
   return out
 }
 
-/** Masks the keys Hive holds in use: main's keyMatcher.ts sets it; nothing in a window holds a key. */
+/** Masks the keys Combwork holds in use: main's keyMatcher.ts sets it; nothing in a window holds a key. */
 let keyMasker: ((text: string) => string) | null = null
 export function setKeyMasker(fn: ((text: string) => string) | null): void {
   keyMasker = fn
@@ -257,7 +257,7 @@ const PLAIN_FOLDER = /^(?:~[\\/](?:AppData|\.)|[A-Za-z]:[\\/](?:Program Files|Pr
 /** An absolute path, up to a space or a character that can't be in one (from a path with spaces, the words after the first space stay). */
 const ABSOLUTE_PATH = /(?<![\w<>])(?:[A-Za-z]:[\\/](?:Program Files(?: \(x86\))?)?|~[\\/]|\\\\)[^\s"'<>|?*,;()[\]{}]*/gi
 
-/** In the line Hive logs as it starts, once its log marks the user's own text. */
+/** In the line Combwork logs as it starts, once its log marks the user's own text. */
 export const MARKED_LOG = 'your text marked'
 /**
  * A start line: "<name> <version> starting (…)". Only Combwork's is read for whether the run marked the user's text; any
@@ -266,16 +266,16 @@ export const MARKED_LOG = 'your text marked'
  */
 const START_LINE = /^\S+ \[INFO\] \[main\] (\S+) \d\S* starting \((.*)\)$/
 const OURS = 'Combwork'
-/** What a line logged before Hive marked the user's text shows instead of its message. */
+/** What a line logged before Combwork marked the user's text shows instead of its message. */
 export const OLDER_LINE = '<message left out: logged by an older version of Combwork>'
 
 /**
- * Redaction for Hive's log: the user's own text it marked goes first, then redact(), then any absolute path left
- * that isn't one of Hive's or the CLIs' own (folders of workspaces no longer open) becomes <path>. Lines from a run
- * of Hive that didn't mark the user's text (its start line doesn't say so) keep only their time, level and scope:
- * card titles and names in them can't be told apart from the rest. `text` is the end of the log of the Hive that is
+ * Redaction for Combwork's log: the user's own text it marked goes first, then redact(), then any absolute path left
+ * that isn't one of Combwork's or the CLIs' own (folders of workspaces no longer open) becomes <path>. Lines from a run
+ * of Combwork that didn't mark the user's text (its start line doesn't say so) keep only their time, level and scope:
+ * card titles and names in them can't be told apart from the rest. `text` is the end of the log of the Combwork that is
  * running: lines before the first start line in it are from an earlier run, unless there is none (then they all come
- * after the running Hive's own start line).
+ * after the running Combwork's own start line).
  */
 export function redactLog(text: string, ctx: RedactContext): string {
   const lines = text.split('\n')

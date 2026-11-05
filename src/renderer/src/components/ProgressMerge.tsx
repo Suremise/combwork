@@ -10,7 +10,7 @@ import { Icon, IconButton, Tooltip } from './ui'
  * The top of the Progress panel (#484): a card per merge going on (a slot its holder has taken), in its own colour, with who
  * holds it, which branch goes where, the holder's current step (its running progress), how long so far and left, and
  * who waits. It folds up to its first line (remembered per workspace); Release frees a holder that is stuck. These are
- * the merge slot's cards (agents merging under "The agent merges", the user's merges); Hive's merge queue has its own
+ * the merge slot's cards (agents merging under "The agent merges", the user's merges); Combwork's merge queue has its own
  * (ProgressQueue.tsx, #1356), with no Release.
  */
 

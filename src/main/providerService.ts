@@ -19,9 +19,9 @@ import { KeyGate } from './taskKeys'
 import { KeysStopped, PickNotFound, typeKeySteps } from './keySteps'
 import { compareTested, noteSelectedCli, testedVersion } from './testedClis'
 
-/** How long a key waits for a busy CLI before Hive stops typing a setup task's keys. */
+/** How long a key waits for a busy CLI before Combwork stops typing a setup task's keys. */
 const BUSY_SECONDS = 30
-/** Why Hive stopped typing into a setup task (KeysStopped's reason, English for the log), and how the window says it (#850). */
+/** Why Combwork stopped typing into a setup task (KeysStopped's reason, English for the log), and how the window says it (#850). */
 const STOPPED = { closed: 'its terminal closed', busy: `it stayed busy for ${BUSY_SECONDS} seconds` } // i18n-ignore: the log's words; the toast says them with STOPPED_TEXT
 const STOPPED_TEXT = {
   closed: msg({ id: 'service.providers.stoppedClosed', defaultMessage: 'its terminal closed', description: "Why Combwork stopped typing a coding agent CLI's setup keys: its terminal closed. A clause, lower case (it follows \"as\")." }),
@@ -71,7 +71,7 @@ class ProviderService {
     return Object.fromEntries([...this.infos].map(([id, info]) => [id, shownInstallInfo(info)]))
   }
 
-  /** The language Hive shows changed (#797): the windows are sent each provider's install info in it. */
+  /** The language Combwork shows changed (#797): the windows are sent each provider's install info in it. */
   relabel(): void {
     for (const [id, info] of this.infos) emit({ type: 'provider-install', provider: id, info: shownInstallInfo(info) })
   }
@@ -162,7 +162,7 @@ class ProviderService {
   detectWaitMs = (!app.isPackaged && Number(process.env.CW_TEST_DETECT_WAIT_MS)) || 20_000
 
   /**
-   * Waits until Hive knows (#506): with no `id`, Automatic's provider (every turned-on provider has answered, found or
+   * Waits until Combwork knows (#506): with no `id`, Automatic's provider (every turned-on provider has answered, found or
    * missing); with `id`, only that provider's CLI (turned on or not), so a launch of a known provider never waits for
    * another. True once known; false when it still isn't after detectWaitMs (a CLI that never answers doesn't hold a
    * launch for ever), and then nothing may be decided from a guess.
@@ -187,7 +187,7 @@ class ProviderService {
     })
   }
 
-  /** detected(), refusing when Hive is still looking: what calls it would otherwise commit to a guess (#506). */
+  /** detected(), refusing when Combwork is still looking: what calls it would otherwise commit to a guess (#506). */
   async settle(id?: ProviderId): Promise<void> {
     if (await this.detected(id)) return
     if (!id) throw combworkError(msg({ id: 'service.providers.stillLookingAll', defaultMessage: 'Combwork is still looking for the coding agent CLIs. Try again in a moment.', description: "An error: Combwork hasn't finished finding the coding agent CLIs installed (it does when it starts), so it can't choose one yet." }), undefined, { kind: 'conflict' })
@@ -195,7 +195,7 @@ class ProviderService {
   }
 
   /**
-   * Refreshes one provider, or all of them. Latest versions are only looked up for enabled providers. First Hive's
+   * Refreshes one provider, or all of them. Latest versions are only looked up for enabled providers. First Combwork's
    * PATH gets the folders installers have added since it started (#472), so a CLI just installed is found.
    */
   async refresh(id?: ProviderId, checkLatest?: boolean): Promise<AgentInstallInfo[]> {
@@ -221,14 +221,14 @@ class ProviderService {
       const slow = app.isPackaged ? 0 : Number((process.env.CW_TEST_SLOW_DETECT ?? '').split(',').find((x) => x.startsWith(`${id}=`))?.slice(id.length + 1) ?? 0)
       if (slow > 0) await new Promise((r) => setTimeout(r, slow))
       const found = await adapter.locate()
-      // Its folder on the PATH of what Hive starts, so its sessions and terminals find the CLI Provider Setup found (#1103).
+      // Its folder on the PATH of what Combwork starts, so its sessions and terminals find the CLI Provider Setup found (#1103).
       if (this.refreshes.get(id) === run) noteCliFolder(id, found.path)
       // Found is known before its version, models and sign-in are: Automatic's pick needs only that (#506).
       if (found.path && this.refreshes.get(id) === run && !this.info(id).found) this.set(id, { ...this.info(id), found: true, path: found.path })
       const latest = latestWanted ? await adapter.latestVersion() : prev.latestVersion
       // The version this release was tested with, against the installed one (#365).
       const tested = await testedVersion(id)
-      // The CLI's own models and what each can do, so new models show without a Hive update (#125). If it can't say,
+      // The CLI's own models and what each can do, so new models show without a Combwork update (#125). If it can't say,
       // its last good answer for this version, else none (the pickers then use the fallbacks in Settings).
       const read = found.path && adapter.listModels ? await adapter.listModels(found.path, childEnv()).catch(() => null) : null
       let catalog: ModelCatalog | null = null
@@ -357,7 +357,7 @@ class ProviderService {
   }
 
   /**
-   * Signs an account's folder in (HI-980): the CLI's own login in a terminal of Hive's, with the folder as its home
+   * Signs an account's folder in (HI-980): the CLI's own login in a terminal of Combwork's, with the folder as its home
    * (`env`), and nothing typed into it: the user signs in through the CLI's flow. One per account: a second start gets
    * the open one's key. `onExit` once it ends. The CLI's own sign-in state isn't changed by it (that is ~/.claude's).
    */

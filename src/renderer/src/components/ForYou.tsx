@@ -18,7 +18,7 @@ import { OPTION_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
 import type { CommitMessage, WorkflowOptions } from '@shared/workflow/options'
 
 // For you in the window (#1276, SPEC §16.8.5): a card's requests for the user, as a chip on its tile and a section in
-// its dialog where the user answers them (tasks:answer, #1269: only the user answers). Hive's own requests are shown
+// its dialog where the user answers them (tasks:answer, #1269: only the user answers). Combwork's own requests are shown
 // through their messages (in the window's language), an agent's question in its own words.
 
 const M = {
@@ -53,7 +53,7 @@ const M = {
   failed: msg({ id: 'board.forYou.failed', defaultMessage: "Your answer wasn't taken", description: "An error toast's title: the user's answer to a request (For you) was refused, perhaps answered or retired meanwhile (a new submission, the card moved on). Its text says why." })
 }
 
-/** A request's text in the window: Hive's own by its message (the window's language), an agent's in its own words. */
+/** A request's text in the window: Combwork's own by its message (the window's language), an agent's in its own words. */
 export const requestText = (i: Pick<ForYouItem, 'shown' | 'text'>): string => (i.shown ? (workflowLine(i.shown, (m, values) => tr(m, values)) ?? i.text) : i.text)
 
 /** A request's kind, as the window names it (Approve, Decide, Test, Sign in, Other). */
@@ -130,7 +130,7 @@ const R = {
 
 /**
  * For you's resolved list (HI-1932): the card's requests a decision of the user's answered, newest first, each with its
- * question (Hive's own request in the window's language), the decision (its text is the card's, by its id), who recorded
+ * question (Combwork's own request in the window's language), the decision (its text is the card's, by its id), who recorded
  * it and when. Display only: nothing to answer.
  */
 function ResolvedList({ card, rows }: { card: TaskCard; rows: readonly WorkResolved[] }) {
@@ -236,7 +236,7 @@ function ForYouRequest({ card, kind, item, reply, setReply, setAnswering }: { ca
   const limit = item.gate === ROUND_LIMIT_GATE
   const projectPath = useStore((s) => s.workspace?.projects.find((p) => p.name.toLowerCase() === card.project.toLowerCase())?.path)
   const [style, setStyle] = useState<WorkflowOptions['style']>('merge')
-  // The branch's own first (HI-1997: every preset's), Hive's marked as how it merged until now.
+  // The branch's own first (HI-1997: every preset's), Combwork's marked as how it merged until now.
   const [message, setMessage] = useState<CommitMessage>('branch')
   // HI-1697: the merge queue's question before an upgraded project's first merge, answered with the two options.
   const chooseMerge = async (): Promise<void> => {

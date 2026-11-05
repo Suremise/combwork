@@ -14,7 +14,7 @@ import { pausedFor } from './teamPause'
 /**
  * Notices in hooks (#650, plans/2026-10-12-messaging-redesign.md §3.2): a busy agent is told what it has unread at its
  * next checkpoint (a tool call of its own ended), and before its turn ends (the Stop drain), in the reply to that hook,
- * so nothing is typed into a working agent. The notice is Hive's fixed text with counts, cards and ids
+ * so nothing is typed into a working agent. The notice is Combwork's fixed text with counts, cards and ids
  * (shared/doorbell.ts); the agent reads the bodies with cw_inbox, which alone makes them received. Each CLI says which
  * of its hooks can carry one (the adapter's noticeReply; sessions.hookReply asks only those).
  *
@@ -53,7 +53,7 @@ export async function noticeFor(st: LiveSessionState, at: 'checkpoint' | 'drain'
 
 /** The notice for what the agent has unread (and the Assistant's unwatched lanes); null when there is nothing new. */
 async function inboxNoticeFor(st: LiveSessionState, at: 'checkpoint' | 'drain'): Promise<string | null> {
-  // One that can't read an inbox (its hive tools off) is given no delivery (#650's decision): nothing to tell it here.
+  // One that can't read an inbox (its Combwork tools off) is given no delivery (#650's decision): nothing to tell it here.
   if (!agentReadsInbox(st.projectPath, st.agentId)) return null
   // Its switch off (#1432): no notice there, so the turn goes on (or ends) as the CLI would; what is unread stays in the
   // inbox for the drain, the doorbell or cw_inbox. The checkpoint's not told isn't counted as told.

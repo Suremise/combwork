@@ -1,8 +1,8 @@
 import type { CloseReason, CommandPoint, CommandRef, CommandsCombwork, CommandsWorkspace, CustomCommand } from './types'
 import { msg } from './i18n'
 
-// HI-1954: custom commands (JetBrains' External Tools), named once at Hive's level or a workspace's and picked for the
-// points Hive runs them at: a workspace opening or closing, Hive quitting, or by hand. Design HI-1954/s15, s19, s21.
+// HI-1954: custom commands (JetBrains' External Tools), named once at Combwork's level or a workspace's and picked for the
+// points Combwork runs them at: a workspace opening or closing, Combwork quitting, or by hand. Design HI-1954/s15, s19, s21.
 // Pure: main runs them (main/commands/), Settings edits them, both through these.
 
 /** Why a list runs: its `{reason}`. */
@@ -17,7 +17,7 @@ export const MIGRATED_QUIT = msg({ id: 'commands.migrated.quit', defaultMessage:
 
 /** How often a list's runner looks for a control while a failure waits (main/closeCommand/listRunner.ts). */
 export const CONTROL_MS = 250
-/** Hive touches a list's `observer` file this often while it watches its run. */
+/** Combwork touches a list's `observer` file this often while it watches its run. */
 export const OBSERVE_MS = 5000
 /** An `observer` older than this: nobody watches, and a failure waiting for a choice is settled as unattended. */
 export const OBSERVER_STALE_MS = 30_000
@@ -87,13 +87,13 @@ export function cleanPoint(v: unknown, scopes: readonly CommandRef['scope'][], u
 export const EMPTY_CW: CommandsCombwork = { list: [], onQuit: { run: [] } }
 export const EMPTY_WORKSPACE: CommandsWorkspace = { list: [], onOpen: { run: [] }, onClose: { run: [] } }
 
-/** Hive's commands as saved (settings.commands). */
+/** Combwork's commands as saved (settings.commands). */
 export function cleanCombwork(v: unknown): CommandsCombwork {
   const c = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
   return { list: cleanList(c.list), onQuit: cleanPoint(c.onQuit, ['combwork'], true) }
 }
 
-/** A workspace's commands as saved (workspace.json's commands): its points may use its own and Hive's. */
+/** A workspace's commands as saved (workspace.json's commands): its points may use its own and Combwork's. */
 export function cleanWorkspace(v: unknown): CommandsWorkspace {
   const c = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
   return { list: cleanList(c.list), onOpen: cleanPoint(c.onOpen, ['workspace', 'combwork'], false), onClose: cleanPoint(c.onClose, ['workspace', 'combwork'], true) }
@@ -127,7 +127,7 @@ export function migrateWorkspaceCommands(raw: { commands?: unknown; onClose?: un
   return { ...commands, onClose: point }
 }
 
-/** Hive's commands from what settings hold, HI-1368's `general.onQuit` adopted. */
+/** Combwork's commands from what settings hold, HI-1368's `general.onQuit` adopted. */
 export function migrateCombworkCommands(raw: { commands?: unknown; onQuit?: unknown }, name: string): CommandsCombwork {
   const now = cleanCombwork(raw.commands)
   const { commands, point } = adopt(now, now.onQuit, raw.onQuit, 'onQuit', name, 'combwork')

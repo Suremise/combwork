@@ -1,13 +1,13 @@
-# Asks the Hive this installer is about to replace to close for the install (HI-1707), before the template's check ends
+# Asks the Combwork this installer is about to replace to close for the install (HI-1707), before the template's check ends
 # it: run by installer.nsh's customInit (the outer instance, as the user), bundled into the installer.
 #
-# Finds the main Hive process of this install folder only (its exact executable, not a renderer or helper: no --type=),
+# Finds the main Combwork process of this install folder only (its exact executable, not a renderer or helper: no --type=),
 # writes Hive's request into its profile (written beside it, then renamed: Hive never reads half of one), waits for
-# Hive's acknowledgement, then for that process to exit (a handle on it, never its name). Hive checks the request is for
+# Combwork's acknowledgement, then for that process to exit (a handle on it, never its name). Combwork checks the request is for
 # it (its id, its start, its executable) and fresh, records and tells its agents, and quits.
 #
-# Exit codes, for the installer's log: 0 no Hive of this folder running, or it closed; 2 no profile to write to;
-# 3 no acknowledgement (the request is removed, and the template's check ends Hive as before); 4 acknowledged but still
+# Exit codes, for the installer's log: 0 no Combwork of this folder running, or it closed; 2 no profile to write to;
+# 3 no acknowledgement (the request is removed, and the template's check ends Combwork as before); 4 acknowledged but still
 # running when the wait ran out; 5 anything else that went wrong.
 param(
   [Parameter(Mandatory = $true)][string]$InstallDir,

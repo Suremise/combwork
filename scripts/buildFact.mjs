@@ -41,7 +41,7 @@ export function installerOf(lines) {
 
 /**
  * A workspace's folder of Combwork's: `.combwork` from 1.1 (HI-2462), else `.hive` in a workspace no 1.1 has opened yet
- * (the installed 1.0's), where that Hive reads its markers and the first open of 1.1 moves them with it. Null: neither.
+ * (the installed 1.0's), where that Combwork reads its markers and the first open of 1.1 moves them with it. Null: neither.
  */
 const dataOf = (dir) => ['.combwork', '.hive'].map((f) => join(dir, f)).find((d) => existsSync(join(d, 'workspace.json'))) ?? null
 
@@ -58,7 +58,7 @@ export function workspaceOf(root, env = process.env) {
   }
 }
 
-/** The token a session's hive tools use: its token file's (it changes each launch), never a token variable (HI-2262). */
+/** The token a session's Combwork tools use: its token file's (it changes each launch), never a token variable (HI-2262). */
 function tokenOf(env) {
   try {
     if (env.CW_API_TOKEN_FILE) return JSON.parse(readFileSync(env.CW_API_TOKEN_FILE, 'utf8')).token || null

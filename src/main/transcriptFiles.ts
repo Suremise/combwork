@@ -4,7 +4,7 @@ import { pipeline } from 'stream/promises'
 import { createGunzip, createGzip, constants } from 'zlib'
 
 /**
- * Hive's transcript backups compressed (#1110): a session's backup (`.combwork/sessions` or `.combwork/archive`, `<id>.jsonl`)
+ * Combwork's transcript backups compressed (#1110): a session's backup (`.combwork/sessions` or `.combwork/archive`, `<id>.jsonl`)
  * is gzipped to `<id>.jsonl.gz` once it ends or is archived (to under a third: pasted images shrink little), and everything that reads a
  * backup reads it through here, compressed or not: the transcript viewer, search and export, usage (the usage worker
  * too: no Electron here), a sub-session's first line, and a resume that puts a backup back where the CLI looks. A

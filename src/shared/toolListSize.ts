@@ -1,5 +1,5 @@
 /**
- * The hive tool list's size as a CLI gets it (HI-2049, HI-2063): characters of its JSON (UTF-16 code units), and of
+ * The Combwork tool list's size as a CLI gets it (HI-2049, HI-2063): characters of its JSON (UTF-16 code units), and of
  * them, the tools' descriptions and their parameters' descriptions (every `description` string inside an inputSchema,
  * nested properties and items too), each as the JSON has it (escapes included, quotes not). The rest of the list, its
  * schemas and structure (names, types, enums, keys, JSON punctuation), is `toolsChars - descriptionChars - paramChars`.

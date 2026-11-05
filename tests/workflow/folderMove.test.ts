@@ -1,9 +1,9 @@
 // A card's folder moved with its worktree (#1343): Repair (or Recreate) writes FolderMoved on the card, and
 // reconciliation, finding the card's folder gone, follows its builder's worktree to its new place when that is on the
 // card's line (a Repair cut short before the card's fact), and takes nothing for gone while a move Repair hasn't recorded
-// covers it. Every write is checked under its lock against the card's folder and cycle: two Hives at once write one
+// covers it. Every write is checked under its lock against the card's folder and cycle: two Combworks at once write one
 // FolderMoved, and a move between an observer's read and its write drops its Gone. Real Git; two Workflows on one store
-// stand in for two Hives.
+// stand in for two Combworks.
 import { renameSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -82,7 +82,7 @@ describe("a card's folder moved with its worktree (#1343)", () => {
     expect(gone(e, card.id)).toEqual([])
   })
 
-  it('two Hives follow the same move at once: one FolderMoved', async () => {
+  it('two Combworks follow the same move at once: one FolderMoved', async () => {
     const e = (env = setup(opts))
     const other = e.another()
     const { card, folder } = await started(e)

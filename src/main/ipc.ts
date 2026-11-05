@@ -219,9 +219,9 @@ const advancedState = (): AdvancedState => advanced.state(workspace.path ? (work
 const senderStore = new AsyncLocalStorage<WebContents>()
 
 /**
- * The Hive window whose IPC request is being served now (HI-2355), or null outside one (a timer, a hook, the Agent API):
+ * The Combwork window whose IPC request is being served now (HI-2355), or null outside one (a timer, a hook, the Agent API):
  * a result or warning made for that request is told in that window (main/notify.ts), even if another has the focus by
- * then. A console window's request is its own, not a Hive window's: none.
+ * then. A console window's request is its own, not a Combwork window's: none.
  */
 export function requestingWindow(): BrowserWindow | null {
   const wc = senderStore.getStore()
@@ -256,7 +256,7 @@ advanced.onChange(() => {
   for (const id of consoleWindows.keys()) devConsole.setIncludeText(id, showText)
   sendToConsoles({ type: 'console-options', showText })
 })
-/** Whether this window's workspace may read a console source (its own agents, its Assistant and Hive there). */
+/** Whether this window's workspace may read a console source (its own agents, its Assistant and Combwork there). */
 const windowMayRead = (source: string): boolean => {
   const ws = currentWorkspace().path
   return !!ws && mayRead({ kind: 'assistant', workspace: ws }, source, (p) => workspaceFor(p)?.path ?? null)
@@ -278,7 +278,7 @@ function knownProvider(id: unknown): ProviderId {
   return id
 }
 
-/** Refuses extra arguments with a bare "--" (#523): Hive passes the task after its own. */
+/** Refuses extra arguments with a bare "--" (#523): Combwork passes the task after its own. */
 function assertExtraArgs(args: unknown): void {
   const problem = typeof args === 'string' ? capturedText((t) => extraArgsProblem(args, t)) : null
   if (problem) throw new CombworkError(problem, { kind: 'invalid' })
@@ -288,12 +288,12 @@ function guardFile(path: string, write = false): string {
   if (insideArchive(path)) throw combworkError(M.insideArchive, undefined, { kind: 'forbidden' })
   // A CLI's own files: its connections' homes on in this workspace (HI-1755), else the CLI's own home.
   if (workspace.isAllowedPath(path) || allProviders().some((p) => p.fileAllowed(path, write, connectionHomes(p.id, workspace.path ? workspace.config : null)?.map((h) => h.home)))) return path
-  // The skills that ship with Hive, to view one the workspace doesn't have.
+  // The skills that ship with Combwork, to view one the workspace doesn't have.
   if (!write && insideReal(path, [skills.bundledSkillsDir()])) return path
   throw combworkError(M.outsideWorkspace, undefined, { kind: 'forbidden' })
 }
 
-/** The log files Hive opens itself (#251): text and reports. Anything else is only shown in its folder, never run. */
+/** The log files Combwork opens itself (#251): text and reports. Anything else is only shown in its folder, never run. */
 const OPENABLE_LOG = /\.(md|markdown|txt|log|out|err|json|jsonl|csv|tsv|xml|html?)$/i
 
 /**
@@ -312,7 +312,7 @@ async function runLog(id: unknown): Promise<string> {
 /** Quitting and closing windows (index.ts): each call names the window it came from. */
 export interface QuitControl {
   quit: () => void
-  /** Quits as quit does (asking about running agents), then starts Hive again (#676). */
+  /** Quits as quit does (asking about running agents), then starts Combwork again (#676). */
   restart: () => void
   decide: (from: BrowserWindow, choice: QuitChoice, dontAskAgain: boolean) => void
   cancelPending: () => void
@@ -358,7 +358,7 @@ function moveOptions(o: unknown): MoveOptions {
 
 
 /**
- * Every merge route's authorization, decided now in main (#1357 and #1450, OP-13): a branch whose card Hive's merge
+ * Every merge route's authorization, decided now in main (#1357 and #1450, OP-13): a branch whose card Combwork's merge
  * queue merges goes only as Merge anyway for that card (then recorded on it as an override, with the reason); a line
  * whose card isn't Done otherwise only when the request names that card, after the window's confirmation. So no dialog
  * whose lookup was pending, failed or out of date, and no older route, merges a card's work plainly.
@@ -418,7 +418,7 @@ function boardSteps(ws: WorkspaceService, upgraded = false, after?: AfterOpen): 
     'adoption, slots, repairs and what changed while closed', // i18n-ignore: a part of a log line's timing
     adoptWorkspace(ws)
       .then(() => settleSlotsUpToDate(ws))
-      // HI-1997: a commit message a preset stored as Hive's, switched once to the branch's own (a proven choice kept).
+      // HI-1997: a commit message a preset stored as Combwork's, switched once to the branch's own (a proven choice kept).
       .then(() => settleCommitMessageDefault(ws))
       .then(() => step('slots'))
       .then(() => migrateSlots(ws))
@@ -446,7 +446,7 @@ function boardSteps(ws: WorkspaceService, upgraded = false, after?: AfterOpen): 
 export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:info']>, quitControl: QuitControl): void {
   // A board upgraded to 1.0 while its workspace is open: what its opening skipped, now (#1621).
   onBoardUpgraded((ws) => boardSteps(ws, true))
-  // Each time a workspace opens: Hive's bundled skills and modes it hasn't got, or has untouched older copies of.
+  // Each time a workspace opens: Combwork's bundled skills and modes it hasn't got, or has untouched older copies of.
   // After the open, not before it (HI-1705): a launch waits for it.
   WorkspaceService.bringItemsUpToDate = (fresh) => syncBundled({ fresh })
   WorkspaceService.runsCommands = closeCommandsRun
@@ -457,7 +457,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     void after.track('usage history', usageHistory.opened(contextWorkspace()!)) // i18n-ignore: a part of a log line's timing
     // Its board's steps: skipped while the board waits for its upgrade to 1.0, and run again once it is upgraded.
     boardSteps(contextWorkspace()!, false, after)
-    // Builds of Hive left for it while it was closed (#1534), into the journal once.
+    // Builds of Combwork left for it while it was closed (#1534), into the journal once.
     void after.track('builds left for it', pickUpBuilds(ws).catch((e) => log.warn('recording the builds left for Combwork', e))) // i18n-ignore: a part of a log line's timing
     // What failed or interrupted saves and the project-id migration left in the .combwork folders (#1016).
     void after.track('leftovers', sweepWorkspaceLeftovers(ws).catch((e) => log.warn('removing leftover temp and backup files', e))) // i18n-ignore: a part of a log line's timing
@@ -465,8 +465,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     void after.track('open commands', runOpenCommands(contextWorkspace()!)) // i18n-ignore: a part of a log line's timing
     // Moved since it was last opened (#146)? In the background: the window opens meanwhile, and a banner follows.
     void after.track('whether it moved', checkMoved(contextWorkspace()!).catch((e) => log.warn('checking whether the workspace moved', e))) // i18n-ignore: a part of a log line's timing
-    // A merge slot an agent held when Hive closed: its merge may be half done (#350).
-    // At start, the notice that Hive closed unexpectedly waits for it, and tells its holds (#984).
+    // A merge slot an agent held when Combwork closed: its merge may be half done (#350).
+    // At start, the notice that Combwork closed unexpectedly waits for it, and tells its holds (#984).
     // Resumes after a restart wait for it too (HI-1707).
     if (ws.path) {
       const recovery = after.track('merge slots', recoverMergeSlots(ws.path).catch((e) => log.warn('recovering the merge slots', e))) // i18n-ignore: a part of a log line's timing
@@ -1006,9 +1006,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'project:updateConfig': (p, patch) => {
       for (const c of Object.values(patch.providers ?? {})) assertExtraArgs(c?.extraArgs)
       // The workflow options are checked as a whole (contradictions, what this version offers): workflow:setOptions.
-      if (patch.workflow !== undefined) throw new CombworkError({ lines: ["A project's workflow options change through workflow:setOptions"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Hive's code, never shown
+      if (patch.workflow !== undefined) throw new CombworkError({ lines: ["A project's workflow options change through workflow:setOptions"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Combwork's code, never shown
       // Its version control switches only with its checks and its options kept per platform (#1419): workflow:setPlatform.
-      if (patch.platform !== undefined) throw new CombworkError({ lines: ["A project's version control changes through workflow:setPlatform"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Hive's code, never shown
+      if (patch.platform !== undefined) throw new CombworkError({ lines: ["A project's version control changes through workflow:setPlatform"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Combwork's code, never shown
       const projectPath = workspace.assertProject(p)
       // A project has no provider pages or default provider since HI-2106/HI-2107: its agents' connections hold what they
       // set (HI-2122: nothing is made from them), and project.json keeps none.
@@ -1075,7 +1075,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'project:openInExplorer': (p) => void shell.openPath(workspace.assertProject(p)),
     'project:openTerminal': async (p) => {
       const dir = workspace.assertProject(p)
-      // A new terminal gets what was installed since Hive started (#821).
+      // A new terminal gets what was installed since Combwork started (#821).
       await refreshPathBeforeStart()
       openExternalTerminal(dir)
     },
@@ -1618,7 +1618,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'console:open': () => {
       const wc = senderStore.getStore()
       const owner = wc ? windowOf(wc) : null
-      if (!owner) throw new Error('Not allowed') // i18n-ignore: a refusal of a page that isn't Hive's window (security, never shown)
+      if (!owner) throw new Error('Not allowed') // i18n-ignore: a refusal of a page that isn't Combwork's window (security, never shown)
       if (!config.settings.advanced.showDeveloperFeatures) throw combworkError(M.consoleHidden, undefined, { kind: 'conflict' })
       openConsoleWindow(owner)
     },
@@ -1626,7 +1626,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'console:options': () => ({ showText: consoleShowsText() }),
     'console:subscribe': (sources) => {
       const wc = senderStore.getStore()
-      if (!wc) throw new Error('Not allowed') // i18n-ignore: a refusal of a page that isn't Hive's window (security, never shown)
+      if (!wc) throw new Error('Not allowed') // i18n-ignore: a refusal of a page that isn't Combwork's window (security, never shown)
       if (!Array.isArray(sources)) throw combworkError(M.sourcesList, undefined, { kind: 'invalid' })
       const ids = sources.filter((s): s is string => typeof s === 'string' && windowMayRead(s))
       const id = `window:${wc.id}`
@@ -1679,7 +1679,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'console:captures': () => listCaptures(),
     'console:showRecording': (name) => {
-      // Only Hive's own recordings, by name, in its folder: never a path the page gives.
+      // Only Combwork's own recordings, by name, in its folder: never a path the page gives.
       if (typeof name !== 'string' || !isRecordingName(name)) throw combworkError(M.notRecording, undefined, { kind: 'invalid' })
       shell.showItemInFolder(join(recordingsDir(), name))
     },
@@ -1748,7 +1748,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'git:info': async (p) => {
       p = workspace.assertProject(p)
       const info = await repoInfo(p, await workTargetOf(p))
-      // Hive's own worktrees said as such (HI-1710): its review copies and the merge queue's folder.
+      // Combwork's own worktrees said as such (HI-1710): its review copies and the merge queue's folder.
       return { ...info, worktrees: info.worktrees.map((w) => {
         const combwork = combworkWorktreeOf(p, w.path)
         return combwork ? { ...w, combwork } : w
@@ -1854,7 +1854,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
   // CW_TEST_SLOW_IPC="tasks:start=1500,git:diff=1500*1" delays those calls (`*n`: only the first n), and
   // CW_TEST_FAIL_IPC="git:status*1" makes them fail, and CW_TEST_BLOCK_IPC="app:info=1500*1" holds the main process
   // that long in them (a stall, #1109).
-  // A suite may change them while Hive runs (in the main process): they are read again when they change.
+  // A suite may change them while Combwork runs (in the main process): they are read again when they change.
   type TestCalls = { from: string; calls: Map<string, { ms: number; left: number }> }
   const testCalls = (name: string, held: TestCalls): TestCalls => {
     const from = app.isPackaged ? '' : (process.env[name] ?? '')
@@ -1879,10 +1879,10 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
   }
   for (const [channel, fn] of Object.entries(impl)) {
     ipcMain.handle(channel, async (e, ...args: unknown[]) => {
-      // Only Hive's own pages may call: not another window, and not a frame inside one (e.g. an HTML preview). A developer
+      // Only Combwork's own pages may call: not another window, and not a frame inside one (e.g. an HTML preview). A developer
       // console's page calls only the console's channels, in the workspace of the window it belongs to (#637).
       const w = windowOf(e.sender) ?? (CONSOLE_WINDOW_CHANNELS.has(channel) ? consoleOwner(e.sender) : null)
-      if (!w || e.senderFrame?.parent) throw new Error('Not allowed') // i18n-ignore: a refusal of a page that isn't Hive's window (security, never shown)
+      if (!w || e.senderFrame?.parent) throw new Error('Not allowed') // i18n-ignore: a refusal of a page that isn't Combwork's window (security, never shown)
       slow = testCalls('CW_TEST_SLOW_IPC', slow)
       failing = testCalls('CW_TEST_FAIL_IPC', failing)
       blocking = testCalls('CW_TEST_BLOCK_IPC', blocking)
@@ -1897,7 +1897,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
         if (block?.ms) for (const until = Date.now() + block.ms; Date.now() < until; );
         return await senderStore.run(e.sender, () => inWorkspace(w.ws, () => (fn as (...a: unknown[]) => unknown)(...args)))
       } catch (err) {
-        // A failure that isn't one of Hive's own refusals (a file that couldn't be written, HI-1749): the window shows it, and
+        // A failure that isn't one of Combwork's own refusals (a file that couldn't be written, HI-1749): the window shows it, and
         // combwork.log has it too, so every "Could not …" notification has its line.
         if (!(err instanceof CombworkError)) log.warn(`ipc ${channel} failed: ${userText(englishError(err))}${typeof (err as NodeJS.ErrnoException)?.code === 'string' ? ` (${(err as NodeJS.ErrnoException).code})` : ''}`)
         throw windowError(err)
@@ -1910,6 +1910,6 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
 
 /** A merge queue's target as the window names it (a branch): refused when it isn't one. */
 function queueTarget(target: unknown): string {
-  if (typeof target !== 'string' || !target || target.length > 255 || /[\s~^:?*[\\]/.test(target)) throw new CombworkError({ lines: ['A merge queue is named by its target branch'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Hive's code, never shown
+  if (typeof target !== 'string' || !target || target.length > 255 || /[\s~^:?*[\\]/.test(target)) throw new CombworkError({ lines: ['A merge queue is named by its target branch'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Combwork's code, never shown
   return target
 }

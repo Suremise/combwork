@@ -104,9 +104,9 @@ export const isRefusal = (r: unknown): r is Refusal => !!r && typeof r === 'obje
 /** What happens outside the store: a delivery per action, deduplicated by the action's id (§16.4.5). */
 export interface Effects {
   wake?: (agent: string, card: CardRecord, why: string) => void
-  /** A notice to the user: its English, and its text as data for the window when Hive wrote it (an agent's words have none). */
+  /** A notice to the user: its English, and its text as data for the window when Combwork wrote it (an agent's words have none). */
   notify?: (card: CardRecord, text: string, shown?: StoredText) => void
-  /** HI-2087: a comment of Hive's on the card: its English, and its text as data for the window. */
+  /** HI-2087: a comment of Combwork's on the card: its English, and its text as data for the window. */
   comment?: (card: CardRecord, text: string, shown?: StoredText) => void
 }
 
@@ -213,7 +213,7 @@ export interface WorkflowConfig {
    * ruleset as ever. Read at each use; left out, always.
    */
   enforced?: () => boolean
-  /** What runs a target's queue in this Hive now (queueHost's queueLive, #1354); left out, nothing here runs one. */
+  /** What runs a target's queue in this Combwork now (queueHost's queueLive, #1354); left out, nothing here runs one. */
   queueLive?: (target: string) => QueueLive
 }
 
@@ -641,7 +641,7 @@ export class Workflow {
    * Requests a write settled without an answer (#1638), closed in the same write: a question still open once the card is
    * in Done (an agent's or the Assistant's, askedQuestion; an agent that asked is told, unless it made the move), and an
    * agent's own questions once it moves the card on itself (a submit, a put back: it went on, answered some other way).
-   * Hive's own requests stay: a merge stopped part way still needs the user on a Done card.
+   * Combwork's own requests stay: a merge stopped part way still needs the user on a Done card.
    */
   private closeSettled(w: Write): void {
     if (!w.written.length) return
@@ -836,7 +836,7 @@ export class Workflow {
     return this.idsOf(w.ruleset, move, only)
   }
 
-  /** What runs a target's queue in this Hive now (cfg.queueLive): for the queue's order, queueState.ts. */
+  /** What runs a target's queue in this Combwork now (cfg.queueLive): for the queue's order, queueState.ts. */
   queueLive(target: string): QueueLive {
     return this.cfg.queueLive?.(target) ?? NOT_RUN_HERE
   }
@@ -893,8 +893,8 @@ export class Workflow {
     // `reopen`: a Done card started again, or one On Hold never started (an agent's old move to Doing, #1268), back to
     // Todo and started in one write, its new cycle gathered and guarded as from Todo (§16.7.4, as the user's reopening).
     const reopening = !!opts.reopen && (s.stage === 'done' || (s.stage === 'hold' && !s.started))
-    // A lane's card Hive has just started for this builder (HI-1990, laneStarts.ts): its own start, racing Hive's, is that
-    // start, not a refusal; Hive's landing between this start's checks and its write too (HI-2029's lanebrief run).
+    // A lane's card Combwork has just started for this builder (HI-1990, laneStarts.ts): its own start, racing Combwork's, is that
+    // start, not a refusal; Combwork's landing between this start's checks and its write too (HI-2029's lanebrief run).
     const forIt = (st: CardState): Reply | null =>
       st.stage === 'active' && !!st.started && !!agentOf(actor) && st.started.builder === agentOf(actor) && this.store.facts(card.id).find((f) => f.seq === st.started!.seq)?.actor === 'combwork'
         ? this.ok(card, 'active', 'active', { folder: this.folderOf(st), line: st.started.line, base: st.started.base, target: st.started.target }, [say(W.laneStarted, { card: card.key })])
@@ -1198,7 +1198,7 @@ export class Workflow {
    */
   askUser(w: Write, kind: ForYouKind, gate: string, text: string | StoredText, o: { asker?: string | null; unbound?: boolean; revision?: string; checklist?: string[]; entry?: string; result?: string; actions?: AskAction[]; tests?: string[] } = {}): string {
     const s = w.state()
-    // Hive's own requests are messages (FOR_YOU): the English for agents and the Agent API, the message for the window.
+    // Combwork's own requests are messages (FOR_YOU): the English for agents and the Agent API, the message for the window.
     // agent-stored: storedForAgents says a request again for each reader (its forYou rows, a lane wake's detail; HI-2464)
     const english = typeof text === 'string' ? text : workflowEnglish(text)
     const shown = typeof text === 'string' ? {} : { requestText: text }
@@ -1227,7 +1227,7 @@ export class Workflow {
   }
 
   /**
-   * At the round limit (§16.11.4): Hive asks the user (Decide: carry on, split, accept with follow-ups, take it over), and
+   * At the round limit (§16.11.4): Combwork asks the user (Decide: carry on, split, accept with follow-ups, take it over), and
    * the card's lane pauses until they answer. Only for a card in a running lane (its rounds: the Card loops settings it
    * started with) and while the rules are enforced (Settings → Advanced).
    */
@@ -1841,7 +1841,7 @@ export class Workflow {
         if (e) w.action('enqueue', { target: e.target })
       }
       if (req.gate !== 'review' && req.gate !== 'okBefore') {
-        // A question an agent asked (or Hive's own, after a merge): recorded, and the asker told; nothing moves.
+        // A question an agent asked (or Combwork's own, after a merge): recorded, and the asker told; nothing moves.
         this.wake(w, req.asker ?? builder, said, 'answer')
         return null
       }
@@ -1914,17 +1914,17 @@ export class Workflow {
     return this.ok(card, s.stage, this.state(card).stage, { answered: [...requests] })
   }
 
-  /** report merge (§16.9.3): the builder merged; Hive checks containment (unless Not checked), then Done. */
+  /** report merge (§16.9.3): the builder merged; Combwork checks containment (unless Not checked), then Done. */
   async reportMerge(ref: unknown, actor: Actor, args: { result?: string } = {}): Promise<Reply> {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
     const r = this.rulesetOf(card, s)
-    // Under Hive merges (the card's own ruleset) the queue merges, never a report: refused saying where it is (#1354).
+    // Under Combwork merges (the card's own ruleset) the queue merges, never a report: refused saying where it is (#1354).
     const combwork = r.options.finish === 'combworkMerges'
     const queued = this.combworkMergesRefusal(card, s)
     if (queued) return this.refuse(card, actor, 'report merge', queued, null) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
-    // Only where the builder merges (or nothing is checked); with workflow rules off, a card Hive merges is reported as
+    // Only where the builder merges (or nothing is checked); with workflow rules off, a card Combwork merges is reported as
     // before 1.0 too, approved or waiting in the queue, whose entry it drops (a merge outside the queue, as S7's).
     const from = s.stage === 'approved' || (combwork && s.stage === 'merging') || awaitsAgentMerge(r, s)
     if (!from || (!combwork && r.options.finish !== 'agentMerges' && r.options.finish !== 'notChecked')) return this.notFrom(card, actor, s, 'report merge') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
@@ -1972,7 +1972,7 @@ export class Workflow {
   }
 
   /**
-   * A card Hive merges (its own ruleset: the options it started under, or a change applied to it, never the project's
+   * A card Combwork merges (its own ruleset: the options it started under, or a change applied to it, never the project's
    * current options) while the rules are enforced: an agent's merge of it is refused, its next step where it is in the
    * merge queue (#1354, queueState.ts). Null otherwise: the agent merges, nobody checks, or the rules are off.
    */
@@ -1989,7 +1989,7 @@ export class Workflow {
     return { rule: 'merge.combworkMerges', values }
   }
 
-  /** Who merges a card and where it is with the merge queue, in a sentence for agents (#1354); null unless Hive merges it. */
+  /** Who merges a card and where it is with the merge queue, in a sentence for agents (#1354); null unless Combwork merges it. */
   queueLineOf(ref: unknown): string | null {
     const card = this.resolve(ref)
     if (isRefusal(card)) return null
@@ -2011,7 +2011,7 @@ export class Workflow {
     return checksView(o.preChecks, card.key, o.platform !== 'none')
   }
 
-  /** The merge slot claimed for a card (#1354): refused, and recorded as Refused, when Hive merges it. */
+  /** The merge slot claimed for a card (#1354): refused, and recorded as Refused, when Combwork merges it. */
   async refuseCombworkMerge(ref: unknown, actor: Actor, move: string): Promise<Refusal | null> {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return null
@@ -2125,7 +2125,7 @@ export class Workflow {
         } else {
           const about = opts.design ?? now.step?.id
           w.fact('LoopStep', { step, text, ...(about ? { design: about } : {}), ...(now.step ? { of: now.step.step } : {}) })
-          // A follow-up checked on an approved card where Hive merges (#1623): queued again while its pass holds.
+          // A follow-up checked on an approved card where Combwork merges (#1623): queued again while its pass holds.
           const r = w.ruleset
           const after = w.state()
           if (step === 'ok' && now.step?.step === 'followUp' && r?.options.finish === 'combworkMerges' && w.current === 'approved' && !openEntry(after) && !notApproved(after, r, card.labels)) this.enqueue(w)
@@ -2283,7 +2283,7 @@ export class Workflow {
           const changed = this.stillAt(w, s, 'move')
           if (changed) return changed
           if (this.leavesNobody(to, by, opts)) w.fact('Override', { rules: ['move.doingNobody'], move: `${from}→${to}`, by, reason: opts.reason ?? '' }) // i18n-ignore: a fact's kind and codes, not text
-          // A card that was queued (Merging, or Approved under Hive merges) is queued again.
+          // A card that was queued (Merging, or Approved under Combwork merges) is queued again.
           const requeue = to === was && (was === 'merging' || (was === 'approved' && r.options.finish === 'combworkMerges' && !s.stale && !notApproved(s, r, card.labels)))
           w.move(requeue ? 'approved' : was, 'user')
           if (requeue) this.enqueue(w)
@@ -2452,7 +2452,7 @@ export class Workflow {
     const intent = { doing: 'start', review: 'submit', passed: 'verdict', done: 'report merge', todo: 'put back' }[column] // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     if (!opts.translate) {
       const card = this.resolve(ref, actor)
-      // Done for a card Hive merges: no intent of the agent's does it, so the refusal names the queue (#1354).
+      // Done for a card Combwork merges: no intent of the agent's does it, so the refusal names the queue (#1354).
       const queued = column === 'done' && !isRefusal(card) ? this.combworkMergesRefusal(card) : null
       return this.refuse(isRefusal(card) ? null : card, actor, `column ${column}`, queued ?? { rule: 'move.useIntent', values: { intent } }, null) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     }
@@ -2527,7 +2527,7 @@ export class Workflow {
     const out = await this.write(card, r, by, (w) => {
       guard?.()
       // For a card the queue returned (Active, its last entry failed), once per revision; or one waiting in Approved
-      // where Hive merges with no entry (taken out of the queue, #1623) and no follow-up waiting: approved and unstale.
+      // where Combwork merges with no entry (taken out of the queue, #1623) and no follow-up waiting: approved and unstale.
       const st = w.state()
       const last = st.entries.at(-1)
       const retries = st.entries.filter((x) => x.seq > (st.latest?.id ?? 0) && x.requeue === 'retry').length
@@ -2558,7 +2558,7 @@ export class Workflow {
 
   // --- None: a card's paths (§16.3.3).
 
-  /** Edits Hive saw through the card's agents' hooks and file locks: the pre-fill of its paths. */
+  /** Edits Combwork saw through the card's agents' hooks and file locks: the pre-fill of its paths. */
   noteEdit(card: CardRecord, path: string): void {
     this.store.addPrefill(card.id, path)
     this.none.invalidate(path)
@@ -2787,7 +2787,7 @@ export class Workflow {
     if (!p.lineNow) return null
     const now = await p.lineNow(own.path, target)
     if (isUnknown(now)) return null
-    // A move begun and not recorded as done (it failed part way, or Hive stopped during it): held until it is settled,
+    // A move begun and not recorded as done (it failed part way, or Combwork stopped during it): held until it is settled,
     // unless the line is back where it began.
     const facts = this.store.facts(prev.id)
     // Its outcome is a fact (HR2's round 4): a head back where it began proves nothing of the files and index.
@@ -2841,7 +2841,7 @@ export class Workflow {
       if (isUnknown(now) || now.line !== b.line || now.head !== b.head || now.targetHead !== b.targetHead || now.dirty.length || !ok()) return null
       const line = b.line ?? b.folder
       // Begun, durably, before anything moves (HR2's round 3): a move that doesn't finish (it fails part way and can't be
-      // put back, or Hive stops) holds the next card until it is settled.
+      // put back, or Combwork stops) holds the next card until it is settled.
       await this.write(b.prev, null, 'combwork', (w) => {
         w.fact('LineMoving', { line, from: b.head, to: b.targetHead }) // i18n-ignore: a fact's kind and codes, not text
         return null
@@ -2896,7 +2896,7 @@ export class Workflow {
     })
   }
 
-  /** The lane's next card, read from Hive: one at a time, a queued change applied at the boundary. */
+  /** The lane's next card, read from Combwork: one at a time, a queued change applied at the boundary. */
   laneNext(id: string): number | null {
     const { lane, card } = nextCard(this.lane(id)!, (c) => this.laneDone(c))
     this.saveLane(lane)

@@ -78,7 +78,7 @@ test('the server: --server, else the workspace\'s installed copy, else a hive-mc
   const installer = path.join(s.dir, 'builds', 'hive', 'Hive-Setup-0.6.0.exe')
   const hive = path.join(s.dir, 'ws', 'hive')
   fs.mkdirSync(hive, { recursive: true })
-  const opts = ['--installer', installer, '--only', 'fresh', '--hive', hive]
+  const opts = ['--installer', installer, '--only', 'fresh', '--repo', hive]
   assert.throws(() => plan([...opts]), /No windows-sandbox server found \(looked in .*\.combwork.*mcp.*windows-sandbox.*server\.js and .*mcp.*servers.*windows-sandbox.*server\.js\): pass --server/)
   const [installed, checkout] = serverCandidates(hive)
   assert.strictEqual(installed, path.join(s.dir, 'ws', '.combwork', 'mcp', 'windows-sandbox', 'server.js'))
@@ -89,8 +89,8 @@ test('the server: --server, else the workspace\'s installed copy, else a hive-mc
   assert.strictEqual(plan(opts).serverJs, checkout)
   assert.strictEqual(plan([...opts, '--server', FAKE_SERVER]).serverJs, FAKE_SERVER)
   assert.throws(() => plan([...opts, '--server', path.join(s.dir, 'nope.js')]), /--server .*nope\.js doesn't exist/)
-  // Without --hive, the repo is this checkout (it gives the previous installer from its dist only when asked to).
-  assert.strictEqual(plan(['--installer', installer, '--only', 'fresh', '--server', FAKE_SERVER]).hive, path.resolve(__dirname, '..'))
+  // Without --repo, the repo is this checkout (it gives the previous installer from its dist only when asked to).
+  assert.strictEqual(plan(['--installer', installer, '--only', 'fresh', '--server', FAKE_SERVER]).repo, path.resolve(__dirname, '..'))
 })
 
 test('inSandbox: a body that throws still stops the Sandbox, confirmed', async () => {
@@ -251,7 +251,7 @@ test('the previous installer: a release sorts above its prereleases, so 0.9.0 is
   fs.mkdirSync(dist)
   // As in Hive's dist on 18 Oct: the RC run picked 0.9.0-beta.1, which sorted level with 0.9.0 and came first.
   for (const v of ['0.8.2-rc.3', '0.9.0-beta.1', '0.9.0-rc.1', '0.9.0', '0.9.1-rc.1']) fs.writeFileSync(path.join(dist, `Hive-Setup-${v}.exe`), 'MZ')
-  const pick = (installer: string) => path.basename(plan(['--installer', path.join(dist, installer), '--hive', hive, '--server', FAKE_SERVER]).previous)
+  const pick = (installer: string) => path.basename(plan(['--installer', path.join(dist, installer), '--repo', hive, '--server', FAKE_SERVER]).previous)
   assert.strictEqual(pick('Hive-Setup-0.9.1-rc.1.exe'), 'Hive-Setup-0.9.0.exe')
   // The newest other than the installer itself, even when that is a prerelease.
   assert.strictEqual(pick('Hive-Setup-0.9.0.exe'), 'Hive-Setup-0.9.1-rc.1.exe')
@@ -265,11 +265,11 @@ test('--previous-rc (HI-2587): a 1.1 release candidate adds scenario 10 beside t
   for (const v of ['Hive-Setup-1.0.0', 'Combwork-Setup-1.1.0-rc.2', 'Combwork-Setup-1.1.0']) fs.writeFileSync(path.join(dist, `${v}.exe`), 'MZ')
   const installer = path.join(dist, 'Combwork-Setup-1.1.0.exe')
   const rc = path.join(dist, 'Combwork-Setup-1.1.0-rc.2.exe')
-  const p = plan(['--installer', installer, '--previous', path.join(dist, 'Hive-Setup-1.0.0.exe'), '--previous-rc', rc, '--hive', hive, '--server', FAKE_SERVER])
+  const p = plan(['--installer', installer, '--previous', path.join(dist, 'Hive-Setup-1.0.0.exe'), '--previous-rc', rc, '--repo', hive, '--server', FAKE_SERVER])
   assert.deepStrictEqual(p.ran, ['fresh', 'upgrade', 'clean', 'profile-move', 'upgrade-rc'])
   assert.strictEqual(p.guestPreviousRc, 'C:\\build\\Combwork-Setup-1.1.0-rc.2.exe')
-  assert.deepStrictEqual(plan(['--installer', installer, '--previous', path.join(dist, 'Hive-Setup-1.0.0.exe'), '--hive', hive, '--server', FAKE_SERVER]).ran, ['fresh', 'upgrade', 'clean', 'profile-move'])
-  assert.throws(() => plan(['--only', 'upgrade-rc', '--installer', installer, '--hive', hive, '--server', FAKE_SERVER]), /--only upgrade-rc needs --previous-rc/)
+  assert.deepStrictEqual(plan(['--installer', installer, '--previous', path.join(dist, 'Hive-Setup-1.0.0.exe'), '--repo', hive, '--server', FAKE_SERVER]).ran, ['fresh', 'upgrade', 'clean', 'profile-move'])
+  assert.throws(() => plan(['--only', 'upgrade-rc', '--installer', installer, '--repo', hive, '--server', FAKE_SERVER]), /--only upgrade-rc needs --previous-rc/)
 })
 
 test('--smart-app-control: only "off"; anything else is refused before anything runs', () => {

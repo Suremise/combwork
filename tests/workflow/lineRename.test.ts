@@ -1,6 +1,6 @@
 // A card's line renamed by Repair (#1305): git's rename, then LineRenamed on the card, and reconciliation, which follows
 // a rename cut short after git's step (a pending rename, `pendingRename`) rather than take the old name for gone. Every
-// observation acts on the card's current line and cycle, checked under its write's lock: two Hives recovering the same
+// observation acts on the card's current line and cycle, checked under its write's lock: two Combworks recovering the same
 // rename at once, a restart, a repeat, a rename between an observer's read and its write, and a new cycle meanwhile
 // never leave a Gone: line or a HeadMoved of the old name. Real Git; two Workflows on one store stand in for two Hives.
 import { afterEach, describe, expect, it } from 'vitest'

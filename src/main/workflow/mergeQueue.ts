@@ -1,11 +1,11 @@
-// The merge queue (SPEC §16.9): Hive performs merges, one entry at a time per target. An entry's way through: check it
+// The merge queue (SPEC §16.9): Combwork performs merges, one entry at a time per target. An entry's way through: check it
 // is still approved and not already in the target; test-merge it in the queue's own worktree; run the merge checks on
 // exactly that result (installing clean when the manifests changed); then advance the target only on green, after
 // writing `IntegrationStarted`, by compare-and-swap (not checked out) or the journaled read-tree/update-ref protocol
 // (checked out). A target that moved since the test is tested again; it never advances an untested target.
 //
 // P2 spike (#1118): the core of the queue over the spike's runtime. The repository lock across processes, hooks and
-// signing pauses are P5's. The merge checks (#1349) run as Hive's own runs (queueChecks.ts), each bracketed here: green
+// signing pauses are P5's. The merge checks (#1349) run as Combwork's own runs (queueChecks.ts), each bracketed here: green
 // only when it exited 0 and its `CheckRan` counted for exactly the test merge's revision.
 
 import { spawn, type ChildProcess } from 'child_process'
@@ -61,7 +61,7 @@ export interface CheckResult {
   output: string
   /** Its log's path, when the log holds its output (#1354: a returned card's wake names it). */
   logPath?: string
-  /** The command that ran, and its run's id (a progress run's, when Hive keeps runs). */
+  /** The command that ran, and its run's id (a progress run's, when Combwork keeps runs). */
   command?: string
   run?: string
   /** Tells the check's run how it counted (its details say why not). */
@@ -76,7 +76,7 @@ export interface CheckContext {
   /** Nothing was installed before the checks (no setup command and no lock file): this check's run says so. */
   noInstall?: boolean
   /**
-   * Variables Hive gives this check itself, past `checkEnv` (which takes every CW_* out of the base): G20's runner
+   * Variables Combwork gives this check itself, past `checkEnv` (which takes every CW_* out of the base): G20's runner
    * reads its tests, results file and jobs from them (HI-1367).
    */
   env?: Record<string, string>
@@ -112,7 +112,7 @@ export interface QueueConfig {
   manifests?: string[]
   /**
    * G20 (HI-1367): how the queue picks a card's focused tests at the result (a check's environment, its time limit),
-   * the jobs its runner is given, and where the tests and results files go (Hive's own folder, never the queue's).
+   * the jobs its runner is given, and where the tests and results files go (Combwork's own folder, never the queue's).
    */
   focused?: { env: () => Record<string, string>; pickTimeoutMs: () => number; jobs: () => number; dir: string }
   /**
@@ -123,7 +123,7 @@ export interface QueueConfig {
   folderBusy?: (folder: string) => string[] | null
   /**
    * Runs the advance into a checked-out target with its folder fenced (#646, folderFence.changingFolder): nothing of
-   * Hive's is typed into that folder and no agent starts there until it settles. Left out, as it is.
+   * Combwork's is typed into that folder and no agent starts there until it settles. Left out, as it is.
    */
   fence?: <T>(folder: string, fn: () => Promise<T>) => Promise<T>
   /**
@@ -140,11 +140,11 @@ export interface QueueConfig {
   holds?: () => boolean
   /**
    * Runs git for the queue (its test merges, the advance, the pins): the runner's recording one in the app (#1360,
-   * QueueRunner.git: its processes in the lease's job, recorded before they run); left out, Hive's own git().
+   * QueueRunner.git: its processes in the lease's job, recorded before they run); left out, Combwork's own git().
    */
   git?: (cwd: string, args: string[], opts?: QueueGitOptions) => Promise<QueueGitResult>
   /**
-   * The longest Hive's merge commit runs when the repository signs its commits (#1350, Advanced
+   * The longest Combwork's merge commit runs when the repository signs its commits (#1350, Advanced
    * `cw.queue.signSeconds`): a signer still waiting then (for a passphrase) is ended and the entry pauses. 60 s left out.
    */
   signTimeoutMs?: number
@@ -247,11 +247,11 @@ export interface QueueStepInfo {
 
 /**
  * `uncounted`: its checks passed but didn't count for the result MAX_RETESTS times in a row (the card's `CheckRan` says
- * why). `signingWaits`: signing Hive's commit waited for a passphrase (or a pinentry) and was ended; `signing`: it failed
+ * why). `signingWaits`: signing Combwork's commit waited for a passphrase (or a pinentry) and was ended; `signing`: it failed
  * (git's message in the pause). `hookTimedOut`: a hook of a signed commit was still running at the signing bound.
  * `identity`: no commit identity for the repository (its folder in the pause). `user`: Pause queue (the user's, or the
  * Assistant's within Control: #1353). `approval`: an entry ready to advance into a checked-out target waits for the
- * user's Approve (Ask each time, #1351). `checkedOut`: a pause from before #1351, which Hive no longer makes.
+ * user's Approve (Ask each time, #1351). `checkedOut`: a pause from before #1351, which Combwork no longer makes.
  * `pushRejected`, `pushFailed`, `pushNoRemote` (G18, #1179): the push of the target after a merge was refused (the
  * remote has commits it lacks), failed (git's message: a sign-in, the network, the bound), or had no remote to go to;
  * `pushUnreadable`: owed, and the target (or whether it still has the merge) couldn't be read to settle it.
@@ -260,7 +260,7 @@ export interface QueueStepInfo {
 export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut' | 'approval' | 'subfolderTarget' | 'pushRejected' | 'pushFailed' | 'pushNoRemote' | 'pushUnreadable' | 'mergeChoice' | 'focusedSkip'
 
 /**
- * G18 (#1179): the push of a target Hive owes after merging into it, as store meta per target: the merge's result, its
+ * G18 (#1179): the push of a target Combwork owes after merging into it, as store meta per target: the merge's result, its
  * card and entry. Written in the same transaction as the merge's `Integrated` (the card Done and the push owed, or
  * neither); cleared only for the result that was pushed (compare-and-clear), never a newer one.
  */
@@ -272,7 +272,7 @@ interface PushOwed {
 
 export const pushOwedKey = (target: string): string => `queue.pushOwed:${target}`
 
-/** The push Hive owes for a target, if any (an unreadable value counts as none). */
+/** The push Combwork owes for a target, if any (an unreadable value counts as none). */
 export function pushOwedOf(value: string | null): PushOwed | null {
   if (!value) return null
   try {
@@ -303,7 +303,7 @@ function pushEnv(): NodeJS.ProcessEnv {
 /** git's words when a remote refuses a push that isn't a fast-forward (the Git view's test). */
 const PUSH_REJECTED = /\[rejected\]|non-fast-forward|fetch first/i
 
-/** What an entry's steps read of the repository's config once (#1386): the identity Hive commits as, and signing. */
+/** What an entry's steps read of the repository's config once (#1386): the identity Combwork commits as, and signing. */
 /** What a pass of an entry reads once (HI-2019: made afresh for each pass, so a pass that goes round again reads again). */
 interface EntryReads {
   identity?: Promise<Maybe<{ name: string; email: string } | null>>
@@ -469,7 +469,7 @@ export function readCommitStream(err: string): CommitStream {
 const joined = (...parts: (string | undefined)[]): string => parts.map((p) => p?.trim()).filter(Boolean).join('\n')
 
 /**
- * Why Hive's merge, or a squash's commit, failed (#1350), from the source of each piece of what it said (its stream,
+ * Why Combwork's merge, or a squash's commit, failed (#1350), from the source of each piece of what it said (its stream,
  * readCommitStream), never from words in another's (a hook that passed saying "passphrase" changes nothing):
  * - ended at the bound: always a pause, decided by what was running when it was ended (`cut`, its stream until then;
  *   ending it may make a hook exit non-zero, which is never its rejection): a hook → `hookTimedOut`; the signer, or
@@ -499,7 +499,7 @@ export function commitFailed(r: QueueGitResult, signs: boolean): { fail: 'hook';
 }
 
 /**
- * The environment of Hive's commits (#1350): no prompt is ever waited on. git asks for no credentials, ssh-keygen never
+ * The environment of Combwork's commits (#1350): no prompt is ever waited on. git asks for no credentials, ssh-keygen never
  * asks for a passphrase, and a credential manager stays non-interactive; a pinentry window is ended by the bound.
  */
 function commitEnv(): NodeJS.ProcessEnv {
@@ -508,7 +508,7 @@ function commitEnv(): NodeJS.ProcessEnv {
 }
 
 /**
- * git as Hive runs it, with no input (no terminal to prompt on), in an environment and within a bound: at the bound its
+ * git as Combwork runs it, with no input (no terminal to prompt on), in an environment and within a bound: at the bound its
  * whole tree (git, a hook, a signer) is ended, and the result says so. The queue's git when its config gives none (tests;
  * the app runs it through the runner's recorded spawn). Exported for its tests (HI-2043: its bound against its output).
  */
@@ -598,7 +598,7 @@ const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms)
 
 const refSafe = (id: string): string => id.replace(/[^A-Za-z0-9._-]/g, '-')
 
-/** A runner that lost its lease stops at once: no outcome (another Hive's runner carries on). */
+/** A runner that lost its lease stops at once: no outcome (another Combwork's runner carries on). */
 const lostIsNull = (e: unknown): null => {
   if (e instanceof LeaseLost) return null
   throw e
@@ -725,7 +725,7 @@ export class MergeQueue {
     return o.platform === 'git' && o.finish === 'combworkMerges' && o.pushTarget === true
   }
 
-  /** The message of Hive's merge commits (G19, HI-1697), as the project's options are now: like G18, never a ruleset's. */
+  /** The message of Combwork's merge commits (G19, HI-1697), as the project's options are now: like G18, never a ruleset's. */
   private commitMessage(): CommitMessage {
     return this.wf.cfg.options().commitMessage ?? 'branch'
   }
@@ -814,7 +814,7 @@ export class MergeQueue {
       await this.clearOwed(target, owed.result, this.notPushed(pending, 'off'))
       return null
     }
-    // HI-2054: where to push couldn't be read: unreadable, as the reads above (in Hive's own words), never "no remote".
+    // HI-2054: where to push couldn't be read: unreadable, as the reads above (in Combwork's own words), never "no remote".
     if (dest === 'unreadable') return this.pausePush(target, owed, 'pushUnreadable')
     if (!dest) return this.pausePush(target, owed, 'pushNoRemote')
     // The head read above, by its commit (HI-1924): what was pushed is exactly what the settled merges are checked against.
@@ -969,7 +969,7 @@ export class MergeQueue {
       if (!check.ok) return this.skip(card, entry, check.cancelled)
       const s = check.s
       // OP-29's backstop (#1419): inside a larger repository, only into a branch the project itself named in the card's
-      // ruleset (`targetOwn`, kept with a lane's rules too), never one inherited from the workspace's or Hive's defaults.
+      // ruleset (`targetOwn`, kept with a lane's rules too), never one inherited from the workspace's or Combwork's defaults.
       if (!this.wf.rulesetOf(card, s).options.targetOwn && this.cfg.subfolder?.()) return this.pause(target, card, entry, 'subfolderTarget')
       // HI-1697: an upgraded project's first merge waits for its merge style and commit message to be chosen.
       if (await this.mergeAsked()) return this.askMerge(card, entry, target)
@@ -1163,7 +1163,7 @@ export class MergeQueue {
   }
 
   /**
-   * The test merge (§16.9.1 step 4), committed as Hive's commits are (#1350): with the project's identity (else paused
+   * The test merge (§16.9.1 step 4), committed as Combwork's commits are (#1350): with the project's identity (else paused
    * `identity`, naming the folder), the repository's hooks run (one that fails returns the card), signed as the
    * repository says but never waiting on a prompt (paused). Any other failure of git pauses with its message; only a
    * conflict or a hook returns the card. A failure leaves the queue's worktree clean, at the expected revision.
@@ -1210,7 +1210,7 @@ export class MergeQueue {
   /**
    * Strict, G8 (§16.9.1 step 3, #1352): a reviewed revision that doesn't contain the target's head is brought up to date
    * in the queue's own worktree only, never on the card's line (the builder's branch, in its worktree): the target merged
-   * into it, or, with merge style Squash, it rebased onto the target, as Hive's commits are made (#1350: the project's
+   * into it, or, with merge style Squash, it rebased onto the target, as Combwork's commits are made (#1350: the project's
    * identity, the repository's hooks and signing, never a prompt). The result is the same change (§16.3.2's replay:
    * `sameChange`) or the card goes back to its builder: a conflict with the files, or a different change, both
    * `notUpToDate`. The same: kept on `refs/cw/queue/<entry>` and recorded (`Updated`, carried), and the entry's test
@@ -1281,7 +1281,7 @@ export class MergeQueue {
     // The reviewers whose passes count for what is merged: the latest submission, at the current generation.
     const reviewers = [...new Set(s.verdicts.filter((v) => v.pass && v.submission === s.latest?.id && v.generation === s.generation).map((v) => v.reviewer))].join(', ')
     // The reviewed revision, and the queue's update of it when strict brought it up to date (#1352).
-    // G19 (HI-1697): Hive's, or the branch's own (its commits since it left the target, merges left out).
+    // G19 (HI-1697): Combwork's, or the branch's own (its commits since it left the target, merges left out).
     const how = this.commitMessage()
     const own = how === 'branch' ? await G.messages(this.project, `${base || (await this.mergeBaseOf(revision, expected))}..${revision}`) : []
     if (isUnknown(own)) return again(`Combwork couldn't read the messages of ${revision.slice(0, 7)}'s commits.`) // i18n-ignore: git's side of a pause, in English as git's messages are
@@ -1538,7 +1538,7 @@ export class MergeQueue {
       try {
         rmSync(dir, { recursive: true, force: true })
       } catch {
-        // Hive's own temporary folder: left for the system's clean-up
+        // Combwork's own temporary folder: left for the system's clean-up
       }
     }
   }
@@ -1595,7 +1595,7 @@ export class MergeQueue {
   }
 
   /**
-   * HI-1697: "How should Hive merge <project>'s cards into <target>?", a Decide on the card in For you; the queue waits
+   * HI-1697: "How should Combwork merge <project>'s cards into <target>?", a Decide on the card in For you; the queue waits
    * for it (paused `mergeChoice`). Asked once: a request of the gate already open on the card stands.
    */
   private async askMerge(card: CardRecord, entry: QueueEntry, target: string): Promise<QueueOutcome> {
@@ -1645,7 +1645,7 @@ export class MergeQueue {
   /** The target checked out nowhere: one compare-and-swap (`update-ref <target> <result> <expected>`). */
   private async advanceRef(card: CardRecord, entry: QueueEntry, target: string, expected: string, result: string): Promise<Advance> {
     const lock = this.cfg.lock ?? (<T,>(fn: () => Promise<T>) => fn())
-    // Under the repository's lock (#1347): the target still checked out nowhere (the user or another Hive may have
+    // Under the repository's lock (#1347): the target still checked out nowhere (the user or another Combwork may have
     // checked it out while the queue waited: a swap then would leave that folder's files behind), `IntegrationStarted`
     // (its write checks the lease, the fence, and the rules) and the ref's compare-and-swap, the lease checked once more
     // just before the swap.
@@ -1668,9 +1668,9 @@ export class MergeQueue {
   }
 
   /**
-   * What an advance came to, settled before the repository lock is released (HR4's #1351 round 1): a pause Hive writes
+   * What an advance came to, settled before the repository lock is released (HR4's #1351 round 1): a pause Combwork writes
    * for what it saw there (a condition, the rules, the terminal state) is written in the lock, so no other run, this
-   * Hive's or another's, acts on the target between the finding and the pause; a residue is merged, then paused.
+   * Combwork's or another's, acts on the target between the finding and the pause; a residue is merged, then paused.
    */
   private async settle(card: CardRecord, entry: QueueEntry, target: string, adv: Advance, integrate?: () => Promise<void>): Promise<Advance> {
     // `again` is never settled into a pause (HI-2019): it leaves the lock for the entry to go round.
@@ -1708,7 +1708,7 @@ export class MergeQueue {
   }
 
   /**
-   * The target checked out in a folder (§16.9.2). Under the repository lock and that folder's fence (nothing of Hive's is
+   * The target checked out in a folder (§16.9.2). Under the repository lock and that folder's fence (nothing of Combwork's is
    * typed into it meanwhile), where it is checked out is read again and the conditions checked before anything is
    * touched, each failed one a pause naming its files; then the journal: `IntegrationStarted` (the listed files), phase
    * files and `read-tree -m -u <expected> <result>`, phase ref and `update-ref <target> <result> <expected>`, and, once
@@ -1854,7 +1854,7 @@ export class MergeQueue {
   }
 
   /**
-   * §16.9.2's terminal state as Hive finds it: the branch, the ref, each listed file's side, and the commands that finish
+   * §16.9.2's terminal state as Combwork finds it: the branch, the ref, each listed file's side, and the commands that finish
    * or undo it, as far as the state allows (none when a file is at neither side: git would refuse them).
    */
   private async stuckOf(target: string, folder: string, expected: string, result: string, files: string[], phase: QueueStuck['phase']): Promise<QueueStuck> {
@@ -1883,7 +1883,7 @@ export class MergeQueue {
   /** `Integrated` → Done; the slot released, the lane ended if done; a decision recorded after the advance began → For you. */
   private async integrated(card: CardRecord, entry: QueueEntry, revision: string, target: string, result: string, method: 'merge' | 'squash' | 'fastForward', by: 'combwork' | 'outside'): Promise<void> {
     await this.write(card, (w) => {
-      // One Integrated per cycle, whoever writes it (the queue, or another Hive's recovery or observation).
+      // One Integrated per cycle, whoever writes it (the queue, or another Combwork's recovery or observation).
       const st = w.state()
       if (st.integrated) return
       const startedAt = this.wf.store.facts(card.id).filter((f) => f.kind === 'IntegrationStarted' && (f.data as FactData['IntegrationStarted']).entry === entry.id).at(-1)?.seq ?? Infinity
@@ -1947,13 +1947,13 @@ export class MergeQueue {
           // Its finish reads what this write recorded (HI-2014): the merge, verified.
           w.written.push(f as Fact)
           w.move('done', 'derived')
-          // Hive's own merge, found done after a restart: its push owed as an advance's is (G18).
+          // Combwork's own merge, found done after a restart: its push owed as an advance's is (G18).
           this.owePush(w, e.id, e.target, result)
         })
       }
-      // The target frozen (HR4's #1351 round 1): a needs-you pause naming a card is the terminal state, or an advance Hive
+      // The target frozen (HR4's #1351 round 1): a needs-you pause naming a card is the terminal state, or an advance Combwork
       // won't guess about. Read in the lock, before anything else, whatever started this run (another card's enqueue, a
-      // reopen, another Hive): recovery writes nothing and touches nothing until the user lifts it (Resume, or the
+      // reopen, another Combwork): recovery writes nothing and touches nothing until the user lifts it (Resume, or the
       // answer to its For you, which check first). Other pauses still let a begun advance finish or roll back.
       const frozen = (): boolean => {
         const p = this.paused(e.target)
@@ -1987,7 +1987,7 @@ export class MergeQueue {
         continue
       }
       // Checked out (§16.9.2's table): read and acted on under the repository lock and the folder's fence, so neither
-      // Hive's other work nor the Git view acts in the folder in between.
+      // Combwork's other work nor the Git view acts in the folder in between.
       const outcome = await this.guarded(checkedOut, async (): Promise<'integrated' | 'rerun' | 'failed' | 'needsYou'> => {
         if (frozen()) return 'needsYou'
         const f = await this.found(e)

@@ -1,5 +1,5 @@
 /**
- * Agent text (dialects, HI-2065; plans/2026-11-03-dialects-design.md, section 2): every text Hive sends an agent is
+ * Agent text (dialects, HI-2065; plans/2026-11-03-dialects-design.md, section 2): every text Combwork sends an agent is
  * declared beside its code with `agentMsg()` and rendered with `say()`, which takes the text of the **current chain**:
  * the dialect of the session the text is for. Plain English, always: the window's translations never reach it, and it
  * never reaches the window (the window renders its own messages with `tr()`).
@@ -8,12 +8,12 @@
  * - **A scope**, in the main process: each Agent API request opens one for its caller (`inRequestScope`, asyncScope.ts),
  *   and wakes and deliveries for the session they target (`inDialectOf`). A **chain resolver** turns a scope into its
  *   chain; until one is registered (`setChainResolver`, the dialects service), every scope resolves to the Default.
- * - **The process**, in hive-mcp.js and hive-progress.js: one process serves one session, whose resolved texts Hive
+ * - **The process**, in cw-mcp.js and cw-progress.js: one process serves one session, whose resolved texts Combwork
  *   writes to the file `CW_DIALECT_FILE` names (processDialect.ts loads it).
  * - Neither: the Default, the code's English.
  *
  * An override that doesn't format (a placeholder it lost, broken ICU) falls back to the code's English: a dialect can't
- * break what Hive says. This module imports no Node module, so the window can import shared code that holds agent text
+ * break what Combwork says. This module imports no Node module, so the window can import shared code that holds agent text
  * (it shows a preview of some, such as the Workspace notes an agent gets); there it is always the Default.
  */
 import { formatIcu, IcuError } from './icu.ts'
@@ -86,7 +86,7 @@ export function setChainResolver(r: ChainResolver | null): void {
   resolver = r
 }
 
-/** The process's own chain (processDialect.ts, in hive-mcp.js and hive-progress.js): used where no scope is open. */
+/** The process's own chain (processDialect.ts, in cw-mcp.js and cw-progress.js): used where no scope is open. */
 export function setProcessChain(chain: DialectChain | null): void {
   processChain = chain
 }

@@ -1,6 +1,6 @@
 /**
- * Whether a Claude Code transcript entry is a prompt the person (or Hive for them) sent: a user entry with any text,
- * markup and all ("<task>…</task>", a command, Hive's typed lines), or images alone. Not Claude Code's own entries,
+ * Whether a Claude Code transcript entry is a prompt the person (or Combwork for them) sent: a user entry with any text,
+ * markup and all ("<task>…</task>", a command, Combwork's typed lines), or images alone. Not Claude Code's own entries,
  * told by their fields: meta entries (its notices, caveats and reminders), a compaction's summary, and tool results.
  * One definition for every reader of the transcript that counts or follows prompts: the usage's user messages, and the
  * turns safeguard stops are matched by (#606).

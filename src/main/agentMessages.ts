@@ -20,7 +20,7 @@ const T = {
  * cw_prompt_agent refused every agent of a running card loop; a message goes in whatever the agent is doing.
  *
  * Its sender's permission is worked out again at every step, until the agent reads it: one no longer allowed is refused.
- * At most MAX_QUEUED waiting per agent, each at most MESSAGE_MAX_CHARS. They survive the agent's stops and Hive's
+ * At most MAX_QUEUED waiting per agent, each at most MESSAGE_MAX_CHARS. They survive the agent's stops and Combwork's
  * restarts; the Assistant's are refused once the launch that left them has ended (#645). One tied to a card's round
  * (`card`, #652) is stale, never given, once that card has moved on: passed, out of Doing and Review, or in a new round.
  */

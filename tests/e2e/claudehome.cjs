@@ -17,7 +17,7 @@ const ws = path.join(lib.WORK, 'claudehome-ws')
 const proj = path.join(ws, 'demo')
 const home = path.join(lib.WORK, 'claudehome-claude-home')
 // Made up: shaped like an API key, valid for nothing.
-const apiKey = `sk-ant-api03-hivetest-${randomBytes(24).toString('hex')}`
+const apiKey = `sk-ant-api03-cwtest-${randomBytes(24).toString('hex')}`
 let failed = 0
 const check = (name, ok, extra = '') => {
   lib.checked(ok)

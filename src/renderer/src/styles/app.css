@@ -16,7 +16,7 @@
 }
 
 /* ==========================================================================
-   Hive — theme tokens. Honey orange replaces VS Code blue as the accent.
+   Combwork — theme tokens. Honey orange replaces VS Code blue as the accent.
    ========================================================================== */
 :root,
 [data-theme='dark'] {
@@ -832,7 +832,7 @@ kbd {
 .row:hover .row-actions {
   display: flex;
 }
-/* A Hive skill's Delivered to agents switch (#1431): always shown, after the hover actions. */
+/* A Combwork skill's Delivered to agents switch (#1431): always shown, after the hover actions. */
 .skill-row .skill-delivered {
   display: flex;
   align-self: center;
@@ -863,7 +863,7 @@ kbd {
   font-weight: 600;
   color: var(--fg-strong);
 }
-/* The project Skills tab (#118): the Hive group folds; one provider's skills, picked from a dropdown. */
+/* The project Skills tab (#118): the Combwork group folds; one provider's skills, picked from a dropdown. */
 .skill-group-toggle {
   cursor: pointer;
   user-select: none;
@@ -1548,7 +1548,7 @@ textarea.input {
 .badge.error { background: rgba(242, 85, 90, 0.16); color: var(--error); }
 .badge.success { background: rgba(78, 201, 107, 0.16); color: var(--success); }
 .badge.signin { background: rgba(180, 140, 255, 0.16); color: var(--signin); }
-/* Who gets a Hive skill (Skills.tsx AudienceBadge): in a row, after the name. */
+/* Who gets a Combwork skill (Skills.tsx AudienceBadge): in a row, after the name. */
 .badge[data-audience] .codicon { font-size: 12px; }
 .badge.audience { margin-left: 4px; vertical-align: 1px; }
 .badge.info { background: rgba(59, 158, 255, 0.14); color: var(--info); }
@@ -1776,7 +1776,7 @@ textarea.input {
   clip-path: inset(50%);
   white-space: nowrap;
 }
-/* A tab's own icon (Hive's mark, a CLI's), the codicons' size; a dimmed tab (a CLI turned off, HI-1839) stays legible. */
+/* A tab's own icon (Combwork's mark, a CLI's), the codicons' size; a dimmed tab (a CLI turned off, HI-1839) stays legible. */
 .cw-tab-icon {
   display: inline-flex;
 }
@@ -1834,7 +1834,7 @@ textarea.input {
   flex-wrap: wrap;
   overflow-x: visible;
 }
-/* "From Hive defaults", "From the workspace": a link to that tab of Settings → Version Control (HI-1837). */
+/* "From Combwork defaults", "From the workspace": a link to that tab of Settings → Version Control (HI-1837). */
 .workflow-origin-link {
   padding: 0;
   border: 0;
@@ -2502,7 +2502,7 @@ textarea.input {
   margin-right: 4px;
   vertical-align: -2px;
 }
-/* Over the Hive skills (the Skills view's list, and a Hive skill being edited): editing them steers the agents. */
+/* Over the Combwork skills (the Skills view's list, and a Combwork skill being edited): editing them steers the agents. */
 .banner.skills-warning {
   align-items: flex-start;
   gap: 6px;
@@ -3148,7 +3148,7 @@ p.hint {
 }
 /* The code editor's right-click menu (#1102). Monaco draws it in a shadow root hosted beside .monaco-editor, where
    its theme's colour variables don't reach (it showed black text on no surface), and standalone Monaco defines no
-   border width or radius at all. Custom properties do cross into a shadow root, so its host gets Hive's menu look
+   border width or radius at all. Custom properties do cross into a shadow root, so its host gets Combwork's menu look
    (.menu above) here, in both themes. */
 .shadow-root-host {
   --vscode-menu-background: var(--bg-elevated);
@@ -3318,7 +3318,7 @@ p.hint {
 .close-command-warn {
   color: var(--warning);
 }
-/* Settings → When this workspace closes, run / When Hive quits, run (HI-1368). */
+/* Settings → When this workspace closes, run / When Combwork quits, run (HI-1368). */
 .close-command-settings {
   display: flex;
   flex-direction: column;
@@ -3771,7 +3771,7 @@ p.hint {
 
 .popups {
   position: fixed;
-  /* Hive's one place for pop-ups (HI-2320): notifications and the tip, where Settings → Notifications puts them. Clear
+  /* Combwork's one place for pop-ups (HI-2320): notifications and the tip, where Settings → Notifications puts them. Clear
      of the title bar, the activity bar and the status bar; bottom right keeps clear of the Assistant's panel and of a
      bar's buttons (CornerPlacement). Above the page, below menus and dialogs' own layers. */
   z-index: 2500;
@@ -4303,7 +4303,7 @@ p.hint {
 .setting.danger .s-title {
   color: var(--error);
 }
-/* Settings → Advanced's list (#367): about:config style, grouped by Hive and each CLI. */
+/* Settings → Advanced's list (#367): about:config style, grouped by Combwork and each CLI. */
 .advanced-list {
   max-width: 900px;
   margin-top: 8px;
@@ -4771,7 +4771,7 @@ h2.section#unused-worktrees {
 .setup-detail {
   margin: -4px 2px 12px;
 }
-/* The CLI version Hive was tested with (#365). */
+/* The CLI version Combwork was tested with (#365). */
 .setup-tested {
   margin-top: 2px;
   font-size: 12px;
@@ -7800,7 +7800,7 @@ button.agent-place:hover {
   font-size: 14px;
   margin-top: 1px;
 }
-/* The Hive Assistant's questions (a card per question, under its header) and its list of actions. */
+/* The Combwork Assistant's questions (a card per question, under its header) and its list of actions. */
 .assistant-questions {
   display: flex;
   flex-direction: column;
@@ -8023,7 +8023,7 @@ button.agent-place:hover {
 .antivirus-folders td:first-child .mono {
   margin-left: 4px;
 }
-/* Hive's exclusions of folders that are gone (#1389): a heading and a table of their own under the workspace's. */
+/* Combwork's exclusions of folders that are gone (#1389): a heading and a table of their own under the workspace's. */
 .antivirus-gone h4 {
   margin: var(--space-3) 0 var(--space-1);
   font-size: inherit;
@@ -9081,7 +9081,7 @@ button.agent-place:hover {
   text-decoration: underline;
 }
 
-/* ---------- Hive updates ---------- */
+/* ---------- Combwork updates ---------- */
 .statusbar .status-item.update-item {
   background: var(--status-raised);
   font-weight: 600;
@@ -9310,7 +9310,7 @@ button.mode-badge.badge:hover {
 .memory-share .codicon { color: var(--info); vertical-align: -2px; }
 .memory-share .btn { margin-top: 6px; display: flex; }
 
-/* ---------- Hive Assistant: the workspace's overseer, in a panel on the right ---------- */
+/* ---------- Combwork Assistant: the workspace's overseer, in a panel on the right ---------- */
 .assistant-panel {
   position: relative;
   display: flex;
@@ -11365,11 +11365,11 @@ textarea.input.task-blocked-input {
   font: inherit;
   text-decoration: underline;
 }
-/* The Merge dialog on a branch whose card Hive merges (#1357). */
+/* The Merge dialog on a branch whose card Combwork merges (#1357). */
 .merge-queue-note {
   margin-bottom: 8px;
 }
-/* Its Merge, held while Hive merges the card: plainly off, its reason on hover (the disabled button passes the hover to
+/* Its Merge, held while Combwork merges the card: plainly off, its reason on hover (the disabled button passes the hover to
    its tooltip). */
 .btn.merge-held:disabled {
   pointer-events: none;
@@ -12158,7 +12158,7 @@ textarea.input.task-blocked-input {
 .perf-limits summary {
   cursor: pointer;
 }
-/* Performance's own, on the shared day tile: a slot Hive wasn't recording is hatched, so it reads as no data
+/* Performance's own, on the shared day tile: a slot Combwork wasn't recording is hatched, so it reads as no data
    rather than zero; one recorded for part of its time fades towards the axis. */
 .perf-trend .daily-col.unobserved:not(:hover),
 .perf-trend .swatch.unobserved {
@@ -12985,7 +12985,7 @@ button.progress-card-key:hover {
   border-radius: 6px;
   background: var(--bg);
 }
-/* A run's details: what Hive has for it, label and value a row each; long values wrap. */
+/* A run's details: what Combwork has for it, label and value a row each; long values wrap. */
 .progress-details {
   margin-top: 8px;
   padding-top: 8px;
@@ -14222,7 +14222,7 @@ button.progress-lane-retry {
   flex-shrink: 0;
   min-width: 0;
 }
-/* The Version Control tab's header (#1416): None · Git, what Hive finds in the folder, and "Workflow: Git · Team". */
+/* The Version Control tab's header (#1416): None · Git, what Combwork finds in the folder, and "Workflow: Git · Team". */
 /*
  * None · Git, the fact line and the workflow link: one row, the fact line taking the room left and wrapping inside it,
  * so the link stays top right on every page; in a narrow tab the fact line has a row of its own under them.
@@ -14317,7 +14317,7 @@ button.progress-lane-retry {
   flex-wrap: wrap;
   gap: 6px;
 }
-/* The switch Hive offers when it detects another version control (#1419): its sentence, then Switch… and Not Now. */
+/* The switch Combwork offers when it detects another version control (#1419): its sentence, then Switch… and Not Now. */
 .vc-offer {
   display: flex;
   align-items: center;

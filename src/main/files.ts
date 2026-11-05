@@ -468,7 +468,7 @@ export function unwatchAll(): void {
 
 /**
  * A session host's attachments folder (.combwork/attachments, moved from .combwork/images first), when it is a real folder of
- * the host's own: never one linked from elsewhere (a junction or symbolic link), which Hive neither lists nor deletes
+ * the host's own: never one linked from elsewhere (a junction or symbolic link), which Combwork neither lists nor deletes
  * through. Null when there is none.
  */
 async function attachmentsRoot(host: string): Promise<string | null> {
@@ -482,7 +482,7 @@ async function attachmentsRoot(host: string): Promise<string | null> {
   return root
 }
 
-/** Throws unless p is a real folder or file (not a link) inside the attachments root, as Hive keeps them. */
+/** Throws unless p is a real folder or file (not a link) inside the attachments root, as Combwork keeps them. */
 async function assertOwnAttachment(root: string, p: string, kind: 'dir' | 'file'): Promise<void> {
   const st = await lstat(p).catch(() => null)
   if (!st || st.isSymbolicLink() || (kind === 'dir' ? !st.isDirectory() : !st.isFile()) || !insideReal(p, [root])) throw combworkError(M.notKept)
@@ -497,7 +497,7 @@ async function attachmentAt(projectPath: string, path: string): Promise<{ root: 
   return { root, sessionId: assertSessionId(parts[0]), abs }
 }
 
-/** A project's session attachments, or the Hive Assistant's (its home is a session host: `.combwork/assistant/.combwork/attachments`). */
+/** A project's session attachments, or the Combwork Assistant's (its home is a session host: `.combwork/assistant/.combwork/attachments`). */
 export async function listAttachments(projectPath: string): Promise<SessionAttachmentGroup[]> {
   projectPath = workspace.assertSessionHost(projectPath)
   const root = await attachmentsRoot(projectPath)
@@ -541,7 +541,7 @@ export async function readAttachment(projectPath: string, path: string): Promise
 /**
  * Moves a session attachment to the Recycle Bin (a project's or the Assistant's), with the checks of deleting sessions
  * (#239): with its session reserved and not running (whileStopped: it can't resume and paste meanwhile), only a file
- * Hive keeps (no link out of .combwork/attachments), and not one another program has open.
+ * Combwork keeps (no link out of .combwork/attachments), and not one another program has open.
  */
 export async function trashAttachment(projectPath: string, path: string): Promise<void> {
   projectPath = workspace.assertSessionHost(projectPath)
@@ -577,7 +577,7 @@ export async function trashAttachmentGroup(projectPath: string, sessionId: strin
       if (isInUse(e)) throw combworkError(msg({ id: 'service.files.groupInUse', defaultMessage: 'Another program has one of these files open. Close it, then try again.', description: "An error deleting a session's attachments: another program has one of them open, so none was moved." }), undefined, { cause: e })
       throw e
     }
-    // The folder goes too once empty (Hive makes it again for the next attachment).
+    // The folder goes too once empty (Combwork makes it again for the next attachment).
     await rmdir(dir).catch(() => undefined)
     return files.length
   })

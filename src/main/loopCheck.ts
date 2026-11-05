@@ -18,13 +18,13 @@ import { pausedFor } from './teamPause'
 const log = createLogger('loops')
 
 /**
- * Agents in a card loop left with no card watch (#376). An agent that has watched cards in this run of Hive is in a
+ * Agents in a card loop left with no card watch (#376). An agent that has watched cards in this run of Combwork is in a
  * loop; if its turn ends with no live watch while a card it was looping on is still in play, nothing will wake it when
  * that card changes, and its lane stalls (7 Oct: a wake typed into a Codex reviewer was never submitted, and it sat
  * "finished" for hours while the builder waited on it). After a short grace (a wake being taken, a watch being started)
  * those cards are marked on the agent (`notWatching`), so they show as stalled ("R6 isn't watching #333"), and the user
  * is told once. Its cards in play: the ones it last watched, in Doing or Review, and any in Review it is the agent or
- * reviewer of. The Hive Assistant isn't checked: it watches cards as it likes.
+ * reviewer of. The Combwork Assistant isn't checked: it watches cards as it likes.
  */
 
 /** How long an agent in a loop may sit with no watch before its cards are flagged. */
@@ -114,9 +114,9 @@ export function othersCards(cards: readonly TaskCard[], agentId: string, watched
     .map((c) => c.number)
 }
 
-/** What reaches an agent of its cards without a watch (HI-1693): whether Hive's loop wakes can, and each card's loop reviewer. */
+/** What reaches an agent of its cards without a watch (HI-1693): whether Combwork's loop wakes can, and each card's loop reviewer. */
 export interface LoopReach {
-  /** The project's loop wakes are on and the agent can read its inbox (its hive tools): a loop wake reaches it. */
+  /** The project's loop wakes are on and the agent can read its inbox (its Combwork tools): a loop wake reaches it. */
   wakes: boolean
   /** The card's loop reviewer's id (loopReviewerOf), or null: no reviewer, so no loop wakes for it. */
   reviewerOf: (n: number) => string | null
@@ -294,7 +294,7 @@ async function checkNow(loop: Loop): Promise<void> {
   if (loop.told === told) return
   loop.told = told
   const which = inPlay.map((n) => `#${n}`).join(', ')
-  // #777: it did watch, and its watch's wake waits untaken in its prompt (its CLI didn't take the line Hive typed): its
+  // #777: it did watch, and its watch's wake waits untaken in its prompt (its CLI didn't take the line Combwork typed): its
   // cards are stalled for that (cardStall says so), and the user was told of the untaken line already, once.
   if (now!.untakenLine) {
     log.info(`${userText(now!.agentName ?? loop.agentId)} hasn't taken the wake Combwork typed for ${which}: it waits in its prompt`)
@@ -320,7 +320,7 @@ export function initLoopCheck(): void {
   onCombworkEvent((e) => {
     if (e.type === 'session-status') statusChanged(e.state)
     else if (e.type === 'tasks-changed' || e.type === 'lanes-changed' || e.type === 'team-pause-changed') recheckAll(e.workspacePath)
-    // What reaches it may have changed (HI-1693): its hive tools (the Agent API, the built-in hive server), or its
+    // What reaches it may have changed (HI-1693): its Combwork tools (the Agent API, the built-in combwork server), or its
     // project's loop wakes and agents (a project's settings written refresh the workspace).
     else if (e.type === 'settings-changed') recheckAll(null)
     else if (e.type === 'workspace-changed' && e.workspace?.path) recheckAll(e.workspace.path)

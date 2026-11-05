@@ -48,7 +48,7 @@ const IN = { sentAt: '2026-10-31T01:00:10.000Z', doneAt: '2026-10-31T01:00:10.01
 const EARLY = { sentAt: '2026-10-31T00:59:59.500Z', doneAt: '2026-10-31T00:59:59.510Z' }
 let seq = 0
 type Who = { agent?: string; assistant?: boolean }
-/** A call line of the hive servers' test log, with its id; `sized`: with its reply's size (mode, chars, bytes). */
+/** A call line of the combwork servers' test log, with its id; `sized`: with its reply's size (mode, chars, bytes). */
 const call = (who: Who, at = LATER, sized = true, extra: object = {}) => ({ at, id: `9.${++seq}`, tool: 'cw_inbox', role: who.assistant ? 'assistant' : 'agent', project: who.assistant ? '' : 'alpha', agent: who.agent ?? null, ok: true, args: '{}', ...(sized ? { mode: 'compact', chars: 10, bytes: 12 } : {}), ...extra })
 const list = (who: Who, at = LATER) => ({ at, id: `9.${++seq}`, kind: 'list', role: who.assistant ? 'assistant' : 'agent', project: 'alpha', agent: who.agent ?? null, tools: 40, bytes: 27000, chars: 26900 })
 /** The `reported` line for these lines' report. */
@@ -292,7 +292,7 @@ describe('Compare shows the subject apart from the other agents (shared/benchmar
       return { ...x, run: { ...x.run!, provider } }
     }
     expect(perCall(on('fake-codex'), on('fake-codex'))).toBe(true)
-    // fake-copilot runs the real Copilot CLI offline: one hive server a session, as a real CLI.
+    // fake-copilot runs the real Copilot CLI offline: one combwork server a session, as a real CLI.
     expect(perCall(on('fake-copilot'), on('fake-copilot'))).toBe(false)
   })
 })

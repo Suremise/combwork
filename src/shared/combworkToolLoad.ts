@@ -1,6 +1,6 @@
 /**
- * Hive's tools as a CLI that defers MCP tools behind a tool search gets them (HI-2229), and what a refused call is told
- * about the arguments it gave. Shared by the hive MCP server (it runs outside the asar: no imports here).
+ * Combwork's tools as a CLI that defers MCP tools behind a tool search gets them (HI-2229), and what a refused call is told
+ * about the arguments it gave. Shared by the combwork MCP server (it runs outside the asar: no imports here).
  *
  * Claude Code defers MCP tools: the model sees their names only and must load a tool's schema before calling it. Haiku
  * often called Hive's most used tools without loading them, guessing their arguments (`key` for `number`), so Hive marks

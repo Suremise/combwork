@@ -12,11 +12,11 @@ import type { UsageTokens } from './types'
  * `reports` are the charges the provider reported, each with the requests it covers (a row's report: its index, or -1
  * for none): Claude Code's running total, each increase covering the requests since the last; Copilot's credits at each
  * turn's checkpoint, covering the requests since the one before. A charge is split only between the requests it covers,
- * so a later one never changes what an earlier card cost. Rows with no report are Hive's estimate (≈).
+ * so a later one never changes what an earlier card cost. Rows with no report are Combwork's estimate (≈).
  */
 export type UsageRow = [start: number, input: number, output: number, cacheWrite: number, cacheRead: number, requests: number, report: number, flags: number, model?: number]
 
-/** A row's tokens are a share Hive worked out of a total the provider gave for several requests (Copilot's, at exit). */
+/** A row's tokens are a share Combwork worked out of a total the provider gave for several requests (Copilot's, at exit). */
 export const TOKENS_SPREAD = 1
 /** A row's tokens aren't known yet (Copilot's, until the launch exits): unknown, never 0. */
 export const TOKENS_UNKNOWN = 2
@@ -221,7 +221,7 @@ export const rowModel = (t: Pick<UsageTimeline, 'models'>, r: UsageRow, model: s
 
 /**
  * Each row's share of the charge covering it (USD; 0 for a row no charge covers): a charge is split only between the rows
- * it covers, by Hive's estimate for their tokens (`est`), else their tokens, their requests, or equally (one measure for
+ * it covers, by Combwork's estimate for their tokens (`est`), else their tokens, their requests, or equally (one measure for
  * all of a charge's rows), so a later charge never changes an earlier row's.
  */
 export function chargeShares(t: UsageTimeline, est: (r: UsageRow) => number | null): number[] {

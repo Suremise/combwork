@@ -33,13 +33,13 @@ export interface PerfFilters {
   view: 'now' | 'compare'
 }
 
-/** The workspace view's filter for work of no project (the Assistant, scripts, Hive's own). */
+/** The workspace view's filter for work of no project (the Assistant, scripts, Combwork's own). */
 export const WORKSPACE_OWN = '\0workspace'
 
 export const DEFAULT_PERF_FILTERS: PerfFilters = { range: '24h', provider: '', role: 'all', project: '', view: 'now' }
 
 /**
- * The query for a scope and the page's filters, as of `now`: the range, role, provider and own work go to Hive, which
+ * The query for a scope and the page's filters, as of `now`: the range, role, provider and own work go to Combwork, which
  * narrows every part, the trend and the provider usage alike (the export uses the same query).
  */
 export function queryFor(scope: MetricsScope, f: PerfFilters, now: number): MetricsQuery {
@@ -245,11 +245,11 @@ export function byTool(mcp: McpSeries[]): ToolRow[] {
 
 /**
  * The providers in a report (launches and usage), for the provider filter: those with data, and `chosen` (the filter's
- * current choice) even without any, so it can always be seen and changed. The page asks Hive for every provider's
+ * current choice) even without any, so it can always be seen and changed. The page asks Combwork for every provider's
  * (the filter narrows its own sections only), so picking one never hides the others (#270).
  */
 /**
- * The hive tool list a start, per role and workflow role (HI-2063): its series merged across projects. Each average is
+ * The Combwork tool list a start, per role and workflow role (HI-2063): its series merged across projects. Each average is
  * over the starts that measured it (tools and bytes: every start; characters: those of a bridge from HI-2049 on; parts:
  * from HI-2063 on), null where none did (unknown, never zero). `schemaChars` is the rest of the parts' characters: the
  * schemas and the list's structure (names, types, keys, punctuation, escapes).

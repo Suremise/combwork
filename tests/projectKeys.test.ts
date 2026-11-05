@@ -435,9 +435,9 @@ describe('wakes, the inbox and replies name cards by key (round 1, finding 3)', 
     expect(named(() => wakeLine(cardChange(c.number, c, ['column'])))).not.toContain(`#${c.number}`)
     // The work of the workspace's window (HI-1661: its errors, notices and history lines) names it by key too.
     expect(inWorkspace(w, () => cardRef(c.number))).toBe('HI-1')
-    // Outside any workspace (the hive MCP server without names): its number, the only name it knows.
+    // Outside any workspace (the combwork MCP server without names): its number, the only name it knows.
     expect(wakeLine(cardChange(c.number, c, ['column']))).toContain(`[CW] #${c.number} is in Todo`)
-    // A text the hive MCP server words gets the names with its JSON.
+    // A text the combwork MCP server words gets the names with its JSON.
     const row = named(() => taskRow({ ...c, agent: null, stalled: null, blockedBy: [c.number] } as never))
     expect(taskRowText(row)).toContain(`after ${name}`)
     expect(taskRowText({ ...row, names: undefined })).toContain(`after #${c.number}`)

@@ -67,7 +67,7 @@ let writerHost: WriterHost = standIn()
 export function setWriterHost(h: WriterHost | null): void {
   writerHost = h ?? standIn()
 }
-// The keeper's receipts name this Hive as its slot writers do (HI-2055): whichever host is set when it is asked.
+// The keeper's receipts name this Combwork as its slot writers do (HI-2055): whichever host is set when it is asked.
 setCombworkIdentity(async () => {
   const me = await writerHost.self()
   return `${me.pid}:${me.started}`
@@ -333,7 +333,7 @@ export interface ClaimInput {
   run: string
   /** Where the project's sessions are kept (their host in combwork.db). */
   sessionsHost: string
-  /** This Hive, as the writer's holder. */
+  /** This Combwork, as the writer's holder. */
   me: { pid: number; started: number }
   /** The folder's head now, clean (null: dirty or unknown): what the user's Resume taking a free slot compares. */
   head: string | null
@@ -382,7 +382,7 @@ export function claimIn(db: DatabaseSync, store: SlotStore, c: ClaimInput): { le
     lease = p.lease.id
   }
   // One writer: this run's from now until its processes are known to have ended. Only into a slot set up and lent, with
-  // no operation (warming, installing, removal) or unsettled job, and no other writer (a writer whose Hive is gone stays
+  // no operation (warming, installing, removal) or unsettled job, and no other writer (a writer whose Combwork is gone stays
   // until the user releases the slot): #1429's operations and a writer exclude each other both ways.
   const took = db
     .prepare("UPDATE slots SET writer_run = ?, writer_lease = ?, writer_agent = ?, writer_pid = ?, writer_started = ? WHERE project = ? AND name = ? AND state = 'lent' AND op IS NULL AND job IS NULL AND (writer_run IS NULL OR writer_run = ?)") // i18n-ignore: SQL
@@ -406,8 +406,8 @@ export async function releaseWriter(projectPath: string, run: string): Promise<v
     runWriterReleased(run)
     log.info(`The slot writer ${run} was released`)
   } catch (e) {
-    // Its workspace closed meanwhile: the row stays, held, until a refresh of this Hive clears it (writerOver), or, this
-    // Hive gone by then, a later one settles it from the run's kept record (HI-1886).
+    // Its workspace closed meanwhile: the row stays, held, until a refresh of this Combwork clears it (writerOver), or, this
+    // Combwork gone by then, a later one settles it from the run's kept record (HI-1886).
     log.warn(`The slot writer ${run} wasn't released: ${userText(e instanceof Error ? e.message : String(e))}`)
     released.add(run)
     keepRunEnded(run)
@@ -416,7 +416,7 @@ export async function releaseWriter(projectPath: string, run: string): Promise<v
   }
 }
 
-/** Runs whose processes are known to have ended but whose writer couldn't be cleared (a refresh of this Hive clears it). */
+/** Runs whose processes are known to have ended but whose writer couldn't be cleared (a refresh of this Combwork clears it). */
 const released = new Set<string>()
 
 /**
@@ -446,8 +446,8 @@ export async function settleWriter(projectPath: string, run: string): Promise<vo
 }
 
 /**
- * Whether a refresh may clear this writer (#1434): this Hive's, its run over (its token ended) and its processes known
- * to have ended, though its release couldn't be written. Never another Hive's, nor one whose processes aren't known.
+ * Whether a refresh may clear this writer (#1434): this Combwork's, its run over (its token ended) and its processes known
+ * to have ended, though its release couldn't be written. Never another Combwork's, nor one whose processes aren't known.
  */
 export async function writerOver(w: { run: string; pid: number; started: number }): Promise<boolean> {
   const me = await writerHost.self()
@@ -455,8 +455,8 @@ export async function writerOver(w: { run: string; pid: number; started: number 
 }
 
 /**
- * Whether a writer is held (#1506): its run isn't live here and its Hive is this one or one known to have gone, so only
- * the user's Release Slot… frees it. Another Hive still running (or one that can't be told) holds its own writer.
+ * Whether a writer is held (#1506): its run isn't live here and its Combwork is this one or one known to have gone, so only
+ * the user's Release Slot… frees it. Another Combwork still running (or one that can't be told) holds its own writer.
  */
 export async function writerHeld(w: { run: string; pid: number; started: number }): Promise<boolean> {
   const me = await writerHost.self()
@@ -474,9 +474,9 @@ export async function heldSlots(projectPath: string): Promise<Map<string, string
 }
 
 /**
- * A slot's writer as Release Slot… shows it (#1506): who holds it (its Hive, this one or another, and whether that one
- * still runs), whether its run is still live (this Hive's, its token not ended: a session, or leftovers being followed),
- * and what Hive lists of its processes (null: nothing listed, so not known). Null when the slot has no writer.
+ * A slot's writer as Release Slot… shows it (#1506): who holds it (its Combwork, this one or another, and whether that one
+ * still runs), whether its run is still live (this Combwork's, its token not ended: a session, or leftovers being followed),
+ * and what Combwork lists of its processes (null: nothing listed, so not known). Null when the slot has no writer.
  */
 export async function heldWriter(projectPath: string, slot: string): Promise<HeldWriter | null> {
   const { ws, project } = await hostOf(projectPath)
@@ -501,8 +501,8 @@ export async function heldWriter(projectPath: string, slot: string): Promise<Hel
 
 /**
  * Why a start in a slot would be refused now for its writer (HI-2304), in English (agent-facing, and a stall's words),
- * known before anything is prepared: a run of this Hive's still holds it, its session there or what it left running
- * there, named. Null when it has no writer, or its writer is another Hive's (a start's claim settles that, HI-1886).
+ * known before anything is prepared: a run of this Combwork's still holds it, its session there or what it left running
+ * there, named. Null when it has no writer, or its writer is another Combwork's (a start's claim settles that, HI-1886).
  * `nameOf`: an agent's name by its id.
  */
 export async function slotHeldWords(projectPath: string, slot: string, nameOf: (agentId: string) => string): Promise<string | null> {
@@ -516,16 +516,16 @@ export async function slotHeldWords(projectPath: string, slot: string, nameOf: (
   return `${slot} is held by ${named}, left running by ${who}'s last run: it is free once they end (End in ${who}'s ⋯ ends them)` // i18n-ignore: agent-facing
 }
 
-/** What a run left running, as listed: by this Hive, or kept from before it started (#614's restore names it `restored:`). */
+/** What a run left running, as listed: by this Combwork, or kept from before it started (#614's restore names it `restored:`). */
 const runLeftovers = (run: string): ReturnType<typeof leftoversOfRun> => leftoversOfRun(run) ?? leftoversOfRun(`restored:${run}`)
 
 /**
- * A slot writer of a Hive that has gone, settled by itself (HI-1886: after a restart, builders' slots stayed held by
+ * A slot writer of a Combwork that has gone, settled by itself (HI-1886: after a restart, builders' slots stayed held by
  * their own ended runs): true when it may be cleared. Only when this profile kept that its run's processes were seen to
- * end (its job seen empty, the proof a release needs; `endedEarlier`), or, its Hive gone first, the helper that held its
+ * end (its job seen empty, the proof a release needs; `endedEarlier`), or, its Combwork gone first, the helper that held its
  * job saw it empty after (HI-2055: its keeper's "ended", from the helper this run was bound to, unrevoked, `keeperState`).
  * A list of its processes taken earlier (the last run's marker) never is: what they started since isn't in it (HR2's
- * round 1). Nothing kept, or its Hive still running or not known to have gone: it stays held for the user's Release Slot….
+ * round 1). Nothing kept, or its Combwork still running or not known to have gone: it stays held for the user's Release Slot….
  */
 export async function goneWriterSettles(projectPath: string, w: { run: string; agent: string; pid: number; started: number }, slot?: string): Promise<GoneEvidence | false> {
   const me = await writerHost.self()
@@ -555,11 +555,11 @@ export async function goneWriterSettles(projectPath: string, w: { run: string; a
   return false
 }
 
-/** Runs whose held slot the user was told only an idle broker holds (HI-2309): once each, in this Hive's run. */
+/** Runs whose held slot the user was told only an idle broker holds (HI-2309): once each, in this Combwork's run. */
 const toldIdleBroker = new Set<string>()
 
 /**
- * A gone Hive's writer held by its keeper's "live" processes that are all Windows' own idle brokers (HI-2309: the one
+ * A gone Combwork's writer held by its keeper's "live" processes that are all Windows' own idle brokers (HI-2309: the one
  * rule, nothingHolds, on those still running): held all the same (fail closed; the keeper's "live" is a snapshot), and
  * the user told once, naming them, that releasing it is safe, with Release Slot…. Nothing is ended.
  */
@@ -586,7 +586,7 @@ async function tellIdleBrokerHold(projectPath: string, slot: string, w: { run: s
 }
 
 /**
- * What settled a gone Hive's writer, for that one attempt's clear (HR2's round 1: never shared between attempts): its run,
+ * What settled a gone Combwork's writer, for that one attempt's clear (HR2's round 1: never shared between attempts): its run,
  * and the helper whose keeper's receipt it was (null: this profile kept its run as seen ended).
  */
 export interface GoneEvidence {
@@ -606,7 +606,7 @@ export function goneWriterStill(evidence: GoneEvidence): () => void {
 }
 
 /**
- * A writer cleared other than by its own release (HI-2303): by the user (Release Slot…), or by a refresh of this Hive
+ * A writer cleared other than by its own release (HI-2303): by the user (Release Slot…), or by a refresh of this Combwork
  * (`writerOver`). Nothing reads its run's records again: its kept record, its keeper's binding and state go.
  */
 export function writerCleared(run: string): void {
@@ -619,7 +619,7 @@ export function writerCleared(run: string): void {
 }
 
 /**
- * A gone Hive's writer cleared (HI-1886): its run's kept record is no longer needed, nor its keeper's (HI-2055), whichever
+ * A gone Combwork's writer cleared (HI-1886): its run's kept record is no longer needed, nor its keeper's (HI-2055), whichever
  * proof cleared it (HR1 on HI-2303: a run can have both, and one cleared by its kept record left its binding behind).
  */
 export function goneWriterCleared(run: string, _evidence?: GoneEvidence): void {
@@ -628,7 +628,7 @@ export function goneWriterCleared(run: string, _evidence?: GoneEvidence): void {
 }
 
 /**
- * The slot a start claims, its writer a gone Hive's (HI-1886): settled first when it may be (`goneWriterSettles`), so a
+ * The slot a start claims, its writer a gone Combwork's (HI-1886): settled first when it may be (`goneWriterSettles`), so a
  * restart's resume takes its own slot back.
  */
 async function settleGoneWriterOf(projectPath: string, store: SlotStore, slot: string, run: string): Promise<void> {
@@ -642,9 +642,9 @@ async function settleGoneWriterOf(projectPath: string, store: SlotStore, slot: s
 }
 
 /**
- * What the notice that Hive closed unexpectedly lists of a held writer's own run (#1506: its Hive gone, the run's own
+ * What the notice that Combwork closed unexpectedly lists of a held writer's own run (#1506: its Combwork gone, the run's own
  * leftovers not listed): that launch's processes in the last run's marker (by its run, and its agent and project), those
- * that still run now, each by id and start time. Another launch of the same agent's, a marker of another Hive's, or one
+ * that still run now, each by id and start time. Another launch of the same agent's, a marker of another Combwork's, or one
  * from before launches named their run, is never this run's: null then, as when none still runs or it can't be told.
  */
 async function restartList(projectPath: string, w: { run: string; agent: string; pid: number; started: number }): Promise<HeldWriter['processes']> {
@@ -663,9 +663,9 @@ async function restartList(projectPath: string, w: { run: string; agent: string;
 }
 
 /**
- * The user's recovery of a held writer (#1506, Release Slot…): with `end`, what Hive lists of its run's processes is
+ * The user's recovery of a held writer (#1506, Release Slot…): with `end`, what Combwork lists of its run's processes is
  * ended first; then the writer is cleared in a write fenced by its run, and drained (the ended lease's last revision,
- * the slot looked at). Refused while its Hive still runs (another one, or one that can't be told) or its run is live
+ * the slot looked at). Refused while its Combwork still runs (another one, or one that can't be told) or its run is live
  * here, and when the slot's writer is no longer that run (a claim or a release meanwhile: one outcome). `guard` (#1561:
  * the Assistant's Control and session) runs just before the processes are ended and in the write that clears it.
  */

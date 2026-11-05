@@ -1,5 +1,5 @@
 // Deliveries (#647): what the Assistant leaves for an agent is a saved record with an id and a state, on fake Claude Code
-// agents (fake-claude/) and the Assistant's hive tools (cw-mcp.js with its token). A message for a working agent is
+// agents (fake-claude/) and the Assistant's Combwork tools (cw-mcp.js with its token). A message for a working agent is
 // queued and saved for the project (in the workspace's .combwork/combwork.db, #1018), its pane shows "✉ 1 unread"; the agent fetches it mid-turn with
 // cw_inbox (received, so it isn't typed after) and acks it (acked); one typed into it is offered, and received once its
 // CLI takes the line (#649), then acked; one not acked in time shows as overdue; cw_agent_activity gives each one's state
@@ -77,7 +77,7 @@ async function start() {
     await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(alpha, id) })
   }
   const idle = async (id) => ['ready', 'finished'].includes((await live(alpha, id))?.status)
-  /** What the agent's hive tool calls got back (its transcript's tool results), for the inbox's replies. */
+  /** What the agent's Combwork tool calls got back (its transcript's tool results), for the inbox's replies. */
   const toolResults = (sessionId) => {
     const dir = path.join(claudeHome, 'projects')
     const f = fs.existsSync(dir) ? fs.readdirSync(dir).map((d) => path.join(dir, d, `${sessionId}.jsonl`)).find((x) => fs.existsSync(x)) : null

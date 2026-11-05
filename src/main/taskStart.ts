@@ -200,7 +200,7 @@ async function giveCard(
     card = await updateTask(n, { agent: agentId, ...(before.column === 'doing' ? {} : { column: 'doing' as const }), ...(reason && actor.kind === 'user' ? { override: { reason } } : {}) }, actor, {
       check: (now) => {
         startable(now)
-        // What the start's caller said must still hold, where the start is written (HI-1990: Hive's start of a lane's next card).
+        // What the start's caller said must still hold, where the start is written (HI-1990: Combwork's start of a lane's next card).
         guard?.(now)
         if (now.project.toLowerCase() !== before.project.toLowerCase()) {
           throw now.project
@@ -252,7 +252,7 @@ async function giveCard(
     if (!(reason && actor.kind === 'user') && (await startedOutsideSlots(workspaceOf(p), p, n))) throw combworkError(NO_SLOT, { card: cardRef(n), active: before.column === 'doing' ? 'yes' : 'no' }, { kind: 'conflict' })
     const inLane = laneBuilds(await rawLanes(workspaceOf(p)), basename(p), agentId, n)
     const prompt = advanced.get<boolean>(RAW_CARD_START) ? rawTaskPrompt(card, note) : taskPrompt(card, !!sessions.combworkMcp(p), { from: before.column, note, context, attachments: await cardAttachments(workspace, n), inLane })
-    // Started in a slot (#1438): Hive gives it to the agent there once the slot is ready (a new conversation where the
+    // Started in a slot (#1438): Combwork gives it to the agent there once the slot is ready (a new conversation where the
     // agent isn't running there), so nothing is typed where it is now. Only while that placement is still to come: a card
     // back from Review for more work keeps its placed cycle, so it is given here like any other (HI-1953).
     if (before.column !== 'doing' && (await placementDue(workspaceOf(p), p, n))) {

@@ -45,7 +45,7 @@ describe('crash dumps (#985)', () => {
 })
 
 describe('every way out is logged (#985)', () => {
-  // The main process's own files; the hive MCP server, hive-progress and a close command's runner (HI-1368: its own
+  // The main process's own files; the combwork MCP server, cw-progress and a close command's runner (HI-1368: its own
   // build entry, started detached as Node) are processes of their own.
   const files = (dir: string): string[] =>
     readdirSync(dir, { withFileTypes: true }).flatMap((e) => {

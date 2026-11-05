@@ -1,10 +1,10 @@
 // The window's messages agents also read (dialects, HI-2065, card 5b HI-2440; plans/2026-11-03-dialects-design.md,
-// section 2, decision 13): a `msg()` descriptor is the window's text, but where Hive renders it for an agent (a CombworkError
+// section 2, decision 13): a `msg()` descriptor is the window's text, but where Combwork renders it for an agent (a CombworkError
 // the Agent API answers with, a history line, a refusal, `agentText`), agents read it too. Each keeps its one descriptor
 // and its UI id; the agent-text catalogue lists it with `audience: "both"` so a dialect can override it, and the schema
 // checks that override's placeholders.
 //
-// This module finds them by following Hive's code, as the design's scan did:
+// This module finds them by following Combwork's code, as the design's scan did:
 //   - **the rendering points:** `agentText`, `englishText` (Default English stored once and said again when read; a log
 //     line marked `// log` or the window's own `// window: <why>` aside), `storedText`, `workflowText` and
 //     `new CombworkError(…)`; a CombworkError subclass's `super(…)`;
@@ -127,7 +127,7 @@ export function marksOf(ast, code) {
 }
 
 /**
- * Follows Hive's code to the window's messages agents read. Returns `messages` (id → { text, note, at }), `unresolved`
+ * Follows Combwork's code to the window's messages agents read. Returns `messages` (id → { text, note, at }), `unresolved`
  * (each call it couldn't follow and no mark covers: { file, line, site }), and `problems` (a mark that leads nowhere).
  */
 export function analyzeBoth(root = ROOT, files = sourceFiles(root).filter(isScanned)) {

@@ -41,7 +41,7 @@ const paneSizes = new Map<string, { cols: number; rows: number }>()
 /**
  * How many stopped terminals' sizes and carried outputs are kept (#489), the least recently set first to go. A running
  * terminal's are always kept, on top of these, and count once it has stopped (trimmed then). Keys come and go with
- * agents, workspaces and task terminals, so neither may grow for as long as Hive runs; a removed agent's or project's
+ * agents, workspaces and task terminals, so neither may grow for as long as Combwork runs; a removed agent's or project's
  * are forgotten at once (forgetPtys).
  */
 let MAX_PANE_SIZES = 200
@@ -132,31 +132,31 @@ const carried = new Map<string, string[]>()
 export const SESSION_SETTINGS = new Set<string>([])
 
 /**
- * Hive's own variables that would change how a child Electron or Chromium app behaves: run as Node, the console, and
- * Hive's crash handler (exitLog.ts, #985: an app an agent starts would report its crashes to Hive's handler, and lose it
- * when Hive quits).
+ * Combwork's own variables that would change how a child Electron or Chromium app behaves: run as Node, the console, and
+ * Combwork's crash handler (exitLog.ts, #985: an app an agent starts would report its crashes to Combwork's handler, and lose it
+ * when Combwork quits).
  */
 export const CHILD_ENV_STRIP = ['ELECTRON_RUN_AS_NODE', 'ELECTRON_NO_ATTACH_CONSOLE', 'CHROME_CRASHPAD_PIPE_NAME']
 
-/** Builds a child environment from Hive's own, minus variables that would change how child Electron apps behave. */
+/** Builds a child environment from Combwork's own, minus variables that would change how child Electron apps behave. */
 export function childEnv(extra: Record<string, string> = {}): Record<string, string> {
   const env: Record<string, string> = {}
   for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v
   for (const k of CHILD_ENV_STRIP) delete env[k]
-  // If Hive itself was started from inside an agent's session, don't leak that session's identity
+  // If Combwork itself was started from inside an agent's session, don't leak that session's identity
   // (each provider lists its variables), nor Combwork's own CW_ variables. User configuration is kept.
   const sessionVars = new Set(allProviders().flatMap((p) => p.envToStrip))
   for (const k of Object.keys(env)) if (sessionVars.has(k) || (k.startsWith('CW_') && !SESSION_SETTINGS.has(k))) delete env[k]
   env.TERM_PROGRAM = 'Combwork' // i18n-ignore: an environment variable's value, which programs in the terminal read
   env.COLORTERM = 'truecolor'
-  // The folders of the CLIs Hive found and its PATH lacks (#1103), so what it starts runs them by name.
+  // The folders of the CLIs Combwork found and its PATH lacks (#1103), so what it starts runs them by name.
   return { ...envWithCliFolders(env), ...extra }
 }
 
 /**
- * A session terminal's environment with its type named as Hive's terminal is (HI-2004, `cw.sessions.terminalType`):
+ * A session terminal's environment with its type named as Combwork's terminal is (HI-2004, `cw.sessions.terminalType`):
  * TERM=xterm-256color unless the environment names one already (the user's own, or the session's), and no
- * WT_SESSION inherited from a Windows Terminal Hive was opened from. So the CLIs draw the same however Hive was opened.
+ * WT_SESSION inherited from a Windows Terminal Combwork was opened from. So the CLIs draw the same however Combwork was opened.
  * Off, the environment as given.
  */
 export function withTerminalType(env: Record<string, string>, on = advanced.get<boolean>(TERMINAL_TYPE), platform: NodeJS.Platform = process.platform): Record<string, string> {
@@ -178,7 +178,7 @@ export function forLog(arg: string): string {
 }
 
 export function spawnPty(key: string, opts: SpawnOptions): IPty {
-  // i18n-ignore: a guard for Hive's own code (callers refuse a second start first, in their own words); the key is internal
+  // i18n-ignore: a guard for Combwork's own code (callers refuse a second start first, in their own words); the key is internal
   if (entries.has(key)) throw new Error(`A process is already running for ${key}`)
   log.info(`spawn ${userText(key)}: ${opts.file} ${JSON.stringify(typeof opts.args === 'string' ? userText(forLog(opts.args)) : argsForLog(opts.args.map(forLog)))}`)
   const size = startSize(key)
@@ -341,7 +341,7 @@ export function ptyGone(key: string, boundMs: number): Promise<boolean> {
 /**
  * Stops a terminal's process, once. On Windows node-pty closes the pseudoconsole a moment after kill() (it first asks
  * which processes are attached), and a second kill before the first has finished closes it again: that corrupts the
- * heap and Hive's main process dies, with nothing in its log (#297). It happened whenever a session being stopped was
+ * heap and Combwork's main process dies, with nothing in its log (#297). It happened whenever a session being stopped was
  * stopped again before it exited: Stop, then switching or closing the workspace or quitting at once (which stop every
  * live session). So a terminal is killed once and then left alone until it exits.
  */

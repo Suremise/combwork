@@ -100,7 +100,7 @@ const leaked = (env) => Object.entries(env).filter(([k, v]) => LEAKS[k.toUpperCa
   check("a test Combwork started with the suite's own environment is refused", await refused(null))
   check('…or with a copy of a run-context environment', await refused({ ...lib.combworkEnv({ CW_USER_DATA: userData }) }))
 
-  // A child that is part of Combwork (the hive MCP server, a bridge): the allowlist and what it is given.
+  // A child that is part of Combwork (the combwork MCP server, a bridge): the allowlist and what it is given.
   const child = await new Promise((resolve) => {
     const p = spawn(process.execPath, ['-e', 'process.stdout.write(JSON.stringify(process.env))'], { env: lib.childEnv({ CW_API_URL: 'http://127.0.0.1:1' }) })
     let out = ''

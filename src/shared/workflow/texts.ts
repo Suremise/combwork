@@ -9,7 +9,7 @@ import { msg, type MessageArgs, type Msg } from '../i18n/msg'
 import type { StoredText } from '../types'
 import { storedLineText } from '../taskHistory'
 
-/** What Hive asks the user (For you, §16.8.5): `ApprovalRequested`'s text and the notification with it. */
+/** What Combwork asks the user (For you, §16.8.5): `ApprovalRequested`'s text and the notification with it. */
 export const FOR_YOU = {
   review: msg({ id: 'workflow.forYou.review', defaultMessage: '{card} waits for your review', description: 'A For you request: the card waits for the user to review it (Version Control → Work is reviewed before it is merged: You). {card} is a card key like AM-12.' }),
   okBefore: msg({ id: 'workflow.forYou.okBefore', defaultMessage: '{card} is approved: OK to merge?', description: "A For you request: the card passed review and waits for the user's OK before it merges (glossary 2.3: approval). {card} is a card key like AM-12." }),
@@ -140,7 +140,7 @@ export const SLOT_NOTICES = {
 
 const BY_ID = new Map<string, Msg>([...Object.values(FOR_YOU), FOR_YOU_KIND, ROUND_CHOICE, ...Object.values(UNREADABLE), ...Object.values(MOVE_NAMES), ...Object.values(RULE_NAMES), ...Object.values(SLOT_NOTICES)].map((m) => [m.id, m]))
 
-/** The workflow's message of an id: null for one this Hive doesn't know (a record from a newer one). */
+/** The workflow's message of an id: null for one this Combwork doesn't know (a record from a newer one). */
 // agent-text: FOR_YOU, FOR_YOU_KIND, ROUND_CHOICE, UNREADABLE, MOVE_NAMES, RULE_NAMES, SLOT_NOTICES (stored by id in history and refusals, said when read)
 export const workflowMessage = (id: string): Msg | null => BY_ID.get(id) ?? null
 
@@ -150,7 +150,7 @@ export function workflowText<Id extends string>(m: Msg<Id>, ...values: MessageAr
   return v ? { id: m.id, values: v } : { id: m.id }
 }
 
-/** A stored workflow text by `format` (the window's language, or English); null when this Hive doesn't know its message. */
+/** A stored workflow text by `format` (the window's language, or English); null when this Combwork doesn't know its message. */
 export const workflowLine = (s: unknown, format: (m: Msg, values?: Record<string, string | number>) => string): string | null => storedLineText(s, format, workflowMessage)
 
 /**
@@ -179,6 +179,6 @@ export function unreadWhy(field: string, of: { unknown: Record<string, string>; 
   return { note: 'other', why: (t && workflowLine(t, format)) || english }
 }
 
-/** A stored workflow text in English (agents, the Agent API, the log); its id when this Hive doesn't know it. */
+/** A stored workflow text in English (agents, the Agent API, the log); its id when this Combwork doesn't know it. */
 // agent-stored: storedForAgents says a request again for each reader (its forYou rows, a lane wake's detail; HI-2464)
 export const workflowEnglish = (s: StoredText): string => workflowLine(s, (m, values) => englishText(values ? { m, values } : m)) ?? s.id

@@ -337,7 +337,7 @@ function manualChoice(projectPath: string, before: AgentDef): void {
   for (const [limit, r] of Object.entries(records()[choice.account.id] ?? {})) if (!r.handled[key] && Date.parse(r.resetsAt) > now) changeRecord(choice.account.id, limit, r.firing, (x) => (x.handled[key] = 'kept'))
 }
 
-/** Usage moves' part of Hive's start (index.ts): they follow usage reports, accounts, workspaces and the Advanced switch. */
+/** Usage moves' part of Combwork's start (index.ts): they follow usage reports, accounts, workspaces and the Advanced switch. */
 export function initUsageMoves(): void {
   onCombworkEvent((e) => {
     if (e.type === 'connections-changed' || e.type === 'advanced-changed' || e.type === 'settings-changed' || e.type === 'workspace-changed') revalidate()

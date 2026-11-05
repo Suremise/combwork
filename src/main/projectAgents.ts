@@ -155,7 +155,7 @@ export function pendingSetupPatch(now: ProjectConfig, change: { add?: string[]; 
 }
 
 /**
- * The project's Maximum agents (HI-2001): its workflow option, the user's team size (Hive's, the workspace's, then its
+ * The project's Maximum agents (HI-2001): its workflow option, the user's team size (Combwork's, the workspace's, then its
  * own; 12 when none sets it). Read afresh each time (under the project's lock too), so a change applies at once.
  */
 export function agentMax(projectPath: string, cfg?: Pick<ProjectConfig, 'workflow' | 'platform'> | null): number {
@@ -228,8 +228,8 @@ async function reuseCheck(projectPath: string, path: string, branch: string, bas
 }
 
 /**
- * Where a project is, for the branches Hive makes in it (#703): its workspace's folder name and its own, and the other
- * workspace parts Hive has given its branches (project.json's `branchSpaces`): with the workspace's own, the only ones
+ * Where a project is, for the branches Combwork makes in it (#703): its workspace's folder name and its own, and the other
+ * workspace parts Combwork has given its branches (project.json's `branchSpaces`): with the workspace's own, the only ones
  * that are its.
  */
 export async function branchPlace(projectPath: string): Promise<BranchHome> {
@@ -249,7 +249,7 @@ export async function branchHome(projectPath: string, reads?: wt.RepoReads): Pro
 }
 
 /**
- * The project's unused worktree on `branch` (#456), checked against `base`: one in Hive's worktrees folder for the
+ * The project's unused worktree on `branch` (#456), checked against `base`: one in Combwork's worktrees folder for the
  * project that git lists on that branch and no agent (`others`) works in. When `branch` is the branch of the agent
  * called `name`, one on the same agent's branch in another of the project's workspace parts is found too, its own
  * first. Null when there is none.
@@ -281,7 +281,7 @@ export async function worktreeMatch(projectPath: string, branch: string, base: s
   return matchingWorktree(projectPath, branch.trim(), base, projectAgents(await workspace.projectConfig(projectPath)), typeof name === 'string' ? name : undefined)
 }
 
-/** Records a workspace part Hive has made a branch in for this project (#703 round 3), so it stays this project's. */
+/** Records a workspace part Combwork has made a branch in for this project (#703 round 3), so it stays this project's. */
 async function recordSpace(projectPath: string, space: string): Promise<void> {
   await workspace.mutateProjectConfig(projectPath, (now) => {
     const before = Array.isArray(now.branchSpaces) ? now.branchSpaces : []
@@ -300,8 +300,8 @@ export async function newWorktreePlace(projectPath: string, name: string, branch
   const repo = reads ?? new wt.RepoReads(projectPath)
   const home = await branchHome(projectPath, repo)
   const generated = agentBranch(home, name)
-  // The default Hive generates for this name, whether left out or sent back as it was shown (the Add Agent dialog and the
-  // Agent API send the branch they show, #703 round 4); a branch of the user's own is never taken as a part Hive gave.
+  // The default Combwork generates for this name, whether left out or sent back as it was shown (the Add Agent dialog and the
+  // Agent API send the branch they show, #703 round 4); a branch of the user's own is never taken as a part Combwork gave.
   const supplied = branch?.trim()
   const isDefault = !supplied || supplied.toLowerCase() === generated.toLowerCase()
   return {
@@ -359,13 +359,13 @@ export async function prepareAgent(projectPath: string, cfg: ProjectConfig, opts
   const id = `a-${randomBytes(4).toString('hex')}`
 
   // The provider is stored on the agent, so changing a default later doesn't move existing agents. Automatic's is only
-  // known once Hive has looked for every CLI before the one it found (#506).
+  // known once Combwork has looked for every CLI before the one it found (#506).
   // Decision A (HI-2106): no default provider; the CLI of the connection named, else of the first account in the one order
   // that's usable here (its CLI on and installed); with no account usable (a test copy on its CLI test home), the first
   // CLI on and installed (autoProvider).
   const named = getConnection(opts.connection)
   const ws = workspaceOf(projectPath)
-  // Only once Hive knows which CLIs are installed (HI-2108 round 2): a CLI earlier in the order still being looked for
+  // Only once Combwork knows which CLIs are installed (HI-2108 round 2): a CLI earlier in the order still being looked for
   // could be the first usable, so nothing is decided from a guess (refused, saying so, if it still isn't known).
   if (!opts.provider && !opts.connection) await providerService.settle()
   const first = opts.provider || opts.connection ? null : firstUsableAccount(ws.path ? ws.config : null)
@@ -414,9 +414,9 @@ export function cleanDialectPick(v: unknown): string | undefined {
 }
 
 export async function updateAgent(projectPath: string, agentId: string, patch: AgentPatch, opts: { check?: (current: AgentDef) => void; session?: string | null } = {}): Promise<AgentDef> {
-  // The Hive Assistant's settings for this workspace are its agent's, too (it keeps its name).
+  // The Combwork Assistant's settings for this workspace are its agent's, too (it keeps its name).
   projectPath = workspace.assertSessionHost(projectPath)
-  // The Assistant gets Hive's own tools, not the projects' MCP servers, whatever it is given (sessions.ts).
+  // The Assistant gets Combwork's own tools, not the projects' MCP servers, whatever it is given (sessions.ts).
   if (workspace.isAssistantHome(projectPath)) {
     delete patch.name
     delete patch.mcpServers
@@ -559,7 +559,7 @@ export async function agentsGone(projectPath: string, agentIds: readonly string[
   const project = basename(projectPath)
   for (const agentId of agentIds) {
     if (opts.releaseCards !== false) await releaseAgentCards(project, agentId, { kind: 'user' }).catch((e) => log.warn('Could not take back the cards of a removed agent', e))
-    // A review it left going (from before Hive last started) ends with it.
+    // A review it left going (from before Combwork last started) ends with it.
     await endReviews(project, agentId, 'the agent was removed', workspaceOf(projectPath)).catch((e) => log.warn('Could not end the reviews of a removed agent', e)) // i18n-ignore: the reason's key (ReviewEnd): the history line is a message (#846)
     // Its lanes, as builder or reviewer, are abandoned (#483).
     await laneAgentRemoved(workspaceOf(projectPath), project, agentId).catch((e) => log.warn('abandoning the lanes of a removed agent', e))
@@ -660,7 +660,7 @@ export function setUserMergeSlot(fn: typeof userMergeSlot): void {
 
 /**
  * Merges a worktree's branch into the project folder's, the user's way: one merge at a time per repository, across
- * Hives too (the repository lock, #1347: two would stage and commit into each other), holding the merge slot of the
+ * Combworks too (the repository lock, #1347: two would stage and commit into each other), holding the merge slot of the
  * branch it merges into (#350), so an agent's merge doesn't land in the middle. An agent's merge and an unused
  * worktree's (#400) both go through it.
  */

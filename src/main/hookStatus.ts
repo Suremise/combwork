@@ -23,19 +23,19 @@ import type { Ask, HookEvent } from './providers/types'
  * need: when the agent starts waiting, or a question appears while it isn't.
  */
 
-/** What Hive knows of the agent when the hook arrives. */
+/** What Combwork knows of the agent when the hook arrives. */
 export interface HookStatusInput {
   status: SessionStatus
   statusMessage?: string
   /** The CLI asked something at start (a trust question) that a SessionStart or a prompt answers. */
   askedAtStart: boolean
-  /** A Compact Hive asked for: not begun yet, under way, or none. */
+  /** A Compact Combwork asked for: not begun yet, under way, or none. */
   compacting: 'requested' | 'started' | null
   /** The CLI starts a new turn by itself when its background tasks end (capabilities.backgroundWakes). */
   backgroundWakes: boolean
   /** Background tasks still counted (for a stop, after reading the transcript). */
   tasks: number
-  /** Where Hive learns that a person must act (see above). */
+  /** Where Combwork learns that a person must act (see above). */
   attention: 'hooks' | 'title'
   /** The mode's permission requests go to the CLI's own reviewer (ModeOption.reviewed). */
   reviewed: boolean
@@ -63,12 +63,12 @@ export type HookAction =
   | 'answered'
   /** A prompt (the Assistant counts its changes per prompt). */
   | 'prompted'
-  /** Hive's Compact began, or is over (PostCompact, or a prompt starting a new turn); the step sets the status. */
+  /** Combwork's Compact began, or is over (PostCompact, or a prompt starting a new turn); the step sets the status. */
   | 'compactBegan'
   | 'compactEnded'
   /** The CLI compacts by itself: say so. */
   | 'autoCompact'
-  /** It began while the agent was idle, where nothing may say it is over (#1115): watch for its end as for Hive's. */
+  /** It began while the agent was idle, where nothing may say it is over (#1115): watch for its end as for Combwork's. */
   | 'autoCompactIdle'
   | 'notifyWaiting'
   /** A question the agent doesn't stop for: tell the user, though it keeps working. */
@@ -82,7 +82,7 @@ export type HookAction =
   | 'turnEnded'
   /** The CLI's sign-in was refused: the agent needs it renewed (told once per CLI and expiry, not per agent). */
   | 'signedOut'
-  /** The CLI said it is idle while Hive showed it working: logged with the hooks Hive saw before, to find out why. */
+  /** The CLI said it is idle while Combwork showed it working: logged with the hooks Combwork saw before, to find out why. */
   | 'idleAgain'
 
 export interface HookStep {
@@ -90,7 +90,7 @@ export interface HookStep {
   next: SessionStatus | null
   /** The status message: a string sets it, null clears it, undefined leaves it (a move to working or ready clears it). */
   message?: string | null
-  /** Beside a `message` that is Hive's own (not the CLI's words): how the window shows it (LiveSessionState.statusText). */
+  /** Beside a `message` that is Combwork's own (not the CLI's words): how the window shows it (LiveSessionState.statusText). */
   messageText?: Text
   /** The pending question: a string sets it, null clears it, undefined leaves it. */
   question?: string | null
@@ -111,7 +111,7 @@ const FAILED_TURN_TEXT = msg({ id: 'session.status.failedTurn', defaultMessage: 
 
 /**
  * A turn that ended on an error (#1632): its mark (the CLI's words, '' for none) and its status message, the CLI's words
- * or Hive's own (English for agents, shown in the window's language).
+ * or Combwork's own (English for agents, shown in the window's language).
  */
 export function failedTurnStep(words: string | null | undefined): Pick<HookStep, 'failed' | 'message' | 'messageText'> {
   const said = words?.trim() ?? ''
@@ -200,7 +200,7 @@ export function idleAfter(s: Pick<HookStatusInput, 'backgroundWakes' | 'tasks'>,
 }
 
 /**
- * A compaction is over (its hook, or what Hive saw instead: the transcript, the CLI refusing it, a time limit):
+ * A compaction is over (its hook, or what Combwork saw instead: the transcript, the CLI refusing it, a time limit):
  * an agent still showing it is idle again (`idle`: background while its background tasks run, #521: an idle compaction
  * left a builder waiting on its e2e run "ready", and it was flagged as not watching); anything since (a prompt began a
  * turn) stands.
@@ -210,8 +210,8 @@ export function compactionOver(s: Pick<HookStatusInput, 'status' | 'statusMessag
 }
 
 /**
- * The user says an agent whose state is unknown is idle (Mark idle, #648): Hive heard nothing of its turn for a while and
- * found no sign of its end. Its turn is over: idle (or on its background tasks), its claims released, and whatever Hive
+ * The user says an agent whose state is unknown is idle (Mark idle, #648): Combwork heard nothing of its turn for a while and
+ * found no sign of its end. Its turn is over: idle (or on its background tasks), its claims released, and whatever Combwork
  * thought ran with it is over too (a compaction, a person asked, its open tool calls: the ledger's). Not told as
  * finished: the user is looking at it.
  */
@@ -219,9 +219,9 @@ export function markedIdle(s: HookStatusInput): HookStep {
   return { next: idleAfter(s, 'ready'), message: null, review: null, ...RESOLVED, actions: ['releaseLocks', ...(s.compacting ? (['compactEnded'] as const) : [])] }
 }
 
-/** What an agent idle after its CLI's safeguard prompt was answered shows (#606): `SAFEGUARD_IDLE_MESSAGE` is its English, which Hive compares. */
+/** What an agent idle after its CLI's safeguard prompt was answered shows (#606): `SAFEGUARD_IDLE_MESSAGE` is its English, which Combwork compares. */
 export const SAFEGUARD_IDLE_TEXT = msg({ id: 'session.status.safeguardIdle', defaultMessage: 'Idle after a safeguard stop: give it a nudge', description: "An agent's status: its CLI's safety classifier stopped a response, the user answered its prompt about it, and the agent now waits for a new prompt." })
-// agent-stored: agentField says it for each agent where its status is sent (servers.ts statusMessageOf); Hive compares the English
+// agent-stored: agentField says it for each agent where its status is sent (servers.ts statusMessageOf); Combwork compares the English
 export const SAFEGUARD_IDLE_MESSAGE = englishText(SAFEGUARD_IDLE_TEXT)
 
 /**
@@ -251,14 +251,14 @@ export function hookStep(ev: HookEvent, s: HookStatusInput): HookStep {
     case 'start':
       return { next: s.status === 'starting' || s.askedAtStart ? 'ready' : null, actions: ['answered'] }
     case 'prompt':
-      // Hive's own message put into the running turn (the turn ledger knows it): no new prompt, nobody answered.
+      // Combwork's own message put into the running turn (the turn ledger knows it): no new prompt, nobody answered.
       if (ev.injected) return { next: null, actions: [] }
       // A question's answer comes as a prompt ('title' attention: the title says when it is answered).
       return {
         next: 'working',
         ...reviewed(s),
-        // A new turn once a compaction has begun (its end unsaid): the compaction is over, and what Hive learns
-        // of its end later must not make the turn idle. Before it begins, the prompt may be the /compact Hive typed.
+        // A new turn once a compaction has begun (its end unsaid): the compaction is over, and what Combwork learns
+        // of its end later must not make the turn idle. Before it begins, the prompt may be the /compact Combwork typed.
         ...(isCompacting(s) && s.compacting !== 'requested' ? { message: null } : {}),
         ...(s.attention === 'hooks' && s.question ? { question: null } : {}),
         actions: ['answered', 'prompted', ...(s.compacting === 'started' ? (['compactEnded'] as const) : [])]
@@ -313,9 +313,9 @@ export function hookStep(ev: HookEvent, s: HookStatusInput): HookStep {
       // Interrupted turns end without Stop: the agent is idle again, and its claims go.
       return { next: idleAfter(s, 'ready'), message: null, review: null, ...RESOLVED, actions: ['releaseLocks'] }
     case 'idle':
-      // The CLI says it is idle at its prompt while Hive still shows it working (#612: HB3 stayed "Working…" after its
+      // The CLI says it is idle at its prompt while Combwork still shows it working (#612: HB3 stayed "Working…" after its
       // turn ended, and prompts to it were refused): no turn runs, so it is idle again and its claims go. Anything
-      // else stands: one waiting for a person or on its background tasks says so itself, and Hive's own Compact has
+      // else stands: one waiting for a person or on its background tasks says so itself, and Combwork's own Compact has
       // its own limits. A safeguard prompt says nothing when it is answered: the CLI idle again is its answer (#606).
       if (s.safeguardPrompt && s.status === 'waiting') return safeguardAnswered(s)
       if (s.status !== 'working' || s.compacting) return { next: null, actions: [] }
@@ -327,7 +327,7 @@ export function hookStep(ev: HookEvent, s: HookStatusInput): HookStep {
       return s.status === 'working' ? { next: null, actions } : { next: 'working', message: COMPACTING_MESSAGE, messageText: COMPACTING_TEXT, actions }
     }
     case 'compactEnd':
-      // Hive's, or one the CLI did while idle (/compact typed in it): idle again. One mid-turn leaves the turn working.
+      // Combwork's, or one the CLI did while idle (/compact typed in it): idle again. One mid-turn leaves the turn working.
       return { ...compactionOver(s, idleAfter(s, 'ready')), actions: s.compacting ? ['compactEnded'] : [] }
     case 'end':
       return { next: 'stopped', question: null, review: null, ...RESOLVED, actions: ['releaseAllLocks', 'clearTasks'] }
@@ -373,7 +373,7 @@ export function applyStep(st: { status: SessionStatus; statusMessage?: string; s
 
 /**
  * Drops background tasks past their own expiry (a Monitor's) or the time limit (`minutes`, Settings → Agents &
- * Worktrees: Hive can't tell a test run from a dev server that never ends). Returns the ids the limit dropped.
+ * Worktrees: Combwork can't tell a test run from a dev server that never ends). Returns the ids the limit dropped.
  */
 export function expireTasks(tasks: Map<string, { at: number; expiresAt?: number }>, now: number, minutes: number): string[] {
   const dropped: string[] = []

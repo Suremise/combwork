@@ -19,7 +19,7 @@ const HIVE = { kind: 'combwork', name: 'Combwork' } as const
 
 /**
  * The journal as a workspace has it (#1031): its settings (workspace.json `journal`, Settings → Assistant → Journal),
- * Hive's own facts, and the Assistant told when the settings change while it may be running. The store is journal.ts.
+ * Combwork's own facts, and the Assistant told when the settings change while it may be running. The store is journal.ts.
  * Agent-facing words here stay English.
  */
 
@@ -117,7 +117,7 @@ export function closeWorkspaceJournal(ws: WorkspaceService): void {
   if (ws.path) closeJournal(ws.assistantHome)
 }
 
-/** A fact Hive records (#1031): an event, by Hive, small and linked. */
+/** A fact Combwork records (#1031): an event, by Combwork, small and linked. */
 export interface Fact {
   summary: string
   project?: string | null
@@ -125,7 +125,7 @@ export interface Fact {
   links?: { type: LinkType; ref: string }[]
   tags?: string[]
   detail?: string
-  /** The summary as Hive's message, beside its English (dialects, HI-2438). */
+  /** The summary as Combwork's message, beside its English (dialects, HI-2438). */
   summaryText?: StoredText
 }
 

@@ -265,7 +265,7 @@ describe('the git Combwork starts', () => {
     const env: NodeJS.ProcessEnv = baseEnv()
     for (const k of Object.keys(env)) if (['PATH', 'HOME', 'HOMEDRIVE', 'HOMEPATH', 'USERPROFILE', 'MSYSTEM', 'PLINK_PROTOCOL'].includes(k.toUpperCase())) delete env[k]
     Object.assign(env, { GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', PATH: `${process.env.SystemRoot}\\System32;${process.env.SystemRoot}`, MSYSTEM: 'MSYS', HOMEDRIVE: roaming.slice(0, 2), HOMEPATH: roaming.slice(2), USERPROFILE: local })
-    const said = (exe: string, e: NodeJS.ProcessEnv): string => execFileSync(exe, ['-c', 'alias.hiveenv=!echo "$MSYSTEM|$HOME|$PLINK_PROTOCOL|$PATH"', 'hiveenv'], { cwd: p, env: e, encoding: 'utf8', windowsHide: true })
+    const said = (exe: string, e: NodeJS.ProcessEnv): string => execFileSync(exe, ['-c', 'alias.cwenv=!echo "$MSYSTEM|$HOME|$PLINK_PROTOCOL|$PATH"', 'cwenv'], { cwd: p, env: e, encoding: 'utf8', windowsHide: true })
     const through = said(launcher, env)
     // The launcher's own MSYSTEM (MINGW64, or UCRT64 on Git for Windows 2.56's UCRT64 build, HI-2400), not the inherited one.
     expect(through.startsWith(`${real.launcherEnv.msystem}|`)).toBe(true)

@@ -63,7 +63,7 @@ function failedTitle(run: CloseCommandRun): string {
 /**
  * The panel over the window while its commands run, or after one failed (HI-1368, HI-1954): what runs, how long, its
  * last lines of output, and Don't wait; on a failed command of a list, Rerun, Skip it and continue or Stop here; on a
- * failure Hive can't go past, Close. Main sends it with close-command; nothing behind takes input.
+ * failure Combwork can't go past, Close. Main sends it with close-command; nothing behind takes input.
  */
 export function CloseCommandPanel() {
   const run = useStore((s) => s.closeCommand)
@@ -131,7 +131,7 @@ function useKeyboardModal(card: React.RefObject<HTMLDivElement | null>, footer: 
 }
 
 /**
- * The command Hive runs (HI-2031): at most two lines, cut with an ellipsis, and the whole line in a tooltip on hover when
+ * The command Combwork runs (HI-2031): at most two lines, cut with an ellipsis, and the whole line in a tooltip on hover when
  * it is cut. A screen reader reads it whole: only its look is cut.
  */
 function CommandLine({ command }: { command: string }) {

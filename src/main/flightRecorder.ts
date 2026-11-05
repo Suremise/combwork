@@ -21,7 +21,7 @@ import { maskText } from '../shared/redact'
  * one is on, the console keeps every agent's events in a small ring whether a console is open or not
  * (`DevConsole.setFlight`), and with all off it keeps nothing. One capture per trigger per agent every
  * `cw.recorder.minutes`; the newest `cw.recorder.keep` captures are kept. What a capture says of its trigger is
- * recorded data, in English (#1104); the notice is in Hive's language.
+ * recorded data, in English (#1104); the notice is in Combwork's language.
  */
 
 const log = createLogger('console')
@@ -51,7 +51,7 @@ const M = {
   failed: msg({ id: 'console.flight.failed', defaultMessage: "Couldn't save the capture of {agent}", description: "A warning: the developer console's flight recorder couldn't write its capture. The reason follows." })
 }
 
-/** The agent a trigger fired on: its session as sessions.ts has it, and its name as Hive shows it. */
+/** The agent a trigger fired on: its session as sessions.ts has it, and its name as Combwork shows it. */
 export interface FlightAgent {
   projectPath: string
   agentId: string
@@ -169,7 +169,7 @@ class FlightRecorder {
     }
   }
 
-  /** A hook or status line arrived: the unknown trigger when it is an event, or has a field, Hive doesn't know. */
+  /** A hook or status line arrived: the unknown trigger when it is an event, or has a field, Combwork doesn't know. */
   arrived(st: { projectPath: string; agentId: string; provider: string }, label: () => string, kind: 'hook' | 'statusline', body: Record<string, unknown>): void {
     if (!this.on('unknown')) return
     const ids = knownIds(st.provider)
@@ -249,7 +249,7 @@ class FlightRecorder {
     return { cooldowns: this.last.size, pending: this.jobs.size }
   }
 
-  /** Captures waiting to be written are dropped (Hive quitting). */
+  /** Captures waiting to be written are dropped (Combwork quitting). */
   stop(): void {
     for (const job of this.jobs.values()) if (job.timer) clearTimeout(job.timer)
     this.jobs.clear()

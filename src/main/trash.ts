@@ -8,10 +8,10 @@ import { takesTestSeams } from './testQuiet'
 const log = createLogger('trash')
 
 /**
- * Hive's one way to delete what the user can see (files, notes, skills, templates, cards, backups, projects): to the
+ * Combwork's one way to delete what the user can see (files, notes, skills, templates, cards, backups, projects): to the
  * Recycle Bin, so it can be restored (#414). Nothing in main calls `shell.trashItem` itself (tests/trash.test.ts).
  *
- * Test copies of Hive never touch the user's Recycle Bin: an unpackaged build, or a quiet packaged one (CW_TEST_QUIET=1,
+ * Test copies of Combwork never touch the user's Recycle Bin: an unpackaged build, or a quiet packaged one (CW_TEST_QUIET=1,
  * which the suites start dist\win-unpacked with: takesTestSeams, #1599), with CW_TEST_TRASH_DIR (the run context gives
  * every test copy one, in the suite's own folder) or with a test profile (CW_USER_DATA: then `<profile>/test-trash`)
  * moves the item into that folder instead, and notes it in `trash.jsonl` there, so suites can check it arrived.
@@ -69,7 +69,7 @@ export async function trash(path: string): Promise<void> {
     await whileHeld(path, () => rename(path, to), (e) => HELD_CODES.has((e as NodeJS.ErrnoException).code ?? ''))
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== 'EXDEV') throw e
-    throw new Error(`${path} is on another drive than the test trash folder (${dir}): a test copy of Hive only moves within a drive, so nothing is half deleted. Nothing was changed.`, { cause: e })
+    throw new Error(`${path} is on another drive than the test trash folder (${dir}): a test copy of Combwork only moves within a drive, so nothing is half deleted. Nothing was changed.`, { cause: e })
   }
   await appendFile(join(dir, 'trash.jsonl'), `${JSON.stringify({ at: new Date().toISOString(), from: path, to })}\n`).catch((e) => log.warn(`Moved ${userText(path)} to the test trash folder, but could not note it in its trash.jsonl`, e))
 }

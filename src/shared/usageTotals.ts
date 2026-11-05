@@ -54,7 +54,7 @@ export interface Totals {
   cacheWrite: number
   output: number
   cost: number
-  /** Some of the cost is Hive's estimate. */
+  /** Some of the cost is Combwork's estimate. */
   estimated: boolean
   /** Sessions with a cost (reported or estimated). */
   priced: number
@@ -66,7 +66,7 @@ export interface Totals {
 
 /**
  * A total cost as the window shows it: "≈ $1.20" when every session in it has a cost, "≈ $1.20 + ?" when some have none (a known
- * subtotal, incomplete), "Unknown" when none has: sessions Hive couldn't price never count as $0.
+ * subtotal, incomplete), "Unknown" when none has: sessions Combwork couldn't price never count as $0.
  */
 export function costText(t: { cost: number; estimated: boolean; priced: number; unpriced: number; free?: number }, label: (n: number) => string = moneyLabel): string {
   // Only free sessions (HI-1772): free (local); free ones beside others: said after the others' cost.

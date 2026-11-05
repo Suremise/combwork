@@ -5,10 +5,10 @@ import { columnName } from './tasks'
 import type { LiveSessionState } from './types'
 
 /**
- * The Assistant panel's status line (#312), from what Hive knows of its session: "Working", "Idle", "Waiting for you",
+ * The Assistant panel's status line (#312), from what Combwork knows of its session: "Working", "Idle", "Waiting for you",
  * "Waiting for #271, #273 → Review (watch until 22:22)". A card watch's cards are kept apart (`cards`, between `text`
  * and `after`) so each can be a chip that opens its card. `tone`: attention when it needs the user, busy while it works,
- * calm while it is idle or waits on cards or tasks, off when it isn't running. `approvals`: the titles of Hive's questions
+ * calm while it is idle or waits on cards or tasks, off when it isn't running. `approvals`: the titles of Combwork's questions
  * its actions wait on (stopping a busy agent…), shown under the line: waiting for the user's answer comes first, over
  * working, idle and a card watch; sign-in and an error keep their words, with it added.
  *
@@ -54,7 +54,7 @@ export function assistantStatusLine(live: Pick<LiveSessionState, 'status' | 'sta
   // A wake it didn't take (#430): the user presses Enter in its terminal.
   if (live.untakenLine) return line(tr(M.untaken), 'attention')
   const n = live.backgroundTasks ?? 0
-  // Hive's own words in the language shown (#847), or the CLI's as they came.
+  // Combwork's own words in the language shown (#847), or the CLI's as they came.
   const said = shownStatusMessage(live)
   const base = ((): AssistantStatusLine => {
     switch (live.status) {

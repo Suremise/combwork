@@ -9,7 +9,7 @@ import { sep } from 'path'
  *   (`pending`, then `saved`), and dropped when its session is deleted;
  * - past that, the host whose id overflows fails closed: its ids are let go and every read in it ignores cost reports;
  *   so do the hosts of a closing workspace that still had unsaved ids (they can't be kept for its reopening otherwise);
- * - at most FAIL_CLOSED_HOSTS_MAX such hosts; past that, every read anywhere ignores cost reports until Hive restarts.
+ * - at most FAIL_CLOSED_HOSTS_MAX such hosts; past that, every read anywhere ignores cost reports until Combwork restarts.
  * Over-cautious for a Claude session there (priced from its tokens), never Claude-priced for a server one. A fail-closed
  * state isn't left in this run.
  */

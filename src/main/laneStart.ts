@@ -163,7 +163,7 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
   }
   const key = `${projectPath.toLowerCase()}|${builder.id}`
   if (starting.has(key)) throw combworkError(M.starting, { agent: builder.name }, { kind: 'conflict' })
-  // Hive's own start of the lane's card waits for this one to lend its slot and start its agents (HI-2029).
+  // Combwork's own start of the lane's card waits for this one to lend its slot and start its agents (HI-2029).
   const release = holdLaneStart(ws, project, builder.id)
   starting.add(key)
   try {
@@ -273,13 +273,13 @@ async function laneCards(ws: WorkspaceService, project: string, numbers: readonl
 
 /** A lane brief's delivery identity (#1438): one per lane and role, so a lane's agents are started with it once. */
 const BRIEF = 'lane-brief'
-/** A launch refused because its start is over (Hive quitting): nothing given, nothing failed. */
+/** A launch refused because its start is over (Combwork quitting): nothing given, nothing failed. */
 class LaunchOver extends Error {}
 /** An agent of a lane started only where stopped (`stoppedOnly`) found running at its launch: left as it is. */
 class StartedMeanwhile extends Error {}
 /**
  * An agent that can't be given its new conversation now for a reason that passes by itself (HI-2034): in a turn, or a
- * prompt Hive typed not taken yet, or no line of Hive's free to go in. Its new conversation is owed (the lane's
+ * prompt Combwork typed not taken yet, or no line of Combwork's free to go in. Its new conversation is owed (the lane's
  * `freshStart`), never dropped and never replaced by the old conversation.
  */
 class NotFreeYet extends Error {}
@@ -294,7 +294,7 @@ const NOT_GIVEN: ReadonlySet<string> = new Set(['cancelled', 'refused', 'expired
  * Starts a lane's builder and reviewer, each in a fresh conversation with its brief: one not running is started with it,
  * an idle one ends its conversation (kept in its Sessions tab) and starts a new one, one busy is refused (the lane stays).
  * An agent whose brief for this lane was already given (`lane-brief`, `<lane>:<role>`: a start cut short by a crash, made
- * again) isn't started again. `over` (Hive quitting, #1628): no agent is started from then on, the ones not started left
+ * again) isn't started again. `over` (Combwork quitting, #1628): no agent is started from then on, the ones not started left
  * out of the result, so the lane's next start (its next pass) starts them. `stoppedOnly` (a lane the Assistant or a
  * script recorded, HI-1934): an agent running, or in `left` (running when the caller looked, so its slot was decided
  * without it, HR6's round 1), is left out and never given a new conversation; one found running at its launch, idle or
@@ -340,7 +340,7 @@ async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: s
       // Free where it is launched (HR6's #1280 round 1): checked with no await before its conversation is replaced
       // (newConversation's `allowed` runs just before it stops the agent), so one that started work meanwhile keeps
       // it: it is reported as not started, and the lane stays.
-      // In a turn, a prompt not taken yet or a line of Hive's not free to go in (HI-2034): its new conversation is owed;
+      // In a turn, a prompt not taken yet or a line of Combwork's not free to go in (HI-2034): its new conversation is owed;
       // asked to sign in again, refused (that doesn't pass by itself). An owed one's obligation is checked here too, so
       // nothing replaces the conversation once it is gone (the lane ended or changed, a retry, cleared).
       const free = (): void => {
@@ -375,7 +375,7 @@ async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: s
       if (launched.record && NOT_GIVEN.has(launched.record.state)) throw new Error(say(A.notGiven, { agent: a.name, state: launched.record.state }))
       started.push({ agentId: a.id, name: a.name, role, how })
     } catch (e) {
-      // Over at its launch (Hive quitting): not started, and no failure; the next start starts it.
+      // Over at its launch (Combwork quitting): not started, and no failure; the next start starts it.
       if (e instanceof LaunchOver || over()) break
       // Started by someone else as it was launched (stoppedOnly): left as it is, as a running one is.
       if (e instanceof StartedMeanwhile) continue
@@ -474,7 +474,7 @@ export interface RecordedLaneLaunch {
   /** The builder or reviewer running already and left as it is (busy, in slots, or the reviewer), the lane recorded for it; the caller tells it. */
   running: string[]
   /**
-   * The lane's builder's name, and whether Hive gives a running one the lane's first card itself once it is free (the
+   * The lane's builder's name, and whether Combwork gives a running one the lane's first card itself once it is free (the
    * workflow rules on: laneStarts.ts, HI-2029): then the caller tells only the reviewer (HR1: a prompt would race it).
    */
   builder?: string
@@ -499,7 +499,7 @@ export async function launchRecordedLane(ws: WorkspaceService, projectPath: stri
   const builder = agents.find((a) => a.id === lane.builder.id)
   const reviewer = lane.reviewer ? (agents.find((a) => a.id === lane.reviewer!.id) ?? null) : null
   if (!builder) return null
-  // Who the reply names, and whether Hive starts a running builder's first card (the rules on, HI-2029).
+  // Who the reply names, and whether Combwork starts a running builder's first card (the rules on, HI-2029).
   const who = { builder: builder.name, firstCardByCombwork: workflowEnforced() }
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
   const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
@@ -559,8 +559,8 @@ export async function resumeLaneBuilder(projectPath: string, lane: { id: string;
 /** What `launchRecordedLane` did, for the lane start's reply (agent-facing English: the Assistant and scripts read it). */
 export function recordedLaneNote(l: RecordedLaneLaunch | null): string {
   if (!l) return ''
-  // A running builder, the rules on: Hive gives it the lane's first card once it is free (HI-2029), so the caller is told
-  // not to prompt it (that would race Hive's start); a running reviewer, or the builder with the rules off, it tells.
+  // A running builder, the rules on: Combwork gives it the lane's first card once it is free (HI-2029), so the caller is told
+  // not to prompt it (that would race Combwork's start); a running reviewer, or the builder with the rules off, it tells.
   const byCombwork = l.firstCardByCombwork && l.builder && l.running.includes(l.builder) ? l.builder : null
   const tell = l.running.filter((n) => n !== byCombwork)
   const running = [
@@ -582,7 +582,7 @@ export function recordedLaneNote(l: RecordedLaneLaunch | null): string {
  * each once, as Start Lane… would have, from the lane as it is now (its builder and reviewer, still the project's
  * agents and the builder still one; its cards; the rules now; the note it was started with). Whether they all started
  * (false: the lane keeps waiting to be started; not running any more: nothing is started, and it is done with).
- * `over` (Hive quitting, #1628), looked at after each await and at each agent's launch: from then on nothing is read
+ * `over` (Combwork quitting, #1628), looked at after each await and at each agent's launch: from then on nothing is read
  * or started, and it is false, the lane left waiting (with its slot lent) for the next start's pass.
  */
 export async function startWaitingLane(ws: WorkspaceService, projectPath: string, laneId: string, slot: string | null, over: () => boolean = () => false): Promise<boolean> {
@@ -626,7 +626,7 @@ interface FreshLaunch {
 /** What launchFresh did: its agent in its new conversation, not free yet, its obligation gone, or no more tried. */
 export type FreshOutcome = 'launched' | 'notFree' | 'gone' | 'blocked'
 
-/** A launch's marker still set (`launching`) as Hive's pass looks: the run id the start task went into ('launching' while it starts). */
+/** A launch's marker still set (`launching`) as Combwork's pass looks: the run id the start task went into ('launching' while it starts). */
 const LAUNCHING_RUN = 'launching'
 
 /**

@@ -71,7 +71,7 @@ const userConfig = (): Record<string, any> => readToml(join(codexHome(), 'config
 /** A home's config.toml: a connection's (HI-1757), or Codex's own. */
 const configOf = (home?: string): Record<string, any> => (home ? readToml(join(home, 'config.toml')) : userConfig())
 
-/** Provider Setup's explanation of the two choices Codex's sandbox setup offers, for someone working in Hive. */
+/** Provider Setup's explanation of the two choices Codex's sandbox setup offers, for someone working in Combwork. */
 const SANDBOX_CHOICE = [
   msg({ id: 'providers.codex.sandbox.setUp', defaultMessage: "**Set up** opens Codex's sandbox setup, which offers two choices. With either, Codex agents in **Ask for approval** or **Approve for me** can edit files in their own folder (the project, or the agent's worktree) and run commands there without asking, and ask before going online or writing anywhere else. Combwork's own features (status, file locks, handovers, shared notes) work the same with both.", description: "Provider Setup, under Codex's sandbox setup (Windows): what Set up does. **…** marks bold text: keep the marks. Set up is the button; Ask for approval and Approve for me are Codex's permission modes as Combwork names them: use their names as shown." }),
   msg({ id: 'providers.codex.sandbox.default', defaultMessage: '**Set up default sandbox** (recommended): commands run under two local Windows accounts Codex creates for them (`CodexSandboxOffline` and `CodexSandboxOnline`), with a firewall rule that keeps them offline unless you allow it. It isolates commands best. Windows asks for Administrator permission once.', description: "Provider Setup, under Codex's sandbox setup (Windows): its first choice. **Set up default sandbox** is the choice as Codex names it (in English); `…` marks account names: keep them." }),
@@ -155,7 +155,7 @@ export function inputHolds(screen: string, command: string): boolean {
   return input !== undefined && input.replace(/^\s*›\s*/, '') === command
 }
 /**
- * Codex's own terminal title items, set for Hive's sessions and its sandbox setup so a user's [tui].terminal_title
+ * Codex's own terminal title items, set for Combwork's sessions and its sandbox setup so a user's [tui].terminal_title
  * can't hide "Action Required" or the busy spinner.
  */
 const titleItems = (): string[] => advanced.get<string[]>('codex.title.items')
@@ -222,7 +222,7 @@ export function hookQueryArgs(args: readonly string[]): string[] {
   return out
 }
 
-/** -c overrides for Hive's hooks, with the trust records that let them run without a review prompt. */
+/** -c overrides for Combwork's hooks, with the trust records that let them run without a review prompt. */
 function hookOverrides(url: string, authFile: string, hashes?: Record<string, string>): string[] {
   const command = hookCommand(url, authFile)
   const args: string[] = []
@@ -246,7 +246,7 @@ async function hooksFromCodex(executable: string, hookArgs: string[], cwd: strin
   return Object.keys(out).length ? out : null
 }
 
-/** Whether a file in a Codex home may be opened in Hive: its AGENTS.md (editable) and its skills' SKILL.md (read-only). */
+/** Whether a file in a Codex home may be opened in Combwork: its AGENTS.md (editable) and its skills' SKILL.md (read-only). */
 function codexFileAllowed(path: string, write: boolean, homeDir: string): boolean {
   const home = resolve(homeDir).toLowerCase()
   const abs = resolve(path).toLowerCase()
@@ -256,7 +256,7 @@ function codexFileAllowed(path: string, write: boolean, homeDir: string): boolea
   return !write && rel.startsWith('skills/') && basename(rel) === 'skill.md'
 }
 
-/** The fields of Codex's sign-in answer Hive reads (Settings → Advanced, codex.accounts.*). */
+/** The fields of Codex's sign-in answer Combwork reads (Settings → Advanced, codex.accounts.*). */
 export interface CodexAccountFields {
   account: string
   email: string
@@ -266,7 +266,7 @@ export interface CodexAccountFields {
 /**
  * Who a CODEX_HOME is signed in as, from its app server's account answer (HI-1757: `account/read`; the type, email and
  * plan, never a token or the account's id): signed out when its account is null. `ok: false` when there was no answer
- * or Hive can't read it, which isn't signed out.
+ * or Combwork can't read it, which isn't signed out.
  */
 export function codexAccountStatus(answer: { ok: true; result: any } | { ok: false; error: string }, f: CodexAccountFields): ConnectionStatus {
   if (!answer.ok) return { ok: false, error: answer.error }
@@ -313,12 +313,12 @@ function connectionSandboxArgs(home: string): string[] {
 
 /**
  * The developer_instructions Codex itself would give a session started with `args` (the agent's Extra arguments) in
- * `cwd` (#1285, the Assistant's design on it): Hive parses no profile and ranks no layer, Codex does. Its offline prompt
+ * `cwd` (#1285, the Assistant's design on it): Combwork parses no profile and ranks no layer, Codex does. Its offline prompt
  * inspector (`debug prompt-input`, no model call or sign-in) renders the session's prompt twice, as it is and with
  * developer_instructions cleared (`-c developer_instructions=""`, which overrides every layer, profile and project
  * alike): what the first's developer message has in front of the second's is the value, and the same renders mean none
  * (missing, empty or blank). Its app server can't do this: it can't select a profile (0.163.0). Null when Codex couldn't
- * render it or the two renders differ otherwise: Hive then gives its guidance alone, as before #1285.
+ * render it or the two renders differ otherwise: Combwork then gives its guidance alone, as before #1285.
  */
 async function developerInstructionsFromCodex(executable: string, cwd: string, args: readonly string[], env?: NodeJS.ProcessEnv): Promise<string | null> {
   const [as, cleared] = await Promise.all([promptDeveloper(executable, cwd, [...args], env), promptDeveloper(executable, cwd, [...args, '-c', 'developer_instructions=""'], env)])
@@ -329,7 +329,7 @@ async function developerInstructionsFromCodex(executable: string, cwd: string, a
  * The developer_instructions in a session's rendered prompt (`as`, its developer messages' texts), given the same prompt
  * with them cleared (`cleared`): one text more, the rest the same and in the same order, is the value (in front in
  * 0.163.0; first in the second developer message, after Codex's own base instructions, in 0.164.0); the same texts, none
- * (''). Null for anything else (a render missing, or renders Hive can't tell apart).
+ * (''). Null for anything else (a render missing, or renders Combwork can't tell apart).
  */
 export function developerInstructionsOf(as: readonly string[] | null, cleared: readonly string[] | null): string | null {
   if (!as || !cleared) return null
@@ -365,7 +365,7 @@ function promptDeveloper(executable: string, cwd: string, args: string[], env?: 
  * The texts of the developer messages in Codex's rendered prompt items (`debug prompt-input`'s JSON), in order: every
  * item with the developer role that is a message. 0.164.0 renders its tools first as an item with the developer role too
  * (`additional_tools`, no content), then its base instructions as a developer message of their own, and the
- * developer_instructions in the next: read from the first developer item alone, every session's read as none, so Hive's
+ * developer_instructions in the next: read from the first developer item alone, every session's read as none, so Combwork's
  * guidance would have replaced the user's (#1514's real tier, codexownhooks).
  */
 export function developerTexts(items: unknown): string[] | null {
@@ -381,7 +381,7 @@ function askAppServer(executable: string, args: string[], cwd: string, method: s
 
 /**
  * One request's answer from Codex's app server: its result, its error (`ok: false`, `error` its message), or none
- * (`error` says why). Run through Hive's process ownership (codexChecks.ts, HI-1757): owned before it runs and confirmed
+ * (`error` says why). Run through Combwork's process ownership (codexChecks.ts, HI-1757): owned before it runs and confirmed
  * gone before the answer is given; an end not confirmed is a failed answer, its connection held until it is.
  */
 function appServerAnswer(executable: string, args: string[], cwd: string, method: string, params: unknown, env: NodeJS.ProcessEnv | undefined, timeoutMs: number): Promise<CheckAnswer> {
@@ -390,11 +390,11 @@ function appServerAnswer(executable: string, args: string[], cwd: string, method
 }
 
 /**
- * Only Hive's own server's tools run without Codex asking (#1166), as with Claude Code and Copilot; every other server's
+ * Only Combwork's own server's tools run without Codex asking (#1166), as with Claude Code and Copilot; every other server's
  * follow Codex's approval policy for the agent's mode. (TOOLS_SERVER is reserved: no workspace server has that name.) The
  * Assistant's only the ones its Control settings let it use without asking (`trusted`, #1174: Codex 0.163 takes a
- * per-tool `tools.<tool>.approval_mode`); none with the switch off (#1281). Hive's server is always on (`enabled`): a
- * native server of that name merges into Hive's table key by key, and could turn it off.
+ * per-tool `tools.<tool>.approval_mode`); none with the switch off (#1281). Combwork's server is always on (`enabled`): a
+ * native server of that name merges into Combwork's table key by key, and could turn it off.
  */
 function combworkTable(name: string, combwork: CombworkServerOptions): Record<string, unknown> {
   if (name !== TOOLS_SERVER) return {}
@@ -403,7 +403,7 @@ function combworkTable(name: string, combwork: CombworkServerOptions): Record<st
   return { enabled: true, default_tools_approval_mode: 'approve' }
 }
 
-/** How Hive's own server is given to this launch: its tools pre-approved (all, or the Assistant's `trusted`), or not. */
+/** How Combwork's own server is given to this launch: its tools pre-approved (all, or the Assistant's `trusted`), or not. */
 export interface CombworkServerOptions {
   preApprove: boolean
   trusted?: readonly string[]
@@ -435,7 +435,7 @@ export function codexMcpServer(name: string, def: McpServerDef, combwork: Combwo
   }
   if (!def.command) return { table: null }
   const table: Record<string, unknown> = { command: def.command, ...approval(name) }
-  // Hive's own tools can wait minutes (for agents to finish, or for the user to answer the Assistant).
+  // Combwork's own tools can wait minutes (for agents to finish, or for the user to answer the Assistant).
   if (name === TOOLS_SERVER) table.tool_timeout_sec = advanced.number('codex.mcp.toolTimeoutSeconds')
   if (def.args?.length) table.args = def.args.map(String)
   if (typeof def.cwd === 'string') table.cwd = def.cwd
@@ -452,7 +452,7 @@ export function codexMcpServer(name: string, def: McpServerDef, combwork: Combwo
   return { table }
 }
 
-/** A native hive server's keys for an HTTP server, which can't be taken out of Hive's stdio one (Codex refuses the mix). */
+/** A native combwork server's keys for an HTTP server, which can't be taken out of Combwork's stdio one (Codex refuses the mix). */
 const HTTP_KEYS = ['url', 'bearer_token_env_var', 'http_headers', 'env_http_headers', 'http_headers_helper', 'auth', 'oauth', 'oauth_resource', 'scopes', 'experimental_environment']
 
 /** Why a Codex agent can't start beside a native HTTP server named hive (outrankNativeCombwork). */
@@ -463,16 +463,16 @@ const NATIVE_CW = msg({
 })
 
 /**
- * Hive's own hive server over a native one of that name (the user's own [mcp_servers.hive] in these config files, #1281):
+ * Hive's own combwork server over a native one of that name (the user's own [mcp_servers.hive] in these config files, #1281):
  * Codex merges Hive's `-c mcp_servers.hive={…}` into it key by key (0.163.0, probed: a whole table, an empty value or
- * another transport can't take a key out), so Hive's table gives every key the native one sets Hive's value, and Hive's
+ * another transport can't take a key out), so Combwork's table gives every key the native one sets Combwork's value, and Combwork's
  * server wins whatever the isolation switch says:
  * - its tools: all of them shown (`enabled_tools`, `disabled_tools`; `enabled` is always set, combworkTable);
  * - their approval: the server default and each native per-tool mode as this launch approves them (`approved`: every
  *   tool, the Assistant's trusted ones, or none), "auto" (Codex's own policy) for the rest;
- * - how it starts: the session's folder for its `cwd`, Hive's startup timeout (`codex.mcp.startupTimeoutSeconds`, Codex's
+ * - how it starts: the session's folder for its `cwd`, Combwork's startup timeout (`codex.mcp.startupTimeoutSeconds`, Codex's
  *   own default), not `required`, and the native
- *   `env` and `env_vars` emptied (an environment variable Hive doesn't set is set empty: Codex can't remove one).
+ *   `env` and `env_vars` emptied (an environment variable Combwork doesn't set is set empty: Codex can't remove one).
  * An HTTP one (`url` and its kin, HTTP_KEYS) can't be taken out of a stdio server: the launch is refused with what to do
  * (NATIVE_CW; Codex itself would refuse to start).
  */
@@ -514,7 +514,7 @@ export function outrankNativeCombwork(files: string[], table: Record<string, unk
   return out
 }
 
-/** Codex's MCP servers in one config file ([mcp_servers.<name>]), as Hive's definitions. */
+/** Codex's MCP servers in one config file ([mcp_servers.<name>]), as Combwork's definitions. */
 function mcpServersIn(file: string): Record<string, McpServerDef> {
   const servers = readToml(file).mcp_servers
   if (!servers || typeof servers !== 'object') return {}
@@ -541,7 +541,7 @@ const idFromFile = (f: string): string | null => /-([0-9a-f]{8}-[0-9a-f]{4}-[0-9
 export class CodexAdapter implements ProviderAdapter {
   readonly id = CODEX
   readonly descriptor = CODEX_DESCRIPTOR
-  /** A parent Codex session's identity, when Hive runs inside one. User configuration (CODEX_HOME…) is kept. */
+  /** A parent Codex session's identity, when Combwork runs inside one. User configuration (CODEX_HOME…) is kept. */
   readonly envToStrip = ['CODEX_SANDBOX', 'CODEX_SANDBOX_NETWORK_DISABLED', 'CODEX_THREAD_ID', 'CODEX_SESSION_ID', 'CODEX_CI']
   readonly compactFailure = null
   // SessionStart only comes with the first prompt; the composer's placeholder means Codex is up. Both texts are
@@ -564,15 +564,15 @@ export class CodexAdapter implements ProviderAdapter {
 
   startHint(text: string): StartHint | null {
     if (/\bmodel\b/i.test(text) && /not found|invalid|unknown|not supported|does not exist/i.test(text)) return { hint: tr(msg({ id: 'providers.codex.hint.model', defaultMessage: "Codex doesn't know this model: choose another in Agent Settings.", description: "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown." })), fix: 'agent-settings' }
-    // Hive's -c overrides and the user's own config.toml.
+    // Combwork's -c overrides and the user's own config.toml.
     if (/error loading config|config\.toml|error parsing -c|invalid value for|unknown variant|unexpected argument|unrecognized|for more information, try '--help'/i.test(text)) return { hint: tr(msg({ id: 'providers.codex.hint.settings', defaultMessage: 'Codex refused its settings: check Extra arguments in Agent Settings and Settings → Codex, and your config.toml.', description: "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown." })), fix: 'agent-settings' }
     if (/not logged in|codex login|please (sign|log) in|unauthorized|401/i.test(text)) return { hint: tr(msg({ id: 'providers.codex.hint.signIn', defaultMessage: "Codex isn't signed in: sign in in Provider Setup, then start it again.", description: "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown." })), fix: 'agent-setup' }
     if (/is not recognized|ENOENT|cannot find|sandbox/i.test(text)) return { hint: tr(msg({ id: 'providers.codex.hint.broken', defaultMessage: 'Codex looks broken or not set up: check it in Provider Setup.', description: "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown." })), fix: 'agent-setup' }
     return null
   }
-  /** Codex versions whose hook hashes Hive has checked against Codex itself: true = Hive's own hash matches. */
+  /** Codex versions whose hook hashes Combwork has checked against Codex itself: true = Combwork's own hash matches. */
   private hashCheck = new Map<string, boolean>()
-  /** Versions whose app server didn't answer this run (not asked again until Hive restarts). */
+  /** Versions whose app server didn't answer this run (not asked again until Combwork restarts). */
   private unreachable = new Set<string>()
   /** Rollout files by session id, and each file's session_meta (id, cwd, and whose sub-session it is), by file mtime. */
   private paths = new Map<string, string>()
@@ -588,7 +588,7 @@ export class CodexAdapter implements ProviderAdapter {
       if (process.platform !== 'win32' || /\.(exe|cmd|bat)$/i.test(line)) out.push({ path: line, source: 'PATH' })
     }
     if (process.platform === 'win32') {
-      // The standalone installer adds this to the user PATH, which a Hive started before the install doesn't have yet.
+      // The standalone installer adds this to the user PATH, which a Combwork started before the install doesn't have yet.
       if (process.env.LOCALAPPDATA) out.push({ path: join(process.env.LOCALAPPDATA, 'Programs', 'OpenAI', 'Codex', 'bin', 'codex.exe'), source: 'standalone install' }) // i18n-ignore: an install's source as Combwork names it, in diagnostics and the Agent API's status
       if (process.env.APPDATA) out.push({ path: join(process.env.APPDATA, 'npm', 'codex.cmd'), source: 'npm' })
     } else out.push({ path: join(homedir(), '.local', 'bin', 'codex'), source: 'standalone install' }) // i18n-ignore: an install's source as Combwork names it, in diagnostics and the Agent API's status
@@ -637,7 +637,7 @@ export class CodexAdapter implements ProviderAdapter {
   }
 
   /**
-   * The key for a line break in a prompt Hive types (HI-1327): Settings → Advanced's choice, if Codex takes it as one.
+   * The key for a line break in a prompt Combwork types (HI-1327): Settings → Advanced's choice, if Codex takes it as one.
    * Automatic (the default): Alt+Enter on a Codex version it was tried on (NEWLINE_TRIED: the real-tier suite
    * codex-newline), a space on another or one not known, as before. A key chosen goes to any version.
    */
@@ -760,7 +760,7 @@ export class CodexAdapter implements ProviderAdapter {
    * It asks only in a Git repository, so a folder without Git needs none. Its own file only: launches pass no trust.
    */
   async connectionTrusts(home: string, targets: readonly TrustTarget[]): Promise<TrustReading[]> {
-    // Each launch trusts its own folder (HI-1871: the Advanced switch, on by default): none of Hive's folders asks.
+    // Each launch trusts its own folder (HI-1871: the Advanced switch, on by default): none of Combwork's folders asks.
     if (advanced.get<boolean>('codex.trust.perLaunch')) return targets.map(() => true)
     let projects: Record<string, unknown>
     try {
@@ -801,7 +801,7 @@ export class CodexAdapter implements ProviderAdapter {
   }
 
   /**
-   * The Windows sandbox setup is Codex's own prompt (the admin sandbox, or the non-admin one). Hive opens
+   * The Windows sandbox setup is Codex's own prompt (the admin sandbox, or the non-admin one). Combwork opens
    * Codex read-only in a folder of its own, trusted for this run only. With no sandbox yet, choosing "Ask for
    * approval" in /permissions brings up the prompt; /setup-default-sandbox only exists once the non-admin
    * sandbox is on (it upgrades that to the admin one).
@@ -836,7 +836,7 @@ export class CodexAdapter implements ProviderAdapter {
     return typeof m === 'string' && m.trim() ? m.trim() : null
   }
 
-  /** model_reasoning_effort in Codex's own config.toml, which every model then uses unless Hive passes one. */
+  /** model_reasoning_effort in Codex's own config.toml, which every model then uses unless Combwork passes one. */
   configuredDefaultEffort(): string | null {
     const e = userConfig().model_reasoning_effort
     return typeof e === 'string' && e.trim() ? e.trim() : null
@@ -850,10 +850,10 @@ export class CodexAdapter implements ProviderAdapter {
   // Launch
   // -------------------------------------------------------------------------
 
-  /** Hook hashes to trust for this launch: Hive's own, unless this Codex version hashes differently (then Codex's). */
+  /** Hook hashes to trust for this launch: Combwork's own, unless this Codex version hashes differently (then Codex's). */
   private hashesByRun = new Map<string, Record<string, string> | undefined>()
 
-  /** Codex has no per-launch skills folder: Hive's copies go in the project's .agents/skills (syncAgentsSkills). */
+  /** Codex has no per-launch skills folder: Combwork's copies go in the project's .agents/skills (syncAgentsSkills). */
   skillCopyPath(ctx: LaunchContext, skill: string): string {
     return agentsSkillCopyPath(ctx.cwd, skill)
   }
@@ -861,8 +861,8 @@ export class CodexAdapter implements ProviderAdapter {
   async prepareLaunch(ctx: LaunchContext): Promise<Record<string, SkillDelivery>> {
     const delivered = await syncAgentsSkills(ctx, this.descriptor.name)
     await this.checkHookHashes(ctx)
-    // The developer_instructions Codex would give this session, for Hive's guidance to follow (#1285): asked at each
-    // launch Hive adds some to, with its own arguments, folder and environment (no cache: only Codex knows what they
+    // The developer_instructions Codex would give this session, for Combwork's guidance to follow (#1285): asked at each
+    // launch Combwork adds some to, with its own arguments, folder and environment (no cache: only Codex knows what they
     // depend on). Unreadable, buildCommand never puts anything in their place (developerOverride).
     if ([ctx.guidance, ctx.instructions, ctx.notes].some((t) => t && t.trim())) {
       const theirs = await developerInstructionsFromCodex(ctx.executable, ctx.cwd, [...launchConnectionArgs(ctx), ...ctx.extraArgs], ctx.env)
@@ -882,11 +882,11 @@ export class CodexAdapter implements ProviderAdapter {
   private developerUnread = new Map<string, 'agent' | 'assistant'>()
 
   /**
-   * The launch's developer_instructions, or null for none of Hive's (#1285, #966 row 13; the Assistant's decisions on
-   * it): Hive's guidance and the Assistant's role after those Codex gives the session (prepareLaunch), never in their
+   * The launch's developer_instructions, or null for none of Combwork's (#1285, #966 row 13; the Assistant's decisions on
+   * it): Combwork's guidance and the Assistant's role after those Codex gives the session (prepareLaunch), never in their
    * place, then the Workspace notes note (#1433). Codex unable to say: an agent's left as they are, with no guidance or
-   * notes of Hive's, and the Assistant's role alone with its notes (without it there is no Assistant), each told once
-   * (launchNotice). Hive never writes Codex's config.
+   * notes of Combwork's, and the Assistant's role alone with its notes (without it there is no Assistant), each told once
+   * (launchNotice). Combwork never writes Codex's config.
    */
   private developerOverride(ctx: LaunchContext): string | null {
     const guidance = ctx.guidance?.trim() ?? ''
@@ -916,9 +916,9 @@ export class CodexAdapter implements ProviderAdapter {
     return null
   }
 
-  /** Which hook hashes to trust for this launch (hashesByRun): Hive's own, unless this Codex version hashes differently. */
+  /** Which hook hashes to trust for this launch (hashesByRun): Combwork's own, unless this Codex version hashes differently. */
   private async checkHookHashes(ctx: LaunchContext): Promise<void> {
-    // In the launch's own environment, with its connection's overrides (HI-1757 round 1): its CODEX_HOME, never Hive's.
+    // In the launch's own environment, with its connection's overrides (HI-1757 round 1): its CODEX_HOME, never Combwork's.
     const version = (await run(ctx.executable, ['--version'], 10000, ctx.env)).stdout.match(/(\d+\.\d+\.\d+[\w.-]*)/)?.[1] ?? 'unknown'
     // Hooks only (without the trust records), to ask Codex what it calls and hashes them.
     const hooksOnly = [...launchConnectionArgs(ctx), ...hookOverrides(ctx.hookUrl, ctx.hookAuthFile).slice(0, -2)]
@@ -926,7 +926,7 @@ export class CodexAdapter implements ProviderAdapter {
     if (known === true) return
     if (this.unreachable.has(version)) return
     const theirs = await hooksFromCodex(ctx.executable, hooksOnly, ctx.cwd, ctx.env)
-    // Codex couldn't be asked: Hive's own hashes are the best guess. Don't wait for it again this run.
+    // Codex couldn't be asked: Combwork's own hashes are the best guess. Don't wait for it again this run.
     if (!theirs) {
       this.unreachable.add(version)
       log.warn(`Codex ${version}: couldn't check hook hashes with its app server; using Combwork's`)
@@ -966,7 +966,7 @@ export class CodexAdapter implements ProviderAdapter {
     // ~/.codex's config: its accounts are the machine's), unless the connection's own config names one.
     args.push(...launchConnectionArgs(ctx))
     // Its own folder trusted for this launch (HI-1871, Darren 27 Oct: on by default, an Advanced off switch): Codex
-    // looks its cwd up first, so it never asks in Hive's folders. The table merges into the home's own for this launch
+    // looks its cwd up first, so it never asks in Combwork's folders. The table merges into the home's own for this launch
     // (config overrides.rs, merge.rs at 6aaac69) and nothing is written.
     if (advanced.get<boolean>('codex.trust.perLaunch')) args.push('-c', `projects=${toToml({ [ctx.cwd]: { trust_level: 'trusted' } })}`)
     const files = [join(ctx.connectionHome ?? codexHome(), 'config.toml'), join(ctx.cwd, '.codex', 'config.toml')]
@@ -1005,10 +1005,10 @@ export class CodexAdapter implements ProviderAdapter {
   private configByRun = new Map<string, string[]>()
 
   /**
-   * The launch's hooks (HI-982): Hive's as passed (the -c hooks.<event> of hookOverrides), and every hook Codex itself
+   * The launch's hooks (HI-982): Combwork's as passed (the -c hooks.<event> of hookOverrides), and every hook Codex itself
    * lists for the launch, asked when the dialog opens (its app server's hooks/list, in the launch's environment and
-   * folder, with the launch's config overrides only: never its other arguments), each with Codex's trust. Hive's are
-   * those of the session flags running exactly Hive's command, with Codex's trust; Codex unable to say, they are as
+   * folder, with the launch's config overrides only: never its other arguments), each with Codex's trust. Combwork's are
+   * those of the session flags running exactly Combwork's command, with Codex's trust; Codex unable to say, they are as
    * passed and the rest unknown.
    */
   launchHooks(ctx: LaunchContext): LaunchHooks {
@@ -1026,8 +1026,8 @@ export class CodexAdapter implements ProviderAdapter {
         if (!answer.ok) return { ...listing, notes: [{ kind: 'cliUnknown', why: answer.error.slice(0, 300) }] }
         const all = ((answer.result as { data?: { hooks?: unknown[] }[] } | null)?.data ?? []).flatMap((e) => (Array.isArray(e?.hooks) ? e.hooks : []))
         const got = codexListedHooks(all as never[], { command, flagsFile: SESSION_FLAGS }, secrets)
-        // Hive's as passed while Codex trusts them; else as Codex has them, or unknown where it doesn't list them (a later
-        // -c of the user's own for that event replaced Hive's).
+        // Combwork's as passed while Codex trusts them; else as Codex has them, or unknown where it doesn't list them (a later
+        // -c of the user's own for that event replaced Combwork's).
         const rows = combwork.map((r): HookRow => {
           const trust = got.combworkTrust.get(r.event) ?? 'unknown'
           return { ...r, status: trust === 'trusted' ? 'passed' : trust }
@@ -1152,7 +1152,7 @@ export class CodexAdapter implements ProviderAdapter {
   /**
    * Codex titles its terminal "[ ! ] Action Required | <project>" (blinking with "[ . ]") exactly while a person
    * must act (an approval prompt, a question), and not while its auto-reviewer decides. Older versions than the one
-   * Hive was tested with go by the hooks, as do sessions whose title Hive leaves to the user's config (#1167).
+   * Combwork was tested with go by the hooks, as do sessions whose title Combwork leaves to the user's config (#1167).
    */
   titleAttention(version: string | null, ctx?: Pick<LaunchContext, 'overrides'>): ((title: string) => boolean) | null {
     if (!version || compareVersions(version, ACTION_REQUIRED_SINCE) < 0 || !launchOverrides(ctx?.overrides, CODEX, 'terminalTitle')) return null
@@ -1182,7 +1182,7 @@ export class CodexAdapter implements ProviderAdapter {
    * Codex's /permissions menu numbers its presets, and typing a number picks one (arrow keys wrap around, so counting
    * presses is unreliable). Which number is read from the menu Codex draws, by the preset's label: Codex 0.161 reordered
    * the menu (#396, permissionsMenu.ts), and a label it doesn't show fails the pick rather than choosing another preset.
-   * Hive confirms the result from the rollout's thread_settings_applied, which Codex writes at once.
+   * Combwork confirms the result from the rollout's thread_settings_applied, which Codex writes at once.
    */
   modeMenuKeys(target: PermissionMode): KeySteps {
     return [
@@ -1319,7 +1319,7 @@ export class CodexAdapter implements ProviderAdapter {
   }
 
   async listSessions(folder: string, skip?: (id: string) => boolean): Promise<ExternalSession[]> {
-    // Codex records the cwd as it was given; Hive may spell the folder another way now (a junction, an 8.3 name, #493).
+    // Codex records the cwd as it was given; Combwork may spell the folder another way now (a junction, an 8.3 name, #493).
     const here = placeMatcher(folder)
     const mine = (await this.rolloutSessions()).filter((s) => here(s.cwd) && !skip?.(s.id))
     // Only the folder's sessions the caller doesn't have are stat'd (HI-1681), a few at once.

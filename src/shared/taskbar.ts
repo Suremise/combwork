@@ -1,6 +1,6 @@
 /**
  * The taskbar button when something needs you (For you's count, #1632: the cards' requests and the agents stopped in
- * their panes; never an agent that only finished): a badge over Hive's icon, the count in
+ * their panes; never an agent that only finished): a badge over Combwork's icon, the count in
  * the window title (Alt+Tab, hover), and a flash when an agent comes to ask you something while the window
  * isn't focused. Each window shows its own workspace's count.
  */

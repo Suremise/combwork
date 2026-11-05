@@ -15,7 +15,7 @@ import { progressRuns, queueChecks, type Spawn } from './queueChecks'
 
 const log = createLogger('queue')
 
-/** Where the queue's runs keep their logs: Hive's own folder, never a project's. */
+/** Where the queue's runs keep their logs: Combwork's own folder, never a project's. */
 export const queueLogDir = (): string => join(app.getPath('userData'), 'logs', 'merge-queue')
 
 /**

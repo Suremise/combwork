@@ -13,8 +13,8 @@ import { requireMasking } from './keyCoverage'
 import { msg } from '../shared/i18n'
 
 /**
- * Recording a developer console source to a file (#366 decision 4, #638): JSON Lines in Hive's own folder
- * (`console-recordings`), a header (Hive's and the CLIs' versions, whether text is kept), each event as the console
+ * Recording a developer console source to a file (#366 decision 4, #638): JSON Lines in Combwork's own folder
+ * (`console-recordings`), a header (Combwork's and the CLIs' versions, whether text is kept), each event as the console
  * captured it, and an end line. Redacted as capture is, unless the user opted in to text for this recording (secrets
  * stay masked).
  *
@@ -47,7 +47,7 @@ interface Recording {
   failed: boolean
   /** Why, in English: the recording's end line keeps it. */
   error?: string
-  /** Why, for the user: in Hive's language as it failed. */
+  /** Why, for the user: in Combwork's language as it failed. */
   shown?: string
   /** Bytes delivered and not yet written. */
   pending: number
@@ -402,7 +402,7 @@ export async function readRecordingText(file: string, tailBytes = 512 * 1024): P
   }
 }
 
-/** The newest recording in Hive's folder, by when it started (one going on as it is now), or null. */
+/** The newest recording in Combwork's folder, by when it started (one going on as it is now), or null. */
 export async function latestRecording(): Promise<ConsoleRecordingInfo | null> {
   const dir = recordingsDir()
   const going = new Map([...slots.values()].flatMap((s) => (s.rec ? [[s.rec.info.name, s.rec.info] as const] : [])))

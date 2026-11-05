@@ -58,7 +58,7 @@ function upgradedPoint(point: unknown): Obj | null {
 
 /**
  * A workspace.json's value with its old stored values converted: its workflow defaults' (each platform's), its command
- * points' refs to Hive's list, and its advanced values' `hive.*` ids (where both ids are there the `cw.*` one wins).
+ * points' refs to Combwork's list, and its advanced values' `hive.*` ids (where both ids are there the `cw.*` one wins).
  * Null when none is old. It runs before the workspace's load, whose command cleaning drops a scope it doesn't know.
  */
 export function upgradedWorkspaceConfig(raw: unknown): Obj | null {
