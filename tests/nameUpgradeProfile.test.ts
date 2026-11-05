@@ -2,7 +2,7 @@
 // marker of a 1.0 or RC run names its version under `hive`: renamed `app` before it is read, its other fields as they
 // were; one already new, or not JSON, is left. The log's files: hive.log and hive.1.log take the new names while those
 // are free; one whose new name is taken stays where it is, byte for byte; a fresh profile has nothing to do.
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs'
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
@@ -119,5 +119,37 @@ describe("the profile's stored values", () => {
     mkdirSync(fresh)
     upgradeProfileFiles(fresh)
     expect(readdirSync(fresh)).toEqual([])
+  })
+
+  it("one it can't rewrite or read now is listed for the start to be refused, changed in nothing; the next start converts it (HR1's round 1)", () => {
+    const dir = join(base, `profile${++n}`)
+    mkdirSync(dir)
+    const advanced = join(dir, 'advanced.json')
+    writeFileSync(advanced, JSON.stringify(ADVANCED_10))
+    const before = readFileSync(advanced, 'utf8')
+    chmodSync(advanced, 0o444)
+    try {
+      expect(upgradeProfileFiles(dir)).toEqual([advanced])
+      expect(readFileSync(advanced, 'utf8')).toBe(before)
+      expect(readdirSync(dir).filter((f) => f.endsWith('.upgrading'))).toEqual([])
+    } finally {
+      chmodSync(advanced, 0o644)
+    }
+    expect(upgradeProfileFiles(dir)).toEqual([])
+    expect(Object.keys(JSON.parse(readFileSync(advanced, 'utf8')).values)).toContain('cw.agents.perProject')
+    // Not readable now (here a folder where the file is): whether it holds an old value can't be told, so it isn't settled.
+    const held = join(base, `profile${++n}`)
+    mkdirSync(join(held, 'config.json'), { recursive: true })
+    expect(upgradeProfileFiles(held)).toEqual([join(held, 'config.json')])
+  })
+
+  it("config.json's last good copy is converted too, so a damaged config.json read from it is current", () => {
+    const dir = join(base, `profile${++n}`)
+    mkdirSync(dir)
+    writeFileSync(join(dir, 'config.json'), '{ damaged')
+    writeFileSync(join(dir, 'config.json.bak'), JSON.stringify(CONFIG_10))
+    expect(upgradeProfileFiles(dir)).toEqual([])
+    expect(readFileSync(join(dir, 'config.json'), 'utf8')).toBe('{ damaged')
+    expect(JSON.parse(readFileSync(join(dir, 'config.json.bak'), 'utf8')).settings.agentApi).toEqual({ enabled: true, provideCombworkMcp: false })
   })
 })

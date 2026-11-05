@@ -200,6 +200,7 @@
   "service.nameUpgrade.boardNotFolded": "Combwork nie mógł zmienić nazwy pliku tablicy {file} na combwork.db: jego dziennik {log} po zamknięciu nadal zawiera zmiany. Zamknij inne programy korzystające z obszaru roboczego, a potem otwórz go ponownie. Nic nie zostało utracone.",
   "service.nameUpgrade.boardOrphan": "Brakuje pliku tablicy obszaru roboczego, ale {file} obok jego miejsca zawiera zmiany, które mogą być tylko tam. Combwork nie założy na nim pustej tablicy. Zamknij Combwork, przywróć plik tablicy obok jako hive.db (z .combwork\\backups lub innej kopii), a potem otwórz obszar roboczy ponownie.",
   "service.nameUpgrade.failed": "Combwork nie mógł dokończyć zmiany nazw {what} z nazw Hive na nazwy Combwork: {error} Otwórz obszar roboczy ponownie, aby to dokończyć. Nic nie zostało utracone.",
+  "service.nameUpgrade.profileFailed": "Combwork nie mógł przekonwertować {files} z nazw Hive na nazwy Combwork: inny program może mieć {n, plural, one {ten plik} few {te pliki} many {te pliki} other {te pliki}} otwarte. Zamknij ten program i uruchom Combwork ponownie. Nic nie zostało zmienione.",
   "service.providers.keysStopped": "{task}: Combwork przestał wpisywać klawisze, bo {why}. Dokończ w terminalu.",
   "service.providers.noSetup": "{cli} nie ma zadania konfiguracji.",
   "service.providers.notInstalled": "{cli} nie jest zainstalowany.",

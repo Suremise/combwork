@@ -238,6 +238,7 @@
   "main.nameUpgrade.what.board": "le fichier du tableau",
   "main.nameUpgrade.what.files": "les paramètres, les modèles, le .gitignore, le README et les définitions MCP de l’espace de travail",
   "main.nameUpgrade.what.projects": "les paramètres, les modèles et les copies de skills des projets, les lignes d’exclusion et les refs de git",
+  "main.nameUpgrade.profileTitle": "Combwork ne peut pas démarrer",
   "main.notify.answered": "Répondu",
   "main.notify.sessionEnded": "Sa session est terminée",
   "main.outage.gaveUpBody": "{n, plural, one {Il a été repris une fois au cours de la dernière heure} many {Il a été repris # fois au cours de la dernière heure} other {Il a été repris # fois au cours de la dernière heure}} et s’est de nouveau arrêté : Combwork ne le reprendra donc plus de lui-même. Le réseau de ce PC ne s’est peut-être pas rétabli : essaie de renouveler les adresses de sa carte réseau (ipconfig /renew), de vider le cache DNS (ipconfig /flushdns) ou de redémarrer le PC, puis reprends-le.",

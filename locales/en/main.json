@@ -943,6 +943,10 @@
     "defaultMessage": "{file} was left as it is",
     "description": "A warning's title as a workspace opens (HI-2587): an SQLite log or journal of the board's old file (hive.db) still holds data, beside the board's new file; {file} is its path."
   },
+  "main.nameUpgrade.profileTitle": {
+    "defaultMessage": "Combwork can't start",
+    "description": "The title of an error box as Combwork starts: it couldn't convert its settings files from Hive's names (service.nameUpgrade.profileFailed)."
+  },
   "main.nameUpgrade.what.board": {
     "defaultMessage": "the board's file",
     "description": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): the task board's database file, hive.db to combwork.db."

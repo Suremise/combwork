@@ -125,7 +125,7 @@ import { startLanes } from './lanes'
 import { startLaneStarts } from './laneStarts'
 import { startHandOverCheck } from './handOverCheck'
 import { startLaunchSides } from './launchSides'
-import { checkInstallDir } from './installDir'
+import { checkInstallDir, setLanguageBeforeReady } from './installDir'
 import { exitBy, logCrashDumps, startCrashDumps, startExitLog } from './exitLog'
 import { checkLastRun, lastUnexpectedClose, startRunMarker, startupStep, tellUnexpectedClose } from './lastRun'
 import { initRestartRecovery, loadRestartRecord, recordClosing, startRestartRecovery, stopRestartRecovery, stopWatchingRestartRequests, watchRestartRequests } from './restartResume'
@@ -163,12 +163,27 @@ if (process.env.CW_USER_DATA && !app.isPackaged && process.env.CW_TEST_PROFILE_C
   chooseProfiles(join(base, 'appdata'), join(base, 'localappdata'), false)
 } else if (process.env.CW_USER_DATA) app.setPath('userData', process.env.CW_USER_DATA)
 else chooseProfiles(app.getPath('appData'), process.env.LOCALAPPDATA || join(app.getPath('home'), 'AppData', 'Local'), app.isPackaged)
-// The names upgrade's stored values in the profile (HI-2598), before any of its files is read.
-upgradeProfileFiles(app.getPath('userData'))
 // Key masking as the profile's files say, before the first line is logged (HI-1855): strict only where a key may be.
 startCoverageEarly()
 // Every way out from here on is logged (#985).
 startExitLog()
+// The names upgrade's stored values in the profile (HI-2598), before any of its files is read. One it couldn't convert
+// (another program holds it, or the disk refused) refuses the start, changing nothing: read now, its old value would be
+// lost under no name, and saved over (HR1's round 1). The next start tries again.
+const unconverted = upgradeProfileFiles(app.getPath('userData'))
+if (unconverted.length) {
+  setLanguageBeforeReady()
+  const title = tr(msg({ id: 'main.nameUpgrade.profileTitle', defaultMessage: "Combwork can't start", description: "The title of an error box as Combwork starts: it couldn't convert its settings files from Hive's names (service.nameUpgrade.profileFailed)." }))
+  const text = tr(msg({ id: 'service.nameUpgrade.profileFailed', defaultMessage: "Combwork couldn't convert {files} from Hive's names to Combwork's: another program may have {n, plural, one {it} other {them}} open. Close that program and start Combwork again. Nothing was changed.", description: "An error box as Combwork starts, after an update from Hive: a settings file couldn't be rewritten with Combwork's names (HI-2598), so Combwork doesn't start rather than lose the settings. {files} lists the files' paths; {n} is how many." }), { files: fmt.list(unconverted, 'unit'), n: unconverted.length })
+  if (!testQuiet()) {
+    try {
+      dialog.showErrorBox(title, text)
+    } catch {
+      // nothing more can be told before the app is ready
+    }
+  }
+  exitBy('process.exit', "Combwork couldn't convert its profile's files from Hive's names", () => process.exit(1))
+}
 
 // Hardware acceleration off (#676): Settings → Advanced's value, read from advanced.json before the app is ready, or
 // --disable-gpu for this start.

@@ -200,6 +200,7 @@
   "service.nameUpgrade.boardNotFolded": "Combwork n’a pas pu renommer le fichier du tableau {file} en combwork.db : son journal {log} contient encore des modifications après sa fermeture. Ferme tout autre programme qui utilise l’espace de travail, puis rouvre-le. Rien n’a été perdu.",
   "service.nameUpgrade.boardOrphan": "Le fichier du tableau de l’espace de travail manque, mais {file}, à côté de son emplacement, contient des modifications qui n’existent peut-être que là. Combwork ne créera pas de tableau vide par-dessus. Ferme Combwork, remets le fichier du tableau sous le nom hive.db à côté (depuis .combwork\\backups ou une autre copie), puis rouvre l’espace de travail.",
   "service.nameUpgrade.failed": "Combwork n’a pas pu finir de renommer {what} des noms de Hive vers ceux de Combwork : {error} Rouvre l’espace de travail pour terminer. Rien n’a été perdu.",
+  "service.nameUpgrade.profileFailed": "Combwork n’a pas pu convertir {files} des noms de Hive vers ceux de Combwork : un autre programme {n, plural, one {l’a peut-être ouvert} other {les a peut-être ouverts}}. Fermez ce programme et redémarrez Combwork. Rien n’a été modifié.",
   "service.providers.keysStopped": "{task} : Combwork a cessé d’y saisir des touches, car {why}. Termine dans le terminal.",
   "service.providers.noSetup": "La CLI {cli} n’a pas de tâche de configuration.",
   "service.providers.notInstalled": "La CLI {cli} n’est pas installée.",

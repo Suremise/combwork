@@ -200,6 +200,7 @@
   "service.nameUpgrade.boardNotFolded": "Combwork はボードのファイル {file} を combwork.db に名前変更できませんでした: 閉じた後もログ {log} に変更が残っています。ワークスペースを使っている他のプログラムを閉じてから、もう一度開いてください。失われたものはありません。",
   "service.nameUpgrade.boardOrphan": "ワークスペースのボードのファイルがありませんが、その場所の隣の {file} には、そこにしかないかもしれない変更があります。Combwork はその上に空のボードを作りません。Combwork を閉じ、ボードのファイルを hive.db としてその隣に戻してから (.combwork\\backups または別のコピーから)、ワークスペースをもう一度開いてください。",
   "service.nameUpgrade.failed": "Combwork は {what} の名前を Hive のものから Combwork のものに変え終えられませんでした: {error} 完了するにはワークスペースをもう一度開いてください。失われたものはありません。",
+  "service.nameUpgrade.profileFailed": "Combwork は {files} を Hive の名前から Combwork の名前に変換できませんでした。別のプログラムが{n, plural, other {開いている}}可能性があります。そのプログラムを閉じてから、Combwork をもう一度起動してください。何も変更されていません。",
   "service.providers.keysStopped": "{task}：{why}ため、Combworkは入力を停止しました。ターミナルで完了してください。",
   "service.providers.noSetup": "{cli}にはセットアップ作業がありません。",
   "service.providers.notInstalled": "{cli}がインストールされていません。",

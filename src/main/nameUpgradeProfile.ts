@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, renameSync, writeFileSync } from 'original-fs'
+import { readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'original-fs'
 import { join } from 'path'
 import { NEW_ID, OLD_ID, upgradedAdvancedIds, upgradedOptions, upgradedRunName } from './storedNames'
 
@@ -38,21 +38,37 @@ export function upgradeRunMarkerFile(file: string): void {
   }
 }
 
-/** A file's text rewritten in place (written beside it, then renamed over it) when `f` changes it. Never throws. */
+/**
+ * A file rewritten in place (written beside it, then renamed over it) when `f` changes it: whether it is settled. Missing,
+ * or not JSON (its loader reads it as before: config.json's from its .bak, converted too), it is. One that holds an old
+ * value and can't be rewritten, or can't be read now (another program holds it), isn't (HR1's round 1): the start is
+ * refused rather than have the setting read under no name, then saved over.
+ */
 function rewrite(file: string, f: (data: any) => unknown | null, text: (data: unknown) => string): boolean {
+  let raw: string
   try {
-    let d: unknown
-    try {
-      d = JSON.parse(readFileSync(file, 'utf8'))
-    } catch {
-      return false // missing, held or not JSON: its loader reads it as it is, as before
-    }
-    const now = f(d)
-    if (now === null) return false
+    raw = readFileSync(file, 'utf8')
+  } catch (e) {
+    return (e as NodeJS.ErrnoException)?.code === 'ENOENT'
+  }
+  let d: unknown
+  try {
+    d = JSON.parse(raw)
+  } catch {
+    return true
+  }
+  const now = f(d)
+  if (now === null) return true
+  try {
     writeFileSync(`${file}.upgrading`, text(now))
     renameSync(`${file}.upgrading`, file)
     return true
   } catch {
+    try {
+      rmSync(`${file}.upgrading`, { force: true })
+    } catch {
+      // left for the next start, which writes it again
+    }
     return false
   }
 }
@@ -132,17 +148,22 @@ export function upgradedRuns(d: unknown): Record<string, unknown> | null {
  * The profile's stored values (HI-2598), at start, right after the profile folder is chosen and before anything reads
  * them (advanced.json is read before the app is ready: hardware acceleration, heap snapshots). Each file is looked at
  * and rewritten only when it holds an old value, so a converted profile is only read. Two first starts at once convert
- * a file alike, each by an atomic rename. Never throws: a file it can't rewrite is read as it is, and tried at the next start.
+ * a file alike, each by an atomic rename. Never throws: the files it couldn't settle, for the start to be refused (index.ts).
  */
-export function upgradeProfileFiles(profile: string): void {
-  rewrite(join(profile, 'config.json'), upgradedConfig, (d) => JSON.stringify(d))
-  rewrite(join(profile, 'advanced.json'), upgradedAdvanced, (d) => `${JSON.stringify(d, null, 2)}
-`)
+export function upgradeProfileFiles(profile: string): string[] {
+  const failed: string[] = []
+  const at = (file: string, f: (data: any) => unknown | null, text: (data: unknown) => string): void => void (rewrite(file, f, text) || failed.push(file))
+  const config = join(profile, 'config.json')
+  at(config, upgradedConfig, (d) => JSON.stringify(d))
+  // Its last good copy too: a damaged config.json is read from it (readKeptJsonSync), and that must be current as well.
+  at(`${config}.bak`, upgradedConfig, (d) => JSON.stringify(d))
+  at(join(profile, 'advanced.json'), upgradedAdvanced, (d) => `${JSON.stringify(d, null, 2)}\n`)
   let files: string[] = []
   try {
     files = readdirSync(join(profile, 'progress-history')).filter((f) => f.endsWith('.json'))
   } catch {
     // none kept yet
   }
-  for (const f of files) rewrite(join(profile, 'progress-history', f), upgradedRuns, (d) => JSON.stringify(d))
+  for (const f of files) at(join(profile, 'progress-history', f), upgradedRuns, (d) => JSON.stringify(d))
+  return failed
 }
