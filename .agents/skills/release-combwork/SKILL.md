@@ -1,9 +1,9 @@
 ---
-name: release-hive
-description: Prepare a release of Hive itself - version, release notes, checks and the draft installer, following RELEASING.md. Use when developing Hive and the user asks to prepare, build or check a release or an installer. Preparing is not publishing; uploading a draft or publishing happens only when the user asks.
+name: release-combwork
+description: Prepare a release of Combwork itself - version, release notes, checks and the draft installer, following RELEASING.md. Use when developing Combwork and the user asks to prepare, build or check a release or an installer. Preparing is not publishing; uploading a draft or publishing happens only when the user asks.
 ---
 
-# Release Hive
+# Release Combwork
 
 [RELEASING.md](../../../RELEASING.md) is the process, in its order. Follow it as written; this skill adds the agent's checks.
 
@@ -23,7 +23,7 @@ RELEASING.md's **The user's OK** lists the decisions that are the user's. Do eac
 - **A baseline install** (RELEASING, The 1.0 path, stage 2) uploads nothing and goes version first: its version is set (asked: a `-beta.<n>`; 1.0's were named `1.0.0-rc.<n>`) before its one `npm run dist`, with no current-version candidate before it. Its prerequisites and its other steps are there. Its checks are lighter than an uploaded release's (the model trials a smoke run: RELEASING says which), and its Sandbox checks are the ones below, with the upgrade check starting from the 0.9.3 installer (`--previous`).
 - **For an uploaded release** (an RC or the release, RELEASING's Steps), the release candidate comes first (step 1): an installer at the current version, built from the commit to release (`main`, or the integration branch for an RC), that the user has installed and tested. Until they have, don't change `version`; ask.
 - **The full set on the RC's commit** before it is built (RELEASING step 1): `npm run e2e -- --all --build --record`. Merges run only focused checks (#1010), so the RC is where every suite runs on the release's code (besides the quiet-time runs on the integration branch); a failure is a release finding.
-- **The Sandbox checks on the RC**, once it is built and before the user installs it: `npm run sandbox-checks -- --installer "<the RC's Combwork-Setup-<version>.exe>" --hive "<Hive repo: the main checkout>" --report "$env:LOCALAPPDATA\hive-test\sandbox-reports\<version>-rc<n>"` (`tests/sandbox`; about 3 minutes; network off, fake CLIs only; the upgrade check starts from the newest other installer in the main checkout's `dist`, or `--previous`). It starts the windows-sandbox MCP server from the workspace's installed copy (`.combwork\mcp\windows-sandbox`), else a hive-mcp checkout beside the repo, or `--server <its server.js>` (tests/e2e/README.md).
+- **The Sandbox checks on the RC**, once it is built and before the user installs it: `npm run sandbox-checks -- --installer "<the RC's Combwork-Setup-<version>.exe>" --hive "<the repo's main checkout>" --report "$env:LOCALAPPDATA\hive-test\sandbox-reports\<version>-rc<n>"` (`tests/sandbox`; about 3 minutes; network off, fake CLIs only; the upgrade check starts from the newest other installer in the main checkout's `dist`, or `--previous`). It starts the windows-sandbox MCP server from the workspace's installed copy (`.combwork\mcp\windows-sandbox`), else a hive-mcp checkout beside the repo, or `--server <its server.js>` (tests/e2e/README.md).
   - Comment the verdict and any failed checks on the release card, with the report folder.
   - A failed check is a release finding, like a failing e2e suite. The "same version" and "No Git" notes are expected for an RC.
   - If another Sandbox is running it says NOT RUN (exit 2): wait, or pass `--wait-min 30`. It never stops one it didn't start.
@@ -56,7 +56,7 @@ RELEASING.md's **The user's OK** lists the decisions that are the user's. Do eac
 
 ## After building
 
-- Check the packaged app: `npm run e2e -- packaged-mcp packaged-transcript` (the `hive` MCP server and transcripts outside the asar), then `--packaged` for the rest when the change warrants it.
+- Check the packaged app: `npm run e2e -- packaged-mcp packaged-transcript` (the `combwork` MCP server and transcripts outside the asar), then `--packaged` for the rest when the change warrants it.
 - The draft has three files: the installer, `latest.yml` and the `.blockmap`. Its version must match `package.json`.
 - After the user publishes: Help → Check for Updates from an installed copy shows the new version.
 - **Verify your report against git** before you tell the user a step is done: the commit you name exists (`git rev-parse <commit>`); the branch and the tags are what you say (`git branch --show-current`, `git tag --list`, `git ls-remote --tags origin`); the commit you say is on `main` is on the remote: `git fetch origin main`, then `git ls-remote origin refs/heads/main` returns that commit (a local `origin/main` can be stale, so refresh it first); and the draft's version matches `package.json`. The 0.4.0 release report once named a placeholder commit id.

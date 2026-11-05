@@ -1,11 +1,11 @@
 ---
 name: add-or-change-provider
-description: Add a coding-agent provider to Hive or change how one is supported (Claude Code, Codex) - its descriptor, adapter, launch, hooks, transcripts, usage, skills and MCP delivery, readiness and tests. Use when developing Hive and a change touches src/shared/providers.ts, src/main/providers/, or how a CLI is launched or read.
+description: Add a coding-agent provider to Combwork or change how one is supported (Claude Code, Codex) - its descriptor, adapter, launch, hooks, transcripts, usage, skills and MCP delivery, readiness and tests. Use when developing Combwork and a change touches src/shared/providers.ts, src/main/providers/, or how a CLI is launched or read.
 ---
 
 # Add or change a provider
 
-Hive works with providers through two pieces and never names one outside them. [SPEC §10](../../../docs/SPEC.md) describes the boundary; the [architecture notes](../../../docs/ARCHITECTURE.md) say where each part lives.
+Combwork works with providers through two pieces and never names one outside them. [SPEC §10](../../../docs/SPEC.md) describes the boundary; the [architecture notes](../../../docs/ARCHITECTURE.md) say where each part lives.
 
 ## The boundary
 
@@ -16,11 +16,11 @@ Hive works with providers through two pieces and never names one outside them. [
 ## Checklist
 
 1. **Descriptor**: modes (with danger flags), efforts, models, capabilities, and the instructions file. Register it, add its icon, and add a price table in `src/shared/prices.ts`, from the vendor's current published prices.
-2. **Launch**: per-agent launch folder or copies (skills by audience, the `hive` MCP server, hooks), the environment Hive adds, and the provider's own session variables stripped (`envToStrip`). Hive's guidance reaches the model: MCP instructions where the CLI shows them, developer instructions where it doesn't.
+2. **Launch**: per-agent launch folder or copies (skills by audience, the `combwork` MCP server, `TOOLS_SERVER`, hooks), the environment Combwork adds, and the provider's own session variables stripped (`envToStrip`). Combwork's guidance reaches the model: MCP instructions where the CLI shows them, developer instructions where it doesn't.
 3. **Status**: hooks normalised to start, prompt, tool, permission, stop and end. Know which events the CLI actually sends and when (Codex sends SessionStart only with the first prompt).
 4. **Transcripts and usage**: the parser, the conversation reader, images and export, tested against **fixtures** in `tests/fixtures` made from real transcripts with personal text removed.
 5. **Readiness**: installed, signed in, sandbox. Never automate a login screen; tell the user what to do.
-6. **Skills and MCP**: where the CLI reads skills (`skillRoots`), how Hive's copies are marked and kept out of git, and how the user's own MCP servers are turned off.
+6. **Skills and MCP**: where the CLI reads skills (`skillRoots`), how Combwork's copies are marked and kept out of git, and how the user's own MCP servers are turned off.
 
 ## Facts that change
 
