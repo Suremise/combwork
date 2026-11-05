@@ -103,7 +103,11 @@ const git = (dir, ...a) => lib.git(dir, a).trim()
 
     // --- 1. afterAction: the start written, its action marked done, then Hive ends: the restart does the rest.
     const s1 = await intent(await tokenOf(b1.id), c1, 'start')
-    check('1. B1 starts card 1 in a slot', s1.status === 0 || (s1.status === 200 && !!s1.body?.data?.folder), JSON.stringify(s1.body))
+    // The crash point is the start's slot action, after its commit, and the start goes on to reply as Hive ends: app.exit
+    // closes the windows first (their workspaces disposed), so a loaded machine's reply can be "No workspace is open"
+    // (HI-2549), or none comes. Any reply but the start's own is a Hive that reached the point (only an accepted start
+    // asks for the action), so it counts once Hive ends there; the restart's checks then find the start recorded.
+    check('1. B1 starts card 1 in a slot', (s1.status === 200 && !!s1.body?.data?.folder) || !!(await until(() => h.ended, HUNG_MS)), JSON.stringify(s1.body))
     await crashedThenRestart('1. afterAction')
     const st1 = await until(() => slotOf(c1), HUNG_MS)
     check("1. …restarted: card 1's line made in its slot, recorded once", !!(await until(async () => (await count(c1, 'SlotPrepared')) === 1, HUNG_MS)) && git(st1.folder, 'branch', '--show-current') === st1.line, JSON.stringify(await kinds(c1)))
