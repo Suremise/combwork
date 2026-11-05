@@ -101,7 +101,7 @@ const check = (name, ok, extra = '') => {
     await page.screenshot({ path: path.join(lib.WORK, 'agents24-2-progress.png') })
 
     // Every working agent, no names: 23 (a watch took at most 20 before #562).
-    await say(watcher.id, `hive cw_wait_for_agents ${JSON.stringify({ wake: true })}`)
+    await say(watcher.id, `cw cw_wait_for_agents ${JSON.stringify({ wake: true })}`)
     check('the 24th watches every working agent', !!(await until(async () => (await live(watcher.id))?.status === 'watching', HUNG_MS)), (await live(watcher.id))?.status)
     const status = (await api('GET', '/v1/projects/crowd')).body?.agents?.find((a) => a.name === `W${N}`)
     check('…all 23 of them', status?.watching?.agents?.length === N - 1, JSON.stringify(status?.watching))

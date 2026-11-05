@@ -456,9 +456,9 @@ const check = (name, ok, extra = '') => {
     const blockedCard = await card('Chip blocked', 'E', 'doing')
     await inv('tasks:update', blockedCard, { blocked: 'Waiting for an answer' })
     // A reviews D's card with its own tool call, then watches it into Passed.
-    await prompts('A').type(`hive cw_update_task ${JSON.stringify({ number: reviewCard, review: 'start' })}`)
+    await prompts('A').type(`cw cw_update_task ${JSON.stringify({ number: reviewCard, review: 'start' })}`)
     await lib.until(async () => (await inv('tasks:list')).find((c) => c.number === reviewCard)?.review?.agent === ids.A, HUNG_MS)
-    await prompts('A').type(`hive cw_wait_for_tasks ${JSON.stringify({ cards: [reviewCard], column: 'passed', changes: ['verdict', 'column'], wake: true })}`)
+    await prompts('A').type(`cw cw_wait_for_tasks ${JSON.stringify({ cards: [reviewCard], column: 'passed', changes: ['verdict', 'column'], wake: true })}`)
     await lib.until(async () => (await live(ids.A))?.status === 'watching', HUNG_MS)
     await page.locator('.session-toolbar .tile-pages button').nth(0).click()
     await tile('A').click()

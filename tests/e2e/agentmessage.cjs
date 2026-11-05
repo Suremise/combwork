@@ -100,7 +100,7 @@ const check = (name, ok, extra = '') => {
 
   // --- 1. A watching reviewer: cw_prompt_agent is refused and names the tool; a message wakes it, and its watch stays.
   const c1 = (await inv('tasks:create', { title: 'Review me later', project: 'alpha', agent: builder.id, column: 'doing' })).number
-  await say(reviewer.id, `hive cw_wait_for_tasks ${JSON.stringify({ cards: [c1], column: 'review', wake: true })}`)
+  await say(reviewer.id, `cw cw_wait_for_tasks ${JSON.stringify({ cards: [c1], column: 'review', wake: true })}`)
   check('the reviewer watches the card', !!(await until(async () => (await live(alpha, reviewer.id))?.status === 'watching', 15000)))
   const prompted = tool('cw_prompt_agent', { project: 'alpha', agent: 'Reviewer', text: 'Review the card' })
   check('cw_prompt_agent refuses a watching agent and points to cw_message_agent', prompted.isError && /cw_message_agent/.test(prompted.text), prompted.text)
@@ -140,7 +140,7 @@ const check = (name, ok, extra = '') => {
   await until(() => idle(builder.id), 15000)
   // While it acts on that one, a second comes (#1531): one call acks the first and reads the second (ack with read),
   // which is received, not acked.
-  await say(builder.id, `waitfile agentmessage-ack-go then hive cw_inbox {"ack":["${mid}"],"read":true}`)
+  await say(builder.id, `waitfile agentmessage-ack-go then cw cw_inbox {"ack":["${mid}"],"read":true}`)
   await until(async () => (await live(alpha, builder.id))?.status === 'working', 10000)
   const second = tool('cw_message_agent', { project: 'alpha', agent: 'Builder', text: 'And note it in the README.' })
   const mid2 = /\((m\d+), working\)/.exec(second.text)?.[1] ?? '?'
@@ -153,7 +153,7 @@ const check = (name, ok, extra = '') => {
   const items = s?.sessionId ? ((await inv('transcript:read', alpha, s.sessionId).catch(() => null))?.items ?? []) : []
   const reply = items.filter((x) => x.kind === 'tool' && x.tool.name === 'combwork · cw_inbox').at(-1)?.tool.result ?? ''
   check('…its reply: the ack line, then the second, received', reply === `Acked ${mid}.\n1 new:\n${mid2} · the Assistant: And note it in the README.\nAck each with cw_inbox (ack: its ids) once you have acted on it.`, reply)
-  await say(builder.id, `hive cw_inbox {"ack":["${mid2}"]}`)
+  await say(builder.id, `cw cw_inbox {"ack":["${mid2}"]}`)
   check('the builder acks it (cw_inbox): acked', !!(await until(async () => lastDelivery('Builder')?.state === 'acked' && !(await unread()), 15000)), JSON.stringify(lastDelivery('Builder')))
 
   // --- 3. Cancelled by the user from the pane: never typed.
@@ -203,7 +203,7 @@ const check = (name, ok, extra = '') => {
   // --- 4. A message queued for a busy reviewer whose card watch fires meanwhile: both in one line, the message first.
   const c2 = (await inv('tasks:create', { title: 'Revised scope', project: 'alpha', agent: builder.id, column: 'doing' })).number
   await until(() => idle(reviewer.id), 15000)
-  await say(reviewer.id, `hive cw_wait_for_tasks ${JSON.stringify({ cards: [c2], column: 'review', wake: true })}`)
+  await say(reviewer.id, `cw cw_wait_for_tasks ${JSON.stringify({ cards: [c2], column: 'review', wake: true })}`)
   await until(async () => (await live(alpha, reviewer.id))?.status === 'watching', 15000)
   await say(reviewer.id, 'work 8')
   check('the watching reviewer works (the user gave it something)', !!(await until(async () => (await live(alpha, reviewer.id))?.status === 'working', 10000)))
@@ -228,7 +228,7 @@ const check = (name, ok, extra = '') => {
   await until(() => idle(builder.id), HUNG_MS)
   await say(reviewer.id, 'holduntil agentmessage-reviewer-go')
   await until(async () => (await live(alpha, reviewer.id))?.status === 'working', HUNG_MS)
-  await say(builder.id, `hive cw_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: 'Reviewer' }], wake: true })}`)
+  await say(builder.id, `cw cw_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: 'Reviewer' }], wake: true })}`)
   check('the builder watches the reviewer (an agent watch)', !!(await until(async () => (await live(alpha, builder.id))?.status === 'watching', HUNG_MS)))
   await say(builder.id, 'holduntil agentmessage-builder-go')
   await until(async () => (await live(alpha, builder.id))?.status === 'working', HUNG_MS)

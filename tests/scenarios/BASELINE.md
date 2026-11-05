@@ -1,7 +1,7 @@
 # Scenario baseline, 3 October 2026
 
 **Fixtures v5** (`scenarios.cjs`), with evidence only of what ran:
-- **Hive calls**: the hive MCP server's own log of executed calls. Transcript names count as mentions only.
+- **Combwork calls**: the Combwork MCP server's own log of executed calls. Transcript names count as mentions only.
 - **Skill reads**: a successful read showing the skill.
 - **Tokens**: the actual values are checked for in tool output and replies.
 
@@ -9,7 +9,7 @@
 - the source commit;
 - a fingerprint of everything uncommitted (the diff and the contents of untracked files), taken when the run starts and
   checked again at its end;
-- the running Hive's guidance and skill revisions before setup;
+- the running Combwork's guidance and skill revisions before setup;
 - what the session itself was given at launch (its guidance and delivered skills).
 
 v3 adds checks that an edited skill was delivered as edited and a deleted one wasn't delivered.
@@ -18,7 +18,7 @@ v3 adds checks that an edited skill was delivered as edited and a deleted one wa
 - **Fake Claude Code**: fixtures v5, all 26 pass (`results/2026-10-03T18-21-32-fake`, kept as the baseline
   `baselines/fake-claude.json`); guidance revision `63db94808e669a5e`.
 - **Fake Codex**: fixtures v5, all 26 pass (`results/2026-10-03T18-28-52-fake-codex`, baseline
-  `baselines/fake-codex.json`). Its board steps and tool calls go through the real hive MCP server, so its benchmark
+  `baselines/fake-codex.json`). Its board steps and tool calls go through the real Combwork MCP server, so its benchmark
   measures their replies.
 - **Codex** (a model): fixtures v2 (below). No model trial has run under v5 yet; one would be its first benchmark.
 

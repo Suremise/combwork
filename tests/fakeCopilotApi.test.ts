@@ -94,7 +94,7 @@ describe("the stand-in model's steps", () => {
       { say: 'Done here.' }
     ])
     expect(actionsOf('shell: git status && node check.js')).toEqual([{ tool: 'powershell', args: { command: 'git status && node check.js', description: 'Run a command', mode: 'sync', initial_wait: 30 } }])
-    expect(actionsOf('hive cw_list_tasks {"column":"todo"}')).toEqual([{ tool: 'cw_list_tasks', args: { column: 'todo' } }])
+    expect(actionsOf('cw cw_list_tasks {"column":"todo"}')).toEqual([{ tool: 'cw_list_tasks', args: { column: 'todo' } }])
     // "work N" anywhere in a step, as in a task's own words.
     expect(actionsOf('Run this, then reply "built" (work 10)')).toEqual([{ wait: 10000 }])
   })

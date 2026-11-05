@@ -3,7 +3,7 @@
 // no network, no credits. Checked with Copilot CLI 1.0.93 (the #403 spike). What the "model" does is the prompt's steps,
 // separated by " then ", as the fake Claude Code and fake Codex take them:
 //   skill NAME                 Copilot's skill tool (it reads the skill's SKILL.md)
-//   hive TOOL {json}           a tool of the hive MCP server (Copilot names it hive-TOOL), run by the real server
+//   cw TOOL {json}             a tool of the Combwork MCP server (Copilot names it combwork-TOOL), run by the real server
 //   boardmove N COLUMN, boardreview N ACTION [COLUMN], boardcomment N    cw_update_task, as the fakes do
 //   work N                     waits N seconds before its next step (a turn that takes a while)
 //   edit PATH OLD NEW          Copilot's edit tool (PATH relative to the session's folder)
@@ -28,7 +28,7 @@ const http = require('http')
 const fs = require('fs')
 const path = require('path')
 const { execFileSync, spawnSync } = require('child_process')
-const { parseHiveStep, isDoorbell, doorbellIsWork, inboxRows } = require('./fake-bridge.cjs')
+const { parseToolStep, isDoorbell, doorbellIsWork, inboxRows } = require('./fake-bridge.cjs')
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -62,7 +62,7 @@ function actionsOf(prompt) {
     if ((m = /\bboardmove\s+(\d+)\s+(\w+)/i.exec(step))) out.push({ tool: 'cw_update_task', args: { number: Number(m[1]), column: m[2].toLowerCase() } })
     if ((m = /\bboardreview\s+(\d+)\s+(\w+)(?:\s+(hold|todo|doing|review|passed|done)\b)?/i.exec(step))) out.push({ tool: 'cw_update_task', args: { number: Number(m[1]), review: m[2].toLowerCase(), ...(m[3] ? { column: m[3].toLowerCase(), comment: 'Fake review: passed.' } : {}) } })
     if ((m = /\bboardcomment\s+(\d+)/i.exec(step))) out.push({ tool: 'cw_update_task', args: { number: Number(m[1]), comment: 'Fake: done, see the files.' } })
-    const call = parseHiveStep(step)
+    const call = parseToolStep(step)
     if (call) out.push({ tool: call.tool, args: call.args })
     // Anywhere in the step, as the fake CLIs read it ("… (work 10)").
     if ((m = /\bwork\s+(\d+)/i.exec(step))) out.push({ wait: Number(m[1]) * 1000 })

@@ -29,5 +29,5 @@ CLI flags, hook payloads, model names and prices change between versions. Check 
 ## Testing
 
 - Unit tests for the parsers and the launch command (`tests/codex.test.ts` is the model), including hook trust hashes where the CLI checks them.
-- The fake CLIs in `tests/e2e` exercise the adapter without sign-in. Extend a fake when a behaviour matters. A provider's fake should take the scenarios' steps (`skill NAME`, the board steps, `hive TOOL {json}` through `tests/e2e/fake-bridge.cjs`), so `npm run scenarios -- --provider fake-<id>` runs the scenarios and their benchmark for it. Real-CLI suites run against test homes only (Codex: `CODEX_HOME` set to the test home).
+- The fake CLIs in `tests/e2e` exercise the adapter without sign-in. Extend a fake when a behaviour matters. A provider's fake should take the scenarios' steps (`skill NAME`, the board steps, `cw TOOL {json}` through `tests/e2e/fake-bridge.cjs`), so `npm run scenarios -- --provider fake-<id>` runs the scenarios and their benchmark for it. Real-CLI suites run against test homes only (Codex: `CODEX_HOME` set to the test home).
 - Check Windows path handling: spaces, `.cmd` shims, quoting on the command line.
