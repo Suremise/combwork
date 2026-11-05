@@ -1123,8 +1123,8 @@
     "audience": "both"
   },
   "workflow.refused.submit.trailer.next": {
-    "text": "Run {command}, then submit again.",
-    "note": "The next step after a refused submit for a missing trailer: {command} is the git command to run.",
+    "text": "{at, select, head {Run {command}, then submit again.} other {Other commits follow it, so amending or rebasing would rewrite them, other agents' work among them: do neither. Report it with cw_cannot_within_rules (rule submit.trailer), and the user decides.}}",
+    "note": "The next step after a refused submit for a missing trailer (HI-2562). {at} (select): head when the commit is the folder's newest, so amending it is safe; other when commits follow it. {command} is the git command to run, kept as typed; cw_cannot_within_rules is a tool's name, kept as typed.",
     "audience": "both"
   },
   "workflow.refused.submit.unchanged.message": {

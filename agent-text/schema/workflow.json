@@ -943,6 +943,7 @@
   },
   "workflow.refused.submit.trailer.next": {
     "placeholders": {
+      "at": "select",
       "command": "plain"
     }
   },

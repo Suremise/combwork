@@ -357,7 +357,7 @@
   "workflow.refused.submit.sameRevisionNote.next": "Envie-a de novo com uma nota dizendo o que mudou na sua resposta, ou faça commit de uma nova versão.",
   "workflow.refused.submit.trailer.change": "Com cada cartão em sua própria pasta, não são necessários trailers: Controle de versão → Onde os cartões são feitos.",
   "workflow.refused.submit.trailer.message": "{card}: o commit {commit} não tem trailer de cartão, e o agente de outro cartão trabalha nesta pasta.",
-  "workflow.refused.submit.trailer.next": "Execute {command} e envie de novo.",
+  "workflow.refused.submit.trailer.next": "{at, select, head {Execute {command} e envie de novo.} other {Outros commits vêm depois dele, entre eles trabalho de outros agentes: um amend ou rebase os reescreveria. Não faça nenhum dos dois. Informe isso com cw_cannot_within_rules (regra submit.trailer), e o usuário decide.}}",
   "workflow.refused.submit.unchanged.message": "{card}: os arquivos não mudaram desde que ele começou.",
   "workflow.refused.submit.unchanged.next": "Altere os arquivos do cartão e então envie-o para revisão.",
   "workflow.refused.verdict.currentSubmission.message": "O envio {submission} não é o mais recente do cartão {card}.",

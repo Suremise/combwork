@@ -357,7 +357,7 @@
   "workflow.refused.submit.sameRevisionNote.next": "Przekaż ją ponownie z notatką, co zmieniło się w Twojej odpowiedzi, albo zrób commit nowej rewizji.",
   "workflow.refused.submit.trailer.change": "Gdy każda karta ma własny folder, trailery nie są potrzebne: Kontrola wersji → Gdzie powstają karty.",
   "workflow.refused.submit.trailer.message": "{card}: commit {commit} nie ma trailera karty, a w tym folderze pracuje agent innej karty.",
-  "workflow.refused.submit.trailer.next": "Uruchom {command}, a potem przekaż ponownie.",
+  "workflow.refused.submit.trailer.next": "{at, select, head {Uruchom {command}, a potem przekaż ponownie.} other {Po nim są inne commity, w tym praca innych agentów: amend lub rebase by je przepisał. Nie rób ani jednego, ani drugiego. Zgłoś to przez cw_cannot_within_rules (reguła submit.trailer), a decyzję podejmie użytkownik.}}",
   "workflow.refused.submit.unchanged.message": "{card}: jej pliki nie zmieniły się od rozpoczęcia.",
   "workflow.refused.submit.unchanged.next": "Zmień pliki karty, a potem przekaż ją do recenzji.",
   "workflow.refused.verdict.currentSubmission.message": "Zgłoszenie {submission} nie jest najnowszym zgłoszeniem karty {card}.",

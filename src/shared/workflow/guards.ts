@@ -34,8 +34,11 @@ export interface GuardInputs {
   folder?: string
   dirty?: Ans<string[]>
   conflicts?: Ans<string[]>
-  /** A commit attributed to no card since the agent's last submission, when another card shares the folder. */
-  untrailered?: Ans<string | null>
+  /**
+   * A commit attributed to no card since the agent's last submission, when another card shares the folder, and whether
+   * it is the folder's head (HI-2562: only then is an amend safe).
+   */
+  untrailered?: Ans<{ commit: string; head: boolean } | null>
   /**
    * A commit not authored with the project's identity, read from git at the move (HI-2266: never a saved copy), with
    * that identity's email; `missing` when git has none for the project.
@@ -67,9 +70,12 @@ export interface GuardRefusal {
 const short = (r: string | null | undefined): string => (r ? r.slice(0, 7) : '—')
 
 /** Does the user's OK before merging (G10) apply to this card? */
-/** submit.trailer's refusal: card `key`'s commit `commit` names no card, with the amend that fixes it (HI-2562: also its submit's). */
-export function trailerRefusal(key: string, commit: string): GuardRefusal {
-  return { rule: 'submit.trailer', values: { card: key, commit: short(commit), command: `git commit --amend --no-edit --trailer "Hive-Card: ${key}"` } } // i18n-ignore: a git command, as typed
+/**
+ * submit.trailer's refusal (HI-2562: also the submit's with nothing of its own): card `key`'s commit names no card. The
+ * amend that fixes it only when it is the folder's head: one other commits follow isn't amended, as that rewrites them.
+ */
+export function trailerRefusal(key: string, u: { commit: string; head: boolean }): GuardRefusal {
+  return { rule: 'submit.trailer', values: { card: key, commit: short(u.commit), at: u.head ? 'head' : 'older', command: `git commit --amend --no-edit --trailer "Hive-Card: ${key}"` } } // i18n-ignore: a git command and select keys, as typed
 }
 
 export function okBeforeApplies(r: Ruleset, labels: string[]): boolean {

@@ -357,7 +357,7 @@
   "workflow.refused.submit.sameRevisionNote.next": "重新提交评审时附上说明，写明你据评审意见改了什么；或提交一个新的修订版本。",
   "workflow.refused.submit.trailer.change": "每张卡片使用自己的文件夹时不需要 trailer：“版本控制”→“卡片在哪里完成”。",
   "workflow.refused.submit.trailer.message": "{card}：提交 {commit} 没有卡片 trailer，而另一张卡片的智能体也在此文件夹中工作。",
-  "workflow.refused.submit.trailer.next": "运行 {command}，然后重新提交评审。",
+  "workflow.refused.submit.trailer.next": "{at, select, head {运行 {command}，然后重新提交评审。} other {此提交之后还有其他提交，其中包括其他智能体的工作：amend 或 rebase 会改写它们。两者都不要做。请用 cw_cannot_within_rules（规则 submit.trailer）报告，由用户决定。}}",
   "workflow.refused.submit.unchanged.message": "{card}：自开始以来，它的文件没有变化。",
   "workflow.refused.submit.unchanged.next": "先修改卡片的文件，再提交评审。",
   "workflow.refused.verdict.currentSubmission.message": "{card} 的第 {submission} 次提交不是最新的。",

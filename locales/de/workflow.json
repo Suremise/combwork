@@ -357,7 +357,7 @@
   "workflow.refused.submit.sameRevisionNote.next": "Reiche sie erneut mit einer Notiz ein, was sich in deiner Antwort geändert hat, oder committe eine neue Revision.",
   "workflow.refused.submit.trailer.change": "Mit „Jede Karte in ihrem eigenen Ordner“ sind keine Trailer nötig: Versionsverwaltung → Wo Karten bearbeitet werden.",
   "workflow.refused.submit.trailer.message": "{card}: Commit {commit} hat keinen Karten-Trailer, und der Agent einer anderen Karte arbeitet in diesem Ordner.",
-  "workflow.refused.submit.trailer.next": "Führe {command} aus und reiche dann erneut ein.",
+  "workflow.refused.submit.trailer.next": "{at, select, head {Führe {command} aus und reiche dann erneut ein.} other {Auf ihn folgen weitere Commits, darunter die Arbeit anderer Agenten: Ein Amend oder Rebase würde sie neu schreiben. Mach beides nicht. Melde es mit cw_cannot_within_rules (Regel submit.trailer); der Benutzer entscheidet.}}",
   "workflow.refused.submit.unchanged.message": "{card}: Die Dateien der Karte haben sich seit ihrem Start nicht geändert.",
   "workflow.refused.submit.unchanged.next": "Ändere die Dateien der Karte und reiche sie dann zum Review ein.",
   "workflow.refused.verdict.currentSubmission.message": "Einreichung {submission} ist nicht die neueste von {card}.",

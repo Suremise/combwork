@@ -60,7 +60,7 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   ),
   'submit.trailer': r(
     msg({ id: 'workflow.refused.submit.trailer.message', defaultMessage: "{card}: commit {commit} has no card trailer, and another card's agent works in this folder.", description: 'A refused submit in a shared folder: a commit lacks the Hive-Card trailer. {commit} is a short commit id.' }),
-    msg({ id: 'workflow.refused.submit.trailer.next', defaultMessage: 'Run {command}, then submit again.', description: 'The next step after a refused submit for a missing trailer: {command} is the git command to run.' }),
+    msg({ id: 'workflow.refused.submit.trailer.next', defaultMessage: "{at, select, head {Run {command}, then submit again.} other {Other commits follow it, so amending or rebasing would rewrite them, other agents' work among them: do neither. Report it with cw_cannot_within_rules (rule submit.trailer), and the user decides.}}", description: "The next step after a refused submit for a missing trailer (HI-2562). {at} (select): head when the commit is the folder's newest, so amending it is safe; other when commits follow it. {command} is the git command to run, kept as typed; cw_cannot_within_rules is a tool's name, kept as typed." }),
     msg({ id: 'workflow.refused.submit.trailer.change', defaultMessage: 'Each card in its own folder needs no trailers: Version Control → Where cards are built.', description: 'Where the setting that needs commit trailers is changed.' })
   ),
   'submit.checksPassed': r(
@@ -385,7 +385,8 @@ const IN_AGENTS: RefusalFormat = { ...IN_ENGLISH, one: (m, values) => agentText(
 const VALUES_BEFORE: Partial<Record<RuleId, Record<string, string>>> = {
   'submit.checksPassed': { why: 'none', files: 'none', copy: 'no' }, // i18n-ignore: select keys, never shown
   'move.doingNobody': { also: 'no' }, // i18n-ignore: select keys, never shown
-  'submit.empty': { changes: 'unknown' } // i18n-ignore: select keys, never shown
+  'submit.empty': { changes: 'unknown' }, // i18n-ignore: select keys, never shown
+  'submit.trailer': { at: 'head' } // i18n-ignore: select keys, never shown
 }
 
 /** The three sentences of a refusal, formatted by `f`: `change` null when the rule has none. */

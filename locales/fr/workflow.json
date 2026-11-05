@@ -357,7 +357,7 @@
   "workflow.refused.submit.sameRevisionNote.next": "Soumets-la de nouveau avec une note qui dit ce qui a changé dans ta réponse, ou fais un commit pour une nouvelle révision.",
   "workflow.refused.submit.trailer.change": "Avec chaque carte dans son propre dossier, aucun trailer n’est nécessaire : Gestion de versions → Où les cartes sont réalisées.",
   "workflow.refused.submit.trailer.message": "Carte {card} : le commit {commit} n’a pas de trailer de carte, et l’agent d’une autre carte travaille dans ce dossier.",
-  "workflow.refused.submit.trailer.next": "Lance {command}, puis soumets de nouveau.",
+  "workflow.refused.submit.trailer.next": "{at, select, head {Lance {command}, puis soumets de nouveau.} other {D’autres commits le suivent, dont le travail d’autres agents : un amend ou un rebase les réécrirait. Ne fais ni l’un ni l’autre. Signale-le avec cw_cannot_within_rules (règle submit.trailer), et l’utilisateur décide.}}",
   "workflow.refused.submit.unchanged.message": "{card} : ses fichiers n’ont pas changé depuis son démarrage.",
   "workflow.refused.submit.unchanged.next": "Modifie les fichiers de la carte, puis soumets-la à la relecture.",
   "workflow.refused.verdict.currentSubmission.message": "La soumission {submission} n’est pas la dernière de la carte {card}.",

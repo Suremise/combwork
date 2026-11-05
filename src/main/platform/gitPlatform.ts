@@ -347,7 +347,7 @@ export class GitPlatform implements PlatformAdapter {
       if (args.predicted) return { ok: false, refusal: { rule: 'submit.empty', values: { card: card.key } } }
       // HI-2562: nothing of its own, but a commit naming no card since it started, with another card's agent in the
       // folder: most likely its own work without the trailer, so the trailer's refusal (the commit, and the amend that
-      // fixes it), not "nothing committed". Whatever the rules hold: the submit is refused either way, and with every
+      // fixes it when it is the head, else a report for the user), not "nothing committed". Whatever the rules hold: the submit is refused either way, and with every
       // rule off (no submit.trailer) the amend is still what lets it through.
       if (commits) {
         const u = await this.untrailered(card, s)
@@ -394,10 +394,11 @@ export class GitPlatform implements PlatformAdapter {
 
   /**
    * A commit attributed to no card, made in the folder since the card's last submission, when another unfinished card
-   * shares it: the newest, the one an amend fixes. HI-2562: only one made since the card started and still on the
-   * folder's line (one an amend or a reset replaced isn't, nor one from before it started).
+   * shares it: the newest, with whether it is the folder's head (HI-2562, HR1's round 1: only then does an amend fix it
+   * without rewriting the commits after it). Only one made since the card started and still on the folder's line (one
+   * an amend or a reset replaced isn't, nor one from before it started).
    */
-  private async untrailered(card: CardRecord, s: CardState): Promise<Maybe<string | null>> {
+  private async untrailered(card: CardRecord, s: CardState): Promise<Maybe<{ commit: string; head: boolean } | null>> {
     const others = this.wf.store.cards().filter((c) => c.id !== card.id && ['active', 'review', 'approved'].includes(c.stage) && this.wf.state(c).started?.folder === 'project')
     if (!others.length) return null
     const lastSub = s.latest?.commits?.at(-1)
@@ -414,7 +415,7 @@ export class GitPlatform implements PlatformAdapter {
       if (!on) continue
       const after = base ? await G.isAncestor(this.project, base, x.sha) : true
       if (isUnknown(after)) return after
-      if (after) return x.sha
+      if (after) return { commit: x.sha, head: x.sha === head }
     }
     return null
   }
