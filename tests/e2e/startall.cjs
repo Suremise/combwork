@@ -2,7 +2,7 @@
 // Archive and Start New and Remove All for every agent in its Agents ▾ menu, each saying how many agents it acts on
 // ("Stop (2)", #275, also in the Session menu and the palette), the same agents its question lists, following agents as
 // they start and stop; the state line ("1 waiting · 2 working", #974); folding at narrow widths (icons, then Agents ▾'s
-// actions in ⋯, then Active, the status to one count, then Resume and Stop, one row at any width, #1051); Explorer, Terminal and Project Settings in the ⋯ menu; the Session menu and the palette have both new
+// actions in ⋯, then Active, the status to one count, then Resume and Stop, one row at any width, #1051); Explorer, Terminal and Remove Project… in the ⋯ menu, with their keys (HI-2551); the Session menu and the palette have both new
 // actions; the Project menu lists every tab and Project Settings; the session toolbar's summary chip counts the agents. Three agents run the fake Claude Code (fake-claude/): one working, one idle,
 // one stopped. Start New (All) asks once (the working one flagged), Cancel changes nothing, and then every agent has a
 // new session with the old ones kept; Archive and Start New (All) archives each agent's session and starts fresh ones.
@@ -45,6 +45,8 @@ const check = (name, ok, extra = '') => {
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  /** The open menu's rows, `label=keys` ('-' a separator), as keys.cjs reads them (HI-2551: ⋯'s entries show their keys). */
+  const menuRows = () => page.locator('.menu').last().evaluate((m) => [...m.children].map((c) => (c.classList.contains('menu-sep') ? '-' : `${c.querySelector('.menu-label, :scope > span:not(.menu-key)')?.textContent.trim() ?? c.textContent.trim()}=${c.querySelector('.menu-key')?.textContent.trim() ?? ''}`)))
   await lib.openWorkspace(inv, page, ws)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
   const until = async (fn, ms = 20000) => {
@@ -194,7 +196,8 @@ const check = (name, ok, extra = '') => {
   check('900 px: Start New opens its question', !!(await lib.until(async () => (await asked.count()) === 1, 5000)))
   await asked.getByRole('button', { name: 'Cancel' }).click()
   await page.locator('.project-header').getByRole('button', { name: 'More actions' }).click()
-  const narrowItems = (await page.locator('.menu .menu-item').allInnerTexts()).map((t) => t.trim())
+  await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, 5000)
+  const narrowItems = (await menuRows()).map((r) => r.split('=')[0])
   check('900 px: ⋯ opens with Explorer and Terminal first', JSON.stringify(narrowItems.slice(0, 2)) === JSON.stringify(['Explorer', 'Terminal']), JSON.stringify(narrowItems))
   await page.keyboard.press('Escape')
   // Squeezed further (#1051), the header stays one row: Agents ▾'s actions, then Active, go into ⋯ and the status keeps
@@ -243,11 +246,24 @@ const check = (name, ok, extra = '') => {
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.until(async () => (await page.locator('.project-header .agents-menu').count()) === 1, 5000)
 
-  // --- ⋯: Explorer, Terminal, Project Settings, Remove Project… (Changes is a tab).
+  // --- ⋯: Explorer, Terminal, Remove Project… (Changes is a tab; Project Settings is More ▾'s, HI-2551), each with its
+  // command's keys where it has some: Terminal's by default, and a key given to Remove Project shows too.
   await page.locator('.project-header').getByRole('button', { name: 'More actions' }).click()
-  const items = (await page.locator('.menu .menu-item').allInnerTexts()).map((t) => t.trim())
-  check('⋯ has Explorer, Terminal, Project Settings and Remove Project…, without Changes', JSON.stringify(items) === JSON.stringify(['Explorer', 'Terminal', 'Project Settings', 'Remove Project…']), JSON.stringify(items))
+  await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, 5000)
+  const items = await menuRows()
+  check('⋯ has Explorer, Terminal (Ctrl+Shift+`) and Remove Project…, without Changes or Project Settings', JSON.stringify(items) === JSON.stringify(['Explorer=', 'Terminal=Ctrl+Shift+`', '-', 'Remove Project…=']), JSON.stringify(items))
+  await page.screenshot({ path: path.join(lib.WORK, 'startall-project-menu.png') })
   await page.keyboard.press('Escape')
+  await lib.until(async () => (await page.locator('.menu').count()) === 0, 5000)
+  await inv('settings:setKeybinding', 'project.remove', 'Ctrl+Alt+Shift+R')
+  await lib.until(async () => (await inv('settings:get')).keybindings['project.remove'] === 'Ctrl+Alt+Shift+R', HUNG_MS)
+  await page.locator('.project-header').getByRole('button', { name: 'More actions' }).click()
+  await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, 5000)
+  const rebound = await menuRows()
+  check("…a key given to Remove Project shows on it (the user's overrides apply)", rebound.at(-1) === 'Remove Project…=Ctrl+Alt+Shift+R', JSON.stringify(rebound))
+  await page.keyboard.press('Escape')
+  await lib.until(async () => (await page.locator('.menu').count()) === 0, 5000)
+  await inv('settings:setKeybinding', 'project.remove', undefined)
 
   // --- Menus: the Project menu lists every tab in the strip's order; the Session menu has both new actions.
   const menuItems = async (name) => {

@@ -88,7 +88,6 @@ const M = {
   more: msg({ id: 'project.header.more', defaultMessage: 'More actions', description: "Tooltip on the project header's ⋯ button." }),
   explorer: msg({ id: 'project.menu.explorer', defaultMessage: 'Explorer', description: "The project header's ⋯ menu: opens the project folder in File Explorer." }),
   terminal: msg({ id: 'project.menu.terminal', defaultMessage: 'Terminal', description: "The project header's ⋯ menu: opens a terminal in the project folder." }),
-  projectSettings: msg({ id: 'project.menu.settings', defaultMessage: 'Project Settings', description: "The project header's ⋯ menu." }),
   removeProject: msg({ id: 'project.menu.remove', defaultMessage: 'Remove Project…', description: "The project header's ⋯ menu: removes the project from the workspace (asks first)." }),
   restartWhenDone: msg({ id: 'project.banner.restartWhenDone', defaultMessage: 'Restart When Its Turn Is Over', description: "Button on the restart banner of an agent running on another connection than the one chosen now (HI-1755): it ends once its turn is over and carries on, on the new connection." }),
   switchFailed: msg({ id: 'project.banner.switchFailed', defaultMessage: "Couldn't arrange the restart", description: "An error's title: Restart When Its Turn Is Over failed." }),
@@ -106,6 +105,12 @@ const bold = (c: React.ReactNode[]): React.ReactNode => <strong>{c}</strong>
 const menuBelow = (el: Element): [number, number] => {
   const r = el.getBoundingClientRect()
   return [r.left, r.bottom + 2]
+}
+
+/** A command's keys as a menu shows them (the user's and the project's overrides applied), or none. */
+function shownKeys(id: string): string | undefined {
+  const kb = commandKeybinding(id)
+  return kb ? formatKeybinding(kb) : undefined
 }
 
 /** A tab's tooltip, with its shortcut (they can be changed, and Tasks has none by default). */
@@ -588,12 +593,11 @@ export function ProjectView({ visible }: { visible: boolean }) {
                 ...(runInMenu && running.length ? [{ label: stopTip, icon: 'stop-circle', action: 'stop' as const, onClick: () => void actions.stopAllAgents(project.path) }] : []),
                 ...(activeInMenu ? [{ separator: true as const }] : []),
                 ...(cramped && batch.length ? [...batch, { separator: true as const }] : []),
-                { label: tr(M.explorer), icon: 'folder-opened', onClick: () => void call('project:openInExplorer', project.path) },
-                { label: tr(M.terminal), icon: 'terminal', onClick: () => void call('project:openTerminal', project.path) },
+                // Each with its command's keys, where it has some (HI-2551). Project Settings is under More ▾ on the tabs' row.
+                { label: tr(M.explorer), icon: 'folder-opened', keybinding: shownKeys('project.openExplorer'), onClick: () => void call('project:openInExplorer', project.path) },
+                { label: tr(M.terminal), icon: 'terminal', keybinding: shownKeys('project.openTerminal'), onClick: () => void call('project:openTerminal', project.path) },
                 { separator: true },
-                { label: tr(M.projectSettings), icon: 'settings', onClick: () => setProjectTab(project.path, 'settings') },
-                { separator: true },
-                { label: tr(M.removeProject), icon: 'trash', onClick: () => set({ removeProjectFor: project.path }) }
+                { label: tr(M.removeProject), icon: 'trash', keybinding: shownKeys('project.remove'), onClick: () => set({ removeProjectFor: project.path }) }
               ])
             }
           />

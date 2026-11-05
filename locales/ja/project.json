@@ -280,7 +280,6 @@
   "project.memory.updated": "{files}を更新しました。",
   "project.menu.explorer": "エクスプローラー",
   "project.menu.remove": "プロジェクトを削除…",
-  "project.menu.settings": "プロジェクト設定",
   "project.menu.terminal": "ターミナル",
   "project.meta.lastActivity": "最終アクティビティ",
   "project.meta.lastPrompt": "最後のプロンプト",

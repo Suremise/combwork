@@ -1123,10 +1123,6 @@
     "defaultMessage": "Remove Project…",
     "description": "The project header's ⋯ menu: removes the project from the workspace (asks first)."
   },
-  "project.menu.settings": {
-    "defaultMessage": "Project Settings",
-    "description": "The project header's ⋯ menu."
-  },
   "project.menu.terminal": {
     "defaultMessage": "Terminal",
     "description": "The project header's ⋯ menu: opens a terminal in the project folder."

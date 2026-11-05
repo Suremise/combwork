@@ -296,7 +296,6 @@
   "project.memory.updated": "Updated {files}.",
   "project.menu.explorer": "Explorer",
   "project.menu.remove": "Remove Project…",
-  "project.menu.settings": "Project Settings",
   "project.menu.terminal": "Terminal",
   "project.meta.lastActivity": "Last activity",
   "project.meta.lastPrompt": "Last prompt",
