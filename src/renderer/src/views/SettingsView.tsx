@@ -519,7 +519,7 @@ function ProviderStatus({ provider }: { provider: ProviderId }) {
           </span>
         ))}
       {info.updateAvailable && <span className="badge accent">{tr(msg({ id: 'settings.provider.updateAvailable', defaultMessage: '{version} available', description: "A badge on a provider's page: a newer version of its CLI. {version} is its number." }), { version: info.latestVersion ?? '' })}</span>}
-      <button className="btn small subtle" onClick={() => void actions.refreshProviders()}>
+      <button className="btn small subtle" onClick={() => void actions.refreshProviders(provider)}>
         {tr(msg({ id: 'settings.provider.checkNow', defaultMessage: 'Check now', description: "Button on a provider's page: looks for its CLI and updates again." }))}
       </button>
       <button className="btn small primary" onClick={() => set({ setupOpen: provider })}>
