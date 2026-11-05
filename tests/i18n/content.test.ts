@@ -253,7 +253,7 @@ describe("the Assistant's instructions stay English", () => {
     await run(() => modes.createMode('Tester'))
     const told = await run(() => modes.assistantInstructions('tester'))
     expect(told.modeText.startsWith('# Your mode: Tester\n\n')).toBe(true)
-    expect(told.text).toContain('You are the Hive Assistant')
+    expect(told.text).toContain('You are the Combwork Assistant')
   })
 })
 

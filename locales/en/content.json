@@ -121,15 +121,15 @@
   },
   "content.mode.badName": {
     "defaultMessage": "Give the mode a name with letters or numbers.",
-    "description": "An error making a new mode for the Hive Assistant: its name has no letters or numbers to name its file after."
+    "description": "An error making a new mode for the Combwork Assistant: its name has no letters or numbers to name its file after."
   },
   "content.mode.exists": {
     "defaultMessage": "There is already a mode called \"{mode}\".",
-    "description": "An error making a new mode for the Hive Assistant: the workspace already has one called {mode}."
+    "description": "An error making a new mode for the Combwork Assistant: the workspace already has one called {mode}."
   },
   "content.mode.invalid": {
     "defaultMessage": "Invalid mode",
-    "description": "An error deleting a mode of the Hive Assistant: its id isn't one Hive could have made."
+    "description": "An error deleting a mode of the Combwork Assistant: its id isn't one Combwork could have made."
   },
   "content.mode.noAssistant": {
     "defaultMessage": "The Assistant has no settings in this workspace.",
