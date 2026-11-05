@@ -359,6 +359,21 @@
     "note": "An error after End Them or Keep Running on the notice of processes an agent left running: Hive couldn't read what the agent's processes are now, so it did nothing (HI-2320).",
     "audience": "both"
   },
+  "main.nameUpgrade.what.board": {
+    "text": "the board's file",
+    "note": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): the task board's database file, hive.db to combwork.db.",
+    "audience": "both"
+  },
+  "main.nameUpgrade.what.files": {
+    "text": "the workspace's .gitignore, README and MCP definitions",
+    "note": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): files in the workspace's .combwork folder. Keep .gitignore, README and MCP as they are.",
+    "audience": "both"
+  },
+  "main.nameUpgrade.what.projects": {
+    "text": "the projects' skill copies and git exclude lines",
+    "note": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): markers in Combwork's copies of skills in projects, and comment lines in git's exclude files.",
+    "audience": "both"
+  },
   "main.outage.gaveUpBody": {
     "text": "{n, plural, one {It was resumed once in the past hour} other {It was resumed # times in the past hour}} and stopped again, so Combwork won't resume it again by itself. This PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.",
     "note": "The notice that Hive stopped resuming an agent whose connection kept dropping. {n} is how many times it was resumed in the past hour. ipconfig /renew and ipconfig /flushdns are Windows commands: keep them.",

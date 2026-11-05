@@ -667,6 +667,23 @@
   "service.metrics.badRole": {
     "placeholders": {}
   },
+  "service.nameUpgrade.boardNotFolded": {
+    "placeholders": {
+      "file": "plain",
+      "log": "plain"
+    }
+  },
+  "service.nameUpgrade.boardOrphan": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
+  "service.nameUpgrade.failed": {
+    "placeholders": {
+      "what": "plain",
+      "error": "plain"
+    }
+  },
   "service.providers.noSetup": {
     "placeholders": {
       "cli": "plain"

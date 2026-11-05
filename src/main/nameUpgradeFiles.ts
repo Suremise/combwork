@@ -46,6 +46,7 @@ export function upgradedGitignore(text: string): string | null {
  * folder's move; HI-2462's; HI-2580's, naming `hive.db`): a README that is exactly one of them (either line ending) is
  * Combwork's own, never edited, and becomes `now` (WORKSPACE_README). Any other is the user's, left as it is.
  */
+// i18n-ignore: a README committed with the workspace, in English, as Hive wrote it
 const README_HI2462 = `# .combwork
 
 This folder is managed by [Hive](https://github.com/) and is meant to be committed.
@@ -58,7 +59,7 @@ This folder is managed by [Hive](https://github.com/) and is meant to be committ
 - \`usage.db\` — what each session used (the usage history the Overviews read). It is this machine's too, kept out of git.
 
 MCP definitions must not contain secrets. Reference environment variables instead, e.g. \`"\${GITHUB_TOKEN}"\`.
-` // i18n-ignore: a README committed with the workspace, in English, as Hive wrote it
+`
 
 const oldReadmes = (now: string): string[] => [README_HI2462.replace('# .combwork', '# .hive').replace('`.combwork/project.json`', '`.hive/project.json`'), README_HI2462, now.replace('`combwork.db`', '`hive.db`')]
 
