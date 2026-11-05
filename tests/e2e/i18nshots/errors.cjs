@@ -16,7 +16,7 @@ async function shown(ctx, locator, what) {
 const projectOf = (ctx) => path.join(ctx.workspace, 'errorsgit')
 
 /**
- * The .combwork notice's Exclude, refused: main says why (errors.hive.notIgnored), and the window shows it in a notice in
+ * The .combwork notice's Exclude, refused: main says why (errors.cw.notIgnored), and the window shows it in a notice in
  * its language.
  */
 async function excludeRefused(ctx) {

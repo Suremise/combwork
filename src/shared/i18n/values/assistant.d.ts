@@ -8,18 +8,18 @@ interface HiveMessageValues {
   'assistant.chooseConnections.otherCli': { agent: string | number }
   'assistant.chooseConnections.role': undefined
   'assistant.chooseConnections.running': undefined
-  'assistant.hiveTemplates.pair': undefined
-  'assistant.hiveTemplates.pairOne': undefined
-  'assistant.hiveTemplates.pairOneText': undefined
-  'assistant.hiveTemplates.pairText': undefined
-  'assistant.hiveTemplates.solo': undefined
-  'assistant.hiveTemplates.soloText': undefined
-  'assistant.hiveTemplates.team3': undefined
-  'assistant.hiveTemplates.team3Text': undefined
-  'assistant.hiveTemplates.team6': undefined
-  'assistant.hiveTemplates.team6Pool': undefined
-  'assistant.hiveTemplates.team6PoolText': undefined
-  'assistant.hiveTemplates.team6Text': undefined
+  'assistant.combworkTemplates.pair': undefined
+  'assistant.combworkTemplates.pairOne': undefined
+  'assistant.combworkTemplates.pairOneText': undefined
+  'assistant.combworkTemplates.pairText': undefined
+  'assistant.combworkTemplates.solo': undefined
+  'assistant.combworkTemplates.soloText': undefined
+  'assistant.combworkTemplates.team3': undefined
+  'assistant.combworkTemplates.team3Text': undefined
+  'assistant.combworkTemplates.team6': undefined
+  'assistant.combworkTemplates.team6Pool': undefined
+  'assistant.combworkTemplates.team6PoolText': undefined
+  'assistant.combworkTemplates.team6Text': undefined
   'assistant.journal.allKinds': undefined
   'assistant.journal.allProjects': undefined
   'assistant.journal.allSources': undefined
@@ -94,7 +94,7 @@ interface HiveMessageValues {
   'assistant.journal.search': undefined
   'assistant.journal.settings': undefined
   'assistant.journal.source.assistant': undefined
-  'assistant.journal.source.hive': undefined
+  'assistant.journal.source.cw': undefined
   'assistant.journal.sourceLabel': undefined
   'assistant.journal.summary': undefined
   'assistant.journal.summaryRequired': undefined
@@ -274,6 +274,9 @@ interface HiveMessageValues {
   'assistant.sidebar.addAgentDialog': undefined
   'assistant.sidebar.builtIn': undefined
   'assistant.sidebar.bypassTip': undefined
+  'assistant.sidebar.combworkGroup': undefined
+  'assistant.sidebar.combworkServerDesc': undefined
+  'assistant.sidebar.combworkServerTip': undefined
   'assistant.sidebar.compactTip': { hasKey: string; key: string | number }
   'assistant.sidebar.create': undefined
   'assistant.sidebar.createFailed': undefined
@@ -289,9 +292,6 @@ interface HiveMessageValues {
   'assistant.sidebar.filterSkills': undefined
   'assistant.sidebar.folderMessage': undefined
   'assistant.sidebar.folderPlaceholder': undefined
-  'assistant.sidebar.hiveGroup': undefined
-  'assistant.sidebar.hiveServerDesc': undefined
-  'assistant.sidebar.hiveServerTip': undefined
   'assistant.sidebar.inactive': undefined
   'assistant.sidebar.inactiveTip': undefined
   'assistant.sidebar.loading': undefined
@@ -390,8 +390,8 @@ interface HiveMessageValues {
   'assistant.skills.copyTip': undefined
   'assistant.skills.create': undefined
   'assistant.skills.delete': undefined
+  'assistant.skills.deleteCombwork': { audience: string }
   'assistant.skills.deleteFailed': undefined
-  'assistant.skills.deleteHive': { audience: string }
   'assistant.skills.deleteLocal': { known: string; provider: string | number }
   'assistant.skills.deleteMessage': { name: string | number }
   'assistant.skills.deleteNobody': { problem: string | number }
@@ -411,7 +411,7 @@ interface HiveMessageValues {
   'assistant.skills.files': { skill: string | number }
   'assistant.skills.filesMore': { count: number }
   'assistant.skills.filesTip': undefined
-  'assistant.skills.levelHive': undefined
+  'assistant.skills.levelCombwork': undefined
   'assistant.skills.levelLocal': undefined
   'assistant.skills.levelPlugin': undefined
   'assistant.skills.levelUser': undefined
@@ -445,11 +445,11 @@ interface HiveMessageValues {
   'assistant.skills.shipped.splitWork': undefined
   'assistant.skills.shipped.triageReport': undefined
   'assistant.skills.shipped.tuneSettings': undefined
-  'assistant.skills.shipped.useHiveApi': undefined
+  'assistant.skills.shipped.useCombworkApi': undefined
   'assistant.skills.shipped.workOnCard': undefined
   'assistant.skills.shipped.workspaceNote': undefined
   'assistant.skills.stillLocal': { known: string; provider: string | number }
-  'assistant.skills.tipHive': undefined
+  'assistant.skills.tipCombwork': undefined
   'assistant.skills.tipLocal': undefined
   'assistant.skills.tipPlugin': undefined
   'assistant.skills.tipUser': undefined
@@ -457,7 +457,7 @@ interface HiveMessageValues {
   'assistant.skills.updateBadge': undefined
   'assistant.skills.updateTip': undefined
   'assistant.skills.warning': undefined
-  'assistant.skills.whereHive': undefined
+  'assistant.skills.whereCombwork': undefined
   'assistant.skills.whereLocal': { provider: string | number }
   'assistant.status.also': { line: string | number; also: string }
   'assistant.status.approval': { title: string | number }
@@ -558,8 +558,10 @@ interface HiveMessageValues {
   'assistant.templates.colAgent': undefined
   'assistant.templates.colRole': undefined
   'assistant.templates.colSuggests': undefined
+  'assistant.templates.combworkSummary': { count: number; layout: string | number }
   'assistant.templates.continue': undefined
   'assistant.templates.copyAgent': { name: string | number }
+  'assistant.templates.cw': undefined
   'assistant.templates.delete': undefined
   'assistant.templates.deleteMessage': { scope: string; project: string | number }
   'assistant.templates.deleteTip': undefined
@@ -591,8 +593,6 @@ interface HiveMessageValues {
   'assistant.templates.exportedDetail': undefined
   'assistant.templates.fullTip': { limit: number }
   'assistant.templates.gone': undefined
-  'assistant.templates.hive': undefined
-  'assistant.templates.hiveSummary': { count: number; layout: string | number }
   'assistant.templates.import': undefined
   'assistant.templates.importButton': undefined
   'assistant.templates.importFailed': undefined
@@ -626,7 +626,7 @@ interface HiveMessageValues {
   'assistant.templates.noSuggestion': undefined
   'assistant.templates.noWorkspace': undefined
   'assistant.templates.noWorkspaceTemplates': undefined
-  'assistant.templates.noneHive': undefined
+  'assistant.templates.noneCombwork': undefined
   'assistant.templates.noneOfItsOwn': undefined
   'assistant.templates.noneYet': undefined
   'assistant.templates.notSaved': undefined

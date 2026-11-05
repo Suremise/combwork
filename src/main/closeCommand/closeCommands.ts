@@ -505,7 +505,7 @@ export function runByHand(win: BrowserWindow, ws: WorkspaceService | null, ref: 
 
 const M = {
   gone: msg({ id: 'commands.run.gone', defaultMessage: 'That command is no longer there.', description: 'An error: the user ran one of their commands by hand (Settings → Commands, or the command palette), but it was deleted meanwhile.' }),
-  testCopy: msg({ id: 'commands.run.testCopy', defaultMessage: "This is a test copy of Combwork: it doesn't run your commands.", description: "An error in a test copy of Hive (one the developers' tests start): it never runs the user's own commands." })
+  testCopy: msg({ id: 'commands.run.testCopy', defaultMessage: "This is a test copy of Combwork: it doesn't run your commands.", description: "An error in a test copy of Combwork (one the developers' tests start): it never runs the user's own commands." })
 }
 
 /**

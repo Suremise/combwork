@@ -40,12 +40,12 @@ const A = {
   first: agentMsg({
     id: 'brief.start.firstCard',
     text: "Combwork started this card for you: it is your lane's first card. Use card-loop as its builder (cw_lane next names your cards).",
-    note: "HI-2029: with the rules on, Hive starts a lane's first card on its builder itself. The note of the card's start prompt."
+    note: "HI-2029: with the rules on, Combwork starts a lane's first card on its builder itself. The note of the card's start prompt."
   }),
   next: agentMsg({
     id: 'brief.start.nextCard',
     text: "Combwork started this card for you: it is your lane's next card, after {card} went Done.",
-    note: "Hive starts a lane's next card on its builder once the one before it is Done. The note of the card's start prompt."
+    note: "Combwork starts a lane's next card on its builder once the one before it is Done. The note of the card's start prompt."
   })
 }
 
@@ -69,8 +69,8 @@ const owed = new Set<string>()
 const launchingNow = new Set<string>()
 
 const M = {
-  freshBlockedTitle: msg({ id: 'service.laneStarts.freshBlockedTitle', defaultMessage: '{agent}’s new conversation didn’t start', description: "A notification's title (HI-2034): a lane's agent ({agent}, its name) is owed a new conversation for the lane, and Hive has stopped trying to start it." }),
-  freshBlockedBody: msg({ id: 'service.laneStarts.freshBlockedBody', defaultMessage: '{why, select, timeout {It wasn’t free within {minutes, plural, one {# minute} other {# minutes}}.} uncertain {Combwork closed while starting it, so it may not have started.} other {{reason}}} Retry it from the lane’s row in the Progress panel, or end the lane. Its cards wait until then.', description: "A notification's text (HI-2034), under \"{agent}'s new conversation didn't start\". why (select): the agent wasn't free (in a turn) within the wait, {minutes} minutes (Settings → Advanced); Hive closed while it was starting it; or (other) its start failed, {reason} saying why (a sentence, may be in English). Translate each." })
+  freshBlockedTitle: msg({ id: 'service.laneStarts.freshBlockedTitle', defaultMessage: '{agent}’s new conversation didn’t start', description: "A notification's title (HI-2034): a lane's agent ({agent}, its name) is owed a new conversation for the lane, and Combwork has stopped trying to start it." }),
+  freshBlockedBody: msg({ id: 'service.laneStarts.freshBlockedBody', defaultMessage: '{why, select, timeout {It wasn’t free within {minutes, plural, one {# minute} other {# minutes}}.} uncertain {Combwork closed while starting it, so it may not have started.} other {{reason}}} Retry it from the lane’s row in the Progress panel, or end the lane. Its cards wait until then.', description: "A notification's text (HI-2034), under \"{agent}'s new conversation didn't start\". why (select): the agent wasn't free (in a turn) within the wait, {minutes} minutes (Settings → Advanced); Combwork closed while it was starting it; or (other) its start failed, {reason} saying why (a sentence, may be in English). Translate each." })
 }
 
 const builderKey = (wsPath: string, project: string, agentId: string): string => `${wsPath.toLowerCase()}#${project.toLowerCase()}|${agentId}`

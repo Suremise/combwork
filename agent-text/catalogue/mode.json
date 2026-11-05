@@ -57,15 +57,15 @@
   },
   "mode.cliOwn.cliNote": {
     "text": "Combwork passed no mode, so the CLI's own screen shows the one it is in.",
-    "note": "The CLI's own setting: why the CLI's own screen names the mode, not Hive (shown with Hive's mode badge while a session runs in it)."
+    "note": "The CLI's own setting: why the CLI's own screen names the mode, not Combwork (shown with Combwork's mode badge while a session runs in it)."
   },
   "mode.cliOwn.desc": {
     "text": "Combwork passes no permission mode: the CLI starts in the mode its own config sets, or its default. Combwork can't switch it in a running session.",
-    "note": "What the CLI's own setting (Hive passes no mode) does, as agents and the Agent API read it (the window has its own message)."
+    "note": "What the CLI's own setting (Combwork passes no mode) does, as agents and the Agent API read it (the window has its own message)."
   },
   "mode.cliOwn.label": {
     "text": "The CLI's own setting",
-    "note": "The CLI's own setting, a permission choice every CLI offers (Hive passes no mode): its name, as agents and the Agent API read it (the window has its own message)."
+    "note": "The CLI's own setting, a permission choice every CLI offers (Combwork passes no mode): its name, as agents and the Agent API read it (the window has its own message)."
   },
   "mode.cliOwn.short": {
     "text": "CLI's own",
@@ -97,7 +97,7 @@
   },
   "mode.copilot.acceptEdits.cliNote": {
     "text": "Copilot’s own footer still says Manual Approval: Combwork starts it with edits in its folder approved (an allow rule), which Copilot’s label doesn’t show.",
-    "note": "GitHub Copilot's permission mode accept-edits: why the CLI's own screen names another mode (shown with Hive's mode badge while a session runs in it)."
+    "note": "GitHub Copilot's permission mode accept-edits: why the CLI's own screen names another mode (shown with Combwork's mode badge while a session runs in it)."
   },
   "mode.copilot.acceptEdits.desc": {
     "text": "Edits files in its folder without asking (not where the folder’s path has parentheses: Copilot can’t approve them there); still asks before other commands, other MCP tools, web access and changes outside its folder.",

@@ -9,7 +9,7 @@ import type { WorkspaceService } from './workspace'
 import { agentMsg, say } from '../shared/agentText'
 
 const T = {
-  whilePlaced: agentMsg({ id: 'wake.watch.whilePlaced', text: 'Combwork is giving you {card} in {slot}: end your turn with no watch. The card comes to you as a task; a watch now would hold it off.', note: 'HI-2197: a watch refused while Hive is placing a card of the agent\'s in a slot (a watch would hold that placement off). card: its key ("HI-12"); slot: the slot\'s name.' }),
+  whilePlaced: agentMsg({ id: 'wake.watch.whilePlaced', text: 'Combwork is giving you {card} in {slot}: end your turn with no watch. The card comes to you as a task; a watch now would hold it off.', note: 'HI-2197: a watch refused while Combwork is placing a card of the agent\'s in a slot (a watch would hold that placement off). card: its key ("HI-12"); slot: the slot\'s name.' }),
   numberClash: agentMsg({ id: 'wake.watch.numberClash', text: '{n} is {key}\'s number (#{n}), not {prefix}-{n}, which is another card. Name cards by key: "{prefix}-{n}" or "{key}".', note: 'A watch refused for naming a card by a plain number that reads as another card\'s key (2189 is HI-2182\'s number while HI-2189 is another card). n: the number; key: the card it is the number of; prefix: the project\'s key.' })
 }
 

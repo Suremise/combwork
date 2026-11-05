@@ -523,7 +523,7 @@ function installInfoIn(info: AgentInstallInfo, shown: (s: string) => string): Ag
 }
 
 const READINESS = {
-  notInstalled: msg({ id: 'providers.readiness.notInstalled', defaultMessage: '{provider} is not installed.', description: "Provider Setup and Settings → Providers: Hive didn't find the coding agent's CLI. {provider} is its name (Claude Code)." }),
+  notInstalled: msg({ id: 'providers.readiness.notInstalled', defaultMessage: '{provider} is not installed.', description: "Provider Setup and Settings → Providers: Combwork didn't find the coding agent's CLI. {provider} is its name (Claude Code)." }),
   signedOut: msg({ id: 'providers.readiness.signedOut', defaultMessage: '{provider} is not signed in.', description: "Provider Setup and Settings → Providers: the coding agent's CLI has no sign-in. {provider} is its name." }),
   update: msg({ id: 'providers.readiness.update', defaultMessage: '{provider} {version} is available.', description: 'Provider Setup and Settings → Providers: a newer version of the coding agent is out. {provider} is its name, {version} the version.' }),
   install: msg({ id: 'providers.action.install', defaultMessage: 'Install', description: "Provider Setup's button: installs the coding agent's CLI in a terminal." }),

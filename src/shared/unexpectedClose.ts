@@ -143,11 +143,11 @@ export interface ResumeReport {
 
 /** The agents left to resume by hand, with why in a few words (#1434). */
 export const resumeHeldLine = (held: NonNullable<ResumeReport['held']>): string =>
-  tr(msg({ id: 'main.unexpectedClose.held', defaultMessage: '{n, plural, one {One was left stopped: {agents}.} other {# were left stopped: {agents}.}}', description: "In the notice that Hive closed unexpectedly (#1434): agents whose conversations can't resume now where they ran (their slot is free, or holds other work), left for the user ({agents}: their names, each with why in a few words)." }), { n: held.length, agents: fmt.list(held.map((h) => `${h.name} (${shownText(holdShort(h.hold))})`)) })
+  tr(msg({ id: 'main.unexpectedClose.held', defaultMessage: '{n, plural, one {One was left stopped: {agents}.} other {# were left stopped: {agents}.}}', description: "In the notice that Combwork closed unexpectedly (#1434): agents whose conversations can't resume now where they ran (their slot is free, or holds other work), left for the user ({agents}: their names, each with why in a few words)." }), { n: held.length, agents: fmt.list(held.map((h) => `${h.name} (${shownText(holdShort(h.hold))})`)) })
 
 /** The agents that couldn't resume, with why. */
 export const resumeFailedLine = (r: ResumeReport): string =>
-  tr(msg({ id: 'main.unexpectedClose.failed', defaultMessage: "{n, plural, one {One couldn't resume: {agents}.} other {# couldn't resume: {agents}.}}", description: 'In the notice that Hive closed unexpectedly, or the report of resuming its agents: the agents that failed to resume ({agents}: their names with why).' }), { n: r.failed.length, agents: fmt.list(r.failed.map((f) => `${f.name} (${f.error})`)) })
+  tr(msg({ id: 'main.unexpectedClose.failed', defaultMessage: "{n, plural, one {One couldn't resume: {agents}.} other {# couldn't resume: {agents}.}}", description: 'In the notice that Combwork closed unexpectedly, or the report of resuming its agents: the agents that failed to resume ({agents}: their names with why).' }), { n: r.failed.length, agents: fmt.list(r.failed.map((f) => `${f.name} (${f.error})`)) })
 
 /**
  * The notice's line on what the agents started that still runs (#987): how many, and what. A hive-progress run, the test
@@ -156,10 +156,10 @@ export const resumeFailedLine = (r: ResumeReport): string =>
 export function stillRunningLine(processes: readonly AgentProcess[], kept: readonly AgentProcess[] = processes): string {
   const { runs, rest } = progressRunsIn(processes, kept)
   const items: AgentProcess[] = [
-    ...runs.map((g) => ({ pid: g.root.pid, name: '', label: tr(msg({ id: 'main.unexpectedClose.progressRun', defaultMessage: '{title} ({n, plural, one {# process} other {# processes}})', description: 'In the notice that Hive closed unexpectedly, a test run (or other command) an agent ran through cw-progress that still runs, as one item of the list of what still runs: its title as the agent gave it ({title}: "e2e: 196 suites in hb2") and how many of its processes still run ({n}).' }), { title: g.title, n: g.processes.length }) })),
+    ...runs.map((g) => ({ pid: g.root.pid, name: '', label: tr(msg({ id: 'main.unexpectedClose.progressRun', defaultMessage: '{title} ({n, plural, one {# process} other {# processes}})', description: 'In the notice that Combwork closed unexpectedly, a test run (or other command) an agent ran through cw-progress that still runs, as one item of the list of what still runs: its title as the agent gave it ({title}: "e2e: 196 suites in hb2") and how many of its processes still run ({n}).' }), { title: g.title, n: g.processes.length }) })),
     ...rest
   ]
-  return tr(msg({ id: 'main.unexpectedClose.stillRunning', defaultMessage: '{n, plural, one {One process the agents started is still running: {processes}.} other {# processes the agents started are still running: {processes}.}}', description: 'The notice that Hive closed unexpectedly: processes the agents had started (test runs, servers) still run, checked to be the same ones. {n} is how many; {processes} lists them ("node serve.js, 2 × npm run e2e"). The notice has a Stop Them button.' }), { n: processes.length, processes: leftoversSummary({ processes: items, more: 0 }, 4, { tr, list: fmt.list }) })
+  return tr(msg({ id: 'main.unexpectedClose.stillRunning', defaultMessage: '{n, plural, one {One process the agents started is still running: {processes}.} other {# processes the agents started are still running: {processes}.}}', description: 'The notice that Combwork closed unexpectedly: processes the agents had started (test runs, servers) still run, checked to be the same ones. {n} is how many; {processes} lists them ("node serve.js, 2 × npm run e2e"). The notice has a Stop Them button.' }), { n: processes.length, processes: leftoversSummary({ processes: items, more: 0 }, 4, { tr, list: fmt.list }) })
 }
 
 /** What Stop Them does with the processes (#987, #1008): passed in, so the unit tests give their own. */
@@ -250,21 +250,21 @@ export class LeftoverStops {
 
 /** The notice's text: when, what was running, what became of it, what it started that still runs, a crash dump, merges left half done. */
 export function unexpectedCloseText(c: { lastSeen: string; agents: readonly RunningAgent[]; dump: boolean; merges: readonly LeftMerge[]; stillRunning?: readonly AgentProcess[]; kept?: readonly AgentProcess[] }, r: ResumeReport | null): string {
-  const lines = [tr(msg({ id: 'main.unexpectedClose.when', defaultMessage: 'Combwork was last seen on {date} at {time}.', description: 'The notice at start that the last run of Hive ended without quitting (its title says so): when that run was last seen running ({date}, {time}).' }), { date: formatDate(c.lastSeen), time: formatTime(c.lastSeen) })]
-  lines.push(tr(msg({ id: 'main.unexpectedClose.agents', defaultMessage: '{n, plural, =0 {No agents were running.} one {One agent was running in {projects}.} other {# agents were running in {projects}.}}', description: 'The notice that Hive closed unexpectedly: how many agents were running ({n}) and in which projects ({projects}: their names, listed).' }), { n: c.agents.length, projects: fmt.list(projectsOf(c.agents)) }))
+  const lines = [tr(msg({ id: 'main.unexpectedClose.when', defaultMessage: 'Combwork was last seen on {date} at {time}.', description: 'The notice at start that the last run of Combwork ended without quitting (its title says so): when that run was last seen running ({date}, {time}).' }), { date: formatDate(c.lastSeen), time: formatTime(c.lastSeen) })]
+  lines.push(tr(msg({ id: 'main.unexpectedClose.agents', defaultMessage: '{n, plural, =0 {No agents were running.} one {One agent was running in {projects}.} other {# agents were running in {projects}.}}', description: 'The notice that Combwork closed unexpectedly: how many agents were running ({n}) and in which projects ({projects}: their names, listed).' }), { n: c.agents.length, projects: fmt.list(projectsOf(c.agents)) }))
   if (r) {
-    lines.push(tr(msg({ id: 'main.unexpectedClose.resumed', defaultMessage: '{n, plural, =0 {None was resumed.} one {One was resumed, as Settings → Sessions says.} other {# were resumed, as Settings → Sessions says.}}', description: 'The notice that Hive closed unexpectedly, with "Resume agents after an unexpected close" on: how many of the agents Hive resumed ({n}).' }), { n: r.resumed.length }))
+    lines.push(tr(msg({ id: 'main.unexpectedClose.resumed', defaultMessage: '{n, plural, =0 {None was resumed.} one {One was resumed, as Settings → Sessions says.} other {# were resumed, as Settings → Sessions says.}}', description: 'The notice that Combwork closed unexpectedly, with "Resume agents after an unexpected close" on: how many of the agents Combwork resumed ({n}).' }), { n: r.resumed.length }))
     if (r.failed.length) lines.push(resumeFailedLine(r))
     if (r.held?.length) lines.push(resumeHeldLine(r.held))
-  } else if (c.agents.length) lines.push(tr(msg({ id: 'main.unexpectedClose.notResumed', defaultMessage: 'Nothing was resumed.', description: 'The notice that Hive closed unexpectedly: Hive did not resume the agents that were running (the user chooses).' })))
+  } else if (c.agents.length) lines.push(tr(msg({ id: 'main.unexpectedClose.notResumed', defaultMessage: 'Nothing was resumed.', description: 'The notice that Combwork closed unexpectedly: Combwork did not resume the agents that were running (the user chooses).' })))
   if (c.stillRunning?.length) lines.push(stillRunningLine(c.stillRunning, c.kept))
-  if (c.dump) lines.push(tr(msg({ id: 'main.unexpectedClose.dump', defaultMessage: 'Combwork kept a crash dump of it: Help → Copy Diagnostics names it.', description: 'The notice that Hive closed unexpectedly: a crash dump of that run was saved on this PC.' })))
+  if (c.dump) lines.push(tr(msg({ id: 'main.unexpectedClose.dump', defaultMessage: 'Combwork kept a crash dump of it: Help → Copy Diagnostics names it.', description: 'The notice that Combwork closed unexpectedly: a crash dump of that run was saved on this PC.' })))
   for (const m of c.merges) {
     const cards = fmt.list(m.cardNames ?? m.cards.map(cardRef))
     lines.push(
       m.cards.length
-        ? tr(msg({ id: 'main.unexpectedClose.mergeCards', defaultMessage: '{agent} was merging {branch} ({cards}): check {folder} for a merge left half done (git status there) before the next merge.', description: 'The notice that Hive closed unexpectedly: an agent ({agent}) held the merge slot for a branch ({branch}) for cards ({cards}); {folder} is where the merge was (its worktree or the main checkout).' }), { agent: m.agentName, branch: m.branch, cards, folder: m.folder })
-        : tr(msg({ id: 'main.unexpectedClose.merge', defaultMessage: '{agent} was merging {branch}: check {folder} for a merge left half done (git status there) before the next merge.', description: 'The notice that Hive closed unexpectedly: an agent ({agent}) held the merge slot for a branch ({branch}); {folder} is where the merge was (its worktree or the main checkout).' }), { agent: m.agentName, branch: m.branch, folder: m.folder })
+        ? tr(msg({ id: 'main.unexpectedClose.mergeCards', defaultMessage: '{agent} was merging {branch} ({cards}): check {folder} for a merge left half done (git status there) before the next merge.', description: 'The notice that Combwork closed unexpectedly: an agent ({agent}) held the merge slot for a branch ({branch}) for cards ({cards}); {folder} is where the merge was (its worktree or the main checkout).' }), { agent: m.agentName, branch: m.branch, cards, folder: m.folder })
+        : tr(msg({ id: 'main.unexpectedClose.merge', defaultMessage: '{agent} was merging {branch}: check {folder} for a merge left half done (git status there) before the next merge.', description: 'The notice that Combwork closed unexpectedly: an agent ({agent}) held the merge slot for a branch ({branch}); {folder} is where the merge was (its worktree or the main checkout).' }), { agent: m.agentName, branch: m.branch, folder: m.folder })
     )
   }
   return lines.join(' ')

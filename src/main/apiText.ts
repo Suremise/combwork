@@ -113,7 +113,7 @@ export const API = {
     unknownView: agentMsg({ id: 'api.card.unknownView', text: 'Unknown view "{view}": short or full.' })
   },
   change: {
-    activateProject: agentMsg({ id: 'api.change.activateProject', text: 'activate the project {project}', note: 'What an Assistant\'s change is called: in its refusals ("Only the Hive Assistant can …", "don\'t let you …") and, capitalised, in its activity.' }),
+    activateProject: agentMsg({ id: 'api.change.activateProject', text: 'activate the project {project}', note: 'What an Assistant\'s change is called: in its refusals ("Only the Combwork Assistant can …", "don\'t let you …") and, capitalised, in its activity.' }),
     addAgent: agentMsg({ id: 'api.change.addAgent', text: 'add an agent to {project}' }),
     addConnection: agentMsg({ id: 'api.change.addConnection', text: 'make a connection' }),
     cancelMessages: agentMsg({ id: 'api.change.cancelMessages', text: 'cancel the messages waiting for {agent} in {project}' }),
@@ -216,7 +216,7 @@ export const API = {
   done: {
     activated: agentMsg({ id: 'api.done.activated', text: 'Activated {project}', note: 'What an Assistant\'s change did, in its activity (stored, said in the Default).' }),
     addedAgent: agentMsg({ id: 'api.done.addedAgent', text: 'Added {agent} to {project}{started, select, yes { and started it} no { (it didn\'t start: {error})} other {}}' }),
-    addedAgentBrief: agentMsg({ id: 'api.done.addedAgentBrief', text: 'Added {agent} to {project}{started, select, yes { and started it} no {; it didn\'t start} other {}}', note: 'The event stream\'s line, in Hive\'s own words: never why it didn\'t start (#763).' }),
+    addedAgentBrief: agentMsg({ id: 'api.done.addedAgentBrief', text: 'Added {agent} to {project}{started, select, yes { and started it} no {; it didn\'t start} other {}}', note: 'The event stream\'s line, in Combwork\'s own words: never why it didn\'t start (#763).' }),
     addedConnection: agentMsg({ id: 'api.done.addedConnection', text: 'Made the connection {connection} on {account}' }),
     alreadyStopped: agentMsg({ id: 'api.done.alreadyStopped', text: '{agent} in {project} had already stopped' }),
     cancelledMessages: agentMsg({ id: 'api.done.cancelledMessages', text: '{n, plural, =0 {No message was waiting for {agent} in {project}} one {Cancelled the message waiting for {agent} in {project}} other {Cancelled {total} messages waiting for {agent} in {project}}}' }),
@@ -325,7 +325,7 @@ export const API = {
     reportOnlyBridge: agentMsg({ id: 'api.mcp.reportOnlyBridge', text: 'Only the combwork MCP bridge reports its calls, with an agent\'s or the Assistant\'s token' })
   },
   mergeSlot: {
-    moveName: agentMsg({ id: 'api.mergeSlot.moveName', text: 'merge slot', note: 'The refused move\'s name, in the workflow\'s refusal of a Hive-merged card\'s merge slot.' }),
+    moveName: agentMsg({ id: 'api.mergeSlot.moveName', text: 'merge slot', note: 'The refused move\'s name, in the workflow\'s refusal of a Combwork-merged card\'s merge slot.' }),
     noBranch: agentMsg({ id: 'api.mergeSlot.noBranch', text: 'The project folder isn\'t on a branch: name the branch to merge into.' }),
     onlyAgents: agentMsg({ id: 'api.mergeSlot.onlyAgents', text: 'Only a project\'s own agents hold its merge slot (with their own token). Scripts and the Assistant can read it.' }),
     onlyRunning: agentMsg({ id: 'api.mergeSlot.onlyRunning', text: 'Only a running agent can hold the merge slot.' })
@@ -406,7 +406,7 @@ export const API = {
   },
   slot: {
     heldGone: agentMsg({ id: 'api.slot.heldGone', text: 'gone (process {pid})' }),
-    heldThisHive: agentMsg({ id: 'api.slot.heldThisHive', text: 'this Combwork' }),
+    heldThisHive: agentMsg({ id: 'api.slot.heldThisCombwork', text: 'this Combwork' }),
     kindArg: agentMsg({ id: 'api.slot.kindArg', text: 'kind is carried or writer' }),
     notAgents: agentMsg({ id: 'api.slot.notAgents', text: 'Project agents can\'t release a slot: that is the user\'s, and the Assistant\'s within Settings → Assistant → Control once the user agrees. Tell the user if a slot is stuck.' })
   },

@@ -17,24 +17,24 @@ import { IconButton, Modal } from './ui'
 const M = {
   empty: msg({ id: 'settings.commands.empty', defaultMessage: 'No commands yet.', description: 'Settings → Commands (HI-1954), when the list is empty.' }),
   add: msg({ id: 'settings.commands.add', defaultMessage: 'Add Command…', description: 'A button under Settings → Commands (HI-1954): opens the dialog to name a new command.' }),
-  run: msg({ id: 'settings.commands.run', defaultMessage: 'Run it now', description: "A button beside one of the user's commands in Settings → Commands (HI-1954): runs it now, by hand, in Hive's commands dialog." }),
+  run: msg({ id: 'settings.commands.run', defaultMessage: 'Run it now', description: "A button beside one of the user's commands in Settings → Commands (HI-1954): runs it now, by hand, in Combwork's commands dialog." }),
   edit: msg({ id: 'settings.commands.edit', defaultMessage: 'Edit…', description: "A button beside one of the user's commands in Settings → Commands (HI-1954)." }),
   up: msg({ id: 'settings.commands.up', defaultMessage: 'Move up', description: 'A button beside a command in a list (Settings → Commands, or a point such as When this workspace opens, run; HI-1954).' }),
   down: msg({ id: 'settings.commands.down', defaultMessage: 'Move down', description: 'A button beside a command in a list (Settings → Commands, or a point such as When this workspace opens, run; HI-1954).' }),
   remove: msg({ id: 'settings.commands.delete', defaultMessage: 'Delete', description: "A button beside one of the user's commands in Settings → Commands (HI-1954): deletes it, and takes it off this level's points." }),
-  needed: msg({ id: 'settings.commands.needed', defaultMessage: 'The commands after this need it', description: "A checkbox of one of the user's commands (HI-1954): when it fails, Hive's dialog leads with Stop here, and when nobody is waiting, the commands after it don't run." }),
+  needed: msg({ id: 'settings.commands.needed', defaultMessage: 'The commands after this need it', description: "A checkbox of one of the user's commands (HI-1954): when it fails, Combwork's dialog leads with Stop here, and when nobody is waiting, the commands after it don't run." }),
   neededBadge: msg({ id: 'settings.commands.neededBadge', defaultMessage: 'needed by the next', description: "A short tag beside a command in Settings → Commands (HI-1954) whose \"The commands after this need it\" is ticked." }),
   titleNew: msg({ id: 'settings.commands.titleNew', defaultMessage: 'Add a Command', description: 'The title of the dialog that names a new command (Settings → Commands, HI-1954).' }),
   titleEdit: msg({ id: 'settings.commands.titleEdit', defaultMessage: 'Edit a Command', description: "The title of the dialog that edits one of the user's commands (Settings → Commands, HI-1954)." }),
-  name: msg({ id: 'settings.commands.name', defaultMessage: 'Name', description: "A field of the command dialog (HI-1954): the command's name, as lists and Hive's dialog show it." }),
-  command: msg({ id: 'settings.closeCommand.command', defaultMessage: 'Command', description: 'The label of the text box of "When this workspace closes, run" and "When Hive quits, run" (Settings): the command Hive runs.' }),
-  folder: msg({ id: 'settings.commands.folder', defaultMessage: 'Folder (empty: the workspace folder)', description: "A field of the command dialog (HI-1954): the folder the command runs in; empty, the workspace's folder (the user's home folder for Hive's quit point)." }),
+  name: msg({ id: 'settings.commands.name', defaultMessage: 'Name', description: "A field of the command dialog (HI-1954): the command's name, as lists and Combwork's dialog show it." }),
+  command: msg({ id: 'settings.closeCommand.command', defaultMessage: 'Command', description: 'The label of the text box of "When this workspace closes, run" and "When Combwork quits, run" (Settings): the command Combwork runs.' }),
+  folder: msg({ id: 'settings.commands.folder', defaultMessage: 'Folder (empty: the workspace folder)', description: "A field of the command dialog (HI-1954): the folder the command runs in; empty, the workspace's folder (the user's home folder for Combwork's quit point)." }),
   placeholders: msg({
     id: 'settings.commands.placeholders',
     defaultMessage: "cmd.exe runs it. '{workspace}' becomes the workspace's folder, '{name}' its name, '{reason}' why it runs (open, window, switch, quit, update or manual), and '{project:api}' the folder of the project api. Quote them where a path may hold spaces.",
     description: "A hint in the command dialog (HI-1954). '{workspace}', '{name}', '{reason}' and '{project:api}' are placeholders the user writes in the command (api is an example project name), and open, window, switch, quit, update and manual are the values {reason} becomes: keep all of them as they are (the quotes around them keep them from being read as placeholders here)."
   }),
-  runs: msg({ id: 'settings.closeCommand.runs', defaultMessage: 'Runs: {command}', description: 'Under the close command in Settings: the command exactly as Hive would run it, its placeholders filled in. {command} is that command: keep it as it is.' }),
+  runs: msg({ id: 'settings.closeCommand.runs', defaultMessage: 'Runs: {command}', description: 'Under the close command in Settings: the command exactly as Combwork would run it, its placeholders filled in. {command} is that command: keep it as it is.' }),
   hint: msg({
     id: 'settings.closeCommand.hint',
     defaultMessage: 'Combwork waits for it, showing it running. A command that shouldn\'t hold Combwork up can start its job and return, e.g. start "" "backup.cmd".',
@@ -43,15 +43,15 @@ const M = {
   save: msg({ id: 'settings.commands.save', defaultMessage: 'Save', description: 'The command dialog\'s button (HI-1954).' }),
   cancel: msg({ id: 'settings.commands.cancel', defaultMessage: 'Cancel', description: 'The command dialog\'s button (HI-1954).' }),
   noWorkspace: msg({ id: 'settings.commands.noWorkspace', defaultMessage: "Open a workspace to set its commands.", description: "Settings → Workspace's commands and its open and close points (HI-1954), with no workspace open." }),
-  saveFailed: msg({ id: 'settings.closeCommand.saveFailed', defaultMessage: "Couldn't save the command", description: "An error's title: saving the command Hive runs as the workspace closes or as Hive quits (Settings) failed (why follows)." }),
+  saveFailed: msg({ id: 'settings.closeCommand.saveFailed', defaultMessage: "Couldn't save the command", description: "An error's title: saving the command Combwork runs as the workspace closes or as Combwork quits (Settings) failed (why follows)." }),
   runFailed: msg({ id: 'settings.commands.runFailed', defaultMessage: "Couldn't run the command", description: "An error's title: running one of the user's commands by hand failed to start (why follows; HI-1954)." }),
   pointEmpty: msg({ id: 'settings.commands.pointEmpty', defaultMessage: 'Nothing runs.', description: 'A point such as "When this workspace opens, run" (HI-1954) with no command picked.' }),
   pointAdd: msg({ id: 'settings.commands.pointAdd', defaultMessage: 'Add a command to run here…', description: 'A drop-down under a point such as "When this workspace opens, run" (HI-1954): picks one of the commands to run there, after those already picked.' }),
   pointRemove: msg({ id: 'settings.commands.pointRemove', defaultMessage: "Don't run it here", description: 'A button beside a command a point runs (HI-1954): takes it off that point; the command itself stays.' }),
-  hiveBadge: msg({ id: 'settings.commands.hiveBadge', defaultMessage: 'Combwork', description: "A short tag beside a command in a workspace's point (HI-1954): one of Hive's own commands (Settings → General → Commands), not the workspace's." }),
+  hiveBadge: msg({ id: 'settings.commands.combworkBadge', defaultMessage: 'Combwork', description: "A short tag beside a command in a workspace's point (HI-1954): one of Combwork's own commands (Settings → General → Commands), not the workspace's." }),
   gone: msg({ id: 'settings.commands.gone', defaultMessage: '(deleted)', description: 'A command a point still names but which was deleted (HI-1954): it is skipped.' }),
-  cantFill: msg({ id: 'settings.commands.cantFill', defaultMessage: "{placeholders} can't be filled here: it won't run", description: "A warning beside a command a point runs (HI-1954): placeholders in it have no value at that point (for example {workspace} as Hive quits), so Hive won't run it there. {placeholders} lists them as written." }),
-  onUpdate: msg({ id: 'settings.closeCommand.onUpdate', defaultMessage: 'Also when Combwork restarts to install an update', description: 'A checkbox under the close command (Settings → Workspace → When this workspace closes, run, and Settings → General → When Hive quits, run): run it too when Hive restarts to install an update (by default it is skipped then).' })
+  cantFill: msg({ id: 'settings.commands.cantFill', defaultMessage: "{placeholders} can't be filled here: it won't run", description: "A warning beside a command a point runs (HI-1954): placeholders in it have no value at that point (for example {workspace} as Combwork quits), so Combwork won't run it there. {placeholders} lists them as written." }),
+  onUpdate: msg({ id: 'settings.closeCommand.onUpdate', defaultMessage: 'Also when Combwork restarts to install an update', description: 'A checkbox under the close command (Settings → Workspace → When this workspace closes, run, and Settings → General → When Combwork quits, run): run it too when Combwork restarts to install an update (by default it is skipped then).' })
 }
 
 /**

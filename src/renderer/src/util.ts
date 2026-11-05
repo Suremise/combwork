@@ -92,12 +92,12 @@ export { sessionLabel } from '@shared/defaults'
 /** A recent workspace's tooltip: its path, and why it is greyed or marked (#144). */
 export function recentTip(r: RecentWorkspace): string {
   if (!r.exists) return `${r.path}\n${tr(msg({ id: 'actions.recent.notFoundTip', defaultMessage: "Not found: moved or deleted, or on a drive that isn't connected.", description: "A recent workspace's tooltip, under its path: its folder isn't there." }))}`
-  if (r.openElsewhere) return `${r.path}\n${tr(msg({ id: 'actions.recent.elsewhereTip', defaultMessage: 'Open in another window: choosing it brings that window forward.', description: "A recent workspace's tooltip, under its path: another Hive window has it open." }))}`
+  if (r.openElsewhere) return `${r.path}\n${tr(msg({ id: 'actions.recent.elsewhereTip', defaultMessage: 'Open in another window: choosing it brings that window forward.', description: "A recent workspace's tooltip, under its path: another Combwork window has it open." }))}`
   return r.path
 }
 
 /** What a recent entry says beside its name: its path, "not found", or "open in another window". */
 export function recentNote(r: RecentWorkspace): string {
   if (!r.exists) return tr(msg({ id: 'actions.recent.notFound', defaultMessage: 'not found', description: "Beside a recent workspace's name: its folder isn't there. Lower case." }))
-  return r.openElsewhere ? tr(msg({ id: 'actions.recent.elsewhere', defaultMessage: 'open in another window', description: "Beside a recent workspace's name: another Hive window has it open. Lower case." })) : r.path
+  return r.openElsewhere ? tr(msg({ id: 'actions.recent.elsewhere', defaultMessage: 'open in another window', description: "Beside a recent workspace's name: another Combwork window has it open. Lower case." })) : r.path
 }

@@ -29,7 +29,7 @@ export const HAND_OVER_TEXT = {
   notice: msg({
     id: 'session.long.noticeText',
     defaultMessage: 'Its transcript is {size} (over {limit, number} MB): it may slow down. {when, select, now {It can hand over to a new conversation: Hand Over to… lets you choose.} assistant {It can start a new conversation (⋯ → New Conversation) once it is idle.} other {It can hand over to a new conversation when it has finished.}}',
-    description: "The notice that an agent's conversation is long. {size}: its transcript's size (\"24 MB\"); {limit}: the size it is flagged over, in MB (Settings → Sessions). Then what can be done: now (it is idle: Hand Over to… is a command), assistant (the Hive Assistant: ⋯ → New Conversation is its menu command), other (it is working, merging or on a card loop's card)."
+    description: "The notice that an agent's conversation is long. {size}: its transcript's size (\"24 MB\"); {limit}: the size it is flagged over, in MB (Settings → Sessions). Then what can be done: now (it is idle: Hand Over to… is a command), assistant (the Combwork Assistant: ⋯ → New Conversation is its menu command), other (it is working, merging or on a card loop's card)."
   }),
   /** A click on Hand Over to… (the notice's, the footer's size) when the agent may no longer hand over now. */
   notNow: msg({ id: 'session.long.notNow', defaultMessage: '{agent} is busy', description: "A notice's title: Hand Over to… was clicked, but the agent ({agent}) is working, merging or on a card loop's card now." }),

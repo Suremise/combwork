@@ -47,7 +47,7 @@ export interface SessionTreeOptions {
 }
 
 /** The group of sessions no agent ran (adopted, or from before Hive recorded agents), as the Sessions tab names it. */
-export const notFromAgent = (): string => tr(msg({ id: 'sessions.tree.notFromAgent', defaultMessage: 'Not from an agent', description: "A group in the Sessions tab's list: sessions no agent ran (adopted, or from before Hive recorded agents)." }))
+export const notFromAgent = (): string => tr(msg({ id: 'sessions.tree.notFromAgent', defaultMessage: 'Not from an agent', description: "A group in the Sessions tab's list: sessions no agent ran (adopted, or from before Combwork recorded agents)." }))
 
 const providerKey = (p: ProviderId): string => `p:${p}`
 export const sessionKey = (id: string): string => `s:${id}`

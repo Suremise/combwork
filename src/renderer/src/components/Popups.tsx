@@ -23,7 +23,7 @@ const M = {
   dismiss: msg({ id: 'shell.toast.dismiss', defaultMessage: 'Dismiss', description: 'Button on a notice in the corner: closes it.' }),
   agent: msg({ id: 'shell.toast.openAgent', defaultMessage: "Open {agent}'s pane", description: "Tooltip on a notification an agent or the Assistant sent about an agent (HI-1961): clicking it shows that agent's pane (where its terminal is). {agent} is the agent's name." }),
   card: msg({ id: 'shell.toast.openCard', defaultMessage: 'Open {card}', description: 'Tooltip on a notification an agent or the Assistant sent about a card (HI-1961): clicking it opens the card ({card}, its key, e.g. HI-12).' }),
-  unfinished: msg({ id: 'shell.entry.unfinished', defaultMessage: "Didn't finish: try again", description: "What a notification says above its buttons when one of them, run in another Hive window, didn't say it had finished (that window reloaded, closed, or took too long; HI-2320). The buttons stay, to try again." }),
+  unfinished: msg({ id: 'shell.entry.unfinished', defaultMessage: "Didn't finish: try again", description: "What a notification says above its buttons when one of them, run in another Combwork window, didn't say it had finished (that window reloaded, closed, or took too long; HI-2320). The buttons stay, to try again." }),
   project: msg({ id: 'shell.toast.openProject', defaultMessage: 'Show {project}', description: 'Tooltip on a notification about a project (HI-2320): clicking it shows the project ({project}, its name).' })
 }
 

@@ -16,8 +16,8 @@ import { timeAgo } from '../util'
  */
 
 const M = {
-  heading: msg({ id: 'performance.stalls.heading', defaultMessage: 'Main process stalls', description: "Heading of the Performance page's table of the times Hive's main process was busy long enough to be felt." }),
-  since: msg({ id: 'performance.stalls.since', defaultMessage: 'since Combwork started', description: 'After the Main process stalls heading: the table covers the time since Hive started, not the page\'s range. Lower case.' }),
+  heading: msg({ id: 'performance.stalls.heading', defaultMessage: 'Main process stalls', description: "Heading of the Performance page's table of the times Combwork's main process was busy long enough to be felt." }),
+  since: msg({ id: 'performance.stalls.since', defaultMessage: 'since Combwork started', description: 'After the Main process stalls heading: the table covers the time since Combwork started, not the page\'s range. Lower case.' }),
   tip: msg({
     id: 'performance.stalls.tip',
     defaultMessage:
@@ -31,13 +31,13 @@ const M = {
   during: msg({ id: 'performance.stalls.during', defaultMessage: 'During it', description: "Column header of the Performance page's Main process stalls table: the other work under way during the stall (calls from the window, Agent API requests, hooks)." }),
   waiting: msg({ id: 'performance.stalls.waiting', defaultMessage: 'mostly waiting', description: "Under a stall's CPU time in the Performance page's Main process stalls table: it used under half its length, so it was waiting. Lower case." }),
   cpuUnknown: msg({ id: 'performance.stalls.cpuUnknown', defaultMessage: 'unknown', description: "A stall's CPU time in the Performance page's Main process stalls table when it couldn't be measured. Lower case." }),
-  none: msg({ id: 'performance.stalls.none', defaultMessage: 'none known', description: "A stall's Step or During it cell in the Performance page's Main process stalls table when Hive knows of none. Lower case." }),
+  none: msg({ id: 'performance.stalls.none', defaultMessage: 'none known', description: "A stall's Step or During it cell in the Performance page's Main process stalls table when Combwork knows of none. Lower case." }),
   more: msg({ id: 'performance.stalls.more', defaultMessage: 'and {n, number} more', description: "The last line of a stall's Step or During it cell in the Performance page's Main process stalls table: how many more were under way. Lower case." }),
   ms: msg({ id: 'performance.stalls.ms', defaultMessage: '{ms, number} ms', description: 'A length in milliseconds ("750 ms") in the Performance page\'s Main process stalls table.' }),
   seconds: msg({ id: 'performance.stalls.seconds', defaultMessage: '{s} s', description: 'A length in seconds ("1.5 s", the number already formatted) in the Performance page\'s Main process stalls table.' }),
   running: msg({ id: 'performance.stalls.running', defaultMessage: '{length}, still running', description: "A work's length in a stall's During it or Step cell, while it was still under way when the stall was recorded ({length}: \"1.5 s\")." }),
   repeated: msg({ id: 'performance.stalls.repeated', defaultMessage: '×{n, number} · {length}', description: "After a work's name in a stall's During it or Step cell when there were several of it: how many ({n}) and their length in all ({length}: \"81 ms\", or \"1.5 s, still running\")." }),
-  count: msg({ id: 'performance.stalls.count', defaultMessage: '{total, plural, one {# stall since Combwork started} other {# stalls since Combwork started}}{listed, select, all {} other {; the last {kept, number} are listed}}.', description: "Under the Performance page's Main process stalls table: how many stalls there were since Hive started, and that only the last {kept} are listed when there were more. {listed} is a key (all or some): don't translate the keys, only the texts." }),
+  count: msg({ id: 'performance.stalls.count', defaultMessage: '{total, plural, one {# stall since Combwork started} other {# stalls since Combwork started}}{listed, select, all {} other {; the last {kept, number} are listed}}.', description: "Under the Performance page's Main process stalls table: how many stalls there were since Combwork started, and that only the last {kept} are listed when there were more. {listed} is a key (all or some): don't translate the keys, only the texts." }),
   empty: msg({ id: 'performance.stalls.empty', defaultMessage: 'No stalls since Combwork started.', description: "The Performance page's Main process stalls table when there were none." }),
   loadTarget: msg({ id: 'performance.stalls.loadTarget', defaultMessage: "the main process's stalls", description: 'What could not be read on the Performance page: shown in "Could not load {what}: {error}".' })
 }

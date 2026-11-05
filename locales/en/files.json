@@ -65,7 +65,7 @@
   },
   "files.attachments.descAssistant": {
     "defaultMessage": "Files pasted or dropped into the Assistant, by conversation.",
-    "description": "Under the Hive Assistant's Attachments heading."
+    "description": "Under the Combwork Assistant's Attachments heading."
   },
   "files.attachments.filters": {
     "defaultMessage": "Show",
@@ -77,7 +77,7 @@
   },
   "files.attachments.groupDeleteDetail": {
     "defaultMessage": "{filtered, select, yes {All of its attachments go, whatever the filter shows. } other {}}{host, select, assistant {The conversation keeps its transcript, which still mentions their paths.} other {The session keeps its transcript, which still mentions their paths.}} You can restore them from the Recycle Bin.",
-    "description": "Under the confirmation before deleting a session's attachments. {filtered} is yes when a filter hides some of them; {host} is assistant for the Hive Assistant's conversations."
+    "description": "Under the confirmation before deleting a session's attachments. {filtered} is yes when a filter hides some of them; {host} is assistant for the Combwork Assistant's conversations."
   },
   "files.attachments.groupDeleteFailed": {
     "defaultMessage": "Could not delete the attachments",
@@ -105,7 +105,7 @@
   },
   "files.attachments.infoAssistant": {
     "defaultMessage": "Kept in the Assistant's home, .combwork/attachments. Click a conversation's name to read it.",
-    "description": "The (i) beside the Hive Assistant's Attachments heading. Keep .combwork/attachments as it is."
+    "description": "The (i) beside the Combwork Assistant's Attachments heading. Keep .combwork/attachments as it is."
   },
   "files.attachments.kind.image": {
     "defaultMessage": "Images",
@@ -137,7 +137,7 @@
   },
   "files.attachments.noneHintAssistant": {
     "defaultMessage": "Paste a screenshot into the Assistant's panel with <kbd>Ctrl+V</kbd>, or drag files onto it: images, PDFs, logs, any file. Combwork keeps a copy of each one here, grouped by conversation.",
-    "description": "Under \"No attachments yet\" in the Hive Assistant's Attachments. <kbd> marks a key: keep it as it is."
+    "description": "Under \"No attachments yet\" in the Combwork Assistant's Attachments. <kbd> marks a key: keep it as it is."
   },
   "files.attachments.openFolder": {
     "defaultMessage": "Open Attachments Folder",
@@ -145,7 +145,7 @@
   },
   "files.attachments.openTranscript": {
     "defaultMessage": "{host, select, assistant {Open this conversation's transcript} other {Open this session's transcript}}",
-    "description": "Tooltip on a session's name in the Attachments tab. {host} is assistant for the Hive Assistant's conversations."
+    "description": "Tooltip on a session's name in the Attachments tab. {host} is assistant for the Combwork Assistant's conversations."
   },
   "files.attachments.paneEmpty": {
     "defaultMessage": "Nothing pasted or dropped into a pane yet.",
@@ -161,7 +161,7 @@
   },
   "files.attachments.running": {
     "defaultMessage": "{host, select, assistant {Its conversation is running} other {Its session is running}}",
-    "description": "Why an attachment can't be deleted now. {host} is assistant for the Hive Assistant's conversations."
+    "description": "Why an attachment can't be deleted now. {host} is assistant for the Combwork Assistant's conversations."
   },
   "files.attachments.runningBadge": {
     "defaultMessage": "Running",
@@ -181,7 +181,7 @@
   },
   "files.attachments.total": {
     "defaultMessage": "{host, select, assistant {{total, number} in {groups, plural, one {# conversation} other {# conversations}}} other {{total, number} in {groups, plural, one {# session} other {# sessions}}}}",
-    "description": "Beside the Attachments heading: how many attachments, in how many sessions (conversations for the Hive Assistant)."
+    "description": "Beside the Attachments heading: how many attachments, in how many sessions (conversations for the Combwork Assistant)."
   },
   "files.attachments.totalWithCards": {
     "defaultMessage": "{total, plural, one {# file} other {# files}} · {cards, number} on cards, {sessions, number} in {groups, plural, one {# session} other {# sessions}}",
@@ -481,7 +481,7 @@
   },
   "files.root.tip": {
     "defaultMessage": "Show the project folder, or the folder an agent works in: its slot or worktree",
-    "description": "Tooltip on the Files tab's folder picker, shown when agents work outside the project folder (in slots, Hive's worktrees lent to cards, or their own worktrees from before 1.0)."
+    "description": "Tooltip on the Files tab's folder picker, shown when agents work outside the project folder (in slots, Combwork's worktrees lent to cards, or their own worktrees from before 1.0)."
   },
   "files.root.worktree": {
     "defaultMessage": "{agent}'s worktree · {branch}",
@@ -521,7 +521,7 @@
   },
   "files.view.binary": {
     "defaultMessage": "This is a binary file.",
-    "description": "Shown in place of a file Hive cannot show as text."
+    "description": "Shown in place of a file Combwork cannot show as text."
   },
   "files.view.changedBanner": {
     "defaultMessage": "{name} has changed on disk since you opened it.",

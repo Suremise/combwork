@@ -11,7 +11,7 @@
   },
   "console.tooMany": {
     "text": "Too many developer consoles open at once",
-    "note": "An error opening a developer console window or starting a recording: Hive already watches for as many as it allows. Closing one helps.",
+    "note": "An error opening a developer console window or starting a recording: Combwork already watches for as many as it allows. Closing one helps.",
     "audience": "both"
   }
 }

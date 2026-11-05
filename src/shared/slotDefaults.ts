@@ -39,5 +39,5 @@ export interface SlotLevelForm {
  */
 export const SLOT_COPY_TEXT = {
   title: msg({ id: 'settings.slotCopy.title', defaultMessage: 'Files copied into new slots', description: 'A workflow default (Git) and a project setting: the git-ignored files copied from the project folder into each new slot and review copy (glossary 2.5: slot, review copy).' }),
-  desc: msg({ id: 'settings.slotCopy.desc', defaultMessage: 'Git-ignored files copied from the project folder into each new slot and review copy, comma separated or one per line, such as .env files. Projects inherit it, and can set their own in Version Control → Slots and copies.', description: 'What the workflow default “Files copied into new slots” does, at Hive’s and a workspace’s level (glossary 2.5: slot, review copy). Keep .env as it is.' })
+  desc: msg({ id: 'settings.slotCopy.desc', defaultMessage: 'Git-ignored files copied from the project folder into each new slot and review copy, comma separated or one per line, such as .env files. Projects inherit it, and can set their own in Version Control → Slots and copies.', description: 'What the workflow default “Files copied into new slots” does, at Combwork’s and a workspace’s level (glossary 2.5: slot, review copy). Keep .env as it is.' })
 }

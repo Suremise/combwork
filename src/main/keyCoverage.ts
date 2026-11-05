@@ -52,8 +52,8 @@ let stored: Stored | null = null
 let total = 0
 let loading: Promise<void> | null = null
 
-const UNREADABLE = msg({ id: 'main.keys.maskingUnreadable', defaultMessage: "Combwork can't check this for API keys: its masking data can't be read. See Settings → Accounts & Connections.", description: "An error: an export, Copy Diagnostics or a recording was refused because the data Hive uses to hide server connections' API keys can't be read. Settings → Accounts & Connections names a section, where it can be reset." })
-const FULL = msg({ id: 'main.keys.maskingFull', defaultMessage: "Combwork can't keep masking for another key: it already keeps the most it can. The key wasn't saved.", description: "An error saving a server connection's API key: Hive keeps a fingerprint of every key ever saved (to hide it in logs and exports) and has reached its limit." })
+const UNREADABLE = msg({ id: 'main.keys.maskingUnreadable', defaultMessage: "Combwork can't check this for API keys: its masking data can't be read. See Settings → Accounts & Connections.", description: "An error: an export, Copy Diagnostics or a recording was refused because the data Combwork uses to hide server connections' API keys can't be read. Settings → Accounts & Connections names a section, where it can be reset." })
+const FULL = msg({ id: 'main.keys.maskingFull', defaultMessage: "Combwork can't keep masking for another key: it already keeps the most it can. The key wasn't saved.", description: "An error saving a server connection's API key: Combwork keeps a fingerprint of every key ever saved (to hide it in logs and exports) and has reached its limit." })
 
 function readMarksFile(): Marks {
   try {

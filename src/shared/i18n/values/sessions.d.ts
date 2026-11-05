@@ -73,8 +73,8 @@ interface HiveMessageValues {
   'sessions.compaction.title': undefined
   'sessions.compaction.tokens': { before: string | number; after: string | number; next: string; freed: string | number; when: string | number }
   'sessions.delete.button': undefined
+  'sessions.delete.detailCombwork': { cli: string | number }
   'sessions.delete.detailExternal': { cli: string | number }
-  'sessions.delete.detailHive': { cli: string | number }
   'sessions.delete.failed': { kind: string }
   'sessions.delete.message': { name: string | number }
   'sessions.delete.title': { kind: string }

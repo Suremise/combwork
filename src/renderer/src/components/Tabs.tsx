@@ -36,7 +36,7 @@ export interface TabItem<T extends string = string> {
 }
 
 const T = {
-  unsaved: msg({ id: 'tabs.unsaved', defaultMessage: 'Unsaved changes', description: "Tooltip of the dot on a tab whose page has changes not saved yet (Settings → Version Control's Hive defaults, say), and read out with the tab's name." }),
+  unsaved: msg({ id: 'tabs.unsaved', defaultMessage: 'Unsaved changes', description: "Tooltip of the dot on a tab whose page has changes not saved yet (Settings → Version Control's Combwork defaults, say), and read out with the tab's name." }),
   named: msg({ id: 'tabs.unsavedNamed', defaultMessage: '{tab} (unsaved changes)', description: "A tab's accessible name while its page has changes not saved yet; {tab} is its name." }),
   withNote: msg({ id: 'tabs.withNote', defaultMessage: '{tab} ({note})', description: "A dimmed tab's accessible name: {tab} is its name, {note} why it is dimmed (a CLI turned off, say)." })
 }

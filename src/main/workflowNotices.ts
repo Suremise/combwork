@@ -45,7 +45,7 @@ const log = createLogger('workflow')
 
 const M = {
   forYou: msg({ id: 'service.workflowNotice.forYou', defaultMessage: '{card} needs you', description: "A notification's title: a card (its key, e.g. HI-12) waits for the user (an approval, a decision, a question an agent asked). Its body says what." }),
-  lane: msg({ id: 'service.workflowNotice.lane', defaultMessage: 'Lane {lane}', description: "A notification's title: something happened in a lane (Hive's record of a card loop, a builder and a reviewer taking cards in turn). {lane} is its label, e.g. “B1 / R1 (greetings)”. Its body lists what happened." }),
+  lane: msg({ id: 'service.workflowNotice.lane', defaultMessage: 'Lane {lane}', description: "A notification's title: something happened in a lane (Combwork's record of a card loop, a builder and a reviewer taking cards in turn). {lane} is its label, e.g. “B1 / R1 (greetings)”. Its body lists what happened." }),
   failed: msg({ id: 'service.workflowNotice.failed', defaultMessage: '{card} failed review', description: "A line of a lane's notification: its reviewer gave a card (its key, e.g. HI-12) a failing verdict, so it goes back to its builder." }),
   blocked: msg({ id: 'service.workflowNotice.blocked', defaultMessage: '{card} is blocked: {reason}', description: "A line of a lane's notification: a card (its key, e.g. HI-12) was marked blocked, with the reason given ({reason}, the user's or an agent's own words)." }),
   blockedNoReason: msg({ id: 'service.workflowNotice.blockedNoReason', defaultMessage: '{card} is blocked', description: "A line of a lane's notification: a card (its key, e.g. HI-12) was marked blocked." }),

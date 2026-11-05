@@ -93,6 +93,21 @@
       "branch": "plain"
     }
   },
+  "main.combworkMove.what.cards": {
+    "placeholders": {}
+  },
+  "main.combworkMove.what.excludes": {
+    "placeholders": {}
+  },
+  "main.combworkMove.what.folders": {
+    "placeholders": {}
+  },
+  "main.combworkMove.what.notes": {
+    "placeholders": {}
+  },
+  "main.combworkMove.what.worktrees": {
+    "placeholders": {}
+  },
   "main.connections.badMode": {
     "placeholders": {
       "cli": "plain",
@@ -296,21 +311,6 @@
     "placeholders": {
       "why": "plain"
     }
-  },
-  "main.hiveMove.what.cards": {
-    "placeholders": {}
-  },
-  "main.hiveMove.what.excludes": {
-    "placeholders": {}
-  },
-  "main.hiveMove.what.folders": {
-    "placeholders": {}
-  },
-  "main.hiveMove.what.notes": {
-    "placeholders": {}
-  },
-  "main.hiveMove.what.worktrees": {
-    "placeholders": {}
   },
   "main.keys.maskingFull": {
     "placeholders": {}

@@ -5,7 +5,7 @@
   },
   "agents.add.checkingConnection": {
     "defaultMessage": "Finding out which coding agents are installed, to choose the first connection that can run…",
-    "description": "Under the choice of connection in Add Agent (HI-2108) while Hive still looks for the installed coding agent CLIs: the first usable connection is chosen once it knows; Add waits until then."
+    "description": "Under the choice of connection in Add Agent (HI-2108) while Combwork still looks for the installed coding agent CLIs: the first usable connection is chosen once it knows; Add waits until then."
   },
   "agents.add.failed": {
     "defaultMessage": "Could not add agent",
@@ -45,7 +45,7 @@
   },
   "agents.add.whereNote": {
     "defaultMessage": "In the project folder. A builder takes one of the project's slots for each card it builds and works there until the card is done; Version Control → Branches & remotes lists them.",
-    "description": "The Add Agent dialog, under Where it works: agents have no worktree of their own (1.0); a builder works in a slot (a working folder Hive lends to a card) while it builds a card. Version Control → Branches & remotes: use their translated names. Glossary: slot."
+    "description": "The Add Agent dialog, under Where it works: agents have no worktree of their own (1.0); a builder works in a slot (a working folder Combwork lends to a card) while it builds a card. Version Control → Branches & remotes: use their translated names. Glossary: slot."
   },
   "agents.batch.busy": {
     "defaultMessage": "{status, select, working {will be interrupted} background {background tasks will stop} waiting {waiting for you} other {its card loop pauses until it is resumed}}",
@@ -69,11 +69,11 @@
   },
   "agents.batch.worktreeUnchecked": {
     "defaultMessage": "{branch}: always kept (couldn't be checked)",
-    "description": "Remove All's Worktree column: the agent's branch ({branch}) is kept because Hive couldn't check it."
+    "description": "Remove All's Worktree column: the agent's branch ({branch}) is kept because Combwork couldn't check it."
   },
   "agents.branchMerge.anyway": {
     "defaultMessage": "Merge anyway…",
-    "description": "A button in the Merge dialog when Hive's merge queue merges the branch's card: merges it here all the same (asks first; recorded as an override)."
+    "description": "A button in the Merge dialog when Combwork's merge queue merges the branch's card: merges it here all the same (asks first; recorded as an override)."
   },
   "agents.branchMerge.anywayConfirm": {
     "defaultMessage": "Merge anyway",
@@ -85,7 +85,7 @@
   },
   "agents.branchMerge.anywayTitle": {
     "defaultMessage": "Merge {card} outside the merge queue?",
-    "description": "Title of the confirmation before Merge anyway: the card ({card}: its key) is one Hive's merge queue merges. Glossary 2.5: merge queue."
+    "description": "Title of the confirmation before Merge anyway: the card ({card}: its key) is one Combwork's merge queue merges. Glossary 2.5: merge queue."
   },
   "agents.branchMerge.branch": {
     "defaultMessage": "Branch",
@@ -129,7 +129,7 @@
   },
   "agents.branchMerge.conflict": {
     "defaultMessage": "Merging would conflict. Nothing was changed. These files were changed on both {branch} and {into}:",
-    "description": "The Merge dialog after a merge that would conflict: Hive tried it and changed nothing; the files follow."
+    "description": "The Merge dialog after a merge that would conflict: Combwork tried it and changed nothing; the files follow."
   },
   "agents.branchMerge.failed": {
     "defaultMessage": "Could not merge",
@@ -137,7 +137,7 @@
   },
   "agents.branchMerge.group.carried": {
     "defaultMessage": "Agents' old worktrees",
-    "description": "A group in the Merge dialog's branch list: branches of agents' 0.9 worktrees that Hive carried into its slots."
+    "description": "A group in the Merge dialog's branch list: branches of agents' 0.9 worktrees that Combwork carried into its slots."
   },
   "agents.branchMerge.group.line": {
     "defaultMessage": "Cards' lines",
@@ -149,7 +149,7 @@
   },
   "agents.branchMerge.inSlot": {
     "defaultMessage": "{branch} (in {slot})",
-    "description": "A branch in the Merge dialog's list, checked out in one of Hive's slots ({slot}: its name, slot-a)."
+    "description": "A branch in the Merge dialog's list, checked out in one of Combwork's slots ({slot}: its name, slot-a)."
   },
   "agents.branchMerge.into": {
     "defaultMessage": "Into",
@@ -261,11 +261,11 @@
   },
   "agents.claude.extensionNote": {
     "defaultMessage": "You have the Claude Code extension for VS Code (or a similar editor). Combwork doesn't use it — the extension's built-in copy moves with every extension update and can't be updated on its own. Install the CLI; your extension keeps working as before.",
-    "description": "Provider Setup → Claude Code, when only an editor extension was found: why Hive needs the standalone CLI."
+    "description": "Provider Setup → Claude Code, when only an editor extension was found: why Combwork needs the standalone CLI."
   },
   "agents.claude.installNote": {
     "defaultMessage": "The installer runs `irm https://claude.ai/install.ps1 | iex` in PowerShell and installs to `%USERPROFILE%\\.local\\bin`. After installing, sign in with your Claude account (Pro, Max, Team or Enterprise) or an Anthropic Console account. If the CLI is installed somewhere else, set its path in Settings → Claude Code.",
-    "description": "Provider Setup → Claude Code: how its installer works. Keep the command and the path in backticks exactly as they are, and the plan names (Pro, Max, Team, Enterprise); Settings → Claude Code is a place in Hive's settings."
+    "description": "Provider Setup → Claude Code: how its installer works. Keep the command and the path in backticks exactly as they are, and the plan names (Pro, Max, Team, Enterprise); Settings → Claude Code is a place in Combwork's settings."
   },
   "agents.claude.latestFable": {
     "defaultMessage": "Fable (latest)",
@@ -317,11 +317,11 @@
   },
   "agents.claude.signInHelp": {
     "defaultMessage": "Type /login in one of its agents’ terminals (that agent then carries on by itself), or use Help → Provider Setup → Claude Code → Sign in.",
-    "description": "How to sign in to Claude Code again after its sign-in expired (an agent's pane, a notification). /login is a command: keep it; Help → Provider Setup → Claude Code → Sign in is a menu path in Hive."
+    "description": "How to sign in to Claude Code again after its sign-in expired (an agent's pane, a notification). /login is a command: keep it; Help → Provider Setup → Claude Code → Sign in is a menu path in Combwork."
   },
   "agents.cliOwn.cliNote": {
     "defaultMessage": "Combwork passed no mode, so the CLI's own screen shows the one it is in.",
-    "description": "In the tooltip of a running agent's permission mode badge, for an agent on \"The CLI's own setting\": Hive doesn't know its mode; the CLI's screen shows it."
+    "description": "In the tooltip of a running agent's permission mode badge, for an agent on \"The CLI's own setting\": Combwork doesn't know its mode; the CLI's screen shows it."
   },
   "agents.cliOwn.description": {
     "defaultMessage": "Combwork passes no permission mode: the CLI starts in the mode its own config sets, or its default. Combwork can't switch it in a running session.",
@@ -329,11 +329,11 @@
   },
   "agents.cliOwn.label": {
     "defaultMessage": "The CLI's own setting",
-    "description": "A permission mode choice offered for every coding agent's CLI: Hive passes no mode, so the CLI uses the one its own config sets. Keep it short."
+    "description": "A permission mode choice offered for every coding agent's CLI: Combwork passes no mode, so the CLI uses the one its own config sets. Keep it short."
   },
   "agents.cliOwn.short": {
     "defaultMessage": "CLI's own",
-    "description": "The permission mode badge of an agent on \"The CLI's own setting\" (Hive passes no mode). Very short: it fits a small badge."
+    "description": "The permission mode badge of an agent on \"The CLI's own setting\" (Combwork passes no mode). Very short: it fits a small badge."
   },
   "agents.codex.approveForMe": {
     "defaultMessage": "Approve for me",
@@ -353,7 +353,7 @@
   },
   "agents.codex.extensionNote": {
     "defaultMessage": "You have the Codex extension for VS Code (or a similar editor). Combwork doesn't use it — the extension's built-in copy moves with every extension update. Install the CLI; your extension keeps working as before.",
-    "description": "Provider Setup → Codex, when only an editor extension was found: why Hive needs the standalone CLI."
+    "description": "Provider Setup → Codex, when only an editor extension was found: why Combwork needs the standalone CLI."
   },
   "agents.codex.fullAccess": {
     "defaultMessage": "Full access",
@@ -365,7 +365,7 @@
   },
   "agents.codex.installNote": {
     "defaultMessage": "The installer runs `irm https://chatgpt.com/codex/install.ps1 | iex` in PowerShell and installs to `%LOCALAPPDATA%\\Programs\\OpenAI\\Codex`. After installing, sign in with your ChatGPT account (Plus, Pro, Business or Enterprise) or an API key, then set up its Windows sandbox once. If the CLI is installed somewhere else, set its path in Settings → Codex.",
-    "description": "Provider Setup → Codex: how its installer works. Keep the command and the path in backticks exactly as they are, and the plan names (Plus, Pro, Business, Enterprise); Settings → Codex is a place in Hive's settings."
+    "description": "Provider Setup → Codex: how its installer works. Keep the command and the path in backticks exactly as they are, and the plan names (Plus, Pro, Business, Enterprise); Settings → Codex is a place in Combwork's settings."
   },
   "agents.codex.modelPlaceholder": {
     "defaultMessage": "Model ID, e.g. gpt-6-sol",
@@ -385,7 +385,7 @@
   },
   "agents.codex.signInHelp": {
     "defaultMessage": "Sign in again in Help → Provider Setup → Codex → Sign in (or run codex login in a terminal).",
-    "description": "How to sign in to Codex again after its sign-in expired (an agent's pane, a notification). Help → Provider Setup → Codex → Sign in is a menu path in Hive; codex login is a command: keep it."
+    "description": "How to sign in to Codex again after its sign-in expired (an agent's pane, a notification). Help → Provider Setup → Codex → Sign in is a menu path in Combwork; codex login is a command: keep it."
   },
   "agents.copilot.acceptEdits": {
     "defaultMessage": "Accept edits",
@@ -425,11 +425,11 @@
   },
   "agents.copilot.extensionNote": {
     "defaultMessage": "You have GitHub Copilot in VS Code (or a similar editor). Combwork doesn't use the editor's copy — it moves with every extension update. Install the Copilot CLI; your extension keeps working as before.",
-    "description": "Provider Setup → GitHub Copilot, when only an editor extension was found: why Hive needs the standalone CLI."
+    "description": "Provider Setup → GitHub Copilot, when only an editor extension was found: why Combwork needs the standalone CLI."
   },
   "agents.copilot.installNote": {
     "defaultMessage": "Install the GitHub Copilot CLI with WinGet (`winget install GitHub.Copilot`) or npm (`npm install -g @github/copilot`), then sign in once with `copilot login` in a terminal (or with the GitHub CLI, which Copilot also uses). Copilot Free runs the Auto model only; choosing a model needs a paid plan. If the CLI is installed somewhere else, set its path in Settings → GitHub Copilot.",
-    "description": "Provider Setup → GitHub Copilot: how to install it. Keep the commands in backticks exactly as they are; Copilot Free is a plan's name and Auto a model's; Settings → GitHub Copilot is a place in Hive's settings."
+    "description": "Provider Setup → GitHub Copilot: how to install it. Keep the commands in backticks exactly as they are; Copilot Free is a plan's name and Auto a model's; Settings → GitHub Copilot is a place in Combwork's settings."
   },
   "agents.copilot.modelPlaceholder": {
     "defaultMessage": "Model ID, e.g. claude-sonnet-5.5 or auto",
@@ -449,11 +449,11 @@
   },
   "agents.copilot.signInHelp": {
     "defaultMessage": "Sign in again: run copilot login in a terminal (Help → Provider Setup → GitHub Copilot shows how).",
-    "description": "How to sign in to GitHub Copilot again after its sign-in expired (an agent's pane, a notification). copilot login is a command: keep it; Help → Provider Setup → GitHub Copilot is a menu path in Hive."
+    "description": "How to sign in to GitHub Copilot again after its sign-in expired (an agent's pane, a notification). copilot login is a command: keep it; Help → Provider Setup → GitHub Copilot is a menu path in Combwork."
   },
   "agents.dialect.auto": {
     "defaultMessage": "Auto (the file for the model it runs)",
-    "description": "Agent Settings' Dialect choice: Hive picks the model file whose model ID is the one the agent runs. Glossary: dialect."
+    "description": "Agent Settings' Dialect choice: Combwork picks the model file whose model ID is the one the agent runs. Glossary: dialect."
   },
   "agents.dialect.copy": {
     "defaultMessage": "{name} (test copy)",
@@ -609,7 +609,7 @@
   },
   "agents.handOver.needsTools": {
     "defaultMessage": "This needs Combwork's tools in sessions. Turn on \"Provide Combwork tools to sessions\" in Settings → Agent API.",
-    "description": "The Continue with… dialog when sessions don't get Hive's tools: the setting to turn on (its name in quotes, and where: use their translated names)."
+    "description": "The Continue with… dialog when sessions don't get Combwork's tools: the setting to turn on (its name in quotes, and where: use their translated names)."
   },
   "agents.handOver.off": {
     "defaultMessage": "{cli} is turned off.",
@@ -649,15 +649,15 @@
   },
   "agents.installSource.native": {
     "defaultMessage": "native install",
-    "description": "Where Hive found a coding agent's CLI: the folder its native installer puts it in. Shown as \"found via native install\" (Provider Setup), in Help → About and in Settings."
+    "description": "Where Combwork found a coding agent's CLI: the folder its native installer puts it in. Shown as \"found via native install\" (Provider Setup), in Help → About and in Settings."
   },
   "agents.installSource.settings": {
     "defaultMessage": "Settings",
-    "description": "Where Hive found a coding agent's CLI: the path set in Settings (the provider's page). Shown as \"found via Settings\" (Provider Setup), in Help → About and in Settings."
+    "description": "Where Combwork found a coding agent's CLI: the path set in Settings (the provider's page). Shown as \"found via Settings\" (Provider Setup), in Help → About and in Settings."
   },
   "agents.installSource.standalone": {
     "defaultMessage": "standalone install",
-    "description": "Where Hive found a coding agent's CLI: the folder its standalone installer puts it in. Shown as \"found via standalone install\" (Provider Setup), in Help → About and in Settings."
+    "description": "Where Combwork found a coding agent's CLI: the folder its standalone installer puts it in. Shown as \"found via standalone install\" (Provider Setup), in Help → About and in Settings."
   },
   "agents.keys.clipboard": {
     "defaultMessage": "Ctrl+{key} is kept for copy, paste and undo.",
@@ -709,7 +709,7 @@
   },
   "agents.limit.most": {
     "defaultMessage": "A project can have up to {most, number} agents.",
-    "description": "Why another agent can't be added to a project: it has as many as Hive allows ({most}, 24)."
+    "description": "Why another agent can't be added to a project: it has as many as Combwork allows ({most}, 24)."
   },
   "agents.limit.openWorkflow": {
     "defaultMessage": "Open Workflow Options",
@@ -765,7 +765,7 @@
   },
   "agents.mergeDialog.anyway": {
     "defaultMessage": "Merge anyway…",
-    "description": "A button in the Merge dialog when Hive's merge queue merges the branch's card: merges it here all the same (asks first; recorded as an override)."
+    "description": "A button in the Merge dialog when Combwork's merge queue merges the branch's card: merges it here all the same (asks first; recorded as an override)."
   },
   "agents.mergeDialog.anywayConfirm": {
     "defaultMessage": "Merge anyway",
@@ -777,7 +777,7 @@
   },
   "agents.mergeDialog.anywayTitle": {
     "defaultMessage": "Merge {card} outside the merge queue?",
-    "description": "Title of the confirmation before Merge anyway: the card ({card}: its key) is one Hive's merge queue merges. Glossary 2.5: merge queue."
+    "description": "Title of the confirmation before Merge anyway: the card ({card}: its key) is one Combwork's merge queue merges. Glossary 2.5: merge queue."
   },
   "agents.mergeDialog.cantRead": {
     "defaultMessage": "Nothing can be merged until Combwork can read the branch.",
@@ -789,7 +789,7 @@
   },
   "agents.mergeDialog.conflict": {
     "defaultMessage": "Merging would conflict. Nothing was changed.",
-    "description": "The Merge dialog after a merge that would conflict: Hive tried it and changed nothing."
+    "description": "The Merge dialog after a merge that would conflict: Combwork tried it and changed nothing."
   },
   "agents.mergeDialog.conflictFiles": {
     "defaultMessage": "These files were changed on both {branch} and {into}:",
@@ -861,15 +861,15 @@
   },
   "agents.mergeDialog.queueLookup": {
     "defaultMessage": "Checking whether Combwork merges this branch’s card through the merge queue…",
-    "description": "Why Merge is off for a moment in the Merge dialog: Hive is reading whether its merge queue merges the branch's card. Glossary 2.5: merge queue."
+    "description": "Why Merge is off for a moment in the Merge dialog: Combwork is reading whether its merge queue merges the branch's card. Glossary 2.5: merge queue."
   },
   "agents.mergeDialog.queueLookupFailed": {
     "defaultMessage": "Couldn't read whether Combwork merges this branch's card through the merge queue, so Merge stays off: {why}",
-    "description": "The Merge dialog when Hive couldn't read whether its merge queue merges the branch's card ({why}: the error). Merge is a button: keep it as Hive shows it."
+    "description": "The Merge dialog when Combwork couldn't read whether its merge queue merges the branch's card ({why}: the error). Merge is a button: keep it as Combwork shows it."
   },
   "agents.mergeDialog.queueMerges": {
     "defaultMessage": "Combwork merges {card} through the merge queue. Merge anyway merges it here instead.",
-    "description": "Why Merge is disabled in the Merge dialog: the branch's card ({card}: its key) is merged by Hive's merge queue under its rules. Glossary 2.5: merge queue."
+    "description": "Why Merge is disabled in the Merge dialog: the branch's card ({card}: its key) is merged by Combwork's merge queue under its rules. Glossary 2.5: merge queue."
   },
   "agents.mergeDialog.queueNotYet": {
     "defaultMessage": "It goes into the queue for {target} once it is approved.",
@@ -889,7 +889,7 @@
   },
   "agents.mergeDialog.queueRetry": {
     "defaultMessage": "Retry",
-    "description": "A button in the Merge dialog after Hive couldn't read whether its merge queue merges the branch's card: reads it again."
+    "description": "A button in the Merge dialog after Combwork couldn't read whether its merge queue merges the branch's card: reads it again."
   },
   "agents.mergeDialog.queueTesting": {
     "defaultMessage": "The queue for {target} is testing it now.",
@@ -981,15 +981,15 @@
   },
   "agents.models.fallback": {
     "defaultMessage": "Fallback ({provider} couldn't be asked){edited, select, yes {, as you edited it} other {}}",
-    "description": "Settings → a provider: its models are Hive's fallback list, because the CLI ({provider}) couldn't be asked; and whether the user edited that list."
+    "description": "Settings → a provider: its models are Combwork's fallback list, because the CLI ({provider}) couldn't be asked; and whether the user edited that list."
   },
   "agents.models.fromCache": {
     "defaultMessage": "From {provider}{version, select, none {} other { {version}}} (as it last said; asking again)",
-    "description": "Settings → a provider: where its models come from now: what the CLI ({provider}) said when last asked ({version}: its version, none: leave that branch empty), while Hive asks again."
+    "description": "Settings → a provider: where its models come from now: what the CLI ({provider}) said when last asked ({version}: its version, none: leave that branch empty), while Combwork asks again."
   },
   "agents.models.fromCli": {
     "defaultMessage": "From {provider}{version, select, none {} other { {version}}}",
-    "description": "Settings → a provider: where its models come from now: the CLI ({provider}: its name) told Hive, in that version ({version}; none: leave that branch empty)."
+    "description": "Settings → a provider: where its models come from now: the CLI ({provider}: its name) told Combwork, in that version ({version}; none: leave that branch empty)."
   },
   "agents.models.olderGroup": {
     "defaultMessage": "Older versions",
@@ -1045,11 +1045,11 @@
   },
   "agents.permission.cliOwnNoSwitch": {
     "defaultMessage": "It started in the CLI's own setting, so Combwork doesn't know which mode it is in. A choice here restarts it.",
-    "description": "In a running agent's permission mode menu, under \"Hive can't switch this session's mode\" (a session started in \"The CLI's own setting\", Hive passed no mode): why, and what a choice does."
+    "description": "In a running agent's permission mode menu, under \"Combwork can't switch this session's mode\" (a session started in \"The CLI's own setting\", Combwork passed no mode): why, and what a choice does."
   },
   "agents.permission.cliOwnNoSwitchTitle": {
     "defaultMessage": "Combwork can't switch this session's mode",
-    "description": "In a running agent's permission mode menu, for a session started in \"The CLI's own setting\" (Hive passed no mode): a short line saying no mode switches live. Keep it short."
+    "description": "In a running agent's permission mode menu, for a session started in \"The CLI's own setting\" (Combwork passed no mode): a short line saying no mode switches live. Keep it short."
   },
   "agents.permission.connectionNewSessions": {
     "defaultMessage": "{agent}: connection for new sessions",
@@ -1093,7 +1093,7 @@
   },
   "agents.permission.notSwitched": {
     "defaultMessage": "Permission mode not switched",
-    "description": "A notification's title: Hive couldn't switch a running agent's permission mode (the message says why)."
+    "description": "A notification's title: Combwork couldn't switch a running agent's permission mode (the message says why)."
   },
   "agents.permission.planFailed": {
     "defaultMessage": "Could not switch Plan mode",
@@ -1153,7 +1153,7 @@
   },
   "agents.permission.switching": {
     "defaultMessage": "Switching to {mode}…",
-    "description": "The permission mode badge while Hive switches the running session to another mode ({mode}: its name)."
+    "description": "The permission mode badge while Combwork switches the running session to another mode ({mode}: its name)."
   },
   "agents.permission.withPlan": {
     "defaultMessage": "{mode} · Plan",
@@ -1245,7 +1245,7 @@
   },
   "agents.resume.hold.byHand": {
     "defaultMessage": "Its slot ({slot}) is free: Resume takes it for {agent} again. Resume All and startup leave it, so free slots stay for new work.",
-    "description": "A conversation's note (#1434): the slot it ran in ({slot}: \"slot-b\") is free and as it left it, so the user's own Resume takes it again for its agent ({agent}); Resume All and Hive's startup don't."
+    "description": "A conversation's note (#1434): the slot it ran in ({slot}: \"slot-b\") is free and as it left it, so the user's own Resume takes it again for its agent ({agent}); Resume All and Combwork's startup don't."
   },
   "agents.resume.hold.changed": {
     "defaultMessage": "This conversation's slot ({slot}) has changed since it ran, so it can't resume there. Read its transcript, or start fresh with a handover.",
@@ -1253,7 +1253,7 @@
   },
   "agents.resume.hold.draining": {
     "defaultMessage": "This conversation's slot ({slot}) is still being handed back from its last session. Try again in a moment.",
-    "description": "Why a conversation can't resume just now (#1434): the slot it ran in ({slot}: \"slot-b\") is free, but its last session there is still exiting and Hive hasn't finished taking the slot back. It can be resumed in a moment."
+    "description": "Why a conversation can't resume just now (#1434): the slot it ran in ({slot}: \"slot-b\") is free, but its last session there is still exiting and Combwork hasn't finished taking the slot back. It can be resumed in a moment."
   },
   "agents.resume.hold.gone": {
     "defaultMessage": "This conversation's slot ({slot}) is gone from disk. Read its transcript, or start fresh with a handover.",
@@ -1277,7 +1277,7 @@
   },
   "agents.resume.noTranscript": {
     "defaultMessage": "Neither {cli} nor Combwork has its transcript any more, so there is nothing to resume.",
-    "description": "Why a session can't be resumed: its conversation's file is gone from the CLI ({cli}) and from Hive's backup."
+    "description": "Why a session can't be resumed: its conversation's file is gone from the CLI ({cli}) and from Combwork's backup."
   },
   "agents.resume.notInstalled": {
     "defaultMessage": "{cli} isn't installed. Set it up in Provider Setup to resume it.",
@@ -1393,23 +1393,23 @@
   },
   "agents.tested.newer": {
     "defaultMessage": "This version came out after this Combwork release was tested. Most updates work; if something behaves oddly, report it (Copy Diagnostics).",
-    "description": "Provider Setup: the installed CLI is newer than the one this Hive release was tested with. Copy Diagnostics is a Help command: use its translated name."
+    "description": "Provider Setup: the installed CLI is newer than the one this Combwork release was tested with. Copy Diagnostics is a Help command: use its translated name."
   },
   "agents.tested.older": {
     "defaultMessage": "Older than tested; consider updating.",
-    "description": "Provider Setup: the installed CLI is older than the one this Hive release was tested with."
+    "description": "Provider Setup: the installed CLI is older than the one this Combwork release was tested with."
   },
   "agents.tested.summary": {
     "defaultMessage": "Tested with {tested} · installed {installed}",
-    "description": "Provider Setup: the CLI version this Hive release was tested with ({tested}) and the one installed ({installed}), version numbers."
+    "description": "Provider Setup: the CLI version this Combwork release was tested with ({tested}) and the one installed ({installed}), version numbers."
   },
   "agents.tested.summaryUnknown": {
     "defaultMessage": "Tested with {tested} · installed version unknown",
-    "description": "Provider Setup: the CLI version this Hive release was tested with ({tested}), and that the installed one's version isn't known."
+    "description": "Provider Setup: the CLI version this Combwork release was tested with ({tested}), and that the installed one's version isn't known."
   },
   "agents.tested.unknown": {
     "defaultMessage": "Combwork couldn't tell which version is installed, so it can't compare it with the tested one.",
-    "description": "Provider Setup: Hive couldn't read the installed CLI's version."
+    "description": "Provider Setup: Combwork couldn't read the installed CLI's version."
   },
   "agents.workflowRole.builder": {
     "defaultMessage": "Builder",

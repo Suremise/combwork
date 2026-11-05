@@ -44,13 +44,13 @@ function problemOf(m: Msg, values?: TextValues): { problem: string; problemText:
 
 /** Why a Hive skill's header can't be used (SkillInfo.problem), and the skills' refusals, in the window's language (#849). */
 const M = {
-  notClosedWithin: msg({ id: 'content.skill.notClosedWithin', defaultMessage: "its header isn't closed within its first {kb} KB", description: "Why nobody gets a Hive skill: its SKILL.md header (front matter, between --- lines) doesn't end within its first {kb} KB. It follows \"Nobody gets this skill until its header is fixed:\", so it starts in lower case." }),
-  notClosed: msg({ id: 'content.skill.notClosed', defaultMessage: "its header isn't closed (no line with --- after it)", description: "Why nobody gets a Hive skill: its SKILL.md header (front matter) starts with a --- line but no --- line ends it. Keep ---. It starts in lower case (it follows a colon)." }),
-  yamlAt: msg({ id: 'content.skill.yamlAt', defaultMessage: "its header isn't valid YAML (line {line}: {reason})", description: "Why nobody gets a Hive skill: its SKILL.md header can't be read as YAML. {line} is the line of the file, {reason} the YAML reader's own words (English). It starts in lower case (it follows a colon)." }),
-  yaml: msg({ id: 'content.skill.yaml', defaultMessage: "its header isn't valid YAML ({reason})", description: "Why nobody gets a Hive skill: its SKILL.md header can't be read as YAML. {reason} is the YAML reader's own words (English). It starts in lower case (it follows a colon)." }),
-  notFields: msg({ id: 'content.skill.notFields', defaultMessage: "its header isn't a list of fields (`name: …`, `description: …`)", description: "Why nobody gets a Hive skill: its SKILL.md header is YAML but not a set of fields. Keep what is between backticks (`name: …`, `description: …`) as it is, backticks included: they mark YAML. It starts in lower case (it follows a colon)." }),
-  metadata: msg({ id: 'content.skill.metadata', defaultMessage: "its metadata isn't a set of fields (`metadata:`, then `audience: …` indented under it)", description: "Why nobody gets a Hive skill: the metadata field of its SKILL.md header isn't a set of fields. Keep what is between backticks (`metadata:`, `audience: …`) as it is, backticks included: they mark YAML. It starts in lower case (it follows a colon)." }),
-  audience: msg({ id: 'content.skill.audience', defaultMessage: '{kind, select, text {its audience is "{audience}", not agents, assistant or all} empty {its audience is empty, not agents, assistant or all} list {its audience is a list, not agents, assistant or all} other {its audience is a {type}, not agents, assistant or all}}', description: "Why nobody gets a Hive skill: its header's metadata.audience isn't agents, assistant or all (keep those three words, which the header must say). {kind} is what it is instead: text ({audience} is the text), empty, a list, or another YAML value ({type}: number, boolean or object, as YAML names them). It starts in lower case (it follows a colon)." }),
+  notClosedWithin: msg({ id: 'content.skill.notClosedWithin', defaultMessage: "its header isn't closed within its first {kb} KB", description: "Why nobody gets a Combwork skill: its SKILL.md header (front matter, between --- lines) doesn't end within its first {kb} KB. It follows \"Nobody gets this skill until its header is fixed:\", so it starts in lower case." }),
+  notClosed: msg({ id: 'content.skill.notClosed', defaultMessage: "its header isn't closed (no line with --- after it)", description: "Why nobody gets a Combwork skill: its SKILL.md header (front matter) starts with a --- line but no --- line ends it. Keep ---. It starts in lower case (it follows a colon)." }),
+  yamlAt: msg({ id: 'content.skill.yamlAt', defaultMessage: "its header isn't valid YAML (line {line}: {reason})", description: "Why nobody gets a Combwork skill: its SKILL.md header can't be read as YAML. {line} is the line of the file, {reason} the YAML reader's own words (English). It starts in lower case (it follows a colon)." }),
+  yaml: msg({ id: 'content.skill.yaml', defaultMessage: "its header isn't valid YAML ({reason})", description: "Why nobody gets a Combwork skill: its SKILL.md header can't be read as YAML. {reason} is the YAML reader's own words (English). It starts in lower case (it follows a colon)." }),
+  notFields: msg({ id: 'content.skill.notFields', defaultMessage: "its header isn't a list of fields (`name: …`, `description: …`)", description: "Why nobody gets a Combwork skill: its SKILL.md header is YAML but not a set of fields. Keep what is between backticks (`name: …`, `description: …`) as it is, backticks included: they mark YAML. It starts in lower case (it follows a colon)." }),
+  metadata: msg({ id: 'content.skill.metadata', defaultMessage: "its metadata isn't a set of fields (`metadata:`, then `audience: …` indented under it)", description: "Why nobody gets a Combwork skill: the metadata field of its SKILL.md header isn't a set of fields. Keep what is between backticks (`metadata:`, `audience: …`) as it is, backticks included: they mark YAML. It starts in lower case (it follows a colon)." }),
+  audience: msg({ id: 'content.skill.audience', defaultMessage: '{kind, select, text {its audience is "{audience}", not agents, assistant or all} empty {its audience is empty, not agents, assistant or all} list {its audience is a list, not agents, assistant or all} other {its audience is a {type}, not agents, assistant or all}}', description: "Why nobody gets a Combwork skill: its header's metadata.audience isn't agents, assistant or all (keep those three words, which the header must say). {kind} is what it is instead: text ({audience} is the text), empty, a list, or another YAML value ({type}: number, boolean or object, as YAML names them). It starts in lower case (it follows a colon)." }),
   badName: msg({ id: 'content.skill.badName', defaultMessage: 'Skill names may contain letters, numbers, "-" and "_" (max 64 characters).', description: "An error adding a skill: its name has a character a skill's name can't have, or is too long." })
 }
 
@@ -325,7 +325,7 @@ export async function skillFiles(dir: string, lim = SKILL_FILES_LIMITS): Promise
 export async function listedSkillFiles(dir: string, projectPath?: string): Promise<{ files: string[]; truncated: boolean }> {
   const want = resolve(String(dir)).toLowerCase()
   const listed = [...(await hiveSkills(true)), ...(projectPath ? await listSkills(projectPath) : [])]
-  if (!listed.some((s) => resolve(s.path).toLowerCase() === want)) throw hiveError(msg({ id: 'content.skill.notListed', defaultMessage: "That folder isn't a skill Combwork lists.", description: "An error listing a skill's files for its page: the folder asked for isn't one of the skills Hive shows (the workspace's skills or a project's)." }), undefined, { kind: 'forbidden' })
+  if (!listed.some((s) => resolve(s.path).toLowerCase() === want)) throw hiveError(msg({ id: 'content.skill.notListed', defaultMessage: "That folder isn't a skill Combwork lists.", description: "An error listing a skill's files for its page: the folder asked for isn't one of the skills Combwork shows (the workspace's skills or a project's)." }), undefined, { kind: 'forbidden' })
   return skillFiles(dir)
 }
 
@@ -452,7 +452,7 @@ export function skillFromZip(data: Uint8Array): { files: Map<string, Uint8Array>
   if (!names.some((n) => norm(n) === 'SKILL.md')) {
     const tops = new Set(names.map((n) => norm(n).split('/')[0]))
     const top = tops.size === 1 ? [...tops][0] : null
-    if (!top || !names.some((n) => norm(n) === `${top}/SKILL.md`)) throw hiveError(msg({ id: 'content.skill.zipNoSkill', defaultMessage: 'No SKILL.md found. A skill .zip has SKILL.md at its top level, or inside one folder.', description: 'An error adding a skill from a .zip that has no SKILL.md where Hive looks. Keep SKILL.md as it is: it is a file name.' }))
+    if (!top || !names.some((n) => norm(n) === `${top}/SKILL.md`)) throw hiveError(msg({ id: 'content.skill.zipNoSkill', defaultMessage: 'No SKILL.md found. A skill .zip has SKILL.md at its top level, or inside one folder.', description: 'An error adding a skill from a .zip that has no SKILL.md where Combwork looks. Keep SKILL.md as it is: it is a file name.' }))
     prefix = `${top}/`
     folder = top
   }
@@ -510,14 +510,14 @@ async function deletableSkill(dir: string): Promise<boolean> {
 
 /** Moves a Hive or local skill folder to the Recycle Bin. */
 export async function deleteSkill(dir: string): Promise<void> {
-  if (!(await deletableSkill(dir)) || !existsSync(join(dir, 'SKILL.md'))) throw hiveError(msg({ id: 'content.skill.cantDelete', defaultMessage: "Only Combwork skills and a project's local skills can be deleted in Combwork.", description: "An error deleting a skill Hive doesn't manage (a CLI's own, from the user's profile or a plugin)." }), undefined, { kind: 'forbidden' })
-  if (existsSync(join(dir, OWN_COPY_MARKER))) throw hiveError(msg({ id: 'content.skill.isCopy', defaultMessage: "That's Combwork's own copy of a workspace skill; delete the skill in the workspace instead.", description: "An error deleting a skill in a project's folder that is Hive's copy of a workspace skill (Hive puts it there for a coding agent)." }), undefined, { kind: 'forbidden' })
+  if (!(await deletableSkill(dir)) || !existsSync(join(dir, 'SKILL.md'))) throw hiveError(msg({ id: 'content.skill.cantDelete', defaultMessage: "Only Combwork skills and a project's local skills can be deleted in Combwork.", description: "An error deleting a skill Combwork doesn't manage (a CLI's own, from the user's profile or a plugin)." }), undefined, { kind: 'forbidden' })
+  if (existsSync(join(dir, OWN_COPY_MARKER))) throw hiveError(msg({ id: 'content.skill.isCopy', defaultMessage: "That's Combwork's own copy of a workspace skill; delete the skill in the workspace instead.", description: "An error deleting a skill in a project's folder that is Combwork's copy of a workspace skill (Combwork puts it there for a coding agent)." }), undefined, { kind: 'forbidden' })
   await trash(dir)
 }
 
 /** Puts back a bundled skill as this version of Hive ships it: the workspace copy (edited) goes to the Recycle Bin. */
 export async function restoreBundledSkill(name: string): Promise<SkillInfo> {
-  if (!(await bundledIds('skills')).includes(name)) throw hiveError(msg({ id: 'content.skill.notBundled', defaultMessage: '"{name}" isn\'t one of Combwork\'s bundled skills.', description: 'An error restoring a skill Hive ships: Hive ships no skill called {name}.' }), { name }, { kind: 'notFound' })
+  if (!(await bundledIds('skills')).includes(name)) throw hiveError(msg({ id: 'content.skill.notBundled', defaultMessage: '"{name}" isn\'t one of Combwork\'s bundled skills.', description: 'An error restoring a skill Combwork ships: Combwork ships no skill called {name}.' }), { name }, { kind: 'notFound' })
   const dest = join(workspace.skillsDir, name)
   if (existsSync(dest)) await trash(dest)
   await restoreBundled('skills', name)
@@ -528,7 +528,7 @@ export async function restoreBundledSkill(name: string): Promise<SkillInfo> {
 /** Deploys a Local or Machine skill into the workspace so Hive can manage it. */
 export async function copySkillToWorkspace(skillPath: string): Promise<SkillInfo> {
   const name = basename(skillPath)
-  if (!validSkillName(name)) throw hiveError(msg({ id: 'content.skill.cantCopyName', defaultMessage: '"{name}" can\'t be a Combwork skill name: use letters, numbers, "-" and "_" (rename the folder first).', description: "An error copying a skill into the workspace: its folder's name {name} can't be a Hive skill's name." }), { name }, { kind: 'invalid' })
+  if (!validSkillName(name)) throw hiveError(msg({ id: 'content.skill.cantCopyName', defaultMessage: '"{name}" can\'t be a Combwork skill name: use letters, numbers, "-" and "_" (rename the folder first).', description: "An error copying a skill into the workspace: its folder's name {name} can't be a Combwork skill's name." }), { name }, { kind: 'invalid' })
   const dest = join(workspace.skillsDir, name)
   if (existsSync(dest)) throw hiveError(msg({ id: 'content.skill.copyExists', defaultMessage: 'The workspace already has a skill named "{name}"', description: 'An error copying a skill into the workspace: it has one called {name} already.' }), { name }, { kind: 'conflict' })
   if (!(await isFile(join(skillPath, 'SKILL.md')))) throw hiveError(msg({ id: 'content.skill.notSkill', defaultMessage: 'Not a skill folder (no SKILL.md)', description: 'An error copying a skill into the workspace: its folder has no SKILL.md (a file name: keep it).' }))

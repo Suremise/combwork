@@ -229,7 +229,7 @@ function emitQuestions(workspacePath: string): void {
  * (HI-2449). {state} is what the agent is doing, from its live status.
  */
 const STOP_QUESTION = {
-  title: msg({ id: 'main.assistantQuestion.stop.title', defaultMessage: 'Stop {agent} in {project}?', description: "A question from the Hive Assistant to the user, in its panel (and a notification while the panel is hidden): it wants to stop an agent that is busy. {agent} is the agent's name, {project} its project's." }),
+  title: msg({ id: 'main.assistantQuestion.stop.title', defaultMessage: 'Stop {agent} in {project}?', description: "A question from the Combwork Assistant to the user, in its panel (and a notification while the panel is hidden): it wants to stop an agent that is busy. {agent} is the agent's name, {project} its project's." }),
   message: msg({
     id: 'main.assistantQuestion.stop.message',
     defaultMessage: 'The Assistant wants to stop {agent}, which is {state}.{hasReason, select, yes { Its reason: {reason}} other {}} Its conversation is kept and can be resumed.',
@@ -238,7 +238,7 @@ const STOP_QUESTION = {
   state: msg({
     id: 'main.assistantQuestion.stop.state',
     defaultMessage: '{status, select, working {working} waiting {waiting for the user} signin {waiting for the user to sign in to its CLI again (its sign-in expired)} starting {starting} background {waiting on background tasks it started} watching {waiting for cards to change (a card watch: its card loop pauses until it is resumed)} ready {idle} finished {idle (finished its task)} error {in error} stopped {stopped} other {{status}}}',
-    description: 'What an agent is doing, inside "The Assistant wants to stop <agent>, which is …". The other branch is its status as Hive names it in code: keep {status}.'
+    description: 'What an agent is doing, inside "The Assistant wants to stop <agent>, which is …". The other branch is its status as Combwork names it in code: keep {status}.'
   }),
   yes: msg({ id: 'main.assistantQuestion.stop.yes', defaultMessage: 'Stop', description: 'The button that answers yes to "Stop <agent> in <project>?" (the Assistant asks before stopping a busy agent).' }),
   no: msg({ id: 'main.assistantQuestion.stop.no', defaultMessage: "Don't stop", description: 'The button that answers no to "Stop <agent> in <project>?".' })
@@ -264,7 +264,7 @@ const questionEnglish = (t: NonNullable<AssistantQuestion['text']>): Pick<Assist
 const shown = (q: AssistantQuestion, field: 'title' | 'message' | 'yes' | 'no'): string => (q.text ? shownText(q.text[field] as Text) : q[field])
 
 const toldQuestions = new Set<string>()
-const QUESTION_ANSWERED = msg({ id: 'main.assistantQuestion.answered', defaultMessage: 'Answered', description: "What the notification of a question from the Hive Assistant says once it is answered or no longer waits (HI-2320), in place of its buttons. Keep it short." })
+const QUESTION_ANSWERED = msg({ id: 'main.assistantQuestion.answered', defaultMessage: 'Answered', description: "What the notification of a question from the Combwork Assistant says once it is answered or no longer waits (HI-2320), in place of its buttons. Keep it short." })
 
 /**
  * A question of the Assistant's, while its panel is hidden in the window that asks (HI-2320): told once as a

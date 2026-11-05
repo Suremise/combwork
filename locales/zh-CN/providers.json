@@ -37,7 +37,7 @@
   "providers.codex.hint.model": "Codex 不认识此模型：请在“智能体设置”中选择其他模型。",
   "providers.codex.hint.settings": "Codex 拒绝了它的设置：请检查“智能体设置”和“设置”→“Codex”中的额外参数，以及你的 config.toml。",
   "providers.codex.hint.signIn": "Codex 未登录：请在“配置提供方”中登录，然后重新启动它。",
-  "providers.codex.nativeHive": "你的 Codex 配置中有一个名为 combwork 的 MCP 服务器，通过 HTTP 访问（{file}）。Codex 会把它合并到 Combwork 自己的 combwork 服务器中，两者同时存在时无法启动。请在那里将你的服务器重命名，以启动 Codex 智能体。",
+  "providers.codex.nativeCombwork": "你的 Codex 配置中有一个名为 combwork 的 MCP 服务器，通过 HTTP 访问（{file}）。Codex 会把它合并到 Combwork 自己的 combwork 服务器中，两者同时存在时无法启动。请在那里将你的服务器重命名，以启动 Codex 智能体。",
   "providers.codex.sandbox.default": "**Set up default sandbox**（推荐）：命令在 Codex 为其创建的两个本地 Windows 账户（`CodexSandboxOffline` 和 `CodexSandboxOnline`）下运行，并有一条防火墙规则让它们保持离线，除非你允许联网。这种方式隔离命令的效果最好。Windows 会请求一次管理员权限。",
   "providers.codex.sandbox.needed": "Codex 需要对其 Windows 沙盒进行一次性设置；在此之前，它会在每条命令前询问。",
   "providers.codex.sandbox.nonAdmin": "**Use non-admin sandbox**：无需管理员权限。命令在你自己的账户下以受限权限运行。它能保护你的文件，并在大多数情况下阻止访问互联网，但 Codex 提醒：如果智能体被所读文件或网页中隐藏的指令诱导（提示词注入），风险会更高。之后可以在这里升级到默认沙盒。",

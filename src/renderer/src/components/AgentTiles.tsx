@@ -316,7 +316,7 @@ function Tile({ project, a, state, tabStop, movable, onFocus, onMenu }: { projec
       <TileBadges
         badges={[
           ...(ctxOver ? [{ icon: 'warning', warn: true, text: tr(msg({ id: 'panes.tiles.context', defaultMessage: 'Context {tokens}', description: 'A warning badge on an agent\'s tile: its context is past the Compact threshold ({tokens}: "210K").' }), { tokens: formatTokens(usage?.contextTokens ?? 0) }) }] : []),
-          ...(longTranscript ? [{ icon: 'warning', warn: true, text: tr(msg({ id: 'panes.tiles.transcript', defaultMessage: 'Transcript {size}', description: 'A warning badge on an agent\'s tile: its transcript is past the size Hive flags ({size}: "24 MB").' }), { size: formatSize(live!.transcriptBytes!) }) }] : []),
+          ...(longTranscript ? [{ icon: 'warning', warn: true, text: tr(msg({ id: 'panes.tiles.transcript', defaultMessage: 'Transcript {size}', description: 'A warning badge on an agent\'s tile: its transcript is past the size Combwork flags ({size}: "24 MB").' }), { size: formatSize(live!.transcriptBytes!) }) }] : []),
           ...(tasksRunning > 0 ? [{ icon: 'server-process', warn: false, text: tr(msg({ id: 'panes.tiles.background', defaultMessage: '{n, plural, one {# background task} other {# background tasks}}', description: "A badge on an agent's tile: background tasks it started that still run." }), { n: tasksRunning }) }] : [])
         ]}
       />

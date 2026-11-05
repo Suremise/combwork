@@ -22,8 +22,8 @@ export function crashResponse(lastCrashAt: number | null, now: number): 'reload'
 /** The note shown once a crashed window has reloaded. */
 export function reloadedMessage(unsaved: number): string {
   return unsaved
-    ? tr(msg({ id: 'main.window.reloadedLost', defaultMessage: '{n, plural, one {Your agents kept running. Unsaved changes to one file were lost.} other {Your agents kept running. Unsaved changes to # files were lost.}}', description: "The notice after Hive's window crashed and was reloaded, when files had unsaved edits. {n} is how many." }), { n: unsaved })
-    : tr(msg({ id: 'main.window.reloaded', defaultMessage: 'Your agents kept running.', description: "The notice after Hive's window crashed and was reloaded." }))
+    ? tr(msg({ id: 'main.window.reloadedLost', defaultMessage: '{n, plural, one {Your agents kept running. Unsaved changes to one file were lost.} other {Your agents kept running. Unsaved changes to # files were lost.}}', description: "The notice after Combwork's window crashed and was reloaded, when files had unsaved edits. {n} is how many." }), { n: unsaved })
+    : tr(msg({ id: 'main.window.reloaded', defaultMessage: 'Your agents kept running.', description: "The notice after Combwork's window crashed and was reloaded." }))
 }
 
 /** What combwork.log needs of a window's page to say why it froze (HI-1775): where it is, its last input, its last long tasks. */
@@ -90,7 +90,7 @@ function hangContext(h: Health, now: number): string {
   return `${whereText(h.where, userText)}; ${input}; ${tasks}`
 }
 
-const stillRunning = (): string => tr(msg({ id: 'main.window.stillRunning', defaultMessage: 'Your agents are still running: reloading the window reconnects to them.', description: "Hive's question when its window stopped or isn't responding." }))
+const stillRunning = (): string => tr(msg({ id: 'main.window.stillRunning', defaultMessage: 'Your agents are still running: reloading the window reconnects to them.', description: "Combwork's question when its window stopped or isn't responding." }))
 
 /**
  * Keeps a window usable when its page crashes or hangs. Agents run in the main process, so they're
@@ -117,7 +117,7 @@ export function watchRenderer(entry: HiveWindow, opts: { quitting: () => boolean
         // Give the page a moment to subscribe to events.
         setTimeout(() => {
           if (win.isDestroyed()) return
-          emitTo(win, { type: 'toast', toast: { id: randomUUID(), level: 'warning', title: tr(msg({ id: 'main.window.reloadedTitle', defaultMessage: "Combwork's window stopped and was reloaded", description: "A notice's title after Hive's window crashed and was reloaded." })), message: reloadedMessage(unsaved), timestamp: new Date().toISOString() } })
+          emitTo(win, { type: 'toast', toast: { id: randomUUID(), level: 'warning', title: tr(msg({ id: 'main.window.reloadedTitle', defaultMessage: "Combwork's window stopped and was reloaded", description: "A notice's title after Combwork's window crashed and was reloaded." })), message: reloadedMessage(unsaved), timestamp: new Date().toISOString() } })
         }, 1500)
       })
     }
@@ -143,9 +143,9 @@ export function watchRenderer(entry: HiveWindow, opts: { quitting: () => boolean
         const choice = await ask({
           type: 'error',
           title: APP_NAME,
-          message: tr(msg({ id: 'main.window.stopped', defaultMessage: "Combwork's window stopped working.", description: "Hive's question when its window crashed again soon after a reload." })),
+          message: tr(msg({ id: 'main.window.stopped', defaultMessage: "Combwork's window stopped working.", description: "Combwork's question when its window crashed again soon after a reload." })),
           detail: stillRunning(),
-          buttons: [tr(msg({ id: 'main.window.reload', defaultMessage: 'Reload', description: "Button: reloads Hive's window." })), tr(msg({ id: 'main.window.openLogs', defaultMessage: 'Open Logs', description: "Button: opens the folder of Hive's log files." })), tr(msg({ id: 'main.window.quit', defaultMessage: 'Quit Combwork', description: 'Button: quits Hive.' }))],
+          buttons: [tr(msg({ id: 'main.window.reload', defaultMessage: 'Reload', description: "Button: reloads Combwork's window." })), tr(msg({ id: 'main.window.openLogs', defaultMessage: 'Open Logs', description: "Button: opens the folder of Combwork's log files." })), tr(msg({ id: 'main.window.quit', defaultMessage: 'Quit Combwork', description: 'Button: quits Combwork.' }))],
           defaultId: 0,
           cancelId: 0
         })
@@ -189,9 +189,9 @@ export function watchRenderer(entry: HiveWindow, opts: { quitting: () => boolean
         {
           type: 'warning',
           title: APP_NAME,
-          message: tr(msg({ id: 'main.window.unresponsive', defaultMessage: "Combwork's window isn't responding.", description: "Hive's question when its window has stopped responding." })),
-          detail: tr(msg({ id: 'main.window.unresponsiveDetail', defaultMessage: '{stillRunning} Wait for it, or reload it.', description: "Hive's question when its window isn't responding. {stillRunning} says the agents are still running." }), { stillRunning: stillRunning() }),
-          buttons: [tr(msg({ id: 'main.window.wait', defaultMessage: 'Wait', description: "Button: waits for Hive's window to respond." })), tr(msg({ id: 'main.window.reload', defaultMessage: 'Reload', description: "Button: reloads Hive's window." }))],
+          message: tr(msg({ id: 'main.window.unresponsive', defaultMessage: "Combwork's window isn't responding.", description: "Combwork's question when its window has stopped responding." })),
+          detail: tr(msg({ id: 'main.window.unresponsiveDetail', defaultMessage: '{stillRunning} Wait for it, or reload it.', description: "Combwork's question when its window isn't responding. {stillRunning} says the agents are still running." }), { stillRunning: stillRunning() }),
+          buttons: [tr(msg({ id: 'main.window.wait', defaultMessage: 'Wait', description: "Button: waits for Combwork's window to respond." })), tr(msg({ id: 'main.window.reload', defaultMessage: 'Reload', description: "Button: reloads Combwork's window." }))],
           defaultId: 0,
           cancelId: 0
         },

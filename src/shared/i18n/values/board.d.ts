@@ -604,6 +604,7 @@ interface HiveMessageValues {
   'board.progress.badgeRuns': { n: number }
   'board.progress.blocksReview': { card: string | number }
   'board.progress.cantShow': { agent: string | number }
+  'board.progress.combworkRun': undefined
   'board.progress.copied': { what: string }
   'board.progress.copiesRun': undefined
   'board.progress.copyCommand': undefined
@@ -617,7 +618,6 @@ interface HiveMessageValues {
   'board.progress.filterProject': undefined
   'board.progress.fold': undefined
   'board.progress.hideDetails': { run: string | number }
-  'board.progress.hiveRun': undefined
   'board.progress.inCopy': { copy: string | number }
   'board.progress.mergeQueue': undefined
   'board.progress.miniWaiting': { agent: string | number; run: string | number }
@@ -886,12 +886,12 @@ interface HiveMessageValues {
   'board.strip.count': { state: string; n: number }
   'board.strip.oneRun': { state: string }
   'board.strip.runs': { n: number; states: string | number }
+  'board.team.cw': undefined
   'board.team.endDetail': undefined
   'board.team.endFailed': { label: string | number }
   'board.team.endIt': undefined
   'board.team.endMessage': { agent: string | number; label: string | number; pid: string | number }
   'board.team.endTitle': undefined
-  'board.team.hive': undefined
   'board.team.install': undefined
   'board.team.item': { kind: string; agent: string | number; label: string | number; pid: string | number }
   'board.team.notParked': undefined
@@ -950,7 +950,7 @@ interface HiveMessageValues {
   'board.work.none': undefined
   'board.work.notRead': { note: string; why: string | number }
   'board.work.openFile': { path: string | number }
-  'board.work.outsideHive': undefined
+  'board.work.outsideCombwork': undefined
   'board.work.outsideRules': { rules: string | number }
   'board.work.overridden': undefined
   'board.work.preWorkflow': undefined

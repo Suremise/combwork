@@ -53,7 +53,7 @@ function runPowerShell(script: string, timeout: number): Promise<string> {
   const encoded = encode(script)
   return new Promise((done, fail) => {
     execFile(POWERSHELL, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], { windowsHide: true, timeout, maxBuffer: 1 << 20, encoding: 'utf8' }, (err, stdout, stderr) => {
-      if (err) fail(new Error(err.killed ? tr(msg({ id: 'main.antivirus.timeout', defaultMessage: 'PowerShell took longer than {seconds} s', description: "An error in Settings → Workspace → Antivirus scanning: Hive's PowerShell check didn't finish in time." }), { seconds: Math.round(timeout / 1000) }) : (stderr || err.message).trim().slice(0, 300)))
+      if (err) fail(new Error(err.killed ? tr(msg({ id: 'main.antivirus.timeout', defaultMessage: 'PowerShell took longer than {seconds} s', description: "An error in Settings → Workspace → Antivirus scanning: Combwork's PowerShell check didn't finish in time." }), { seconds: Math.round(timeout / 1000) }) : (stderr || err.message).trim().slice(0, 300)))
       else done(stdout)
     })
   })

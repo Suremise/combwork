@@ -50,7 +50,7 @@ export function CardCostLine({ card }: { card: TaskCard }) {
           <div className="cost-tip">
             <PartLine label={tr(BUILDER)} part={cost.build} />
             <PartLine label={tr(REVIEWER)} part={cost.review} />
-            {cost.unmatched > 0 && <div className="warn-text">{tr(msg({ id: 'board.costs.unmatched', defaultMessage: '{n, plural, one {One agent that held it has} other {# agents that held it have}} no session Combwork knows of: unknown.', description: "In a card's cost hover: some agents that held the card have no session Hive knows of, so what they used is unknown." }), { n: cost.unmatched })}</div>}
+            {cost.unmatched > 0 && <div className="warn-text">{tr(msg({ id: 'board.costs.unmatched', defaultMessage: '{n, plural, one {One agent that held it has} other {# agents that held it have}} no session Combwork knows of: unknown.', description: "In a card's cost hover: some agents that held the card have no session Combwork knows of, so what they used is unknown." }), { n: cost.unmatched })}</div>}
             <div className="faint">{tr(COST_NOTE_TEXT, { zero: moneyLabel(0) })}</div>
           </div>
         }
@@ -70,7 +70,7 @@ const ROUNDS = {
   verdict: msg({ id: 'board.costs.roundVerdict', defaultMessage: '{verdict, select, passed {Passed} failed {Failed} other {Not reviewed yet}}', description: "Hover of a round in the card's cost-by-round table (card dialog, Work section): how its review ended, passed or failed, or not reviewed yet. Keep the select keys." }),
   note: msg({ id: 'board.costs.byRoundNote', defaultMessage: 'Each role’s cost is shared between its rounds by when its agents used it (≈); the rows and columns add up to the card’s cost.', description: "Under the card's cost-by-round table (card dialog, Work section): how the split is made. Keep ≈." }),
   hourly: msg({ id: 'board.costs.byRoundHourly', defaultMessage: 'Rounds from more than {days, plural, one {# day} other {# days}} ago may be split to the hour: Combwork keeps older sessions’ use in 1-hour steps.', description: "Under the card's cost-by-round table (card dialog, Work section), when a round ended before Settings → Advanced's days of full detail: such a round's split may be only to the hour." }),
-  failed: msg({ id: 'board.costs.byRoundFailed', defaultMessage: 'Its cost by round couldn’t be worked out.', description: "The card dialog's Work section, in place of the cost-by-round table, when Hive couldn't work it out." })
+  failed: msg({ id: 'board.costs.byRoundFailed', defaultMessage: 'Its cost by round couldn’t be worked out.', description: "The card dialog's Work section, in place of the cost-by-round table, when Combwork couldn't work it out." })
 }
 
 /**
@@ -147,8 +147,8 @@ export function CardRoundCostTable({ card }: { card: TaskCard }) {
 
 /** A lane's cost in words, for its hover. */
 export function LaneCostTip({ cost }: { cost: LaneCost | null | 'loading' }) {
-  if (cost === 'loading') return <div className="cost-tip faint">{tr(msg({ id: 'board.costs.laneLoading', defaultMessage: 'Working out its cost…', description: "A lane's cost hover (Progress panel) while Hive works the cost out." }))}</div>
-  if (!cost) return <div className="cost-tip faint">{tr(msg({ id: 'board.costs.laneFailed', defaultMessage: 'Its cost couldn’t be worked out.', description: "A lane's cost hover (Progress panel) when Hive couldn't work the cost out." }))}</div>
+  if (cost === 'loading') return <div className="cost-tip faint">{tr(msg({ id: 'board.costs.laneLoading', defaultMessage: 'Working out its cost…', description: "A lane's cost hover (Progress panel) while Combwork works the cost out." }))}</div>
+  if (!cost) return <div className="cost-tip faint">{tr(msg({ id: 'board.costs.laneFailed', defaultMessage: 'Its cost couldn’t be worked out.', description: "A lane's cost hover (Progress panel) when Combwork couldn't work the cost out." }))}</div>
   const each = perFinished(cost)
   return (
     <div className="cost-tip" data-testid="lane-cost">

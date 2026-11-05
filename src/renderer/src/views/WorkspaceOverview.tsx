@@ -27,9 +27,9 @@ const LOAD_LIMIT_MS = 60_000
 const projectPart = (c: React.ReactNode[]): React.ReactNode => <span className="running-project">{c}</span>
 
 const M = {
-  noAnswer: msg({ id: 'workspace.overview.noAnswer', defaultMessage: 'no answer after {seconds, number} s', description: "Why the workspace's usage could not be loaded: Hive read it for this long without finishing. Shown as {error} in \"Could not load {what}: {error}\", with Retry." }),
+  noAnswer: msg({ id: 'workspace.overview.noAnswer', defaultMessage: 'no answer after {seconds, number} s', description: "Why the workspace's usage could not be loaded: Combwork read it for this long without finishing. Shown as {error} in \"Could not load {what}: {error}\", with Retry." }),
   costTip: msg({ id: 'workspace.overview.costTip', defaultMessage: 'What this work would have cost at API prices: reported by the provider where it does (Claude Code), else estimated by Combwork from token counts and the prices in Settings → the provider. On a subscription you are not charged this; it shows how heavy the work was.', description: "The Workspace Overview: tooltip on API-equivalent cost." }),
-  assistant: msg({ id: 'workspace.overview.assistant', defaultMessage: 'Assistant', description: "The Workspace Overview: the Hive Assistant's row and series (beside the projects)." }),
+  assistant: msg({ id: 'workspace.overview.assistant', defaultMessage: 'Assistant', description: "The Workspace Overview: the Combwork Assistant's row and series (beside the projects)." }),
   chartLabel: msg({ id: 'workspace.overview.chartLabel', defaultMessage: 'Tokens per day by project', description: "The Workspace Overview's chart, for screen readers." }),
   dayTip: msg({ id: 'workspace.overview.dayTip', defaultMessage: '<b>{day}</b>: {tokens} tokens · {cost} · {prompts, plural, one {# prompt} other {# prompts}}', description: 'Tooltip on a day of the chart: {tokens} like 1.2M; {cost} a cost. <b> is bold.' }),
   today: msg({ id: 'workspace.overview.today', defaultMessage: 'Today', description: "The end of the chart's day axis." }),
@@ -57,7 +57,7 @@ const M = {
   withoutPrice: msg({ id: 'workspace.overview.withoutPrice', defaultMessage: '{count, plural, one {# session without a price} other {# sessions without a price}}', description: 'Under API-equivalent cost: sessions whose model has no known price.' }),
   partlyEstimated: msg({ id: 'workspace.overview.partlyEstimated', defaultMessage: 'partly estimated', description: 'Under API-equivalent cost. Lower case.' }),
   asReported: msg({ id: 'workspace.overview.asReported', defaultMessage: 'as reported', description: 'Under API-equivalent cost: the provider reported it. Lower case.' }),
-  estimated: msg({ id: 'workspace.overview.estimated', defaultMessage: 'estimated', description: 'Under API-equivalent cost: Hive worked it out from prices. Lower case.' }),
+  estimated: msg({ id: 'workspace.overview.estimated', defaultMessage: 'estimated', description: 'Under API-equivalent cost: Combwork worked it out from prices. Lower case.' }),
   runningNow: msg({ id: 'workspace.overview.runningNowSub', defaultMessage: '{count} running now', description: 'Under Sessions: agents running now.' }),
   prompts: msg({ id: 'workspace.overview.prompts', defaultMessage: 'Prompts', description: "A figure's title: prompts sent." }),
   compactions: msg({ id: 'workspace.overview.compactions', defaultMessage: '{count, plural, one {# compaction} other {# compactions}}', description: 'Under Prompts: how many times sessions were compacted.' }),
@@ -73,8 +73,8 @@ const M = {
   withoutPriceShort: msg({ id: 'workspace.overview.withoutPriceShort', defaultMessage: '{count, number} without a price', description: "Under a coding agent's API-equivalent cost: sessions whose model has no known price." }),
   promptsSub: msg({ id: 'workspace.overview.promptsSub', defaultMessage: '{count, plural, one {# prompt} other {# prompts}}', description: "Under a coding agent's Sessions: prompts sent." }),
   panelTip: msg({ id: 'workspace.overview.panelTip', defaultMessage: 'What each project used in the period chosen in the overview. Click one for its own Overview.', description: "The Workspace Overview's sidebar: tooltip on its heading." }),
-  importing: msg({ id: 'workspace.overview.importing', defaultMessage: 'Importing the usage history: {done, number} of {total, plural, one {# session} other {# sessions}}. The figures are partial until it is done.', description: "The Workspace Overview while Hive records, once, what the workspace's existing sessions used ({done} of {total} so far)." }),
-  importingStart: msg({ id: 'workspace.overview.importingStart', defaultMessage: 'Importing the usage history. The figures are partial until it is done.', description: "The Workspace Overview while Hive starts recording, once, what the workspace's existing sessions used (before it has counted them)." }),
+  importing: msg({ id: 'workspace.overview.importing', defaultMessage: 'Importing the usage history: {done, number} of {total, plural, one {# session} other {# sessions}}. The figures are partial until it is done.', description: "The Workspace Overview while Combwork records, once, what the workspace's existing sessions used ({done} of {total} so far)." }),
+  importingStart: msg({ id: 'workspace.overview.importingStart', defaultMessage: 'Importing the usage history. The figures are partial until it is done.', description: "The Workspace Overview while Combwork starts recording, once, what the workspace's existing sessions used (before it has counted them)." }),
   rowTip: msg({ id: 'workspace.overview.rowTip', defaultMessage: '{tokens} tokens · {sessions, plural, one {# session} other {# sessions}}{running, plural, =0 {} other { · # running}}', description: "The Workspace Overview's sidebar: tooltip on a project ({tokens} like 1.2M)." })
 }
 

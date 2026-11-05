@@ -81,7 +81,7 @@
   },
   "actions.attach.largeDetail": {
     "defaultMessage": "An agent may not manage a file this large: its CLI can refuse it, or reading it can fill much of its context.{copy, select, yes { Combwork keeps a copy with the session.} other {}}",
-    "description": "Why attaching a large file needs a confirmation; then, when Hive copies it into the session's attachments, that it keeps a copy (copy: yes)."
+    "description": "Why attaching a large file needs a confirmation; then, when Combwork copies it into the session's attachments, that it keeps a copy (copy: yes)."
   },
   "actions.attach.largeMany": {
     "defaultMessage": "These files are over {size}:",
@@ -261,7 +261,7 @@
   },
   "actions.mcp.deleteAdded": {
     "defaultMessage": "{where}: deleting it removes it there too.",
-    "description": "The question before deleting a workspace MCP server (HI-2059), when it is added somewhere: {where} says where, such as \"Added in hive and for the Hive Assistant\"."
+    "description": "The question before deleting a workspace MCP server (HI-2059), when it is added somewhere: {where} says where, such as \"Added in hive and for the Combwork Assistant\"."
   },
   "actions.mcp.deleteMessage": {
     "defaultMessage": "Move {name}.json to the Recycle Bin, with its folder if it was added from a .zip? Projects will no longer be able to use it.",
@@ -305,7 +305,7 @@
   },
   "actions.mcp.updateFailedAdded": {
     "defaultMessage": "Could not update the server",
-    "description": "An error's title: adding an MCP server to a project or the Hive Assistant, or removing it, failed."
+    "description": "An error's title: adding an MCP server to a project or the Combwork Assistant, or removing it, failed."
   },
   "actions.pane.edge": {
     "defaultMessage": "{agent} can't move further {dir, select, left {left} right {right} up {up} other {down}}",
@@ -389,11 +389,11 @@
   },
   "actions.provider.lookingMessage": {
     "defaultMessage": "Combwork is still finding out which coding agent CLIs are installed. Try again in a moment.",
-    "description": "Under the warning that Hive is still looking for the coding agent CLIs."
+    "description": "Under the warning that Combwork is still looking for the coding agent CLIs."
   },
   "actions.provider.lookingTitle": {
     "defaultMessage": "Still looking for the coding agents",
-    "description": "A warning's title: Hive hasn't finished finding which coding agent CLIs are installed."
+    "description": "A warning's title: Combwork hasn't finished finding which coding agent CLIs are installed."
   },
   "actions.provider.offAgent": {
     "defaultMessage": "Turn it on in Settings → Providers to run this agent, or give the agent another provider in its settings.",
@@ -493,11 +493,11 @@
   },
   "actions.recent.elsewhere": {
     "defaultMessage": "open in another window",
-    "description": "Beside a recent workspace's name: another Hive window has it open. Lower case."
+    "description": "Beside a recent workspace's name: another Combwork window has it open. Lower case."
   },
   "actions.recent.elsewhereTip": {
     "defaultMessage": "Open in another window: choosing it brings that window forward.",
-    "description": "A recent workspace's tooltip, under its path: another Hive window has it open."
+    "description": "A recent workspace's tooltip, under its path: another Combwork window has it open."
   },
   "actions.recent.keep": {
     "defaultMessage": "Keep",
@@ -541,15 +541,15 @@
   },
   "actions.releaseHeld.detailUnknown": {
     "defaultMessage": "Combwork doesn't know which of the processes its session started still run. Release it once you know nothing of it still writes in the slot.",
-    "description": "Release Slot…: Hive lists no processes the agent's session left running, so it can't say whether any still run."
+    "description": "Release Slot…: Combwork lists no processes the agent's session left running, so it can't say whether any still run."
   },
   "actions.releaseHeld.endFirst": {
     "defaultMessage": "End these processes first",
-    "description": "Release Slot…: a tick box, on by default: Hive ends the listed processes before releasing the slot."
+    "description": "Release Slot…: a tick box, on by default: Combwork ends the listed processes before releasing the slot."
   },
   "actions.releaseHeld.messageGone": {
     "defaultMessage": "{slot} is held by a session of agent {agent} (run {run}) in a Combwork that is no longer running (process {pid}). Combwork can't tell whether what it started still runs: until you release it, nothing else uses the slot.",
-    "description": "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Hive that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Hive's process id: they tell one launch from another. A noun before the name (glossary §1 rule 4)."
+    "description": "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Combwork that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Combwork's process id: they tell one launch from another. A noun before the name (glossary §1 rule 4)."
   },
   "actions.releaseHeld.messageIdleBroker": {
     "defaultMessage": "{slot} is held by {names}, Windows' idle Sandbox broker, left by {agent}'s last session there (run {run}). No Sandbox is running, so releasing it is safe.",
@@ -557,7 +557,7 @@
   },
   "actions.releaseHeld.messageSelf": {
     "defaultMessage": "{agent}'s last session in {slot} (run {run}) has ended in this Combwork (process {pid}, running), but Combwork doesn't know that everything it started there has: until you release it, nothing else uses the slot.",
-    "description": "Release Slot…: why the slot ({slot}) is held. The session of the agent ({agent}) ended in this Hive; its processes were kept running or Hive could not follow them. {run} is the session's run id (a code such as 3f9a1c…), {pid} this Hive's process id: they tell one launch from another."
+    "description": "Release Slot…: why the slot ({slot}) is held. The session of the agent ({agent}) ended in this Combwork; its processes were kept running or Combwork could not follow them. {run} is the session's run id (a code such as 3f9a1c…), {pid} this Combwork's process id: they tell one launch from another."
   },
   "actions.releaseHeld.process": {
     "defaultMessage": "{label} (process {pid})",
@@ -565,11 +565,11 @@
   },
   "actions.releaseHeld.readFailed": {
     "defaultMessage": "Could not read the slot's writer",
-    "description": "An error's title: Hive couldn't read who holds a slot, before Release Slot…'s question."
+    "description": "An error's title: Combwork couldn't read who holds a slot, before Release Slot…'s question."
   },
   "actions.releaseHeld.title": {
     "defaultMessage": "Release {agent}'s slot {slot}?",
-    "description": "Title of the question before releasing a slot ({slot}, such as slot-b) that an agent's ({agent}) last session there still holds: it has ended, but Hive doesn't know that everything it started has."
+    "description": "Title of the question before releasing a slot ({slot}, such as slot-b) that an agent's ({agent}) last session there still holds: it has ended, but Combwork doesn't know that everything it started has."
   },
   "actions.releaseSlot.confirm": {
     "defaultMessage": "Release",
@@ -693,7 +693,7 @@
   },
   "actions.removeAll.notChecked": {
     "defaultMessage": "{branch} (not checked)",
-    "description": "Remove All's report, in the list of worktrees kept: a branch ({branch}) Hive couldn't check."
+    "description": "Remove All's report, in the list of worktrees kept: a branch ({branch}) Combwork couldn't check."
   },
   "actions.removeAll.note": {
     "defaultMessage": "{running, select, yes {Running agents are stopped first. } other {}}Their sessions stay in the Sessions tab.{trees, select, tick { Worktrees and branches are kept unless you tick the box; unmerged or changed ones are kept either way.} kept { Their worktrees and branches are kept.} other {}}",
@@ -841,7 +841,7 @@
   },
   "actions.slot.goneTitle": {
     "defaultMessage": "The slot is gone",
-    "description": "Title of the question when the folder of a slot an agent holds (a working folder Hive lends it for a card or lane) is missing."
+    "description": "Title of the question when the folder of a slot an agent holds (a working folder Combwork lends it for a card or lane) is missing."
   },
   "actions.slot.recreate": {
     "defaultMessage": "Recreate and Start",
@@ -853,7 +853,7 @@
   },
   "actions.slot.release": {
     "defaultMessage": "Release the Slot",
-    "description": "Button: the agent gives up the slot whose folder is gone; Hive makes the slot again the next time it lends it."
+    "description": "Button: the agent gives up the slot whose folder is gone; Combwork makes the slot again the next time it lends it."
   },
   "actions.slot.releaseFailed": {
     "defaultMessage": "Could not release the slot",
@@ -937,7 +937,7 @@
   },
   "actions.startFresh.why.pending": {
     "defaultMessage": "a prompt not taken yet: left as it is",
-    "description": "Start Fresh (Idle Agents)' list (#1437): Hive typed a prompt this agent's CLI hasn't taken yet, so it keeps its conversation."
+    "description": "Start Fresh (Idle Agents)' list (#1437): Combwork typed a prompt this agent's CLI hasn't taken yet, so it keeps its conversation."
   },
   "actions.startFresh.why.stopped": {
     "defaultMessage": "stopped: left stopped",
@@ -1045,7 +1045,7 @@
   },
   "actions.template.includeWorkflow": {
     "defaultMessage": "Include this project's workflow (its rules for {platform}: review, checks by name, merging, stages; never its target branch, check commands or identity's name)",
-    "description": "A tick box in the Save as Template dialog (HI-1910), ticked by default: the template keeps the project's workflow options for its version control ({platform}: None or Git, as Hive names them), the rules only. Glossary: workflow, check, target branch, identity."
+    "description": "A tick box in the Save as Template dialog (HI-1910), ticked by default: the template keeps the project's workflow options for its version control ({platform}: None or Git, as Combwork names them), the rules only. Glossary: workflow, check, target branch, identity."
   },
   "actions.template.load": {
     "defaultMessage": "Load template",
@@ -1157,7 +1157,7 @@
   },
   "actions.template.workflowSaved": {
     "defaultMessage": "It holds this project's workflow for {platform}.",
-    "description": "Under the notification that a template was saved (HI-1910): it holds the project's workflow options for its version control ({platform}: None or Git, as Hive names them)."
+    "description": "Under the notification that a template was saved (HI-1910): it holds the project's workflow options for its version control ({platform}: None or Git, as Combwork names them)."
   },
   "actions.unsaved.changedMessage": {
     "defaultMessage": "Save them, then {action, select, switch {switch workspace} close {close the workspace} other {reload the window}} again.",

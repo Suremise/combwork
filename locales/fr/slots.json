@@ -5,7 +5,7 @@
   "slots.release.changed": "{slot} a changé entre-temps : ce qui y écrit n’est plus ce qui est affiché. Regarde à nouveau.",
   "slots.release.live": "Ce qui écrit dans {slot} tourne encore dans ce Combwork : arrête d’abord l’agent, ou arrête ou garde ce qu’il a laissé tourner.",
   "slots.release.notEnded": "Certains des processus listés tournent encore : Windows n’a pas laissé Combwork les arrêter, donc {slot} n’a pas été libéré. Réessaie, ou libère-le sans les arrêter.",
-  "slots.release.otherHive": "{slot} est retenu par un autre Combwork qui tourne encore (processus {pid}) : libère-le là-bas, ou quitte d’abord cet autre Combwork.",
+  "slots.release.otherCombwork": "{slot} est retenu par un autre Combwork qui tourne encore (processus {pid}) : libère-le là-bas, ou quitte d’abord cet autre Combwork.",
   "slots.setting.bad": "Ce paramètre des emplacements n’existe pas dans Combwork.",
   "slots.setting.badSize": "Le nombre de copies de relecture et de vérification est un nombre entier de {min, number} à {max, number}.",
   "slots.setting.badText": "Un script d’emplacement ou une liste de fichiers est un texte d’au plus {max, number} caractères."

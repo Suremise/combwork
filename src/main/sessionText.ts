@@ -9,7 +9,7 @@ import { agentMsg } from '../shared/agentText'
 export const SESSION = {
   carryOn: agentMsg({ id: 'session.carryOn', text: 'Your last turn stopped because your sign-in had expired. It is renewed now: carry on where you left off.', note: 'What Resume types into an agent whose turn stopped while its sign-in had expired.' }),
   skillNotGiven: agentMsg({ id: 'session.skillNotGiven', text: 'nobody gets it: {why}', note: "A skill not delivered at a launch, in the launch record the Agent API's project status shows (stored)." }),
-  adopted: agentMsg({ id: 'session.adopted', text: 'Adopted session {id}', note: 'The stored name of a session Hive adopted that has no title (its id, cut): agents read it and the user can rename it.' }),
+  adopted: agentMsg({ id: 'session.adopted', text: 'Adopted session {id}', note: 'The stored name of a session Combwork adopted that has no title (its id, cut): agents read it and the user can rename it.' }),
   handover: {
     ask: agentMsg({
       id: 'session.handover.ask',

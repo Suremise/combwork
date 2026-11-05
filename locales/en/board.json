@@ -345,7 +345,7 @@
   },
   "board.busy.assistantWatching": {
     "defaultMessage": "The Assistant is watching it",
-    "description": "Why Archive All skips a card (listed in its dialog): the Hive Assistant waits for it to change."
+    "description": "Why Archive All skips a card (listed in its dialog): the Combwork Assistant waits for it to change."
   },
   "board.busy.reviewing": {
     "defaultMessage": "{agent} is reviewing it",
@@ -477,7 +477,7 @@
   },
   "board.column.holdDescription": {
     "defaultMessage": "Parked: nobody picks these up until they move to Todo. Only you and the Assistant put cards here.",
-    "description": "The On Hold column's description (its hover). Todo is the column's name; the Assistant is the Hive Assistant."
+    "description": "The On Hold column's description (its hover). Todo is the column's name; the Assistant is the Combwork Assistant."
   },
   "board.column.passed": {
     "defaultMessage": "Approved",
@@ -549,7 +549,7 @@
   },
   "board.conflicts.clipped": {
     "defaultMessage": "{n, plural, one {# long line shortened} other {# long lines shortened}}",
-    "description": "Under a conflict's text in the card dialog's Work section (HI-1181): {n} of its lines were longer than Hive keeps, so only their start is shown."
+    "description": "Under a conflict's text in the card dialog's Work section (HI-1181): {n} of its lines were longer than Combwork keeps, so only their start is shown."
   },
   "board.conflicts.count": {
     "defaultMessage": "{n, plural, one {# conflict} other {# conflicts}}",
@@ -561,7 +561,7 @@
   },
   "board.conflicts.filesLeft": {
     "defaultMessage": "{n, plural, one {# more file in conflict, not read} other {# more files in conflict, not read}}",
-    "description": "Under the files in conflict in the card dialog's Work section (HI-1181): git named {n} more conflicting files than Hive reads for one return."
+    "description": "Under the files in conflict in the card dialog's Work section (HI-1181): git named {n} more conflicting files than Combwork reads for one return."
   },
   "board.conflicts.line": {
     "defaultMessage": "From line {line, number}",
@@ -569,7 +569,7 @@
   },
   "board.conflicts.mayHaveMore": {
     "defaultMessage": "it may have more, not shown",
-    "description": "Beside a file in conflict in the card dialog's Work section (HI-1181): Hive stopped recording its conflicts (it had shown enough), so there may be more than shown."
+    "description": "Beside a file in conflict in the card dialog's Work section (HI-1181): Combwork stopped recording its conflicts (it had shown enough), so there may be more than shown."
   },
   "board.conflicts.more": {
     "defaultMessage": "{n, plural, one {# more not shown} other {# more not shown}}",
@@ -577,15 +577,15 @@
   },
   "board.conflicts.noText": {
     "defaultMessage": "no text conflict",
-    "description": "Beside a file in conflict in the card dialog's Work section (HI-1181): Hive read the whole file and git left no conflict markers in it (a conflict over the file itself: deleted, renamed, its mode)."
+    "description": "Beside a file in conflict in the card dialog's Work section (HI-1181): Combwork read the whole file and git left no conflict markers in it (a conflict over the file itself: deleted, renamed, its mode)."
   },
   "board.conflicts.notRead": {
     "defaultMessage": "{why, select, link {not read: it is a link} outside {not read: outside the queue's folder} missing {not read: not a file there} binary {not read: not text (binary)} notText {not read: not UTF-8 text} budget {not read: past how much Combwork reads} other {not read: it couldn't be read}}",
-    "description": "Beside a file in conflict in the card dialog's Work section (HI-1181): Hive didn't read its text, and why (select: translate each): a link it never follows, a path outside the merge queue's folder, not a file there (deleted on one side), binary, not UTF-8 text, past the amount Hive reads for one return, or an error."
+    "description": "Beside a file in conflict in the card dialog's Work section (HI-1181): Combwork didn't read its text, and why (select: translate each): a link it never follows, a path outside the merge queue's folder, not a file there (deleted on one side), binary, not UTF-8 text, past the amount Combwork reads for one return, or an error."
   },
   "board.conflicts.readInPart": {
     "defaultMessage": "read in part: it may have more",
-    "description": "Beside a file in conflict in the card dialog's Work section (HI-1181): it is large, so Hive read only its start; there may be more conflicts than shown."
+    "description": "Beside a file in conflict in the card dialog's Work section (HI-1181): it is large, so Combwork read only its start; there may be more conflicts than shown."
   },
   "board.context.close": {
     "defaultMessage": "Close",
@@ -621,7 +621,7 @@
   },
   "board.cost.tokens": {
     "defaultMessage": "{estimated, select, yes {≈ } other {}}in {input} · out {output} · cache write {cacheWrite} · cache read {cacheRead}{unknown, select, yes { + unknown} other {}}{requests, plural, =0 {} one { · # request} other { · # requests}}",
-    "description": "A card's or lane's token use, in a cost hover: input, output, cache write and cache read tokens (\"12K\"); ≈ first when some are Hive's estimate; + unknown when some aren't known; then how many requests (none: leave that branch empty). Lower case: it follows a cost."
+    "description": "A card's or lane's token use, in a cost hover: input, output, cache write and cache read tokens (\"12K\"); ≈ first when some are Combwork's estimate; + unknown when some aren't known; then how many requests (none: leave that branch empty). Lower case: it follows a cost."
   },
   "board.cost.tokensUnknown": {
     "defaultMessage": "tokens unknown{requests, plural, =0 {} one { · # request} other { · # requests}}",
@@ -637,7 +637,7 @@
   },
   "board.costs.byRoundFailed": {
     "defaultMessage": "Its cost by round couldn’t be worked out.",
-    "description": "The card dialog's Work section, in place of the cost-by-round table, when Hive couldn't work it out."
+    "description": "The card dialog's Work section, in place of the cost-by-round table, when Combwork couldn't work it out."
   },
   "board.costs.byRoundHourly": {
     "defaultMessage": "Rounds from more than {days, plural, one {# day} other {# days}} ago may be split to the hour: Combwork keeps older sessions’ use in 1-hour steps.",
@@ -653,11 +653,11 @@
   },
   "board.costs.laneFailed": {
     "defaultMessage": "Its cost couldn’t be worked out.",
-    "description": "A lane's cost hover (Progress panel) when Hive couldn't work the cost out."
+    "description": "A lane's cost hover (Progress panel) when Combwork couldn't work the cost out."
   },
   "board.costs.laneLoading": {
     "defaultMessage": "Working out its cost…",
-    "description": "A lane's cost hover (Progress panel) while Hive works the cost out."
+    "description": "A lane's cost hover (Progress panel) while Combwork works the cost out."
   },
   "board.costs.note": {
     "defaultMessage": "What its agents used while they held it, as the providers reported it: ≈ is Combwork’s estimate, ? or Unknown what isn’t known (never {zero}).",
@@ -701,7 +701,7 @@
   },
   "board.costs.unmatched": {
     "defaultMessage": "{n, plural, one {One agent that held it has} other {# agents that held it have}} no session Combwork knows of: unknown.",
-    "description": "In a card's cost hover: some agents that held the card have no session Hive knows of, so what they used is unknown."
+    "description": "In a card's cost hover: some agents that held the card have no session Combwork knows of, so what they used is unknown."
   },
   "board.decision.add": {
     "defaultMessage": "Add Decision",
@@ -737,7 +737,7 @@
   },
   "board.decision.info": {
     "defaultMessage": "What you decided about this card: scope, wording, a default. Agents read them when they start and again before Review, and follow them where the description says otherwise; reviewers check the work against them. An agent or the Assistant can write down a decision you made; only you change or remove one.",
-    "description": "The (i) beside the card dialog's Decisions heading. Review is the board column; the Assistant is the Hive Assistant."
+    "description": "The (i) beside the card dialog's Decisions heading. Review is the board column; the Assistant is the Combwork Assistant."
   },
   "board.decision.new": {
     "defaultMessage": "new since start",
@@ -809,7 +809,7 @@
   },
   "board.details.copy": {
     "defaultMessage": "Copy",
-    "description": "A label in a run's details (Progress panel): the name of the review or check copy it ran in follows (copy-1): a folder Hive keeps at exactly the card's revision, which nothing else writes."
+    "description": "A label in a run's details (Progress panel): the name of the review or check copy it ran in follows (copy-1): a folder Combwork keeps at exactly the card's revision, which nothing else writes."
   },
   "board.details.countsAsCheck": {
     "defaultMessage": "Counts as check: {name}",
@@ -837,7 +837,7 @@
   },
   "board.details.installAsWritten": {
     "defaultMessage": "The setup command as written, after removing node_modules: Combwork has no clean form of it",
-    "description": "A run's details in the Progress panel, on the merge queue's install: Hive ran the project's worktree setup command as it is written (it is not a package manager's plain install, such as npm install, that Hive knows how to run clean), after deleting the queue folder's node_modules so the install starts from scratch."
+    "description": "A run's details in the Progress panel, on the merge queue's install: Combwork ran the project's worktree setup command as it is written (it is not a package manager's plain install, such as npm install, that Combwork knows how to run clean), after deleting the queue folder's node_modules so the install starts from scratch."
   },
   "board.details.interrupted": {
     "defaultMessage": "Stopped: its command was interrupted",
@@ -857,7 +857,7 @@
   },
   "board.details.noInstall": {
     "defaultMessage": "Nothing installed: the project has no setup command and no lock file",
-    "description": "A run's details in the Progress panel, on one of the merge queue's checks: Hive installed nothing before the checks, because the project has neither a worktree setup command (Project Settings → Agents) nor a package lock file."
+    "description": "A run's details in the Progress panel, on one of the merge queue's checks: Combwork installed nothing before the checks, because the project has neither a worktree setup command (Project Settings → Agents) nor a package lock file."
   },
   "board.details.notCounted": {
     "defaultMessage": "Doesn't count as check {name}: {why, select, notCheck {it wasn't started as a check (cw-progress --check), and its command isn't one the project has for a check} notContained {what was checked out doesn't contain the card's revision} dirty {the folder had uncommitted changes when it started or ended} moved {something else was checked out when it ended} changed {files changed in the folder while it ran} revisionChanged {the card's files changed while it ran} other {it can't be told whether its files changed}}",
@@ -953,7 +953,7 @@
   },
   "board.dialog.added": {
     "defaultMessage": "{who, select, you {Added by you} assistant {Added by the Assistant} repair {Added by Repair} other {Added by {by}}} {added} · changed {changed}",
-    "description": "At the foot of the card dialog: who added the card ({who}: you, the user; assistant, the Hive Assistant; repair, Hive's Repair, which gives cards back to a moved project; other: an agent, {by} its name), when ({added}: \"3 days ago\"), and when it last changed ({changed})."
+    "description": "At the foot of the card dialog: who added the card ({who}: you, the user; assistant, the Combwork Assistant; repair, Combwork's Repair, which gives cards back to a moved project; other: an agent, {by} its name), when ({added}: \"3 days ago\"), and when it last changed ({changed})."
   },
   "board.dialog.addedUnknown": {
     "defaultMessage": "Added by unknown {added} · changed {changed}",
@@ -1269,7 +1269,7 @@
   },
   "board.error.inUse": {
     "defaultMessage": "Another Combwork has this workspace open: close it first.",
-    "description": "An error: the board can't be upgraded to 1.0 (or its 0.9 backup put back) while another copy of Hive (an older version, or another profile) has the workspace open. Nothing was changed."
+    "description": "An error: the board can't be upgraded to 1.0 (or its 0.9 backup put back) while another copy of Combwork (an older version, or another profile) has the workspace open. Nothing was changed."
   },
   "board.error.move": {
     "defaultMessage": "Could not move the card",
@@ -1277,7 +1277,7 @@
   },
   "board.error.newer": {
     "defaultMessage": "This board was saved by a newer version of Combwork. It is shown read-only: update Combwork to change it.",
-    "description": "An error: the workspace's task board was saved by a newer Hive, whose format this version doesn't know; cards can be read but not changed."
+    "description": "An error: the workspace's task board was saved by a newer Combwork, whose format this version doesn't know; cards can be read but not changed."
   },
   "board.error.noBackup": {
     "defaultMessage": "There is no 0.9 board backup to put back: this board was never upgraded to 1.0 here.",
@@ -1289,7 +1289,7 @@
   },
   "board.error.stopAgentsFirst": {
     "defaultMessage": "Stop this workspace's agents and its Assistant first: once the 0.9 board is back, Combwork can't record them.",
-    "description": "An error from Help → Restore the 0.9 Board Backup…: agents of the workspace are running or starting; the board put back is read-only in this Hive, so their sessions couldn't be recorded. Nothing was changed."
+    "description": "An error from Help → Restore the 0.9 Board Backup…: agents of the workspace are running or starting; the board put back is read-only in this Combwork, so their sessions couldn't be recorded. Nothing was changed."
   },
   "board.error.unarchive": {
     "defaultMessage": "Could not bring the card back",
@@ -1305,7 +1305,7 @@
   },
   "board.error.upgradeFirstStart": {
     "defaultMessage": "This workspace is from Combwork 0.9: upgrade it to 1.0 before starting agents (Upgrade… on the banner at the top of the window).",
-    "description": "An error: an agent (or the Assistant) can't start while the workspace's data waits for its upgrade to Hive 1.0's format (the user said Not Now): Hive couldn't record its session. Upgrade… is the button on the banner at the top of the window."
+    "description": "An error: an agent (or the Assistant) can't start while the workspace's data waits for its upgrade to Hive 1.0's format (the user said Not Now): Combwork couldn't record its session. Upgrade… is the button on the banner at the top of the window."
   },
   "board.export.command": {
     "defaultMessage": "Export Board to JSON…",
@@ -1361,7 +1361,7 @@
   },
   "board.filter.noProject": {
     "defaultMessage": "Assistant and scripts",
-    "description": "A choice of the Progress panel's project filter: the runs of the Hive Assistant and of scripts, which belong to no project."
+    "description": "A choice of the Progress panel's project filter: the runs of the Combwork Assistant and of scripts, which belong to no project."
   },
   "board.forYou.agree": {
     "defaultMessage": "{action, select, done {Move to Done With This Reply} noCode {Make It No Code With This Reply} skipReview {Skip Review With This Reply} other {Unblock With This Reply}}",
@@ -1389,7 +1389,7 @@
   },
   "board.forYou.asked": {
     "defaultMessage": "{who, select, hive {Combwork asks} other {{who} asks}} · {when}",
-    "description": "Under a request for the user in the card dialog: who asks (Hive, or an agent: its name {who}) and when ({when}: \"5 min ago\"). Keep the select keys as they are."
+    "description": "Under a request for the user in the card dialog: who asks (Combwork, or an agent: its name {who}) and when ({when}: \"5 min ago\"). Keep the select keys as they are."
   },
   "board.forYou.checklist": {
     "defaultMessage": "To try:",
@@ -1445,7 +1445,7 @@
   },
   "board.forYou.resolvedBy": {
     "defaultMessage": "{gone, select, yes {By a decision since removed} other {By your decision: “{decision}”}}, {who, select, you {recorded by you} assistant {recorded by the Assistant} other {recorded by {name}}}",
-    "description": "Under a request in the card dialog's For you section answered by a decision (HI-1932): the user's decision that answered it ({decision}: its words, cut short; gone yes: the user has removed that decision from the card since), and who wrote the decision down: the user, the Hive Assistant (recording the user's own words), or another ({name}). Keep the select keys."
+    "description": "Under a request in the card dialog's For you section answered by a decision (HI-1932): the user's decision that answered it ({decision}: its words, cut short; gone yes: the user has removed that decision from the card since), and who wrote the decision down: the user, the Combwork Assistant (recording the user's own words), or another ({name}). Keep the select keys."
   },
   "board.forYou.resolvedHeading": {
     "defaultMessage": "Answered by your decisions",
@@ -1477,7 +1477,7 @@
   },
   "board.forYou.tipAsks": {
     "defaultMessage": "{kind, select, approve {{who} asks for your OK} decide {{who} asks you to decide} test {{who} asks you to test} signIn {{who} asks you to sign in} other {{who} asks you}}",
-    "description": "The first line of a request in the tooltip of a card's For you chip: who asks ({who}: an agent's name, or Hive) and what for (the request's kind: approve, decide, test, sign in, or anything else). The start of the request follows on the next line. Keep the select keys as they are. Glossary: For you."
+    "description": "The first line of a request in the tooltip of a card's For you chip: who asks ({who}: an agent's name, or Combwork) and what for (the request's kind: approve, decide, test, sign in, or anything else). The start of the request follows on the next line. Keep the select keys as they are. Glossary: For you."
   },
   "board.forYou.tipMore": {
     "defaultMessage": "{n, plural, one {and # more request} other {and # more requests}}",
@@ -1489,7 +1489,7 @@
   },
   "board.forYou.todayValue": {
     "defaultMessage": "{today, select, yes {{value} (as until now)} other {{value}}}",
-    "description": "A choice in the merge queue's question before an upgraded project's first merge (HI-1697, For you): a value of a workflow option ({value}), marked when it is how Hive merged until now. Keep the select keys as they are."
+    "description": "A choice in the merge queue's question before an upgraded project's first merge (HI-1697, For you): a value of a workflow option ({value}), marked when it is how Combwork merged until now. Keep the select keys as they are."
   },
   "board.inbox.asks": {
     "defaultMessage": "Asks you something",
@@ -1501,7 +1501,7 @@
   },
   "board.inbox.assistant": {
     "defaultMessage": "Assistant",
-    "description": "The Hive Assistant, named in the attention inbox (status bar popover, tray menu) where a project name goes. Hive is the app's name: keep it."
+    "description": "The Combwork Assistant, named in the attention inbox (status bar popover, tray menu) where a project name goes. Combwork is the app's name: keep it."
   },
   "board.inbox.cardRequests": {
     "defaultMessage": "{n, plural, one {# question} other {# questions}}",
@@ -1693,7 +1693,7 @@
   },
   "board.lane.andMore": {
     "defaultMessage": "{n, plural, one {# more} other {# more}}",
-    "description": "The last item of a folded lane segment's list of cards (Progress panel), after the first eight card numbers: how many more there are ({n}). Hive joins it to the list (\"#1, #2 … #8 and 3 more\")."
+    "description": "The last item of a folded lane segment's list of cards (Progress panel), after the first eight card numbers: how many more there are ({n}). Combwork joins it to the list (\"#1, #2 … #8 and 3 more\")."
   },
   "board.lane.blocked": {
     "defaultMessage": "{card}: blocked",
@@ -1769,11 +1769,11 @@
   },
   "board.lane.unrecorded": {
     "defaultMessage": "{card} {title} · not recorded: the lane ended before Combwork kept where its cards were",
-    "description": "A lane segment's label (Progress panel), in a lane that ended before Hive recorded its cards' columns. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none, {title} its title (the user's own words)."
+    "description": "A lane segment's label (Progress panel), in a lane that ended before Combwork recorded its cards' columns. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none, {title} its title (the user's own words)."
   },
   "board.lane.unrecordedUntitled": {
     "defaultMessage": "{card} · not recorded: the lane ended before Combwork kept where its cards were",
-    "description": "A lane segment's label (Progress panel), in a lane that ended before Hive recorded its cards' columns. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none."
+    "description": "A lane segment's label (Progress panel), in a lane that ended before Combwork recorded its cards' columns. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.lane.workChecks": {
     "defaultMessage": "Checks on it: {passed, number} passed, {failed, number} failed",
@@ -1841,11 +1841,11 @@
   },
   "board.laneStart.deferred": {
     "defaultMessage": "{agent} starts once it is free",
-    "description": "A toast's title (HI-2034): the lane was started, but its agent {agent} was busy (in a turn, or reading a message Hive had just given it), so it isn't in its new conversation yet."
+    "description": "A toast's title (HI-2034): the lane was started, but its agent {agent} was busy (in a turn, or reading a message Combwork had just given it), so it isn't in its new conversation yet."
   },
   "board.laneStart.deferredText": {
     "defaultMessage": "Combwork starts {agent} in a new conversation with the lane’s brief as soon as its turn is over. The lane’s row says so meanwhile, and its cards wait for it.",
-    "description": "The text of the toast when a lane's agent ({agent}) was busy as the lane started (HI-2034): Hive starts it in a new conversation once it is free; the lane's row in the Progress panel says it waits. Glossary: lane, conversation."
+    "description": "The text of the toast when a lane's agent ({agent}) was busy as the lane started (HI-2034): Combwork starts it in a new conversation once it is free; the lane's row in the Progress panel says it waits. Glossary: lane, conversation."
   },
   "board.laneStart.down": {
     "defaultMessage": "Move {card} down",
@@ -1973,7 +1973,7 @@
   },
   "board.lanes.barUnrecorded": {
     "defaultMessage": "{pair}: {total, plural, one {# card} other {# cards}}, not recorded",
-    "description": "Accessible name of a lane's bar (Progress panel) when the lane ended before Hive recorded where its cards were: the builder / reviewer ({pair}) and how many cards."
+    "description": "Accessible name of a lane's bar (Progress panel) when the lane ended before Combwork recorded where its cards were: the builder / reviewer ({pair}) and how many cards."
   },
   "board.lanes.copyMerge": {
     "defaultMessage": "Copy the merge commit {commit}",
@@ -2009,7 +2009,7 @@
   },
   "board.lanes.freshBlocked": {
     "defaultMessage": "{agent}’s new conversation didn’t start ({why, select, timeout {it wasn’t free in time} uncertain {Combwork closed as it started} other {{reason}}}): retry it, or end the lane",
-    "description": "Why a lane waits, in its header in the Progress panel (HI-2034): its agent {agent} (an agent's name) is owed a new conversation for the lane, and Hive stopped trying. why (select): it wasn't free within the wait (Settings → Advanced); Hive closed while starting it, so it may not have started; or (other) its start failed, {reason} saying why (a sentence, may be in English). The row's Retry New Conversation button tries again. Translate each."
+    "description": "Why a lane waits, in its header in the Progress panel (HI-2034): its agent {agent} (an agent's name) is owed a new conversation for the lane, and Combwork stopped trying. why (select): it wasn't free within the wait (Settings → Advanced); Combwork closed while starting it, so it may not have started; or (other) its start failed, {reason} saying why (a sentence, may be in English). The row's Retry New Conversation button tries again. Translate each."
   },
   "board.lanes.latestRun": {
     "defaultMessage": "{card}'s latest run: {run}, {state, select, running {running} passed {passed} failed {failed} other {stopped}}",
@@ -2085,27 +2085,27 @@
   },
   "board.lanes.queuedAdded": {
     "defaultMessage": "{n, plural, one {{cards} added} other {{cards} added}}",
-    "description": "Part of a lane's queued list change (Progress panel → Lanes, HI-2151): the cards {cards} (their keys, such as HI-12, joined: \"HI-12 and HI-13\"; {n} of them) are added to the lane's list. Hive joins the parts with commas."
+    "description": "Part of a lane's queued list change (Progress panel → Lanes, HI-2151): the cards {cards} (their keys, such as HI-12, joined: \"HI-12 and HI-13\"; {n} of them) are added to the lane's list. Combwork joins the parts with commas."
   },
   "board.lanes.queuedChange": {
     "defaultMessage": "{after, select, yes {Next, once {card} is Done: {changes}} other {Next: {changes}}}",
-    "description": "A line under a lane's cards in the Progress panel's Lanes tab (HI-2151): a change to the lane's list of cards made while a card was in flight, which Hive applies once that card ({card}, its key such as HI-12) is Done (merged); other: the card isn't known. {changes}: what changes, such as \"HI-13 added, HI-9 moves to HB6’s lane\". Keep the select keys. Glossary: Done, lane."
+    "description": "A line under a lane's cards in the Progress panel's Lanes tab (HI-2151): a change to the lane's list of cards made while a card was in flight, which Combwork applies once that card ({card}, its key such as HI-12) is Done (merged); other: the card isn't known. {changes}: what changes, such as \"HI-13 added, HI-9 moves to HB6’s lane\". Keep the select keys. Glossary: Done, lane."
   },
   "board.lanes.queuedMoves": {
     "defaultMessage": "{n, plural, one {{cards} moves to {builder}’s lane} other {{cards} move to {builder}’s lane}}",
-    "description": "Part of a lane's queued list change (Progress panel → Lanes, HI-2151): the cards {cards} (their keys, joined; {n} of them) leave this lane's list for another lane's, whose builder is {builder} (an agent's name, such as HB6). Hive joins the parts with commas."
+    "description": "Part of a lane's queued list change (Progress panel → Lanes, HI-2151): the cards {cards} (their keys, joined; {n} of them) leave this lane's list for another lane's, whose builder is {builder} (an agent's name, such as HB6). Combwork joins the parts with commas."
   },
   "board.lanes.queuedOrder": {
     "defaultMessage": "new order: {cards}",
-    "description": "Part of a lane's queued list change (Progress panel → Lanes, HI-2151), lower case: its cards change order, and {cards} is the whole new list in order (keys, such as HI-12, joined with commas). Hive joins the parts with commas."
+    "description": "Part of a lane's queued list change (Progress panel → Lanes, HI-2151), lower case: its cards change order, and {cards} is the whole new list in order (keys, such as HI-12, joined with commas). Combwork joins the parts with commas."
   },
   "board.lanes.queuedRemoved": {
     "defaultMessage": "{n, plural, one {{cards} taken off} other {{cards} taken off}}",
-    "description": "Part of a lane's queued list change (Progress panel → Lanes, HI-2151): the cards {cards} (their keys, joined; {n} of them) are taken off the lane's list. Hive joins the parts with commas."
+    "description": "Part of a lane's queued list change (Progress panel → Lanes, HI-2151): the cards {cards} (their keys, joined; {n} of them) are taken off the lane's list. Combwork joins the parts with commas."
   },
   "board.lanes.retryFresh": {
     "defaultMessage": "Retry New Conversation",
-    "description": "A button in a lane's header (Progress panel) and an item of its menu (HI-2034): one of the lane's agents was owed a new conversation, and Hive stopped trying to start it (it wasn't free in time, Hive closed while starting it, or its start failed); this tries again, once the agent is free. Glossary: lane, conversation."
+    "description": "A button in a lane's header (Progress panel) and an item of its menu (HI-2034): one of the lane's agents was owed a new conversation, and Combwork stopped trying to start it (it wasn't free in time, Combwork closed while starting it, or its start failed); this tries again, once the agent is free. Glossary: lane, conversation."
   },
   "board.lanes.retryFreshFailed": {
     "defaultMessage": "Couldn't retry {lane}'s new conversation",
@@ -2113,7 +2113,7 @@
   },
   "board.lanes.retryFreshShort": {
     "defaultMessage": "Retry {agent}",
-    "description": "A lane's header in the Progress panel (HI-2034), after a refresh icon: a button that tries again to start the lane's agent {agent} (an agent's name) in a new conversation, which Hive stopped trying. Short: the panel is narrow; its tooltip says why in full."
+    "description": "A lane's header in the Progress panel (HI-2034), after a refresh icon: a button that tries again to start the lane's agent {agent} (an agent's name) in a new conversation, which Combwork stopped trying. Short: the panel is narrow; its tooltip says why in full."
   },
   "board.lanes.round": {
     "defaultMessage": "r{round}",
@@ -2153,7 +2153,7 @@
   },
   "board.lanes.teamPause": {
     "defaultMessage": "paused: the team is pausing",
-    "description": "Why a lane waits, in its header in the Progress panel, lower case (HI-2081): the user (or the Hive Assistant) paused the whole team before an update, so Hive starts none of the lane's cards and wakes none of its agents until the team resumes. 'The team' is every agent of the workspace."
+    "description": "Why a lane waits, in its header in the Progress panel, lower case (HI-2081): the user (or the Combwork Assistant) paused the whole team before an update, so Combwork starts none of the lane's cards and wakes none of its agents until the team resumes. 'The team' is every agent of the workspace."
   },
   "board.lanes.title": {
     "defaultMessage": "Lanes",
@@ -2177,11 +2177,11 @@
   },
   "board.lanes.waitedAtLeast": {
     "defaultMessage": "{time}+",
-    "description": "How long a lane has waited, in its header (Progress panel), when Hive didn't see its wait begin (it was already waiting when Hive started): at least {time} (4 min, 1 h 5 min)."
+    "description": "How long a lane has waited, in its header (Progress panel), when Combwork didn't see its wait begin (it was already waiting when Combwork started): at least {time} (4 min, 1 h 5 min)."
   },
   "board.lanes.waitedAtLeastTip": {
     "defaultMessage": "It was already waiting when Combwork first saw it: it has waited at least this long.",
-    "description": "Tooltip of a lane's wait time with a + in its header (Progress panel): Hive didn't see the wait begin."
+    "description": "Tooltip of a lane's wait time with a + in its header (Progress panel): Combwork didn't see the wait begin."
   },
   "board.lanes.waitingForYou": {
     "defaultMessage": "{n, plural, one {# waiting for you} other {# waiting for you}}",
@@ -2189,15 +2189,15 @@
   },
   "board.lanes.waits": {
     "defaultMessage": "{reason, select, blocked {{card} is blocked} hold {{card} is On Hold} you {waiting for you ({ask, select, approve {approval} decide {a decision} test {a test} signIn {a sign-in} other {an answer}}): {card}} roundLimit {waiting for you: {card} reached its round limit} notMerged {waiting: {card} not merged} merging {waiting: {card} merging} stale {stale: {card} must be submitted again} reviewer {waiting for a reviewer on {card}} lineUpdate {waiting: bringing the builder’s branch up to date before {card}} hooks {paused: {agent}'s hooks aren't arriving} checkCopy {waiting for a check copy for {card}} slot {waiting for a slot} other {list changes after {card}}}",
-    "description": "Why a lane (a builder and its reviewer working through cards) waits, in its header in the Progress panel, lower case. {card} is a card's name (its key, such as HI-12). reason: blocked or On Hold (a board column); waiting for the user (ask: for their approval, a decision, a test, a sign-in or another answer); at its round limit (the user decides how to go on); a card passed but not merged yet (or merging now), so the next can't start (one card at a time); its pass is stale (the builder must submit again); nobody reviews it; Hive brings the builder's branch up to date before that card (after a squash merge, #1271); hooks: the agent {agent} (a name) has stopped sending Hive its hooks (the calls that tell Hive what it is doing), so the lane is paused; checkCopy: its review or check waits for a check copy (a folder Hive keeps at one revision for a review or an isolated check) to be free; slot: every slot (a working folder Hive lends to a card or a lane) is in use, so the lane can't start until one is free; changes to the lane's list of cards apply once that card is done (other). Keep the select keys. Glossary: lane, round limit, stale."
+    "description": "Why a lane (a builder and its reviewer working through cards) waits, in its header in the Progress panel, lower case. {card} is a card's name (its key, such as HI-12). reason: blocked or On Hold (a board column); waiting for the user (ask: for their approval, a decision, a test, a sign-in or another answer); at its round limit (the user decides how to go on); a card passed but not merged yet (or merging now), so the next can't start (one card at a time); its pass is stale (the builder must submit again); nobody reviews it; Combwork brings the builder's branch up to date before that card (after a squash merge, #1271); hooks: the agent {agent} (a name) has stopped sending Combwork its hooks (the calls that tell Combwork what it is doing), so the lane is paused; checkCopy: its review or check waits for a check copy (a folder Combwork keeps at one revision for a review or an isolated check) to be free; slot: every slot (a working folder Combwork lends to a card or a lane) is in use, so the lane can't start until one is free; changes to the lane's list of cards apply once that card is done (other). Keep the select keys. Glossary: lane, round limit, stale."
   },
   "board.lanes.waitsDependency": {
     "defaultMessage": "{card} waits to start: it waits for {dependency} to merge",
-    "description": "Why a lane waits, in its header in the Progress panel (HI-2129): its card {card} (its key, such as HI-12) is due to start, but it depends on the card {dependency} (its key, such as HI-11), which isn't merged (Done) yet, and the project's workflow starts a card only once the cards it depends on are. Hive starts it once that card is merged. The lane isn't paused."
+    "description": "Why a lane waits, in its header in the Progress panel (HI-2129): its card {card} (its key, such as HI-12) is due to start, but it depends on the card {dependency} (its key, such as HI-11), which isn't merged (Done) yet, and the project's workflow starts a card only once the cards it depends on are. Combwork starts it once that card is merged. The lane isn't paused."
   },
   "board.lanes.waitsFresh": {
     "defaultMessage": "waiting: {agent} starts in a new conversation once it is free",
-    "description": "Why a lane waits, in its header in the Progress panel, lower case (HI-2034): its agent {agent} (an agent's name) was busy as the lane started (in a turn, or reading a message), so Hive starts it in a new conversation with the lane's brief once it is free. The lane isn't paused."
+    "description": "Why a lane waits, in its header in the Progress panel, lower case (HI-2034): its agent {agent} (an agent's name) was busy as the lane started (in a turn, or reading a message), so Combwork starts it in a new conversation with the lane's brief once it is free. The lane isn't paused."
   },
   "board.lanes.waitsLink": {
     "defaultMessage": "Click to show it.",
@@ -2205,19 +2205,19 @@
   },
   "board.lanes.waitsPreparing": {
     "defaultMessage": "waiting: preparing {slot}",
-    "description": "Why a lane waits, in its header in the Progress panel, lower case: Hive is preparing its slot (a working folder it lends to the lane: its setup command or a dependency install before the next card). {slot} is the slot's name, such as slot-b: keep it as it is. The lane isn't paused."
+    "description": "Why a lane waits, in its header in the Progress panel, lower case: Combwork is preparing its slot (a working folder it lends to the lane: its setup command or a dependency install before the next card). {slot} is the slot's name, such as slot-b: keep it as it is. The lane isn't paused."
   },
   "board.lanes.waitsSlotHeld": {
     "defaultMessage": "waiting for {slot}: {held, select, session {{agent}’s session is still in it} broker {a process still has a file or folder in it open: Windows Sandbox’s broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}",
-    "description": "Why a lane waits, in its header in the Progress panel, lower case (HI-2466): the lane waits for a slot (a working folder Hive lends to a lane), and the only free one, {slot} (its name, such as slot-b: keep it as it is), can't be lent yet because something still uses it. held (select): session, the agent {agent} (an agent's name) still has a session running in it; broker (HI-2467), a process still has a file or folder in it open, and Windows Sandbox's broker ({broker}: its process name, WindowsSandboxServer: keep it as it is) is seen using the slot as its working folder; other, a process still has a file or folder in it open (often a program the last agent there started, still closing). idle (select, only with broker): yes, no Windows Sandbox is running; no, one is; other, not known (nothing said). Hive lends the slot by itself once it is free. Translate each."
+    "description": "Why a lane waits, in its header in the Progress panel, lower case (HI-2466): the lane waits for a slot (a working folder Combwork lends to a lane), and the only free one, {slot} (its name, such as slot-b: keep it as it is), can't be lent yet because something still uses it. held (select): session, the agent {agent} (an agent's name) still has a session running in it; broker (HI-2467), a process still has a file or folder in it open, and Windows Sandbox's broker ({broker}: its process name, WindowsSandboxServer: keep it as it is) is seen using the slot as its working folder; other, a process still has a file or folder in it open (often a program the last agent there started, still closing). idle (select, only with broker): yes, no Windows Sandbox is running; no, one is; other, not known (nothing said). Combwork lends the slot by itself once it is free. Translate each."
   },
   "board.lanes.waitsStart": {
     "defaultMessage": "{card} waits to start: {why, select, watching {{agent} is waiting on other work} queued {a line of Combwork’s is on its way to {agent}} failed {{agent}’s last start failed} refused {its start was refused for now, and Combwork tries again} other {{agent} is in a turn}}",
-    "description": "Why a lane waits, in its header in the Progress panel (HI-2029): its card {card} (its key, such as HI-12) is due to start but isn't started yet. why (select): its builder {agent} (an agent's name) is waiting on other work (a card watch); a line Hive types (a message or a wake) is about to reach it; its last start failed; Hive's start was refused for now and is tried again; or (other) it is in a turn (working, starting, waiting for the user). Translate each. The lane isn't paused."
+    "description": "Why a lane waits, in its header in the Progress panel (HI-2029): its card {card} (its key, such as HI-12) is due to start but isn't started yet. why (select): its builder {agent} (an agent's name) is waiting on other work (a card watch); a line Combwork types (a message or a wake) is about to reach it; its last start failed; Combwork's start was refused for now and is tried again; or (other) it is in a turn (working, starting, waiting for the user). Translate each. The lane isn't paused."
   },
   "board.lanes.waitsStartHeld": {
     "defaultMessage": "{card} waits to start: its start was refused for now, {slot} still in use ({held, select, session {{agent}’s session is still in it} left {{agent}’s last run left {program}{more, plural, =0 {} other { and # more}} running in it} lastRun {{agent}’s last run there isn’t known to have ended} broker {a process still has a file or folder in it open: Windows Sandbox’s broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}), and Combwork tries again",
-    "description": "Why a lane waits, in its header in the Progress panel (HI-2468): its card {card} (its key, such as HI-12) is due to start, but Hive's start of it was refused because its slot {slot} (a working folder Hive lends to a lane, such as slot-a: keep it as it is) is still in use. held (select): session, the agent {agent} (an agent's name) still has a session running in it; left, the agent {agent}'s last run left programs running in it ({program}: the first one's process name, such as node: keep it as it is; {more}: how many more, a number); lastRun, that last run of {agent}'s there isn't known to have ended; broker, a process still has a file or folder in it open, and Windows Sandbox's broker ({broker}: its process name, WindowsSandboxServer: keep it as it is) is seen using the slot as its working folder; other, a process still has a file or folder in it open (often a program the last agent there started, still closing). idle (select, only with broker): yes, no Windows Sandbox is running; no, one is; other, not known (nothing said). Hive tries the start again. Translate each. The lane isn't paused."
+    "description": "Why a lane waits, in its header in the Progress panel (HI-2468): its card {card} (its key, such as HI-12) is due to start, but Combwork's start of it was refused because its slot {slot} (a working folder Combwork lends to a lane, such as slot-a: keep it as it is) is still in use. held (select): session, the agent {agent} (an agent's name) still has a session running in it; left, the agent {agent}'s last run left programs running in it ({program}: the first one's process name, such as node: keep it as it is; {more}: how many more, a number); lastRun, that last run of {agent}'s there isn't known to have ended; broker, a process still has a file or folder in it open, and Windows Sandbox's broker ({broker}: its process name, WindowsSandboxServer: keep it as it is) is seen using the slot as its working folder; other, a process still has a file or folder in it open (often a program the last agent there started, still closing). idle (select, only with broker): yes, no Windows Sandbox is running; no, one is; other, not known (nothing said). Combwork tries the start again. Translate each. The lane isn't paused."
   },
   "board.leftOut.detail": {
     "defaultMessage": "{hasPaths, select, yes {Its paths: {paths}.} other {It has no paths yet.}} A file changed meanwhile may be another card's work or your own: include only what belongs to {card}.",
@@ -2317,7 +2317,7 @@
   },
   "board.move.refused": {
     "defaultMessage": "{card} can't move to {column}",
-    "description": "A toast's title: a card's move was refused for something no exception to the rules can make true (nothing to submit, something Hive couldn't read). {card} is the card's name, {column} a board column. The toast's text says why and what to do."
+    "description": "A toast's title: a card's move was refused for something no exception to the rules can make true (nothing to submit, something Combwork couldn't read). {card} is the card's name, {column} a board column. The toast's text says why and what to do."
   },
   "board.move.stopped": {
     "defaultMessage": "{card} stopped in {column}",
@@ -2385,7 +2385,7 @@
   },
   "board.progress.anAgent": {
     "defaultMessage": "Agent",
-    "description": "Who ran a run in the Progress panel when Hive doesn't have the agent's name (an older record)."
+    "description": "Who ran a run in the Progress panel when Combwork doesn't have the agent's name (an older record)."
   },
   "board.progress.attention": {
     "defaultMessage": "{n, plural, one {# run failed} other {# runs failed}}",
@@ -2411,13 +2411,17 @@
     "defaultMessage": "Can't show {agent}",
     "description": "A notification's title: the agent ({agent}) that ran a Progress panel run can't be shown. Its message says why."
   },
+  "board.progress.combworkRun": {
+    "defaultMessage": "Combwork’s merge queue ran it, not an agent: there is no agent to show.",
+    "description": "Why a Progress panel run's agent can't be shown: Combwork's merge queue ran the run itself (a merge check on a card's merged result; glossary 2.5: merge queue)."
+  },
   "board.progress.copied": {
     "defaultMessage": "{what, select, command {Command copied} other {Details copied}}",
     "description": "A notification after copying a run's command or its details from the Progress panel."
   },
   "board.progress.copiesRun": {
     "defaultMessage": "Combwork (review copies)",
-    "description": "Who ran a run in the Progress panel when Hive ran it itself to set up one of a project's review or check copies (folders at one revision where a reviewer reads a card's work, or an isolated check runs) and no agent's lease held the copy: its setup command or a dependency install. Also an entry of the panel's Agent filter."
+    "description": "Who ran a run in the Progress panel when Combwork ran it itself to set up one of a project's review or check copies (folders at one revision where a reviewer reads a card's work, or an isolated check runs) and no agent's lease held the copy: its setup command or a dependency install. Also an entry of the panel's Agent filter."
   },
   "board.progress.copyCommand": {
     "defaultMessage": "Copy command",
@@ -2463,17 +2467,13 @@
     "defaultMessage": "Hide details for {run}",
     "description": "Tooltip of the button closing a run's details in the Progress panel ({run}: the run's title)."
   },
-  "board.progress.hiveRun": {
-    "defaultMessage": "Combwork’s merge queue ran it, not an agent: there is no agent to show.",
-    "description": "Why a Progress panel run's agent can't be shown: Hive's merge queue ran the run itself (a merge check on a card's merged result; glossary 2.5: merge queue)."
-  },
   "board.progress.inCopy": {
     "defaultMessage": "in {copy}",
-    "description": "Under a run's agent in the Progress panel, after its card and revision (\"AM-12 · a3f2c1d · in copy-2\"): the run ran in that review or check copy (a folder Hive keeps at exactly the card's revision). {copy} is its name, such as copy-2: keep it as it is."
+    "description": "Under a run's agent in the Progress panel, after its card and revision (\"AM-12 · a3f2c1d · in copy-2\"): the run ran in that review or check copy (a folder Combwork keeps at exactly the card's revision). {copy} is its name, such as copy-2: keep it as it is."
   },
   "board.progress.mergeQueue": {
     "defaultMessage": "Combwork (merge queue)",
-    "description": "Who ran a run in the Progress panel when Hive's merge queue ran it itself: a merge check or install on a card's merged result, not an agent (glossary 2.5: merge queue)."
+    "description": "Who ran a run in the Progress panel when Combwork's merge queue ran it itself: a merge check or install on a card's merged result, not an agent (glossary 2.5: merge queue)."
   },
   "board.progress.miniWaiting": {
     "defaultMessage": "{agent}: {run} (waiting)",
@@ -2489,7 +2489,7 @@
   },
   "board.progress.noAssistant": {
     "defaultMessage": "The Assistant is not in this workspace.",
-    "description": "Why a Progress panel run's agent can't be shown: the run is the Hive Assistant's, and this workspace has none."
+    "description": "Why a Progress panel run's agent can't be shown: the run is the Combwork Assistant's, and this workspace has none."
   },
   "board.progress.noMerges": {
     "defaultMessage": "No merge is going on. While Combwork's merge queue merges a card, or an agent merges its branch, it shows here with its cards, its checks and what waits.",
@@ -2549,7 +2549,7 @@
   },
   "board.progress.script": {
     "defaultMessage": "Script",
-    "description": "Who ran a run in the Progress panel when a script (a program calling Hive's Agent API) ran it, not an agent."
+    "description": "Who ran a run in the Progress panel when a script (a program calling Combwork's Agent API) ran it, not an agent."
   },
   "board.progress.scriptRun": {
     "defaultMessage": "A script reported it, not an agent: there is no agent to show.",
@@ -2565,7 +2565,7 @@
   },
   "board.progress.showAssistant": {
     "defaultMessage": "Show the Assistant, which ran {run}",
-    "description": "Accessible name of the button showing the Hive Assistant, which ran a Progress panel run ({run}: the run's title)."
+    "description": "Accessible name of the button showing the Combwork Assistant, which ran a Progress panel run ({run}: the run's title)."
   },
   "board.progress.showDetails": {
     "defaultMessage": "Show details for {run}",
@@ -2585,7 +2585,7 @@
   },
   "board.progress.slotRun": {
     "defaultMessage": "Combwork (slot {slot})",
-    "description": "Who ran a run in the Progress panel when Hive ran it itself to set up one of a project's slots (a worktree Hive lends to a card or a lane: its setup command, a dependency install or its archive command), not an agent. {slot} is the slot's name, such as slot-b: keep it as it is."
+    "description": "Who ran a run in the Progress panel when Combwork ran it itself to set up one of a project's slots (a worktree Combwork lends to a card or a lane: its setup command, a dependency install or its archive command), not an agent. {slot} is the slot's name, such as slot-b: keep it as it is."
   },
   "board.progress.stepOf": {
     "defaultMessage": "{step, number} of {total, number}",
@@ -2597,7 +2597,7 @@
   },
   "board.progress.stopIsolated": {
     "defaultMessage": "Stop this check and everything it started",
-    "description": "Tooltip of the button stopping an isolated check (a check an agent runs in a copy of its own) in the Progress panel: Hive ends its command and every process it started."
+    "description": "Tooltip of the button stopping an isolated check (a check an agent runs in a copy of its own) in the Progress panel: Combwork ends its command and every process it started."
   },
   "board.progress.tab": {
     "defaultMessage": "{tab, select, pulse {Pulse} merges {Merges} runs {Runs} other {Lanes}}",
@@ -2653,7 +2653,7 @@
   },
   "board.queue.pause.byAssistant": {
     "defaultMessage": "Paused by the Assistant. The queue merges nothing until it is resumed.",
-    "description": "Why a merge queue is paused, on its card in the Progress panel: the Hive Assistant paused it (Pause queue)."
+    "description": "Why a merge queue is paused, on its card in the Progress panel: the Combwork Assistant paused it (Pause queue)."
   },
   "board.queue.pause.byYou": {
     "defaultMessage": "Paused by you. The queue merges nothing until you resume it.",
@@ -2661,7 +2661,7 @@
   },
   "board.queue.pause.checkedOut": {
     "defaultMessage": "{target} is checked out in a folder. Combwork merges into it there now: resume to carry on.",
-    "description": "Why a merge queue is paused, on its card in the Progress panel: an older pause, from before Hive could merge into a checked-out branch ({target})."
+    "description": "Why a merge queue is paused, on its card in the Progress panel: an older pause, from before Combwork could merge into a checked-out branch ({target})."
   },
   "board.queue.pause.folderBusy": {
     "defaultMessage": "The folder {target} is checked out in was busy (an operation such as a merge or rebase was going on there).",
@@ -2673,19 +2673,19 @@
   },
   "board.queue.pause.identity": {
     "defaultMessage": "The repository has no commit identity, so Combwork can't make its merge commit. Set one in Version Control → Branches & remotes, then resume.",
-    "description": "Why a merge queue is paused, on its card in the Progress panel: git has no user name and email for the repository. Version Control → Branches & remotes is a place in Hive."
+    "description": "Why a merge queue is paused, on its card in the Progress panel: git has no user name and email for the repository. Version Control → Branches & remotes is a place in Combwork."
   },
   "board.queue.pause.mergeChoice": {
     "defaultMessage": "{card} is the first card to merge since the upgrade to Combwork 1.0: choose how Combwork merges this project (merge style and commit message) in For you, or in Version Control → Workflow.",
-    "description": "Why a merge queue is paused, on its card in the Progress panel (HI-1697): a project from before Hive 1.0 reached the merge queue for the first time ({card}: its key), and nobody chose its merge style and commit message (workflow options' names, glossary 2.6), so it waits for the user. For you is the list of what waits on the user (glossary 2.3); Version Control → Workflow is a place in Hive."
+    "description": "Why a merge queue is paused, on its card in the Progress panel (HI-1697): a project from before Hive 1.0 reached the merge queue for the first time ({card}: its key), and nobody chose its merge style and commit message (workflow options' names, glossary 2.6), so it waits for the user. For you is the list of what waits on the user (glossary 2.3); Version Control → Workflow is a place in Combwork."
   },
   "board.queue.pause.needsYou": {
     "defaultMessage": "Needs you: Combwork stopped part way and changes nothing more on its own. Open the card for its state and the commands that finish or undo it.",
-    "description": "Why a merge queue is paused, on its card in the Progress panel: something Hive couldn't settle by itself (a merge stopped part way, or what an earlier run left). Open the card: a button beside it."
+    "description": "Why a merge queue is paused, on its card in the Progress panel: something Combwork couldn't settle by itself (a merge stopped part way, or what an earlier run left). Open the card: a button beside it."
   },
   "board.queue.pause.other": {
     "defaultMessage": "Paused ({reason}).",
-    "description": "Why a merge queue is paused, on its card in the Progress panel, for a reason this window has no words for ({reason}: Hive's code for it)."
+    "description": "Why a merge queue is paused, on its card in the Progress panel, for a reason this window has no words for ({reason}: Combwork's code for it)."
   },
   "board.queue.pause.pushFailed": {
     "defaultMessage": "{card} is merged, but pushing {target} failed (git’s message follows). Fix it, then resume; or turn off “Push the target branch after merging” and resume to keep merging locally.",
@@ -2701,7 +2701,7 @@
   },
   "board.queue.pause.pushUnreadable": {
     "defaultMessage": "{card} is merged, and {target} still has to be pushed, but Combwork couldn’t read {target} to do it. Resume to try again; or turn off “Push the target branch after merging” and resume to keep merging locally.",
-    "description": "Why a merge queue is paused, on its card in the Progress panel (G18): after merging a card ({card}: its key), Hive couldn't read the target ({target}: a branch) to push it (git didn't answer), so the push still waits. “Push the target branch after merging” is a workflow option's name: use its words."
+    "description": "Why a merge queue is paused, on its card in the Progress panel (G18): after merging a card ({card}: its key), Combwork couldn't read the target ({target}: a branch) to push it (git didn't answer), so the push still waits. “Push the target branch after merging” is a workflow option's name: use its words."
   },
   "board.queue.pause.rulesOff": {
     "defaultMessage": "The workflow's rules are off (Settings → Advanced), so the queue doesn't merge.",
@@ -2713,7 +2713,7 @@
   },
   "board.queue.pause.signingWaits": {
     "defaultMessage": "Signing the merge commit waits for you (a passphrase or a PIN). Unlock your signing key, then resume.",
-    "description": "Why a merge queue is paused, on its card in the Progress panel: git's commit signing asked for a passphrase or PIN, which Hive can't type."
+    "description": "Why a merge queue is paused, on its card in the Progress panel: git's commit signing asked for a passphrase or PIN, which Combwork can't type."
   },
   "board.queue.pause.staged": {
     "defaultMessage": "Changes are staged in the folder {target} is checked out in. Commit or unstage them, then resume.",
@@ -2721,7 +2721,7 @@
   },
   "board.queue.pause.subfolderTarget": {
     "defaultMessage": "This project is inside a larger repository, so the queue merges only into a branch the card’s options name. Name it in Version Control → Workflow, apply it to {card} when you save, then resume; or remove {card} from the queue.",
-    "description": "Why a merge queue is paused, on its card in the Progress panel (OP-29): the project is a subfolder of a bigger Git repository and the card's options name no target branch. {card} is the card's key. Version Control → Workflow is a place in Hive (glossary 2.1); saving the options there can apply them to cards already started."
+    "description": "Why a merge queue is paused, on its card in the Progress panel (OP-29): the project is a subfolder of a bigger Git repository and the card's options name no target branch. {card} is the card's key. Version Control → Workflow is a place in Combwork (glossary 2.1); saving the options there can apply them to cards already started."
   },
   "board.queue.pause.targetMovesFast": {
     "defaultMessage": "{target} kept moving during each test merge. Resume once it settles.",
@@ -2773,7 +2773,7 @@
   },
   "board.queue.recent.more": {
     "defaultMessage": "More in Version Control",
-    "description": "A link after a merge queue's Recent merges in the Progress panel: its full history, in the project's Version Control tab (Merge queue section). Version Control is a place in Hive."
+    "description": "A link after a merge queue's Recent merges in the Progress panel: its full history, in the project's Version Control tab (Merge queue section). Version Control is a place in Combwork."
   },
   "board.queue.recent.none": {
     "defaultMessage": "No merges yet.",
@@ -2781,11 +2781,11 @@
   },
   "board.queue.recent.paused": {
     "defaultMessage": "Paused: {reason, select, user {by you} assistant {by the Assistant} pushRejected {the remote refused the push} pushFailed {the push failed} pushNoRemote {no remote to push to} pushUnreadable {couldn’t read the branch to push it} targetMovesFast {the branch kept moving} folderBusy {its folder was busy} wrongBranch {its folder changed branch} staged {changes staged in its folder} unstagedChanges {changes in its folder} identity {no commit identity} needsYou {needs you} uncounted {the checks didn’t count} checkedOut {the branch was checked out} rulesOff {the rules were off} signingWaits {signing waited for you} signing {signing failed} hookTimedOut {a hook ran too long} subfolderTarget {no target branch named} mergeChoice {waiting for how to merge} approval {waiting for your OK} focusedSkip {waiting for your OK to skip focused tests} other {{code}}}",
-    "description": "A pause in the Progress panel's Recent merges (Merges tab): the merge queue paused, and why in a few words (by the user or the Assistant; the push of the target branch refused, failed, with no remote or unreadable (G18); the branch moving, its checked-out folder busy, on another branch, with staged or other changes; no git identity; needs the user; checks that didn't count; rules off; commit signing; a git hook; no target branch for a project in a subfolder; the merge style choice after the upgrade; the user's approval; skipping focused tests). Else {code}, Hive's code for it. Lower case after the colon. Keep the select keys."
+    "description": "A pause in the Progress panel's Recent merges (Merges tab): the merge queue paused, and why in a few words (by the user or the Assistant; the push of the target branch refused, failed, with no remote or unreadable (G18); the branch moving, its checked-out folder busy, on another branch, with staged or other changes; no git identity; needs the user; checks that didn't count; rules off; commit signing; a git hook; no target branch for a project in a subfolder; the merge style choice after the upgrade; the user's approval; skipping focused tests). Else {code}, Combwork's code for it. Lower case after the colon. Keep the select keys."
   },
   "board.queue.recent.push": {
     "defaultMessage": "{state, select, pushed {Pushed} pending {Not pushed yet} off {Not pushed: pushing was turned off} reset {Not pushed: the branch no longer had it} other {Push not recorded}}",
-    "description": "Beside a merge in the Progress panel's Recent merges (Merges tab), when the workflow pushes the target branch after merging (G18): pushed; not pushed yet; not pushed because the option was turned off, or because the branch was reset and no longer had the merge; or Hive has no record of its push (an older merge). Keep the select keys."
+    "description": "Beside a merge in the Progress panel's Recent merges (Merges tab), when the workflow pushes the target branch after merging (G18): pushed; not pushed yet; not pushed because the option was turned off, or because the branch was reset and no longer had the merge; or Combwork has no record of its push (an older merge). Keep the select keys."
   },
   "board.queue.recent.returned": {
     "defaultMessage": "Returned: {why}",
@@ -2833,7 +2833,7 @@
   },
   "board.queue.returnWhy": {
     "defaultMessage": "{reason, select, conflict {{files, select, none {conflict} other {conflict in {files}}}} checks {{check, select, none {checks failed} other {checks failed: {check}}}} hook {a hook failed} folderBusy {the folder {target} is checked out in was busy} notUpToDate {not up to date with {target}} focused {its focused tests couldn’t be chosen or proved} other {{why}}}",
-    "description": "Why the merge queue returned a card to its builder, in a few words after a colon: a conflict (in {files}: file names), its merge checks failed ({check}: the check, such as unit), a git hook failed, the folder the target ({target}: a branch) is checked out in was busy, or it wasn't up to date with the target, or its focused tests (G20: the tests its change needs) couldn't be chosen or proved by its review; else {why} as Hive recorded it. Lower case. Keep the select keys and the word none."
+    "description": "Why the merge queue returned a card to its builder, in a few words after a colon: a conflict (in {files}: file names), its merge checks failed ({check}: the check, such as unit), a git hook failed, the folder the target ({target}: a branch) is checked out in was busy, or it wasn't up to date with the target, or its focused tests (G20: the tests its change needs) couldn't be chosen or proved by its review; else {why} as Combwork recorded it. Lower case. Keep the select keys and the word none."
   },
   "board.queue.returned": {
     "defaultMessage": "{card} returned: {why}",
@@ -2845,7 +2845,7 @@
   },
   "board.queue.runBy": {
     "defaultMessage": "Run by profile {profile}",
-    "description": "On a merge queue's card in the Progress panel: another Hive on this workspace runs the queue ({profile}: its profile's name, such as Hive-Dev). A noun before the name (glossary §1 rule 4)."
+    "description": "On a merge queue's card in the Progress panel: another Combwork on this workspace runs the queue ({profile}: its profile's name, such as Combwork-Dev). A noun before the name (glossary §1 rule 4)."
   },
   "board.queue.saidMerged": {
     "defaultMessage": "{card} merged",
@@ -2905,7 +2905,7 @@
   },
   "board.readOnly.newer": {
     "defaultMessage": "This board was saved by a newer version of Combwork: it is read-only here.",
-    "description": "Tooltip on what changes cards (the board's add-card buttons, the card dialog's Save, comments and decisions), disabled while the board was saved by a newer Hive (whose format this one can't change); also a banner in the card dialog."
+    "description": "Tooltip on what changes cards (the board's add-card buttons, the card dialog's Save, comments and decisions), disabled while the board was saved by a newer Combwork (whose format this one can't change); also a banner in the card dialog."
   },
   "board.restore09.done": {
     "defaultMessage": "The 0.9 board is back",
@@ -2933,7 +2933,7 @@
   },
   "board.restore09.title": {
     "defaultMessage": "Restore the 0.9 board backup?",
-    "description": "Title of the confirmation before Help → Restore the 0.9 Board Backup… puts back the copy of the board Hive kept when it upgraded it to 1.0."
+    "description": "Title of the confirmation before Help → Restore the 0.9 Board Backup… puts back the copy of the board Combwork kept when it upgraded it to 1.0."
   },
   "board.review.line": {
     "defaultMessage": "Reviewing: {agent} · {ago}",
@@ -3025,7 +3025,7 @@
   },
   "board.reviewSkip.skippedTip": {
     "defaultMessage": "{who, select, assistant {Review skipped, set by the Assistant: {reason}} note {Review skipped, set by you: {reason}} other {Review skipped, set by you.}}",
-    "description": "Tooltip and accessible name of a card's Review skipped mark (#1625): who set it and why. Select keys (keep them): assistant, the Hive Assistant set it, with the user's reason ({reason}: their words); note, the user set it with a note ({reason}); other, the user set it with no note."
+    "description": "Tooltip and accessible name of a card's Review skipped mark (#1625): who set it and why. Select keys (keep them): assistant, the Combwork Assistant set it, with the user's reason ({reason}: their words); note, the user set it with a note ({reason}); other, the user set it with no note."
   },
   "board.reviewSkip.working": {
     "defaultMessage": "Saving…",
@@ -3141,11 +3141,11 @@
   },
   "board.runs.noFinished": {
     "defaultMessage": "No finished runs",
-    "description": "The Progress panel's Runs tab's finished runs (docked at the bottom) when Hive has none."
+    "description": "The Progress panel's Runs tab's finished runs (docked at the bottom) when Combwork has none."
   },
   "board.runs.none": {
     "defaultMessage": "No runs yet. When an agent runs tests or a build with progress reporting, every run shows here, kept by day.",
-    "description": "The Progress panel's Runs tab when Hive has no runs."
+    "description": "The Progress panel's Runs tab when Combwork has no runs."
   },
   "board.runs.noneMatch": {
     "defaultMessage": "No runs match.",
@@ -3157,7 +3157,7 @@
   },
   "board.runs.other": {
     "defaultMessage": "Other",
-    "description": "The heading of a group in the Progress panel's Runs tab, where runs are grouped by card: the runs for no card (Hive's own, the user's scripts) follow."
+    "description": "The heading of a group in the Progress panel's Runs tab, where runs are grouped by card: the runs for no card (Combwork's own, the user's scripts) follow."
   },
   "board.runs.queueChecks": {
     "defaultMessage": "{checks}{failed, plural, =0 {} one { · # failed} other { · # failed}}",
@@ -3213,7 +3213,7 @@
   },
   "board.setAside.intro": {
     "defaultMessage": "This workspace was opened in an older Combwork, which saved these cards where it keeps them. They were set aside, unchanged, and not added to the board. Add each one, or discard it.",
-    "description": "The top of the dialog listing cards an older Hive saved."
+    "description": "The top of the dialog listing cards an older Combwork saved."
   },
   "board.setAside.keeps": {
     "defaultMessage": "Add keeps #{n}",
@@ -3221,11 +3221,11 @@
   },
   "board.setAside.links": {
     "defaultMessage": "Nothing is rewritten for them: a card here that links to one by its old number keeps that number, and a card added under a new number keeps its own links as they were.",
-    "description": "A note in the dialog listing cards an older Hive saved: Hive changes no references between cards when adding them."
+    "description": "A note in the dialog listing cards an older Combwork saved: Combwork changes no references between cards when adding them."
   },
   "board.setAside.loading": {
     "defaultMessage": "Reading the set-aside cards…",
-    "description": "The dialog listing cards an older Hive saved, while it reads them."
+    "description": "The dialog listing cards an older Combwork saved, while it reads them."
   },
   "board.setAside.made": {
     "defaultMessage": "Made by {by} on {when}",
@@ -3233,15 +3233,15 @@
   },
   "board.setAside.menu": {
     "defaultMessage": "Set-Aside Cards ({n, number})…",
-    "description": "An item of the board's ⋯ menu, shown while cards an older Hive saved are set aside: opens the dialog to add or discard them. {n} is how many. The … says it opens a dialog: keep it."
+    "description": "An item of the board's ⋯ menu, shown while cards an older Combwork saved are set aside: opens the dialog to add or discard them. {n} is how many. The … says it opens a dialog: keep it."
   },
   "board.setAside.none": {
     "defaultMessage": "No cards are set aside.",
-    "description": "The dialog listing cards an older Hive saved, when none are left."
+    "description": "The dialog listing cards an older Combwork saved, when none are left."
   },
   "board.setAside.number": {
     "defaultMessage": "#{n} in the older Combwork",
-    "description": "A set-aside card's number as the older Hive gave it. {n} is the number (after #)."
+    "description": "A set-aside card's number as the older Combwork gave it. {n} is the number (after #)."
   },
   "board.setAside.taken": {
     "defaultMessage": "#{n} is taken here: Add gives the next free number",
@@ -3249,7 +3249,7 @@
   },
   "board.setAside.title": {
     "defaultMessage": "Cards Made by an Older Combwork",
-    "description": "Title of the dialog listing cards an older version of Hive saved in this workspace after the board moved to its database; they were kept aside, not added to the board."
+    "description": "Title of the dialog listing cards an older version of Combwork saved in this workspace after the board moved to its database; they were kept aside, not added to the board."
   },
   "board.setAside.unreadable": {
     "defaultMessage": "This file isn't a card Combwork can read: it can only be discarded.",
@@ -3373,7 +3373,7 @@
   },
   "board.stall.hintReviewSilent": {
     "defaultMessage": "Its reviewer may have finished its turn without Combwork seeing it end. Show the reviewer: if its terminal waits at its prompt, Mark idle, and the watch wakes it.",
-    "description": "Tooltip on a card stalled in Review whose reviewer Hive has heard nothing from. \"Mark idle\" is a command in the agent's menu: keep its wording as that command is translated."
+    "description": "Tooltip on a card stalled in Review whose reviewer Combwork has heard nothing from. \"Mark idle\" is a command in the agent's menu: keep its wording as that command is translated."
   },
   "board.stall.hintReviewVerdict": {
     "defaultMessage": "Its reviewer stopped without a verdict and waits on the card. Read its latest comment (it may have a question for you), then show the reviewer and ask it to finish its review.",
@@ -3385,7 +3385,7 @@
   },
   "board.stall.hintWakeUntaken": {
     "defaultMessage": "Combwork typed this card's wake into that agent, but its CLI didn't send it. Show the agent, click its terminal and press Enter.",
-    "description": "Tooltip on a stalled card: Hive typed the line that wakes the agent into its terminal, and the agent's CLI never sent it (it waits in the agent's prompt)."
+    "description": "Tooltip on a stalled card: Combwork typed the line that wakes the agent into its terminal, and the agent's CLI never sent it (it waits in the agent's prompt)."
   },
   "board.stalled.followUpWait": {
     "defaultMessage": "{builder} posted a follow-up on {card} for its reviewer to check and has waited {waited}: nobody has answered it.",
@@ -3433,19 +3433,19 @@
   },
   "board.stalled.reviewWaitSilent": {
     "defaultMessage": "{agent} is watching {card} but hasn't started reviewing it (it shows working, but has been silent for {silent}: state unknown): in Review for {waited}.",
-    "description": "Why a card waiting in Review is stalled: its reviewer watches it but hasn't started, and Hive can't tell what the reviewer is doing. {agent} is the reviewer's name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none, {silent} minutes, {waited} how long it has waited (\"40 min\", \"2 h 5 min\"). {silent} is a duration too, written like {waited}."
+    "description": "Why a card waiting in Review is stalled: its reviewer watches it but hasn't started, and Combwork can't tell what the reviewer is doing. {agent} is the reviewer's name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none, {silent} minutes, {waited} how long it has waited (\"40 min\", \"2 h 5 min\"). {silent} is a duration too, written like {waited}."
   },
   "board.stalled.startFailed": {
     "defaultMessage": "{agent}'s start failed: {why}",
-    "description": "Why a card in the Active column is stalled: its agent couldn't be started. {agent} is the agent's name; {why} is the reason, in English as Hive or the agent's CLI gave it."
+    "description": "Why a card in the Active column is stalled: its agent couldn't be started. {agent} is the agent's name; {why} is the reason, in English as Combwork or the agent's CLI gave it."
   },
   "board.stalled.startWaiting": {
     "defaultMessage": "{agent} waits to start: {why}",
-    "description": "Why a card in the Active column is stalled (HI-2304): Hive can't start its agent in its slot yet, because the slot is held by processes a run left running there; it starts the agent once the slot is free. {agent} is the agent's name; {why} says what holds the slot, in English (\"slot-a is held by WindowsSandboxServer, left running by MB1's last run\")."
+    "description": "Why a card in the Active column is stalled (HI-2304): Combwork can't start its agent in its slot yet, because the slot is held by processes a run left running there; it starts the agent once the slot is free. {agent} is the agent's name; {why} says what holds the slot, in English (\"slot-a is held by WindowsSandboxServer, left running by MB1's last run\")."
   },
   "board.stalled.wakeUntaken": {
     "defaultMessage": "{agent} hasn't taken the wake Combwork typed for {card}: it waits in its prompt.",
-    "description": "Why a card in a card loop is stalled: the agent watched the card, and Hive typed its wake line into the agent's terminal, but the agent's CLI never sent it. {agent} is its name, {card} the card's name: its key, such as AM-12, or #12 for a card with none."
+    "description": "Why a card in a card loop is stalled: the agent watched the card, and Combwork typed its wake line into the agent's terminal, but the agent's CLI never sent it. {agent} is its name, {card} the card's name: its key, such as AM-12, or #12 for a card with none."
   },
   "board.start.busy": {
     "defaultMessage": "{status}. Choose it once it's idle.",
@@ -3453,7 +3453,7 @@
   },
   "board.start.checkingConnection": {
     "defaultMessage": "Finding out which coding agents are installed, to choose the first connection that can run…",
-    "description": "Under the new agent's choice of connection in the Start dialog (HI-2121) while Hive still looks for the installed coding agent CLIs: the first usable connection is chosen once it knows; Start waits until then."
+    "description": "Under the new agent's choice of connection in the Start dialog (HI-2121) while Combwork still looks for the installed coding agent CLIs: the first usable connection is chosen once it knows; Start waits until then."
   },
   "board.start.idle": {
     "defaultMessage": "{status}: gets the card as its next message.",
@@ -3539,6 +3539,10 @@
     "defaultMessage": "{n, plural, one {# run} other {# runs}}: {states}",
     "description": "The folded Progress strip's name: how many runs, then how many are in each state (\"8 runs: 5 running, 2 failed\"). {states} is that list."
   },
+  "board.team.cw": {
+    "defaultMessage": "Combwork",
+    "description": "Who runs something while the team is paused when no agent does (HI-2081): Combwork itself (a slot's setup, a merge). Combwork is the product's name."
+  },
   "board.team.endDetail": {
     "defaultMessage": "Only that process and what it started end, and only while they are still the ones listed. Work they had not saved is lost.",
     "description": "Detail of the question before ending a process from the paused team's band (HI-2081)."
@@ -3559,21 +3563,17 @@
     "defaultMessage": "End this process?",
     "description": "Title of the question before ending a process the paused team's band names (HI-2081)."
   },
-  "board.team.hive": {
-    "defaultMessage": "Combwork",
-    "description": "Who runs something while the team is paused when no agent does (HI-2081): Hive itself (a slot's setup, a merge). Hive is the product's name."
-  },
   "board.team.install": {
     "defaultMessage": "Install Now",
-    "description": "A button on the paused team’s band (HI-2081), once all are parked and an update is ready: restarts Hive and installs the update (checked again first)."
+    "description": "A button on the paused team’s band (HI-2081), once all are parked and an update is ready: restarts Combwork and installs the update (checked again first)."
   },
   "board.team.item": {
     "defaultMessage": "{kind, select, working {{agent} is working} starting {{agent} is starting} background {{agent} has background tasks running} run {{agent}: {label} (a run)} merge {A merge: {label}} copy {A check in a copy: {label}} process {{agent}: {label} (process {pid})} writer {{agent}: its slot {label} is still held} status {{agent}: Combwork can’t tell what it is doing} other {{agent}: can’t be checked now}}",
-    "description": "One thing that still runs while the team is paused (HI-2081), a line in its band. {agent} is an agent's name (or Assistant); {label} the user's own words for it (a run's title, a process's command, a slot's name); {pid} a process id. kind: working or starting; background tasks; a run (a test run through cw-progress); a merge of the merge queue; a check in a copy (a folder Hive keeps at one revision); a process (a test runner, a dev server, a test copy of Hive); its slot (a working folder Hive lends) still held by its processes; its state unknown; or (other) its processes can't be read now. Keep the select keys."
+    "description": "One thing that still runs while the team is paused (HI-2081), a line in its band. {agent} is an agent's name (or Assistant); {label} the user's own words for it (a run's title, a process's command, a slot's name); {pid} a process id. kind: working or starting; background tasks; a run (a test run through cw-progress); a merge of the merge queue; a check in a copy (a folder Combwork keeps at one revision); a process (a test runner, a dev server, a test copy of Combwork); its slot (a working folder Combwork lends) still held by its processes; its state unknown; or (other) its processes can't be read now. Keep the select keys."
   },
   "board.team.notParked": {
     "defaultMessage": "The team isn't parked any more, so the update wasn't installed.",
-    "description": "A notice (HI-2081): the user chose Install Now, and as Hive checked again something had started running (an agent, a run) in an open workspace."
+    "description": "A notice (HI-2081): the user chose Install Now, and as Combwork checked again something had started running (an agent, a run) in an open workspace."
   },
   "board.team.otherNotPaused": {
     "defaultMessage": "{name} isn’t paused",
@@ -3585,7 +3585,7 @@
   },
   "board.team.pause": {
     "defaultMessage": "Pause the Team",
-    "description": "A button and command (the Progress panel's Lanes, the command palette, Help → Check for Updates) (HI-2081): before an update, Hive starts no lane card, wakes no agent with card events and gives no reviews out in every open workspace, and tells each running agent once to finish its turn, end its runs and commit. 'The team' is every agent of the workspace."
+    "description": "A button and command (the Progress panel's Lanes, the command palette, Help → Check for Updates) (HI-2081): before an update, Combwork starts no lane card, wakes no agent with card events and gives no reviews out in every open workspace, and tells each running agent once to finish its turn, end its runs and commit. 'The team' is every agent of the workspace."
   },
   "board.team.pauseFailed": {
     "defaultMessage": "{n, plural, one {# workspace couldn't be paused: {names}} other {# workspaces couldn't be paused: {names}}}",
@@ -3605,7 +3605,7 @@
   },
   "board.team.showWindow": {
     "defaultMessage": "Show Its Window",
-    "description": "A button beside another open workspace's name in the paused team's band (HI-2095): brings forward the Hive window showing that workspace, where what still runs in it can be ended."
+    "description": "A button beside another open workspace's name in the paused team's band (HI-2095): brings forward the Combwork window showing that workspace, where what still runs in it can be ended."
   },
   "board.team.showWindowTitle": {
     "defaultMessage": "Its processes are ended from its own window",
@@ -3641,19 +3641,19 @@
   },
   "board.upgrade.askDetail": {
     "defaultMessage": "Close every other Combwork that has this workspace open first. Until it is upgraded, its board is read-only here and its agents can't start.",
-    "description": "Under the upgrade dialog's text: the upgrade is refused while another copy of Hive has the workspace open; declining leaves the board readable but not changeable in this Hive, and no agent (nor the Assistant) can start."
+    "description": "Under the upgrade dialog's text: the upgrade is refused while another copy of Combwork has the workspace open; declining leaves the board readable but not changeable in this Combwork, and no agent (nor the Assistant) can start."
   },
   "board.upgrade.askMessage": {
     "defaultMessage": "Combwork 1.0 needs to upgrade this workspace's data. A 0.9 Combwork can then no longer open it; a backup of the board is kept, and Help → Restore the 0.9 Board Backup… puts it back. Back up first: there's no going back to 0.9.3 once your agents' worktrees become slots.",
-    "description": "The upgrade dialog's text: why (Hive 1.0 keeps the workspace's data in a new format), then what follows: an older Hive (0.9) can't open the board any more, and a copy of the board as it was is kept; but the agents' own worktrees become slots (working folders Hive lends to cards), which Hive 0.9.3 can't use again, so the user should back up first. Help → Restore the 0.9 Board Backup… is a command in the Help menu: keep its name as Hive shows it. Keep 0.9.3 as it is (a version)."
+    "description": "The upgrade dialog's text: why (Hive 1.0 keeps the workspace's data in a new format), then what follows: an older Combwork (0.9) can't open the board any more, and a copy of the board as it was is kept; but the agents' own worktrees become slots (working folders Combwork lends to cards), which Hive 0.9.3 can't use again, so the user should back up first. Help → Restore the 0.9 Board Backup… is a command in the Help menu: keep its name as Combwork shows it. Keep 0.9.3 as it is (a version)."
   },
   "board.upgrade.askTitle": {
     "defaultMessage": "Upgrade this workspace's board to 1.0?",
-    "description": "Title of the dialog Hive shows on opening a workspace whose task board was saved by Hive 0.9: Hive 1.0 keeps the board in a new format, and asks before converting it."
+    "description": "Title of the dialog Combwork shows on opening a workspace whose task board was saved by Hive 0.9: Hive 1.0 keeps the board in a new format, and asks before converting it."
   },
   "board.upgrade.banner": {
     "defaultMessage": "This workspace is from Combwork 0.9: until it is upgraded to 1.0, its board is read-only here and its agents can't start.",
-    "description": "A banner at the top of the window while the workspace's upgrade to Hive 1.0's format waits (the user said Not Now): cards can be read but not changed, and no agent (nor the Assistant) can start, as Hive couldn't record its session. Also the tooltip of what is disabled meanwhile: the board's add-card buttons, dragging cards, the card dialog's changes, and New Session and Resume."
+    "description": "A banner at the top of the window while the workspace's upgrade to Hive 1.0's format waits (the user said Not Now): cards can be read but not changed, and no agent (nor the Assistant) can start, as Combwork couldn't record its session. Also the tooltip of what is disabled meanwhile: the board's add-card buttons, dragging cards, the card dialog's changes, and New Session and Resume."
   },
   "board.upgrade.bannerButton": {
     "defaultMessage": "Upgrade…",
@@ -3665,7 +3665,7 @@
   },
   "board.upgrade.doneDetail": {
     "defaultMessage": "The 0.9 board is kept: Help → Restore the 0.9 Board Backup… puts it back.",
-    "description": "Under \"Board upgraded to 1.0\". Help → Restore the 0.9 Board Backup… is a command in the Help menu: keep its name as Hive shows it."
+    "description": "Under \"Board upgraded to 1.0\". Help → Restore the 0.9 Board Backup… is a command in the Help menu: keep its name as Combwork shows it."
   },
   "board.upgrade.learnMore": {
     "defaultMessage": "Learn more",
@@ -3673,7 +3673,7 @@
   },
   "board.upgrade.notNow": {
     "defaultMessage": "Not Now",
-    "description": "The upgrade dialog's other button: leaves the board as it is, read-only in this Hive, with a banner offering the upgrade."
+    "description": "The upgrade dialog's other button: leaves the board as it is, read-only in this Combwork, with a banner offering the upgrade."
   },
   "board.upgrade.upgrade": {
     "defaultMessage": "Upgrade",
@@ -3705,7 +3705,7 @@
   },
   "board.work.adopted": {
     "defaultMessage": "Adopted at the upgrade, from {column}: its work starts from what its folder showed then.",
-    "description": "The card dialog's Work section for a card Hive took on at the upgrade to 1.0 from what could be read. {column} is the board column it was in (Doing, Review, Passed)."
+    "description": "The card dialog's Work section for a card Combwork took on at the upgrade to 1.0 from what could be read. {column} is the board column it was in (Doing, Review, Passed)."
   },
   "board.work.backAtApproved": {
     "defaultMessage": "Its branch came back to {revision}, the revision that passed: the pass counts again.",
@@ -3717,7 +3717,7 @@
   },
   "board.work.badgeOverride": {
     "defaultMessage": "{by, select, assistant {The Assistant moved it past its rules} other {You moved it past its rules}}: {rules}. {hasReason, select, yes {Reason: {reason}} other {No reason given.}}",
-    "description": "Tooltip and accessible name of a mark on a board card (and a line in its lane segment's hover): a move made an exception to the card's workflow rules (glossary: override), by the user (other) or the Hive Assistant (assistant) (select: translate each); {rules} lists the rules it skipped (their names); then the reason the user or the Assistant gave (their own words), or that none was given. Glossary: rule, override."
+    "description": "Tooltip and accessible name of a mark on a board card (and a line in its lane segment's hover): a move made an exception to the card's workflow rules (glossary: override), by the user (other) or the Combwork Assistant (assistant) (select: translate each); {rules} lists the rules it skipped (their names); then the reason the user or the Assistant gave (their own words), or that none was given. Glossary: rule, override."
   },
   "board.work.badgeStale": {
     "defaultMessage": "Stale: its pass no longer counts for its revision",
@@ -3749,7 +3749,7 @@
   },
   "board.work.filesNotRead": {
     "defaultMessage": "{note, select, beforeChange {Files not read} noBaseOrHead {Files not read: there was no base or revision to compare} other {Files not read: Combwork couldn't read {why}}}",
-    "description": "In the card dialog's Work section, in place of a revision's changed files: Hive couldn't read which files changed when it was submitted. {note} picks why: Hive read nothing then (beforeChange: the revision's line above says why), it had no base or revision to compare (noBaseOrHead), or another reason, {why}: what it couldn't read (already translated). Keep the select keys. Glossary: revision."
+    "description": "In the card dialog's Work section, in place of a revision's changed files: Combwork couldn't read which files changed when it was submitted. {note} picks why: Combwork read nothing then (beforeChange: the revision's line above says why), it had no base or revision to compare (noBaseOrHead), or another reason, {why}: what it couldn't read (already translated). Keep the select keys. Glossary: revision."
   },
   "board.work.folder": {
     "defaultMessage": "Folder",
@@ -3781,7 +3781,7 @@
   },
   "board.work.noRevision": {
     "defaultMessage": "No revision recorded",
-    "description": "In place of a revision in the card dialog's Work section: the card's revision couldn't be read when it was submitted (a project without version control, before Hive reads its revisions). Glossary: revision."
+    "description": "In place of a revision in the card dialog's Work section: the card's revision couldn't be read when it was submitted (a project without version control, before Combwork reads its revisions). Glossary: revision."
   },
   "board.work.none": {
     "defaultMessage": "No revision submitted yet.",
@@ -3789,15 +3789,15 @@
   },
   "board.work.notRead": {
     "defaultMessage": "{note, select, beforeChange {Not read when its work started} noTarget {Not read: there was no target branch to start from} other {Combwork couldn't read {why}}}",
-    "description": "In the card dialog's Work section, in place of a branch, base or target Hive couldn't read when the card's work started. {note} picks why: Hive read nothing as the work started (beforeChange), it had no target branch to find the base from (noTarget), or another reason, {why}: what Hive couldn't read (such as \"the latest commit in …\", already translated). Keep the select keys. Glossary: target branch."
+    "description": "In the card dialog's Work section, in place of a branch, base or target Combwork couldn't read when the card's work started. {note} picks why: Combwork read nothing as the work started (beforeChange), it had no target branch to find the base from (noTarget), or another reason, {why}: what Combwork couldn't read (such as \"the latest commit in …\", already translated). Keep the select keys. Glossary: target branch."
   },
   "board.work.openFile": {
     "defaultMessage": "Open {path} in Files",
     "description": "Tooltip of a file a revision changed (card dialog's Work section): opens it in the project's Files tab. {path} is the file's path."
   },
-  "board.work.outsideHive": {
+  "board.work.outsideCombwork": {
     "defaultMessage": "Merged outside Combwork.",
-    "description": "The card dialog's Work section, under how the card was merged: the merge was made outside Hive (in a terminal or another tool). Glossary: outside Hive."
+    "description": "The card dialog's Work section, under how the card was merged: the merge was made outside Combwork (in a terminal or another tool). Glossary: outside Combwork."
   },
   "board.work.outsideRules": {
     "defaultMessage": "Merged outside the rules: {rules}.",
@@ -3809,7 +3809,7 @@
   },
   "board.work.preWorkflow": {
     "defaultMessage": "Before 1.0: this card has no work record.",
-    "description": "The card dialog's Work section for a card from before Hive 1.0: Hive records no work for it and invents none. Glossary: before 1.0."
+    "description": "The card dialog's Work section for a card from before Hive 1.0: Combwork records no work for it and invents none. Glossary: before 1.0."
   },
   "board.work.projectFolder": {
     "defaultMessage": "The project folder",
@@ -3825,7 +3825,7 @@
   },
   "board.work.revisionNotRead": {
     "defaultMessage": "{note, select, beforeChange {No revision recorded: Combwork didn't read one when the card went to Review.} other {Revision not read when it was submitted: Combwork couldn't read {why}.}} Its next submission reads it again.",
-    "description": "In place of a revision in the card dialog's Work section. {note} picks why: Hive read nothing when the card was moved into Review (beforeChange; the card had no agent then, say), or it couldn't read the revision when the builder submitted it, {why}: what it couldn't read (such as \"the latest commit in …\", already translated). Then: the next submission reads it again. Keep the select keys. Glossary: revision."
+    "description": "In place of a revision in the card dialog's Work section. {note} picks why: Combwork read nothing when the card was moved into Review (beforeChange; the card had no agent then, say), or it couldn't read the revision when the builder submitted it, {why}: what it couldn't read (such as \"the latest commit in …\", already translated). Then: the next submission reads it again. Keep the select keys. Glossary: revision."
   },
   "board.work.revisions": {
     "defaultMessage": "Revisions, newest first",
@@ -3881,7 +3881,7 @@
   },
   "board.workQueue.cancelled": {
     "defaultMessage": "{reason, select, removed {Taken out of the queue (Remove from queue).} stale {Taken out of the queue: its pass no longer counts.} hold {Taken out of the queue: the card went On Hold.} decision {Taken out of the queue: a decision was recorded.} integratedOutside {Taken out of the queue: it was merged outside Combwork.} followUp {Taken out of the queue for a follow-up: queued again once its reviewer checks it.} other {Taken out of the queue.}}",
-    "description": "The card dialog's Work section: the card's merge queue entry was cancelled, and why. Keep the select keys. Glossary: merge queue, On Hold, decision, outside Hive, follow-up."
+    "description": "The card dialog's Work section: the card's merge queue entry was cancelled, and why. Keep the select keys. Glossary: merge queue, On Hold, decision, outside Combwork, follow-up."
   },
   "board.workQueue.command": {
     "defaultMessage": "{purpose, select, finish {To finish it} other {To undo it}}, in {folder}",
@@ -3889,7 +3889,7 @@
   },
   "board.workQueue.commands": {
     "defaultMessage": "Commands (PowerShell): nothing runs them for you",
-    "description": "A sub-heading in the card dialog's Work section, over the git commands that finish or undo a stopped merge: the user runs them in PowerShell; Hive doesn't."
+    "description": "A sub-heading in the card dialog's Work section, over the git commands that finish or undo a stopped merge: the user runs them in PowerShell; Combwork doesn't."
   },
   "board.workQueue.conflictFiles": {
     "defaultMessage": "Files in conflict",
@@ -3965,7 +3965,7 @@
   },
   "board.workQueue.queuedNoPlace": {
     "defaultMessage": "Queued for {target}",
-    "description": "The card dialog's Work section: the card waits in the merge queue for the branch {target} (its place isn't known here: another Hive runs the queue)."
+    "description": "The card dialog's Work section: the card waits in the merge queue for the branch {target} (its place isn't known here: another Combwork runs the queue)."
   },
   "board.workQueue.result": {
     "defaultMessage": "The merge",

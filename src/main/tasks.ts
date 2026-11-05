@@ -831,7 +831,7 @@ export function addSetAsideCard(ws: WorkspaceService, file: string): Promise<Tas
     const path = setAsideFile(ws, file)
     const entry = path ? setAsideFiles(ws).find((f) => f.file === file) : undefined
     const raw = setAsideDoc(entry?.text ?? null)
-    if (!entry || !raw) throw hiveError(msg({ id: 'tasks.error.setAsideGone', defaultMessage: 'That set-aside card is gone, or isn\'t a card: it can only be discarded.', description: "An error in the Review… dialog for cards an older Hive saved: the card's file was removed meanwhile, or can't be read as a card." }), undefined, { kind: 'notFound' })
+    if (!entry || !raw) throw hiveError(msg({ id: 'tasks.error.setAsideGone', defaultMessage: 'That set-aside card is gone, or isn\'t a card: it can only be discarded.', description: "An error in the Review… dialog for cards an older Combwork saved: the card's file was removed meanwhile, or can't be read as a card." }), undefined, { kind: 'notFound' })
     const ids = await ws.projectIds()
     const was = entry.number
     const n = hasCard(ws, was) ? await nextNumber(ws) : was
@@ -1353,7 +1353,7 @@ export async function createTask(...args: Parameters<typeof createTaskLocked>): 
 }
 
 /** The Assistant's card made in Doing with nobody on it (HI-2062): refused, naming the user's three choices. */
-export const DOING_NOBODY_NEW = msg({ id: 'tasks.error.doingNobodyNew', defaultMessage: 'A card made in Active needs an agent on it (agent). Ask the user which they want: an agent on it, an agent started on it (make it in Todo, then cw_start_task), or nobody on it (make it in Todo, then move it with override and their reason).', description: "An error said to the Hive Assistant (HI-2062): it made a card straight into the Active stage with no agent on it. agent, override and cw_start_task are names of a call's fields and a tool: keep them as they are. Active and Todo are stage names." })
+export const DOING_NOBODY_NEW = msg({ id: 'tasks.error.doingNobodyNew', defaultMessage: 'A card made in Active needs an agent on it (agent). Ask the user which they want: an agent on it, an agent started on it (make it in Todo, then cw_start_task), or nobody on it (make it in Todo, then move it with override and their reason).', description: "An error said to the Combwork Assistant (HI-2062): it made a card straight into the Active stage with no agent on it. agent, override and cw_start_task are names of a call's fields and a tool: keep them as they are. Active and Todo are stage names." })
 
 async function createTaskLocked(
   input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; blocked?: string | null; blockedBy?: number[]; links?: number[]; context?: string[]; kind?: CardKind; skipReview?: string },
@@ -1462,7 +1462,7 @@ export async function updateTask(...args: Parameters<typeof updateTaskLocked>): 
 /** An override is the user's or the Assistant's (SPEC §16.8.4): agents never override a rule. */
 function checkOverride(patch: TaskPatch, actor: TaskActor): void {
   if (patch.override === undefined) return
-  if (actor.kind === 'agent') throw new TaskPermissionError(msg({ id: 'tasks.error.overrideNotAgents', defaultMessage: "Agents can't override workflow rules: only the user or the Assistant can.", description: 'An error: an agent passed an override (moving a card across a workflow rule, with a reason); only the user or the Hive Assistant can.' }))
+  if (actor.kind === 'agent') throw new TaskPermissionError(msg({ id: 'tasks.error.overrideNotAgents', defaultMessage: "Agents can't override workflow rules: only the user or the Assistant can.", description: 'An error: an agent passed an override (moving a card across a workflow rule, with a reason); only the user or the Combwork Assistant can.' }))
   if (!patch.override || typeof patch.override !== 'object' || typeof patch.override.reason !== 'string') throw hiveError(msg({ id: 'tasks.error.overrideShape', defaultMessage: 'An override needs a reason: why the card moves across its rules, as text.', description: 'An error: an override (moving a card across a workflow rule) was passed without its reason as text.' }), undefined, { kind: 'invalid' })
 }
 
@@ -1857,8 +1857,8 @@ export function kindOf(v: unknown): CardKind {
 
 const KIND = {
   bad: msg({ id: 'tasks.error.badKind', defaultMessage: 'A card is code or no-code, not {kind}.', description: "An error: a card's kind was given as {kind}; it is code (work in commits, the default) or no-code (a decision, a write-up, a trial). Keep code and no-code as they are (they are values)." }),
-  agents: msg({ id: 'tasks.error.kindNotAgents', defaultMessage: "Agents can't change a card's kind: propose no-code when you make the card, and the user or the Assistant confirms it.", description: "An error: an agent tried to change a card's kind (code or no-code) after it was made, or to answer a proposed kind; only the user or the Hive Assistant can." }),
-  needsReason: msg({ id: 'tasks.error.kindNeedsReason', defaultMessage: "Changing a card's kind after it is made is an exception to its rules: pass override.reason with the user's reason.", description: "An error said to the Hive Assistant: it changed a card's kind (code or no-code) after the card was made without giving the user's reason (override.reason: keep it as it is)." }),
+  agents: msg({ id: 'tasks.error.kindNotAgents', defaultMessage: "Agents can't change a card's kind: propose no-code when you make the card, and the user or the Assistant confirms it.", description: "An error: an agent tried to change a card's kind (code or no-code) after it was made, or to answer a proposed kind; only the user or the Combwork Assistant can." }),
+  needsReason: msg({ id: 'tasks.error.kindNeedsReason', defaultMessage: "Changing a card's kind after it is made is an exception to its rules: pass override.reason with the user's reason.", description: "An error said to the Combwork Assistant: it changed a card's kind (code or no-code) after the card was made without giving the user's reason (override.reason: keep it as it is)." }),
   noProposal: msg({ id: 'tasks.error.noKindProposal', defaultMessage: 'Nothing proposes a kind for {card}: its kind is {kind}.', description: "An error: confirming a card's proposed kind, but no agent proposed one (or it was answered already). {card} is the card's key (HI-12); {kind} its kind, code or no-code (values: keep them as they are)." })
 }
 
@@ -1932,8 +1932,8 @@ export async function confirmKind(n: number, accept: boolean, actor: TaskActor, 
 }
 
 const SKIP = {
-  agents: msg({ id: 'tasks.error.reviewSkipNotAgents', defaultMessage: "Agents can't make a card skip review: propose it when you make the card (skipReview, with your reason), and the user or the Assistant decides.", description: "An error: an agent tried to make a card skip its review, or to answer a proposal that it skip review, after the card was made; only the user or the Hive Assistant can. Keep skipReview as it is (a field's name)." }),
-  needsReason: msg({ id: 'tasks.error.reviewSkipNeedsReason', defaultMessage: "A card skips review only with the user's reason: pass skipReview with it, in the user's words.", description: "An error said to the Hive Assistant (or an agent proposing it): it asked for a card to skip its review without a reason. Keep skipReview as it is (a field's name)." }),
+  agents: msg({ id: 'tasks.error.reviewSkipNotAgents', defaultMessage: "Agents can't make a card skip review: propose it when you make the card (skipReview, with your reason), and the user or the Assistant decides.", description: "An error: an agent tried to make a card skip its review, or to answer a proposal that it skip review, after the card was made; only the user or the Combwork Assistant can. Keep skipReview as it is (a field's name)." }),
+  needsReason: msg({ id: 'tasks.error.reviewSkipNeedsReason', defaultMessage: "A card skips review only with the user's reason: pass skipReview with it, in the user's words.", description: "An error said to the Combwork Assistant (or an agent proposing it): it asked for a card to skip its review without a reason. Keep skipReview as it is (a field's name)." }),
   nothingNew: msg({ id: 'tasks.error.reviewSkipNothingNew', defaultMessage: "This card's rules don't review it: there is no review to skip.", description: "An error making a card: it was to skip its review, but its project's workflow has no review (Solo, or no workflow)." }),
   nothing: msg({ id: 'tasks.error.reviewSkipNothing', defaultMessage: "{card}'s rules don't review it: there is no review to skip.", description: "An error: a card was to skip its review, but its project's workflow has no review (Solo, or no workflow). {card} is the card's key (HI-12)." }),
   inReview: msg({ id: 'tasks.error.reviewSkipInReview', defaultMessage: "{card} is in Review: whether it skips review is decided before it is submitted. To take it past its review now, the user moves it on (an override, with their reason).", description: "An error: a card's review skip was to change while the card is in Review. The way past its review is the user's override of the move (dragging it on, or the Assistant moving it with the user's reason). {card} is the card's key (HI-12)." }),
@@ -2113,9 +2113,9 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
 }
 
 const DECIDE = {
-  agents: msg({ id: 'tasks.error.answersNotAgents', defaultMessage: "Only the user, or the Assistant recording the user's decision, closes a request for the user.", description: "An error (HI-1932): an agent recorded a decision naming the card's requests it answers (For you); only the user, or the Hive Assistant writing down the user's own decision, may close them that way." }),
+  agents: msg({ id: 'tasks.error.answersNotAgents', defaultMessage: "Only the user, or the Assistant recording the user's decision, closes a request for the user.", description: "An error (HI-1932): an agent recorded a decision naming the card's requests it answers (For you); only the user, or the Combwork Assistant writing down the user's own decision, may close them that way." }),
   shape: msg({ id: 'tasks.error.answersShape', defaultMessage: 'answers takes the ids of 1 to {max, number} of the card’s open requests, with a decision and nothing else in the same change.', description: "An error (HI-1932): a decision naming the card's requests it answers was sent wrongly: answers must list between 1 and {max} request ids (For you's requests), together with the decision's text and no other change. Keep answers as it is (a field's name)." }),
-  not: msg({ id: 'tasks.error.answersNot', defaultMessage: "{why, select, open {{request} isn't an open request on {card}.} other {A decision can't answer {request} on {card}: approve, decline or choose it in For you.}}", description: "An error (HI-1932): a decision named a request ({request}: its id, such as r12) of card {card} (its key) that it can't answer: it isn't open on the card (answered or closed meanwhile), or it is an approval or one of Hive's own requests (a review, the OK before merging, the round limit), which the user answers in For you. Keep the select keys." })
+  not: msg({ id: 'tasks.error.answersNot', defaultMessage: "{why, select, open {{request} isn't an open request on {card}.} other {A decision can't answer {request} on {card}: approve, decline or choose it in For you.}}", description: "An error (HI-1932): a decision named a request ({request}: its id, such as r12) of card {card} (its key) that it can't answer: it isn't open on the card (answered or closed meanwhile), or it is an approval or one of Combwork's own requests (a review, the OK before merging, the round limit), which the user answers in For you. Keep the select keys." })
 }
 
 /**
@@ -3049,7 +3049,7 @@ async function unarchiveBatchLocked(id: string, actor: TaskActor): Promise<Unarc
   const result = await (async (): Promise<UnarchiveResult> => {
     const batches = await readBatches(ws)
     const batch = batches.find((b) => b.id === id)
-    if (!batch) throw hiveError(msg({ id: 'tasks.error.batchGone', defaultMessage: 'That batch is no longer kept: unarchive its cards from Archived.', description: "An error: the Archive All batch to bring back is no longer kept (Hive keeps the latest 50); its cards can still be brought back one by one from the board's Archived list." }))
+    if (!batch) throw hiveError(msg({ id: 'tasks.error.batchGone', defaultMessage: 'That batch is no longer kept: unarchive its cards from Archived.', description: "An error: the Archive All batch to bring back is no longer kept (Combwork keeps the latest 50); its cards can still be brought back one by one from the board's Archived list." }))
     const failed = new Set<number>()
     // The batch's own list, read card by card: one that can't be read now still belongs to it.
     const back: TaskCard[] = []

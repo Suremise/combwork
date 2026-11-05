@@ -166,7 +166,7 @@ const PROBLEM = {
   taken: msg({ id: 'service.keys.taken', defaultMessage: '{key} is another project’s key, or was: a key stays with its project for good.', description: "An error changing a project's key: {key} (letters such as AM) belongs to another project now or did before (its old keys stay its aliases)." }),
   prefix: msg({ id: 'service.keys.prefix', defaultMessage: '{key} and another project’s key {other} begin alike: no key can be the start of another.', description: "An error changing a project's key: {key} and another project's key {other} (both letters such as AM and AMB) would be one the start of the other, which isn't allowed." }),
   closed: msg({ id: 'service.keys.closed', defaultMessage: 'The workspace was closed, or the window opened another, before the key was changed: nothing changed.', description: "An error changing a project's key: its workspace closed (or the window switched to another workspace) while the change waited; nothing was changed." }),
-  unknownProject: msg({ id: 'service.keys.unknownProject', defaultMessage: 'That project has no id yet, so it can’t have a key: open it in Combwork first.', description: "An error changing a project's key: the project hasn't been given Hive's id (it hasn't been opened yet)." })
+  unknownProject: msg({ id: 'service.keys.unknownProject', defaultMessage: 'That project has no id yet, so it can’t have a key: open it in Combwork first.', description: "An error changing a project's key: the project hasn't been given Combwork's id (it hasn't been opened yet)." })
 }
 
 /** Refuses a key the project `id` can't take, saying why. */

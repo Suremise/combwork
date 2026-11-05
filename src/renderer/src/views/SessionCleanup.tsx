@@ -138,13 +138,13 @@ const ACTIONS: { id: CleanupAction; icon: string; label: Msg; summary: Msg }[] =
   {
     id: 'delete',
     icon: 'trash',
-    label: msg({ id: 'sessions.cleanup.delete', defaultMessage: 'Delete', description: 'A choice in Clean Up (Sessions tab): delete the old sessions from Hive. Keep it short.' }),
-    summary: msg({ id: 'sessions.cleanup.deleteSummary', defaultMessage: "Archived ones too. Combwork's copies of their transcripts go to the Recycle Bin and Combwork stops listing them; what they used stays in the totals. Each CLI keeps its own transcript.", description: "Under the Delete choice in Clean Up: it takes archived sessions too; Hive's copies go to the Recycle Bin, usage stays counted, and the coding agents' CLIs keep their own transcripts." })
+    label: msg({ id: 'sessions.cleanup.delete', defaultMessage: 'Delete', description: 'A choice in Clean Up (Sessions tab): delete the old sessions from Combwork. Keep it short.' }),
+    summary: msg({ id: 'sessions.cleanup.deleteSummary', defaultMessage: "Archived ones too. Combwork's copies of their transcripts go to the Recycle Bin and Combwork stops listing them; what they used stays in the totals. Each CLI keeps its own transcript.", description: "Under the Delete choice in Clean Up: it takes archived sessions too; Combwork's copies go to the Recycle Bin, usage stays counted, and the coding agents' CLIs keep their own transcripts." })
   }
 ]
 
 const M = {
-  title: msg({ id: 'sessions.cleanup.title', defaultMessage: '{kind, select, conversation {Clean Up Old Conversations} other {Clean Up Old Sessions}}', description: "Title of the Sessions tab's Clean Up dialog (the Hive Assistant's: conversations): archives or deletes sessions older than an age." }),
+  title: msg({ id: 'sessions.cleanup.title', defaultMessage: '{kind, select, conversation {Clean Up Old Conversations} other {Clean Up Old Sessions}}', description: "Title of the Sessions tab's Clean Up dialog (the Combwork Assistant's: conversations): archives or deletes sessions older than an age." }),
   olderThan: msg({ id: 'sessions.cleanup.olderThan', defaultMessage: 'Last active more than', description: 'In Clean Up, above the ages (24 hours, 7 days, 30 days): sessions whose last activity is longer ago than the one picked.' }),
   age: msg({ id: 'sessions.cleanup.age', defaultMessage: '{age, select, day {24 hours ago} week {7 days ago} other {30 days ago}}', description: 'An age to pick in Clean Up, after "Last active more than": 24 hours, 7 days or 30 days ago.' }),
   summary: msg({ id: 'sessions.cleanup.summary', defaultMessage: '{what} older than {age, select, day {24 hours} week {7 days} other {30 days}}.', description: 'In Clean Up: what goes ({what}: "3 sessions and 12 sub-sessions"), last active more than 24 hours, 7 days or 30 days ago.' }),
@@ -159,7 +159,7 @@ const M = {
     id: 'sessions.bulk.progress',
     defaultMessage:
       '{action, select, archive {{kind, select, conversation {Archiving {done, number} of {total, plural, one {# conversation} other {# conversations}}…} other {Archiving {done, number} of {total, plural, one {# session} other {# sessions}}…}}} unarchive {{kind, select, conversation {Unarchiving {done, number} of {total, plural, one {# conversation} other {# conversations}}…} other {Unarchiving {done, number} of {total, plural, one {# session} other {# sessions}}…}}} other {{kind, select, conversation {Deleting {done, number} of {total, plural, one {# conversation} other {# conversations}}…} other {Deleting {done, number} of {total, plural, one {# session} other {# sessions}}…}}}}',
-    description: "While many sessions are archived, unarchived or deleted at once (Clean Up, or a branch's Archive All): how many of them ({done}) of how many ({total}) it has been through so far. The Hive Assistant's: conversations."
+    description: "While many sessions are archived, unarchived or deleted at once (Clean Up, or a branch's Archive All): how many of them ({done}) of how many ({total}) it has been through so far. The Combwork Assistant's: conversations."
   }),
   busy: msg({ id: 'sessions.cleanup.busy', defaultMessage: '{action, select, archive {Archiving…} other {Deleting…}}', description: 'The Clean Up button while it archives or deletes.' })
 }

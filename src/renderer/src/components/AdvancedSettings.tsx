@@ -23,7 +23,7 @@ import { TabPanel, Tabs } from './Tabs'
  * value that applies when Hive restarts, changed since this Hive started, offers Restart Hive (#676).
  */
 const T = {
-  tabs: msg({ id: 'settings.advancedList.tabs', defaultMessage: 'Combwork and the CLIs', description: "Accessible name of Settings → Advanced's tabs: Hive, then one per CLI (Claude Code, Codex, GitHub Copilot)." }),
+  tabs: msg({ id: 'settings.advancedList.tabs', defaultMessage: 'Combwork and the CLIs', description: "Accessible name of Settings → Advanced's tabs: Combwork, then one per CLI (Claude Code, Codex, GitHub Copilot)." }),
   cliOff: msg({ id: 'settings.advancedList.cliOff', defaultMessage: '{cli} is turned off: these settings apply once you turn it on', description: "Tooltip of a dimmed tab of Settings → Advanced, and part of its name for screen readers: the CLI is turned off in Settings → Providers. {cli} is its name." }),
   off: msg({ id: 'settings.advancedList.off', defaultMessage: 'off', description: "A short mark on the tab of a CLI turned off in Settings → Advanced (beside its name, such as Codex). Lower case, one short word." }),
   noMatchHere: msg({ id: 'settings.advancedList.noMatchHere', defaultMessage: 'No settings of {group} match.', description: "A tab of Settings → Advanced with none of the filtered values: {group} is Combwork or the CLI's name." })
@@ -178,7 +178,7 @@ function AdvancedItem({ row, cli, workspace, restartDue }: { row: AdvancedRow; c
     def.applies === 'sessions' ? tr(msg({ id: 'settings.advancedList.appliesToSessions', defaultMessage: 'Applies to sessions started afterwards.', description: "A line of an advanced value's info tip." })) : '',
     def.applies === 'restart' ? tr(msg({ id: 'settings.advancedList.appliesAtRestart', defaultMessage: 'Applies when Combwork restarts.', description: "A line of an advanced value's info tip." })) : '',
     cliFacing(def) ? tr(msg({ id: 'settings.advancedList.cliVersion', defaultMessage: "It is {cli}'s: a change records the version it was made for.", description: "A line of an advanced value's info tip, for a CLI's value. {cli} is the CLI's name." }), { cli: groupName(def.group) }) : '',
-    def.setting ? tr(msg({ id: 'settings.advancedList.alsoSetting', defaultMessage: "Combwork's setting {key}, kept in advanced.json too.", description: "A line of an advanced value's info tip, for one of Hive's settings shown here. {key} is its key in Hive's settings: keep it." }), { key: def.setting }) : ''
+    def.setting ? tr(msg({ id: 'settings.advancedList.alsoSetting', defaultMessage: "Combwork's setting {key}, kept in advanced.json too.", description: "A line of an advanced value's info tip, for one of Combwork's settings shown here. {key} is its key in Combwork's settings: keep it." }), { key: def.setting }) : ''
   ].filter(Boolean)
   return (
     <div
@@ -223,9 +223,9 @@ function AdvancedItem({ row, cli, workspace, restartDue }: { row: AdvancedRow; c
         )}
         {restartDue && (
           <div className="advanced-note" data-note="restart">
-            <Icon name="info" /> {tr(msg({ id: 'settings.advancedList.restartDue', defaultMessage: 'Restart Combwork to apply this.', description: 'Under an advanced value that applies when Hive restarts, changed since Hive started.' }))}
-            <button className="btn small subtle" onClick={() => void call('app:restart').catch((e) => notify('error', tr(msg({ id: 'settings.advancedList.restartFailed', defaultMessage: 'Could not restart Combwork', description: "An error's title: restarting Hive from Settings → Advanced failed." })), errorMessage(e)))}>
-              {tr(msg({ id: 'settings.advancedList.restart', defaultMessage: 'Restart Combwork', description: 'Button under an advanced value that applies when Hive restarts: quits Hive (asking about running agents, as quitting does) and starts it again.' }))}
+            <Icon name="info" /> {tr(msg({ id: 'settings.advancedList.restartDue', defaultMessage: 'Restart Combwork to apply this.', description: 'Under an advanced value that applies when Combwork restarts, changed since Combwork started.' }))}
+            <button className="btn small subtle" onClick={() => void call('app:restart').catch((e) => notify('error', tr(msg({ id: 'settings.advancedList.restartFailed', defaultMessage: 'Could not restart Combwork', description: "An error's title: restarting Combwork from Settings → Advanced failed." })), errorMessage(e)))}>
+              {tr(msg({ id: 'settings.advancedList.restart', defaultMessage: 'Restart Combwork', description: 'Button under an advanced value that applies when Combwork restarts: quits Combwork (asking about running agents, as quitting does) and starts it again.' }))}
             </button>
           </div>
         )}
@@ -260,7 +260,7 @@ function InboxAvailableNote() {
         msg({
           id: 'settings.advancedList.inboxAvailable',
           defaultMessage: "{on, select, true {Agents can read their inbox: they have Combwork's tools (Settings → Agent API → Provide Combwork tools to sessions).} other {Agents can't read an inbox now: they need Combwork's tools (Settings → Agent API → Provide Combwork tools to sessions), so nothing is left for them and these switches don't apply.}}",
-          description: 'A note under the advanced setting "Tell a working agent at the end of a tool" (Settings → Advanced), beside the other inbox switches: whether agents can read their inbox at all, which another setting decides. Settings → Agent API → Provide Hive tools to sessions names a setting: use its names as Hive shows them.'
+          description: 'A note under the advanced setting "Tell a working agent at the end of a tool" (Settings → Advanced), beside the other inbox switches: whether agents can read their inbox at all, which another setting decides. Settings → Agent API → Provide Combwork tools to sessions names a setting: use its names as Combwork shows them.'
         }),
         { on: String(on) }
       )}

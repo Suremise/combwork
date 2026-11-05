@@ -24,7 +24,7 @@ type Recorded = Pick<SessionListItem, 'source' | 'agentId' | 'agentName' | 'cwd'
 
 /** A removed agent's name as the Sessions tab shows it: "Coder (removed)", or "Removed agent" from before names were kept. */
 export function removedAgentName(name: string | null | undefined): string {
-  return name ? tr(msg({ id: 'sessions.origin.removedName', defaultMessage: '{agent} (removed)', description: 'An agent that ran sessions and has since been removed from the project, in the Sessions tab: its name ({agent}).' }), { agent: name }) : tr(msg({ id: 'sessions.origin.removedUnnamed', defaultMessage: 'Removed agent', description: "An agent that ran sessions and has since been removed, from before Hive kept agents' names (the Sessions tab)." }))
+  return name ? tr(msg({ id: 'sessions.origin.removedName', defaultMessage: '{agent} (removed)', description: 'An agent that ran sessions and has since been removed from the project, in the Sessions tab: its name ({agent}).' }), { agent: name }) : tr(msg({ id: 'sessions.origin.removedUnnamed', defaultMessage: 'Removed agent', description: "An agent that ran sessions and has since been removed, from before Combwork kept agents' names (the Sessions tab)." }))
 }
 
 /**
@@ -37,14 +37,14 @@ export function sessionOrigin(projectPath: string, agents: readonly { id: string
   const inWorktree = folder.toLowerCase() !== projectPath.toLowerCase()
   const named = inWorktree ? folders.find((f) => samePath(f.path, folder)) : undefined
   const location = named
-    ? tr(msg({ id: 'sessions.origin.named', defaultMessage: '{is, select, slot {Slot · {name}} other {Home · {name}}}', description: "Where a session ran (the Sessions tab): in one of the project's slots (a working folder Hive lends to cards; {name} is its name, such as slot-b) or a reviewer's retired home ({name}: its folder's name, such as hr4). Glossary: slot." }), { is: named.is, name: named.name })
+    ? tr(msg({ id: 'sessions.origin.named', defaultMessage: '{is, select, slot {Slot · {name}} other {Home · {name}}}', description: "Where a session ran (the Sessions tab): in one of the project's slots (a working folder Combwork lends to cards; {name} is its name, such as slot-b) or a reviewer's retired home ({name}: its folder's name, such as hr4). Glossary: slot." }), { is: named.is, name: named.name })
     : inWorktree
       ? tr(msg({ id: 'sessions.origin.worktree', defaultMessage: 'Worktree · {branch}', description: "Where a session ran (the Sessions tab): in a worktree, named by its branch ({branch}) or folder." }), { branch: s.branch || folder.split(/[\\/]/).filter(Boolean).pop() || folder })
       : tr(msg({ id: 'sessions.origin.projectFolder', defaultMessage: 'Project folder', description: "Where a session ran (the Sessions tab): in the project's own folder." }))
   const now = s.agentId ? agents.find((a) => a.id === s.agentId) : undefined
   const agent = !s.agentId ? null : now ? now.name : removedAgentName(s.agentName)
   const who = !s.agentId
-    ? tr(msg({ id: 'sessions.origin.noAgent', defaultMessage: 'No agent recorded (adopted, or from before Combwork recorded agents).', description: "A session's origin hover (the Sessions tab): Hive has no record of which agent ran it." }))
+    ? tr(msg({ id: 'sessions.origin.noAgent', defaultMessage: 'No agent recorded (adopted, or from before Combwork recorded agents).', description: "A session's origin hover (the Sessions tab): Combwork has no record of which agent ran it." }))
     : now
       ? tr(msg({ id: 'sessions.origin.agent', defaultMessage: 'Agent {agent} ({id}).', description: "A session's origin hover (the Sessions tab): the agent that ran it, by name ({agent}) and id ({id})." }), { agent: now.name, id: s.agentId })
       : tr(msg({ id: 'sessions.origin.removed', defaultMessage: 'Its agent ({id}) has since been removed.', description: "A session's origin hover (the Sessions tab): the agent that ran it ({id}: its id) was removed from the project." }), { id: s.agentId })

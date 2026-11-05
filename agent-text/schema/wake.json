@@ -401,7 +401,7 @@
       "column": "plain"
     }
   },
-  "wake.lane.nextHiveStarts": {
+  "wake.lane.nextCombworkStarts": {
     "placeholders": {
       "card": "plain",
       "title": "plain"

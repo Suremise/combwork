@@ -9,7 +9,7 @@
   },
   "skillCopy.source.fileWent": {
     "text": "a file in it went while it was being copied",
-    "note": "A skill delivery's problem: a file of the skill's folder in the workspace went while Hive copied it."
+    "note": "A skill delivery's problem: a file of the skill's folder in the workspace went while Combwork copied it."
   },
   "skillCopy.source.folderGone": {
     "text": "its folder in the workspace is gone",
@@ -21,31 +21,31 @@
   },
   "skillCopy.swap.changedBeforeRemoved": {
     "text": "{name} changed before it could be removed",
-    "note": "Why a removal was abandoned: it was edited before Hive removed it. Nothing was removed."
+    "note": "Why a removal was abandoned: it was edited before Combwork removed it. Nothing was removed."
   },
   "skillCopy.swap.changedBeforeReplaced": {
     "text": "{name} changed before it could be replaced",
-    "note": "Why a swap was abandoned (a skill's or mode's copy; name: its folder or file name): it was edited before Hive replaced it. Nothing was replaced."
+    "note": "Why a swap was abandoned (a skill's or mode's copy; name: its folder or file name): it was edited before Combwork replaced it. Nothing was replaced."
   },
   "skillCopy.swap.changedKeptBeside": {
     "text": "{name} changed while it was being replaced; the edited copy is kept beside it",
-    "note": "Why a swap was abandoned: it was edited while Hive replaced it; the edited copy is kept beside it as a -conflict- copy."
+    "note": "Why a swap was abandoned: it was edited while Combwork replaced it; the edited copy is kept beside it as a -conflict- copy."
   },
   "skillCopy.swap.changedWhileRemoved": {
     "text": "{name} changed while it was being removed",
-    "note": "Why a removal was abandoned: it was edited while Hive removed it, and was put back (or kept as a -conflict- copy)."
+    "note": "Why a removal was abandoned: it was edited while Combwork removed it, and was put back (or kept as a -conflict- copy)."
   },
   "skillCopy.swap.changedWhileReplaced": {
     "text": "{name} changed while it was being replaced",
-    "note": "Why a swap was abandoned: it was edited while Hive replaced it, and was put back as it was."
+    "note": "Why a swap was abandoned: it was edited while Combwork replaced it, and was put back as it was."
   },
   "skillCopy.swap.putBackWhileReplaced": {
     "text": "{name} was put back while it was being replaced",
-    "note": "Why a swap was abandoned: something new took its place while Hive replaced it."
+    "note": "Why a swap was abandoned: something new took its place while Combwork replaced it."
   },
   "skillCopy.tooBig.bytes": {
     "text": "it is over {mb} MB",
-    "note": "Why a skill or mode is too big for Hive to check (HASH_LIMITS): mb is the limit in MB, a whole number. A delivery's problem and a kept revision's reason."
+    "note": "Why a skill or mode is too big for Combwork to check (HASH_LIMITS): mb is the limit in MB, a whole number. A delivery's problem and a kept revision's reason."
   },
   "skillCopy.tooBig.deliver": {
     "text": "it is too big for Combwork to check ({why})",
@@ -53,10 +53,10 @@
   },
   "skillCopy.tooBig.depth": {
     "text": "it has folders more than {depth} deep",
-    "note": "Why a skill or mode is too big for Hive to check (HASH_LIMITS): depth is the most folder levels."
+    "note": "Why a skill or mode is too big for Combwork to check (HASH_LIMITS): depth is the most folder levels."
   },
   "skillCopy.tooBig.entries": {
     "text": "it has more than {entries} files and folders",
-    "note": "Why a skill or mode is too big for Hive to check (HASH_LIMITS): entries is the most files and folders."
+    "note": "Why a skill or mode is too big for Combwork to check (HASH_LIMITS): entries is the most files and folders."
   }
 }

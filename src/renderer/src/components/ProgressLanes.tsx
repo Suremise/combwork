@@ -453,9 +453,9 @@ const LANE_DRAG = 'application/x-combwork-lane'
 
 const START_LANE = msg({ id: 'board.lanes.start', defaultMessage: 'Start Lane…', description: "A button in the Progress panel's Lanes tab and an item of a lane's menu: opens Start Lane (a builder and a reviewer agent work through cards in turn). Glossary: lane." })
 
-const RETRY_FRESH = msg({ id: 'board.lanes.retryFresh', defaultMessage: 'Retry New Conversation', description: "A button in a lane's header (Progress panel) and an item of its menu (HI-2034): one of the lane's agents was owed a new conversation, and Hive stopped trying to start it (it wasn't free in time, Hive closed while starting it, or its start failed); this tries again, once the agent is free. Glossary: lane, conversation." })
+const RETRY_FRESH = msg({ id: 'board.lanes.retryFresh', defaultMessage: 'Retry New Conversation', description: "A button in a lane's header (Progress panel) and an item of its menu (HI-2034): one of the lane's agents was owed a new conversation, and Combwork stopped trying to start it (it wasn't free in time, Combwork closed while starting it, or its start failed); this tries again, once the agent is free. Glossary: lane, conversation." })
 
-const RETRY_FRESH_SHORT = msg({ id: 'board.lanes.retryFreshShort', defaultMessage: 'Retry {agent}', description: "A lane's header in the Progress panel (HI-2034), after a refresh icon: a button that tries again to start the lane's agent {agent} (an agent's name) in a new conversation, which Hive stopped trying. Short: the panel is narrow; its tooltip says why in full." })
+const RETRY_FRESH_SHORT = msg({ id: 'board.lanes.retryFreshShort', defaultMessage: 'Retry {agent}', description: "A lane's header in the Progress panel (HI-2034), after a refresh icon: a button that tries again to start the lane's agent {agent} (an agent's name) in a new conversation, which Combwork stopped trying. Short: the panel is narrow; its tooltip says why in full." })
 
 /** Whether a lane's agent is owed its new conversation and no more is tried (HI-2034): the row offers Retry. */
 const freshBlocked = (l: Lane): boolean => l.status?.reason === 'startWait' && l.status.why === 'fresh' && !!l.status.freshBlocked && !l.frozen
@@ -784,7 +784,7 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
           </span>
         </div>
       </Tooltip>
-      <div className="lane-bar" role="list" aria-label={unknown ? tr(msg({ id: 'board.lanes.barUnrecorded', defaultMessage: '{pair}: {total, plural, one {# card} other {# cards}}, not recorded', description: "Accessible name of a lane's bar (Progress panel) when the lane ended before Hive recorded where its cards were: the builder / reviewer ({pair}) and how many cards." }), { pair, total }) : tr(msg({ id: 'board.lanes.bar', defaultMessage: '{pair}: {finished} of {total, plural, one {# card} other {# cards}} finished', description: "Accessible name of a lane's bar (Progress panel): the builder / reviewer ({pair}), and how many of its cards are finished (passed or done)." }), { pair, finished, total })}>
+      <div className="lane-bar" role="list" aria-label={unknown ? tr(msg({ id: 'board.lanes.barUnrecorded', defaultMessage: '{pair}: {total, plural, one {# card} other {# cards}}, not recorded', description: "Accessible name of a lane's bar (Progress panel) when the lane ended before Combwork recorded where its cards were: the builder / reviewer ({pair}) and how many cards." }), { pair, total }) : tr(msg({ id: 'board.lanes.bar', defaultMessage: '{pair}: {finished} of {total, plural, one {# card} other {# cards}} finished', description: "Accessible name of a lane's bar (Progress panel): the builder / reviewer ({pair}), and how many of its cards are finished (passed or done)." }), { pair, finished, total })}>
         {segments.map((s) => (
           <Segment key={s.kind === 'card' ? s.number : `${s.kind}-${s.numbers[0]}`} segment={s} work={s.kind === 'card' ? laneSegmentWork(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES) : []} marks={s.kind === 'card' ? segmentMarks(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES, enforced) : {}} folded={s.kind === 'card' ? null : foldedMarks(l, badges, cards, s.numbers, shortFor, tr, OVERRIDE_NAMES, enforced)} />
         ))}
@@ -854,8 +854,8 @@ function LaneQueue({ lane: l, badges }: { lane: Lane; badges: Map<number, WorkBa
   )
 }
 
-const WAITED_AT_LEAST = msg({ id: 'board.lanes.waitedAtLeast', defaultMessage: '{time}+', description: "How long a lane has waited, in its header (Progress panel), when Hive didn't see its wait begin (it was already waiting when Hive started): at least {time} (4 min, 1 h 5 min)." })
-const WAITED_AT_LEAST_TIP = msg({ id: 'board.lanes.waitedAtLeastTip', defaultMessage: 'It was already waiting when Combwork first saw it: it has waited at least this long.', description: "Tooltip of a lane's wait time with a + in its header (Progress panel): Hive didn't see the wait begin." })
+const WAITED_AT_LEAST = msg({ id: 'board.lanes.waitedAtLeast', defaultMessage: '{time}+', description: "How long a lane has waited, in its header (Progress panel), when Combwork didn't see its wait begin (it was already waiting when Combwork started): at least {time} (4 min, 1 h 5 min)." })
+const WAITED_AT_LEAST_TIP = msg({ id: 'board.lanes.waitedAtLeastTip', defaultMessage: 'It was already waiting when Combwork first saw it: it has waited at least this long.', description: "Tooltip of a lane's wait time with a + in its header (Progress panel): Combwork didn't see the wait begin." })
 
 /**
  * One segment: a card (a click opens it), or the finished cards folded together, or the rest of a long lane. `work`:
