@@ -556,7 +556,7 @@ const backedUp = new Set<string>()
  * `guard` (HI-2563) runs before each rename of the file into place (renameRetrying's, after each refused one too) and stops
  * the save by throwing: nothing written, its .bak neither.
  */
-export async function writeKeptJson(path: string, data: unknown, opts: { compact?: boolean; bakOncePerRun?: boolean; existing?: boolean; holder?: object; guard?: () => Promise<void> } = {}): Promise<void> {
+export async function writeKeptJson(path: string, data: unknown, opts: { compact?: boolean; bakOncePerRun?: boolean; existing?: boolean; holder?: object; guard?: (held?: string) => Promise<void> } = {}): Promise<void> {
   await saveKept(path, data, opts)
 }
 
@@ -569,7 +569,7 @@ export async function createKeptJson(path: string, data: unknown, opts: { compac
   return saveKept(path, data, { ...opts, onlyNew: true })
 }
 
-async function saveKept(path: string, data: unknown, opts: { compact?: boolean; bakOncePerRun?: boolean; existing?: boolean; holder?: object; onlyNew?: boolean; guard?: () => Promise<void> }): Promise<boolean> {
+async function saveKept(path: string, data: unknown, opts: { compact?: boolean; bakOncePerRun?: boolean; existing?: boolean; holder?: object; onlyNew?: boolean; guard?: (held?: string) => Promise<void> }): Promise<boolean> {
   const k = path.toLowerCase()
   if (opts.holder && staleHolders.get(k)?.has(opts.holder)) {
     if (!(await keptGone(path))) {
@@ -637,18 +637,44 @@ let tmpCounter = 0
  * contents; the last rename wins with a complete file. Windows briefly refuses a rename while
  * another process (or another rename) holds the target, so that is retried. `mkdir: false` writes only into a folder
  * that is there (ENOENT otherwise).
+ *
+ * `guard` (HI-2563) runs before each rename attempt, given no path, and stops the write by throwing. Something outside
+ * can still write the file whole between its last check and the rename (HI-2565: the main thread busy for a moment).
+ * So the file the rename replaces is held by a hard link, and once the new one is in place the guard checks the held
+ * file too, given its path. Throwing then puts the held file back, and the write fails as the guard's error.
  */
-export async function writeTextAtomic(path: string, text: string, opts: { mkdir?: boolean; guard?: () => Promise<void> } = {}): Promise<void> {
+export async function writeTextAtomic(path: string, text: string, opts: { mkdir?: boolean; guard?: (held?: string) => Promise<void> } = {}): Promise<void> {
   if (opts.mkdir !== false) await mkdir(dirname(path), { recursive: true })
   const tmp = `${path}.${process.pid}-${++tmpCounter}.tmp`
+  // Named as a temp file, so a crash that leaves it is swept with them.
+  const held = opts.guard ? `${path}.${process.pid}-${++tmpCounter}.tmp` : null
+  let holding = false
+  const renameOnce = async (a: string, b: string): Promise<void> => {
+    if (held) {
+      await rm(held, { force: true })
+      // Nothing there yet (or no hard links on this drive): nothing to check after.
+      holding = await link(b, held).then(() => true, () => false)
+    }
+    await (atomicTestHooks.renameOnce ?? rename)(a, b)
+  }
   // A write that fails, while the temp file is written (a full disk) or renamed (retries given up, EPERM included),
   // removes it, so failed saves leave nothing behind (#1016). A crash part way still can: sweepLeftovers removes those.
   try {
     await writeFile(tmp, text, 'utf8')
-    await renameRetrying(tmp, path, 20, opts.guard, (a, b) => (atomicTestHooks.renameOnce ?? rename)(a, b))
+    await renameRetrying(tmp, path, 20, opts.guard ? () => opts.guard!() : undefined, renameOnce)
+    if (held && holding) {
+      try {
+        await opts.guard!(held)
+      } catch (e) {
+        await renameRetrying(held, path)
+        throw e
+      }
+    }
   } catch (e) {
     await rm(tmp, { force: true }).catch(() => undefined)
     throw e
+  } finally {
+    if (held) await rm(held, { force: true }).catch(() => undefined)
   }
 }
 

@@ -408,6 +408,15 @@ const check = (name, ok, extra = '') => {
     await shots('after-remove')
   } catch (e) {
     check('the suite ran to its end', false, e.stack)
+    // What the test copy did with epsilon's project.json (HI-2565): its log's lines on it, in the suite's own log.
+    const logged = (() => {
+      try {
+        return fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').split(/\r?\n/).filter((l) => /epsilon|project\.json/.test(l))
+      } catch {
+        return []
+      }
+    })()
+    if (logged.length) console.log(`Its log on epsilon and project.json:\n${logged.join('\n')}`)
   } finally {
     await app.close().catch(() => undefined)
   }
