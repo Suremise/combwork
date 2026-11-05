@@ -1937,8 +1937,8 @@ const SOURCES: readonly AdvancedSource[] = [
     flags: 'm',
     applies: 'now',
     samples: [
-      { from: `${FIX}/advanced/input-ascii-claude-2.1.312.txt`, version: '2.1.312', text: `${'─'.repeat(113)} demo ─\n> a draft typed and left there, long enough to wrap onto rows of its own Combwork wake line typed and not sent\n${'─'.repeat(120)}`, shows: "Its input box where the terminal doesn't say it shows Unicode: \">\" its prompt mark, and the session's name in its top rule" }, // i18n-ignore: a CLI's recorded text (#367)
-      { from: `${FIX}/advanced/input-claude-2.1.312.txt`, version: '2.1.312', text: `${'─'.repeat(120)}\n❯ Combwork wake line typed and not sent\n${'─'.repeat(120)}` }] // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/input-ascii-claude-2.1.312.txt`, version: '2.1.312', text: `${'─'.repeat(113)} demo ─\n> a draft typed and left there, long enough to wrap onto rows of its own hive wake line typed and not sent\n${'─'.repeat(120)}`, shows: "Its input box where the terminal doesn't say it shows Unicode: \">\" its prompt mark, and the session's name in its top rule" }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/input-claude-2.1.312.txt`, version: '2.1.312', text: `${'─'.repeat(120)}\n❯ hive wake line typed and not sent\n${'─'.repeat(120)}` }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'claude-code.prompt.clearKeySeconds',

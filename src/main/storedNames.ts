@@ -43,7 +43,7 @@ export function upgradedOptions<T extends Record<string, unknown>>(o: T | null |
 }
 
 /** A run's or a check's name written by Combwork before 1.1: "Hive (merge queue)", "Hive (slot c)", "Hive (copy 2)". */
-const OLD_RUN_NAME = /^Combwork \(/
+const OLD_RUN_NAME = /^Hive \(/
 export const upgradedRunName = (name: unknown): unknown => (typeof name === 'string' && OLD_RUN_NAME.test(name) ? `${NEW_NAME} (${name.slice('Hive ('.length)}` : name) // i18n-ignore: a run's stored name
 
 /** A tool's name in a metrics series written before HI-2463 (`hive_<tool>`): its `cw_<tool>`, when it is one. */
