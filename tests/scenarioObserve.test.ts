@@ -1088,6 +1088,7 @@ describe('the HI-2261 check fixes', () => {
   const h = helpers as unknown as {
     readOf: (t: unknown, target: string, facts: RegExp) => boolean
     asksTheUser: (t: string) => boolean
+    relaysOk: (t: string) => boolean
     testRunsIn: (commands: string[]) => { command: string; files: string[] }[]
   }
   const byName = (id: string, o: object, c: object) => Object.fromEntries(SCENARIOS.find((s) => s.id === id)!.expect(o, c).map(([name, ok]) => [name.replace(/ \(.*$/, ''), ok]))
