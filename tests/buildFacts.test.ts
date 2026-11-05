@@ -1,6 +1,6 @@
-// Builds recorded as facts (#1534, #1062): npm run dist and npm run release tell Hive of each successful build
-// (scripts/buildFact.mjs), through the Agent API when Hive answers, else by a marker in the workspace's .combwork/builds;
-// Hive writes it into the journal as its own entry, once, while Settings → Advanced → Record builds in the journal and
+// Builds recorded as facts (#1534, #1062): npm run dist and npm run release tell Combwork of each successful build
+// (scripts/buildFact.mjs), through the Agent API when Combwork answers, else by a marker in the workspace's .combwork/builds;
+// Combwork writes it into the journal as its own entry, once, while Settings → Advanced → Record builds in the journal and
 // the journal take it (src/main/buildFacts.ts). A failed build records nothing.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { createServer } from 'http'
@@ -137,7 +137,7 @@ describe('the scripts tell Hive of a build', () => {
     expect(await script.recordBuild(input, { env: { ...env, CW_API_URL: 'http://127.0.0.1:1', CW_API_TOKEN_FILE: tokenFile }, post })).toBe("Build recorded in Hive's journal (baseline).")
     expect(sent).toEqual([{ f: fact, to: { url: 'http://127.0.0.1:1', token: 't', workspace: ws } }])
     expect(markers()).toEqual([])
-    // Hive answered but didn't write it (the switch or the journal off): said, and no marker either.
+    // Combwork answered but didn't write it (the switch or the journal off): said, and no marker either.
     expect(await script.recordBuild(input, { env: { ...env, CW_API_URL: 'http://127.0.0.1:1', CW_API_TOKEN_FILE: tokenFile }, post: async () => ({ recorded: false, reason: 'off.' }) })).toBe("Build not recorded in Hive's journal: off.")
     expect(markers()).toEqual([])
   })

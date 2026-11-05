@@ -101,6 +101,6 @@ if (made.refused) {
 console.log(`\n${made.lines.join('\n')}`)
 console.log(`\nDraft release ${tag} uploaded. Review it at https://github.com/Suremise/combwork/releases and publish it there.`)
 if (dialectsOnly) console.log('Before publishing a dialect-only release: the packaged checks on this build and the Sandbox upgrade check (RELEASING.md, A dialect-only release).')
-// The uploaded build, recorded in Hive's journal (buildFact.mjs, #1534).
+// The uploaded build, recorded in Combwork's journal (buildFact.mjs, #1534).
 const git = (...a) => execSync(`git ${a.join(' ')}`, { cwd: root }).toString().trim()
 console.log(await recordBuild({ root, version: pkg.version, commit: git('rev-parse', 'HEAD'), branch: git('branch', '--show-current') || null, installer: join(root, 'dist', installerName(pkg.version)), by: 'release' }))
