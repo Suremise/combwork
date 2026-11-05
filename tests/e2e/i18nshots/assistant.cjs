@@ -260,8 +260,8 @@ async function retryTemplates(ctx) {
 /** The Templates view, one of Combwork's own selected (#1436): Team 3×3, its roles and pairs, read-only. */
 async function combworkTemplates(ctx) {
   await showView(ctx, 'view.templates', '.sidebar .template-row')
-  await (await shown(ctx, ctx.page.locator('.sidebar .template-row[data-scope="hive"]'), "Combwork's templates")).nth(3).click()
-  await shown(ctx, ctx.page.locator('.template-detail[data-scope="hive"] .template-agents'), "one of Combwork's templates")
+  await (await shown(ctx, ctx.page.locator('.sidebar .template-row[data-scope="combwork"]'), "Combwork's templates")).nth(3).click()
+  await shown(ctx, ctx.page.locator('.template-detail[data-scope="combwork"] .template-agents'), "one of Combwork's templates")
   return windowShot()
 }
 

@@ -64,8 +64,8 @@ const check = (name, ok, extra = '') => {
   // The view's main area (a project's Templates tab has a .tab-body of its own).
   const detail = page.locator('.main-area > .tab-body .template-detail')
   // The templates kept in the workspace and its projects (Combwork's own, #1436, aside), and one of them by name.
-  const rowNames = async (where) => (await where.locator('.template-row:not([data-scope="hive"]) .label').allInnerTexts()).map((t) => t.split('\n')[0].trim())
-  const userRow = (where, name) => where.locator(`.template-row:not([data-scope="hive"])[aria-label="${name}"]`)
+  const rowNames = async (where) => (await where.locator('.template-row:not([data-scope="combwork"]) .label').allInnerTexts()).map((t) => t.split('\n')[0].trim())
+  const userRow = (where, name) => where.locator(`.template-row:not([data-scope="combwork"])[aria-label="${name}"]`)
   const CW_NAMES = ['Solo', 'Pair', 'Pair: one provider', 'Team 3×3', 'Team 6×6', 'Team 6 + pool']
   // (Their headers are upper-case by CSS.)
   const groups = async () => (await sidebar.locator('.template-group .skill-group').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim().toLowerCase())
@@ -90,7 +90,7 @@ const check = (name, ok, extra = '') => {
   const bar = await page.locator('.activitybar .activity-btn').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))
   check('the Templates icon follows Skills and Dialects on the activity bar', bar.indexOf('Dialects') === bar.indexOf('Skills') + 1 && bar.indexOf('Templates') === bar.indexOf('Dialects') + 1, JSON.stringify(bar))
   await page.locator('.activitybar [aria-label="Templates"]').click()
-  check("the view lists Combwork's own, the workspace's templates, then each project's under its name", !!(await lib.until(async () => JSON.stringify(await groups()) === '["combwork 6","workspace 1","alpha 1"]', 5000)) && JSON.stringify(await rowNames(sidebar)) === '["Pair","Solo"]' && JSON.stringify(await sidebar.locator('.template-row[data-scope="hive"]').evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))) === JSON.stringify(CW_NAMES), JSON.stringify([await groups(), await rowNames(sidebar)]))
+  check("the view lists Combwork's own, the workspace's templates, then each project's under its name", !!(await lib.until(async () => JSON.stringify(await groups()) === '["combwork 6","workspace 1","alpha 1"]', 5000)) && JSON.stringify(await rowNames(sidebar)) === '["Pair","Solo"]' && JSON.stringify(await sidebar.locator('.template-row[data-scope="combwork"]').evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))) === JSON.stringify(CW_NAMES), JSON.stringify([await groups(), await rowNames(sidebar)]))
   await sidebar.locator('select[aria-label="Show templates of"]').selectOption({ label: 'alpha' })
   check('the filter shows one project\'s', !!(await lib.until(async () => JSON.stringify(await rowNames(sidebar)) === '["Solo"]', HUNG_MS)))
   await sidebar.locator('select[aria-label="Show templates of"]').selectOption({ label: 'All templates' })

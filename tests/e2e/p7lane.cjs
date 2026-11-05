@@ -273,10 +273,10 @@ function helpers(h) {
     // --- A. alpha: Team 6×6 from Combwork's template, its agents named from the project's key.
     // Loaded from the Templates view: Team 6×6 → Load into Project… → alpha; its load dialog names each agent.
     await page.locator('.activitybar [aria-label="Templates"]').click()
-    const tplRow = page.locator('.sidebar .template-row[data-scope="hive"][aria-label="Team 6×6"]')
+    const tplRow = page.locator('.sidebar .template-row[data-scope="combwork"][aria-label="Team 6×6"]')
     await tplRow.waitFor({ timeout: HUNG_MS })
     await tplRow.click()
-    const detail = page.locator('.main-area > .tab-body .template-detail[data-scope="hive"]')
+    const detail = page.locator('.main-area > .tab-body .template-detail[data-scope="combwork"]')
     await detail.waitFor({ timeout: HUNG_MS })
     await detail.getByRole('button', { name: 'Load into Project…' }).click()
     const pick = page.locator('.dialog').last()
@@ -552,9 +552,9 @@ async function pool(h) {
   const { inv } = h
   const x = helpers(h)
   await inv('workflow:setOptions', beta, { preset: null, options: { review: 'agent', noSelfReview: true, reviewers: 2, finish: 'combworkMerges', folder: 'slots', target: 'main', style: 'merge', preChecks: [], mergeChecks: [], identity: fx.identity, okBefore: { mode: 'never', labels: [] }, reviewerMode: 'pool' } })
-  const plan = await inv('templates:plan', beta, 'hive', 'team-6-pool.json')
+  const plan = await inv('templates:plan', beta, 'combwork', 'team-6-pool.json')
   check('Team 6 + pool suggests the reviewer pool', plan.reviewerMode === 'pool', JSON.stringify(plan.reviewerMode))
-  await inv('templates:load', beta, 'hive', 'team-6-pool.json', plan.remove.map((a) => a.id))
+  await inv('templates:load', beta, 'combwork', 'team-6-pool.json', plan.remove.map((a) => a.id))
   const agentsOf = async () => (await inv('workspace:refresh'))?.projects.find((p) => same(p.path, beta))?.agents ?? []
   for (const extra of (await agentsOf()).filter((a) => /-B[3-6]$/.test(a.name))) await inv('agents:remove', beta, extra.id, { deleteWorktree: false })
   await lib.addAgent(inv, beta, { name: 'E1', workflowRole: 'either' })
@@ -787,8 +787,8 @@ async function gallery(h, kept) {
 
   // A template's load dialog, its names table from the project's key (delta's, loaded nowhere).
   await page.locator('.activitybar [aria-label="Templates"]').click()
-  await page.locator('.sidebar .template-row[data-scope="hive"][aria-label="Team 6×6"]').click()
-  const detail = page.locator('.main-area > .tab-body .template-detail[data-scope="hive"]')
+  await page.locator('.sidebar .template-row[data-scope="combwork"][aria-label="Team 6×6"]').click()
+  const detail = page.locator('.main-area > .tab-body .template-detail[data-scope="combwork"]')
   await detail.waitFor({ timeout: HUNG_MS })
   await shoot('template-names', {
     open: async (lang) => {
