@@ -282,7 +282,6 @@ interface HiveMessageValues {
   'project.memory.updated': { files: string | number }
   'project.menu.explorer': undefined
   'project.menu.remove': undefined
-  'project.menu.settings': undefined
   'project.menu.terminal': undefined
   'project.meta.lastActivity': undefined
   'project.meta.lastPrompt': undefined

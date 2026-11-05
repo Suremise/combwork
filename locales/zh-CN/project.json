@@ -280,7 +280,6 @@
   "project.memory.updated": "已更新 {files}。",
   "project.menu.explorer": "文件资源管理器",
   "project.menu.remove": "移除项目…",
-  "project.menu.settings": "项目设置",
   "project.menu.terminal": "终端",
   "project.meta.lastActivity": "最近活动",
   "project.meta.lastPrompt": "最近提示词",
