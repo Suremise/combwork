@@ -1,14 +1,14 @@
 /**
  * Combwork's installer checks in Windows Sandbox (the Sandbox checks, a release step: RELEASING.md, tests/e2e/README.md):
  * fresh install and first run, first run with no CLIs, a CLI appearing while Combwork runs, the upgrade from the previous
- * release, uninstall, and a new workspace. Drives the windows-sandbox MCP server (the hive-mcp project's) over stdio, as
- * any MCP client does: one Sandbox for scenarios 1, 2, 3, 5 and 6, a second for 4. Network off throughout, fake CLIs
+ * release, uninstall, a new workspace, and a clean install searched for "hive" (HI-2592). Drives the windows-sandbox MCP server (the hive-mcp project's) over stdio, as
+ * any MCP client does: one Sandbox for scenarios 1, 2, 3, 5 and 6, a second for 4, a third for 9. Network off throughout, fake CLIs
  * only, nothing signed in; every command has a timeout. Writes a short report (report.md, report.json) with screenshots
  * to --report. Moved from the hive-mcp repo (servers/windows-sandbox/scenarios/hive-checks.js at c5dee8a, HI-2298).
  *
  *   npm run sandbox-checks -- --installer <Combwork-Setup-x.y.z.exe> [--previous <older installer>] [--hive <Combwork repo>]
- *        [--server <windows-sandbox server.js>] [--report <folder>] [--only fresh|upgrade|manual|edges] [--short <installer>] [--wait-min N]
- *        [--smart-app-control off]
+ *        [--server <windows-sandbox server.js>] [--report <folder>] [--only fresh|upgrade|manual|edges|clean] [--short <installer>] [--wait-min N]
+ *        [--smart-app-control off] [--git <Git for Windows' folder>]
  *
  * --hive (or HIVE_REPO; default this checkout) is where --previous is looked for: the newest Combwork-Setup-*.exe or Hive-Setup-*.exe in
  * <hive>\dist other than --installer, so pass the main checkout from a worktree. Both installers must sit under one
@@ -17,6 +17,8 @@
  * --server (or WSB_SERVER) is the server's server.js; by default the copy Combwork installed from the MCP catalogue in the
  * workspace holding <hive> (<workspace>\.combwork\mcp\windows-sandbox), else a hive-mcp checkout beside <hive>
  * (<hive>\..\mcp\servers\windows-sandbox). The server keeps its run folders in %LOCALAPPDATA%\hive-test\sandbox.
+ * --git: the clean install's git project (scenario 9) needs Git, which a fresh Windows hasn't got: this machine's Git for
+ * Windows is mapped read-only at C:\tools\git (by default the folder of the git.exe on the PATH).
  * Exit code: 0 all checks passed, 1 a check failed (or a Sandbox's cleanup wasn't confirmed), 2 not run (also when the
  * Sandbox's App Control policy, e.g. Smart App Control, refuses an installer: see NotRun).
  * --smart-app-control off: the server turns Smart App Control off inside each Sandbox (never on the host), so unsigned
@@ -26,6 +28,7 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const crypto = require('crypto')
+const { execFileSync } = require('child_process')
 const { server } = require('./client.cjs')
 const { stopConfirmed, list, hostProblem, SAC_QUERY, sacState } = require('./wsb.cjs')
 const { evaluate, markdown, verdict, KINDS } = require('./report.cjs')
@@ -75,6 +78,17 @@ function cmpVersion(a, b) {
 function splitVersion(v) {
   const i = v.indexOf('-')
   return [(i < 0 ? v : v.slice(0, i)).split('.').map(Number), i < 0 ? null : v.slice(i + 1).split('.')]
+}
+/** Git for Windows' folder (the one with cmd\git.exe): --git, else that of the git.exe on the PATH; null without one. */
+function gitRoot(opt) {
+  const ok = d => !!d && fs.existsSync(path.join(d, 'cmd', 'git.exe'))
+  if (opt) return ok(path.resolve(opt)) ? path.resolve(opt) : null
+  let found = ''
+  try { found = execFileSync('where.exe', ['git'], { encoding: 'utf8', windowsHide: true, timeout: 10_000 }).split(/\r?\n/)[0].trim() } catch { /* none */ }
+  // git.exe is in <root>\cmd (or <root>\bin, <root>\mingw64\bin): the root is the folder above it holding cmd\git.exe.
+  if (!found) return null
+  for (let d = path.dirname(found); d !== path.dirname(d); d = path.dirname(d)) if (ok(d)) return d
+  return null
 }
 const isInside = (child, parent) => { const r = path.relative(parent, child); return !!r && !r.startsWith('..') && !path.isAbsolute(r) }
 
@@ -136,9 +150,9 @@ function plan(argv) {
   // The edge cases' second installer (HI-2460): built with HIVE_TEST_SHORT_LEGACY_WAIT=1, its legacy-mutex wait 20 s.
   const short = opt('--short') && path.resolve(opt('--short'))
   if (!installer || !fs.existsSync(installer) || !versionOf(installer)) throw new Error('--installer must name an existing Combwork-Setup-<version>.exe (or Hive-Setup-, before HI-2458)')
-  // By default the release checks' two kinds; the install by hand over the previous release (manual, HI-2460) and the
+  // By default the release checks' three kinds (the clean install's since HI-2592); the install by hand over the previous release (manual, HI-2460) and the
   // edge cases (edges) run when asked for (--only).
-  const ran = only ? [only] : ['fresh', 'upgrade']
+  const ran = only ? [only] : ['fresh', 'upgrade', 'clean']
   let previous = opt('--previous') && path.resolve(opt('--previous'))
   const overOld = ran.includes('upgrade') || ran.includes('manual') || ran.includes('edges')
   if (ran.includes('edges') && (!short || !fs.existsSync(short))) throw new Error('--only edges needs --short <an installer built with HIVE_TEST_SHORT_LEGACY_WAIT=1>, beside --installer')
@@ -170,7 +184,8 @@ function plan(argv) {
     guestShort: short ? guest(short) : null,
     report: path.resolve(opt('--report', path.join(process.env.LOCALAPPDATA, 'hive-test', 'sandbox-reports', stamp))),
     waitMin: Number(opt('--wait-min', 0)),
-    sacOff: sac === 'off'
+    sacOff: sac === 'off',
+    git: ran.includes('clean') ? gitRoot(opt('--git')) : null
   }
 }
 
@@ -231,7 +246,7 @@ function steps(srv, ctx) {
     return r
   }
   const ps = (scenario, what, script, args, o) => run(scenario, what, `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${INSIDE}\\${script} ${args}`, o)
-  const drive = (scenario, what, step, prefix) => run(scenario, what, `C:\\tools\\node\\node.exe ${INSIDE}\\drive.cjs ${step} ${prefix}`, { timeoutSec: 420 })
+  const drive = (scenario, what, step, prefix, timeoutSec = 420) => run(scenario, what, `C:\\tools\\node\\node.exe ${INSIDE}\\drive.cjs ${step} ${prefix}`, { timeoutSec })
   /** Smart App Control's state in this Sandbox, read only; logged and kept for the reason if an install is blocked. */
   const readSac = async () => {
     const r = await srv.call('sandbox_run', { command: SAC_QUERY, as: 'user', timeoutSec: 30 }).catch(e => ({ text: e.message }))
@@ -274,7 +289,7 @@ function steps(srv, ctx) {
   return { run, ps, drive, desktop, collect, record, readSac, install }
 }
 
-const SCENARIO_OF = { fresh: 1, upgrade: 4, manual: 7, edges: 8 }
+const SCENARIO_OF = { fresh: 1, upgrade: 4, manual: 7, edges: 8, clean: 9 }
 // How long Settings gets to open inside the Sandbox before its screenshot (nothing there to wait on from the host); the
 // unit tests, whose fake server shows nothing, set it to 0.
 const SETTINGS_OPEN_MS = Number(process.env.HIVE_SANDBOX_TEST_SETTINGS_MS ?? 6000)
@@ -304,7 +319,7 @@ async function main(argv) {
       WSB_MCP_ENABLED: '1',
       WSB_ALLOWED_ROOTS: '', // the build folder comes as an MCP root (inSandbox), not from the config
       WSB_ROOTS_FROM_CWD: '',
-      WSB_TOOL_DIRS: [`node=${path.dirname(process.execPath)}`, `playwright=${path.join(REPO, 'node_modules', 'playwright-core')}`, `hive-tests=${path.join(REPO, 'tests')}`].join(';'),
+      WSB_TOOL_DIRS: [`node=${path.dirname(process.execPath)}`, `playwright=${path.join(REPO, 'node_modules', 'playwright-core')}`, `hive-tests=${path.join(REPO, 'tests')}`, ...(p.git ? [`git=${p.git}`] : [])].join(';'),
       WSB_SANDBOX_ROOT: process.env.HIVE_SANDBOX_CHECKS_ROOT || SANDBOX_ROOT,
       WSB_STUB: process.env.WSB_STUB,
       WSB_STUB_STATE: process.env.WSB_STUB_STATE
@@ -352,6 +367,19 @@ async function main(argv) {
     upgrade: srv => overPrevious(srv, 4, 's4', '--updated /S --force-run'),
     manual: srv => overPrevious(srv, 7, 's7', '/S --force-run'),
     // The installer's edge cases over Hive Desktop (edges.ps1), then a notification under the new app ID (HI-2460).
+    // HI-2592, the rename's acceptance test: a Windows that never had Hive or Combwork, the build installed, used as a new
+    // user would (drive.cjs clean), quit, then every place it wrote or shows searched for "hive" (inside/clean-scan.cjs).
+    clean: async srv => {
+      const s = steps(srv, ctx)
+      await s.readSac()
+      if (!p.git) s.record(9, '9. Git for the git project, mapped from this machine', false, 'no Git for Windows found here (git.exe on the PATH, or --git <its folder>)')
+      await s.run(9, '9. what HKCU says of "hive" before the install', `C:\\tools\\node\\node.exe ${INSIDE}\\clean-scan.cjs baseline s9`, { timeoutSec: 300 })
+      await time('9. silent install', () => s.install(9, '9. install', p.guestInstaller, '-Arguments "/S" -Name s9', { timeoutSec: 300 }))
+      await s.desktop(9, 's9-desktop')
+      await time("9. a new user's first session", () => s.drive(9, '9. first session', 'clean', 's9', 900))
+      await time('9. the search for "hive"', () => s.run(9, '9. search for "hive"', `C:\\tools\\node\\node.exe ${INSIDE}\\clean-scan.cjs scan s9`, { timeoutSec: 900 }))
+      await s.collect(9, ['s9'])
+    },
     edges: async srv => {
       const s = steps(srv, ctx)
       await s.readSac()
@@ -372,7 +400,7 @@ async function main(argv) {
       continue
     }
     try {
-      await inSandbox(srvOpts, kind, start, bodies[kind], [p.root])
+      await inSandbox(srvOpts, kind, kind === 'clean' && p.git ? { ...start, tools: [...start.tools, 'git'] } : start, bodies[kind], [p.root])
     } catch (e) {
       if (e instanceof NotRun) {
         // Its steps so far go too: the scenarios weren't checked, so nothing in them passed or failed.
@@ -407,6 +435,7 @@ async function main(argv) {
     steps: ctx.steps,
     leftRunning: ctx.leftRunning,
     notRun: ctx.notRun,
+    git: p.git,
     smartAppControl: sacMeta(ctx.sac, p.sacOff)
   }
   const result = evaluate(meta, ctx.files)
