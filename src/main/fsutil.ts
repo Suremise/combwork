@@ -1044,6 +1044,13 @@ let swapCounter = 0
 /** A swap that found its destination no longer as expected: nothing was replaced, and the destination is as it was. */
 export class SwapAbandoned extends Error {}
 
+/**
+ * A swapOut abandoned because what it checks couldn't be read (access denied, held, a failed read: `cause`), not because
+ * it differs (HI-2612): put back as any abandoned swap is, but a step that must not pass on an I/O failure (the names
+ * upgrade's retirement of old copies) fails on it rather than take it for the user's change.
+ */
+export class SwapUnreadable extends SwapAbandoned {}
+
 /** A swap whose copy couldn't be made (its source gone, unreadable or changing): nothing was replaced. `cause` is why. Restore (Skills, modes) shows it in the window's language (#850). */
 export class CopyFailed extends CombworkError {}
 
@@ -1059,13 +1066,28 @@ export function sourceProblem(e: unknown, source: string): string {
   return stored(A.notCopied, { hasCode: code ? 'yes' : 'no', code: code ?? '' })
 }
 
-/** What a path holds, to compare with what a swap expects: its contentHash, null if nothing is there. */
-async function hashOrNone(path: string): Promise<string | null> {
+/** A hash that couldn't be read, with what it failed with (hashChecked). */
+class Unreadable {
+  constructor(readonly error: unknown) {}
+}
+
+/**
+ * What a path holds: its contentHash, null if nothing is there, or Unreadable when a read of it failed. Too large, or a
+ * file of it gone as it was read, is a difference (a hash no expected one matches), not a failure.
+ */
+async function hashChecked(path: string): Promise<string | null | Unreadable> {
   const there = await lstat(path).then(
     () => true,
     (e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? false : Promise.reject(e))
   )
-  return there ? contentHash(path).catch(() => '\0unreadable') : null
+  if (!there) return null
+  return contentHash(path).catch((e: unknown) => (e instanceof ContentTooLarge || (e as NodeJS.ErrnoException | null)?.code === 'ENOENT' ? '\0changed' : new Unreadable(e)))
+}
+
+/** What a path holds, to compare with what a swap expects: its contentHash, null if nothing is there. */
+async function hashOrNone(path: string): Promise<string | null> {
+  const h = await hashChecked(path)
+  return h instanceof Unreadable ? '\0unreadable' : h
 }
 
 const exists = (path: string): Promise<boolean> => lstat(path).then(() => true, () => false)
@@ -1205,18 +1227,27 @@ export async function swapOut(dest: string, expected: string): Promise<void> {
   const parent = dirname(dest)
   const name = dest.slice(parent.length + 1)
   const old = join(parent, `.${name}.cw-old-${tag}`)
+  /** Null while `p` is still exactly `expected`; else the abandonment to throw: SwapUnreadable when it couldn't be read. */
+  const unlike = async (p: string, why: string): Promise<SwapAbandoned | null> => {
+    const h = await hashChecked(p)
+    if (h instanceof Unreadable) return new SwapUnreadable(why, { cause: h.error })
+    return h === expected ? null : new SwapAbandoned(why)
+  }
   const remove = async (): Promise<void> => {
-    if ((await hashOrNone(dest)) !== expected) throw new SwapAbandoned(stored(A.changedBeforeRemoved, { name }))
+    const before = await unlike(dest, stored(A.changedBeforeRemoved, { name }))
+    if (before) throw before
     await renameRetrying(dest, old, 5)
-    const putBack = async (why: string): Promise<never> => {
+    const putBack = async (why: SwapAbandoned): Promise<never> => {
       if (!(await exists(dest))) await renameRetrying(old, dest).catch(() => keepAsConflict(old, parent, name))
       else await keepAsConflict(old, parent, name)
-      throw new SwapAbandoned(why)
+      throw why
     }
-    if ((await hashOrNone(old)) !== expected) await putBack(stored(A.changedWhileRemoved, { name }))
+    const moved = await unlike(old, stored(A.changedWhileRemoved, { name }))
+    if (moved) await putBack(moved)
     // Something new in its place meanwhile is the user's: it stays, and so does what was moved aside (as a conflict copy
     // if it was changed: it is removed only while it is still exactly Combwork's).
-    if ((await hashOrNone(old)) !== expected) await putBack(stored(A.changedWhileRemoved, { name }))
+    const last = await unlike(old, stored(A.changedWhileRemoved, { name }))
+    if (last) await putBack(last)
     await rm(old, { recursive: true, force: true })
   }
   await withFileLocks(await filesIn(dest), remove)

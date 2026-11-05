@@ -14,9 +14,18 @@ import { tempDir } from './tempDir'
 vi.mock('../src/main/events', async (orig) => ({ ...(await orig<object>()), toast: () => undefined }))
 
 /** Paths whose calls fail, each with its error's code, as access denied, another program holding it or a bad disk would. */
-const { held, sync, async_ } = vi.hoisted(() => {
+const { held, later, sync, async_ } = vi.hoisted(() => {
   const paths = new Map<string, string>()
-  const failing = (p: unknown): string | undefined => paths.get(String(p).toLowerCase())
+  /** Paths matching a pattern whose calls fail once `pass` of them have gone through (a later read failing). */
+  const after: { match: RegExp; code: string; pass: number }[] = []
+  const failing = (p: unknown): string | undefined => {
+    const now = paths.get(String(p).toLowerCase())
+    if (now) return now
+    const l = after.find((x) => x.match.test(String(p)))
+    if (!l) return undefined
+    if (l.pass > 0) return void l.pass--
+    return l.code
+  }
   const failure = (p: unknown, code: string): Error => Object.assign(new Error(`${code}: refused, '${String(p)}' (test)`), { code })
   const syncCall = <F extends (...a: any[]) => any>(real: F): F =>
     ((p: unknown, ...rest: unknown[]) => {
@@ -29,7 +38,7 @@ const { held, sync, async_ } = vi.hoisted(() => {
       const code = failing(p)
       return code ? Promise.reject(failure(p, code)) : real(p, ...rest)
     }) as F
-  return { held: paths, sync: syncCall, async_: asyncCall }
+  return { held: paths, later: after, sync: syncCall, async_: asyncCall }
 })
 
 vi.mock('original-fs', async (orig) => {
@@ -46,10 +55,10 @@ const base = tempDir('upgrade-io-')
 const { ours } = await import('../src/main/combworkFolder')
 const { classify, moveFolders } = await import('../src/main/combworkMove')
 const { moveOldLogs } = await import('../src/main/logger')
-const { NAMES_DONE_FILE, NAMES_VERSION, projectNamesDone, workspaceNeeds } = await import('../src/main/nameUpgrade')
+const { NAMES_DONE_FILE, NAMES_VERSION, projectNamesDone, upgradeWorkspace, workspaceNeeds } = await import('../src/main/nameUpgrade')
 const { removeOldShims } = await import('../src/main/nameUpgradeProfile')
 const { upgradeProject } = await import('../src/main/nameUpgradeProjects')
-const { contentHash, COPY_MARKER } = await import('../src/main/fsutil')
+const { contentHash, COPY_MARKER, SwapAbandoned, swapOut, SwapUnreadable } = await import('../src/main/fsutil')
 
 /** The three ways a look fails that aren't an absence. */
 const CODES = ['EACCES', 'EPERM', 'EIO'] as const
@@ -66,7 +75,12 @@ const write = (p: string, text: string): void => {
 }
 const hold = (p: string, code: string): void => void held.set(p.toLowerCase(), code)
 
-afterEach(() => held.clear())
+const release = (): void => {
+  held.clear()
+  later.length = 0
+}
+
+afterEach(release)
 
 describe("the folder move's test of a .hive (combworkFolder.ts ours)", () => {
   for (const code of CODES) {
@@ -235,6 +249,44 @@ describe("the old skill copies' markers and hashes (nameUpgradeProjects.ts)", ()
       expect(existsSync(c.dir)).toBe(false)
     })
   }
+
+  // HR2's round 1: swapOut checks the copy again as it removes it (before the rename, then twice once it is moved aside).
+  // A read failing at any of those is put back like a change, but fails the step: the project's record isn't written, and
+  // the next run retires it. `pass`: the reads of SKILL.md let through before the failing one, at its place or aside.
+  const LATER = [
+    { check: 'the check before it moves', at: /hive-merge-ready[\\/]SKILL\.md$/, pass: 1 },
+    { check: 'the first check once moved aside', at: /\.cw-old-[^\\/]+[\\/]SKILL\.md$/, pass: 0 },
+    { check: 'the last check once moved aside', at: /\.cw-old-[^\\/]+[\\/]SKILL\.md$/, pass: 1 }
+  ]
+  for (const code of CODES) {
+    for (const l of LATER) {
+      it(`${code} at ${l.check}: put back, the step fails and the project's record isn't written; released, the next run retires it`, async () => {
+        const c = await oldCopy()
+        write(join(c.folder, '.combwork', 'project.json'), '{}')
+        const run = (): Promise<void> => upgradeWorkspace(c.folder, { only: c.folder, projects: [], stop: () => undefined, checkpoint: async () => ({ ok: true }), copyFolders: async () => [] })
+        later.push({ match: l.at, code, pass: l.pass })
+        await expect(run()).rejects.toThrow(/couldn't finish renaming the projects'/)
+        expect(later[0].pass).toBe(0)
+        release()
+        expect(readFileSync(join(c.dir, 'SKILL.md'), 'utf8')).toBe('# merge-ready')
+        expect(readdirSync(join(c.folder, '.agents', 'skills'))).toEqual(['hive-merge-ready'])
+        expect(await projectNamesDone(c.folder)).toBe(false)
+        await run()
+        expect(existsSync(c.dir)).toBe(false)
+        expect(await projectNamesDone(c.folder)).toBe(true)
+      })
+    }
+  }
+
+  it("a copy that differs is a change, not a failure: swapOut abandons it as the user's, and the step keeps it and goes on", async () => {
+    const c = await oldCopy()
+    writeFileSync(join(c.dir, 'SKILL.md'), '# merge-ready, edited')
+    const e = await swapOut(c.dir, JSON.parse(readFileSync(c.marker, 'utf8')).hash).catch((x: unknown) => x)
+    expect(e).toBeInstanceOf(SwapAbandoned)
+    expect(e).not.toBeInstanceOf(SwapUnreadable)
+    await upgradeProject(c.folder, [])
+    expect(readFileSync(join(c.dir, 'SKILL.md'), 'utf8')).toBe('# merge-ready, edited')
+  })
 
   it("no marker, a damaged one, or a file of the user's under the prefix: kept, and no failure", async () => {
     const c = await oldCopy()

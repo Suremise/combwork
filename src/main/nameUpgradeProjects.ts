@@ -1,7 +1,7 @@
 import { readdir, readFile, rename } from 'original-fs/promises'
 import { join } from 'path'
 import { EXCLUDE_COMMENT } from '../shared/combworkFolderMove'
-import { contentHash, ContentTooLarge, COPY_MARKER, SwapAbandoned, swapOut, withFileLock, writeTextAtomic } from './fsutil'
+import { contentHash, ContentTooLarge, COPY_MARKER, SwapAbandoned, swapOut, SwapUnreadable, withFileLock, writeTextAtomic } from './fsutil'
 import { git } from './git'
 import { createLogger, userText } from './logger'
 import { gitDirOf, vcsOf } from './combworkVcs'
@@ -153,8 +153,10 @@ async function retireOldCopies(folder: string): Promise<void> {
         await swapOut(dest, marker)
         log.info(`retired the old copy ${userText(dest)}`)
       } catch (e) {
-        // Changed while it was being removed: the user's now, kept (put back, or beside it as a conflict copy).
-        if (e instanceof SwapAbandoned) log.info(`kept ${userText(dest)}: it changed as it was being retired`)
+        // Changed while it was being removed: the user's now, kept (put back, or beside it as a conflict copy). One it
+        // couldn't read again as it went (SwapUnreadable, HI-2612) is put back too, but fails the step: not the user's
+        // change, so the next open retires it.
+        if (e instanceof SwapAbandoned && !(e instanceof SwapUnreadable)) log.info(`kept ${userText(dest)}: it changed as it was being retired`)
         else throw e
       }
     }
