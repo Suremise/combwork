@@ -143,7 +143,7 @@ describe('hive tools named in a transcript are mentions, not calls', () => {
   })
 })
 
-describe("a Codex code-mode script's calls, as Hive's parser gives them (HI-2235, HI-2246)", () => {
+describe("a Codex code-mode script's calls, as Combwork's parser gives them (HI-2235, HI-2246)", () => {
   // As Codex 0.166.0 records them: the script (exec), each call it made as that call ends (item_completed), its output.
   const call = (id: string, code: string) => ({ type: 'response_item', payload: { type: 'custom_tool_call', name: 'exec', call_id: id, input: code } })
   const output = (id: string, text: string) => ({ type: 'response_item', payload: { type: 'custom_tool_call_output', call_id: id, output: [{ type: 'input_text', text: `Script completed\nOutput:\n${text}` }] } })
@@ -151,13 +151,13 @@ describe("a Codex code-mode script's calls, as Hive's parser gives them (HI-2235
   const mcp = (id: string, toolName: string, args: unknown, text: string, failed = false) => done({ type: 'McpToolCall', id, server: 'combwork', tool: toolName, arguments: args, status: failed ? 'failed' : 'completed', result: { content: [{ type: 'text', text }], ...(failed ? { isError: true } : {}) } })
   const shell = (id: string, cmd: string, out: string, exit = 0) => done({ type: 'CommandExecution', id, command: ['C:\\Program Files\\PowerShell\\7\\pwsh.exe', '-Command', cmd], status: exit ? 'failed' : 'completed', aggregated_output: out, exit_code: exit })
   const rollout = (...lines: unknown[]) => lines.map((l) => JSON.stringify(l)).join('\n') + '\n'
-  // The transcript's items as Hive's parser gives them (HI-2246): each script with the calls it made (`calls`).
+  // The transcript's items as Combwork's parser gives them (HI-2246): each script with the calls it made (`calls`).
   const parsed = (text: string): unknown[] => {
     const p = new CodexConversationParser(null)
     p.feed(Buffer.from(text))
     return p.items
   }
-  // A script as Hive gives one whose calls aren't known (a Codex that records none): one tool, Script, no `calls`.
+  // A script as Combwork gives one whose calls aren't known (a Codex that records none): one tool, Script, no `calls`.
   const script = (id: string, code: string, result = '') => ({ kind: 'tool', tool: { toolUseId: id, name: 'Script', summary: '', input: code, result, isError: false, images: [] } })
   type Seen = { tools: { name: string; input: string; result: string; isError: boolean }[]; skillsRead: string[]; hiveMentions: string[] }
   const observeItems = (items: unknown[]) => observeTranscript(withScriptCalls(items).items, SKILLS) as unknown as Seen
@@ -204,7 +204,7 @@ describe("a Codex code-mode script's calls, as Hive's parser gives them (HI-2235
     const code = `if (false) await tools.exec_command({cmd:"pwsh -File scripts/cards.ps1"}); if (false) await tools.exec_command({cmd:"npm test"}); if (false) await tools.mcp__combwork__cw_read_task({number:"AL-1"}); text(${JSON.stringify(printed)}); text("ACCEPT-ZEBRA-42"); text(${JSON.stringify(SKILL_TEXT('work-on-card'))})`
     const shown = `${code} // .agents/skills/hive-work-on-card/SKILL.md`
     const result = `${printed}\nACCEPT-ZEBRA-42\n${SKILL_TEXT('work-on-card')}`
-    // Parsed from a rollout that records no calls, and a Script as Hive gives one whose calls aren't known.
+    // Parsed from a rollout that records no calls, and a Script as Combwork gives one whose calls aren't known.
     const unknowns: [string, unknown[]][] = [
       ['a rollout with no calls recorded', parsed(rollout(call('c1', shown), output('c1', result)))],
       ['a Script with no calls known', [script('c1', shown, result)]]
@@ -269,7 +269,7 @@ describe("a Codex code-mode script's calls, as Hive's parser gives them (HI-2235
     const change = done({ type: 'FileChange', id: 'exec-1', changes: { 'notes.txt': { type: 'add', content: 'one\n' } }, status: 'completed' })
     const direct = { type: 'response_item', payload: { type: 'custom_tool_call', name: 'apply_patch', call_id: 'd1', input: patch } }
     const directOut = { type: 'response_item', payload: { type: 'custom_tool_call_output', call_id: 'd1', output: 'Success.' } }
-    // Its Codex records no calls: Hive shows the Edit, but it is an unknown script, and credits nothing.
+    // Its Codex records no calls: Combwork shows the Edit, but it is an unknown script, and credits nothing.
     const unknown = parsed(rollout(call('s1', code), output('s1', 'not run')))
     expect((unknown[0] as { tool: { name: string; script?: boolean } }).tool).toMatchObject({ name: 'Edit', script: true })
     expect(withScriptCalls(unknown)).toMatchObject({ scripts: 0, calls: 0, unknown: 1 })
@@ -476,7 +476,7 @@ describe("the lane and wait lists, moves and intents name a card by its number o
     expect(namesCards(o, ['AL-2', 'AL-1'], [1, 3])).toBe(false)
   })
 
-  // HR1 round 1: the wait lists and Hive's text that card-loop-released, assistant-dispatch and inbox-stale read.
+  // HR1 round 1: the wait lists and Combwork's text that card-loop-released, assistant-dispatch and inbox-stale read.
   const run = (id: string, obs: Record<string, unknown>, c: Record<string, unknown>) => {
     const sc = SCENARIOS.find((s) => s.id === id)!
     return Object.fromEntries(sc.expect({ ...o, hiveCalls: [], tools: [], skillsRead: [], finalReply: '', gitStatus: '', status: 'finished', cards: {}, facts: {}, ...obs }, c).map(([name, ok]) => [name, ok]))
@@ -508,7 +508,7 @@ describe("the lane and wait lists, moves and intents name a card by its number o
     expect(dispatch({ cards: [13], wake: true })).toBe(false)
   })
 
-  it("inbox-stale: Hive's message names the card by its own key or #n, not another card's key", () => {
+  it("inbox-stale: Combwork's message names the card by its own key or #n, not another card's key", () => {
     const LEFT = 'the message was left, tied to its round'
     const STALE = 'stale once the card passed, never given'
     const stale = (sent: string, detail: string) =>
@@ -632,7 +632,7 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
   describe('coordinator-team-lanes: each lane started with cw_lane start; a reviewer briefed only by its start or a prompt', () => {
     const cards = { a: 1, b: 2, c: 3 }
     const board = [1, 2, 3].map((n) => ({ number: n, key: `AL-${n}` }))
-    // A lane start: its call in Hive's log (JSON arguments), its reply in the transcript (whose input is display text).
+    // A lane start: its call in Combwork's log (JSON arguments), its reply in the transcript (whose input is display text).
     type Start = { call: unknown; tool: unknown }
     const start = (builder: string, reviewer: string, laneCards: unknown[], reply: string, brief = 'Use card-loop as the builder.', ok = true): Start => {
       const args = { action: 'start', project: 'alpha', builder, reviewer, cards: laneCards, brief }
@@ -642,7 +642,7 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
     const STARTED = (who: string) => `Lane started: ${who} (alpha) L: active. Its brief is delivered to the builder now. Started ${who.replace(' / ', ' and ')} with the lane's brief.`
     const both = [start('Coder', 'Implementer', ['AL-1', 'AL-2'], STARTED('Coder / Implementer')), start('Builder2', 'Reviewer2', [3], STARTED('Builder2 / Reviewer2'))]
 
-    it('passes two lane starts whose replies say Hive started every agent with the brief', () => {
+    it('passes two lane starts whose replies say Combwork started every agent with the brief', () => {
       const r = lanes(both)
       expect(r["started Coder's lane (cw_lane start: its cards, its reviewer, a card-loop brief)"]).toBe(true)
       expect(r['Implementer briefed: started by the lane with its brief, or prompted with card-loop, the cards and its builder']).toBe(true)
@@ -674,7 +674,7 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
     it("HR1 round 1: a second start of the same pair gets its own reply, never the first's", () => {
       const IMPL = 'Implementer briefed: started by the lane with its brief, or prompted with card-loop, the cards and its builder'
       const CODER = "started Coder's lane (cw_lane start: its cards, its reviewer, a card-loop brief)"
-      // Started on [3] (Hive started both), then updated to [1, 2], whose own reply says Implementer is running: tell it.
+      // Started on [3] (Combwork started both), then updated to [1, 2], whose own reply says Implementer is running: tell it.
       const first = start('Coder', 'Implementer', [3], STARTED('Coder / Implementer'))
       const update = start('Coder', 'Implementer', [1, 2], 'Lane updated: Coder / Implementer (alpha) L: active. Coder and Implementer are running, so Combwork left them as they are: tell them about the lane.')
       const r = lanes([first, update])
@@ -689,7 +689,7 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
     })
   })
 
-  describe("assistant-new-lane: cw_lane start, Coder left to Hive's start as the reply says", () => {
+  describe("assistant-new-lane: cw_lane start, Coder left to Combwork's start as the reply says", () => {
     const LEFT = "left Coder to Hive's start as the reply said (no prompt where Hive gives it the card; a new conversation where it said to tell it)"
     const STARTED = "started Coder's lane with cw_lane start, which worked: its card, rounds 3, wait 60 minutes"
     const byHive = "Lane started: Coder / no reviewer (alpha) L: active. Coder is running, so Combwork left it as it is: Combwork gives it the lane's first card itself once it is free, so don't prompt it."
@@ -699,13 +699,13 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
       run('assistant-new-lane', { tools: [hiveTool('cw_lane', 'action: start\nbuilder: Coder', reply)], hiveCalls: [call('cw_lane', { action: 'start', builder: 'Coder', cards: ['AL-1'], rounds: 3, waitMinutes: 60 }), ...hiveCalls], lanes }, { cards: { n: 1 }, agents })
     const prompt = call('cw_prompt_agent', { project: 'alpha', agent: 'Coder', text: 'Use card-loop as the builder of lane L.', newConversation: true })
 
-    it('passes the lane start with no prompt where Hive gives Coder the card, and the one prompt where its reply says to tell it', () => {
+    it('passes the lane start with no prompt where Combwork gives Coder the card, and the one prompt where its reply says to tell it', () => {
       expect(newLane(byHive)[STARTED]).toBe(true)
       expect(newLane(byHive)[LEFT]).toBe(true)
       expect(newLane(tellIt, [prompt])[LEFT]).toBe(true)
     })
 
-    it("fails the old cw_prompt_agent alone, a prompt racing Hive's start, and a lane with other rounds or wait", () => {
+    it("fails the old cw_prompt_agent alone, a prompt racing Combwork's start, and a lane with other rounds or wait", () => {
       expect(run('assistant-new-lane', { hiveCalls: [prompt], lanes: [] }, { cards: { n: 1 }, agents })[STARTED]).toBe(false)
       expect(newLane(byHive, [prompt])[LEFT]).toBe(false)
       expect(newLane(tellIt)[LEFT]).toBe(false)
@@ -755,14 +755,14 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
     expect(merge(null, [])[ASKED]).toBe(false)
   })
 
-  // Checks since HI-2232 (decision (a): Hive gives the idle builder the lane in a new conversation); HI-2222 recorded them.
+  // Checks since HI-2232 (decision (a): Combwork gives the idle builder the lane in a new conversation); HI-2222 recorded them.
   describe("assistant-new-lane's conversation checks: the Sessions history read whether or not a new conversation began (HR1 round 1)", () => {
     const NEW = 'Coder runs in a new conversation'
     const KEPT = 'its last conversation stays in the Sessions history'
     const sc = SCENARIOS.find((s) => s.id === 'assistant-new-lane') as unknown as { during: (c: unknown) => Promise<void>; expect: (o: unknown, c: unknown) => [string, boolean, string?][] }
     const o = { hiveCalls: [], tools: [], skillsRead: [], finalReply: '', lanes: [] }
     const checked = (c: unknown) => sc.expect(o, c).filter(([n]) => n === NEW || n === KEPT)
-    // The scenario's own during(), against a stand-in Hive: Coder's live state and its project's session list.
+    // The scenario's own during(), against a stand-in Combwork: Coder's live state and its project's session list.
     const look = async (live: { runId: string; sessionId: string; status: string }, sessions: string[]) => {
       const c: Record<string, unknown> = {
         alpha: 'C:/w/alpha',
@@ -812,7 +812,7 @@ describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescri
     return Object.fromEntries(sc.expect({ hiveCalls: [], tools: [], skillsRead: [], finalReply: '', gitStatus: '', status: 'finished', allCards: board, cards: {}, facts: {}, ...obs }, c).map(([name, ok]) => [name, ok]))
   }
 
-  it("card-loop-two-cards: the passed card finished by a merge report Hive took passes; its builder's own move or verdict doesn't", () => {
+  it("card-loop-two-cards: the passed card finished by a merge report Combwork took passes; its builder's own move or verdict doesn't", () => {
     const FIN = "finished neither card by a move of its own (the passed one only by a merge report Hive took, its project's finish)"
     const two = (hiveCalls: unknown[], pColumn: string) => run('card-loop-two-cards', { hiveCalls, cards: { p: { number: 1, key: 'AL-1', column: pColumn, history: [] }, f: { number: 2, key: 'AL-2', column: 'review', history: [] } } }, { cards: { p: 1, f: 2 }, read: () => '' })[FIN]
     expect(two([call('cw_report_merge', { card: 'AL-1' }), call('cw_submit', { card: 'AL-2', summary: 'Fixed.' })], 'done')).toBe(true)
@@ -822,7 +822,7 @@ describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescri
     expect(two([call('cw_report_merge', { card: 'AL-2' })], 'passed')).toBe(false)
   })
 
-  describe("coordinator-fact-before-asking: Hive's recorded reads and an exact Read count; a shell lookup is neither credited nor blamed (Darren's decision)", () => {
+  describe("coordinator-fact-before-asking: Combwork's recorded reads and an exact Read count; a shell lookup is neither credited nor blamed (Darren's decision)", () => {
     const LOOKED = 'looked the card or its doc up (cw_read_task, cw_read_section or a detailed listing of alpha, or a Read of the doc)'
     const STARTED = 'started Coder on the card'
     const DOC = "# Deploying alpha\n\n## Staging\n\nRun `npm run deploy:staging`. The host is staging.example.com; the build needs `ALPHA_ENV=staging`."
@@ -856,7 +856,7 @@ describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescri
     })
 
     it("HR1 round 4: a card read counts only with its own reply, and that reply is the card", () => {
-      // Hive's log of the call alone (no reply in the transcript), a failed reply, another card's reply.
+      // Combwork's log of the call alone (no reply in the transcript), a failed reply, another card's reply.
       expect(looked([], [call('cw_read_task', { number: 'AL-1' })])).toBe(false)
       expect(looked(...readTask('AL-1', 'Unknown card AL-1.', true))).toBe(false)
       expect(looked(...readTask('AL-1', 'AL-2 Something else (Todo)\nNothing about deploying.'))).toBe(false)
@@ -889,7 +889,7 @@ describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescri
       expect(looked(...list('beta', CARD))).toBe(false)
       expect(looked(...list('alpha', 'No cards.', { column: 'done' }))).toBe(false)
       expect(looked([t('mcp__combwork__cw_list_tasks', 'project: alpha', 'Todo (1):\nAL-1 Publish the greeting page to staging')], [call('cw_list_tasks', { project: 'alpha' })])).toBe(false)
-      // A reply with no call of Hive's to pair it with gives nothing.
+      // A reply with no call of Combwork's to pair it with gives nothing.
       expect(looked([t('mcp__combwork__cw_list_tasks', 'project: alpha\ndetails: true', CARD)])).toBe(false)
       expect(looked([t('mcp__combwork__cw_read_section', 'project: beta\npath: docs/DEPLOY.md', 'The host is staging.example.com.')], [call('cw_read_section', { project: 'beta', path: 'docs/DEPLOY.md', heading: 'Staging' })])).toBe(false)
       const brief = sc.expect(obs([t('mcp__combwork__cw_start_task', 'number: 1\nagent: Coder\nnote: Read alpha/docs/DEPLOY.md and publish to staging.', 'Started.')]), ctx)
@@ -1049,7 +1049,7 @@ describe('the HI-2260 check fixes', () => {
     expect(byName('assistant-look-lanes', o([lane({ action: 'start', cards: [1] }, false), lane({ action: 'list' }, true)]), { cards: { a: 1 } })[NONE]).toBe(false)
   })
 
-  it("card-loop-uncommitted: a card watch naming no changes wakes on a comment (Hive records it so); one on columns only doesn't", () => {
+  it("card-loop-uncommitted: a card watch naming no changes wakes on a comment (Combwork records it so); one on columns only doesn't", () => {
     const WATCH = "ended its turn watching for the builder's reply"
     const o = (changes: string[] | undefined, recorded: string[]) => ({
       status: 'watching',
@@ -1645,8 +1645,8 @@ describe('the fixtures fail when nothing was done', () => {
   })
 
   const base = { skillsRead: [] as string[], hiveCalls: [] as unknown[], hiveMentions: [], tools: [] as { name: string; input: string; result: string; isError: boolean }[], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], gitStatus: '', live: [], tokenLeak: false }
-  // The merge slot as Hive's slot log records it (#374): a line per change to the slots, and a line per claim or release
-  // as Hive resolved it (the branch it was for, what it did), written just after the change it made.
+  // The merge slot as Combwork's slot log records it (#374): a line per change to the slots, and a line per claim or release
+  // as Combwork resolved it (the branch it was for, what it did), written just after the change it made.
   const slotEntry = (at: number, branch: string, holder: string | null, waiting: string[] = [], taken = true) => ({ at: new Date(at).toISOString(), slots: holder || waiting.length ? [{ project: 'C:\\ws\\alpha', branch, holder: holder ? { agentId: holder, name: holder, cards: [], taken } : null, waiting }] : [] })
   const slotEvent = (at: number, event: 'claim' | 'release', outcome: string, branch: string, agent = 'Coder') => ({ at: new Date(at).toISOString(), event, project: 'C:\\ws\\alpha', branch, agentId: agent, agent, outcome })
   /**
@@ -1752,7 +1752,7 @@ describe('the fixtures fail when nothing was done', () => {
       const checks = sc.expect({ ...base, skillsRead: ['review-agent-work'], tools: calls.map(([name, input]) => ({ name, input, result: '', isError: false })) }, {})
       return checks.filter(([n]) => n === whole || n === affected).filter(([, ok]) => !ok).map(([n]) => n)
     }
-    // As Hive's transcripts give them: Claude Code's Bash and Codex's shell as the command itself; a Codex script's cmd.
+    // As Combwork's transcripts give them: Claude Code's Bash and Codex's shell as the command itself; a Codex script's cmd.
     expect(run(['Bash', 'node --test "greet.test.js"'])).toEqual([])
     expect(run(['Shell', 'node --test .\\greet.test.js'])).toEqual([])
     expect(run(['Script', 'text(await tools.exec_command({cmd:"git rev-parse --short HEAD; node --test greet.test.js"}))'])).toEqual([])
@@ -1788,7 +1788,7 @@ describe('the fixtures fail when nothing was done', () => {
   })
 })
 
-// A model trial the environment stops is skipped at once (#302): Hive waiting for a sign-in, or the CLI's own notes
+// A model trial the environment stops is skipped at once (#302): Combwork waiting for a sign-in, or the CLI's own notes
 // matched with the e2e runner's list (lib.cjs), never the prompt.
 describe('a trial the environment stops (trialEnvironment)', () => {
   const { trialEnvironment, environmentAdvice } = require('./scenarios/harness.cjs') as {
@@ -1802,7 +1802,7 @@ describe('a trial the environment stops (trialEnvironment)', () => {
     expect(environmentAdvice(why!, 'claude-code')).toMatch(/^sign in to Claude Code's test home .*, by hand$/)
   })
 
-  it('so is a usage limit, and Hive showing the session waiting for a sign-in', () => {
+  it('so is a usage limit, and Combwork showing the session waiting for a sign-in', () => {
     const why = trialEnvironment({ replies: ["You've hit your usage limit · resets 5pm (Europe/London)"] })
     expect(why).toMatch(/^usage or rate limit: /)
     expect(environmentAdvice(why!, 'claude-code')).toBe('run them again once the limit has reset')
@@ -1877,7 +1877,7 @@ describe('a trial the environment stops (trialEnvironment)', () => {
     })
   })
 
-  // HI-2225: Hive's relaunch of the session under test in a slot asked to trust that folder, unanswered, and the trial
+  // HI-2225: Combwork's relaunch of the session under test in a slot asked to trust that folder, unanswered, and the trial
   // ended waiting. HR2's round 1: the launch's run is the one session:start replied with, so a relaunch that came before
   // the prompt was taken is still a later run, whose question is answered.
   describe("a relaunch's trust question (relaunchTrust)", () => {
@@ -1918,7 +1918,7 @@ describe('a trial the environment stops (trialEnvironment)', () => {
     const { dirname, join } = require('path') as typeof import('path')
     const OAUTH = 'Failed to authenticate: OAuth session expired and could not be refreshed'
 
-    it('its last screen or the reason Hive gives: skipped for the environment, with the sign-in advice', () => {
+    it('its last screen or the reason Combwork gives: skipped for the environment, with the sign-in advice', () => {
       const why = launchEnded({ screen: `Claude Code ${OAUTH}` }).environment
       expect(why).toMatch(/^not signed in: /)
       expect(environmentAdvice(why!, 'claude-code')).toMatch(/^sign in to Claude Code's test home .*, by hand$/)
@@ -1930,7 +1930,7 @@ describe('a trial the environment stops (trialEnvironment)', () => {
       expect(launchEnded({ screen: 'Claude Code', auth: { loggedIn: false } }).environment).toMatch(/^not signed in: its auth status/)
     })
 
-    it('a concrete launch failure stays an error even when the test home is signed out too, from Hive or the screen', () => {
+    it('a concrete launch failure stays an error even when the test home is signed out too, from Combwork or the screen', () => {
       const bad = "error: option '--model <model>' argument 'x' is invalid."
       expect(launchEnded({ reason: bad, auth: { loggedIn: false } })).toEqual({ error: `the session ended at launch: ${bad}` })
       expect(launchEnded({ screen: `Claude Code ${bad}`, auth: { loggedIn: false } })).toEqual({ error: `the session ended at launch: ${bad}` })
@@ -1944,7 +1944,7 @@ describe('a trial the environment stops (trialEnvironment)', () => {
       expect(parseAuthStatus('not json')).toBeNull()
     })
 
-    it("asks the CLI Hive started, and keeps its answer when it exits with 1 signed out (the fake, in a test home)", () => {
+    it("asks the CLI Combwork started, and keeps its answer when it exits with 1 signed out (the fake, in a test home)", () => {
       const dir = tempDir('hive-auth-status-')
       const home = join(dir, 'home')
       mkdirSync(home)
@@ -1961,14 +1961,14 @@ describe('a trial the environment stops (trialEnvironment)', () => {
       expect(launchEnded({})).toEqual({ error: 'the session ended at launch' })
     })
 
-    it("reads the reason from Hive's log", () => {
+    it("reads the reason from Combwork's log", () => {
       const log = join(tempDir('hive-start-failure-'), 'hive.log')
       writeFileSync(log, `2026-10-11T08:24:30.000Z [INFO] [pty] spawn x\n2026-10-11T08:24:33.000Z [WARN] [sessions] ⁨alpha · Coder⁩: exited with code 1 before it started: ⁨${OAUTH}⁩\n`)
       expect(startFailureIn(log)).toBe(OAUTH)
       expect(startFailureIn(join(dirname(log), 'none.log'))).toBe('')
     })
   })
-  // Claude Code's transcript read as Hive reads it (its parser), then the notices the harness takes as the CLI's (#342):
+  // Claude Code's transcript read as Combwork reads it (its parser), then the notices the harness takes as the CLI's (#342):
   // a background task's summary or a command's output may talk about an expired sign-in or a limit without one.
   describe("the CLI's own notices, not what it relays (cliNotices, #342)", () => {
     const { cliNotices } = require('./scenarios/harness.cjs') as { cliNotices: (items: unknown) => string[] }
@@ -2005,7 +2005,7 @@ describe('a trial the environment stops (trialEnvironment)', () => {
   })
 })
 
-// Before reading Hive's metrics, the harness waits until they count every hive call the bridges logged (#527): the whole
+// Before reading Combwork's metrics, the harness waits until they count every hive call the bridges logged (#527): the whole
 // run on both sides, so a setup call reported before the scenario's baseline counts as reported, not missing.
 describe("every logged hive call reported (allCallsReported)", () => {
   const { allCallsReported } = require('./scenarios/harness.cjs') as { allCallsReported: (logged: { tool: string; direct?: boolean }[], metrics: unknown) => boolean }
@@ -2093,9 +2093,9 @@ describe('coordinator-lanes-to-end scoring', () => {
   })
 })
 
-// The coordinator scenarios' simulated wakes end as Hive's real one to the Assistant does while lanes run (#402).
+// The coordinator scenarios' simulated wakes end as Combwork's real one to the Assistant does while lanes run (#402).
 describe("the scenarios' simulated wake", () => {
-  it("ends with Hive's own lanes-running tail", async () => {
+  it("ends with Combwork's own lanes-running tail", async () => {
     const { lanesRunningTail } = await import('../src/shared/watch')
     expect(helpers.LANES_RUNNING_TAIL).toBe(lanesRunningTail())
   })
@@ -2136,7 +2136,7 @@ describe('mode-*-plans: a decision put to the user', () => {
   })
 })
 
-// fake-copilot's stand-in model starts just before Hive's launch; a launch that fails (or Copilot's environment before
+// fake-copilot's stand-in model starts just before Combwork's launch; a launch that fails (or Copilot's environment before
 // it) closes it at once, and the launch's own failure is what the run throws (#464).
 describe("Copilot's stand-in model when a scenario's launch fails (#464)", () => {
   it('is closed: nothing listens on its port after, and the launch failure is the one thrown', async () => {
