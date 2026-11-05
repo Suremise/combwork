@@ -124,18 +124,47 @@ const sendLanguage = (ctx, language) =>
   ctx.app.evaluate(({ BrowserWindow }, l) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', { type: 'language-changed', language: l }), language)
 
 /**
+ * The notices closed. Putting .git back (closeInit) raises "Version control changed in alpha" at the window's bottom
+ * right, over the Tags heading's Create tag button: where a language's label is long enough (fr, pl), the button's
+ * middle is under it and its click never lands (HI-2601).
+ */
+async function noNotices(ctx) {
+  const { page, lib } = ctx
+  const dismiss = () => page.locator('.toasts .toast .icon-btn').first().click({ timeout: 2000 }).then(() => false, () => false)
+  if (!(await lib.until(async () => (await page.locator('.toasts .toast').count()) === 0 || (await dismiss()), ctx.hungMs))) throw new Error("the notices didn't close")
+}
+
+/** The window back in the run's language, its switch landed (the page's lang). */
+async function restoreLanguage(ctx, info) {
+  await sendLanguage(ctx, info)
+  if (!(await ctx.lib.until(async () => (await ctx.page.evaluate(() => document.documentElement.lang)) === info.code, ctx.hungMs))) throw new Error(`the window didn't switch back to ${info.code}`)
+}
+
+/**
  * A Git form opened in English that then follows the change to the run's language (#804, round 1: an open form keeps
  * no text of its own). It opens with the window switched to English, takes some typing, and is switched back; what
  * was typed must stay. Under the pseudo-locale every message differs from its English, so its title, help, labels and
  * button must each change; a language may rightly keep a word ("URL") or not have it translated yet (English, its
  * fallback), so there only the switch landing (the page's lang) is waited for. Throws otherwise, so the screen isn't
- * reached. The form is left open in the run's language, for its screenshots.
+ * reached, with the window switched back to the run's language first, so the screens after it aren't in English
+ * (HI-2601). The form is left open in the run's language, for its screenshots.
  */
 async function formFollowsLanguage(ctx, action, what) {
-  const { page, lib } = ctx
   const info = (await ctx.inv('app:info')).language
+  if (info.code === 'en') return openFollowing(ctx, action, what, info)
+  try {
+    return await openFollowing(ctx, action, what, info)
+  } catch (e) {
+    await restoreLanguage(ctx, info).catch(() => {})
+    throw e
+  }
+}
+
+async function openFollowing(ctx, action, what, info) {
+  const { page, lib } = ctx
   const english = info.code === 'en'
   const pseudo = info.code === PSEUDO
+  await noNotices(ctx)
   if (!english) await sendLanguage(ctx, { ...info, code: 'en', locale: 'en', messages: {} })
   await page.locator(`[data-action="${action}"]`).first().click()
   const dialog = await shown(ctx, page.locator('.dialog', { has: page.locator('.git-form') }).last(), what)
