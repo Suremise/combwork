@@ -505,7 +505,7 @@ const commitIn = (dir, files, message, trailer) => {
     check("P's question is still open, and P still ZE-R1's: never released or given again", JSON.stringify(await assigned(p)) === JSON.stringify([zr1.id]) && !factsP.some((f) => f.kind === 'ReviewerReleased') && factsP.some((f) => f.kind === 'ApprovalRequested' && f.data.request === askReq) && !factsP.some((f) => f.kind === 'Approval'), JSON.stringify({ assigned: await assigned(p), forYou: openAsk?.forYou }))
     check('…and told of P once only', (await zToldOf(keyP)).filter((dv) => dv.state !== 'cancelled').length === 1, JSON.stringify(await zToldOf(keyP)))
     // The user answers; ZE-R1 passes P and Q: both Done.
-    await inv('tasks:answer', p, askReq, { outcome: 'answered', note: 'Yes' })
+    await inv('tasks:answer', p, askReq, { outcome: 'answered', reply: 'Yes' })
     await inv('watch:cancel', zeta, zr1.id)
     await idle(zeta, zr1.id)
     check('ZE-R1 passes P: Done', (await intent(tzr, p, 'verdict', { pass: true, comment: 'P: passed' })).status === 200 && !!(await until(async () => (await card(p))?.column === 'done', HUNG_MS)), (await card(p))?.column)
