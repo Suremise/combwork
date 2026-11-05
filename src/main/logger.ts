@@ -36,7 +36,7 @@ function file(name: string): string {
     f = join(dir, name)
     logFiles.set(name, f)
     // Said once the log has its file (HI-2612): after the line being written, never inside its write.
-    if (left.length) queueMicrotask(() => write('warn', 'logger', `The log's old files were left under their old names for the next start: ${left.join('; ')}`))
+    if (left.length) queueMicrotask(() => write('warn', 'logger', `The log's old files were left under their old names for the next start: ${left.join('; ')}`)) // i18n-ignore: a line in the app's own log, which stays English
   }
   return f
 }
