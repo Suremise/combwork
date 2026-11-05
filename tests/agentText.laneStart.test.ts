@@ -120,7 +120,7 @@ describe('the canary dialect over them (card 5)', () => {
     check('builder failed', await resumeLaneBuilder('C:/ws/alpha', { id: 'lane-1', builder: { id: 'b', name: 'B1' } }), ['B1', 'no CLI'])
     // Said where their code runs, through the launch and the start pass (laneStart.test.ts, laneStarts.test.ts): each
     // a single sentence the descriptor holds whole.
-    const elsewhere = ['brief.start.notGiven', 'brief.start.firstCard', 'brief.start.nextCard', 'brief.record.cleared', 'brief.record.inSlot', 'brief.record.delivered']
+    const elsewhere = ['brief.start.notGiven', 'brief.start.firstCard', 'brief.start.firstWithBrief','brief.start.nextCard', 'brief.record.cleared', 'brief.record.inSlot', 'brief.record.delivered']
     // Stored for any reader: the Default's, whatever the scope (below).
     const stored = ['brief.start.byUser', 'brief.start.fromUser', 'brief.start.retryCancel', 'finish.journal.done', 'finish.cancel.cardDone', 'restart.closed.fact']
     expect(mine.filter((id) => !seen.has(id) && !elsewhere.includes(id) && !stored.includes(id))).toEqual([])

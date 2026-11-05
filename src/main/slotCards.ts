@@ -1290,6 +1290,9 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
         w.action('notify', { text: english, shown: workflowText(SLOT_NOTICES.notPrepared, { slot: st.slot, card: card.card.key, why: r.error }) })
         wf.wake(w, st.builder, english)
       })
+      // A lane's first card started with its brief on a stopped builder (HI-2558): that builder started with its brief
+      // now, as the step-by-step start would have, so it reads the wake and learns why.
+      void import('./laneStart').then((m) => m.briefAfterFailedPrepare(ws, projectPath, n, builder)).catch((e) => log.warn(`#${n}'s lane brief after its slot failed`, e))
       return null
     }
     // Not now (busy, not quiet at the boundary): looked at again at the next change.
@@ -1775,6 +1778,11 @@ export async function settleRenames(pool: SlotPool): Promise<void> {
 }
 
 // --- Lanes.
+
+/** A slot's folder, by its name (HI-2558: whether a lane's idle builder already works in its slot). */
+export async function slotFolderOf(ws: WorkspaceService, projectPath: string, slot: string): Promise<string> {
+  return (await poolFor(ws, projectPath)).folderFor(slot)
+}
 
 /**
  * A lane's slot (#1438, §16.10.2), lent to its builder as Start Lane… starts it, before its agents start, and kept for the

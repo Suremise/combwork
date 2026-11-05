@@ -2,7 +2,8 @@
 // the Todo column's menu opens Start Lane with its cards in order (moved up and down there), Start records the lane and
 // starts both agents in fresh conversations with the generated brief (B1, running and idle, gets a new conversation; R1,
 // stopped, is started), the lane shows in the Progress panel, its menu has End Lane and Abandon Lane…, Abandon asks
-// first, End ends it; the Lanes tab's Start Lane… starts another, which Abandon ends. Screenshots of the dialog and the
+// first, End ends it; the Lanes tab's Start Lane… starts another, which Abandon ends. B1 is given its first card and its
+// brief in one task, one turn, with no "end your turn, it's coming" round (HI-2558). Screenshots of the dialog and the
 // lane's menu in both themes. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -133,6 +134,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await shoot('dialog', dialog)
 
     // --- Start: the lane recorded; both agents in a fresh conversation with their brief.
+    const startedAt = new Date().toISOString()
     await dialog.getByRole('button', { name: 'Start Lane' }).click()
     check('the dialog closes', !!(await until(async () => (await dialog.count()) === 0, HUNG_MS)), await dialog.locator('.dialog-error, .error').innerText().catch(() => ''))
     const lanes = async () => (await inv('lanes:list')).filter((l) => l.state === 'active' || l.state === 'paused')
@@ -143,9 +145,49 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
       return !!s?.sessionId && s.sessionId !== firstSession
     }, HUNG_MS)), JSON.stringify(await live(b1.id)))
     check('R1 is started', !!(await until(async () => !!(await live(r1.id)), HUNG_MS)))
-    check("B1's brief: the builder of the lane, card-loop as the builder, with R1", !!(await until(async () => /You are the builder of a lane in alpha that the user started: use the card-loop skill as the builder, with R1 as the reviewer/.test(await brief('B1')), HUNG_MS)), (await brief('B1')).slice(0, 400))
-    check("…B1 works in the lane's slot, a new branch per card (#1438)", /B1 works in slot-a, a new branch per card/.test(await brief('B1')), (await brief('B1')).slice(0, 600))
+    // B1's prompts in its new conversation (HI-2558: one doorbell), and what it read for them, whole, as the fake logs it
+    // (a delivery's listing shortens its body): its brief came with its first card.
+    const prompts = async () => {
+      const s = await live(b1.id)
+      const items = s?.sessionId ? ((await inv('transcript:read', alpha, s.sessionId).catch(() => null))?.items ?? []) : []
+      return items.filter((x) => x.kind === 'user')
+    }
+    const wakesFile = path.join(claudeHome, 'fake-wakes.jsonl')
+    const b1Read = () => (fs.existsSync(wakesFile) ? fs.readFileSync(wakesFile, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === 'B1' && (w.at ?? '') >= startedAt)
+    const b1Brief = async () => b1Read().map((w) => w.text ?? '').join('\n')
+    check("B1's brief: the builder of the lane, card-loop as the builder, with R1", !!(await until(async () => /You are the builder of a lane in alpha that the user started: use the card-loop skill as the builder, with R1 as the reviewer/.test(await b1Brief()), HUNG_MS)), (await b1Brief()).slice(0, 400))
+    check("…B1 works in the lane's slot, a new branch per card (#1438)", /B1 works in slot-a, a new branch per card/.test(await b1Brief()), (await b1Brief()).slice(0, 600))
     check("R1's brief: the reviewer of B1's lane", !!(await until(async () => /You are the reviewer of B1's lane in alpha/.test(await brief('R1')), HUNG_MS)), (await brief('R1')).slice(0, 400))
+
+    // --- HI-2558: B1's brief and its first card in one task, with no "end your turn, it's coming" round. Since the start
+    // B1 was given one task, its first card with the brief in it, placed in the lane's slot; once B1 is idle there
+    // nothing more is given (before, the brief came first and the card a turn later), and its new conversation has had
+    // one prompt, one turn.
+    const given = async () => {
+      const v = await api(`/v1/projects/alpha/agents/B1/deliveries?limit=20`)
+      return (v.items ?? v.deliveries ?? []).filter((d) => (d.created ?? '') >= startedAt && d.kind === 'task')
+    }
+    const placed = async () => ((await inv('tasks:facts', chosen[0])) ?? []).some((f) => f.kind === 'BuilderPlaced')
+    check(`B1's first card ${chosen[0]} is Active on B1 and placed in its slot`, !!(await until(async () => (await card(chosen[0]))?.column === 'doing' && (await placed()), HUNG_MS)), JSON.stringify({ card: await card(chosen[0]), facts: ((await inv('tasks:facts', chosen[0])) ?? []).map((f) => f.kind) }))
+    const idleInSlot = async () => {
+      const s = await live(b1.id)
+      return ['ready', 'finished'].includes(s?.status) && /slot-a$/i.test(s?.cwd ?? '')
+    }
+    check('…B1 idle in slot-a after its turn', !!(await until(idleInSlot, HUNG_MS)), JSON.stringify(await live(b1.id)))
+    // Looked at a few times as B1's status settles (another task would come now: the step-by-step start's card).
+    let tasks = []
+    for (let i = 0; i < 5; i++) {
+      await until(idleInSlot, HUNG_MS)
+      tasks = await given()
+      if (tasks.length !== 1) break
+    }
+    // A delivery's listing shortens its body (its text): its start is enough to tell the card's task with the brief.
+    const head = (d) => d.text ?? d.body ?? ''
+    check('…one task given to B1 since the start: its first card, the brief in it', tasks.length === 1 && tasks[0].card === chosen[0] && /it is your lane's first card, and your lane's brief follows/.test(head(tasks[0])), JSON.stringify(tasks.map((d) => ({ card: d.card, text: head(d).slice(0, 300) }))))
+    const one = await prompts()
+    check("…B1's new conversation has had one prompt (one turn), that task's", one.length === 1 && /New in your inbox: 1 task/.test(one[0].text ?? ''), JSON.stringify(one.map((x) => (x.text ?? '').slice(0, 160))))
+    const read = b1Read()
+    check('…what B1 read for it: the card, then its brief whole, no "End your turn now"', read.length === 1 && (read[0].text ?? '').startsWith('Work on task ') && /You are the builder of a lane in alpha/.test(read[0].text ?? '') && /The user's note: Keep the API stable\./.test(read[0].text ?? '') && !/End your turn now/.test(read[0].text ?? ''), JSON.stringify(read.map((w) => (w.text ?? '').slice(0, 160))))
 
     // --- The lane in the Progress panel; its menu: End Lane and Abandon Lane….
     await page.locator('.progress-rail').click().catch(() => undefined)
