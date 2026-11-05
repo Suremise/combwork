@@ -191,8 +191,8 @@ async function holdsCombwork(w: WorkspaceService): Promise<boolean> {
   for (const p of await w.listProjectPaths().catch(() => [] as string[])) {
     try {
       const pkg = JSON.parse(await readFile(join(p, 'package.json'), 'utf8')) as { name?: unknown; productName?: unknown }
-      // Its product name before and after the rename to Combwork (HI-2461, HI-2458).
-      if (pkg.name === 'hive' && (pkg.productName === 'Hive Desktop' || pkg.productName === 'Hive' || pkg.productName === 'Combwork')) return true
+      // Its package and product names (HI-2591: the repository's own, from 1.1; an older checkout's isn't asked for).
+      if (pkg.name === 'combwork' && pkg.productName === 'Combwork') return true
     } catch {
       // Not a Node project.
     }

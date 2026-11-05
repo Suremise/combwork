@@ -3,14 +3,16 @@
 ; Electron refuses to start from a folder whose permissions have an entry for an AppContainer package but none for
 ; ALL APPLICATION PACKAGES (S-1-15-2-1): Windows would deny its sandboxed processes access. Give it read access to the
 ; install folder, inherited by what it holds, on every install and update (electron-updater runs this installer too).
-; Hive checks again at start (src/main/installDir.ts), for a folder changed after installing.
+; Combwork checks again at start (src/main/installDir.ts), for a folder changed after installing.
 ;
 ; A local build's installer (#1647: npm run dist sets CW_LOCAL_BUILD=1, the release workflow 0; scripts/appIdentity.mjs)
-; also drops a downloaded update Hive was keeping (hive-updater\pending), so it isn't installed over this build later.
+; also drops a downloaded update Combwork was keeping (combwork-updater\pending, electron-updater's cache named after
+; package.json's name; hive-updater\pending before HI-2591), so it isn't installed over this build later.
 !macro customInstall
   nsExec::Exec '"$SYSDIR\icacls.exe" "$INSTDIR" /grant *S-1-15-2-1:(OI)(CI)(RX)'
   Pop $0
   !ifdef CW_LOCAL_BUILD
+    RMDir /r "$LOCALAPPDATA\combwork-updater\pending"
     RMDir /r "$LOCALAPPDATA\hive-updater\pending"
   !endif
 !macroend
