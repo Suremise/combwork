@@ -308,7 +308,7 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
     // The seals of jobs settled before this Hive started (HI-1723).
     sweepSealsOf(root, { once: true })
     // Writers a Hive that has gone left, settled where what was kept of their runs allows (HI-1886).
-    void made.settleGoneWriters().catch((e) => log.warn(`settling the slot writers of a Hive that has gone in ${userText(projectPath)}`, e))
+    void made.settleGoneWriters().catch((e) => log.warn(`settling the slot writers of a Combwork that has gone in ${userText(projectPath)}`, e))
     return made
   })()
   pools.set(key, { life: ws.lifetime, pool })

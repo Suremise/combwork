@@ -731,7 +731,7 @@ async function recoverHost(ws: WorkspaceService, host: string, root: string, out
       }
       if (!rec) {
         out.left++
-        log.warn(`${userText(dir)} has no record Hive wrote: left as it is`)
+        log.warn(`${userText(dir)} has no record Combwork wrote: left as it is`)
         continue
       }
       if (rec.kind === 'remove') {

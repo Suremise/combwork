@@ -28,8 +28,8 @@ export async function migrateAgentsPerProject(): Promise<void> {
     const next = withOldDefaults(levels, { maxAgents: old as number })
     if (JSON.stringify(next) !== JSON.stringify(levels ?? {})) {
       config.update((c) => void (c.settings.workflow = next))
-      if (!(await config.saveNow())) return log.warn("Agents per project stays in advanced.json: Hive's settings couldn't be saved with it as Maximum agents")
-      log.info(`Agents per project (${String(old)}) is Maximum agents in Hive's workflow defaults now`)
+      if (!(await config.saveNow())) return log.warn("Agents per project stays in advanced.json: Combwork's settings couldn't be saved with it as Maximum agents")
+      log.info(`Agents per project (${String(old)}) is Maximum agents in Combwork's workflow defaults now`)
     }
   }
   await advanced.dropLegacy(AGENTS_PER_PROJECT).catch((e) => log.warn("Couldn't drop Agents per project from advanced.json", e))

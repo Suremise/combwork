@@ -191,7 +191,7 @@ export async function untilJournalOpenable(home: string, signal: AbortSignal): P
   const onWait = (e: Error): void => {
     waiting = true
     journalTestHooks.openableWait?.(home)
-    log.warn(`the journal ${userText(file)} can't be opened yet: ${userText(e.message)} (SQLite code ${(e as { errcode?: number }).errcode}; another process still maps its -shm, as just after a Hive ended without quitting): waiting up to ${OPENABLE_WAIT_MS / 1000} s`)
+    log.warn(`the journal ${userText(file)} can't be opened yet: ${userText(e.message)} (SQLite code ${(e as { errcode?: number }).errcode}; another process still maps its -shm, as just after a Combwork ended without quitting): waiting up to ${OPENABLE_WAIT_MS / 1000} s`)
   }
   const waited = await untilOpenable(file, { onWait, signal })
   if (waiting) log.info(`the journal ${userText(file)}: ${signal.aborted ? 'its wait ended with its open' : 'openable'} after ${Math.round(waited)} ms`)

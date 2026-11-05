@@ -52,7 +52,7 @@ const START_SLACK_MS = 50
 /** The runner no longer holds its target's lease (another Hive took it over): it stops, writing nothing. */
 export class LeaseLost extends Error {
   constructor(readonly target: string) {
-    super(`the merge queue for ${target} is run by another Hive now`) // i18n-ignore: an internal error, caught by the queue's host and logged
+    super(`the merge queue for ${target} is run by another Combwork now`) // i18n-ignore: an internal error, caught by the queue's host and logged
   }
 }
 
@@ -664,7 +664,7 @@ export class QueueRunner {
       void locked(this.cfg, () => this.cfg.store.renewQueueLease(this.lease, this.token, new Date().toISOString()))
         .then((held) => {
           if (!held && !this.released) {
-            log.warn(`The merge queue for ${userText(this.target)} is run by another Hive now: this one stopped`)
+            log.warn(`The merge queue for ${userText(this.target)} is run by another Combwork now: this one stopped`)
             this.stop()
           }
         })

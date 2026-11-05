@@ -486,7 +486,7 @@ export function outrankNativeHive(files: string[], table: Record<string, unknown
     const n = native as Record<string, unknown>
     const http = Object.keys(n).filter((k) => HTTP_KEYS.includes(k))
     if (http.length) {
-      log.warn(`Codex has an HTTP MCP server named ${TOOLS_SERVER} in ${userText(file)} (${http.join(', ')}): Codex agents can't start beside Hive's own.`)
+      log.warn(`Codex has an HTTP MCP server named ${TOOLS_SERVER} in ${userText(file)} (${http.join(', ')}): Codex agents can't start beside Combwork's own.`)
       throw hiveError(NATIVE_HIVE, { file })
     }
     if ('enabled_tools' in n) out.enabled_tools = [...HIVE_TOOLS]
@@ -866,7 +866,7 @@ export class CodexAdapter implements ProviderAdapter {
     // depend on). Unreadable, buildCommand never puts anything in their place (developerOverride).
     if ([ctx.guidance, ctx.instructions, ctx.notes].some((t) => t && t.trim())) {
       const theirs = await developerInstructionsFromCodex(ctx.executable, ctx.cwd, [...launchConnectionArgs(ctx), ...ctx.extraArgs], ctx.env)
-      if (theirs === null) log.warn("Codex couldn't render the session's prompt to say which developer_instructions apply; Hive leaves them as they are")
+      if (theirs === null) log.warn("Codex couldn't render the session's prompt to say which developer_instructions apply; Combwork leaves them as they are")
       keepBounded(this.developerByRun, ctx.runId, theirs)
     }
     return delivered
@@ -929,7 +929,7 @@ export class CodexAdapter implements ProviderAdapter {
     // Codex couldn't be asked: Hive's own hashes are the best guess. Don't wait for it again this run.
     if (!theirs) {
       this.unreachable.add(version)
-      log.warn(`Codex ${version}: couldn't check hook hashes with its app server; using Hive's`)
+      log.warn(`Codex ${version}: couldn't check hook hashes with its app server; using Combwork's`)
       return
     }
     if (known === undefined) {
@@ -937,7 +937,7 @@ export class CodexAdapter implements ProviderAdapter {
       const same = HOOKS.every((h) => theirs[`${SESSION_FLAGS}:${h.label}:0:0`] === hookHash(h.label, h.matcher, command, hookTimeout(h.wait)))
       this.hashCheck.set(version, same)
       if (same) return
-      log.warn(`Codex ${version} hashes hooks differently from Hive; Hive asks Codex for the hashes on each launch`)
+      log.warn(`Codex ${version} hashes hooks differently from Combwork; Combwork asks Codex for the hashes on each launch`)
     }
     this.hashesByRun.set(ctx.runId, theirs)
   }
@@ -992,7 +992,7 @@ export class CodexAdapter implements ProviderAdapter {
       for (const name of theirs) {
         if (own.has(name)) continue
         if (/^[A-Za-z0-9_-]+$/.test(name)) args.push('-c', `mcp_servers.${name}.enabled=false`)
-        else log.warn(`Codex MCP server ${userText(name)} can't be turned off for Hive sessions (its name needs quoting).`)
+        else log.warn(`Codex MCP server ${userText(name)} can't be turned off for Combwork sessions (its name needs quoting).`)
       }
     }
     args.push(...ctx.extraArgs)

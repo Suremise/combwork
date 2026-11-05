@@ -314,7 +314,7 @@ export async function runListInWindow(win: BrowserWindow | null, point: NonNulla
   const r = await result
   clearInterval(tick)
   following.delete(id)
-  if (r === 'left') log.info(`${said}: Hive stopped waiting (Don't wait); the rest run on by themselves`)
+  if (r === 'left') log.info(`${said}: Combwork stopped waiting (Don't wait); the rest run on by themselves`)
   // A list that ended (done or stopped) goes; one whose runner went keeps its panel until it is closed.
   if (r === 'ok' || (r === 'failed' && panel.run.failure !== 'runner')) panel.end('dismissed')
   if (r === 'failed' && panel.run.failure === 'runner') await panel.ended
@@ -406,7 +406,7 @@ async function heldForTest(signal: AbortSignal): Promise<void> {
 
 async function closeAndRun(ws: WorkspaceService, op: CloseOp, plan: ReturnType<typeof planList>, win: BrowserWindow | null, values: CommandValues): Promise<RunOutcome> {
   const name = userText(basename(op.path))
-  if ('skip' in plan && plan.skip !== 'none') log.info(`${name}'s close commands not run: ${plan.skip === 'test' ? 'a test copy of Hive' : 'Hive is restarting for an update'}`)
+  if ('skip' in plan && plan.skip !== 'none') log.info(`${name}'s close commands not run: ${plan.skip === 'test' ? 'a test copy of Combwork' : 'Combwork is restarting for an update'}`)
   if ('gone' in plan && plan.gone) log.info(`${name}'s close point picks ${plan.gone} command(s) no longer there: left out`)
   const hasCommand = 'steps' in plan
   // The saving step's panel: up from the start when there is a command to run, or a caller needs it drained; brought up
@@ -417,14 +417,14 @@ async function closeAndRun(ws: WorkspaceService, op: CloseOp, plan: ReturnType<t
     if (panel) return
     panel = showPanel(win, { ...newRun('workspace', '', 'saving', basename(op.path)), point: 'close', ...(hasCommand ? { steps: plan.steps.map((s) => ({ name: s.name, state: 'waiting' as const, exitCode: null })) } : {}) })
     void panel.skipped.then(() => {
-      log.info(`${name}: the user skipped its close command; Hive finishes closing it`)
+      log.info(`${name}: the user skipped its close command; Combwork finishes closing it`)
       op.skip.abort()
     })
   }
   if (hasCommand || op.wantDrain) op.showSaving()
   const ended = (): void => (panel as Panel | null)?.end('dismissed')
   const skipped = (): RunOutcome => {
-    log.warn(`${name}: the user skipped the command, so ${hasCommand ? 'its close command' : 'When Hive quits, run'} won't run`)
+    log.warn(`${name}: the user skipped the command, so ${hasCommand ? 'its close command' : 'When Combwork quits, run'} won't run`)
     ended()
     return 'leftSaving'
   }
@@ -434,7 +434,7 @@ async function closeAndRun(ws: WorkspaceService, op: CloseOp, plan: ReturnType<t
   } catch (e) {
     // Nothing to run and nothing waiting on it: an ordinary close's failure, as before.
     if (!panel) throw e
-    log.warn(`${name}'s close failed, so ${hasCommand ? 'its close command' : 'When Hive quits, run'} won't run`, e)
+    log.warn(`${name}'s close failed, so ${hasCommand ? 'its close command' : 'When Combwork quits, run'} won't run`, e)
     if (hasCommand) return closeFailed(panel)
     ended()
     return 'notDrained'
@@ -448,7 +448,7 @@ async function closeAndRun(ws: WorkspaceService, op: CloseOp, plan: ReturnType<t
   op.drainedOk = d.drained
   if (op.skip.signal.aborted) return skipped()
   if (!d.drained) {
-    log.warn(`${name} wasn't finished being written (${d.left.join(', ')}), so ${hasCommand ? 'its close command' : 'When Hive quits, run'} won't run`)
+    log.warn(`${name} wasn't finished being written (${d.left.join(', ')}), so ${hasCommand ? 'its close command' : 'When Combwork quits, run'} won't run`)
     ended()
     return 'notDrained'
   }
@@ -466,15 +466,15 @@ async function closeAndRun(ws: WorkspaceService, op: CloseOp, plan: ReturnType<t
 export async function runQuitCommand(commands: CommandsHive, reason: CloseReason, win: BrowserWindow | null, blocked: 'failed' | 'left' | null): Promise<RunOutcome> {
   const plan = planList(commands.onQuit, { hive: commands.list }, reason, { runs: closeCommandsRun() })
   if ('skip' in plan) {
-    if (plan.skip !== 'none') log.info(`When Hive quits, run: not run (${plan.skip === 'test' ? 'a test copy of Hive' : 'Hive is restarting for an update'})`)
+    if (plan.skip !== 'none') log.info(`When Combwork quits, run: not run (${plan.skip === 'test' ? 'a test copy of Combwork' : 'Combwork is restarting for an update'})`)
     return 'skipped'
   }
   if (blocked === 'left') {
-    log.info("When Hive quits, run: not run, as the user didn't wait for a workspace to finish saving")
+    log.info("When Combwork quits, run: not run, as the user didn't wait for a workspace to finish saving")
     return 'leftSaving'
   }
   if (blocked) {
-    log.warn("When Hive quits, run: not run, as a workspace's close didn't finish")
+    log.warn("When Combwork quits, run: not run, as a workspace's close didn't finish")
     return closeFailed(showPanel(win, { ...newRun('quit', '', 'failed'), point: 'quit', steps: plan.steps.map((s) => ({ name: s.name, state: 'waiting' as const, exitCode: null })) }))
   }
   return runListInWindow(win, 'quit', null, plan.steps, () => ({ reason }))

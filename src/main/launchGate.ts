@@ -27,13 +27,13 @@ const GATE_SCRIPT = `
 $pipe = $env:HIVE_GATE_PIPE; $file = $env:HIVE_GATE_FILE; $argline = $env:HIVE_GATE_ARGS
 foreach ($n in @('HIVE_GATE_PIPE', 'HIVE_GATE_FILE', 'HIVE_GATE_ARGS')) { [Environment]::SetEnvironmentVariable($n, $null) }
 $word = $null
-$why = 'Hive gave no word to start it'
+$why = 'Combwork gave no word to start it'
 try {
   $c = [System.IO.Pipes.NamedPipeClientStream]::new('.', $pipe, [System.IO.Pipes.PipeDirection]::InOut)
   $c.Connect(${CONNECT_MS})
   $word = [System.IO.StreamReader]::new($c).ReadLine()
   $c.Dispose()
-} catch { $why = "its connection to Hive failed ($($_.Exception.InnerException.Message))" }
+} catch { $why = "its connection to Combwork failed ($($_.Exception.InnerException.Message))" }
 if ($word -ne 'go') {
   if ($word -and $word.StartsWith('stop ')) { $why = $word.Substring(5) }
   [Console]::Error.WriteLine("Error: Combwork didn't start $([System.IO.Path]::GetFileName($file)): $why")

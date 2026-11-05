@@ -175,7 +175,7 @@ describe('diagnosticRecording', () => {
   it("takes a redacted recording's newest events, every string redacted again", async () => {
     const part = diagnosticRecording(await record(false), (s) => s.split(alpha).join('<folder>').replace('alpha · B1', '<agent>'))
     expect(part?.lines).toHaveLength(3)
-    expect(part?.summary).toMatch(/^session source \(claude-code\), started 2026-10-12T09:00:00.000Z, Hive 0.7.0; 3 events, ended \(stopped\); CLIs: claude-code 2.1.296 \(tested with 2.1.296\); redacted; the newest 3$/)
+    expect(part?.summary).toMatch(/^session source \(claude-code\), started 2026-10-12T09:00:00.000Z, Combwork 0.7.0; 3 events, ended \(stopped\); CLIs: claude-code 2.1.296 \(tested with 2.1.296\); redacted; the newest 3$/)
     expect(part?.lines.join('\n')).not.toContain(alpha.replace(/\\/g, '\\\\'))
     // Its paths (cwd, transcript_path) go whole (HI-2332), before redact sees them.
     expect(part?.lines.join('\n')).toContain('"cwd":"<path>"')

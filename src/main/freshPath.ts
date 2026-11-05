@@ -123,7 +123,7 @@ export function refreshPath(): Promise<string[]> {
       const { value, added } = mergePath(process.env[key] ?? '', fresh)
       if (added.length) {
         process.env[key] = value
-        log.info(`Added to Hive's PATH from the registry: ${userText(added.join(delimiter))}`)
+        log.info(`Added to Combwork's PATH from the registry: ${userText(added.join(delimiter))}`)
       }
       return added
     })
@@ -153,7 +153,7 @@ export function noteCliFolder(id: string, executable: string | null): void {
   if (folder) cliFolders.set(id, folder)
   else cliFolders.delete(id)
   if (folder && !mergePath(process.env.PATH ?? process.env.Path ?? '', [folder]).added.length) return
-  if (folder) log.info(`A CLI found off Hive's PATH: what Hive starts gets its folder, ${userText(folder)}`)
+  if (folder) log.info(`A CLI found off Combwork's PATH: what Combwork starts gets its folder, ${userText(folder)}`)
 }
 
 /**

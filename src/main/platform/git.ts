@@ -750,7 +750,7 @@ export async function moveLineLocked(folder: string, to: string, expect: { line:
       return (e as Error).message
     }
     // 2. The branch, only from the head checked (compare and swap).
-    const ref = await git(folder, ['update-ref', '-m', 'Hive: up to date after a squash merge', `refs/heads/${expect.line}`, to, expect.head])
+    const ref = await git(folder, ['update-ref', '-m', 'Combwork: up to date after a squash merge', `refs/heads/${expect.line}`, to, expect.head])
     if (!ref.ok) {
       // The branch moved on (not through this worktree's index): its files back as they were, nothing moved.
       if (!(await filesBack())) throw new LineMoveBroken(`the files of ${expect.line} couldn't be put back after its branch moved on`) // i18n-ignore: a log line's reason
@@ -770,7 +770,7 @@ export async function moveLineLocked(folder: string, to: string, expect: { line:
       }
     }
     // Not published: the branch back to the head (only if still where this moved it), the files with it.
-    const back = await git(folder, ['update-ref', '-m', 'Hive: put back, its index not written', `refs/heads/${expect.line}`, expect.head, to])
+    const back = await git(folder, ['update-ref', '-m', 'Combwork: put back, its index not written', `refs/heads/${expect.line}`, expect.head, to])
     if (!back.ok || !(await filesBack())) throw new LineMoveBroken(`${expect.line} was moved to ${to.slice(0, 7)} but its index couldn't be written (${failed?.message}), and it couldn't be put back`) // i18n-ignore: a log line's reason
     return failed?.message ?? 'the index could not be written' // i18n-ignore: a reason, agent- and log-facing
   } finally {

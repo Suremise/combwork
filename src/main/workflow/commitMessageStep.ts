@@ -83,9 +83,9 @@ export async function settleGlobalCommitMessage(): Promise<void> {
   })
   if (!(await config.saveNow())) {
     // Not recorded on disk: the next start runs it again (dropping a 'hive' again is the same change).
-    return log.warn("Hive's workflow defaults couldn't be saved with the branch's own commit messages: tried again at the next start")
+    return log.warn("Combwork's workflow defaults couldn't be saved with the branch's own commit messages: tried again at the next start")
   }
-  if (next) log.info("Hive's workflow defaults now merge with the branch's own commit messages (HI-1997)")
+  if (next) log.info("Combwork's workflow defaults now merge with the branch's own commit messages (HI-1997)")
 }
 
 /**

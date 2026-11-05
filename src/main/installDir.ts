@@ -254,7 +254,7 @@ const windowsTools: InstallDirTools = {
     setLanguageBeforeReady()
     tellCantStart(dir, file)
   },
-  exit: (code) => exitBy('process.exit', "Hive can't start from its install folder", () => process.exit(code))
+  exit: (code) => exitBy('process.exit', "Combwork can't start from its install folder", () => process.exit(code))
 }
 
 /**

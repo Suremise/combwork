@@ -186,7 +186,7 @@ if (testQuiet()) app.commandLine.appendSwitch('disable-features', 'CalculateNati
 chooseStartLanguage(config.savedLanguage())
 
 if (!app.requestSingleInstanceLock()) {
-  exitBy('process.exit', 'Hive is already running: this start brings it forward', () => {
+  exitBy('process.exit', 'Combwork is already running: this start brings it forward', () => {
     app.quit()
     process.exit(0)
   })
@@ -527,7 +527,7 @@ async function requestQuit(opts: { force?: boolean; intent?: 'update' | 'restart
   if (asking) {
     // A dialog is already open: just bring it forward. Its answer is about what it asked: this request's install or
     // restart is dropped, never kept for a later quit (HI-2427); its notice keeps Restart and Update.
-    if (opts.intent) log.info(`${forUpdate ? 'Restart and Update' : 'Restart Hive'} while a question is open: brought it forward, not kept for a later quit`)
+    if (opts.intent) log.info(`${forUpdate ? 'Restart and Update' : 'Restart Combwork'} while a question is open: brought it forward, not kept for a later quit`)
     showWindow(asking.win)
     return
   }
@@ -720,7 +720,7 @@ async function quitNow(tellUser: boolean): Promise<void> {
   stopRestartRecovery()
   stopWatchingRestartRequests()
   const reason: RestartReason = quitReason ?? (installOnQuit || installsOnQuit() ? 'update' : relaunchOnQuit ? 'restart' : 'quit')
-  await recordClosing(reason).catch((e) => log.warn('recording the agents as Hive closes', e))
+  await recordClosing(reason).catch((e) => log.warn('recording the agents as Combwork closes', e))
   await sessions.stopAllAndWait(3000)
   await quitLeftovers()
   // The stopped runs' slot writers released before the workspaces close (HI-1801): their outcomes are known by now.
@@ -729,13 +729,13 @@ async function quitNow(tellUser: boolean): Promise<void> {
   await releaseQueueRunners()
   // Codex's checks (HI-1757): those under way settled, each held one's end tried once more (bounded); what is left ends
   // with its job (kill on close) as Hive exits.
-  await stopCodexChecks().catch((e) => log.warn("ending Codex's checks as Hive closes", e))
+  await stopCodexChecks().catch((e) => log.warn("ending Codex's checks as Combwork closes", e))
   await slotsQuiet
   await usageHistory.stop()
   await progress.saveNow().catch(() => undefined)
   await flushMetrics().catch(() => undefined)
   // The close commands (HI-1368), each window's and then When Hive quits, waited for as their panels say.
-  await closeCommandsOnQuit(reason === 'update' ? 'update' : 'quit').catch((e) => log.warn('running the close commands as Hive quits', e))
+  await closeCommandsOnQuit(reason === 'update' ? 'update' : 'quit').catch((e) => log.warn('running the close commands as Combwork quits', e))
   await config.flush()
   // Apps that find Hive by its discovery file stop looking for this one (#620).
   await clearDiscovery()
@@ -761,7 +761,7 @@ async function closeCommandsOnQuit(reason: CloseReason): Promise<void> {
   // When Hive quits runs only once every workspace has closed and drained, theirs with a command or not (HR6's round 1).
   // No timer: each window's saving step shows, and its Don't wait is the user's (Darren's decision, 28 Oct ~14:15).
   const drain = quitCommandPlanned(global, reason)
-  const outcomes = await Promise.all(entries.map((e) => closeWithCommand(e.ws, reason, e.win, { drain }).catch((err): RunOutcome => (log.warn("closing a window's workspace as Hive quits", err), 'notDrained'))))
+  const outcomes = await Promise.all(entries.map((e) => closeWithCommand(e.ws, reason, e.win, { drain }).catch((err): RunOutcome => (log.warn("closing a window's workspace as Combwork quits", err), 'notDrained'))))
   const last = lastFocused() ?? entries[0]
   await runQuitCommand(global, reason, last?.win ?? null, outcomes.includes('notDrained') ? 'failed' : outcomes.includes('leftSaving') ? 'left' : null)
 }
@@ -810,7 +810,7 @@ async function quitLeftovers(): Promise<void> {
   }
   // The runs seen ended, the stopped launches' jobs looked at until empty (at most 5 s), kept (HI-1886): the next start
   // settles their slot writers if their releases aren't written before Hive exits.
-  await recordEndedLaunches().catch((e) => log.warn('keeping the ended runs for their slot writers as Hive quits', e))
+  await recordEndedLaunches().catch((e) => log.warn('keeping the ended runs for their slot writers as Combwork quits', e))
   await leftoversSaved()
   stopOrphanWatch()
   closeProcessTracking()
@@ -1035,7 +1035,7 @@ app.whenReady().then(async () => {
   // hive-progress on every session's PATH (#137): shims in Hive's bin folder, timings beside them.
   void installShims(join(app.getPath('userData'), 'bin'), { exec: process.execPath, script: unpackedScript('cw-progress.js'), data: join(app.getPath('userData'), 'progress') }).then((dir) => {
     sessions.binDir = dir
-    if (!dir) log.warn("Couldn't write the hive-progress command into Hive's bin folder; sessions start without it")
+    if (!dir) log.warn("Couldn't write the cw-progress command into Combwork's bin folder; sessions start without it")
   })
   /** Tests only (development builds): where the hive MCP servers log the calls they ran (tests/scenarios). */
   const testMcpLog = (): Record<string, string> => (!app.isPackaged && process.env.HIVE_TEST_MCP_LOG ? { HIVE_TEST_MCP_LOG: process.env.HIVE_TEST_MCP_LOG } : {})
@@ -1317,17 +1317,17 @@ app.whenReady().then(async () => {
     setTimeout(() => {
       reportsReady = true
       for (const r of corruptReports.splice(0)) showCorrupt(...r)
-      void offerRestoredLeftovers().catch((e) => log.warn('offering what agents left running before Hive restarted', e))
-      void tellUnexpectedClose().catch((e) => log.warn('telling Hive closed unexpectedly', e))
+      void offerRestoredLeftovers().catch((e) => log.warn('offering what agents left running before Combwork restarted', e))
+      void tellUnexpectedClose().catch((e) => log.warn('telling Combwork closed unexpectedly', e))
       void startRestartRecovery().catch((e) => log.warn('resuming the agents a restart recorded', e))
-      void startProfileNotices().catch((e) => log.warn('telling which profile folders Hive uses', e))
+      void startProfileNotices().catch((e) => log.warn('telling which profile folders Combwork uses', e))
     }, 1500)
   })
   if (!first) {
-    void offerRestoredLeftovers().catch((e) => log.warn('offering what agents left running before Hive restarted', e))
-    void tellUnexpectedClose().catch((e) => log.warn('telling Hive closed unexpectedly', e))
+    void offerRestoredLeftovers().catch((e) => log.warn('offering what agents left running before Combwork restarted', e))
+    void tellUnexpectedClose().catch((e) => log.warn('telling Combwork closed unexpectedly', e))
     void startRestartRecovery().catch((e) => log.warn('resuming the agents a restart recorded', e))
-    void startProfileNotices().catch((e) => log.warn('telling which profile folders Hive uses', e))
+    void startProfileNotices().catch((e) => log.warn('telling which profile folders Combwork uses', e))
   }
   createTray(() => lastFocused()?.win ?? null, {
     quit: () => void requestQuit(),

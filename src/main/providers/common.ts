@@ -310,10 +310,10 @@ async function syncAgentsSkillsNow(ctx: LaunchContext, cli: string): Promise<Rec
     // Hive's record of the copy (#1431): only one that is exactly what Hive wrote (its content its marker's hash), so a
     // copy edited since keeps its old record and is never taken for Hive's own.
     const revision = out[s.name].revision
-    if (ctx.copies && revision && (await skillMarker(join(dir, folder))) === revision) await ctx.copies.record(ctx.cwd, ctx.projectPath, s.name, revision).catch((e) => log.warn(`Could not record Hive's copy of ${userText(s.name)} for ${cli}`, e))
+    if (ctx.copies && revision && (await skillMarker(join(dir, folder))) === revision) await ctx.copies.record(ctx.cwd, ctx.projectPath, s.name, revision).catch((e) => log.warn(`Could not record Combwork's copy of ${userText(s.name)} for ${cli}`, e))
   }
   // Keeping the copies out of git: a failure here changes nothing about what was delivered.
-  await excludeCopies(ctx.cwd).catch((e) => log.warn(`Could not add Hive's ${cli} skill copies to git's exclude file`, e))
+  await excludeCopies(ctx.cwd).catch((e) => log.warn(`Could not add Combwork's ${cli} skill copies to git's exclude file`, e))
   return out
 }
 
@@ -326,7 +326,7 @@ async function syncAgentsSkillsNow(ctx: LaunchContext, cli: string): Promise<Rec
  * (null: it stays), which retireCopy checks again as it goes: an edit made meanwhile keeps it.
  */
 async function ownCopies(folder: string, project: string, book: SkillCopyBook | undefined): Promise<(skill: string, prefix?: string) => Promise<string | null>> {
-  const records = book ? await book.of(folder).catch((e) => (log.warn("Could not read Hive's record of its skill copies", e), null)) : undefined
+  const records = book ? await book.of(folder).catch((e) => (log.warn("Could not read Combwork's record of its skill copies", e), null)) : undefined
   return async (skill, prefix = COPY_PREFIX) => {
     if (records === null) return null
     const dest = agentsSkillCopyPath(folder, skill, prefix)
@@ -400,7 +400,7 @@ export async function removeHiveCopies(folder: string, project: string, book: Sk
         }
       } catch (e) {
         // In use (a CLI run on its own there has a file open): it stays, and goes at a later clean-up.
-        log.warn(`Could not remove Hive's copy of ${userText(skill)} from ${userText(folder)}; trying again later`, e)
+        log.warn(`Could not remove Combwork's copy of ${userText(skill)} from ${userText(folder)}; trying again later`, e)
       }
     }
     return removed
@@ -437,7 +437,7 @@ async function deliverSkill(s: LaunchContext['skills'][number], dest: string, fo
   if (had === null) {
     // Not marked: the user's own folder, unless it is an unchanged copy from before markers.
     if ((await revision()) !== hash) {
-      log.warn(`Not copying skill ${userText(s.name)} for ${cli}: ${userText(dest)} is not Hive's copy.`)
+      log.warn(`Not copying skill ${userText(s.name)} for ${cli}: ${userText(dest)} is not Combwork's copy.`)
       return { revision: null, problem: `a folder of the user's in .agents/skills is named ${folder}`, lasting: true } // i18n-ignore: the skills' launch record, which agents read (the Agent API's status): guidance.ts
     }
     await writeFile(join(dest, COPY_MARKER), JSON.stringify({ source: s.sourcePath, hash }) + '\n')

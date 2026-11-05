@@ -79,7 +79,7 @@ function set(next: GitTool): void {
   current = next
   if (!changed) return
   if (next.state === 'ok') log.info(`Git ${next.version}`)
-  else log.warn(next.state === 'missing' ? "Git isn't on Hive's PATH" : next.state === 'old' ? `Git ${next.version} is older than Hive needs` : `Couldn't check git: ${next.error ?? 'unknown'}`)
+  else log.warn(next.state === 'missing' ? "Git isn't on Combwork's PATH" : next.state === 'old' ? `Git ${next.version} is older than Combwork needs` : `Couldn't check git: ${next.error ?? 'unknown'}`)
   emit({ type: 'git-tool', git: next })
 }
 
@@ -136,7 +136,7 @@ export async function realGit(said: string, onPath: string | null, run: CheckRun
   if (!real) return PATH_GIT
   const same = (await run(real.exe, ['--version'])) ?? ''
   if (same.trim() !== said.trim()) {
-    log.warn(`Git for Windows' git.exe beside its launcher said ${JSON.stringify(same.trim().slice(0, 80))}, not ${JSON.stringify(said.trim())}: Hive starts git through the launcher`)
+    log.warn(`Git for Windows' git.exe beside its launcher said ${JSON.stringify(same.trim().slice(0, 80))}, not ${JSON.stringify(said.trim())}: Combwork starts git through the launcher`)
     return PATH_GIT
   }
   log.info(`Git: starting ${userText(real.exe)} directly, not through its launcher`)

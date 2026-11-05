@@ -216,14 +216,14 @@ export function spawnPty(key: string, opts: SpawnOptions): IPty {
     whenPid(proc, (pid) => {
       log.info(`started ${userText(key)}: process ${pid}`)
       // i18n-ignore: the launch gate's reason, printed in the terminal by its script in English (launchGate.ts, CLI-facing)
-      const word: Promise<GateWord> = pid ? track(pid, exited.signal) : Promise.resolve({ go: false, reason: 'Hive never learned the id of the process it started' })
+      const word: Promise<GateWord> = pid ? track(pid, exited.signal) : Promise.resolve({ go: false, reason: 'Combwork never learned the id of the process it started' })
       gate?.open(word)
     })
   proc.onExit(({ exitCode }) => {
     exited.abort()
     gate?.close()
     // No code: its terminal closed while its process (pid) may still run (#551).
-    log.info(`exit ${userText(key)}: ${exitCode}${exitCode === undefined ? ` (process ${proc.pid}${processRunning(proc.pid) ? ' still running' : ' gone'}${entry.killed ? '' : ', not killed by Hive'})` : ''}`)
+    log.info(`exit ${userText(key)}: ${exitCode}${exitCode === undefined ? ` (process ${proc.pid}${processRunning(proc.pid) ? ' still running' : ' gone'}${entry.killed ? '' : ', not killed by Combwork'})` : ''}`)
     if (entries.get(key)?.proc === proc) entries.delete(key)
     if (opts.quietExit) remember(carried, key, entry.buffer, MAX_CARRIED)
     else sendPty('pty:exit', key, exitCode)

@@ -476,7 +476,7 @@ async function attachmentsRoot(host: string): Promise<string | null> {
   const st = await lstat(root).catch(() => null)
   if (!st) return null
   if (st.isSymbolicLink() || !st.isDirectory() || !insideReal(root, [host])) {
-    log.warn(`${userText(root)} is a link to another folder: Hive leaves it alone`)
+    log.warn(`${userText(root)} is a link to another folder: Combwork leaves it alone`)
     return null
   }
   return root

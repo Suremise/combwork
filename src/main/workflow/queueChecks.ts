@@ -521,7 +521,7 @@ export const execCommand = (o: { spawn: Spawn; platform: NodeJS.Platform; timeou
     try {
       const env = o.env()
       if (!programFound(command, env, folder, o.platform)) {
-        log.write(Buffer.from(`Hive couldn't find the program this command starts: ${command}\n`)) // i18n-ignore: the run's log, beside the command's own output
+        log.write(Buffer.from(`Combwork couldn't find the program this command starts: ${command}\n`)) // i18n-ignore: the run's log, beside the command's own output
         return done({ spawnError: true, notFound: true, exitCode: null, signal: null })
       }
       const sh = shellSpec(command, env, o.platform)

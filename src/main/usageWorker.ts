@@ -150,7 +150,7 @@ async function whenOpenable(file: string, noWait = false): Promise<boolean> {
     let waiting = false
     const onWait = (e: Error): void => {
       waiting = true
-      log('warn', `the usage history can't be opened yet: ${e.message} (SQLite code ${(e as { errcode?: number }).errcode}; another process still maps its -shm, as just after a Hive ended without quitting): waiting up to ${OPENABLE_WAIT_MS / 1000} s`, file)
+      log('warn', `the usage history can't be opened yet: ${e.message} (SQLite code ${(e as { errcode?: number }).errcode}; another process still maps its -shm, as just after a Combwork ended without quitting): waiting up to ${OPENABLE_WAIT_MS / 1000} s`, file)
     }
     const entry: Openable = { wait: Promise.resolve(), stop, closed: false }
     entry.wait = untilOpenable(file, { onWait, signal: stop.signal }).then((ms) => {
@@ -199,7 +199,7 @@ function readOnly(file: string): boolean {
   if (db.newer === null) return false
   if (!warnedNewer.has(file.toLowerCase())) {
     warnedNewer.add(file.toLowerCase())
-    log('warn', `usage history: saved by a newer Hive (schema ${db.newer}), so this one only reads it`, file)
+    log('warn', `usage history: saved by a newer Combwork (schema ${db.newer}), so this one only reads it`, file)
   }
   return true
 }

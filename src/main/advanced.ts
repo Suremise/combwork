@@ -109,7 +109,7 @@ export class AdvancedStore {
         // Old hive.* ids read as their cw.* ones (HI-2518) are written back under the new ids, in the same queued write.
         this.recordsDue = JSON.stringify(made) !== JSON.stringify(parsed.madeFor) || parsed.renamed.length > 0
         if (parsed.renamed.length) log.info(`advanced.json: moved ${parsed.renamed.length} setting(s) to their cw.* ids (${parsed.renamed.join(', ')})`)
-        if (this.unknown.length) log.warn(`advanced.json names settings this Hive doesn't know: ${this.unknown.join(', ')}`)
+        if (this.unknown.length) log.warn(`advanced.json names settings this Combwork doesn't know: ${this.unknown.join(', ')}`)
       }
     }
     this.warned.clear()
@@ -451,7 +451,7 @@ export function bindAdvancedSettings(cfg: { settings: AppSettings; updateSetting
       .transact(async () => {
         for (const d of bound) if (migrating.has(d.id) && advanced.overrides()[d.id] === undefined) await advanced.setNow(d.id, settingOf(d, cfg.settings))
       })
-      .catch((e) => log.warn("Couldn't keep Hive's settings in advanced.json", e))
+      .catch((e) => log.warn("Couldn't keep Combwork's settings in advanced.json", e))
   fromFile()
   advanced.onChange(fromFile)
   // A change of the setting that doesn't come from the file (made without updateSettingsChecked) would leave the two

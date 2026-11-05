@@ -45,7 +45,7 @@ export async function changingFolder<T>(folder: string, what: string, fn: () => 
   } finally {
     fences.delete(fence)
     release()
-    log.info(`${userText(folder)}: ${what} done, ${Date.now() - t0} ms; Hive's lines and starts there go on`)
+    log.info(`${userText(folder)}: ${what} done, ${Date.now() - t0} ms; Combwork's lines and starts there go on`)
     for (const tell of lifted) {
       try {
         tell(folder)

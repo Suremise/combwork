@@ -105,7 +105,7 @@ export function checkLastRun(file = markerFile()): UnexpectedClose | null {
   if (m && m.hive && m.hive !== app.getVersion() && found.agents.length) adoptInstalledRun(found.agents, m.hive, found.lastSeen)
   // The agents a restart's record has (restartResume.ts owns their resume): not resumed from here too.
   toResume = found.agents.filter((a) => !ownsResume(a.projectPath, a.agentId))
-  log.warn(`The last run of Hive ended without quitting: last seen ${found.lastSeen}${m ? ` (Hive ${m.hive}, started ${m.startedAt})` : ' (its marker could not be read)'}; ${found.agents.length} agent(s) were running${found.agents.length ? `: ${found.agents.map((a) => `${userText(a.agentName)} in ${userText(a.project)}`).join(', ')}` : ''}${dump ? `; a crash dump from ${new Date(dump.at).toISOString()}` : '; no crash dump'}`) // i18n-ignore: a line of hive.log
+  log.warn(`The last run of Combwork ended without quitting: last seen ${found.lastSeen}${m ? ` (Combwork ${m.hive}, started ${m.startedAt})` : ' (its marker could not be read)'}; ${found.agents.length} agent(s) were running${found.agents.length ? `: ${found.agents.map((a) => `${userText(a.agentName)} in ${userText(a.project)}`).join(', ')}` : ''}${dump ? `; a crash dump from ${new Date(dump.at).toISOString()}` : '; no crash dump'}`) // i18n-ignore: a line of hive.log
   return found
 }
 
@@ -353,7 +353,7 @@ async function tellAssistants(c: UnexpectedClose, r: ResumeReport | null, still:
     if (!existsSync(join(dataFolder(home, 'assistant'), 'project.json'))) continue
     // Its workspace may be open in no window now (#1395): left on a lease, for its next open, not admitted for this.
     // Stored for its next start: the Default's words until stored text is said when read (5b, 6b).
-    await leaveDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body: inDefaultDialect(() => assistantLine(c, r, still)) }).catch((e) => log.warn('telling the Assistant Hive closed unexpectedly', e))
+    await leaveDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body: inDefaultDialect(() => assistantLine(c, r, still)) }).catch((e) => log.warn('telling the Assistant Combwork closed unexpectedly', e))
   }
 }
 
@@ -403,11 +403,11 @@ export async function tellUnexpectedClose(): Promise<void> {
 export async function stopLeftAfterClose(): Promise<number> {
   // After any click still going (#1028): it sees what that one left, never a list from before it.
   const { stopped, left, tried } = await leftovers.click()
-  if (stopped) log.info(`Stopped ${stopped} process(es) the agents had started before Hive closed unexpectedly`)
+  if (stopped) log.info(`Stopped ${stopped} process(es) the agents had started before Combwork closed unexpectedly`)
   const n = left.running.length
   const u = left.unverified.length
-  if (n) log.warn(`Couldn't stop ${n} process(es) the agents had started before Hive closed unexpectedly`)
-  if (u && tried) log.warn(`${u} process(es) a test run had started may still run: Windows let Hive neither end nor check them (ids ${left.unverified.join(', ')})`)
+  if (n) log.warn(`Couldn't stop ${n} process(es) the agents had started before Combwork closed unexpectedly`)
+  if (u && tried) log.warn(`${u} process(es) a test run had started may still run: Windows let Combwork neither end nor check them (ids ${left.unverified.join(', ')})`)
   // A test run's child Hive could neither end nor check may still run: never a success (#1008), on any click (#1028).
   if (!n && !u && !tried) return 0
   const ids = fmt.list(left.unverified.map(String))

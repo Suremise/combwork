@@ -418,7 +418,7 @@ function load(ws: WorkspaceService): Promise<Store> {
           delete rec.fired.sending
           rec.fired.again = true
           migrated = true
-          log.info(`The wake for ${userText(rec.agentId)} was being typed when Hive stopped: it is offered once more, saying it may repeat`)
+          log.info(`The wake for ${userText(rec.agentId)} was being typed when Combwork stopped: it is offered once more, saying it may repeat`)
         }
         list.push({ ...rec, scope: scopeFor(ws, rec.projectPath) })
       }

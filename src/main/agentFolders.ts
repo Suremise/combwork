@@ -531,13 +531,13 @@ export async function goneWriterSettles(projectPath: string, w: { run: string; a
   const me = await writerHost.self()
   if ((w.pid === me.pid && w.started === me.started) || (await writerHost.alive(w.pid, w.started)) !== false) return false
   if (await endedEarlier(w.run)) {
-    log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} of a Hive that has gone (process ${w.pid}) settled: its processes were seen to end`)
+    log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} of a Combwork that has gone (process ${w.pid}) settled: its processes were seen to end`)
     return Object.freeze({ run: w.run, helper: null })
   }
   const hive = `${w.pid}:${w.started}`
   const kept = await keeperState(w.run, hive)
   if (kept?.state === 'ended') {
-    log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} settled: ${userText(w.agent)}'s ended run left nothing running (its Hive, process ${w.pid}, gone; seen by its helper ${kept.helper})`)
+    log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} settled: ${userText(w.agent)}'s ended run left nothing running (its Combwork, process ${w.pid}, gone; seen by its helper ${kept.helper})`)
     return Object.freeze({ run: w.run, helper: kept.helper })
   }
   // Its keeper's "live" is a snapshot, never proof (HI-2309): its keeper is asked for the run now (HI-2313), and the one
@@ -546,7 +546,7 @@ export async function goneWriterSettles(projectPath: string, w: { run: string; a
   if (now && (await nothingHolds(now.members, now.more, w.agent))) {
     // Revoked while it was asked: held (the clear checks the binding again inside its write).
     if (!keeperStillBound(w.run, now.helper)) return false
-    log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} settled: ${userText(w.agent)}'s ended run has nothing running that holds it (its Hive, process ${w.pid}, gone; its helper ${now.helper} asked now)`)
+    log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} settled: ${userText(w.agent)}'s ended run has nothing running that holds it (its Combwork, process ${w.pid}, gone; its helper ${now.helper} asked now)`)
     return Object.freeze({ run: w.run, helper: now.helper })
   }
   // Held, and when what its last receipt lists is only Windows' own idle brokers, the user is told once that releasing
@@ -572,7 +572,7 @@ async function tellIdleBrokerHold(projectPath: string, slot: string, w: { run: s
   const cfg = await workspaceOf(projectPath).projectConfig(projectPath).catch(() => null)
   const agent = (cfg ? projectAgents(cfg) : []).find((a) => a.id === w.agent)?.name ?? w.agent
   const names = fmt.list(running.map((p) => p.name.replace(/\.exe$/i, '')), 'unit')
-  log.info(`${userText(slot)} in ${userText(basename(projectPath))} stays held by ${userText(names)} (only Windows' own idle brokers), left by ${userText(agent)}'s run in a Hive that has gone: the user is told releasing it is safe`)
+  log.info(`${userText(slot)} in ${userText(basename(projectPath))} stays held by ${userText(names)} (only Windows' own idle brokers), left by ${userText(agent)}'s run in a Combwork that has gone: the user is told releasing it is safe`)
   toast(
     'info',
     tr(msg({ id: 'slots.idleBroker.title', defaultMessage: '{slot} is held by {names}', description: "A notice's title (HI-2309): a slot (a worktree Hive lends to a card, {slot} such as slot-a) stays held after Hive restarted, only by Windows' own idle Windows Sandbox broker ({names}: its process names, such as WindowsSandboxServer)." }), { slot, names }),
@@ -684,6 +684,6 @@ export async function releaseHeldWriter(projectPath: string, slot: string, run: 
   if (!(await new SlotStore(boardConn(ws), project).clearWriter(slot, run, o.guard))) throw changed()
   resolveOffer(`slot:${run}`, tr(OUTCOME.released))
   writerCleared(run)
-  log.info(`The slot writer ${run} on ${userText(slot)} released by the user (its Hive ${w.hive.self ? 'this one' : `process ${w.hive.pid}, gone`}${o.end && w.processes ? ', its listed processes ended first' : ''})`)
+  log.info(`The slot writer ${run} on ${userText(slot)} released by the user (its Combwork ${w.hive.self ? 'this one' : `process ${w.hive.pid}, gone`}${o.end && w.processes ? ', its listed processes ended first' : ''})`)
   await writerHost.drained(projectPath, slot)
 }

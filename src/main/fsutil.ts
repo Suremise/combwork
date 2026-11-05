@@ -573,7 +573,7 @@ async function saveKept(path: string, data: unknown, opts: { compact?: boolean; 
   const k = path.toLowerCase()
   if (opts.holder && staleHolders.get(k)?.has(opts.holder)) {
     if (!(await keptGone(path))) {
-      log.warn(`${userText(path)} wasn't saved: what this save holds came from its last good copy or a default, not the file, so it could replace settings Hive never saw`)
+      log.warn(`${userText(path)} wasn't saved: what this save holds came from its last good copy or a default, not the file, so it could replace settings Combwork never saw`)
       throw new KeptFileUnreadable(path)
     }
     staleHolders.delete(k)

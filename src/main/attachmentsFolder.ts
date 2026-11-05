@@ -104,7 +104,7 @@ async function moveOldFolder(host: string): Promise<void> {
   const hive = join(host, HIVE_DIR)
   const old = join(hive, OLD_ATTACHMENTS_DIR)
   if (!(await lstat(old).catch(() => null))) return
-  if (!(await isOwnFolder(host, hive)) || !(await isOwnFolder(host, old))) return log.warn(`${userText(old)} is a link or not a folder: Hive leaves it alone`)
+  if (!(await isOwnFolder(host, hive)) || !(await isOwnFolder(host, old))) return log.warn(`${userText(old)} is a link or not a folder: Combwork leaves it alone`)
   const dest = join(hive, ATTACHMENTS_DIR)
   const there = await lstat(dest).catch(() => null)
   if (there && !(await isOwnFolder(host, dest))) return log.warn(`${userText(dest)} is a link or not a folder: the images folder stays`)

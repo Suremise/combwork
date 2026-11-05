@@ -1799,7 +1799,7 @@ export class WorkspaceService {
       if (before) resolveOffer(`platform:${key}`, tr(M.platformSettled))
       return
     }
-    if (p.invalid !== undefined) log.warn(`${userText(basename(projectPath))}'s project.json names no platform Hive has (${userText(p.invalid)}): it uses ${p.id}, as detected`)
+    if (p.invalid !== undefined) log.warn(`${userText(basename(projectPath))}'s project.json names no platform Combwork has (${userText(p.invalid)}): it uses ${p.id}, as detected`)
     else log.info(`${userText(basename(projectPath))} is a ${p.id} project; its folder now says ${p.detected.platform}${p.detected.other ? ` (${p.detected.other} found)` : ''}`)
     // An offer has its button to the tab that makes it (#1419); an unknown setting is fixed in project.json.
     const actions = p.offer ? [{ label: tr(M.openVc), command: 'project.openVersionControl', args: [projectPath] }] : undefined
