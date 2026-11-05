@@ -2,7 +2,7 @@
 // alone on the machine or inherit whatever environment they were started from.
 //
 // - The environment, here: every child a test starts (a suite, a test copy of Combwork, the hive MCP server, the
-//   hive-progress wrapper) gets an environment built from an allowlist (ALLOW: Windows' own variables, the user's
+//   cw-progress wrapper) gets an environment built from an allowlist (ALLOW: Windows' own variables, the user's
 //   folders, the network's proxy and certificates) plus what the context sets itself (a profile, quiet, ports, the
 //   suite's folders, CLI homes). Nothing else from the parent: not the variables of the Combwork session it was started
 //   from (HIVE_API_TOKEN…, HIVE_PROGRESS_*), not NO_COLOR or FORCE_COLOR, not ELECTRON_RUN_AS_NODE, not CLAUDE_* or
@@ -77,7 +77,7 @@ const PASS_ENV = {
   HIVE_TEST_CLAUDE_HOME: 'another Claude Code test home (CLAUDE_TEST_HOME above)',
   HIVE_TEST_QUIET: '0 shows the test copies of Combwork (taking focus, notifying), to watch a run',
   HIVE_TEST_PROGRESS_TIMINGS: "where the Progress panel's suite timings are kept (tests/progressReport.mts)",
-  HIVE_PROGRESS_CHECK_DEV: "1: packaged-progress checks the dev build's hive-progress",
+  HIVE_PROGRESS_CHECK_DEV: "1: packaged-progress checks the dev build's cw-progress",
   HIVE_EXE: 'plan and lib.launch run this packaged Combwork executable instead of the dev build (the Sandbox upgrade checks, #1227)',
   HIVE_E2E_HIVE09: "boardupgrade's 0.9 Hive: a 0.9.x win-unpacked folder (else the main checkout's dist/win-unpacked, when it is 0.9.x)",
   REPLYSIZE_OUT: "replysize's report file, in the work folder"
@@ -110,10 +110,10 @@ function apply(env, vars) {
 }
 
 /**
- * PATH without the folders of the hive-progress shims the user's copies of Combwork install (`%APPDATA%\Combwork\bin`, `Combwork-Dev\bin`,
+ * PATH without the folders of the cw-progress shims the user's copies of Combwork install (`%APPDATA%\Combwork\bin`, `Combwork-Dev\bin`,
  * and before HI-2461 `Hive\bin`, `Hive-Dev\bin`),
  * which an agent's session has on its PATH (#1253): they run the installed Combwork.exe (or the main checkout's dev build), so
- * a test's `hive-progress` would start another Combwork than its own, and report to the user's. A test Combwork puts its own
+ * a test's `cw-progress` would start another Combwork than its own, and report to the user's. A test Combwork puts its own
  * shims on its sessions' PATH.
  */
 function withoutHiveShims(env, parent) {
@@ -132,7 +132,7 @@ function baseEnv(parent = process.env) {
 }
 
 /**
- * A child that is part of Combwork but not a copy of it (the hive MCP server, the hive-progress wrapper, a bridge): the
+ * A child that is part of Combwork but not a copy of it (the hive MCP server, the cw-progress wrapper, a bridge): the
  * allowlist and `vars` (the Agent API URL and token it should use, ELECTRON_RUN_AS_NODE where Electron runs it as Node).
  */
 function childEnv(vars = {}, parent = process.env) {

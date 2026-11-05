@@ -75,7 +75,7 @@ const check = (name, ok, extra = '') => {
     // --- S24: 70 cards the user made, relabelled by the Assistant in one message (one batch).
     const numbers = []
     for (let i = 1; i <= 70; i++) numbers.push((await inv('tasks:create', { project: 'alpha', title: `Card ${i}` })).number)
-    check('it relabels 70 cards in one message', await say(`hive cw_update_tasks ${JSON.stringify({ numbers, addLabels: ['triage'] })}`))
+    check('it relabels 70 cards in one message', await say(`cw cw_update_tasks ${JSON.stringify({ numbers, addLabels: ['triage'] })}`))
     check('…every card has the label', !!(await lib.until(async () => (await inv('tasks:list')).filter((c) => numbers.includes(c.number) && c.labels?.includes('triage')).length === 70, HUNG_MS)))
     // The user edits one of them since: its labels are theirs now.
     const edited = numbers[4]
@@ -120,7 +120,7 @@ const check = (name, ok, extra = '') => {
 
     // --- One change at a time: a title and a comment in the next message.
     const [one, two] = [numbers[0], numbers[1]]
-    check('a new message: a title changed and a comment', await say(`hive cw_update_task {"number":${one},"title":"Renamed by the Assistant"} then hive cw_update_task {"number":${two},"comment":"A note"}`))
+    check('a new message: a title changed and a comment', await say(`cw cw_update_task {"number":${one},"title":"Renamed by the Assistant"} then cw cw_update_task {"number":${two},"comment":"A note"}`))
     check('…the newest message open, the one before folded', !!(await lib.until(async () => (await groups.count()) === 2 && (await head(0).getAttribute('aria-expanded')) === 'true' && (await head(1).getAttribute('aria-expanded')) === 'false', HUNG_MS)), String(await groups.count()))
     const titleRow = groups.first().locator('.assistant-action', { hasText: 'Renamed by the Assistant' })
     const commentRow = groups.first().locator('.assistant-action[data-status="final"]')
@@ -132,9 +132,9 @@ const check = (name, ok, extra = '') => {
     await shots('single')
 
     // --- The Assistant's own undo, in the same list: a change the user partly changed since says Partly undone.
-    check('a third message: it blocks a card and renames it', await say(`hive cw_update_task {"number":${numbers[2]},"blocked":"Waiting on a decision","title":"Renamed again"}`))
+    check('a third message: it blocks a card and renames it', await say(`cw cw_update_task {"number":${numbers[2]},"blocked":"Waiting on a decision","title":"Renamed again"}`))
     await inv('tasks:update', numbers[2], { title: 'My own title' })
-    check('…then undoes it with its own tool', await say('hive cw_undo {"group":"latest"}'))
+    check('…then undoes it with its own tool', await say('cw cw_undo {"group":"latest"}'))
     check('…its undo listed with its message (the newest, open)', !!(await lib.until(async () => (await groups.count()) === 4 && (await groups.first().locator('.assistant-action', { hasText: 'Undid 1 of 1 change of its own' }).count()) === 1, HUNG_MS)) && !(await card(numbers[2]))?.blocked, await panel().locator('.assistant-actions').innerText().catch(() => ''))
     // The message before it, opened: the change it undid, struck through.
     await head(1).click()

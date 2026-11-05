@@ -147,7 +147,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const watched = await inv('tasks:create', { title: 'Burst of card events', project: 'alpha' })
     const unrelated = await inv('tasks:create', { title: 'Unrelated board traffic', project: 'alpha' })
     await lib.typeLine(inv, lib.ptyKey(alpha, claude.id), claudeHome, null,
-      `hive cw_wait_for_tasks ${JSON.stringify({ cards: [watched.key], changes: ['comment'], wake: true })}`, { live: () => live(claude.id) })
+      `cw cw_wait_for_tasks ${JSON.stringify({ cards: [watched.key], changes: ['comment'], wake: true })}`, { live: () => live(claude.id) })
     check('burst: Claude watches the card', !!(await until(async () => (await live(claude.id))?.status === 'watching', HUNG_MS)))
     const burstBefore = wakes(claude).length
     const burstHeld = logCount(/the line Combwork typed is held before its Enter/)
@@ -175,7 +175,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const loopCard = await inv('tasks:create', { title: 'Loop wake during a burst', project: 'alpha', agent: builder.id })
     await inv('tasks:update', loopCard.number, { column: 'doing', agent: builder.id })
     await lib.typeLine(inv, lib.ptyKey(alpha, builder.id), claudeHome, null,
-      `hive cw_lane ${JSON.stringify({ action: 'start', cards: [loopCard.key], reviewer: claude.name })}`, { live: () => live(builder.id) })
+      `cw cw_lane ${JSON.stringify({ action: 'start', cards: [loopCard.key], reviewer: claude.name })}`, { live: () => live(builder.id) })
     check('loop burst: its lane names Claude as reviewer', !!(await until(async () => (await inv('lanes:list')).some((l) => l.reviewer?.id === claude.id), HUNG_MS)))
     for (const withdraw of [false, true]) {
       const before = wakes(claude).length

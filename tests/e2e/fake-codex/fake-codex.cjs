@@ -18,7 +18,7 @@
 //   "hold": waits for "g" before its next step, so a test can wait until Combwork has taken the steps before (#329).
 //   Steps combine with " then " ("question then review deny").
 //   The scenarios' steps, as the fake Claude Code takes them: "skill NAME" (a shell read of its SKILL.md),
-//   "boardmove", "boardreview", "boardcomment" and "hive TOOL {json}" (through the launch's real hive MCP server),
+//   "boardmove", "boardreview", "boardcomment" and "cw TOOL {json}" (through the launch's real Combwork MCP server),
 //   "work N" and "shell: <command line>" (run in cmd with the session's environment, between its PreToolUse and
 //   PostToolUse; fake-shell.jsonl in CODEX_HOME records it, #1486). "planusage F W": its rollout's rate limits, F% of
 //   the 5-hour window and W% of the weekly one (HI-1882). "patch FILE" (HI-2386): an apply_patch edit of FILE, which
@@ -37,8 +37,8 @@
 // - Each prompt is a turn with its own id, which its hooks carry (turn_id) and its rollout records (task_started,
 //   task_complete after Stop), as Codex 0.162.1 does.
 // - With fake-code-mode.txt in CODEX_HOME (the scenarios', HI-2235) it works in code mode, as Codex 0.166.0 does: its
-//   hive calls and skill reads are each made from a script (exec), its rollout recording each call the script made.
-// - It connects the launch's hive MCP server as it starts (#865: the real server, which tells Combwork it has connected).
+//   Combwork calls and skill reads are each made from a script (exec), its rollout recording each call the script made.
+// - It connects the launch's Combwork MCP server as it starts (#865: the real server, which tells Combwork it has connected).
 // - A first prompt as its last plain argument (after "resume <id>" too) is its first turn, as Codex starts on one.
 // - Ctrl+C twice ends it with SessionEnd.
 // - While fake-nohooks-<agent> is in CODEX_HOME it sends no hook at all, as when a Codex update broke them (#1336). A
@@ -54,7 +54,7 @@ const fs = require('fs')
 const path = require('path')
 const { randomUUID } = require('crypto')
 const { spawn } = require('child_process')
-const { callHiveTool, connectHive, fromCodexTable, parseHiveStep, isDoorbell, doorbellIsWork, inboxRows } = require('../fake-bridge.cjs')
+const { callOwnTool, connectOwnServer, fromCodexTable, parseToolStep, isDoorbell, doorbellIsWork, inboxRows } = require('../fake-bridge.cjs')
 
 const args = process.argv.slice(2)
 if (args[0] === '--version') {
@@ -311,9 +311,9 @@ function followsNotices() {
 
 /** Acts on a notice as a model that follows them: reads its inbox (cw_inbox), then acks the ids it listed. */
 async function readInbox() {
-  const listed = await hiveCall('cw_inbox', {})
+  const listed = await ownCall('cw_inbox', {})
   const ids = [...new Set([...String(listed?.text ?? '').matchAll(/\bm\d+\b/g)].map((m) => m[0]))]
-  if (ids.length) await hiveCall('cw_inbox', { ack: ids })
+  if (ids.length) await ownCall('cw_inbox', { ack: ids })
 }
 
 /** Codex's own record of a turn starting or ending (task_started, task_complete), by its turn id. */
@@ -389,8 +389,8 @@ async function question(late) {
 /** One rollout entry, as Codex writes it. */
 const record = (payload) => fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'response_item', payload }) + '\n')
 
-/** The launch's hive MCP server (its -c mcp_servers.combwork table), or null. */
-function hiveServer() {
+/** The launch's Combwork MCP server (its -c mcp_servers.combwork table), or null. */
+function ownServer() {
   const arg = args.find((a) => a.startsWith('mcp_servers.combwork='))
   try {
     return arg ? fromCodexTable(arg.slice('mcp_servers.combwork='.length)) : null
@@ -429,22 +429,22 @@ function readFile(file) {
   record({ type: 'function_call_output', call_id: id, output: text ?? 'Process exited with code 1: no such file' })
 }
 
-/** A hive tool call through the launch's own hive MCP server, recorded as Codex records an MCP call and its output. */
-async function hiveCall(tool, input) {
-  const server = hiveServer()
+/** A Combwork tool call through the launch's own Combwork MCP server, recorded as Codex records an MCP call and its output. */
+async function ownCall(tool, input) {
+  const server = ownServer()
   if (codeMode()) {
     let r = null
     await inScript(`text(await tools.mcp__combwork__${tool}(${JSON.stringify(input)}));`, async (done) => {
-      r = server ? await callHiveTool(server, tool, input) : { text: 'error: no hive server', isError: true }
+      r = server ? await callOwnTool(server, tool, input) : { text: 'error: no Combwork MCP server', isError: true }
       const result = { content: [{ type: 'text', text: r.text }], ...(r.isError ? { isError: true } : {}) }
-      done({ type: 'McpToolCall', server: 'hive', tool, arguments: input, status: r.isError ? 'failed' : 'completed', result })
+      done({ type: 'McpToolCall', server: 'combwork', tool, arguments: input, status: r.isError ? 'failed' : 'completed', result })
       return JSON.stringify(result)
     })
     return r
   }
   const id = `call_${randomUUID().slice(0, 8)}`
   record({ type: 'function_call', name: `mcp__combwork__${tool}`, arguments: JSON.stringify(input), call_id: id })
-  const r = server ? await callHiveTool(server, tool, input) : { text: 'error: no hive server', isError: true }
+  const r = server ? await callOwnTool(server, tool, input) : { text: 'error: no Combwork MCP server', isError: true }
   record({ type: 'function_call_output', call_id: id, output: r.isError && !/^error/i.test(r.text) ? `error: ${r.text}` : r.text })
   return r
 }
@@ -469,7 +469,7 @@ function readSkillRef(name, file) {
 
 /**
  * The scenario steps the fake Claude Code takes too (tests/scenarios): "skill NAME", "boardmove N COLUMN", "boardreview N
- * ACTION [COLUMN]", "boardcomment N", "hive TOOL {json}" and "work N". Board changes go through the real hive MCP
+ * ACTION [COLUMN]", "boardcomment N", "cw TOOL {json}" and "work N". Board changes go through the real Combwork MCP
  * server (cw_update_task), as a model's would. Whether the step was one of these.
  */
 async function scripted(step) {
@@ -483,13 +483,13 @@ async function scripted(step) {
     any = true
   }
   const move = /\bboardmove\s+(\d+)\s+(\w+)/i.exec(step)
-  if (move) await hiveCall('cw_update_task', { number: Number(move[1]), column: move[2].toLowerCase() })
+  if (move) await ownCall('cw_update_task', { number: Number(move[1]), column: move[2].toLowerCase() })
   const rev = /\bboardreview\s+(\d+)\s+(\w+)(?:\s+(hold|todo|doing|review|passed|done)\b)?/i.exec(step)
-  if (rev) await hiveCall('cw_update_task', { number: Number(rev[1]), review: rev[2].toLowerCase(), ...(rev[3] ? { column: rev[3].toLowerCase(), comment: 'Fake review: passed.' } : {}) })
+  if (rev) await ownCall('cw_update_task', { number: Number(rev[1]), review: rev[2].toLowerCase(), ...(rev[3] ? { column: rev[3].toLowerCase(), comment: 'Fake review: passed.' } : {}) })
   const comment = /\bboardcomment\s+(\d+)/i.exec(step)
-  if (comment) await hiveCall('cw_update_task', { number: Number(comment[1]), comment: 'Fake: done, see the files.' })
-  const call = parseHiveStep(step)
-  if (call) await hiveCall(call.tool, call.args)
+  if (comment) await ownCall('cw_update_task', { number: Number(comment[1]), comment: 'Fake: done, see the files.' })
+  const call = parseToolStep(step)
+  if (call) await ownCall(call.tool, call.args)
   const pause = /\bwork\s+(\d+)/i.exec(step)
   if (pause) await sleep(Number(pause[1]) * 1000)
   // "checkpoint": a command of its own, whose PostToolUse reply may carry Combwork's notice (#650).
@@ -604,9 +604,9 @@ async function takeQueued() {
     const text = queued.shift()
     userLine(text)
     if (!isDoorbell(text)) continue
-    const r = await hiveCall('cw_inbox', {})
+    const r = await ownCall('cw_inbox', {})
     const rows = r.isError ? [] : inboxRows(r.text)
-    if (rows.length && followsNotices()) await hiveCall('cw_inbox', { ack: rows.flatMap((x) => x.ids) })
+    if (rows.length && followsNotices()) await ownCall('cw_inbox', { ack: rows.flatMap((x) => x.ids) })
     if (process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-wakes.jsonl'), JSON.stringify({ agent: String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_'), text: rows.map((x) => x.text).join(' '), at: new Date().toISOString(), queued: true }) + '\n')
   }
 }
@@ -645,9 +645,9 @@ async function runPrompt(text) {
   // notices acks it too); what else it read (a wake, a message) is logged in fake-wakes.jsonl in CODEX_HOME.
   if (isDoorbell(text)) {
     const work = doorbellIsWork(text)
-    const r = await hiveCall('cw_inbox', {})
+    const r = await ownCall('cw_inbox', {})
     const rows = r.isError ? [] : inboxRows(r.text)
-    if (rows.length && followsNotices()) await hiveCall('cw_inbox', { ack: rows.flatMap((x) => x.ids) })
+    if (rows.length && followsNotices()) await ownCall('cw_inbox', { ack: rows.flatMap((x) => x.ids) })
     const read = rows.map((x) => x.text).join(' ')
     if (!work && process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-wakes.jsonl'), JSON.stringify({ agent: String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_'), text: read, doorbell: text, at: new Date().toISOString() }) + '\n')
     if (rows.length) text = work ? read : nextScripted() || ''
@@ -744,8 +744,8 @@ process.stdin.on('data', (data) => {
 })
 
 out('OpenAI Codex (fake, for Combwork tests)\r\n')
-// Its MCP servers connect as it starts (#865): the launch's hive server, through the real server, which tells Combwork.
-void connectHive(hiveServer())
+// Its MCP servers connect as it starts (#865): the launch's Combwork MCP server, through the real server, which tells Combwork.
+void connectOwnServer(ownServer())
 setTitle(project)
 promptLine()
 if (firstPrompt) void runPrompt(firstPrompt)

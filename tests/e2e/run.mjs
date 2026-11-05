@@ -331,7 +331,7 @@ const run = (name, port) =>
       // result line says that one.
       const windows = windowsCodesIn(out).filter((w) => w !== describeExit(code))
       const outcome = { ...suiteOutcome({ code, out }), clis: suiteClis(dir), windows }
-      // What a suite's agents left running from its folder (a command through hive-progress, a server: #542) would hold
+      // What a suite's agents left running from its folder (a command through cw-progress, a server: #542) would hold
       // the folder and outlive the run: stopped, by command line (its folder, started since the suite did), never by name.
       // Its test copies of Combwork first (HI-1453): those it recorded, as the processes recorded. One not recorded is the
       // folder's sweep's below (#542), which takes what names the folder and started since the suite did.

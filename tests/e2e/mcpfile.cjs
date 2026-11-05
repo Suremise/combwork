@@ -96,7 +96,7 @@ const check = (name, ok, extra = '') => {
   check("its view shows what it runs", !!(await lib.until(async () => (await runs.innerText().catch(() => '')).includes('Runs: npx -y @modelcontextprotocol/server-github'), HUNG_MS)))
   await shot('2-json-added')
 
-  // --- A .zip of a server folder: unpacked to .combwork/mcp/notes/, its definition from hive-mcp.json; added nowhere.
+  // --- A .zip of a server folder: unpacked to .combwork/mcp/notes/, its definition from cw-mcp.json; added nowhere.
   await pick(path.join(dump, 'notes.zip'))
   await addButton.click()
   await lib.until(async () => (await add.count()) === 1, HUNG_MS)

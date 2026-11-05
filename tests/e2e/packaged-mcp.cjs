@@ -1,4 +1,4 @@
-// Mock Agent API + drive out/main/hive-mcp.js over stdio.
+// Mock Agent API + drive out/main/cw-mcp.js over stdio.
 const lib = require('./lib.cjs')
 const path = require('path')
 const http = require('http'), { spawn } = require('child_process')

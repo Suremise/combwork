@@ -192,7 +192,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     await setSwitch('idleWakes', false)
     const n = (await inv('tasks:create', { title: 'Carry on', project: 'alpha', agent: codex.id })).number
     await inv('tasks:update', n, { column: 'doing', agent: codex.id })
-    await say(codex.id, `hive cw_lane ${JSON.stringify({ action: 'start', cards: [n], reviewer: 'Claude' })}`)
+    await say(codex.id, `cw cw_lane ${JSON.stringify({ action: 'start', cards: [n], reviewer: 'Claude' })}`)
     check('the lane is registered', !!(await until(async () => (await inv('lanes:list')).some((l) => l.reviewer?.id === claude.id), HUNG_MS)))
     await until(() => idle(codex.id), HUNG_MS)
     const before = wakes(claude).length
@@ -208,7 +208,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     // shows it unread, and Deliver Now there types its line once.
     const asst = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === home.toLowerCase())
     // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
-    await lib.typeLine(inv, lib.ptyKey(home, 'assistant'), claudeHome, null, `hive cw_wait_for_tasks ${JSON.stringify({ cards: [n], changes: ['comment'], wake: true })}`, { live: asst })
+    await lib.typeLine(inv, lib.ptyKey(home, 'assistant'), claudeHome, null, `cw cw_wait_for_tasks ${JSON.stringify({ cards: [n], changes: ['comment'], wake: true })}`, { live: asst })
     check('the Assistant watches the card', !!(await until(async () => (await asst())?.status === 'watching', HUNG_MS)), (await asst())?.status)
     await inv('tasks:comment', n, 'A note for the watch.')
     const asstUnread = async () => (await asst())?.inbox?.unread ?? []

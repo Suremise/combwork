@@ -5,7 +5,7 @@
 // isn't started:
 // - the reviewers' launches (R1, R2, E1 in the project folder) have --add-dir <ws>.worktrees\alpha\copies; B1's has none;
 // - R1's start review replies with copies\copy-1, at the submitted revision, while the builder's folder has moved on;
-// - R1's hive-progress --check there (no card named) counts for the submission, the copy's card and revision;
+// - R1's cw-progress --check there (no card named) counts for the submission, the copy's card and revision;
 // - with a pool of two, R1 and R2 review at once; E1's start review waits ("Waiting for a review copy", the card's
 //   history says so); R1's verdict returns copy-1, which E1 is then leased and told of (its inbox);
 // - R2's session ending gives its review up: copy-2 is returned and freed; with review copies off, R2 started again has
@@ -168,7 +168,7 @@ const starts = () => lines(started)
       const sent = await lib.sendPrompt(inv, lib.ptyKey(alpha, id), `shell: ${cmd}`, { submitted: () => lines(file).length > before })
       return sent ? lines(file)[before] : null
     }
-    const ran = await shell(r1.id, `cd /d "${c1.folder}" && hive-progress --check quick`)
+    const ran = await shell(r1.id, `cd /d "${c1.folder}" && cw-progress --check quick`)
     check('R1 runs the check in copy-1', ran?.code === 0 && same(starts().at(-1)?.cwd, c1.folder), JSON.stringify({ ran, starts: starts() }))
     const run = await until(async () => (await inv('progress:snapshot')).runs.find((r) => r.check === 'quick' && r.card === a && r.copy === 'copy-1' && r.state !== 'running'), HUNG_MS)
     const counted = await until(async () => (await inv('tasks:work', a))?.checks.find((x) => x.name === 'quick' && x.run === run?.id), HUNG_MS)

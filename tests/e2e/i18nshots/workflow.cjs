@@ -87,7 +87,7 @@ async function showProject(ctx, dir) {
 }
 
 /**
- * A project check run as an agent runs it, `hive-progress --check quick --card <key>` in its folder with its token (the
+ * A project check run as an agent runs it, `cw-progress --check quick --card <key>` in its folder with its token (the
  * dev build's wrapper, run by Electron as Node): { code, out }.
  */
 function runCheck(ctx, agent, key) {

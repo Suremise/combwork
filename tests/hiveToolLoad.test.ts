@@ -5,7 +5,7 @@ import { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, HIVE_TOOLS, assistantTools } fr
 import { AGENT_ALWAYS_LOAD, ASSISTANT_ALWAYS_LOAD, alwaysLoaded, argumentHint } from '../src/shared/hiveToolLoad'
 
 describe('the tools sent in full (HI-2229)', () => {
-  it('are hive tools, a few per role', () => {
+  it('are Combwork tools, a few per role', () => {
     for (const t of ASSISTANT_ALWAYS_LOAD) expect(HIVE_TOOLS).toContain(t)
     expect(alwaysLoaded(false)).toEqual(AGENT_ALWAYS_LOAD)
     expect(alwaysLoaded(true)).toEqual(ASSISTANT_ALWAYS_LOAD)

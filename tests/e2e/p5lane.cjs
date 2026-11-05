@@ -3,7 +3,7 @@
 // hive tools' calls), B1 added in the project folder. The project's options are set through Version Control → Workflow
 // (#1355's form: Pair, with G8 strict on); lanes are started from the board, each lent a slot that B1 then works in.
 // The quick check is the project's `typecheck` script, steered from outside the repository (queueFixture.cjs's check),
-// run by the builder through hive-progress --check before each submit (counted) and by the queue on the merged result.
+// run by the builder through cw-progress --check before each submit (counted) and by the queue on the merged result.
 // Lane A (merge commits, strict):
 // - One: built on its line in the lane's slot (the next card's start refused meanwhile: one card at a time), submitted,
 //   passed; the queue merges its line at the approved revision (testing shown in the Merges tab): Done, and only then
@@ -154,7 +154,7 @@ const ancestor = (x, y) => {
     const untouched = (was) => git(wt, 'rev-parse', 'HEAD') === was.head && git(wt, 'status', '--porcelain') === was.status
     const worktreeNow = () => ({ head: git(wt, 'rev-parse', 'HEAD'), status: git(wt, 'status', '--porcelain') })
 
-    // The builder's shell (the fake's "shell:" step), as hive-progress runs in its session (p4lane's).
+    // The builder's shell (the fake's "shell:" step), as cw-progress runs in its session (p4lane's).
     const shells = () => {
       const file = path.join(fx.claudeHome, 'fake-shell.jsonl')
       return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
@@ -190,11 +190,11 @@ const ancestor = (x, y) => {
       if (!shells().slice(before).some((s) => s.cmd === cmd)) throw new Error(`B1 didn't run "${cmd}" (its line wasn't taken)`)
     }
     const counted = (x) => x.kind === 'CheckRan' && x.data?.counted === true
-    /** The quick check through hive-progress on the card's revision now (passing): a new counted CheckRan on it. */
+    /** The quick check through cw-progress on the card's revision now (passing): a new counted CheckRan on it. */
     const quickCheck = async (n) => {
       q.steer(fx, 'pass')
       const before = (await h.facts(n)).filter(counted).length
-      await shell(`hive-progress --check typecheck --card ${await keyOf(n)}`)
+      await shell(`cw-progress --check typecheck --card ${await keyOf(n)}`)
       return !!(await waitHung(async () => (await h.facts(n)).filter(counted).length > before))
     }
     const commit = (file, text = `${file}\n`) => {
@@ -217,7 +217,7 @@ const ancestor = (x, y) => {
      */
     const round = async (n, file, { text, meanwhile, merge = 'pass', commitIt = true, watched = false } = {}) => {
       const rev = commitIt ? commit(file, text) : git(wt, 'rev-parse', 'HEAD')
-      check(`${await keyOf(n)}'s quick check through hive-progress --check is counted`, await quickCheck(n))
+      check(`${await keyOf(n)}'s quick check through cw-progress --check is counted`, await quickCheck(n))
       // HI-2015: B1 watching its card before it submits (card-loop's order), its column moves too, isn't woken by its own
       // submission's move into Review (the checks gate on): its first wake is the reviewer's verdict.
       if (watched) {

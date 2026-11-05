@@ -1,15 +1,15 @@
-// The fake CLIs' way to call Combwork's tools: through the real hive MCP server, started as the launch configured it (its
+// The fake CLIs' way to call Combwork's tools: through the launch's real Combwork MCP server, started as the launch configured it (its
 // command, arguments and environment), so a scripted call is what a model's call would be. The server runs the call
 // against the Agent API, logs it (HIVE_TEST_MCP_LOG) and reports its reply's size to Combwork's performance metrics, as
-// it does for a real CLI. Used by fake-claude and fake-codex for their "hive", "boardmove", "boardreview" and
+// it does for a real CLI. Used by fake-claude and fake-codex for their "cw", "boardmove", "boardreview" and
 // "boardcomment" steps.
 const { spawn } = require('child_process')
 
 /**
- * Calls `tool` with `args` on the hive MCP server `server` ({ command, args, env }): initialize, tools/list, the call,
+ * Calls `tool` with `args` on the Combwork MCP server `server` ({ command, args, env }): initialize, tools/list, the call,
  * then end of input (the server sends its metrics report and exits). Resolves { text, isError }.
  */
-function callHiveTool(server, tool, args, timeoutMs = 30000) {
+function callOwnTool(server, tool, args, timeoutMs = 30000) {
   return new Promise((resolve) => {
     const env = { ...process.env, ...server.env }
     const p = spawn(server.command, server.args ?? [], { env, stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true })
@@ -23,10 +23,10 @@ function callHiveTool(server, tool, args, timeoutMs = 30000) {
       p.stdin.end()
     }
     const timer = setTimeout(() => {
-      done({ text: 'The hive server did not answer', isError: true })
+      done({ text: 'The Combwork MCP server did not answer', isError: true })
       p.kill()
     }, timeoutMs)
-    p.on('exit', () => resolve(result ?? { text: 'The hive server exited', isError: true }))
+    p.on('exit', () => resolve(result ?? { text: 'The Combwork MCP server exited', isError: true }))
     p.on('error', (e) => {
       done({ text: String(e), isError: true })
       resolve(result)
@@ -53,12 +53,12 @@ function callHiveTool(server, tool, args, timeoutMs = 30000) {
 }
 
 /**
- * Connects the launch's hive MCP server as a CLI does when it starts (#865): initialize and notifications/initialized,
+ * Connects the launch's Combwork MCP server as a CLI does when it starts (#865): initialize and notifications/initialized,
  * which the server tells Combwork of (POST /v1/launch/connected), then end of input (it exits once that is sent). `held`:
  * a promise to wait for first (a test holding the connection back, as a resumed Claude Code connects after its
  * SessionStart). Resolves once the server has exited; never fails.
  */
-async function connectHive(server, held) {
+async function connectOwnServer(server, held) {
   if (!server) return
   if (held) await held
   await new Promise((resolve) => {
@@ -106,11 +106,11 @@ function fromCodexTable(text) {
 }
 
 /**
- * Parses a scripted "hive TOOL {json}" step's arguments: the JSON object after the tool's name (no " then " in it), or
- * none. A tool by its 1.1 name (cw_*, HI-2463), or by an older Hive's (hive_*: upgradelane's 0.9 Hive, HI-2506).
+ * Parses a scripted "cw TOOL {json}" step's arguments: the JSON object after the tool's name (no " then " in it), or
+ * none. A tool by its 1.1 name (cw_*, HI-2463), or by a 0.9 release's name for it (hive_*: upgradelane runs that release, HI-2506).
  */
-function parseHiveStep(step) {
-  const m = /\bhive\s+((?:cw|hive)_[a-z_]+)(?:\s+(\{.*\}))?/i.exec(step)
+function parseToolStep(step) {
+  const m = /\bcw\s+((?:cw|hive)_[a-z_]+)(?:\s+(\{.*\}))?/i.exec(step)
   if (!m) return null
   let args = {}
   try {
@@ -149,4 +149,4 @@ function inboxRows(reply) {
   return rows
 }
 
-module.exports = { callHiveTool, connectHive, fromCodexTable, parseHiveStep, isDoorbell, doorbellIsWork, inboxRows }
+module.exports = { callOwnTool, connectOwnServer, fromCodexTable, parseToolStep, isDoorbell, doorbellIsWork, inboxRows }

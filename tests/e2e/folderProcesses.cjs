@@ -1,5 +1,5 @@
 // What still runs of a test once its Combwork has closed (#542): a command an agent started (Codex through the profile's
-// hive-progress shim, a shell command Claude Code ran in the folder) can outlive its session and hold the folder. Only
+// cw-progress shim, a shell command Claude Code ran in the folder) can outlive its session and hold the folder. Only
 // what is the test's own, never by name: what its Combwork started (its process tree, taken before it closes, each by pid
 // and start time, so a reused pid is never taken), and what names its folder on the command line (a path boundary, so
 // `scenario` never takes `scenario-2`'s) and started after the test did.

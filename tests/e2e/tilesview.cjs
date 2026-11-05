@@ -187,7 +187,7 @@ const check = (name, ok, extra = '') => {
     // measuring it again and again took the window down).
     const runDone = path.join(lib.WORK, 'tilesview-run-done')
     const runTitle = 'A very long progress run title that should be truncated cleanly in every narrow tile'
-    await prompts('A').type(`shell: hive-progress --title "${runTitle}" -- node -e "setInterval(() => require('fs').existsSync(process.argv[1]) && process.exit(0), 100)" ${runDone}`)
+    await prompts('A').type(`shell: cw-progress --title "${runTitle}" -- node -e "setInterval(() => require('fs').existsSync(process.argv[1]) && process.exit(0), 100)" ${runDone}`)
     const progressShown = () => tile('A').evaluate((el) => el.querySelector('.tile-progress-text')?.textContent ?? '')
     check("A's tile shows its progress run", !!(await lib.until(async () => (await progressShown()).startsWith(runTitle), HUNG_MS)), await progressShown())
     const during = await heights()
@@ -456,9 +456,9 @@ const check = (name, ok, extra = '') => {
     const blockedCard = await card('Chip blocked', 'E', 'doing')
     await inv('tasks:update', blockedCard, { blocked: 'Waiting for an answer' })
     // A reviews D's card with its own tool call, then watches it into Passed.
-    await prompts('A').type(`hive cw_update_task ${JSON.stringify({ number: reviewCard, review: 'start' })}`)
+    await prompts('A').type(`cw cw_update_task ${JSON.stringify({ number: reviewCard, review: 'start' })}`)
     await lib.until(async () => (await inv('tasks:list')).find((c) => c.number === reviewCard)?.review?.agent === ids.A, HUNG_MS)
-    await prompts('A').type(`hive cw_wait_for_tasks ${JSON.stringify({ cards: [reviewCard], column: 'passed', changes: ['verdict', 'column'], wake: true })}`)
+    await prompts('A').type(`cw cw_wait_for_tasks ${JSON.stringify({ cards: [reviewCard], column: 'passed', changes: ['verdict', 'column'], wake: true })}`)
     await lib.until(async () => (await live(ids.A))?.status === 'watching', HUNG_MS)
     await page.locator('.session-toolbar .tile-pages button').nth(0).click()
     await tile('A').click()
