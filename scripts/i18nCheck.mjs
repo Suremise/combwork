@@ -125,7 +125,7 @@ export function verifyWithJs(english, translated) {
 
 /** The same checks by `formatjs verify`: each problem as a line of its report. */
 export function verifyWithCli(code, english, translated) {
-  const dir = mkdtempSync(join(tmpdir(), 'hive-i18n-check-'))
+  const dir = mkdtempSync(join(tmpdir(), 'cw-i18n-check-'))
   try {
     writeFileSync(join(dir, 'en.json'), JSON.stringify(english))
     writeFileSync(join(dir, `${code}.json`), JSON.stringify(translated))

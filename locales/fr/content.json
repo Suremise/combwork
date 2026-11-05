@@ -2,7 +2,7 @@
   "content.mcp.badArgs": "« args » doit être une liste de chaînes.",
   "content.mcp.badCommand": "« command » doit être le programme à exécuter.",
   "content.mcp.badCwd": "« cwd » doit être un dossier.",
-  "content.mcp.badName": "Les noms de serveurs peuvent contenir des lettres, des chiffres, « - » et « _ » (64 caractères au maximum). « combwork » et « hive » sont réservés.",
+  "content.mcp.badName": "Les noms de serveurs peuvent contenir des lettres, des chiffres, « - » et « _ » (64 caractères au maximum). « combwork » est réservé.",
   "content.mcp.badRecord": "« {field} » doit être un objet de chaînes.",
   "content.mcp.badUrl": "« url » doit être une adresse http:// ou https://.",
   "content.mcp.changedAdd": "{name} a changé depuis qu’il t’a été montré. Vérifie ce qu’il exécute et ajoute-le de nouveau.",

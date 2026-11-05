@@ -179,7 +179,7 @@ export function removeCopy(dir, modules = join(dir, 'node_modules')) {
 export function audit({ root = ROOT, extra = {}, keep = false, dir: given } = {}) {
   const bad = patchCounts(root).filter(([, , n]) => n !== 1)
   if (bad.length) throw Object.assign(new Error(`a helper changed, so its patch no longer applies; update PATCHES in scripts/i18nNumbers.mjs:\n  ${bad.map(([f, from, n]) => `${f} (${n}×): ${from.slice(0, 90)}`).join('\n  ')}`), { exitCode: 2 })
-  const dir = given ?? mkdtempSync(join(realpathSync.native(tmpdir()), 'hive-i18n-numbers-'))
+  const dir = given ?? mkdtempSync(join(realpathSync.native(tmpdir()), 'cw-i18n-numbers-'))
   if (readdirSync(dir).length) throw new Error(`${dir} isn't empty: the copy needs a new folder`)
   const modules = join(dir, 'node_modules')
   try {

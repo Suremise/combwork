@@ -8,7 +8,7 @@ Combwork updates itself from this repository's [GitHub Releases](https://github.
 
 | File | Purpose |
 |---|---|
-| `Combwork-Setup-<version>.exe` | The NSIS installer, for new installs and updates (`Hive-Setup-<version>.exe` before the Combwork rename, HI-2458) |
+| `Combwork-Setup-<version>.exe` | The NSIS installer, for new installs and updates |
 | `latest.yml` | What the updater reads: version, file name, size, SHA-512 and release date |
 | `Combwork-Setup-<version>.exe.blockmap` | Lets the next update download only the blocks that changed |
 
@@ -59,13 +59,13 @@ A lane ends its builder's session when its last card merges, so steps written af
 
    Failures are carded at once and bisected over the merges since the last full run.
 2. **The baseline install** (#1288): a 1.0 build the user installs and uses day to day, before anything is uploaded. Features from On Hold are then built on top of it for a while.
-   - It waits for the last phase's checks card (#1539), the translation review (#1126) and #1582 (Hive's version checks off `fetch()`). Electron's CVE fix (#1503) comes before the RC (#1541), not the baseline (the user, 24 Oct).
+   - It waits for the last phase's checks card (#1539), the translation review (#1126) and #1582 (the version checks off `fetch()`). Electron's CVE fix (#1503) comes before the RC (#1541), not the baseline (the user, 24 Oct).
    - **Its checks are lighter than a release's** (the user, 24 Oct): the checks on the integration branch's head, where the last checks card's results stand if the branch hasn't moved since (otherwise run them again), with the model trials as a **smoke run**: Claude Code and Codex each run the key scenarios once, with no repeats, no Haiku and no Copilot. The full trials, the full e2e set and the real tier come before a proper release (What a release checks).
    - The release notes (below).
    - The version is `1.0.0-rc.<n>` (asked), set before the build: no current-version candidate comes first (that's Step 1, for an uploaded release). (1.0's baselines were named as RCs; a later baseline is a beta: Betas and RCs.) A pre-release version means the updater never offers a 0.9.x release over it, and a later RC or 1.0.0 updates it.
    - `npm run dist -- --kind baseline` (asked), built from the integration branch's head. From a worktree, it copies the installer into the main checkout's `dist` (Notes).
    - `npm run e2e -- packaged-mcp packaged-progress` against `dist/win-unpacked`, and the Sandbox checks (the release-combwork skill), including the one-way upgrade from 0.9.3.
-   - An install note for the user: back up first, close every 0.9.3 Hive on the workspace, and what to expect. **The user installs.** Nothing is pushed, tagged or uploaded.
+   - An install note for the user: back up first, close every 0.9.3 on the workspace, and what to expect. **The user installs.** Nothing is pushed, tagged or uploaded.
 3. **The RC, then the release** (#1541), once the user is happy with what the baseline has become:
    - **An RC** is a draft GitHub pre-release at `1.0.0-rc.<n>`. It follows the Steps below, built from the integration branch, with **Set as a pre-release** ticked. Only installs with **Include pre-releases** on see it.
    - **The release**: the integration branch is merged into `main` (asked, `--no-ff`), and the Steps run on `main` at `1.0.0`, as a version card and a build card in one lane (A bump and its build: two cards): the version card holds steps 3 to 5, the build card steps 6 to 8. After that, 1.0.x fixes go to `main`, and 1.1's working builds are `1.1.0-beta.<n>` (Betas and RCs).
@@ -92,7 +92,7 @@ A release has **no known gaps**: a card showing that one of the release's featur
 For 1.0, that's a 0.9.3 user. It says first:
 - that the upgrade is one way: **back up first, there's no going back**;
 - what Help → Restore the 0.9 Board Backup… brings back (the board's cards and history), and that it isn't a way back for worktrees, sessions or lanes;
-- that every 0.9.3 Hive on the workspace must be closed first.
+- that every 0.9.3 on the workspace must be closed first.
 
 Then it says what's new.
 
@@ -105,7 +105,7 @@ These are the steps for an uploaded release: an RC, or the release. The commit t
 3. **Version and release notes.** Set `version` in `package.json` (semver: `0.2.0`, or `0.2.0-beta.1` for a pre-release) and run `npm install` so `package-lock.json` matches. In `CHANGELOG.md`, turn the **Unreleased** section into `## <version> — <date>`: it is bundled into the app (Docs → Release Notes), and the same text goes in the GitHub release. Commit everything; the script refuses to run on a dirty tree. It also refuses stale third-party notices (`npm run licenses -- --check`; the unit tests and CI check the same): run `npm run licenses` and commit them. When the release adds dependencies, bundled libraries, assets or installer parts, audit their licences first with the **licence-audit** skill (vendored material and what the installer adds included; `scripts/thirdPartyNotices.mjs` lists the bundled renderer libraries).
 4. **The real tier on that commit.** The full fake set must pass on this code first (`npm run e2e -- --all --build --record`). Then the real tier, with the CLIs signed in (the release-combwork skill checks that first): `npm run e2e -- --all --real --build --record`. The manifest needs that one record of both tiers: Copilot's suites run the real Copilot CLI offline, so they are in the fake set, and an `--only-real` record has no Copilot version (0.8.0 found this). Keep the record. Every real suite must pass: a suite that failed or was skipped for the environment (a sign-in, a usage limit, the network) is rerun on this exact code, with a stable CLI version and its sign-in in place, before step 5. A reviewer's acceptance of a skip doesn't stand in for that: `npm run tested-clis` requires every real suite of each CLI to have run and passed. The real tier may also run one CLI at a time (when one CLI's suites can't share the machine with another's, as Codex's with a Store PowerShell 7 for 0.9.2, #585): each run on this same commit, with `--record`, its record kept.
 5. **The tested-with manifest.** Run `npm run tested-clis` on that record (or on the per-CLI records, all of this commit: `npm run tested-clis -- <record> <record>…`, each CLI's entry from the record where all its real suites ran and passed; never a record merged by hand, #1105) and commit `resources/tested-clis.json` (what Provider Setup shows as "Tested with", #365). It writes each CLI's version from the record, and exits 1 if a CLI's real suites ran different versions or the record doesn't say which. A CLI can update itself during the run (Codex went from 0.160.1 to 0.161.0 during 0.4.0's): then rerun the real tier on one stable version. A new real-tier failure after a CLI update may be a real change in behaviour (#396), not noise. `npm run release` refuses a manifest that isn't from a run on this code, so only the manifest may differ since the run. Each CLI's entry comes from this run's real suites, which run in the test homes (`%LOCALAPPDATA%\hive-test\claude` and `…\codex`), not in your own `~/.claude` or `~/.codex`; the sign-ins are in the release-combwork skill and tests/e2e/README.md.
-6. **Build and upload:** `npm run release`. It uses your `gh` login (`gh auth status` to check), builds, and creates or updates the draft release `v<version>` (titled **Combwork <version>**, package.json's productName; releases before the rename, HI-2458, were titled **Hive Desktop <version>**, and before 0.5.0 **Hive <version>**) with the three files. It builds in the checkout's own `dist` by `npm run dist`'s rules and writes `dist/build-info.json` for what it uploaded (Notes).
+6. **Build and upload:** `npm run release`. It uses your `gh` login (`gh auth status` to check), builds, and creates or updates the draft release `v<version>` (titled **Combwork <version>**, package.json's productName) with the three files. It builds in the checkout's own `dist` by `npm run dist`'s rules and writes `dist/build-info.json` for what it uploaded (Notes).
 7. **Review the draft** on GitHub. Write the release notes (the updater shows them in Combwork's update dialog; Markdown works). When the changelog is long, put a short summary at the top for that dialog. Tick **Set as a pre-release** for a beta, then **Publish**. Publishing creates the tag.
 8. **Check** from an installed copy: Help → Check for Updates.
 

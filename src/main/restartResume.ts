@@ -709,7 +709,7 @@ async function tellAssistants(resumed: readonly RestartEntry[], not: readonly Re
     }
   for (const [ws, r] of byWs) {
     const home = assistantHome(ws)
-    if (!existsSync(join(dataFolder(home, 'assistant'), 'project.json'))) continue
+    if (!existsSync(join(dataFolder(home), 'project.json'))) continue
     const first = r.resumed[0] ?? r.not[0]
     const versions = first.from && first.from !== app.getVersion() ? ` (${first.from} → ${app.getVersion()})` : ''
     const resumedList = r.resumed.map((e) => `${e.agentName} (${e.project})`).join(', ')

@@ -15,8 +15,8 @@
     "audience": "both"
   },
   "content.mcp.badName": {
-    "text": "Server names may contain letters, numbers, \"-\" and \"_\" (max 64 characters). \"combwork\" and \"hive\" are reserved.",
-    "note": "An error adding an MCP server: its name has a character a server name can't have, is too long, or is combwork or hive (Combwork's own server and its name before HI-2463: keep them).",
+    "text": "Server names may contain letters, numbers, \"-\" and \"_\" (max 64 characters). \"combwork\" is reserved.",
+    "note": "An error adding an MCP server: its name has a character a server name can't have, is too long, or is combwork (Combwork's own server: keep it as it is).",
     "audience": "both"
   },
   "content.mcp.badRecord": {

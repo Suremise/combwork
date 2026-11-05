@@ -36,8 +36,8 @@ import { handoversFor } from './notes'
 import { assistantInstructions } from './modes'
 import { ASSISTANT_NAME, assistantModeId } from '../shared/assistant'
 import { MARKED_LOG } from '../shared/redact'
-import { APP_NAME, DEV_APP_NAME, appName, legacyProfileFolder, profileFolder } from '../shared/appName'
-import { chooseProfile, choiceLine, setProfileChoices } from './profileFolders'
+import { APP_NAME, DEV_APP_NAME, appName, profileFolder } from '../shared/appName'
+import { chooseProfile, choiceLine, ProfileMoveRefused, setProfileChoices, type ProfileChoice } from './profileFolders'
 import { upgradeProfileFiles } from './nameUpgradeProfile'
 import { syncLoginItemAtStart } from './loginItem'
 import { startProfileNotices } from './profileNotices'
@@ -91,6 +91,7 @@ import { killAll } from './ptyHost'
 import { allLeftovers, closeProcessTracking, leftoversOffer, leftoversSaved, leftoversSettled, recordEndedLaunches, restoreLeftovers, settleAllLeftovers, settleLeftovers, warmProcessTracking } from './agentProcesses'
 import { leftoversSummary } from '../shared/agentProcesses'
 import { installShims } from './progressReporters/shims'
+import { oldProfileFolder, removeOldShims } from './nameUpgradeProfile'
 import { insideArchive, onCorruptFile, renameDiagnostics } from './fsutil'
 import { apiEnv, assistantApiUrl, startApiServer, startHookServer } from './servers'
 import { clearDiscovery, clearDiscoveryNow } from './apiDiscovery'
@@ -126,7 +127,7 @@ import { startLaneStarts } from './laneStarts'
 import { startHandOverCheck } from './handOverCheck'
 import { startLaunchSides } from './launchSides'
 import { checkInstallDir, setLanguageBeforeReady } from './installDir'
-import { exitBy, logCrashDumps, startCrashDumps, startExitLog } from './exitLog'
+import { exitBeforeProfile, exitBy, logCrashDumps, startCrashDumps, startExitLog } from './exitLog'
 import { checkLastRun, lastUnexpectedClose, startRunMarker, startupStep, tellUnexpectedClose } from './lastRun'
 import { initRestartRecovery, loadRestartRecord, recordClosing, startRestartRecovery, stopRestartRecovery, stopWatchingRestartRequests, watchRestartRequests } from './restartResume'
 import type { RestartReason } from '../shared/restartResume'
@@ -143,18 +144,43 @@ let quitting = false
 // Development builds use their own profile (and Agent API port, see servers.ts) so they can run
 // alongside the installed Hive — e.g. while developing Hive from a session inside Hive.
 // CW_USER_DATA overrides the profile folder for tests. The installed app's is set too: Electron would name it after
-// productName. The profile folders are Combwork's (HI-2461), which the installer moves Hive's to (HI-2460); while
-// Combwork's isn't there, Hive's is used (profileFolders.ts: it only looks, never moves or deletes), and a notice says so.
+// productName. The profile folders are Combwork's (HI-2461), which the installer moves Hive's to (HI-2460); where it
+// hasn't, the names upgrade moves them here (profileFolders.ts), and a move it can't make refuses the start.
 const profileLines: string[] = []
 const chooseProfiles = (roamingParent: string, localParent: string, packaged: boolean): void => {
-  const roaming = chooseProfile(roamingParent, legacyProfileFolder(packaged), profileFolder(packaged))
-  const local = chooseProfile(localParent, legacyProfileFolder(packaged), profileFolder(packaged))
+  let roaming: ProfileChoice
+  let local: ProfileChoice
+  try {
+    roaming = chooseProfile(roamingParent, oldProfileFolder(packaged), profileFolder(packaged))
+    local = chooseProfile(localParent, oldProfileFolder(packaged), profileFolder(packaged), { record: true })
+  } catch (e) {
+    if (!(e instanceof ProfileMoveRefused)) throw e
+    refuseStart(e)
+  }
   setProfileChoices({ roaming, local })
   for (const c of [roaming, local]) {
     const line = choiceLine(c, userText)
     if (line) profileLines.push(line)
   }
   app.setPath('userData', roaming.use)
+}
+/**
+ * A profile folder's move refused (HI-2594): said, then the start ends, nothing made in its place. Before the app is
+ * ready and before the profile (and its language setting) is read: in English, as the install folder's check (installDir.ts).
+ * A test copy only writes it to stderr: it never shows a window.
+ */
+function refuseStart(e: ProfileMoveRefused): never {
+  const title = tr(msg({ id: 'main.profileMove.refusedTitle', defaultMessage: "Combwork couldn't move its data folder", description: "The title of an error box at start (HI-2594): Combwork's data folder from before (named Hive, the app's old name) has to be renamed to Combwork's before Combwork can start, and the rename failed. Nothing was lost." }))
+  const text = tr(msg({ id: 'main.profileMove.refused', defaultMessage: "Combwork's data from before it was renamed is in {from}, and Combwork couldn't rename that folder to {to}: {reason}. Nothing was changed or lost. Close any copy of Hive or Combwork that is still running, then start Combwork again.", description: "The text of an error box at start (HI-2594): Combwork's data folder from Hive Desktop (the app's old name, keep it) couldn't be renamed to Combwork's. {from} and {to} are folder paths; {reason} says why, in English (e.g. \"it couldn't be renamed (EBUSY)\"). Hive and Combwork are the app's old and new names: keep them." }), { from: e.from, to: e.to, reason: e.reason })
+  process.stderr.write(`${title}: ${e.message}\n`) // i18n-ignore: a line for whoever started it from a shell
+  if (!testQuiet()) {
+    try {
+      dialog.showErrorBox(title, text)
+    } catch {
+      // Said on stderr: the start ends all the same.
+    }
+  }
+  exitBeforeProfile(1)
 }
 // A test copy of the choice (unpackaged only): made in CW_TEST_PROFILE_CHOOSE's appdata and localappdata folders,
 // never the real ones, with a dev build's names.
@@ -1050,8 +1076,10 @@ app.whenReady().then(async () => {
     workspaceFor(p)?.scheduleRefresh()
   })
   sessions.apiEnv = apiEnv
-  // hive-progress on every session's PATH (#137): shims in Hive's bin folder, timings beside them.
-  void installShims(join(app.getPath('userData'), 'bin'), { exec: process.execPath, script: unpackedScript('cw-progress.js'), data: join(app.getPath('userData'), 'progress') }).then((dir) => {
+  // cw-progress on every session's PATH (#137): shims in Combwork's bin folder, timings beside them; the old names'
+  // shims removed first (the names upgrade, HI-2594).
+  const binDir = join(app.getPath('userData'), 'bin')
+  void removeOldShims(binDir).then(() => installShims(binDir, { exec: process.execPath, script: unpackedScript('cw-progress.js'), data: join(app.getPath('userData'), 'progress') })).then((dir) => {
     sessions.binDir = dir
     if (!dir) log.warn("Couldn't write the cw-progress command into Combwork's bin folder; sessions start without it")
   })

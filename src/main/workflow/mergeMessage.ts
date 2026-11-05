@@ -18,13 +18,14 @@ export interface MergeMessageInputs {
 }
 
 /**
- * A `Combwork-…:` trailer line, as Combwork writes them (and a builder may have copied into a commit of the branch), or
- * a `Hive-…:` one from before 1.1 (HI-2588): a commit Combwork makes now carries neither from its branch. The branch's
- * own commits keep theirs: their history isn't rewritten.
+ * A `Combwork-…:` trailer line, as Combwork writes them (and a builder may have copied into a commit of the branch): a
+ * commit Combwork makes carries none from its branch. The branch's own commits keep theirs: their history isn't
+ * rewritten. A commit's text from before 1.1 is history, and Combwork reads nothing of it (HI-2594): a line in it is
+ * kept as written, whatever it says.
  */
-const CARD_TRAILER = /^(?:Combwork|Hive)-[A-Za-z-]+:/
+const CARD_TRAILER = /^Combwork-[A-Za-z-]+:/
 
-/** A message without Combwork's (or Hive's) trailer lines, its runs of blank lines (where they were) made one, trimmed. */
+/** A message without Combwork's trailer lines, its runs of blank lines (where they were) made one, trimmed. */
 function withoutCardTrailers(m: string): string {
   return m
     .split(/\r?\n/)
@@ -36,8 +37,8 @@ function withoutCardTrailers(m: string): string {
 
 /**
  * The branch's own message (G19, the branch's own): one commit's message as it is; several, each one's in turn, oldest
- * first, the first one's subject the commit's subject (as git's own squash message joins them). `Combwork-` (and pre-1.1
- * `Hive-`) trailers left out. A branch with no message of its own (only merges) takes the card's title, with no key.
+ * first, the first one's subject the commit's subject (as git's own squash message joins them). `Combwork-` trailers left
+ * out (a pre-1.1 `Hive-` one is kept as written). A branch with no message of its own (only merges) takes the card's title, with no key.
  */
 export function branchMessage(messages: string[], title: string): string {
   const own = messages.map(withoutCardTrailers).filter(Boolean)

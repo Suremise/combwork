@@ -1,4 +1,4 @@
-import { LEGACY_TOOLS_SERVER, TOOLS_SERVER } from '../../../shared/assistantTools'
+import { TOOLS_SERVER } from '../../../shared/assistantTools'
 import { homedir } from 'os'
 import { msg, tr } from '../../../shared/i18n'
 import { basename, join, resolve } from 'path'
@@ -298,10 +298,6 @@ export class CopilotAdapter implements ProviderAdapter {
     if (launchOverrides(ctx.overrides, COPILOT, 'mcpIsolation')) {
       args.push('--disable-builtin-mcps')
       for (const name of this.otherMcpServers(ctx.cwd)) if (!ctx.mcpServers[name]) args.push('--disable-mcp-server', name)
-    } else if (ctx.mcpServers[TOOLS_SERVER] && !ctx.mcpServers[LEGACY_TOOLS_SERVER] && this.otherMcpServers(ctx.cwd).includes(LEGACY_TOOLS_SERVER)) {
-      // A user's own server under Combwork's name before HI-2463 (their copy of its server, with the old hive_* tools):
-      // off for this session whatever the switch says, so the agent gets one set of Combwork's tools (as for Codex).
-      args.push('--disable-mcp-server', LEGACY_TOOLS_SERVER)
     }
     // Hive's own tools run without asking in every mode, as for the other CLIs: the Agent API decides what an agent may
     // do with them. The Assistant only the ones its Control settings let it use without asking (trustedHiveTools).

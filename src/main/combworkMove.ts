@@ -14,7 +14,7 @@ import { HiveError, errorText, hiveError } from './hiveError'
 import { excludeLine, gitDirOf, vcsOf } from './hiveVcs'
 import { createLogger, userText } from './logger'
 import { othersPresentByProcess } from './presence'
-import { dataFolder, ours, type HostKind } from './hiveFolder'
+import { ours, type HostKind } from './hiveFolder'
 import { withNamedLock } from './repoLock'
 import { projectNamesDone, record as recordNames, upgradeWorkspace, workspaceNeeds } from './nameUpgrade'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
@@ -179,8 +179,16 @@ export async function hostsOf(ws: string): Promise<{ host: string; kind: HostKin
   return out
 }
 
-/** The workspace's tree in use: `.combwork` once there, else its own `.hive`, else `.combwork` (to be made). */
-export const treeOf = (ws: string): string => dataFolder(ws, 'workspace')
+/**
+ * The workspace's tree as the move finds it: `.combwork` once there, else its own `.hive` (the move's input, and a 0.9
+ * profile's connection order's, accounts.ts), else `.combwork` (to be made). Never makes either.
+ */
+export function treeOf(ws: string): string {
+  const now = join(ws, CW_DIR)
+  if (present(now)) return now
+  const old = join(ws, LEGACY_HIVE_DIR)
+  return present(old) && ours(old, 'workspace') ? old : now
+}
 
 /**
  * The moves a workspace's folders show now (s65): each host whose `.combwork` holds the marker. The Assistant's home's
@@ -459,7 +467,8 @@ async function movedUnderLock(ws: string, o: MoveOptions & { only?: string }, st
   // Then what is kept inside under Hive's names (HI-2587, nameUpgrade.ts), still under the lock and before anything of
   // the workspace is admitted.
   const projects = (await hostsOf(ws)).filter((h) => h.kind === 'project').map((h) => h.host)
-  await upgradeWorkspace(ws, { stop, checkpoint: checkpointOffMain, copyFolders: copyFoldersOffMain, projects, only: o.only })
+  const setAside = async (cards: number): Promise<void> => (await import('./boardStore')).tellSetAside(ws, cards)
+  await upgradeWorkspace(ws, { stop, checkpoint: checkpointOffMain, copyFolders: copyFoldersOffMain, projects, only: o.only, setAside })
   const moves = await deriveMoves(ws)
   publish(ws, moves)
   if (!moves.length || (await doneHash(ws)) === mapHash(moves)) return { late: false, moved }

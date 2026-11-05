@@ -1,7 +1,7 @@
 {
   "mcp.catalog.badName": {
-    "text": "Server names may contain letters, numbers, \"-\" and \"_\" (max 64 characters). \"combwork\" and \"hive\" are reserved.",
-    "note": "An error installing a catalogue server (HI-545) under a name a server can't have.",
+    "text": "Server names may contain letters, numbers, \"-\" and \"_\" (max 64 characters). \"combwork\" is reserved.",
+    "note": "An error installing a catalogue server (HI-545) under a name a server can't have. Keep combwork as it is (Combwork's own server).",
     "audience": "both"
   },
   "mcp.catalog.expired": {

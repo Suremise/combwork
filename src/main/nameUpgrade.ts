@@ -88,6 +88,8 @@ export interface UpgradeOptions {
   projects: readonly string[]
   /** A single project that came into the open workspace later: its own steps only. */
   only?: string
+  /** Cards an older version saved in the board's stub were set aside (HI-2594): the board's notice says so. */
+  setAside?: (cards: number) => Promise<void> | void
 }
 
 /** The steps (under the move's lock, nothing of the workspace open): each throws a HiveError naming it when it can't. */
@@ -105,7 +107,8 @@ export async function upgradeWorkspace(ws: string, o: UpgradeOptions): Promise<v
   // A file that couldn't be read now (another program holds it) is converted at the next open: no record till then.
   let settled = true
   await step('files', o.stop, async () => {
-    await upgradeWorkspaceFiles(dir, (await import('./workspace')).WORKSPACE_README)
+    const cards = await upgradeWorkspaceFiles(dir, (await import('./workspace')).WORKSPACE_README)
+    if (cards) await o.setAside?.(cards)
     // workspace.json's and the templates' stored values (HI-2598, nameUpgradeValues.ts), before its load reads them.
     if (!(await upgradeWorkspaceValues(ws))) settled = false
   })

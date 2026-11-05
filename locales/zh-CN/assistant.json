@@ -350,7 +350,7 @@
   "assistant.sidebar.saveFirst": "请先保存或放弃对 {name} 的更改",
   "assistant.sidebar.saveFirstDetail": "它有未保存的编辑，否则这些编辑会以旧名称保存。",
   "assistant.sidebar.serverFromFile": "从文件添加 MCP 服务器（.json 或 .zip）…",
-  "assistant.sidebar.serverNameRule": "请使用字母、数字、“-”和“_”。“combwork”和“hive”为保留名称。",
+  "assistant.sidebar.serverNameRule": "请使用字母、数字、“-”和“_”。“combwork”为保留名称。",
   "assistant.sidebar.sharedNotes": "共享笔记",
   "assistant.sidebar.skillFromFile": "从文件添加技能（.md 或 .zip）…",
   "assistant.sidebar.skills": "技能",

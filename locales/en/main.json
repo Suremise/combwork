@@ -1091,17 +1091,13 @@
     "defaultMessage": "{share, number, ::percent} of the {window, select, hours {{hours, plural, one {#-hour limit} other {#-hour limit}}} weekly {weekly limit} other {{label} limit}} used on {connection}",
     "description": "A notice (HI-1756): how much of a plan's usage limit is used ({share}: \"85%\") on one connection, a sign-in the user named ({connection}: \"Max 1\"). The limit is a rolling window of {hours} hours (the 5-hour one), the weekly one, or another the provider names itself ({label}, in English as the provider says it)."
   },
-  "main.profileMove.fallbackBody": {
-    "defaultMessage": "{n, plural, one {The Combwork folder isn't there, so Combwork runs from {folders}, Hive Desktop's, as before.} other {The Combwork folders aren't there, so Combwork runs from {folders}, Hive Desktop's, as before.}} Running the Combwork installer with Combwork closed moves {n, plural, one {it} other {them}}; nothing is lost meanwhile.",
-    "description": "The notice that Combwork uses its old data folders. {folders} lists their paths; {n} is how many (1 or 2). \"Installing Combwork\": running the installer of the app under its new name."
+  "main.profileMove.refused": {
+    "defaultMessage": "Combwork's data from before it was renamed is in {from}, and Combwork couldn't rename that folder to {to}: {reason}. Nothing was changed or lost. Close any copy of Hive or Combwork that is still running, then start Combwork again.",
+    "description": "The text of an error box at start (HI-2594): Combwork's data folder from Hive Desktop (the app's old name, keep it) couldn't be renamed to Combwork's. {from} and {to} are folder paths; {reason} says why, in English (e.g. \"it couldn't be renamed (EBUSY)\"). Hive and Combwork are the app's old and new names: keep them."
   },
-  "main.profileMove.fallbackBodyDev": {
-    "defaultMessage": "{n, plural, one {The {name} folder isn't there, so this dev build runs from {folders}.} other {The {name} folders aren't there, so this dev build runs from {folders}.}} To move {n, plural, one {it} other {them}}, close Combwork and rename {n, plural, one {it} other {each}} to {name}.",
-    "description": "The same notice for a development build of Combwork (no installer moves its folders). {name} is the new folder name (Combwork-Dev: keep it as it is); {folders} lists the old folders' paths; {n} is how many (1 or 2)."
-  },
-  "main.profileMove.fallbackTitle": {
-    "defaultMessage": "Combwork is using Hive Desktop's data folders",
-    "description": "A notice at start (HI-2461): the app's data folders are now named Combwork (the app's new name, keep it as it is), which the installer moves them to; they weren't moved yet, so Combwork uses its old folders. Nothing is lost."
+  "main.profileMove.refusedTitle": {
+    "defaultMessage": "Combwork couldn't move its data folder",
+    "description": "The title of an error box at start (HI-2594): Combwork's data folder from before (named Hive, the app's old name) has to be renamed to Combwork's before Combwork can start, and the rename failed. Nothing was lost."
   },
   "main.profileMove.signInBody": {
     "defaultMessage": "Since its data moved to the Combwork folder, {names} {n, plural, one {shows} other {show}} signed out. Sign in again in Settings → Accounts & Connections.",

@@ -913,6 +913,7 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
     tree(top, {
       'Temp/claude/D--proj/session/scratchpad/shots/a.png': 0,
       'Temp/claude/D--proj/session/scratchpad/kept/b.png': 0,
+      'Temp/cw-r2-291-x/c.png': 0,
       'Temp/hive-r2-291-x/c.png': 0,
       'Temp/other-app/d.txt': 0,
       'hive-test/scratch/probe-1/e.png': 0,
@@ -928,9 +929,9 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
     return { top, tmp, testRoot, pad, homes, clear }
   }
 
-  it('empties (or makes) a probe’s folder in a scratchpad, a hive… temp folder, hive-test\\scratch or a suite’s own e2e folder', () => {
+  it('empties (or makes) a probe’s folder in a scratchpad, a cw… temp folder, hive-test\\scratch or a suite’s own e2e folder', () => {
     const { tmp, testRoot, pad, clear } = roots()
-    for (const p of [join(pad, 'shots'), join(tmp, 'hive-r2-291-x'), join(testRoot, 'scratch', 'probe-1'), join(testRoot, 'e2e', 'startall-ws')]) {
+    for (const p of [join(pad, 'shots'), join(tmp, 'cw-r2-291-x'), join(testRoot, 'scratch', 'probe-1'), join(testRoot, 'e2e', 'startall-ws')]) {
       expect(clear(p)).toBe(p)
       expect(readdirSync(p)).toEqual([])
     }
@@ -947,6 +948,8 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
       [tmp, /outside the temp folder and hive-test/],
       [join(top, 'elsewhere'), /outside the temp folder and hive-test/],
       [join(tmp, 'other-app'), /isn't a probe's folder/],
+      // One-way rename (HI-2600): a hive… temp folder is no longer a probe's.
+      [join(tmp, 'hive-r2-291-x'), /isn't a probe's folder: .*cw… folders/],
       [join(tmp, 'claude'), /isn't a probe's folder/],
       [join(tmp, 'claude', 'D--proj', 'session'), /isn't a probe's folder/],
       [pad, /isn't a probe's folder/],
@@ -959,6 +962,7 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
     ] as const
     for (const [p, why] of refused) expect(() => clear(p), p).toThrow(why)
     expect(readFileSync(join(tmp, 'other-app', 'd.txt'), 'utf8')).toHaveLength(100)
+    expect(readdirSync(join(tmp, 'hive-r2-291-x'))).toEqual(['c.png'])
     expect(readFileSync(join(testRoot, 'e2e', 'lanes', '0', 'board', 'g.png'), 'utf8')).toHaveLength(100)
   })
 
@@ -980,14 +984,14 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
     expect(() => clear(join(pad, 'linked'))).toThrow(/is a link/)
     expect(() => clear(join(pad, 'linked', 'sub'))).toThrow(/reached through a link/)
     expect(existsSync(join(outside, 'precious.txt'))).toBe(true)
-    writeFileSync(join(tmp, 'hive-file'), 'x')
-    expect(() => clear(join(tmp, 'hive-file'))).toThrow(/is a file/)
+    writeFileSync(join(tmp, 'cw-file'), 'x')
+    expect(() => clear(join(tmp, 'cw-file'))).toThrow(/is a file/)
   })
 
   it('never when an allowed root, or a folder above it, is a link: the delete would land outside (round 2)', () => {
     const top = temp('hive-cleardir-rootlink-')
     const outside = join(top, 'outside')
-    tree(top, { 'outside/scratch/probe/sentinel.txt': 0, 'outside/scratch/probe/auth.json': 0, 'outside/Temp/hive-x/sentinel.txt': 0, 'realtmp/hive-y/keep.txt': 0 })
+    tree(top, { 'outside/scratch/probe/sentinel.txt': 0, 'outside/scratch/probe/auth.json': 0, 'outside/Temp/cw-x/sentinel.txt': 0, 'realtmp/cw-y/keep.txt': 0 })
     // hive-test itself is a junction to the outside folder; and the configured home is that outside place.
     const testRoot = join(top, 'hive-test')
     symlinkSync(outside, testRoot, 'junction')
@@ -997,9 +1001,9 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
     // A folder above the temp root is a junction.
     const above = join(top, 'linkedparent')
     symlinkSync(outside, above, 'junction')
-    expect(() => clearDir(join(above, 'Temp', 'hive-x'), { board: { cards: [] }, temp: join(above, 'Temp'), testRoot: join(top, 'nowhere'), homes: [] })).toThrow(/reached through a link/)
+    expect(() => clearDir(join(above, 'Temp', 'cw-x'), { board: { cards: [] }, temp: join(above, 'Temp'), testRoot: join(top, 'nowhere'), homes: [] })).toThrow(/reached through a link/)
     // Everything is where it was.
-    for (const f of ['scratch/probe/sentinel.txt', 'scratch/probe/auth.json', 'Temp/hive-x/sentinel.txt']) expect(existsSync(join(outside, f)), f).toBe(true)
+    for (const f of ['scratch/probe/sentinel.txt', 'scratch/probe/auth.json', 'Temp/cw-x/sentinel.txt']) expect(existsSync(join(outside, f)), f).toBe(true)
   })
 
   it('a test home is recognised as it really is: one reached through a link elsewhere still protects its folder', () => {
@@ -1016,7 +1020,7 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
     const { tmp, pad, clear } = roots()
     expect(() => clear(join(pad, 'kept'))).toThrow(/must stay: cited by #401/)
     expect(readdirSync(join(pad, 'kept'))).toEqual(['b.png'])
-    expect(() => clear(join(tmp, 'hive-r2-291-x'), { tasksDir: null })).toThrow(/must stay: no board was found/)
+    expect(() => clear(join(tmp, 'cw-r2-291-x'), { tasksDir: null })).toThrow(/must stay: no board was found/)
     // Paths in the temp folder are matched as `Temp\\…`: a card naming hive-test's own claude home doesn't keep a
     // scratchpad under `Temp\\claude` (it did, read as `hive-test\\claude`); nor does one naming the scratchpads' folders
     // as a pattern (areas, like hive-test's lanes).
@@ -1029,9 +1033,9 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
     }
     expect(clear(join(pad, 'shots'), others)).toBe(join(pad, 'shots'))
     // …while the temp path itself, as a card writes it, does.
-    const cited = { cards: [card(402, 'see C:\\Users\\X\\AppData\\Local\\Temp\\hive-r2-291-x\\c.png')] }
-    expect(() => clear(join(tmp, 'hive-r2-291-x'), cited)).toThrow(/cited by #402/)
-    expect(readdirSync(join(tmp, 'hive-r2-291-x'))).toEqual(['c.png'])
+    const cited = { cards: [card(402, 'see C:\\Users\\X\\AppData\\Local\\Temp\\cw-r2-291-x\\c.png')] }
+    expect(() => clear(join(tmp, 'cw-r2-291-x'), cited)).toThrow(/cited by #402/)
+    expect(readdirSync(join(tmp, 'cw-r2-291-x'))).toEqual(['c.png'])
   })
 
   it('probeDir gives a new folder every call, in hive-test\\scratch, named for the probe', () => {

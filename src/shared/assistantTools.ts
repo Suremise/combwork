@@ -123,14 +123,8 @@ export function assistantTools(level: AssistantControlLevel | string | undefined
  */
 export const TOOLS_SERVER = 'combwork'
 
-/**
- * Its name before HI-2463, still reserved: a workspace server named hive is never given, and a user's own native
- * `[mcp_servers.hive]` (Codex) is turned off for Combwork's sessions, so no agent gets the old hive_* tools beside cw_*.
- */
-export const LEGACY_TOOLS_SERVER = 'hive'
-
-/** Whether a name is one of the reserved server names (case-insensitive, as servers' names are compared). */
-export const isReservedServerName = (name: string): boolean => [TOOLS_SERVER, LEGACY_TOOLS_SERVER].includes(name.trim().toLowerCase())
+/** Whether a name is the reserved server name, Combwork's own (case-insensitive, as servers' names are compared). */
+export const isReservedServerName = (name: string): boolean => name.trim().toLowerCase() === TOOLS_SERVER
 
 /** Every tool the combwork MCP server has (a test checks it against hive-mcp.ts): the only tool names metrics record. */
 export const CW_TOOLS: readonly string[] = [

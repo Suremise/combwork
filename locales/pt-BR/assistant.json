@@ -350,7 +350,7 @@
   "assistant.sidebar.saveFirst": "Salve ou descarte primeiro suas alterações em {name}",
   "assistant.sidebar.saveFirstDetail": "Há edições não salvas, que de outra forma seriam salvas com o nome antigo.",
   "assistant.sidebar.serverFromFile": "Adicionar servidor MCP de um arquivo (.json ou .zip)…",
-  "assistant.sidebar.serverNameRule": "Use letras, números, “-” e “_”. “combwork” e “hive” são reservados.",
+  "assistant.sidebar.serverNameRule": "Use letras, números, “-” e “_”. “combwork” é reservado.",
   "assistant.sidebar.sharedNotes": "Notas compartilhadas",
   "assistant.sidebar.skillFromFile": "Adicionar skill de um arquivo (.md ou .zip)…",
   "assistant.sidebar.skills": "Skills",

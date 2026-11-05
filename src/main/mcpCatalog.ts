@@ -13,7 +13,7 @@ import { existsSync } from 'original-fs'
 import { readFile, stat } from 'original-fs/promises'
 import { msg } from '../shared/i18n/msg'
 import { tr } from '../shared/i18n'
-import { OUR_CATALOG_URL, OUR_OLD_CATALOG_URLS, catalogRowShown, isOurCatalogUrl, sameCatalogSource, catalogUrlAllowed, checkRequirements, compareVersions, editionOf, readCatalog, type PcFacts, type ReadCatalog } from '../shared/mcpCatalog'
+import { OUR_CATALOG_URL, catalogRowShown, isOurCatalogUrl, sameCatalogSource, catalogUrlAllowed, checkRequirements, compareVersions, editionOf, readCatalog, type PcFacts, type ReadCatalog } from '../shared/mcpCatalog'
 import type { McpCatalogCheck, McpCatalogFilter, McpCatalogPrepared, McpCatalogRow, McpCatalogServer, McpCatalogSettings, McpCatalogSourcePage, McpServerDef, McpShown } from '../shared/types'
 import { advanced } from './advanced'
 import { config } from './config'
@@ -86,7 +86,7 @@ export function catalogSources(): { url: string; ours: boolean; noted: boolean }
 
 /** The sources changed in Settings (HI-545): ours on or off, and the user's own (added, turned on or off, removed, reordered). */
 export function setCatalogSources(next: McpCatalogSettings): McpCatalogSettings {
-  const seen = new Set<string>([OUR_CATALOG_URL, ...OUR_OLD_CATALOG_URLS])
+  const seen = new Set<string>([OUR_CATALOG_URL])
   const sources: McpCatalogSettings['sources'] = []
   const was = config.settings.mcpCatalogs?.sources ?? []
   for (const x of Array.isArray(next?.sources) ? next.sources : []) {
@@ -412,7 +412,7 @@ export function dropPrepared(id: string): void {
  */
 export async function installCatalogServer(id: string, name: string, replace: boolean): Promise<void> {
   const h = heldFor(id)
-  if (!validMcpName(name)) throw hiveError(msg({ id: 'mcp.catalog.badName', defaultMessage: 'Server names may contain letters, numbers, "-" and "_" (max 64 characters). "combwork" and "hive" are reserved.', description: 'An error installing a catalogue server (HI-545) under a name a server can\'t have.' }), undefined, { kind: 'invalid' })
+  if (!validMcpName(name)) throw hiveError(msg({ id: 'mcp.catalog.badName', defaultMessage: 'Server names may contain letters, numbers, "-" and "_" (max 64 characters). "combwork" is reserved.', description: 'An error installing a catalogue server (HI-545) under a name a server can\'t have. Keep combwork as it is (Combwork\'s own server).' }), undefined, { kind: 'invalid' })
   const p = h.prepared
   const def = name === p.server.name ? p.def : { ...retarget(p.def, p.server.name, name) }
   await inTurn(() =>

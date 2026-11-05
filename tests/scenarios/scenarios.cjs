@@ -888,7 +888,7 @@ const editSkill = (c, name) => require('fs').appendFileSync(require('path').join
 /** The successful tool calls whose input runs `needle` (a script by name), with their output. */
 const runs = (o, needle) => o.tools.filter((t) => !t.isError && !/^(Write|Edit|MultiEdit|Read)$/i.test(t.name) && t.input.includes(needle))
 
-/** A test suite that says it takes minutes (its tests take a few seconds), for the hive-progress scenarios (#167). */
+/** A test suite that says it takes minutes (its tests take a few seconds), for the cw-progress scenarios (#167). */
 const SLOW_TESTS = {
   'package.json': JSON.stringify({ name: 'alpha', private: true, scripts: { test: 'node test.js' } }, null, 2) + '\n',
   'test.js': "// The full suite: about two minutes on CI.\nsetTimeout(() => console.log('3 passing'), 4000)\n"
@@ -1049,7 +1049,7 @@ const timedWaits = (c, rel) => require('../../scripts/testWaits.mjs').findWaits(
 /** Whether the project's tests pass (`node --test`), with the run context's environment. */
 const testsPass = (c) => require('child_process').spawnSync(process.execPath, ['--test'], { cwd: c.alpha, env: require('../e2e/runContext.cjs').baseEnv(), encoding: 'utf8', timeout: 60000 }).status === 0
 /** The tool calls that ran the test suite. */
-/** A test run through hive-progress with a title of its own (#251), not the command line by default. */
+/** A test run through cw-progress with a title of its own (#251), not the command line by default. */
 const titled = (t) => /(?:cw|hive)-progress(\.cmd)?\s+--title(\s+|=)\S/.test(t.input)
 const testRuns = (o) => o.tools.filter((t) => !/^(Write|Edit|MultiEdit|Read)$/i.test(t.name) && /npm(\.cmd)? (run )?test\b|node test\.js/.test(t.input))
 /** Whether the session's contract was the one with long commands wrapped (`on`) or not, by its measured size. */
@@ -2077,30 +2077,30 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'progress-long-command',
-    title: 'A long test run, not asked for hive-progress: the agent runs it through hive-progress (the default)',
+    title: 'A long test run, not asked for cw-progress: the agent runs it through cw-progress (the default)',
     files: SLOW_TESTS,
     prompt: "Run this project's tests (npm test; the full suite takes about two minutes) and tell me whether they pass.",
     fake: 'work 1',
     expect: (o) => [
-      ['its guidance said to run long commands through hive-progress', contractWas(o, true), String(o.measures?.coreChars)],
-      ['ran the tests through hive-progress', testRuns(o).some((t) => /(?:cw|hive)-progress/.test(t.input)), testRuns(o).map((t) => t.input).join(' | ')],
+      ['its guidance said to run long commands through cw-progress', contractWas(o, true), String(o.measures?.coreChars)],
+      ['ran the tests through cw-progress', testRuns(o).some((t) => /(?:cw|hive)-progress/.test(t.input)), testRuns(o).map((t) => t.input).join(' | ')],
       ['gave the run a title for the user (#251)', testRuns(o).some(titled), testRuns(o).map((t) => t.input).join(' | ')],
       ['changed nothing on the board', !o.hiveCalls.some((x) => /cw_(create|update|reorder)_task/.test(x.tool))]
     ],
-    fakeSkips: ['ran the tests through hive-progress', 'gave the run a title for the user (#251)']
+    fakeSkips: ['ran the tests through cw-progress', 'gave the run a title for the user (#251)']
   },
   {
     id: 'progress-background',
-    title: 'A long test run started in the background: it goes through hive-progress too',
+    title: 'A long test run started in the background: it goes through cw-progress too',
     files: SLOW_TESTS,
     prompt: "Start this project's tests in the background (npm test; the full suite takes about two minutes), and tell me whether they pass when they finish.",
     fake: 'work 1',
     expect: (o) => [
-      ['its guidance said to run long commands through hive-progress', contractWas(o, true), String(o.measures?.coreChars)],
-      ['ran the tests through hive-progress', testRuns(o).some((t) => /(?:cw|hive)-progress/.test(t.input)), testRuns(o).map((t) => t.input).join(' | ')],
+      ['its guidance said to run long commands through cw-progress', contractWas(o, true), String(o.measures?.coreChars)],
+      ['ran the tests through cw-progress', testRuns(o).some((t) => /(?:cw|hive)-progress/.test(t.input)), testRuns(o).map((t) => t.input).join(' | ')],
       ['gave the run a title for the user (#251)', testRuns(o).some(titled), testRuns(o).map((t) => t.input).join(' | ')]
     ],
-    fakeSkips: ['ran the tests through hive-progress', 'gave the run a title for the user (#251)']
+    fakeSkips: ['ran the tests through cw-progress', 'gave the run a title for the user (#251)']
   },
   {
     id: 'watcher-stopped',
@@ -2139,15 +2139,15 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'progress-off',
-    title: 'Agents show long commands turned off (Settings → General): a long test run without hive-progress',
+    title: 'Agents show long commands turned off (Settings → General): a long test run without cw-progress',
     general: { progressCommands: false },
     files: SLOW_TESTS,
     prompt: "Run this project's tests (npm test; the full suite takes about two minutes) and tell me whether they pass.",
     fake: 'work 1',
     expect: (o) => [
-      ["its guidance said to use hive-progress only when asked", contractWas(o, false), String(o.measures?.coreChars)],
+      ["its guidance said to use cw-progress only when asked", contractWas(o, false), String(o.measures?.coreChars)],
       ['ran the tests', testRuns(o).length > 0],
-      ["didn't use hive-progress", !o.tools.some((t) => /(?:cw|hive)-progress/.test(t.input)), testRuns(o).map((t) => t.input).join(' | ')]
+      ["didn't use cw-progress", !o.tools.some((t) => /(?:cw|hive)-progress/.test(t.input)), testRuns(o).map((t) => t.input).join(' | ')]
     ],
     fakeSkips: ['ran the tests']
   },
@@ -3356,14 +3356,14 @@ module.exports.SCENARIOS = [
       const inCopy = ranAt.filter((r) => /[\\/]copies[\\/]/i.test(r.cwd))
       // What it does is the check, not which skill it read: Claude Code found --isolated without reading work-on-card (#1444).
       return [
-        ['ran the check isolated (hive-progress --check quick --isolated)', isolated.length > 0, o.tools.map((t) => t.input.slice(0, 100)).join(' | ')],
+        ['ran the check isolated (cw-progress --check quick --isolated)', isolated.length > 0, o.tools.map((t) => t.input.slice(0, 100)).join(' | ')],
         ['the check ran in a check copy, not the shared folder', inCopy.length > 0 && ranAt.every((r) => /[\\/]copies[\\/]/i.test(r.cwd)), JSON.stringify(ranAt)],
         ["…at the card's revision", inCopy.length > 0 && inCopy.every((r) => r.head === c.revision), `${c.revision} | ${JSON.stringify(ranAt)}`],
         ['changed nothing in the shared folder', o.gitStatus.trim() === '', o.gitStatus]
       ]
     },
     // The fakes' shell steps aren't tool calls in their transcripts: where the check ran shows it.
-    fakeSkips: ['ran the check isolated (hive-progress --check quick --isolated)']
+    fakeSkips: ['ran the check isolated (cw-progress --check quick --isolated)']
   },
   {
     id: 'card-loop-design-first',

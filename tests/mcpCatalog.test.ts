@@ -11,7 +11,7 @@ import { pathToFileURL } from 'url'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { strToU8, zipSync } from 'fflate'
 import * as electron from 'electron'
-import { OUR_CATALOG_URL, OUR_OLD_CATALOG_URLS, catalogRowShown, checkRequirements, compareVersions, editionOf, readCatalog, type PcFacts } from '../src/shared/mcpCatalog'
+import { OUR_CATALOG_URL, catalogRowShown, isOurCatalogUrl, sameCatalogSource, checkRequirements, compareVersions, editionOf, readCatalog, type PcFacts } from '../src/shared/mcpCatalog'
 import { tempDir } from './tempDir'
 
 const base = tempDir('hive-mcp-catalog-')
@@ -165,10 +165,10 @@ describe('installing and updating (HI-545)', () => {
   const source = (): string => pathToFileURL(join(share, 'catalog.json')).href
 
   /** Publishes demo at `version` to the share: its zip (running `script`, with `env`) and the catalogue listing it. */
-  const publish = (version: string, script = 'server.js', env: Record<string, string> = { DEMO_TOKEN: '${DEMO_TOKEN}' }, o: { folder?: string; size?: number; sha?: string; cw?: boolean } = {}): void => {
-    // Combwork's names (HI-2503) with cw, else those the catalogue used up to v1.1.1.
-    const def = { description: 'A demo server', command: 'node', args: [`\${${o.cw ? 'CW' : 'HIVE'}_MCP_DIR}/demo/${script}`], env }
-    const zip = zipSync({ [`${o.folder ?? 'demo'}/${o.cw ? 'combwork' : 'hive'}-mcp.json`]: strToU8(JSON.stringify(def)), [`${o.folder ?? 'demo'}/${script}`]: strToU8(`// demo ${version}`) })
+  const publish = (version: string, script = 'server.js', env: Record<string, string> = { DEMO_TOKEN: '${DEMO_TOKEN}' }, o: { folder?: string; size?: number; sha?: string; old?: boolean } = {}): void => {
+    // Combwork's names (HI-2503); with old, those the catalogue used up to v1.1.1, which aren't read (HI-2594).
+    const def = { description: 'A demo server', command: 'node', args: [`\${${o.old ? 'HIVE' : 'CW'}_MCP_DIR}/demo/${script}`], env }
+    const zip = zipSync({ [`${o.folder ?? 'demo'}/${o.old ? 'hive' : 'combwork'}-mcp.json`]: strToU8(JSON.stringify(def)), [`${o.folder ?? 'demo'}/${script}`]: strToU8(`// demo ${version}`) })
     writeFileSync(join(share, `demo-${version}.zip`), zip)
     const server = entry({ version, requires: { os: ['windows', 'macos', 'linux'] }, zip: { url: pathToFileURL(join(share, `demo-${version}.zip`)).href, sha256: o.sha ?? sha(zip), size: o.size ?? zip.length } })
     writeFileSync(join(share, 'catalog.json'), JSON.stringify({ schemaVersion: 1, name: 'Test catalogue', servers: [server, entry({ name: 'needs-mac', requires: { os: ['macos'] }, zip: server.zip })] }))
@@ -272,20 +272,23 @@ describe('installing and updating (HI-545)', () => {
     expect(await row()).toMatchObject({ installed: '1.1.0', update: false })
   })
 
-  it("installs and runs a zip with Combwork's names, and updates one installed from the old names to them (HI-2503)", async () => {
-    // Installed from the catalogue as it was (hive-mcp.json, ${HIVE_MCP_DIR}): it runs from its folder.
+  it("installs and runs a zip with Combwork's names, updating it from the same folder; a zip with only the old names has no definition (HI-2594)", async () => {
     await install()
     await addTo(ambrosia)
     const folder = join(mcpDir(), 'demo').replace(/\\/g, '/')
     expect((await launched(ambrosia)).demo?.args?.[0]).toBe(`${folder}/server.js`)
-    // The catalogue moved to Combwork's names: the update is read, and runs from the same folder.
-    publish('1.1.0', 'server2.js', undefined, { cw: true })
+    publish('1.1.0', 'server2.js')
     expect(await row()).toMatchObject({ installed: '1.0.0', update: true })
     const u = await prepareUpdate()
     expect(await run(() => catalog.updateCatalogServer(u.p.id, u.shown, u.places))).toEqual({})
     expect(JSON.parse(readFileSync(join(mcpDir(), 'demo.json'), 'utf8')).args).toEqual(['${CW_MCP_DIR}/demo/server2.js'])
     expect(readdirSync(join(mcpDir(), 'demo'))).toEqual(['server2.js'])
     expect((await launched(ambrosia)).demo?.args?.[0]).toBe(`${folder}/server2.js`)
+    // hive-mcp.json, the catalogue's name up to v1.1.1: refused, and nothing written.
+    publish('1.2.0', 'server3.js', undefined, { old: true })
+    await pages()
+    await expect(run(() => catalog.prepareCatalogServer(source(), 'demo'))).rejects.toThrow('No combwork-mcp.json or combwork-mcp.example.json found')
+    expect(readdirSync(join(mcpDir(), 'demo'))).toEqual(['server2.js'])
   })
 
   it('writes nothing when a place is removed or added, or the definition edited, while the update waits; nothing is re-added', async () => {
@@ -383,7 +386,7 @@ describe('installing and updating (HI-545)', () => {
     await run(() => catalog.installCatalogServer(p.id, 'demo-cat', false))
     const m = (await run(() => mcp.listMcp(true))).find((x) => x.name === 'demo-cat')!
     expect(m.def?.catalog).toMatchObject({ name: 'demo', version: '1.0.0' })
-    // The catalogue's ${HIVE_MCP_DIR} reference, moved to its name, is written with the new variable (HI-2503).
+    // The catalogue's ${CW_MCP_DIR} reference, moved to its name.
     expect(m.def?.args?.[0]).toBe('${CW_MCP_DIR}/demo-cat/server.js')
     expect(readFileSync(join(mcpDir(), 'demo-cat', 'server.js'), 'utf8')).toBe('// demo 1.0.0')
     // The local demo is untouched; the catalogue row is installed (by its provenance), not "name in use".
@@ -397,33 +400,11 @@ describe('installing and updating (HI-545)', () => {
     expect((await run(() => mcp.listMcp(true))).find((x) => x.name === 'demo-cat')?.def?.args?.[0]).toBe('${CW_MCP_DIR}/demo-cat/server2.js')
   })
 
-  it("takes ours at its old address (Suremise/hive-mcp) as ours: a server installed from there is installed, with its update, and the old address is never another source (HI-2472)", async () => {
-    const zip = zipSync({ 'demo/hive-mcp.json': strToU8(JSON.stringify({ command: 'node', args: ['${HIVE_MCP_DIR}/demo/server.js'] })), 'demo/server.js': strToU8('// demo 1.1.0') })
-    const ours = { schemaVersion: 1, name: 'Suremise/combwork-mcp', servers: [entry({ version: '1.1.0', zip: { url: 'https://example.com/demo-1.1.0.zip', sha256: sha(zip), size: zip.length } })] }
-    catalog.testHooks.fetch = (async (url: string) =>
-      url === OUR_CATALOG_URL ? new Response(JSON.stringify(ours), { status: 200 }) : url === 'https://example.com/demo-1.1.0.zip' ? new Response(Buffer.from(zip), { status: 200 }) : new Response('missing', { status: 404 })) as never
-    try {
-      // Installed from ours when its address was the old one, and listed as a source of the user's then.
-      const old = OUR_OLD_CATALOG_URLS[0]
-      mkdirSync(join(mcpDir(), 'demo'), { recursive: true })
-      writeFileSync(join(mcpDir(), 'demo', 'server.js'), '// demo 1.0.0')
-      writeFileSync(join(mcpDir(), 'demo.json'), JSON.stringify({ command: 'node', args: ['${HIVE_MCP_DIR}/demo/server.js'], catalog: { source: old, name: 'demo', version: '1.0.0', sha256: 'b'.repeat(64) } }))
-      config.update((c) => {
-        c.settings.mcpCatalogs = { oursOn: true, sources: [{ url: old, on: true }] }
-      })
-      // Ours once, at its new address; the old one isn't listed again.
-      expect(catalog.catalogSources()).toEqual([{ url: OUR_CATALOG_URL, ours: true, noted: true }])
-      const [p] = await pages()
-      expect(p).toMatchObject({ url: OUR_CATALOG_URL, ours: true })
-      expect(p.rows.find((r) => r.name === 'demo')).toMatchObject({ installed: '1.0.0', update: true })
-      // Its update is found by where it came from: the server installed from the old address.
-      const prepared = await run(() => catalog.prepareCatalogServer(OUR_CATALOG_URL, 'demo'))
-      expect(prepared.existing).toMatchObject({ name: 'demo', version: '1.0.0' })
-      // Adding the old address as a source of one's own: listed already.
-      expect(() => catalog.setCatalogSources({ oursOn: true, sources: [{ url: old, on: true }] })).toThrow('listed already')
-    } finally {
-      catalog.testHooks.fetch = undefined
-    }
+  it("knows ours by its current address only: the old one (Suremise/hive-mcp) isn't ours (HI-2594; the names upgrade converts the definitions stored with it)", () => {
+    const old = 'https://github.com/Suremise/hive-mcp/releases/latest/download/catalog.json'
+    expect(isOurCatalogUrl(OUR_CATALOG_URL)).toBe(true)
+    expect(isOurCatalogUrl(old)).toBe(false)
+    expect(sameCatalogSource(old, OUR_CATALOG_URL)).toBe(false)
   })
 
   it("shows a requirement whose probe failed or timed out as not checkable, never as met", async () => {

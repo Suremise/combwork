@@ -28,8 +28,8 @@ const check = (name, ok, extra = '') => {
 /** Publishes demo at `version` (running `script`) and a server only macOS can run, as a file:// catalogue in `dir`. */
 function publish(dir, version, script, name = 'Test catalogue') {
   fs.mkdirSync(dir, { recursive: true })
-  const def = { description: 'A demo server', command: 'node', args: [`\${HIVE_MCP_DIR}/demo/${script}`] }
-  const zip = zipSync({ 'demo/hive-mcp.json': strToU8(JSON.stringify(def)), [`demo/${script}`]: strToU8(`// demo ${version}`) })
+  const def = { description: 'A demo server', command: 'node', args: [`\${CW_MCP_DIR}/demo/${script}`] }
+  const zip = zipSync({ 'demo/combwork-mcp.json': strToU8(JSON.stringify(def)), [`demo/${script}`]: strToU8(`// demo ${version}`) })
   const zipFile = path.join(dir, `demo-${version}.zip`)
   fs.writeFileSync(zipFile, zip)
   const z = { url: pathToFileURL(zipFile).href, sha256: crypto.createHash('sha256').update(zip).digest('hex'), size: zip.length }
@@ -88,7 +88,7 @@ function publish(dir, version, script, name = 'Test catalogue') {
     await shots('catalogue')
     await detail.locator('[data-action="catalog-install"]').click()
     const ask = page.getByRole('dialog', { name: 'Install demo 1.0.0?' })
-    check('Install shows what it runs first, and its name', !!(await lib.until(async () => (await ask.count()) === 1, HUNG_MS)) && (await ask.innerText()).includes('Runs: node ${HIVE_MCP_DIR}/demo/server.js') && (await ask.locator('input').inputValue()) === 'demo', JSON.stringify(await page.getByRole('dialog').allInnerTexts()))
+    check('Install shows what it runs first, and its name', !!(await lib.until(async () => (await ask.count()) === 1, HUNG_MS)) && (await ask.innerText()).includes('Runs: node ${CW_MCP_DIR}/demo/server.js') && (await ask.locator('input').inputValue()) === 'demo', JSON.stringify(await page.getByRole('dialog').allInnerTexts()))
     await shots('install')
     await ask.getByRole('button', { name: 'Install', exact: true }).click()
     // The name is taken: Replace, or choose another (#550's Add).

@@ -2,7 +2,7 @@
   "content.mcp.badArgs": "“args” deve ser uma lista de textos.",
   "content.mcp.badCommand": "“command” deve ser o programa a executar.",
   "content.mcp.badCwd": "“cwd” deve ser uma pasta.",
-  "content.mcp.badName": "Nomes de servidor podem conter letras, números, “-” e “_” (no máximo 64 caracteres). “combwork” e “hive” são reservados.",
+  "content.mcp.badName": "Nomes de servidor podem conter letras, números, “-” e “_” (no máximo 64 caracteres). “combwork” é reservado.",
   "content.mcp.badRecord": "“{field}” deve ser um objeto de textos.",
   "content.mcp.badUrl": "“url” deve ser um endereço http:// ou https://.",
   "content.mcp.changedAdd": "{name} mudou desde que foi mostrado a você. Confira o que ele executa e adicione de novo.",

@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'original-fs'
+import { rm } from 'original-fs/promises'
 import { join } from 'path'
 import { RUN_MARKER } from '../shared/unexpectedClose'
 import { NEW_ID, OLD_ID, upgradedAdvancedIds, upgradedOptions, upgradedRunName } from './storedNames'
@@ -10,10 +11,29 @@ import { NEW_ID, OLD_ID, upgradedAdvancedIds, upgradedOptions, upgradedRunName }
  *
  * - **Stored values** (HI-2598, its design HI-2598/s9 §5; upgradeProfileFiles): config.json's workflow defaults, commands
  *   and Agent API switch, advanced.json's ids, and each workspace's kept progress runs, before anything reads them.
+ * - **The profile folders** (HI-2594): Hive's `Hive` (`Hive-Dev`) moved to Combwork's where the installer hasn't
+ *   (profileFolders.ts chooseProfile, before userData is set); a move it can't make refuses the start.
  * - **The run marker** (`running.json`, lastRun.ts): the version that wrote it, `hive` before 1.1, is `app`. Rewritten
  *   before the last run's marker is read (checkLastRun), so a 1.0 or RC run that ended without quitting is still told;
  *   by upgradeProfileFiles, under its rule.
+ * - **The progress command's old names** (HI-2594): 1.0 and the RCs put `hive-progress` and `hive-progress.cmd` beside
+ *   `cw-progress` in the profile's bin folder. They are removed before the shims are written (index.ts), so no session
+ *   finds the old command.
  */
+
+/**
+ * The profile folder's name before HI-2461 (`Hive`, a dev build's `Hive-Dev`): the input of the profile folders' step
+ * (profileFolders.ts chooseProfile), where the installer hasn't moved it (HI-2460).
+ */
+export const oldProfileFolder = (packaged: boolean): string => (packaged ? 'Hive' : 'Hive-Dev') // i18n-ignore: folder names
+
+/** The progress command's shims under their names before 1.1, in the profile's bin folder. */
+export const OLD_SHIMS: readonly string[] = ['hive-progress', 'hive-progress.cmd']
+
+/** Removes the old shims from `binDir` (none there: nothing to do). Never throws: one left is never run by Combwork. */
+export async function removeOldShims(binDir: string): Promise<void> {
+  for (const name of OLD_SHIMS) await rm(join(binDir, name), { force: true }).catch(() => undefined)
+}
 
 /** A run marker's data with its old key renamed; null when it has nothing old. */
 export function upgradedRunMarkerData(d: unknown): Record<string, unknown> | null {

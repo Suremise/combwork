@@ -364,9 +364,9 @@ describe("Codex: Combwork's hive server over a native one of that name", () => {
     expect(outrankNativeHive([join(base, 'missing.toml')], {}, 'all', 'C:\\p')).toEqual({})
   })
 
-  // HI-2463: the user's own copy of Combwork's server under its name before (their [mcp_servers.hive], with the old
-  // cw_* tools) is turned off for the session by a launch override, isolation on or off; their config isn't changed.
-  it('a native server named hive (the name before HI-2463): off for the session, isolation on and off, its file untouched', async () => {
+  // HI-2594: a native server named hive is the user's own like any other (the name isn't reserved after 1.1): turned off
+  // with the user's other servers while isolation is on, loaded with them when it is off; their config isn't changed.
+  it('a native server named hive: off with the others under isolation, loaded with it off, its file untouched', async () => {
     for (const isolation of [true, false])
       for (const place of places) {
         await advanced.set(overrideId('codex', 'mcpIsolation'), isolation ? null : false)
@@ -376,21 +376,13 @@ describe("Codex: Combwork's hive server over a native one of that name", () => {
         const dir = place === 'home' ? process.env.CODEX_HOME : join(cwd, '.codex')
         mkdirSync(dir, { recursive: true })
         mkdirSync(cwd, { recursive: true })
-        const text = '[mcp_servers.hive]\ncommand = "node"\nargs = ["old-hive-mcp.js"]\n'
+        const text = '[mcp_servers.hive]\ncommand = "node"\nargs = ["their-server.js"]\n'
         writeFileSync(join(dir, 'config.toml'), text)
         const args = codex.buildCommand('C:\\bin\\codex.exe', context({ cwd })).args
-        expect(args.filter((a) => a === 'mcp_servers.hive.enabled=false'), `${place}, isolation ${isolation}`).toHaveLength(1)
+        expect(args.filter((a) => a === 'mcp_servers.hive.enabled=false'), `${place}, isolation ${isolation}`).toHaveLength(isolation ? 1 : 0)
         expect(args.some((a) => a.startsWith('mcp_servers.combwork=')), `${place}, isolation ${isolation}`).toBe(true)
         expect(readFileSync(join(dir, 'config.toml'), 'utf8')).toBe(text)
       }
-  })
-
-  it('no native hive: nothing turned off for it', () => {
-    const root = join(base, `legacy-${++n}`)
-    process.env.CODEX_HOME = join(root, 'codex-home')
-    mkdirSync(process.env.CODEX_HOME, { recursive: true })
-    const args = codex.buildCommand('C:\\bin\\codex.exe', context({ cwd: root })).args
-    expect(args.some((a) => a.startsWith('mcp_servers.hive'))).toBe(false)
   })
 })
 
@@ -410,12 +402,12 @@ describe("Claude Code's and Copilot's own MCP servers (rows 4 and 6)", () => {
     try {
       const args = (): string[] => copilot.buildCommand('C:\\bin\\copilot.exe', context()).args
       expect(args()).toContain('--disable-builtin-mcps')
-      // The user's own hive (Combwork's server's name before HI-2463) is theirs now: off with the others…
+      // A server of the user's named hive is theirs like any other (HI-2594): off with the others…
       expect(args().filter((a, i, all) => all[i - 1] === '--disable-mcp-server')).toEqual(['mine', 'hive'])
       await advanced.set(overrideId('copilot', 'mcpIsolation'), false)
       expect(args()).not.toContain('--disable-builtin-mcps')
-      // …and with the switch off too, alone: its old hive_* tools never reach a session beside the cw_* ones.
-      expect(args().filter((a, i, all) => all[i - 1] === '--disable-mcp-server')).toEqual(['hive'])
+      // …and with the switch off, none disabled.
+      expect(args().filter((a, i, all) => all[i - 1] === '--disable-mcp-server')).toEqual([])
       expect(args()).toContain('--additional-mcp-config')
     } finally {
       rmSync(join(home, 'mcp-config.json'), { force: true })

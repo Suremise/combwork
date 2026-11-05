@@ -90,12 +90,12 @@ describe('the comments in info/exclude', () => {
     const { dir, exclude } = repo()
     writeFileSync(exclude, '')
     await excludeCopies(dir)
-    expect(readFileSync(exclude, 'utf8')).toBe(`${COPIES_EXCLUDE_COMMENT}\n/.agents/skills/cw-*/\n/.agents/skills/.cw-*/\n/.agents/skills/hive-*/\n/.agents/skills/.hive-*/\n`)
+    expect(readFileSync(exclude, 'utf8')).toBe(`${COPIES_EXCLUDE_COMMENT}\n/.agents/skills/cw-*/\n/.agents/skills/.cw-*/\n`)
   })
 
-  it("Hive's comments become Combwork's once (HI-2575, HI-2580), every other line as it was", () => {
-    const text = "# mine\n# Hive project metadata (added by Hive)\n/alpha/.combwork/\n# Hive's copies of workspace skills for Codex and Copilot (added by Hive)\r\n/.agents/skills/hive-*/\n"
-    expect(upgradedExclude(text)).toBe(`# mine\n${EXCLUDE_COMMENT}\n/alpha/.combwork/\n${COPIES_EXCLUDE_COMMENT}\r\n/.agents/skills/hive-*/\n`)
+  it("Hive's comments become Combwork's once (HI-2575, HI-2580), the old copies' lines go (HI-2594), every other line as it was", () => {
+    const text = "# mine\n# Hive project metadata (added by Hive)\n/alpha/.combwork/\n# Hive's copies of workspace skills for Codex and Copilot (added by Hive)\r\n/.agents/skills/cw-*/\n/.agents/skills/hive-*/\n/.agents/skills/.hive-*/\r\n/hive-*/\n"
+    expect(upgradedExclude(text)).toBe(`# mine\n${EXCLUDE_COMMENT}\n/alpha/.combwork/\n${COPIES_EXCLUDE_COMMENT}\r\n/.agents/skills/cw-*/\n/hive-*/\n`)
     expect(upgradedExclude(upgradedExclude(text)!)).toBeNull()
     expect(upgradedExclude('# mine\n/x/\n')).toBeNull()
   })

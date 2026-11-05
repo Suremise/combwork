@@ -350,7 +350,7 @@
   "assistant.sidebar.saveFirst": "Speichere oder verwirf zuerst deine Änderungen an {name}",
   "assistant.sidebar.saveFirstDetail": "Die Notiz hat ungespeicherte Änderungen, die sonst unter dem alten Namen gespeichert würden.",
   "assistant.sidebar.serverFromFile": "MCP-Server aus Datei hinzufügen (.json oder .zip)…",
-  "assistant.sidebar.serverNameRule": "Verwende Buchstaben, Ziffern, „-“ und „_“. „combwork“ und „hive“ sind reserviert.",
+  "assistant.sidebar.serverNameRule": "Verwende Buchstaben, Ziffern, „-“ und „_“. „combwork“ ist reserviert.",
   "assistant.sidebar.sharedNotes": "Gemeinsame Notizen",
   "assistant.sidebar.skillFromFile": "Skill aus Datei hinzufügen (.md oder .zip)…",
   "assistant.sidebar.skills": "Skills",

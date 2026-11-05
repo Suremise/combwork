@@ -224,16 +224,9 @@ export const AGENTS_SKILLS = join('.agents', 'skills')
 /** The prefix of Combwork's copies' folders in .agents/skills (HI-2463: the name agents see their skills by). */
 export const COPY_PREFIX = 'cw-'
 
-/**
- * The prefix of its copies before HI-2463. A copy still there under it is retired when it is provably Combwork's own
- * (ownCopies: marker, record and unchanged content), so a CLI never reads one skill under both names; a user's own
- * folder with this prefix is never touched.
- */
-export const LEGACY_COPY_PREFIX = 'hive-'
-
-/** Where a launch's CLI reads Combwork's copy of a skill in .agents/skills (`prefix`: a copy from before, to retire it). */
-export function agentsSkillCopyPath(cwd: string, skill: string, prefix = COPY_PREFIX): string {
-  return join(cwd, AGENTS_SKILLS, `${prefix}${skill}`)
+/** Where a launch's CLI reads Combwork's copy of a skill in .agents/skills. */
+export function agentsSkillCopyPath(cwd: string, skill: string): string {
+  return join(cwd, AGENTS_SKILLS, `${COPY_PREFIX}${skill}`)
 }
 
 /** The hash in a Hive copy's marker ('' for one from before hashes), or null: not Hive's copy (or no folder). */
@@ -255,7 +248,7 @@ async function keptCopy(dest: string, problem: string): Promise<SkillDelivery> {
 }
 
 /**
- * Copies the session's Hive skills into <cwd>/.agents/skills/hive-<name> (for CLIs with no per-launch skills folder:
+ * Copies the session's Combwork skills into <cwd>/.agents/skills/cw-<name> (for CLIs with no per-launch skills folder:
  * Codex and Copilot, which share the copies), removes Hive's copies of skills it no longer gets, and keeps them out of
  * git. Hive's copies carry a marker file (with the source's hash): folders without one are the user's and are never
  * touched. An unchanged skill isn't copied again, and a changed one is swapped in whole (swapIn), so another agent
@@ -286,18 +279,15 @@ async function syncAgentsSkillsNow(ctx: LaunchContext, cli: string): Promise<Rec
   // Under the same lock as the swaps: Hive's own leftovers only (dot-folders named for a swap).
   await cleanSwaps(dir, unchangedCopy)
   const own = await ownCopies(ctx.cwd, ctx.projectPath, ctx.copies)
-  // Copies under the old prefix first (HI-2463), while their records still describe them: each is retired as any copy
-  // no longer given is, so the new cw- copy delivered below is the only one the CLI reads.
-  const entries = await readdir(dir).catch(() => [] as string[])
-  for (const [prefix, f] of [...entries.filter((e) => e.startsWith(LEGACY_COPY_PREFIX)).map((e) => [LEGACY_COPY_PREFIX, e] as const), ...entries.filter((e) => e.startsWith(COPY_PREFIX)).map((e) => [COPY_PREFIX, e] as const)]) {
-    // A copy Hive no longer gives (switched off, deleted or renamed) goes only when it is Hive's own, unchanged (#1431),
-    // and no other session of Hive's works in the folder (it may be reading it): asked for each copy, inside the lock.
-    // One kept now (a reader there, or a file in it open) goes at a later launch with the folder to itself, or when the
-    // last session there ends (as Settings → Advanced says).
+  for (const f of (await readdir(dir).catch(() => [] as string[])).filter((e) => e.startsWith(COPY_PREFIX))) {
+    // A copy Combwork no longer gives (switched off, deleted or renamed) goes only when it is Combwork's own, unchanged
+    // (#1431), and no other session of Combwork's works in the folder (it may be reading it): asked for each copy, inside
+    // the lock. One kept now (a reader there, or a file in it open) goes at a later launch with the folder to itself, or
+    // when the last session there ends (as Settings → Advanced says).
     if (wanted.has(f) || ctx.othersHere?.()) continue
-    const skill = f.slice(prefix.length)
-    const revision = await own(skill, prefix)
-    if (revision) await retireCopy(ctx.cwd, skill, revision, ctx.copies, prefix).catch((e) => log.warn(`Could not remove ${userText(f)} for ${cli}; trying again next time`, e))
+    const skill = f.slice(COPY_PREFIX.length)
+    const revision = await own(skill)
+    if (revision) await retireCopy(ctx.cwd, skill, revision, ctx.copies).catch((e) => log.warn(`Could not remove ${userText(f)} for ${cli}; trying again next time`, e))
   }
   for (const [folder, s] of wanted) {
     // One skill's failure is its own: the others are still delivered, and each record says what the CLI reads.
@@ -325,11 +315,11 @@ async function syncAgentsSkillsNow(ctx: LaunchContext, cli: string): Promise<Rec
  * Without a book (tests), the marker and content alone decide. Each answer is the revision the copy may be removed at
  * (null: it stays), which retireCopy checks again as it goes: an edit made meanwhile keeps it.
  */
-async function ownCopies(folder: string, project: string, book: SkillCopyBook | undefined): Promise<(skill: string, prefix?: string) => Promise<string | null>> {
+async function ownCopies(folder: string, project: string, book: SkillCopyBook | undefined): Promise<(skill: string) => Promise<string | null>> {
   const records = book ? await book.of(folder).catch((e) => (log.warn("Could not read Combwork's record of its skill copies", e), null)) : undefined
-  return async (skill, prefix = COPY_PREFIX) => {
+  return async (skill) => {
     if (records === null) return null
-    const dest = agentsSkillCopyPath(folder, skill, prefix)
+    const dest = agentsSkillCopyPath(folder, skill)
     const marker = await skillMarker(dest)
     // No marker: the user's. An empty one, from before hashes: whether it was changed can't be told.
     if (!marker) return null
@@ -350,8 +340,8 @@ async function ownCopies(folder: string, project: string, book: SkillCopyBook | 
  * or kept beside it as a conflict copy), then its record. One already gone just loses its record; one edited meanwhile
  * keeps its record, whose revision no longer matches, so it is never taken for Hive's own again.
  */
-async function retireCopy(folder: string, skill: string, revision: string, book: SkillCopyBook | undefined, prefix = COPY_PREFIX): Promise<void> {
-  const dest = agentsSkillCopyPath(folder, skill, prefix)
+async function retireCopy(folder: string, skill: string, revision: string, book: SkillCopyBook | undefined): Promise<void> {
+  const dest = agentsSkillCopyPath(folder, skill)
   if (existsSync(dest)) await swapOut(dest, revision)
   await book?.forget(folder, skill)
 }
@@ -383,19 +373,18 @@ export async function removeHiveCopies(folder: string, project: string, book: Sk
     }
     await cleanSwaps(dir, unchangedCopy)
     const own = await ownCopies(folder, project, book)
-    // Both prefixes (HI-2463): copies from before the rename go the same way, under the same test.
-    const names = new Map<string, Set<string>>([[COPY_PREFIX, new Set([...recorded.values()].map((r) => r.skill))], [LEGACY_COPY_PREFIX, new Set()]])
-    for (const f of await readdir(dir).catch(() => [] as string[])) for (const [prefix, set] of names) if (f.startsWith(prefix)) set.add(f.slice(prefix.length))
+    const names = new Set([...recorded.values()].map((r) => r.skill))
+    for (const f of await readdir(dir).catch(() => [] as string[])) if (f.startsWith(COPY_PREFIX)) names.add(f.slice(COPY_PREFIX.length))
     const removed: string[] = []
-    for (const [prefix, skill] of [...names].flatMap(([p, set]) => [...set].map((s) => [p, s] as const))) {
+    for (const skill of names) {
       try {
-        if (!existsSync(agentsSkillCopyPath(folder, skill, prefix))) {
-          // A record with no copy under either name is dropped.
-          if (prefix === COPY_PREFIX && !existsSync(agentsSkillCopyPath(folder, skill, LEGACY_COPY_PREFIX))) await book?.forget(folder, skill)
+        if (!existsSync(agentsSkillCopyPath(folder, skill))) {
+          // A record with no copy is dropped.
+          await book?.forget(folder, skill)
         } else {
-          const revision = await own(skill, prefix)
+          const revision = await own(skill)
           if (!revision) continue
-          await retireCopy(folder, skill, revision, book, prefix)
+          await retireCopy(folder, skill, revision, book)
           if (!removed.includes(skill)) removed.push(skill)
         }
       } catch (e) {
@@ -478,9 +467,8 @@ export async function excludeCopies(cwd: string): Promise<void> {
   const exclude = join(isAbsolute(gitDir) ? gitDir : resolvePath(cwd, gitDir), 'info', 'exclude')
   const text = await readFile(exclude, 'utf8').catch(() => '')
   const lines = text.split(/\r?\n/)
-  // Hive's copies, and the dot-folders a swap uses for a moment (left behind only by a crash, until the next launch).
-  // The cw- names (HI-2463), and the hive- ones copies had before, which may still be there until they are retired.
-  const missing = ['/.agents/skills/cw-*/', '/.agents/skills/.cw-*/', '/.agents/skills/hive-*/', '/.agents/skills/.hive-*/'].filter((l) => !lines.includes(l))
+  // Combwork's copies, and the dot-folders a swap uses for a moment (left behind only by a crash, until the next launch).
+  const missing = ['/.agents/skills/cw-*/', '/.agents/skills/.cw-*/'].filter((l) => !lines.includes(l))
   if (missing.length) {
     await mkdir(join(exclude, '..'), { recursive: true })
     await appendFile(exclude, `${text && !text.endsWith('\n') ? '\n' : ''}${lines.some((l) => l.startsWith(COPIES_COMMENT_HEAD)) ? '' : `${COPIES_EXCLUDE_COMMENT}\n`}${missing.join('\n')}\n`)

@@ -13,7 +13,7 @@ import type { StartHint } from '../../../shared/startFailure'
 import { CODEX, CODEX_DESCRIPTOR, CODEX_MODE_FLAGS, CODEX_PERMISSION_MODES } from '../../../shared/codex'
 import { providerSettings } from '../../../shared/providers'
 import type { TypedNewline } from '../../../shared/terminalInput'
-import { CW_TOOLS, LEGACY_TOOLS_SERVER, TOOLS_SERVER } from '../../../shared/assistantTools'
+import { CW_TOOLS, TOOLS_SERVER } from '../../../shared/assistantTools'
 import { config } from '../../config'
 import { isFile, placeMatcher } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
@@ -979,15 +979,10 @@ export class CodexAdapter implements ProviderAdapter {
       if (name === TOOLS_SERVER) Object.assign(table, outrankNativeHive(files, table, hive.preApprove ? (hive.trusted ?? 'all') : [], ctx.cwd))
       args.push('-c', `mcp_servers.${name}=${toToml(table)}`)
     }
-    // A user's own server under Hive's name before HI-2463 ([mcp_servers.hive]: their copy of Hive's server, with the old
-    // hive_* tools): off for this launch whatever the isolation switch says, so the agent gets one set of Combwork's tools.
-    // A launch override: their config isn't changed.
-    const legacy = !!ctx.mcpServers[TOOLS_SERVER] && files.some((f) => LEGACY_TOOLS_SERVER in mcpServersIn(f))
-    if (legacy) args.push('-c', `mcp_servers.${LEGACY_TOOLS_SERVER}.enabled=false`)
     // Only the workspace's MCP servers: the user's own (and a project's own) are turned off, as for Claude Code; with the
-    // switch off (#1281), they load beside Hive's (one of the workspace's name still merges into the workspace's).
+    // switch off (#1281), they load beside Combwork's (one of the workspace's name still merges into the workspace's).
     if (launchOverrides(ctx.overrides, CODEX, 'mcpIsolation')) {
-      const own = new Set([...Object.keys(ctx.mcpServers), ...(legacy ? [LEGACY_TOOLS_SERVER] : [])])
+      const own = new Set(Object.keys(ctx.mcpServers))
       const theirs = new Set(files.flatMap((f) => Object.keys(mcpServersIn(f))))
       for (const name of theirs) {
         if (own.has(name)) continue
