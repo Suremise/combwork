@@ -4,6 +4,7 @@ import { join } from 'path'
 import { EXCLUDE_COMMENT } from '../shared/hiveFolderMove'
 import { COPY_MARKER, writeTextAtomic } from './fsutil'
 import { git } from './git'
+import { createLogger, userText } from './logger'
 import { gitDirOf, vcsOf } from './hiveVcs'
 
 /**
@@ -25,6 +26,8 @@ import { gitDirOf, vcsOf } from './hiveVcs'
  * one ref at a time, so a run stopped halfway leaves each ref under one name or both, and the next run finishes it.
  * Nothing reads them back by name (they keep commits alive), so order doesn't matter. Branches (`hive/…`) are left.
  */
+const log = createLogger('nameUpgrade')
+
 const OLD_REFS = ['refs/hive/cards/', 'refs/hive/queue/']
 
 async function moveRefs(root: string): Promise<void> {
@@ -39,6 +42,13 @@ async function moveRefs(root: string): Promise<void> {
       // Made only where none is: the empty old value refuses one made meanwhile.
       const made = await git(root, ['update-ref', now, sha, ''])
       if (!made.ok) throw new Error(made.err || `git update-ref ${now} failed`) // i18n-ignore: the error's detail, for the step's message
+    }
+    // The old one goes only once the new one is verified to hold its commit. One already there at another commit (both
+    // names kept their own): neither is touched, so no commit loses its ref; said in the log.
+    const verified = await git(root, ['rev-parse', '--verify', '--quiet', now])
+    if (!verified.ok || verified.out.trim() !== sha) {
+      log.warn(`${userText(root)}: ${now} is at ${verified.out.trim() || 'nothing'}, not ${sha} as ${ref} is: both are left as they are`)
+      continue
     }
     const gone = await git(root, ['update-ref', '-d', ref, sha])
     if (!gone.ok) throw new Error(gone.err || `git update-ref -d ${ref} failed`) // i18n-ignore: the error's detail, for the step's message

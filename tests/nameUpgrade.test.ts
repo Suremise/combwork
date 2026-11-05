@@ -133,6 +133,19 @@ describe('the names upgrade at the open', () => {
     expectUpgraded(w)
   })
 
+  it('a ref under both names at different commits: neither is touched, no commit loses its ref; the others move', async () => {
+    const w = workspace('rc2')
+    const first = git(w.alpha, 'rev-parse', 'HEAD').trim()
+    write(join(w.alpha, 'two.txt'), 'two')
+    git(w.alpha, 'add', 'two.txt')
+    git(w.alpha, 'commit', '-q', '-m', 'two')
+    const second = git(w.alpha, 'rev-parse', 'HEAD').trim()
+    git(w.alpha, 'update-ref', 'refs/cw/cards/AL-1/1', second)
+    await open(w.ws)
+    const refs = git(w.alpha, 'for-each-ref', '--format=%(refname) %(objectname)', 'refs/hive', 'refs/cw').trim().split('\n').sort()
+    expect(refs).toEqual([`refs/cw/cards/AL-1/1 ${second}`, `refs/cw/queue/AL-1-e1 ${first}`, `refs/hive/cards/AL-1/1 ${first}`])
+  })
+
   it('a step that fails refuses the open naming it; the next open finishes', async () => {
     const w = workspace('rc2')
     // A read-only definition can't be replaced: the files step fails.
