@@ -1,9 +1,9 @@
 ---
 name: service-changes
-description: Hive's rules for risky changes to its main process - workspaces and windows, project scope and access checks, locking, storage and clean-up, cancellation, transcripts and bounded resources. Use when developing or reviewing Hive and a change touches src/main services, the Agent API or cw_ tools, files under .combwork, or anything several windows, agents or processes can do at once.
+description: Combwork's rules for risky changes to its main process - workspaces and windows, project scope and access checks, locking, storage and clean-up, cancellation, transcripts and bounded resources. Use when developing or reviewing Combwork and a change touches src/main services, the Agent API or cw_ tools, files under .combwork, or anything several windows, agents or processes can do at once.
 ---
 
-# Changing Hive's services
+# Changing Combwork's services
 
 The workspace's shared note `conventions/engineering-quality.md` (`cw_read_shared_note`) applies to every change, and [ARCHITECTURE.md](../../../docs/ARCHITECTURE.md) says where things live. Read the parts of this list your change touches. Each item is something that has gone wrong before.
 
@@ -28,11 +28,11 @@ The Assistant's changes go through `assistantChange()` (control level, recorded 
 - Kept files and session records change only through their locked helpers (AGENTS.md, Gotchas: Kept files, project.json / sessions).
 - A slow call can see its world change: an agent stopped, a card moved, a window closed. Check again after each await that matters.
 
-## Files Hive manages
+## Files Combwork manages
 
 - Folders other agents may read are replaced whole (`replaceDir`), never deleted and copied in place.
-- What Hive deletes, it identifies first:
-  - Hive's own copies carry markers;
+- What Combwork deletes, it identifies first:
+  - Combwork's own copies carry markers;
   - worktrees must be ones git lists;
   - user folders are never touched;
   - deletions go to the Recycle Bin when the user could want them back.

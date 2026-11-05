@@ -1,4 +1,4 @@
-// npm run dist [-- --here | --replace | --kind <beta|baseline|rc|release>]: builds Hive and its Windows installer (dist/Combwork-Setup-<version>.exe, with its
+// npm run dist [-- --here | --replace | --kind <beta|baseline|rc|release>]: builds Combwork and its Windows installer (dist/Combwork-Setup-<version>.exe, with its
 // blockmap and latest.yml; never published: npm run release does that, RELEASING.md), and writes dist/build-info.json:
 // what the installer was built from (the code's fingerprint, commit, branch, version, time), only if that didn't change
 // while it was built. Built in an agent's git worktree, the installer is also copied to the main checkout's dist, where
@@ -7,7 +7,7 @@
 // Its `npm run build` makes the dev build in out/ that the app is packaged from: that is stamped as `npm run e2e --
 // --build` stamps it (tests/e2e/build.mjs, under the worktree's build lock), so the packaged checks run straight after
 // it (npm run e2e -- packaged packaged-mcp packaged-progress --record) find out/ from this source (#274).
-// A successful build is then recorded in Hive's journal (buildFact.mjs, #1534); --kind says what it is (else from the
+// A successful build is then recorded in Combwork's journal (buildFact.mjs, #1534); --kind says what it is (else from the
 // version: RELEASING.md).
 import { spawnSync } from 'child_process'
 import { existsSync, readFileSync } from 'fs'

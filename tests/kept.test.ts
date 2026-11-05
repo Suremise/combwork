@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { Worker } from 'worker_threads'
 import { describe, expect, it, vi } from 'vitest'
-import { DAMAGED_AGE_MS, KEPT_BY_STAT_MAX, KeptFileBusy, keptSettleSteps, onCorruptFile, readKeptJson, readKeptJsonByStat, readKeptJsonSync, writeKeptJson, type KeptSample, type KeptSettled } from '../src/main/fsutil'
+import { createKeptJson, DAMAGED_AGE_MS, KEPT_BY_STAT_MAX, KeptFileBusy, keptSettleSteps, onCorruptFile, readKeptJson, readKeptJsonByStat, readKeptJsonSync, writeKeptJson, type KeptSample, type KeptSettled } from '../src/main/fsutil'
 import { tempDir } from './tempDir'
 
 describe('kept files', () => {
@@ -20,6 +20,20 @@ describe('kept files', () => {
     await writeKeptJson(f, { n: 1 })
     expect(JSON.parse(readFileSync(`${f}.bak`, 'utf8'))).toEqual({ n: 1 })
     expect(await readKeptJson(f, null)).toEqual({ n: 1 })
+  })
+
+  it('createKeptJson (HI-2542): makes the file where there is none, never replacing one written meanwhile', async () => {
+    const f = join(dir, 'new.json')
+    expect(await createKeptJson(f, { n: 'default' })).toBe(true)
+    expect(JSON.parse(readFileSync(f, 'utf8'))).toEqual({ n: 'default' })
+    expect(JSON.parse(readFileSync(`${f}.bak`, 'utf8'))).toEqual({ n: 'default' })
+    // One written after its absence was checked (a project's own config, copied in) is kept, with its .bak, and no temp file is left.
+    const g = join(dir, 'theirs.json')
+    writeFileSync(g, '{"n":"theirs"}\n')
+    expect(await createKeptJson(g, { n: 'default' })).toBe(false)
+    expect(JSON.parse(readFileSync(g, 'utf8'))).toEqual({ n: 'theirs' })
+    expect(readdirSync(dir).filter((n) => n.startsWith('theirs.json.'))).toEqual([])
+    expect(await readKeptJson(g, null)).toEqual({ n: 'theirs' })
   })
 
   it('sets a damaged file aside and restores the last good copy', async () => {

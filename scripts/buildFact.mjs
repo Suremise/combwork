@@ -1,8 +1,8 @@
-// Builds recorded as facts (#1534, #1062): after a successful `npm run dist` or `npm run release`, tells Hive of the
-// build so it goes into the workspace's journal as Hive's own entry (src/main/buildFacts.ts). A failed build never gets
-// here: both scripts exit first. Through the Agent API (POST /v1/builds) when Hive can be reached: the session's
-// CW_API_URL and token (an agent running the build has them; a script can set them). Otherwise, or when Hive doesn't
-// answer, a marker file in the workspace's .combwork/builds, which Hive picks up when the workspace next opens. The
+// Builds recorded as facts (#1534, #1062): after a successful `npm run dist` or `npm run release`, tells Combwork of the
+// build so it goes into the workspace's journal as Combwork's own entry (src/main/buildFacts.ts). A failed build never gets
+// here: both scripts exit first. Through the Agent API (POST /v1/builds) when Combwork can be reached: the session's
+// CW_API_URL and token (an agent running the build has them; a script can set them). Otherwise, or when Combwork doesn't
+// answer, a marker file in the workspace's .combwork/builds, which Combwork picks up when the workspace next opens. The
 // workspace is CW_WORKSPACE, else the nearest folder above the main checkout with a .combwork/workspace.json.
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { request } from 'http'
@@ -69,7 +69,7 @@ function tokenOf(env) {
 }
 
 /**
- * POSTs the fact; resolves to Hive's reply ({ recorded, reason? }), or null when Hive can't be reached, refuses, or the
+ * POSTs the fact; resolves to Combwork's reply ({ recorded, reason? }), or null when Combwork can't be reached, refuses, or the
  * exchange ends any other way (a reply cut off, the connection closed early, no answer within timeoutMs for the whole
  * exchange). It always settles, once, and never rejects (#1534 round 1: a cut-off reply left it pending, and the script
  * ended with an unsettled await after a good build): the caller then leaves a marker.
@@ -118,7 +118,7 @@ export function postBuild(fact, { url, token, workspace }, timeoutMs = 10_000) {
   })
 }
 
-/** Leaves the fact for Hive as a marker in the workspace (written whole: a temp file renamed). Returns its path. */
+/** Leaves the fact for Combwork as a marker in the workspace (written whole: a temp file renamed). Returns its path. */
 export function leaveBuild(fact, workspace) {
   const dir = join(dataOf(workspace) ?? join(workspace, '.combwork'), BUILD_MARKERS_DIR)
   mkdirSync(dir, { recursive: true })
@@ -130,7 +130,7 @@ export function leaveBuild(fact, workspace) {
 }
 
 /**
- * Tells Hive of a successful build: { version, commit, branch, installer, builtAt, by, kind? }. Returns the line to
+ * Tells Combwork of a successful build: { version, commit, branch, installer, builtAt, by, kind? }. Returns the line to
  * print. Never fails the build: a fact that can't be sent or left is said, and the build stands.
  */
 export async function recordBuild({ root, version, commit, branch = null, installer, builtAt = new Date().toISOString(), by, kind = null }, { env = process.env, post = postBuild } = {}) {
@@ -138,7 +138,7 @@ export async function recordBuild({ root, version, commit, branch = null, instal
   try {
     fact = { kind: buildKind(version, by, kind), version, commit, branch, installer, builtAt, by }
   } catch (e) {
-    return `Build not recorded in Hive's journal: ${e.message}`
+    return `Build not recorded in Combwork's journal: ${e.message}`
   }
   const workspace = workspaceOf(root, env)
   const token = tokenOf(env)
@@ -146,14 +146,14 @@ export async function recordBuild({ root, version, commit, branch = null, instal
     const reply = await Promise.resolve()
       .then(() => post(fact, { url: env.CW_API_URL, token, workspace }))
       .catch(() => null)
-    if (reply) return reply.recorded ? `Build recorded in Hive's journal (${fact.kind}).` : `Build not recorded in Hive's journal: ${reply.reason}`
+    if (reply) return reply.recorded ? `Build recorded in Combwork's journal (${fact.kind}).` : `Build not recorded in Combwork's journal: ${reply.reason}`
   }
-  if (!workspace) return "Build not recorded in Hive's journal: no Hive workspace holds this checkout (CW_WORKSPACE names one)."
+  if (!workspace) return "Build not recorded in Combwork's journal: no Combwork workspace holds this checkout (CW_WORKSPACE names one)."
   try {
     leaveBuild(fact, workspace)
-    return `Build left for Hive's journal (${fact.kind}): it's recorded when the workspace next opens in Hive.`
+    return `Build left for Combwork's journal (${fact.kind}): it's recorded when the workspace next opens in Combwork.`
   } catch (e) {
-    return `Build not recorded in Hive's journal: ${e.message}`
+    return `Build not recorded in Combwork's journal: ${e.message}`
   }
 }
 

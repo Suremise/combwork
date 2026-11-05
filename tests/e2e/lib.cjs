@@ -1709,10 +1709,10 @@ async function setMaxAgents(inv, n, level = 'global') {
   }
 }
 
-/** Opens the project's settings from the header's ⋯ (#974: Settings left the tab strip), and waits for them. */
+/** Opens the project's settings from the tab strip's More ▾ (HI-2551: no longer in the header's ⋯), and waits for them. */
 async function openProjectSettings(page, ms = 10000) {
-  await page.locator('.project-header').getByRole('button', { name: 'More actions' }).click()
-  await page.locator('.menu .menu-item', { hasText: 'Project Settings' }).click()
+  await page.locator('.tabs .tab-more').click()
+  await menuEntry(page, 'Project Settings…').click()
   if (!(await until(async () => (await page.locator('.tab-body .settings-top').count()) > 0, ms))) throw new Error("Project Settings didn't open")
 }
 

@@ -280,7 +280,6 @@
   "project.memory.updated": "Zaktualizowano: {files}.",
   "project.menu.explorer": "Eksplorator",
   "project.menu.remove": "Usuń projekt…",
-  "project.menu.settings": "Ustawienia projektu",
   "project.menu.terminal": "Terminal",
   "project.meta.lastActivity": "Ostatnia aktywność",
   "project.meta.lastPrompt": "Ostatni prompt",

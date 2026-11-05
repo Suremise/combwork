@@ -347,6 +347,26 @@ const check = (name, ok, extra = '') => {
     check('…closed while Codex runs (asked, confirmed), its row then says it is set up', !!(await closeRunning(true)) && !!(await lib.until(async () => (await row('ChatGPT').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
     await shots('codex-set-up')
 
+    // --- Its terminal in its own card (HI-2541): Set Up on the middle account opens under that account's row, above
+    // the next account, not under the whole list; scrolled into view, and kept there as its state is read again.
+    const middle = page.locator('.account-block').nth(1)
+    const middleId = await middle.getAttribute('data-account')
+    await middle.locator('[data-action="account-menu"]').click()
+    await page.locator('.menu .menu-item', { hasText: 'Set Up' }).first().click()
+    const panel = page.locator('.account-signin')
+    check('Set Up on the middle account opens its terminal in that account’s card', !!(await lib.until(async () => (await middle.locator('.account-signin .task-terminal').count()) === 1, HUNG_MS)) && (await panel.count()) === 1 && (await panel.getAttribute('data-terminal-of')) === middleId)
+    const boxes = async () => ({ row: await middle.locator('.account-row').boundingBox(), panel: await panel.boundingBox(), next: await page.locator('.account-block').nth(2).boundingBox() })
+    // Polled (HR1 on HI-2541): it scrolls in an effect after it renders, and the list may still be laying out.
+    const isPlaced = (b) => !!b.row && !!b.panel && !!b.next && b.panel.y >= b.row.y + b.row.height - 1 && b.panel.y + b.panel.height <= b.next.y + 1
+    const placed = await lib.until(async () => { const b = await boxes(); return isPlaced(b) ? b : null }, HUNG_MS)
+    check('…under its row and above the next account', !!placed, JSON.stringify(placed ?? (await boxes())))
+    const inView = () => panel.locator('.task-terminal').evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight }).catch(() => false)
+    check('…scrolled into view', !!(await lib.until(inView, HUNG_MS)))
+    // Opening it re-reads the list (its row's sign-in state): the terminal stays in the card, nothing under the list.
+    check('…and stays there as the list is read again', !!(await lib.until(async () => (await list()).connections.find((a) => a.id === middleId)?.signingIn === true, HUNG_MS)) && (await middle.locator('.account-signin .task-terminal').count()) === 1 && (await page.locator('.accounts-settings > .account-signin').count()) === 0)
+    await shots('set-up-middle')
+    check('…closed, its card is as it was', !!(await closeRunning(true)) && !!(await lib.until(async () => (await panel.count()) === 0, HUNG_MS)))
+
     // --- A sign-in still waiting for its browser: Close asks, and Remove offers to close it (HI-1870).
     loginAs('held@example.com', true)
     await addVia('claude-code', 'Held')

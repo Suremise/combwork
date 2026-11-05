@@ -1,6 +1,6 @@
 ---
 name: investigate-flake
-description: Investigate a test that fails intermittently in Hive - does it still happen, reproduce it alone and under load, find the race, fix it with a condition rather than a timeout, prove the fix with repeated runs, and close it only with evidence. Use when a card or a run says a test is flaky, intermittent, passes alone but fails in a full run, or fails under load.
+description: Investigate a test that fails intermittently in Combwork - does it still happen, reproduce it alone and under load, find the race, fix it with a condition rather than a timeout, prove the fix with repeated runs, and close it only with evidence. Use when a card or a run says a test is flaky, intermittent, passes alone but fails in a full run, or fails under load.
 ---
 
 # Investigate a flaky test
@@ -20,7 +20,7 @@ A flake is a test whose result depends on timing or on what else is running. Eac
 ## 2. Find the race
 
 - Read the failing check's name and its log line, then compare what the test waits for with what it assumes. A flake is a gap between the two.
-- Typical causes in Hive: a Windows file lock (EPERM on teardown, `index.lock` in git), a wake or a keypress not yet taken, focus or timing in the UI, lane folders shared between runs, a real CLI home (#368), an antivirus scan holding a file.
+- Typical causes in Combwork: a Windows file lock (EPERM on teardown, `index.lock` in git), a wake or a keypress not yet taken, focus or timing in the UI, lane folders shared between runs, a real CLI home (#368), an antivirus scan holding a file.
 - If the state at the failure is unknown, add evidence to the test (a screenshot, the page's status, the file's contents) and run it again before changing anything.
 
 ## 3. Fix with a condition, not a timeout

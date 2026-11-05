@@ -1,6 +1,6 @@
 ---
 name: translate-ui
-description: Add, change or remove text Hive's window shows - messages, plurals and numbers, the English catalogues, the i18n guard's allow lists, translating into every locale and checking it. Use when developing Hive and a change touches text the user sees, or a locale file.
+description: Add, change or remove text Combwork's window shows - messages, plurals and numbers, the English catalogues, the i18n guard's allow lists, translating into every locale and checking it. Use when developing Combwork and a change touches text the user sees, or a locale file.
 ---
 
 # Text the user sees, in every language
@@ -38,7 +38,7 @@ the shared note `plans/2026-10-14-i18n-design.md`.
 3. **Translate into every language in `locales/`** (all seven besides `en`), in the same change, before review; never
    English fallbacks for later. Translations are `locales/<code>/<area>.json`, a flat object of ids: change a file
    with your editing tool or a script that keeps its key order and line endings (a re-sorted file is churn). Keep each
-   locale's own words for Hive's names (Version Control → Workflow, the presets, the Assistant), as its other messages
+   locale's own words for Combwork's names (Version Control → Workflow, the presets, the Assistant), as its other messages
    have them, and each language's plural forms (`many` in es and fr; `few` and `many` in pl; only `other` in ja and
    zh-CN).
 4. `npm run i18n:check` must pass: an extra key (a message removed: drop it from each locale), broken ICU, a changed
