@@ -315,7 +315,7 @@
   },
   "session.notice.finished": {
     "text": "{agent} finished",
-    "note": "A notification's title: an agent's turn has ended. {agent} is the agent (\"hive · B1\", or the project when it has one agent).",
+    "note": "A notification's title: an agent's turn has ended. {agent} is the agent (\"demo · B1\", or the project when it has one agent).",
     "audience": "both"
   },
   "session.notice.lineLostTitle": {
@@ -325,7 +325,7 @@
   },
   "session.notice.needsInput": {
     "text": "{agent} needs your input",
-    "note": "A notification's title: an agent waits for the user. {agent} is the agent (\"hive · B1\", or the project when it has one agent).",
+    "note": "A notification's title: an agent waits for the user. {agent} is the agent (\"demo · B1\", or the project when it has one agent).",
     "audience": "both"
   },
   "session.notice.notWatching": {

@@ -1,6 +1,6 @@
 // What a progress run ran for (#1220, SPEC §16.13): the card, the revision and the check that `cw-progress --card
 // --revision --check` and `/v1/progress` name, or their defaults: the reporting agent's card in Doing, and the head of
-// the folder it runs in, at the start. hive-progress asks for it before it starts the command
+// the folder it runs in, at the start. cw-progress asks for it before it starts the command
 // (`POST /v1/progress/resolve`), so a revision that isn't what's checked out is refused before anything runs.
 //
 // A run for a card with a start in its facts reads its revisions through the card's platform adapter (#1233): Git, the
@@ -270,13 +270,13 @@ export function admitLinked<T>(gate: ProgressGate, ignored: T, steps: { caller: 
 /** Who a link was given to: an agent, or a workspace's Assistant or scripts. */
 export const linkOwner = (c: ProgressCaller): string => (c.source === 'agent' ? `agent|${c.projectPath.toLowerCase()}|${c.agentId}` : `${c.source}|${c.workspacePath.toLowerCase()}`)
 
-/** How long a link resolve gave out waits for its start (hive-progress starts its run within seconds). */
+/** How long a link resolve gave out waits for its start (cw-progress starts its run within seconds). */
 export const LINK_TTL_MS = 10 * 60_000
 /** Links kept at most: past it, the oldest go. */
 export const MAX_LINKS = 200
 
 /**
- * The links resolve gave out, so a run's start carries what was checked out when hive-progress asked, before its command
+ * The links resolve gave out, so a run's start carries what was checked out when cw-progress asked, before its command
  * started, rather than reading it again seconds later (the command may have changed it) or taking a commit id from the
  * request (#1220 round 2: that is no proof of the checkout). Each is its caller's own, taken once, and gone after
  * LINK_TTL_MS; a start whose link is unknown, expired or someone else's is resolved again from what it names.

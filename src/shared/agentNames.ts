@@ -25,7 +25,7 @@ export function nameTaken(name: string, agents: readonly NamedAgent[], self?: { 
   return agents.find((a) => sameAgentName(a.name, name) && !(self && a.id === self.id && a.project.toLowerCase() === self.project.toLowerCase())) ?? null
 }
 
-/** The project's initials, upper case: hive → H, hive-desktop → HD, ambrosiaLabs → AL. */
+/** The project's initials, upper case: demo → D, web-dashboard → WD, ambrosiaLabs → AL. */
 export function projectPrefix(project: string): string {
   const words = project.replace(/([a-z0-9])([A-Z])/g, '$1 $2').split(/[^A-Za-z0-9]+/).filter(Boolean)
   return words.map((w) => w[0]).join('').toUpperCase() || 'P'

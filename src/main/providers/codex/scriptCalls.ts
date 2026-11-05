@@ -9,7 +9,7 @@ import { firstLine, shortPath, toolLabel } from '../conversation'
  * `item_completed` event whose item is the call: McpToolCall (server, tool, arguments, status, result.content),
  * CommandExecution (command, aggregated_output, exit_code, status), FileChange (changes), ImageView (path), WebSearch
  * (query) or another kind (Extension…). Each becomes a transcript tool named as Combwork names the same call made directly
- * (`hive · cw_read_task`, Shell, Edit, view_image), the Script's `calls`. The format belongs to Codex: the scenario
+ * (`combwork · cw_read_task`, Shell, Edit, view_image), the Script's `calls`. The format belongs to Codex: the scenario
  * harness reads it the same way (tests/scenarios/codexScripts.cjs).
  */
 

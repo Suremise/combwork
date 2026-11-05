@@ -147,7 +147,7 @@ export interface RepoLockOptions {
 
 /**
  * Runs fn holding the repository lock of `folder`'s repository. A wait longer than a moment shows who holds it ("Another
- * Hive is merging into this repository (Hive-Dev)"); one longer than the Advanced setting's bound gives up with that, the
+ * Combwork is merging into this repository (Combwork-Dev)"); one longer than the Advanced setting's bound gives up with that, the
  * lock staying the holder's (a live holder is never taken over), and nothing of fn runs.
  */
 export async function withRepoLock<T>(folder: string, fn: () => Promise<T>, opts: RepoLockOptions = {}): Promise<T> {

@@ -3,7 +3,7 @@
  * about the arguments it gave. Shared by the combwork MCP server (it runs outside the asar: no imports here).
  *
  * Claude Code defers MCP tools: the model sees their names only and must load a tool's schema before calling it. Haiku
- * often called Hive's most used tools without loading them, guessing their arguments (`key` for `number`), so Hive marks
+ * often called Combwork's most used tools without loading them, guessing their arguments (`key` for `number`), so Combwork marks
  * those few to be sent in full. The mark is the MCP tool's `_meta`, which a CLI that doesn't defer ignores; the other
  * tools stay deferred, so the prompt grows by these schemas only.
  */

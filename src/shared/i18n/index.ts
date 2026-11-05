@@ -4,7 +4,7 @@
  * `t` for times and tasks, and lint forbids shadowing), which formats it in the current language with ICU
  * MessageFormat (plurals, select, named placeholders). The English catalogue `locales/en/<area>.json` is extracted from
  * the code; translators edit `locales/<code>/<area>.json`. A message a language lacks, or one whose translation can't
- * be formatted (a renamed placeholder, broken ICU), shows in English: a translation can't break Hive.
+ * be formatted (a renamed placeholder, broken ICU), shows in English: a translation can't break Combwork.
  *
  * Text is translated when it is shown, never when a module loads: keep messages (descriptors) in data, and call
  * `tr()` at render or send time, so a change of language reaches it. Agent-facing text stays English and never comes

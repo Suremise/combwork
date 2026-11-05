@@ -636,7 +636,7 @@ export class ProgressStore {
 
   /**
    * Whether a caller may change a run: its own agent, the Assistant its own, a script any in its workspace but Combwork's,
-   * and Hive (its merge queue) only its own for that project.
+   * and Combwork (its merge queue) only its own for that project.
    */
   private owns(caller: ProgressCaller, r: ProgressRun, forLimit = false): boolean {
     if (key(r.workspacePath) !== key(caller.workspacePath)) return false

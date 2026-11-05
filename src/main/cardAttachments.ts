@@ -271,7 +271,7 @@ export interface Staging {
   dispose(): Promise<void>
 }
 
-/** Staging folders of operations running in this Hive (lower-cased paths), from before they are made until disposed of. */
+/** Staging folders of operations running in this Combwork (lower-cased paths), from before they are made until disposed of. */
 const liveStaging = new Set<string>()
 
 /** Whether another process (another Combwork on the workspace) is running: its staging may be in use. */

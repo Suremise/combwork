@@ -405,7 +405,7 @@ export function stampWait(was: WaitStamp | undefined, status: LaneStatus | null,
 
 /**
  * What the Combwork tools say of lanes (dialects, HI-2435): a lane's line, its state and why it waits, and the replies of
- * cw_lane. Said where the text is sent (hive-mcp.js formats these replies in its own process, with its session's
+ * cw_lane. Said where the text is sent (cw-mcp.js formats these replies in its own process, with its session's
  * dialect); `{card}` is a card's key or number, `{agent}` an agent's name.
  */
 const L = {
@@ -460,7 +460,7 @@ const L = {
   pairInSlot: agentMsg({ id: 'lane.line.pairInSlot', text: '{builder} / {reviewer} ({project}, in {slot})', note: "A lane's builder and reviewer, its project and the slot its cards are built in (#1438), at the start of its line." }),
   pool: agentMsg({ id: 'lane.line.pool', text: 'the reviewer pool', note: "In place of {reviewer}: the lane is reviewed by the project's reviewer pool (#1443)." }),
   noReviewer: agentMsg({ id: 'lane.line.noReviewer', text: 'no reviewer', note: 'In place of {reviewer}: the lane has no reviewer yet.' }),
-  line: agentMsg({ id: 'lane.line.text', text: '{pair}: {state}; {cards}; rounds {rounds}, wait {wait}. {id}', note: 'A lane in one line, for the Combwork tools: "B1 / R1 (hive): active, on #405; #483 Passed, #405 Review r2; rounds 10, wait 6 h. lane-3fa2". {cards}: its cards, each "key column"; {id}: the lane\'s id.' }),
+  line: agentMsg({ id: 'lane.line.text', text: '{pair}: {state}; {cards}; rounds {rounds}, wait {wait}. {id}', note: 'A lane in one line, for the Combwork tools: "B1 / R1 (demo): active, on #405; #483 Passed, #405 Review r2; rounds 10, wait 6 h. lane-3fa2". {cards}: its cards, each "key column"; {id}: the lane\'s id.' }),
   lineNamed: agentMsg({ id: 'lane.line.named', text: '{pair} {name}: {state}; {cards}; rounds {rounds}, wait {wait}. {id}', note: "A lane in one line, as lane.line.text, with the lane's own name ({name})." }),
   hours: agentMsg({ id: 'lane.wait.hours', text: '{n} h', note: 'A lane\'s wait in hours ("6 h", "1.5 h").' }),
   minutes: agentMsg({ id: 'lane.wait.minutes', text: '{n} min', note: 'A lane\'s wait in minutes ("90 min").' }),
@@ -667,7 +667,7 @@ export const waitText = (minutes: number): string => (minutes >= 60 && minutes %
 const cardWord = (c: LaneCard): string => `${cardRef(c.number)} ${say(L.column[c.column])}${c.round > 1 && c.column !== 'gone' && c.column !== 'unrecorded' ? ` ${say(L.cardRound, { round: c.round })}` : ''}${c.blocked ? ` ${say(L.cardBlocked)}` : ''}`
 
 /**
- * A lane in one line, for the Combwork tools: "B1 / R1 (hive) lanes and loops: active, on #405; #483 Passed, #405 Review r2,
+ * A lane in one line, for the Combwork tools: "B1 / R1 (demo) lanes and loops: active, on #405; #483 Passed, #405 Review r2,
  * #412 Todo; rounds 10, wait 6 h. lane-3fa2".
  */
 export function laneLine(l: LaneInfo): string {

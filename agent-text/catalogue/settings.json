@@ -5039,7 +5039,7 @@
   },
   "settings.updates.status.tip": {
     "text": "The version you are running and the result of the last check.",
-    "note": "The info tip of the setting \"Hive Desktop version\" (Settings → Updates): more on what it does and when it applies.",
+    "note": "The info tip of the setting \"Combwork version\" (Settings → Updates): more on what it does and when it applies.",
     "audience": "both"
   },
   "settings.updates.status.title": {

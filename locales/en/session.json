@@ -445,7 +445,7 @@
   },
   "session.notice.finished": {
     "defaultMessage": "{agent} finished",
-    "description": "A notification's title: an agent's turn has ended. {agent} is the agent (\"hive · B1\", or the project when it has one agent)."
+    "description": "A notification's title: an agent's turn has ended. {agent} is the agent (\"demo · B1\", or the project when it has one agent)."
   },
   "session.notice.finishedBody": {
     "defaultMessage": "The agent has finished its task.",
@@ -469,7 +469,7 @@
   },
   "session.notice.needsInput": {
     "defaultMessage": "{agent} needs your input",
-    "description": "A notification's title: an agent waits for the user. {agent} is the agent (\"hive · B1\", or the project when it has one agent)."
+    "description": "A notification's title: an agent waits for the user. {agent} is the agent (\"demo · B1\", or the project when it has one agent)."
   },
   "session.notice.notWatching": {
     "defaultMessage": "{agent} isn't watching {cards}",

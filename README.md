@@ -99,7 +99,7 @@ The seven languages besides English were translated by AI, and Combwork says so 
 
 Download `Combwork-Setup-<version>.exe` (`Hive-Setup-<version>.exe` for releases before the rename) from the [latest release](https://github.com/Suremise/combwork/releases/latest) and run it. The installer is not code-signed, so Windows SmartScreen may warn you; choose **More info → Run anyway**. After that Combwork keeps itself up to date.
 
-**Upgrading from 0.9.3?** The upgrade is one way: back up your workspace's `.hive` folder and your agents' worktrees first, and close every 0.9.3 Combwork on the workspace. Combwork asks before it upgrades a workspace's board; the [release notes](CHANGELOG.md) and [Upgrading to 1.0](docs/USER_GUIDE.md#upgrading-to-10) say what changes.
+**Upgrading from 0.9.3?** The upgrade is one way: back up your workspace's `.hive` folder and your agents' worktrees first, and close every Hive 0.9.3 on the workspace. Combwork asks before it upgrades a workspace's board; the [release notes](CHANGELOG.md) and [Upgrading to 1.0](docs/USER_GUIDE.md#upgrading-to-10) say what changes.
 
 To build the installer yourself, run `npm run dist`; it's written to `dist/`.
 

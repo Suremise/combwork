@@ -5541,7 +5541,7 @@
   },
   "settings.updates.status.tip": {
     "defaultMessage": "The version you are running and the result of the last check.",
-    "description": "The info tip of the setting \"Hive Desktop version\" (Settings → Updates): more on what it does and when it applies."
+    "description": "The info tip of the setting \"Combwork version\" (Settings → Updates): more on what it does and when it applies."
   },
   "settings.updates.status.title": {
     "defaultMessage": "Combwork version",

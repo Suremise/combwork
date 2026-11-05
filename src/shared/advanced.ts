@@ -176,7 +176,7 @@ interface AdvancedSource extends Omit<AdvancedDef, 'title' | 'desc' | 'text'> {
 }
 
 export interface AdvancedDef {
-  /** Stable, as advanced.json names it: "<provider or hive>.<what>.<which>". */
+  /** Stable, as advanced.json names it: "<provider or cw>.<what>.<which>". */
   id: string
   group: AdvancedGroup
   /** Its title and description in English (the Assistant's tools, errors and the log); `text` has them as Settings shows them. */
@@ -2917,7 +2917,7 @@ const SOURCES: readonly AdvancedSource[] = [
     samples: [{ from: `${FIX}/advanced/help-claude-2.1.305.txt`, version: '2.1.305', text: '--allowedTools, --allowed-tools <tools...>', shows: "Claude Code's help for the flag Combwork passes the Assistant's tools in" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   // Only the workspace's MCP servers (#1281, #966 rows 4–6). Off, the CLI's own load beside them, and the workspace's
-  // (Combwork's hive among them) still win over the CLI's own of the same name: each CLI checked (Claude Code 2.1.305,
+  // (Combwork's own server, combwork, among them) still win over the CLI's own of the same name: each CLI checked (Claude Code 2.1.305,
   // Copilot 1.0.100 natively; Codex by Combwork's table, outrankNativeCombwork).
   {
     id: overrideId('claude-code', 'mcpIsolation'),

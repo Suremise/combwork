@@ -1,5 +1,5 @@
 /**
- * Combwork's performance metrics (#115): what the Agent API, the hive MCP bridge, Combwork's launch guidance and its skill
+ * Combwork's performance metrics (#115): what the Agent API, the combwork MCP bridge, Combwork's launch guidance and its skill
  * service cost, counted locally per workspace. Units are exact where Combwork can measure them (UTF-8 bytes, characters as
  * UTF-16 code units, i.e. JavaScript string length, milliseconds on a monotonic clock); provider token usage is what the
  * provider reported. Combwork estimates no tokens. Nothing here holds a prompt, a body, a token, a URL or a path.
@@ -48,7 +48,7 @@ export interface McpSeries extends Timed {
   bytes: number
 }
 
-/** What a launch gave a session from Hive (by provider and role), exact sizes of each part. */
+/** What a launch gave a session from Combwork (by provider and role), exact sizes of each part. */
 export interface GuidanceSeries {
   provider: string
   role: 'agent' | 'assistant'
@@ -91,7 +91,7 @@ export interface GuidanceSeries {
 }
 
 /**
- * The hive MCP bridge's tool list as one session start sent it to its CLI (tools/list: names, descriptions, schemas).
+ * The combwork MCP bridge's tool list as one session start sent it to its CLI (tools/list: names, descriptions, schemas).
  * Its instructions aren't counted here: they are Combwork's session contract, counted once per launch in GuidanceSeries.
  */
 export interface CatalogSeries {

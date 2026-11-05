@@ -86,7 +86,7 @@ export interface StartDeps {
 }
 
 /**
- * Starts the runner for a command in a new folder under `root`: detached, hidden, with no pipe to Hive (so nothing of
+ * Starts the runner for a command in a new folder under `root`: detached, hidden, with no pipe to Combwork (so nothing of
  * it breaks when Combwork stops waiting or exits). Throws as spawn does; a later failure shows in the folder (no status).
  */
 export function startRun(root: string, folder: string, command: string | ListJob, cwd: string, deps: StartDeps): string {

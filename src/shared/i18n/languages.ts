@@ -27,7 +27,7 @@ export interface Language {
    */
   unitList?: 'narrow'
   /**
-   * Windows' UI font for its script, for the windows Combwork draws without Chromium (the "Hive can't start" window): Segoe
+   * Windows' UI font for its script, for the windows Combwork draws without Chromium (the "Combwork can't start" window): Segoe
    * UI has no CJK, so Windows' fallback mixes typefaces and narrows ，。 (#893). Segoe UI when not set.
    */
   uiFont?: string

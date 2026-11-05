@@ -126,13 +126,13 @@ function leaseOver(workspacePath: string, l: CopyLease): boolean | null {
 /** An isolated check's agent text (dialects, HI-2447): cw-progress --isolated's waits and refusals. */
 const T = {
   stillInUse: agentMsg({ id: 'copy.isolated.stillInUse', text: 'a check copy ({copy} is still in use by {by})', note: 'What cw-progress --isolated waits for: a check copy, the one it would get still held. {by} says by what.' }),
-  setupFailed: agentMsg({ id: 'copy.isolated.setupFailed', text: "{copy}'s setup failed ({error}), so nothing was run", note: "hive-progress --isolated's refusal: its check copy's setup failed." }),
+  setupFailed: agentMsg({ id: 'copy.isolated.setupFailed', text: "{copy}'s setup failed ({error}), so nothing was run", note: "cw-progress --isolated's refusal: its check copy's setup failed." }),
   noLease: agentMsg({ id: 'copy.isolated.noLease', text: 'no check copy could be leased', note: "cw-progress --isolated's refusal: no check copy could be lent, for another reason." }),
   noSupervisor: agentMsg({ id: 'copy.isolated.noSupervisor', text: "Combwork's process supervisor isn't running, so an isolated check can't be run", note: "cw-progress --isolated's refusal: Combwork can't run the check in a job of its own (#1435)." }),
   noLease2: agentMsg({ id: 'copy.assign.noLease', text: 'no such check copy lease', note: "Why cw-progress's launcher wasn't put in its check copy's job: the lease it named isn't this agent's." }),
   notOwn: agentMsg({ id: 'copy.assign.notOwn', text: "that process isn't one of this agent's own", note: "Why cw-progress's launcher wasn't put in its check copy's job: the process isn't the agent's (HR1's #1435 round 1)." }),
   noLauncher: agentMsg({ id: 'copy.assign.noLauncher', text: "its check copy's job takes no launcher now", note: "Why cw-progress's launcher wasn't put in its check copy's job: it has one already, or no job." }),
-  returned: agentMsg({ id: 'copy.assign.returned', text: 'its check copy was returned', note: "Why hive-progress's launcher wasn't put in its check copy's job: the copy was given back meanwhile." }),
+  returned: agentMsg({ id: 'copy.assign.returned', text: 'its check copy was returned', note: "Why cw-progress's launcher wasn't put in its check copy's job: the copy was given back meanwhile." }),
   notPut: agentMsg({ id: 'copy.assign.notPut', text: "the check's launcher couldn't be put in its check copy's job", note: "Why cw-progress's launcher wasn't put in its check copy's job: Windows refused it." })
 }
 

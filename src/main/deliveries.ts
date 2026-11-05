@@ -75,7 +75,7 @@ import { scopeOfHost, withCardNames } from './projectKeys'
  * **No inbox** (Darren's decision on #650): an agent that can't read an inbox (`readsInbox`: a project agent while the
  * Agent API or its combwork server is off) is given no delivery, and its bodies are never typed instead: each is refused with
  * the reason its sender sees (`noInbox`: made, NoInbox; one already waiting, refused when next looked at). Only the
- * user's own action, a task they give it from Hive (Start), is typed as their input, as their typing in its pane is: no
+ * user's own action, a task they give it from Combwork (Start), is typed as their input, as their typing in its pane is: no
  * delivery, no receipt.
  *
  * **Sources.** What made a delivery (`source`: a watch, a loop wake…) registers itself here: it can make its line again
@@ -794,7 +794,7 @@ let senderRefusal = (from: DeliverySender): string | null => {
   return null
 }
 /**
- * Whether an agent can read its inbox (#650): the Assistant always (its own tools); a project agent through its hive
+ * Whether an agent can read its inbox (#650): the Assistant always (its own tools); a project agent through its Combwork
  * tools, which it has only while the Agent API and the built-in combwork server are on.
  */
 let readsInbox = (_host: string, agentId: string): boolean => agentId === ASSISTANT_AGENT_ID || (config.settings.agentApi.enabled && config.settings.agentApi.provideCombworkMcp)
@@ -1835,7 +1835,7 @@ export async function deliverNow(host: string, nd: NewDelivery, holds?: () => bo
   let why: string | null = null
   try {
     // Another try for the agent may be running (the tick's): once it is done, this one's own. A wait for its folder
-    // (#646) or its hive tools (#865) is no try: given at once after it, or cancelled as before if it can't be then.
+    // (#646) or its Combwork tools (#865) is no try: given at once after it, or cancelled as before if it can't be then.
     for (let i = 0; i < 3; ) {
       const now = deliveryNow(host, rec.id)
       if (!now || !isWaiting(now)) break

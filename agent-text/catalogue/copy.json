@@ -17,7 +17,7 @@
   },
   "copy.assign.returned": {
     "text": "its check copy was returned",
-    "note": "Why hive-progress's launcher wasn't put in its check copy's job: the copy was given back meanwhile."
+    "note": "Why cw-progress's launcher wasn't put in its check copy's job: the copy was given back meanwhile."
   },
   "copy.error.checkout": {
     "text": "git checkout: {error}",
@@ -97,7 +97,7 @@
   },
   "copy.isolated.setupFailed": {
     "text": "{copy}'s setup failed ({error}), so nothing was run",
-    "note": "hive-progress --isolated's refusal: its check copy's setup failed."
+    "note": "cw-progress --isolated's refusal: its check copy's setup failed."
   },
   "copy.isolated.stillInUse": {
     "text": "a check copy ({copy} is still in use by {by})",

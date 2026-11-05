@@ -509,7 +509,7 @@ function progressOf(projectPath: string, agentId: string) {
 
 /**
  * An agent's status message: a watching agent's is what it waits for; one whose state is unknown says so (#648), as
- * does one whose hooks aren't reaching Hive (#1336) and one whose CLI waits to retry its model request (HI-1972).
+ * does one whose hooks aren't reaching Combwork (#1336) and one whose CLI waits to retry its model request (HI-1972).
  */
 const statusMessageOf = (live: LiveSessionState | null | undefined): string | null =>
   live?.hooksMissing
@@ -563,7 +563,7 @@ async function projectSummary(p: string) {
       // An action under the CLI's automatic review (as asked); never a question for the user.
       reviewing: a.live?.review ?? null,
       backgroundTasks: a.live?.backgroundTasks ?? 0,
-      // The project's MCP servers it gets (the built-in hive server besides): all of them, or only those it was given.
+      // The project's MCP servers it gets (the built-in combwork server besides): all of them, or only those it was given.
       mcpServers: mcpOn.filter((n) => agentGetsMcp(a, n)),
       mcpChoice: agentChoosesMcp(a) ? 'only' : 'all',
       // The guidance and skill revisions it launched with (compare with GET /v1/status's to spot an old launch).
@@ -3259,7 +3259,7 @@ route('POST', '/v1/tasks/reorder', async ({ body }) => {
 
 // Only a card's newest comment (its author, time and whole text), for "check the latest comment": the card's
 // description, earlier comments and history stay out of the reply. A card without comments gives comment null.
-// A card's attachment, read through Hive (HI-1751: the document tools refuse `.combwork`, so a reviewer couldn't read the
+// A card's attachment, read through Combwork (HI-1751: the document tools refuse `.combwork`, so a reviewer couldn't read the
 // builder's evidence): a page of its text, or its kind and path for an image or a binary file. Only a card the caller may
 // read (its scope, as GET /v1/tasks/:n), from that card's own folder.
 route('GET', '/v1/tasks/:n/attachments/:name', async ({ params, query }) => {
@@ -3480,7 +3480,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     return { watching: await withUsage(r.watching.label), limitAt: r.watching.limitAt, ...unsubmitted, ...(idle !== null ? { idle } : {}), ...left, ...(mine.length || idle !== null ? withNames([...mine.map((u) => u.card), ...(idle !== null ? [idle] : [])]) : {}) }
   }
   const seconds = body?.timeoutSeconds === undefined ? 300 : Number(body.timeoutSeconds)
-  // The longest is Settings → Advanced's (#367), under Codex's timeout for hive's tools.
+  // The longest is Settings → Advanced's (#367), under Codex's timeout for Combwork's tools.
   const maxSeconds = waitMaxSeconds('cards')
   if (!Number.isFinite(seconds) || seconds < 1) throw new HttpError(400, say(API.watch.timeoutRange, { max: String(maxSeconds) }))
   const limitMs = Math.min(maxSeconds, seconds) * 1000
@@ -3913,7 +3913,7 @@ route('GET', '/v1/metrics', async ({ query }) => {
 
 
 /**
- * The hive MCP bridge's report of its tool calls (the final text each gave the model) and, once per start, its tool
+ * The cw-mcp bridge's report of its tool calls (the final text each gave the model) and, once per start, its tool
  * list and instructions. From an agent's or the Assistant's own token only, attributed by that token (an agent's
  * project; the Assistant's workspace); checked and bounded: a report that isn't valid is refused, not stored.
  */
@@ -3935,7 +3935,7 @@ route('POST', '/v1/metrics/mcp', async ({ body }) => {
 })
 
 /**
- * The hive MCP bridge says its CLI has connected it (#865): the launch whose token it calls with may be given Combwork's
+ * The cw-mcp bridge says its CLI has connected it (#865): the launch whose token it calls with may be given Combwork's
  * lines now (sessions.combworkToolsConnected). An agent's or the Assistant's own token only, for its own launch: a token
  * names one launch, so a bridge left from an earlier one is refused (its token has stopped working).
  */
@@ -4081,7 +4081,7 @@ function consoleAllowed(): void {
 const consoleWorkspaceOf = (projectPath: string): string | null => workspaceFor(projectPath)?.path ?? null
 
 /**
- * The source a console request names: source=hive or source=assistant (the request's workspace), or an agent (agent,
+ * The source a console request names: source=combwork or source=assistant (the request's workspace), or an agent (agent,
  * and project unless it is the caller's own); a project agent naming none reads its own session. Anything the caller
  * may not read is refused as if it didn't exist (404), and so is anything an agent names that doesn't.
  */
@@ -4212,7 +4212,7 @@ async function runLinkOf(body: Record<string, unknown>) {
   }
 }
 
-// What a run would run for (#1220), checked before its command starts: hive-progress calls it first, so a revision that
+// What a run would run for (#1220), checked before its command starts: cw-progress calls it first, so a revision that
 // isn't checked out, an unknown card or a check with no command is refused before anything runs. Its `link` is for the
 // start: the only way a start gets the checkout seen here rather than read again.
 route('POST', '/v1/progress/resolve', async ({ body }) => {
@@ -4235,7 +4235,7 @@ route('POST', '/v1/progress/resolve', async ({ body }) => {
 
 /**
  * An isolated check's copy (#1435): an agent's check for a card of its own project on Git, leased at the card's revision.
- * Refused (400) for anything else, with what to do; 409 with `wait` while no copy is free (hive-progress asks again).
+ * Refused (400) for anything else, with what to do; 409 with `wait` while no copy is free (cw-progress asks again).
  */
 async function isolatedFor(ws: WorkspaceService, caller: ProgressCaller, link: RunLink, ticket?: string): Promise<{ project: string; lease: string; folder: string; copy: string }> {
   if (caller.source !== 'agent') throw new HttpError(400, say(API.check.isolatedAgentsOnly))

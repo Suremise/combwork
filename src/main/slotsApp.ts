@@ -141,7 +141,7 @@ const T = {
 const sayStored = (m: AgentMsg, values?: AgentValues): string => inDefaultDialect(() => say(m, values))
 
 /**
- * A project's slot runs: each a run of "Hive (slot <name>)" in the Progress panel, in the job the pool recorded for it.
+ * A project's slot runs: each a run of "Combwork (slot <name>)" in the Progress panel, in the job the pool recorded for it.
  * Fails closed: with no process supervisor, or its job not made, nothing runs. Its job is ended when the command
  * ends, when the workspace closes (`signal`) or at its time limit, and the run is settled only once the job is seen
  * empty: otherwise the job stays recorded on the slot for `settle`.

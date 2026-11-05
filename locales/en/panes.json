@@ -817,7 +817,7 @@
   },
   "panes.table.projectPrefix": {
     "defaultMessage": "in {value}",
-    "description": "The agent's project in a line of text (screen readers, a dialog's copy): {value} is its name (\"in hive\"). Lower case."
+    "description": "The agent's project in a line of text (screen readers, a dialog's copy): {value} is its name (\"in demo\"). Lower case."
   },
   "panes.table.role": {
     "defaultMessage": "Role",

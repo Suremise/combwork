@@ -11,7 +11,7 @@
 //   typed or queued, no run or background task), as #1429's warming operation on the lent slot, under the folder's fence
 //   (#646: nothing typed into or started in it meanwhile) and the repository's lock for the switch; recorded as
 //   `SlotPrepared` for the cycle.
-// - **place**: the builder given the card there once quiet: claimed by this Hive (`PlacementClaimed`, taken over once
+// - **place**: the builder given the card there once quiet: claimed by this Combwork (`PlacementClaimed`, taken over once
 //   its process is gone), delivered once (its delivery's identity is the card's cycle and lease), recorded as
 //   `BuilderPlaced`.
 // - **delete**: a Done card's merged line (containment by key), under the repository's lock, never one checked out.
@@ -855,7 +855,7 @@ function until(projectPath: string, agentId: string, ok: () => boolean, over: ()
 
 // --- The pass.
 
-/** Each project's pass, one at a time in this Hive (another asked while one runs: once more after it). */
+/** Each project's pass, one at a time in this Combwork (another asked while one runs: once more after it). */
 const passes = new Map<string, { again: boolean; done: Promise<void> }>()
 /** Cycles being prepared or placed here now (`<project>#<card>#<seq>`): one at a time each. */
 const ensuring = new Set<string>()

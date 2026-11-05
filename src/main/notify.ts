@@ -53,7 +53,7 @@ export interface TellSpec {
   apiTitle?: string
   /** The title's text as data: the stream says it again in each client's dialect (HI-2465). Its English is `apiTitle` (or `title`). */
   apiTitleText?: TextPart
-  /** The project it is about (null: Hive-wide): its scope, its owner window when none is focused, and its link. */
+  /** The project it is about (null: Combwork-wide): its scope, its owner window when none is focused, and its link. */
   projectPath?: string | null
   /** The agent it is about, for the Agent API's stream and its link. */
   agentId?: string

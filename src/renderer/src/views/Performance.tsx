@@ -42,7 +42,7 @@ const M = {
   projects: msg({ id: 'performance.panel.projects', defaultMessage: 'Projects', description: "Section heading in the Performance sidebar, above the workspace's projects." }),
   projectTip: msg({ id: 'performance.scope.projectTip', defaultMessage: "Only {project}'s work. Its own Performance tab shows the same.", description: "Tooltip of a project's row in the Performance sidebar. {project} is the project's name." }),
   project: msg({ id: 'performance.scope.project', defaultMessage: 'Project: {project}', description: "The Performance page's badge when it shows one project. {project} is its name." }),
-  pageLabel: msg({ id: 'performance.pageLabel', defaultMessage: 'Performance, {scope}', description: 'Name of the Performance page for screen readers. {scope} is what it shows, such as "Whole workspace" or "Project: hive".' }),
+  pageLabel: msg({ id: 'performance.pageLabel', defaultMessage: 'Performance, {scope}', description: 'Name of the Performance page for screen readers. {scope} is what it shows, such as "Whole workspace" or "Project: demo".' }),
   scopeTitle: msg({ id: 'performance.scope.badgeTitle', defaultMessage: 'What these numbers are about', description: "Tooltip of the Performance page's badge naming what it shows." }),
   viewLabel: msg({ id: 'performance.view.label', defaultMessage: 'Now or compare', description: 'Name, for screen readers, of the switch between the Now and Compare views of the Performance page.' }),
   now: msg({ id: 'performance.view.now', defaultMessage: 'Now', description: 'Button of the Performance page: shows the live metrics. Keep it short.' }),

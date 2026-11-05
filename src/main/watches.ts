@@ -1286,7 +1286,7 @@ async function assistantFollows(store: Store, reply: Reply): Promise<boolean> {
  * Tells the Assistant a reply of the user's on its own (#1099), when it follows the agent but no watch of its own tells
  * it now: a wake of its own, within seconds, like any other. Told so, no watch tells it again; not made (a failed save,
  * a refusal), it is left to the Assistant's watches again. Its watches carry on. Made under the replies' generation and
- * this run of Hive (its `meta`): the 'reply' source gives it only while replies may still be told.
+ * this run of Combwork (its `meta`): the 'reply' source gives it only while replies may still be told.
  */
 async function tellReplyNow(store: Store, reply: Reply): Promise<void> {
   const generation = replyGeneration
@@ -1313,7 +1313,7 @@ async function tellReplyNow(store: Store, reply: Reply): Promise<void> {
   await offerNow(home, ASSISTANT_AGENT_ID)
 }
 
-/** This run of Hive (#1099): a reply's delivery made in it is checked against the replies' generation, which is this run's. */
+/** This run of Combwork (#1099): a reply's delivery made in it is checked against the replies' generation, which is this run's. */
 const RUN = randomBytes(6).toString('hex')
 /**
  * Whether a reply told on its own may still be given (#1099): replies still told, and, when it was made in this run, not
@@ -2406,7 +2406,7 @@ async function deliverFor(store: Store, rec: WatchRecord): Promise<void> {
     return
   }
   // Not over a line it hasn't taken (#430): its next wake waits until it takes that one, or the user presses Enter there.
-  // Nor before its CLI has taken its launch's task (#721), or connected its hive tools (#865).
+  // Nor before its CLI has taken its launch's task (#721), or connected its Combwork tools (#865).
   if (!readyFor(sessions.liveFor(rec.projectPath, rec.agentId)) || sessions.userMayBeTyping(rec.projectPath, rec.agentId) || sessions.lineWaiting(rec.projectPath, rec.agentId) || sessions.launchTaskWaiting(rec.projectPath, rec.agentId) || sessions.combworkToolsWaiting(rec.projectPath, rec.agentId)) return
   const token = { cancelled: false }
   store.delivering.set(rec.id, token)
@@ -2858,7 +2858,7 @@ function followIds(ws: WorkspaceService, path: string, ids: ProjectIdIndex, rec:
 }
 
 /**
- * Watches whose project was renamed or moved within the workspace while Hive runs (#508) go with it, by its id: their
+ * Watches whose project was renamed or moved within the workspace while Combwork runs (#508) go with it, by its id: their
  * folder and the cards they may see are the project's now, and so do the agents an agent watch follows. A watch whose
  * project is gone while another project has its folder leaves the list, kept aside in the file (as one that isn't valid
  * is when read). Whether any changed (in the store's lock).

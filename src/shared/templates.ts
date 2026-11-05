@@ -15,7 +15,7 @@ import { agentWorkflowRole, buildsWork, isWorkflowRole, reviewsWork, type Review
 import { hasWorkflow, readTemplateWorkflows, TEMPLATE_PLATFORMS, type TemplateWorkflows } from './workflow/templateOptions'
 import type { PlatformId } from './platform/descriptors'
 
-/** The format's version: a template made by a newer Hive (a higher one) is refused rather than half read; 0.9's (1) too (#1436). */
+/** The format's version: a template made by a newer Combwork (a higher one) is refused rather than half read; 0.9's (1) too (#1436). */
 export const TEMPLATE_VERSION = 2
 /** A template's name is at most this long. */
 export const TEMPLATE_NAME_MAX = 60
@@ -361,7 +361,7 @@ export const usesKey = (agents: readonly Pick<TemplateAgent, 'name'>[]): boolean
 export const expandName = (pattern: string, key: string, n: number): string => pattern.replace(NAME_TOKENS, (_m, t: string) => (t === 'key' ? key : String(n)))
 
 /**
- * A template's agent names for a project (#1123 names, #1440): each pattern made with the project's key (`HI-B1` in hive)
+ * A template's agent names for a project (#1123 names, #1440): each pattern made with the project's key (`DE-B1` in demo)
  * and the agent's number among the agents of the same pattern, from 1 (in Combwork's own, `{key}-B{n}` is every builder:
  * its number among its role), so agents of one pattern never share a name. A name without tokens is itself.
  */

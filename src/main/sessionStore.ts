@@ -35,7 +35,7 @@ export interface SessionsPlace {
   scope: string
   file: string
   /**
-   * Removed from Hive (hidden as removed in its workspace): records it took away in its folder stay there (#1061). Asked
+   * Removed from Combwork (hidden as removed in its workspace): records it took away in its folder stay there (#1061). Asked
    * when a file would be moved in, not when the place was worked out (#1161): a change can wait for its turn meanwhile,
    * and land after its workspace closed. True too when that can't be known now (its workspace no longer open): no file
    * is moved in then.

@@ -1,4 +1,4 @@
-// A lane's card list, owned by Hive (SPEC §16.11.1): the loop reads its next card from here, not from its brief.
+// A lane's card list, owned by Combwork (SPEC §16.11.1): the loop reads its next card from here, not from its brief.
 // Changing the list is never refused: while a card is in flight the change is queued and applied at the next card
 // boundary. The lane keeps the ruleset in force when it started until it ends (§16.6.5).
 //

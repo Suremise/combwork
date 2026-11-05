@@ -9,10 +9,10 @@ import type { JournalSource } from '../../../shared/journal'
  */
 
 const KIND: Record<BuildKind, Msg> = {
-  beta: msg({ id: 'assistant.journal.build.kind.beta', defaultMessage: 'beta', description: 'A kind of build of Combwork itself, in a journal line such as "Built Hive 1.0.0-beta.1 (beta) from 1fef5341 on main".' }),
-  baseline: msg({ id: 'assistant.journal.build.kind.baseline', defaultMessage: 'baseline', description: 'A kind of build of Combwork itself: the 1.0 build installed for daily use before any release, in a journal line such as "Built Hive 1.0.0-rc.1 (baseline) from 1fef5341 on 1.0.0".' }),
-  rc: msg({ id: 'assistant.journal.build.kind.rc', defaultMessage: 'release candidate', description: 'A kind of build of Combwork itself, in a journal line such as "Built Hive 1.0.0-rc.2 (release candidate) from 1fef5341 on 1.0.0".' }),
-  release: msg({ id: 'assistant.journal.build.kind.release', defaultMessage: 'release', description: 'A kind of build of Combwork itself, in a journal line such as "Uploaded a draft of Hive 1.0.0 (release) from 1fef5341 on main".' })
+  beta: msg({ id: 'assistant.journal.build.kind.beta', defaultMessage: 'beta', description: 'A kind of build of Combwork itself, in a journal line such as "Built Combwork 1.1.0-beta.1 (beta) from 1fef5341 on main".' }),
+  baseline: msg({ id: 'assistant.journal.build.kind.baseline', defaultMessage: 'baseline', description: 'A kind of build of Combwork itself: the build installed for daily use before a release, in a journal line such as "Built Combwork 1.1.0-rc.1 (baseline) from 1fef5341 on 1.1.0".' }),
+  rc: msg({ id: 'assistant.journal.build.kind.rc', defaultMessage: 'release candidate', description: 'A kind of build of Combwork itself, in a journal line such as "Built Combwork 1.1.0-rc.2 (release candidate) from 1fef5341 on 1.1.0".' }),
+  release: msg({ id: 'assistant.journal.build.kind.release', defaultMessage: 'release', description: 'A kind of build of Combwork itself, in a journal line such as "Uploaded a draft of Combwork 1.1.0 (release) from 1fef5341 on main".' })
 }
 
 const M = {

@@ -42,7 +42,7 @@ export default defineConfig({
         external: ['original-fs', 'original-fs/promises'],
         input: {
           index: resolve(__dirname, 'src/main/index.ts'),
-          // The scripts agents' sessions run, named for what agents see (HI-2463: cw-*); their sources keep hive-* names.
+          // The scripts agents' sessions run, named for what agents see (HI-2463: cw-*), as their sources are.
           'cw-mcp': resolve(__dirname, 'src/main/mcp/cw-mcp.ts'),
           'cw-progress': resolve(__dirname, 'src/main/progressReporters/cw-progress.ts'),
           // The close commands' runner (HI-1368), run as Node outside the asar.

@@ -70,7 +70,7 @@ export async function startProfileNotices(): Promise<void> {
 }
 
 /**
- * After the local folder moved (the installer, or the names upgrade at start): each of Hive's connections checked, and those that show signed out named
+ * After the local folder moved (the installer, or the names upgrade at start): each of Combwork's connections checked, and those that show signed out named
  * once. A check that failed (no answer) leaves the record unfinished, for the next start; the names said are kept.
  */
 export async function checkSignInsAfterMove(folder: string, check: (id: string) => Promise<{ loggedIn: boolean | null } | null> = checkAccount): Promise<string[]> {

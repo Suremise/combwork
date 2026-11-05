@@ -1,4 +1,4 @@
-// A watch on React's commits in test copies of Hive (HI-1387; a suite fails on its commit chain, HI-1865). A render
+// A watch on React's commits in test copies of Combwork (HI-1387; a suite fails on its commit chain, HI-1865). A render
 // loop (a setState per event in a useEffect, #1366) only throws (#185) once React's nested-update limit is passed, and a
 // production build says nothing before then, so a smaller loop went unseen in suites that passed. React DOM reports each
 // commit to a DevTools hook installed before it loads, production builds too: test copies install one

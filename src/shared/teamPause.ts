@@ -1,13 +1,13 @@
 /**
  * Pausing the team before an update (HI-2081, SPEC §16.10.9): a workspace's hold on Combwork's own automation (lane starts,
  * loop and watch wakes, the reviewer pool's hand-outs, the new conversations Combwork starts by itself, the merge queue's
- * next entry), and what still runs before it is safe to install. hive-mcp.js and the window read it too: it imports only
+ * next entry), and what still runs before it is safe to install. cw-mcp.js and the window read it too: it imports only
  * the agent text module and the notices' prefix, which need no Node module.
  */
 import { agentMsg, say } from './agentText'
 import { NOTICE_PREFIX } from './doorbell'
 
-/** A workspace's pause, held in memory by the running Hive (HI-2156): its epoch, since when, and who paused it. */
+/** A workspace's pause, held in memory by the running Combwork (HI-2156): its epoch, since when, and who paused it. */
 export interface TeamPause {
   pauseId: string
   since: string

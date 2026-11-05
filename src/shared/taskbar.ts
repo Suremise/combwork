@@ -13,7 +13,7 @@ export function badgeText(count: number): string {
   return count > 9 ? '9+' : String(count)
 }
 
-/** The window's title, prefixed with the count when there is one: "(2) alpha — work — Hive". */
+/** The window's title, prefixed with the count when there is one: "(2) alpha — work — Combwork". */
 export function windowTitle(title: string, count: number): string {
   return count > 0 ? `(${count}) ${title}` : title
 }

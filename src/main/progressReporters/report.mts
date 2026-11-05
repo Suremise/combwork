@@ -274,7 +274,7 @@ export class ProgressRun {
         return r?.ok ? r.body : null
       })
     let timer: ReturnType<typeof setTimeout> | undefined
-    // Its start may still be waiting for Hive (a quick command's start goes as it ends): what is left of the start's own
+    // Its start may still be waiting for Combwork (a quick command's start goes as it ends): what is left of the start's own
     // time comes first, so a start Combwork takes within it is followed by the finish (HR2's round 1), then the finish's.
     const startLeft = Math.max(0, this.startedAt + this.startTimeoutMs - Date.now())
     const bound = startLeft + (retry !== undefined ? 2 * finishWaitMs + retry : finishWaitMs) + 250
@@ -343,7 +343,7 @@ export interface RunLink {
 /**
  * Why Combwork gave no answer (HI-1892): `slow`, no reply within the time allowed (it is there, but busy); `refused`, the
  * connection was refused or not allowed (Combwork isn't running, or this process may not reach it: a sandbox); `failed`,
- * anything else (an older Hive without the call, an error), with what happened.
+ * anything else (an older Combwork without the call, an error), with what happened.
  */
 export type Unreachable = { unreachable: true; why: 'slow' | 'refused' | 'failed'; detail: string; status?: number | null }
 

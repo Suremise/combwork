@@ -172,7 +172,7 @@ async function projectOptions(ws: WorkspaceService, folder: string, hasLane: boo
   let configured = false
   let made = false
   const cfg = await ws.mutateProjectConfig(folder, (c) => {
-    // Under the lock, from the file as it is now: another Hive (or a rerun) may have written them meanwhile.
+    // Under the lock, from the file as it is now: another Combwork (or a rerun) may have written them meanwhile.
     if (c.workflow) return {}
     if (madeBy1_0(c)) {
       made = true

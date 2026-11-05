@@ -870,7 +870,7 @@ interface Pending<T> {
 
 /** Requests at most at once (the oldest go, a copy of theirs given back). */
 const MAX_REQUESTS = 100
-/** A copy leased for a request nobody asked about for this long is given back (hive-progress gone, or given up). */
+/** A copy leased for a request nobody asked about for this long is given back (cw-progress gone, or given up). */
 export const ABANDON_MS = 60_000
 /** How long the first ask waits for its answer before saying to wait (the rest comes by asking again). */
 export const FIRST_WAIT_MS = 2000
@@ -878,7 +878,7 @@ export const FIRST_WAIT_MS = 2000
 /**
  * Isolated runs' copies leased and set up apart from the Agent API's request that asks for them (HR1's #1435 round 1: a
  * first setup takes minutes, longer than any request may): the first ask starts the lease and answers within
- * FIRST_WAIT_MS, with the copy or `wait` and a ticket; asked again with the ticket (hive-progress asks every 2 s), the
+ * FIRST_WAIT_MS, with the copy or `wait` and a ticket; asked again with the ticket (cw-progress asks every 2 s), the
  * copy once ready. A ticket is its asker's alone and for what it asked (another's, or for something else, starts anew).
  * A copy nobody collects within ABANDON_MS of the last ask is given back (`abandon`, on each look).
  */

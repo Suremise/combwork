@@ -16,7 +16,7 @@ export type FocusedNeed = 'unit' | 'fake' | 'real' | 'packaged'
 export const FOCUSED_NEEDS: readonly FocusedNeed[] = ['unit', 'fake', 'real', 'packaged']
 
 export interface FocusedTest {
-  /** The project's own id for it: opaque to Hive (a file, a suite, `file.py::test`). */
+  /** The project's own id for it: opaque to Combwork (a file, a suite, `file.py::test`). */
   id: string
   needs: FocusedNeed[]
 }

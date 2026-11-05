@@ -824,7 +824,7 @@ async function agentIn(ws: WorkspaceService, project: string, id: string): Promi
 
 /**
  * A generalist takes no side in the workflow (HI-686): never a lane's builder or reviewer, however the lane is started
- * or joined (the window's Start Lane, the Agent API, the hive tools). Refused before anything changes; the other roles
+ * or joined (the window's Start Lane, the Agent API, the cw_ tools). Refused before anything changes; the other roles
  * as before.
  */
 async function refuseGeneralist(ws: WorkspaceService, project: string, ids: readonly (string | null | undefined)[]): Promise<void> {

@@ -59,7 +59,7 @@ export function unusedState(w: UnusedWorktree): string {
   return parts.length ? parts.join(' · ') : (c.reason ?? tr(M.notChecked))
 }
 
-/** Who made it, in a few words (#476): "was B4" (the Combwork agent that worked there), "made by Hive", "not made by Hive". */
+/** Who made it, in a few words (#476): "was B4" (the Combwork agent that worked there), "made by Combwork", "not made by Combwork". */
 export function originLabel(w: Pick<UnusedWorktree, 'origin'>): string {
   const o = w.origin
   if (!o) return ''

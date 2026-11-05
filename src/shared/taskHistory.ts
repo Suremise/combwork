@@ -187,7 +187,7 @@ export function setStoredForAgents(fn: ((english: string, stored: unknown) => st
 /**
  * A history line or Combwork's comment as an agent reads it (dialects, HI-2440; design section 2): said again from its
  * message and values in the reader's chain where that chain overrides a message it names, else its English as stored.
- * A record from before #845, with no message (decision 5), is shown as stored. Where none is registered (hive-mcp.js,
+ * A record from before #845, with no message (decision 5), is shown as stored. Where none is registered (cw-mcp.js,
  * which renders no history), the stored English.
  */
 export const storedForAgents = (english: string, stored: unknown): string => (stored && forAgents ? forAgents(english, stored) : english)

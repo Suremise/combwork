@@ -206,7 +206,7 @@ export function workspaceAccounts(cfg: Pick<WorkspaceConfig, 'connections'> | nu
 
 /**
  * The connection new launches use (HI-1875): the first in the preference order (each CLI's connections in the list's
- * order, Hive-wide) that's on; else none.
+ * order, Combwork-wide) that's on; else none.
  */
 export function firstOn(on: readonly string[], connections: readonly Account[]): string | null {
   return connections.find((a) => on.includes(a.id))?.id ?? null
@@ -310,7 +310,7 @@ export interface ConnectionShownApi {
   on?: boolean
   /** The first in its CLI's order that's on in the caller's workspace: what a provider-only call uses there (HI-1875). */
   default?: boolean
-  /** Its place in its CLI's preference order, from 1 (HI-1875: Hive-wide; 1 wears the Default hint). */
+  /** Its place in its CLI's preference order, from 1 (HI-1875: Combwork-wide; 1 wears the Default hint). */
   order?: number
   email?: string
   plan?: string

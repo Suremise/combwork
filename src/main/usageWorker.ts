@@ -34,7 +34,7 @@ export interface IngestJob extends SessionMeta {
   holds: SessionHold[]
   /** Keep the parser's state now: the session ended, or main says it runs (then at most every few minutes). */
   keepState: 'now' | 'running' | 'no'
-  /** A session started outside Hive (no record): kept for the Sessions list, never counted in totals. */
+  /** A session started outside Combwork (no record): kept for the Sessions list, never counted in totals. */
   external?: boolean
   /** The holds `holds` were made from, as a key (open ones as open): a change re-shares the session's cards. */
   holdsKey: string | null
@@ -192,7 +192,7 @@ async function feed(path: string, parser: RawUsageParser, from: number): Promise
   return readTranscript(path, from, (piece) => parser.feed(piece.toString('utf8')), CHUNK)
 }
 
-/** Files saved by a newer Hive (opened read-only, db.ts): nothing is written to them, said once each. */
+/** Files saved by a newer Combwork (opened read-only, db.ts): nothing is written to them, said once each. */
 const warnedNewer = new Set<string>()
 function readOnly(file: string): boolean {
   const db = dbOf(file)

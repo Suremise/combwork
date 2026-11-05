@@ -2,7 +2,7 @@ import type { MovePlan } from './types'
 
 /**
  * Paths after a workspace or project folder moved (#146): what a stored absolute path becomes, compared as Windows
- * does (without case, either separator) and only at folder boundaries, so `D:\Dev\HIVE` never matches `D:\Dev\HIVE2`.
+ * does (without case, either separator) and only at folder boundaries, so `D:\Dev\Demo` never matches `D:\Dev\Demo2`.
  * Pure, for both the plan and the repair in main/workspaceMove.ts.
  */
 

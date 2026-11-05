@@ -907,7 +907,7 @@ export class Workflow {
     // user's own drag is theirs to make.
     const lane = this.enforced() && !opts.drag ? this.laneRefusal(card) : null
     if (lane) return this.refuse(card, actor, 'start', lane)
-    // Its builder's worktree still has an earlier card's squashed work (§16.19.2, #1271): it waits for Hive (or the user)
+    // Its builder's worktree still has an earlier card's squashed work (§16.19.2, #1271): it waits for Combwork (or the user)
     // to bring the branch up to date, so its change is only its own.
     const behind = this.enforced() && !opts.drag ? await this.lineBehind(card) : null
     if (behind) return this.refuse(card, actor, 'start', { rule: 'lane.lineBehind', values: { card: card.key, earlier: behind.prev.key, line: behind.line ?? behind.folder, target: behind.target } })

@@ -11,7 +11,7 @@
  * Conventions: STRICT tables; a card's child rows reference `cards(number)` ON DELETE CASCADE (a card's facts, comments
  * and the rest go only with the card itself: Delete permanently); `ord` is an entry's place in its list, from 0; times
  * are ISO strings as today; keys compare case-insensitively (COLLATE NOCASE); a typed store row keeps the fields this
- * build has no column for in `extra` (a JSON object), so an older Hive saving a newer one's row loses nothing.
+ * build has no column for in `extra` (a JSON object), so an older version saving a newer one's row loses nothing.
  *
  * `QUERIES` are the modules' real queries against these tables, each with the index it must use: tests/schemaV1_0.test.ts
  * checks every one with EXPLAIN QUERY PLAN, and the modules import them from here as they move onto the tables.
@@ -895,7 +895,7 @@ export const COPIES_STEP: SchemaStep = {
       CHECK ((op IS NULL) = (op_kind IS NULL))
     ) STRICT, WITHOUT ROWID`,
     // A lease: one review (its card and submission) or one isolated run (its card and run, or the link that will start
-    // it) by a holder agent, through a Hive (its profile, pid and start: a lease whose Hive is gone is returned), from
+    // it) by a holder agent, through a Combwork (its profile, pid and start: a lease whose Combwork is gone is returned), from
     // `from_at`; `returned_at` once its review or run is over (why), `freed_at` once the copy was quiet. `job` is the
     // supervisor job its run's processes are put in (an isolated check), settled before the copy is freed.
     `CREATE TABLE copy_leases (

@@ -6,7 +6,7 @@
 import { agentMsg, say } from './agentText'
 import { NOTICE_PREFIX } from './doorbell'
 
-/** Why Hive closed: an installer asked (install), an update installing (update), Restart Hive (restart), or a quit. */
+/** Why Combwork closed: an installer asked (install), an update installing (update), Restart Combwork (restart), or a quit. */
 export type RestartReason = 'install' | 'update' | 'restart' | 'quit'
 
 /**
@@ -119,7 +119,7 @@ export function parseRecord(text: string): RestartRecord | null {
 // The installer's request (installer.nsh): close for an install, bound to this process and this copy.
 // ---------------------------------------------------------------------------
 
-/** The request's file in Hive's profile, the acknowledgement's, and what a request taken is renamed to. */
+/** The request's file in Combwork's profile, the acknowledgement's, and what a request taken is renamed to. */
 export const REQUEST_FILE = 'restart-request.json'
 export const ackFile = (nonce: string): string => `restart-ack-${nonce}.json`
 export const takenFile = (nonce: string): string => `restart-request.${nonce}.taken`
@@ -137,7 +137,7 @@ export interface RestartRequest {
   pid: number
   /** When that process started (UTC, ISO). */
   pidCreated: string
-  /** The Hive.exe it was started from. */
+  /** The Combwork.exe it was started from. */
   exe: string
   reason: 'install'
   /** When the installer wrote it (UTC, ISO). */

@@ -5,7 +5,7 @@
   },
   "notice.decision.flag": {
     "text": "{cards} since you last read {n, plural, one {it} other {them}}: read {n, plural, one {the card} other {each card}} (cw_read_task) at your next checkpoint.",
-    "note": "#357: the flag after \"[Combwork] \" in a hive tool's reply, when decisions were recorded or changed on the agent's cards since it last read them. cards: each card's decisions (notice.decision.card); n: how many cards."
+    "note": "#357: the flag after \"[CW] \" in a cw_ tool's reply, when decisions were recorded or changed on the agent's cards since it last read them. cards: each card's decisions (notice.decision.card); n: how many cards."
   },
   "notice.intent.already": {
     "text": "{card} is already {column}: carry on.",
@@ -33,7 +33,7 @@
   },
   "notice.orphan.running": {
     "text": "{n, plural, one {A process your command started is} other {{count} processes your commands started are}} still running with the shell that started {n, plural, one {it} other {them}} gone: {list}. End {n, plural, one {it} other {them}} if not needed; Combwork won't.",
-    "note": "After \"[Combwork] \", at the agent's next tool call or turn's end: processes its commands started still run with their shell gone (HI-2111), told once; Combwork doesn't end them. n and count: how many; list: each process (notice.orphan.process), joined by \"; \"."
+    "note": "After \"[CW] \", at the agent's next tool call or turn's end: processes its commands started still run with their shell gone (HI-2111), told once; Combwork doesn't end them. n and count: how many; list: each process (notice.orphan.process), joined by \"; \"."
   },
   "notice.outage.after": {
     "text": "(Settings → Advanced: Resume agents after a connection drops.)",

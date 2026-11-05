@@ -117,7 +117,7 @@
   },
   "lane.line.text": {
     "text": "{pair}: {state}; {cards}; rounds {rounds}, wait {wait}. {id}",
-    "note": "A lane in one line, for the Combwork tools: \"B1 / R1 (hive): active, on #405; #483 Passed, #405 Review r2; rounds 10, wait 6 h. lane-3fa2\". {cards}: its cards, each \"key column\"; {id}: the lane's id."
+    "note": "A lane in one line, for the Combwork tools: \"B1 / R1 (demo): active, on #405; #483 Passed, #405 Review r2; rounds 10, wait 6 h. lane-3fa2\". {cards}: its cards, each \"key column\"; {id}: the lane's id."
   },
   "lane.list.none": {
     "text": "No lanes.",

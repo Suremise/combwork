@@ -1313,7 +1313,7 @@
   },
   "performance.pageLabel": {
     "defaultMessage": "Performance, {scope}",
-    "description": "Name of the Performance page for screen readers. {scope} is what it shows, such as \"Whole workspace\" or \"Project: hive\"."
+    "description": "Name of the Performance page for screen readers. {scope} is what it shows, such as \"Whole workspace\" or \"Project: demo\"."
   },
   "performance.panel.projects": {
     "defaultMessage": "Projects",

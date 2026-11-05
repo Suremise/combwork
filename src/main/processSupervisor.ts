@@ -4,7 +4,7 @@ import { join } from 'path'
 import type { Writable } from 'stream'
 
 /**
- * Hive's process supervisor (#507, #543, #659, #678; shared since #1360): one hidden PowerShell per Hive (its C#
+ * Combwork's process supervisor (#507, #543, #659, #678; shared since #1360): one hidden PowerShell per Combwork (its C#
  * through Add-Type) holding Windows job objects, that both agents' launches (agentProcesses.ts) and the merge queue's
  * runners (workflow/queueRunner.ts) use, never a copy of it each.
  *
@@ -1329,7 +1329,7 @@ const HOST_INPUT = Buffer.from(HOST_SOURCE, 'utf8').toString('base64') + '\n'
 /**
  * The helper's launcher (HI-2314): starts the command line given with only its own standard handles (its pipes to
  * Combwork) to inherit, in a console of its own with no window, waits for it, and returns its exit code (-1: it couldn't
- * start it, said on its error output). Its fourth pipe from Hive (fd 3, the C runtime's handles in its startup info,
+ * start it, said on its error output). Its fourth pipe from Combwork (fd 3, the C runtime's handles in its startup info,
  * never handed on) is its control: an "e" read there ends the helper through the handle it holds (under the lock its
  * closing takes, so never once that handle is closed); the pipe's end (Combwork gone: a quit, a crash) ends nothing.
  */
@@ -1489,7 +1489,7 @@ export class JobHost {
   private closed = false
   /**
    * Every helper started that hasn't exited yet (one being replaced too), with whether it said it was ready; `gone` also
-   * resolves once it says it is keeping its jobs past its Hive (HI-2055): closing waits for that, never for them to end.
+   * resolves once it says it is keeping its jobs past its Combwork (HI-2055): closing waits for that, never for them to end.
    * `pid`: the helper's own id once it has said it (its "pid" line), when it was started through its launcher (helperLaunch).
    */
   private alive = new Map<ChildProcessWithoutNullStreams, { up: boolean; gone: Promise<void>; pid?: number }>()
@@ -1535,7 +1535,7 @@ export class JobHost {
         // Test copies: CW_TEST_PROCESS_TRACKER=silent acts out a helper that starts but never says it is ready, =mute
         // one that is ready but never answers (each request it reads noted in CW_TEST_TRACKER_HEARD), until its input closes.
         // The test modes' PowerShell is Combwork's own child (no keeper: ended with Combwork, the silent one included); the
-        // helper is started through its launcher, to outlive Hive (helperLaunch).
+        // helper is started through its launcher, to outlive Combwork (helperLaunch).
         const mode = this.opts.testMode()
         direct = mode === 'silent' || mode === 'mute'
         const { file, args, stdio } = direct ? { file: POWERSHELL, args: psArgs(mode === 'silent' ? '[System.Threading.Thread]::Sleep(-1)' : MUTE_SCRIPT), stdio: 'pipe' as const } : helperLaunch()

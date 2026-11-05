@@ -323,7 +323,7 @@ function readCappedSync(file: string, max: number): string | null {
   }
 }
 
-/** A metrics.json that isn't Hive's (too big, damaged) renamed `metrics.json.<why>-<time>`, kept as it was; false if Windows refused. */
+/** A metrics.json that isn't Combwork's (too big, damaged) renamed `metrics.json.<why>-<time>`, kept as it was; false if Windows refused. */
 function setAside(file: string, why: 'too-big' | 'damaged'): boolean {
   const to = `${file}.${why}-${Date.now()}`
   for (let i = 0; i < 5; i++) {
@@ -487,7 +487,7 @@ class Store {
       data = null
     }
     if (!data || data.version !== 1 || !Array.isArray(data.buckets)) {
-      // Too big or not Hive's metrics: set aside as it is (renamed, never deleted), and the metrics start again; if it
+      // Too big or not Combwork's metrics: set aside as it is (renamed, never deleted), and the metrics start again; if it
       // can't be set aside, nothing is saved over it, as above.
       if (!setAside(this.file, text === null ? 'too-big' : 'damaged')) {
         this.unreadable = true
@@ -1006,7 +1006,7 @@ export function recordCatalog(h: MetricsHandle | null, project: string | null, r
   return true
 }
 
-/** One launch's Hive-supplied guidance (exact sizes of each part; the skills as delivered). */
+/** One launch's Combwork-supplied guidance (exact sizes of each part; the skills as delivered). */
 export function recordLaunch(h: MetricsHandle | null, project: string | null, g: Omit<GuidanceSeries, 'launches'>): void {
   try {
     const at = bucketOf(h)

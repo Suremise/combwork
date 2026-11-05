@@ -11,7 +11,7 @@ import { agentMsg, inDefaultDialect, say, type AgentMsg } from '../../shared/age
 
 /**
  * What cw-progress says (agent text, HI-2065): its usage, refusals and run lines. It runs as the session's own process,
- * so it speaks the session's dialect (processDialect.ts, loaded first by cw-progress.ts). "hive-progress: " before a
+ * so it speaks the session's dialect (processDialect.ts, loaded first by cw-progress.ts). "cw-progress: " before a
  * line is the command's name, as a shell's error says it: protocol, not wording.
  */
 const A = {
@@ -408,7 +408,7 @@ export interface WrapperIo {
 }
 
 /**
- * How long hive-progress waits for Combwork's reply (HI-1892: a fixed 5 s gave up on a Combwork whose main was slow): Settings →
+ * How long cw-progress waits for Combwork's reply (HI-1892: a fixed 5 s gave up on a Combwork whose main was slow): Settings →
  * Advanced, "cw-progress: Combwork's reply time" (cw.progress.replySeconds), handed to sessions as
  * CW_PROGRESS_REPLY_SECONDS; without it, 15 s. Kept within 1 s to 2 minutes whatever is set, so a hung Combwork never holds
  * a command for long.
@@ -437,7 +437,7 @@ export function unansweredLine(u: Unreachable, check: string | null, waitedMs: n
 }
 
 /**
- * What hive-progress says when a check's result may not have been recorded (HI-1892), or null when it was: Combwork never
+ * What cw-progress says when a check's result may not have been recorded (HI-1892), or null when it was: Combwork never
  * took the run's start, gave no reply to its finish (asked twice), or took a finish sent again after the first had
  * arrived (how it counted not said).
  */
@@ -586,7 +586,7 @@ export function uncountedLine(answer: unknown, isolated: boolean): string | null
 }
 
 /**
- * The command's environment: the caller's, without what hive-progress was started with. Run by Combwork's executable as
+ * The command's environment: the caller's, without what cw-progress was started with. Run by Combwork's executable as
  * Node (its shims), ELECTRON_RUN_AS_NODE is the shims' own: the command gets the caller's value back (kept in
  * CW_PROGRESS_RUN_AS_NODE; usually none), so an Electron app it starts runs as an app.
  */
@@ -603,7 +603,7 @@ export function commandEnv(env: Record<string, string | undefined>, viaElectron:
 
 /**
  * Whether the command ended by an interrupt (#549): Windows' STATUS_CONTROL_C_EXIT (0xC000013A, what a console program
- * Ctrl+C ends exits with), a shell's 130 (128 + SIGINT), or a signal; or hive-progress itself was sent one.
+ * Ctrl+C ends exits with), a shell's 130 (128 + SIGINT), or a signal; or cw-progress itself was sent one.
  */
 export function wasInterrupted(code: number, signal: NodeJS.Signals | null, signalled: boolean): boolean {
   return signalled || signal === 'SIGINT' || signal === 'SIGTERM' || signal === 'SIGBREAK' || code === 0xc000013a || code === -1073741510 || code === 130
@@ -611,7 +611,7 @@ export function wasInterrupted(code: number, signal: NodeJS.Signals | null, sign
 
 /** The signals that mean "stop" (Ctrl+C, Ctrl+Break, the console closing, a polite kill), where the wrapper gets them. */
 const STOP_SIGNALS: NodeJS.Signals[] = ['SIGINT', 'SIGBREAK', 'SIGHUP', 'SIGTERM']
-/** How long the command gets to end by itself after hive-progress is told to stop, before it is ended. */
+/** How long the command gets to end by itself after cw-progress is told to stop, before it is ended. */
 const STOP_GRACE_MS = 5000
 /** Once the command has been ended, how long its output may stay open (a descendant that got away) before the run ends anyway. */
 const CLOSE_AFTER_KILL_MS = 2000
@@ -720,7 +720,7 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
     return 2
   }
   // What the run is for, checked before anything runs: a revision that isn't checked out, an unknown card or a check
-  // with no command is refused here. An older Hive, or one that doesn't answer, just doesn't link it.
+  // with no command is refused here. An older Combwork, or one that doesn't answer, just doesn't link it.
   let link: RunLink | null = null
   if (target) {
     const ask = { folder: io.cwd, ...(parsed.card !== undefined ? { card: parsed.card } : {}), ...(parsed.revision !== undefined ? { revision: parsed.revision } : {}), ...(parsed.check !== undefined ? { check: parsed.check } : {}), ...(parsed.isolated ? { isolated: true as const } : {}) }

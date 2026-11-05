@@ -293,7 +293,7 @@ export class CopilotAdapter implements ProviderAdapter {
     if (launchOverrides(ctx.overrides, COPILOT, 'allMcpInstructions')) args.push('--allow-all-mcp-server-instructions')
     // Only the workspace's MCP servers, as for the other CLIs: Copilot's built-in GitHub servers and the user's and the
     // project's own are turned off for Combwork's sessions (never by editing their config). Switched off (#1281), they load
-    // too: the --additional-mcp-config servers win over Copilot's own of the same name (1.0.100), hive included, and are
+    // too: the --additional-mcp-config servers win over Copilot's own of the same name (1.0.100), combwork included, and are
     // never disabled by name (--disable-mcp-server <name> would turn Combwork's off with the user's).
     if (launchOverrides(ctx.overrides, COPILOT, 'mcpIsolation')) {
       args.push('--disable-builtin-mcps')

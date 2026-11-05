@@ -237,7 +237,7 @@
   },
   "reply.journal.mark.detail": {
     "text": "detail",
-    "note": "A journal entry's mark: it has detail (hive_journal_get reads it)."
+    "note": "A journal entry's mark: it has detail (cw_journal_entry reads it)."
   },
   "reply.journal.mark.essential": {
     "text": "essential",
