@@ -75,7 +75,7 @@ const kinds = (n) => rows('SELECT kind FROM card_facts WHERE card = ? ORDER BY s
 
 /** A copy to drive, the 0.9 Hive or the dev build, with what the loop needs of it. */
 function driver(app, page) {
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
   const typers = new Map()
   /** Types a prompt into an agent once its fake takes prompts (cardloop's say). */

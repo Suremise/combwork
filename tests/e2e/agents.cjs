@@ -47,7 +47,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
   await lib.fitWindow(app, page, { width: 1600, height: 950 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const project = async () => (await inv('workspace:refresh')).projects.find((p) => p.name === 'demo')
   await inv('workspace:open', ws); await sleep(800)
   await page.getByText('demo', { exact: true }).first().click(); await sleep(500)

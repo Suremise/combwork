@@ -8,7 +8,7 @@ import type { WorkspaceInfo } from '../src/shared/types'
 /** Replies to templates:list, held until the test resolves them. */
 const pending: ((v: unknown) => void)[] = []
 ;(globalThis as unknown as { window: unknown }).window = {
-  hive: { invoke: (channel: string) => (channel === 'templates:list' ? new Promise((resolve) => pending.push(resolve)) : Promise.resolve(null)), on: () => () => {} },
+  combwork: { invoke: (channel: string) => (channel === 'templates:list' ? new Promise((resolve) => pending.push(resolve)) : Promise.resolve(null)), on: () => () => {} },
   addEventListener: () => {},
   matchMedia: () => ({ matches: false, addEventListener: () => {} })
 }

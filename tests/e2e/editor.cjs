@@ -53,7 +53,7 @@ const HUNG_MS = 10000
     return Buffer.from(await win.webContents.printToPDF({})).toString('base64')
   })
   w('doc.pdf', Buffer.from(pdf, 'base64'))
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('demo', { exact: true }).first().click()
   await page.locator('.tab', { hasText: 'Files' }).click()

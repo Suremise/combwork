@@ -21,7 +21,7 @@ export function useProjectStages(): Map<string, ProjectStages> {
     if (!ws) return
     const paths = key ? key.split('\n') : []
     load(scope, async () => {
-      const got = await Promise.all(paths.map(async (path) => [path.toLowerCase(), await window.hive.invoke('workflow:stages', path)] as const))
+      const got = await Promise.all(paths.map(async (path) => [path.toLowerCase(), await window.combwork.invoke('workflow:stages', path)] as const))
       return got.filter((x): x is [string, ProjectStages] => !!x[1])
     })
   }, [scope, ws, key, version, load])

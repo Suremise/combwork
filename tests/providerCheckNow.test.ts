@@ -7,7 +7,7 @@ import type { AgentInstallInfo, ProviderId } from '../src/shared/types'
 const asked: unknown[][] = []
 let reply: Record<string, AgentInstallInfo> = {}
 ;(globalThis as unknown as { window: unknown }).window = {
-  hive: {
+  combwork: {
     invoke: async (...args: unknown[]) => {
       asked.push(args)
       return args[0] === 'provider:refresh' ? reply : null

@@ -32,7 +32,7 @@ async function launch() {
   app.process().on('exit', (c) => console.log('DEBUG exit', c, new Date().toISOString()))
   app.process().stderr.on('data', (d) => /error|quit/i.test(String(d)) && console.log('DEBUG stderr', String(d).slice(0, 300)))
   await lib.appReady(page)
-  await page.evaluate((folder) => window.hive.invoke('workspace:open', folder), ws)
+  await page.evaluate((folder) => window.combwork.invoke('workspace:open', folder), ws)
   await lib.until(async () => page.evaluate((n) => document.title.includes(n), path.basename(ws)), 20000)
   await page.getByText('demo', { exact: true }).first().click()
   await page.locator('.tab', { hasText: 'Files' }).click()
@@ -113,7 +113,7 @@ const quits = async (q, ms = 8000) => {
   check('delete: file gone, and its unsaved changes with it', !!(await lib.until(async () => !exists('gone.ts') && (await pane.locator('.editor-toolbar .dirty-dot').count()) === 0, 10000)))
 
   // Quit: the dialog lists the two unsaved files (not the deleted one), Save and quit saves them.
-  await page.evaluate(() => window.hive.invoke('app:quit'))
+  await page.evaluate(() => window.combwork.invoke('app:quit'))
   await sleep(800)
   const quitText = await page.locator('.dialog').last().innerText().catch(() => '')
   check('quit: asks with no sessions running', /unsaved changes/.test(quitText))
@@ -128,7 +128,7 @@ const quits = async (q, ms = 8000) => {
   // ---- Run 2: discard.
   ;({ app, page } = await launch())
   await edit('keep.ts', 'export const discardMe = true\n')
-  await page.evaluate(() => window.hive.invoke('app:quit'))
+  await page.evaluate(() => window.combwork.invoke('app:quit'))
   await sleep(800)
   await page.getByRole('button', { name: 'Discard the changes' }).click()
   const q2 = await lib.quitWatch(app)
@@ -141,7 +141,7 @@ const quits = async (q, ms = 8000) => {
   await edit('keep.ts', 'export const mine = true\n')
   fs.writeFileSync(path.join(proj, 'keep.ts'), 'export const theirs = true\n')
   await sleep(300)
-  await page.evaluate(() => window.hive.invoke('app:quit'))
+  await page.evaluate(() => window.combwork.invoke('app:quit'))
   await sleep(800)
   await page.getByRole('button', { name: 'Save and quit' }).click()
   await lib.sleep(1500) // A fixed wait on purpose: this checks that Combwork does NOT quit, which no condition can show.
@@ -157,7 +157,7 @@ const quits = async (q, ms = 8000) => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'P', code: 'KeyP', ctrlKey: true, shiftKey: true }))
   })
   await page.keyboard.press('Escape')
-  await page.evaluate(() => window.hive.invoke('app:quit'))
+  await page.evaluate(() => window.combwork.invoke('app:quit'))
   await sleep(600)
   await page.getByRole('button', { name: 'Discard the changes' }).click()
   const q3 = await lib.quitWatch(app)

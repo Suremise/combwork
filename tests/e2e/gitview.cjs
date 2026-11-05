@@ -47,7 +47,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
 
   const { app, page } = await lib.launch({ userData, env: { ...claude, HIVE_API_PORT: lib.port(47880), GIT_CONFIG_GLOBAL: globalConfig }, viewport: { width: 1500, height: 900 } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const text = (loc) => loc.innerText().catch(() => '')
 

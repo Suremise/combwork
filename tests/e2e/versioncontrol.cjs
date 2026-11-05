@@ -53,7 +53,7 @@ function board(sql, ...args) {
   const { app, page } = await lib.launch({ userData, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     const text = (loc) => loc.innerText().catch(() => '')
     await lib.openWorkspace(inv, page, ws)
     const vcTab = page.locator('.tabs .tab', { hasText: 'Version Control' })

@@ -46,7 +46,7 @@ const check = (name, ok, extra = '') => {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1300, height: 800 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
 
   const n0 = (await inv('settings:get')).notifications
   check('a profile from before gets the one notification system: no While Combwork is focused, pop-ups bottom right', !('whileFocused' in n0) && !('onlyWhenUnfocused' in n0) && n0.bannerPosition === 'bottom-right' && n0.bannerScope === 'all' && n0.bannerSeconds === 6 && n0.waitingBannerStays === true, JSON.stringify(n0))

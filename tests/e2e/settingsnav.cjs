@@ -20,7 +20,7 @@ const HUNG_MS = 10000
     // 900 px with the side panel open, as the audit (HI-2529) found it: section names are cut.
     await lib.fitWindow(app, page, { width: 900, height: 860 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await lib.until(async () => (await page.locator('.project-row').count()) === 1, HUNG_MS)
     await inv('project:setActive', path.join(ws, 'alpha'), true)

@@ -29,7 +29,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 950 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await inv('workspace:open', ws); await sleep(800)
   await page.getByText('demo', { exact: true }).first().click(); await sleep(500)
   await inv('project:updateConfig', proj, { worktreeSetup: 'npm install' }); await inv('workspace:refresh'); await sleep(300)

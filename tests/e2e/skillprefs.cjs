@@ -47,7 +47,7 @@ const skillsTab = async (page, name) => {
   await page2.waitForLoadState('domcontentloaded')
   await lib.appReady(page2)
   page2.on('pageerror', (e) => check('no page errors (window 2)', false, e.message))
-  const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv2, page2, wsB)
 
   const a = await skillsTab(page, 'alpha')

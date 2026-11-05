@@ -67,11 +67,11 @@ const deleteFromOutside = (file) => {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.evaluate(() => {
     window.__events = []
-    window.hive.onEvent((e) => window.__events.push(e))
+    window.combwork.onEvent((e) => window.__events.push(e))
   })
 
   // An agent's worktree with a build in it, as Claudio's was.

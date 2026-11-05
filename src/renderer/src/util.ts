@@ -44,7 +44,7 @@ export type SessionAction = 'stop' | 'remove' | 'start' | 'archive-start' | 'res
 export const actClass = (a: SessionAction | undefined): string | false => !!a && `act-${a}`
 
 export function isMac(): boolean {
-  return window.hive.platform === 'darwin'
+  return window.combwork.platform === 'darwin'
 }
 
 /** A key combination as the window shows it ("Mod+Shift+P" → "Strg+Umschalt+P"): the keys keyboards in the language name differently in its words (#885). */

@@ -87,7 +87,7 @@ async function start() {
   const page = await app.firstWindow()
   await lib.fitWindow(app, page, { width: 1300, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const token = () => JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
   const api = async (method, route, body) => {
     const r = await fetch(`http://127.0.0.1:${PORT}${route}`, { method, headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', 'X-Combwork-Workspace': ws }, ...(body ? { body: JSON.stringify(body) } : {}) })
@@ -186,7 +186,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     const pageB = await nextWindow
     await pageB.waitForLoadState('domcontentloaded')
     await lib.appReady(pageB)
-    const invB = (ch, ...a) => pageB.evaluate(([x, y]) => window.hive.invoke(x, ...y), [ch, a])
+    const invB = (ch, ...a) => pageB.evaluate(([x, y]) => window.combwork.invoke(x, ...y), [ch, a])
     await lib.openWorkspace(invB, pageB, wsB)
     agents.Other = await lib.addAgent(invB, beta, { name: 'Other' })
     const liveOther = async () => (await c.inv('session:live')).find((s) => s.projectPath.toLowerCase() === beta.toLowerCase() && s.agentId === agents.Other.id)
@@ -294,7 +294,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     const others = ['Watcher', 'Builder', 'Reviewer']
     for (const n of others) await c.inv('session:stop', alpha, agents[n].id)
     // The second workspace's window stops Other (a window's calls are its own workspace's).
-    for (const p of c.app.windows()) await p.evaluate(([x, id]) => window.hive.invoke('session:stop', x, id), [beta, agents.Other.id]).catch(() => undefined)
+    for (const p of c.app.windows()) await p.evaluate(([x, id]) => window.combwork.invoke('session:stop', x, id), [beta, agents.Other.id]).catch(() => undefined)
     check('Watcher, Builder, Reviewer and Other are stopped', !!(await lib.until(async () => (await Promise.all([...others.map((n) => c.live(agents[n].id)), liveAny(beta, agents.Other.id)])).every((s) => !s), HUNG_MS, 300)))
     await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Worker.id), 'holduntil go-worker-3', { submitted: async () => (await c.live(agents.Worker.id))?.status === 'working' })
     check('Combwork quits', await quit(c))

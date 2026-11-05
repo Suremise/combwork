@@ -29,7 +29,7 @@ const launch = async () => {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   return { app, page, inv }
 }
 
@@ -142,7 +142,7 @@ const launch = async () => {
   check('Move Agent Left on Two, its save held: shown at once, not saved yet', !!(await lib.until(async () => (await shownCells()) === '. One . . Two .', HUNG_MS)) && savedCells('grid6') === '. One . . . Two', `${savedCells('grid6')} / ${await shownCells()}`)
   await page.evaluate(() => {
     window.__olderCells = null
-    window.hive.onEvent((e) => {
+    window.combwork.onEvent((e) => {
       const p = e.type === 'workspace-changed' && window.__olderCells === null ? e.workspace?.projects.find((x) => x.name === 'alpha') : null
       if (p) window.__olderCells = (p.config.placement?.grid6 ?? []).map((id) => p.agents.find((a) => a.id === id)?.name ?? '.').join(' ')
     })

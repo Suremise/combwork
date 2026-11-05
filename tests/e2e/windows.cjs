@@ -42,7 +42,7 @@ async function start() {
   app.on('window', (p) => p.on('pageerror', (e) => console.log('FAIL page error', e.message)))
   return app
 }
-const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
 async function waitFor(fn, ms = 15000) {
   const t = Date.now()
   while (Date.now() - t < ms) {
@@ -148,7 +148,7 @@ async function waitFor(fn, ms = 15000) {
   await invB('session:start', beta, { agentId: agent.id })
   await lib.acceptClaudeTrust(invB, beta, agent.id)
   check('an agent runs in window B', !!(await waitFor(async () => (await invA('session:live')).length === 1)))
-  await pb.evaluate(() => window.hive.invoke('window:close')).catch(() => undefined)
+  await pb.evaluate(() => window.combwork.invoke('window:close')).catch(() => undefined)
   const dialog = await waitFor(async () => (await pb.getByText('Close this window?').count()) > 0, 8000)
   check('closing it asks first ("Close this window?")', !!dialog)
   await pb.screenshot({ path: path.join(lib.WORK, 'windows-close.png') }).catch(() => undefined)

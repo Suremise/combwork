@@ -112,7 +112,7 @@ const log = () => {
     // board, takes all three events before it renders again, so a step it was told need not be painted.
     await h.page.evaluate(() => {
       const seen = (window.__opening = { told: [], shown: [] })
-      window.hive.onEvent((e) => e.type === 'workspace-progress' && seen.told.push(e.progress))
+      window.combwork.onEvent((e) => e.type === 'workspace-progress' && seen.told.push(e.progress))
       new MutationObserver(() => {
         const el = document.querySelector('.workspace-opening')
         const t = el?.innerText.replace(/\s+/g, ' ').trim()

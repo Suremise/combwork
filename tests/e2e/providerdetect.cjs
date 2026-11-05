@@ -49,7 +49,7 @@ const check = (name, ok, extra = '') => {
     p.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(a, p, { width: 1400, height: 850 })
     await lib.until(() => p.evaluate(() => !!document.querySelector('.app .workbench')).catch(() => false), 30000)
-    return { app: a, page: p, inv: (ch, ...x) => p.evaluate(([c, args]) => window.hive.invoke(c, ...args), [ch, x]) }
+    return { app: a, page: p, inv: (ch, ...x) => p.evaluate(([c, args]) => window.combwork.invoke(c, ...args), [ch, x]) }
   }
   /** The Assistant's CLI changed (HI-2108: it follows its connection; Codex has no account here, so its test home's, decision H), as part 5's agent's. */
   const assistantOn = (cli) => inv('agents:update', home, 'assistant', { provider: cli })

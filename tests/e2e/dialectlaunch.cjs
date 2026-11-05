@@ -98,7 +98,7 @@ function initialize(def) {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const until = async (fn, ms = HUNG_MS) => {
     const t = Date.now()
     let v
@@ -229,7 +229,7 @@ function initialize(def) {
   await inv('window:new')
   const second = await next
   await lib.appReady(second)
-  const inv2 = (ch, ...a) => second.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv2 = (ch, ...a) => second.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv2, second, wsB)
   // B's window opened last: a request naming no workspace would fall back to it by focus.
   check("?workspace= naming A is said A's text, with B's window opened last", (await said(wsToken, { at: ws })).startsWith('A-ROUTE GET'), await said(wsToken, { at: ws }))

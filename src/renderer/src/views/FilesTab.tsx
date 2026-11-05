@@ -692,7 +692,7 @@ function FilesBrowser({ project, selector, jump }: { project: ProjectInfo; selec
         out = await actions.attempt(tr(M.couldNotCopy), () => call('files:copy', project.path, data.rels!, dir))
       } else out = await actions.attempt(tr(M.couldNotCopy), () => call('files:import', project.path, data.paths, dir))
     } else {
-      const sources = [...ev.dataTransfer.files].map((f) => window.hive.pathForFile(f)).filter(Boolean)
+      const sources = [...ev.dataTransfer.files].map((f) => window.combwork.pathForFile(f)).filter(Boolean)
       if (sources.length) out = await actions.attempt(tr(M.couldNotCopyIn), () => call('files:import', project.path, sources, dir))
     }
     if (dir) expand(dir)

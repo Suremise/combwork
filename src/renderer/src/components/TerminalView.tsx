@@ -283,8 +283,8 @@ function fitTerminal(term: Terminal, fit: FitAddon, el: HTMLElement | null, visi
 function wire(): void {
   if (wired) return
   wired = true
-  window.hive.onPtyData((key, data) => dataListeners.get(key)?.forEach((l) => l(data)))
-  window.hive.onPtyExit((key, code) => exitListeners.get(key)?.forEach((l) => l(code)))
+  window.combwork.onPtyData((key, data) => dataListeners.get(key)?.forEach((l) => l(data)))
+  window.combwork.onPtyExit((key, code) => exitListeners.get(key)?.forEach((l) => l(code)))
 }
 
 function subscribe<T>(map: Map<string, Set<T>>, key: string, fn: T): () => void {
@@ -570,7 +570,7 @@ export function TerminalView({
       if (!carriesFiles(dt)) return
       e.preventDefault()
       const internal = dt!.getData(FILES_MIME)
-      const sources = internal ? (JSON.parse(internal) as { paths: string[] }).paths : [...dt!.files].map((f) => window.hive.pathForFile(f))
+      const sources = internal ? (JSON.parse(internal) as { paths: string[] }).paths : [...dt!.files].map((f) => window.combwork.pathForFile(f))
       void (async () => {
         const files = sources.filter(Boolean)
         const project = pathRef.current

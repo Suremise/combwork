@@ -1132,7 +1132,7 @@ export function Markdown({ source, className, onLink, cards, breaks, images }: {
         const card = /^hive-card:(\d+)$/.exec(href)
         if (card && cards) return cards.open(Number(card[1]))
         if (onLink?.(href)) return
-        if (/^https?:/.test(href)) void window.hive.invoke('app:openExternal', href)
+        if (/^https?:/.test(href)) void window.combwork.invoke('app:openExternal', href)
         else if (href.startsWith('#')) document.getElementById(href.slice(1))?.scrollIntoView({ behavior: 'smooth' })
       }}
       dangerouslySetInnerHTML={{ __html: html }}

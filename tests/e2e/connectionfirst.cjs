@@ -65,7 +65,7 @@ async function settled(env) {
   })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await inv('connections:setOn', 'a-codex', true)
     await inv('connections:setOn', 'a-claude', true)
@@ -149,7 +149,7 @@ async function duringDetection(env) {
   await lib.until(() => page.evaluate(() => !!document.querySelector('.app .workbench')).catch(() => false), HUNG_MS)
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     // Both on here again (the first part turned them off at its end).
     await inv('connections:setOn', 'a-codex', true)
@@ -175,7 +175,7 @@ async function duringDetection(env) {
 
     // The window's call with no connection (as quick add's fallback, or a script), made while it is looked for: main
     // waits for detection before choosing, so it goes on Codex's.
-    const viaMain = page.evaluate((p) => window.hive.invoke('agents:add', p, { name: 'Viamain' }), alpha)
+    const viaMain = page.evaluate((p) => window.combwork.invoke('agents:add', p, { name: 'Viamain' }), alpha)
     check('…an add with no connection made then waits for detection (Codex still looked for)', (await codex()).checking === true)
 
     // Once Codex is found: Codex first in the order, chosen; Add enabled.

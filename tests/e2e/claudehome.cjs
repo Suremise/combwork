@@ -49,7 +49,7 @@ function filesHolding(dir, text) {
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await lib.waitForProvider(inv)
   check("the test Combwork's sessions get the suite's own home", (await app.evaluate(() => process.env.CLAUDE_CONFIG_DIR)) === home)
