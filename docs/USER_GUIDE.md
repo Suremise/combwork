@@ -184,6 +184,8 @@ Each **project** (every subfolder except dot-folders) gets its own `.combwork` f
 
 A project's `.combwork` folder is this computer's, not the project's: its settings, the session list, transcript backups and archive, attachments (files pasted or dropped into sessions), and each agent's launch folder (the skills, MCP servers and hooks it started with). None of it belongs in commits or shared copies. What could hold a secret isn't kept there at all: the key the hooks use to report an agent's status, and each session's settings and MCP server configuration (which may carry your servers' keys or a `--settings` file's `env`), go in Combwork's own data folder instead, for as long as that session runs.
 
+To start a project's Combwork settings afresh, stop its agents and delete its `.combwork` folder. Combwork sets the project up anew the next time you open the workspace, or as soon as you change the project's settings or start an agent in it. Until then it doesn't make the folder again by itself, so a project folder you delete outright (Shift+Delete, say) while Combwork is open goes completely.
+
 Combwork keeps `.combwork` out of git by adding it to the repository's `.git/info/exclude`, never your `.gitignore`. It checks again whenever it refreshes the project and before every agent starts, so a repository you create later (`git init`), or one in a folder above the project (a workspace kept in git), is covered too.
 
 Where Combwork can't do that, the project's **Overview** and **Project Settings** say so:

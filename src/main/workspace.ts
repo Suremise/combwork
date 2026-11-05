@@ -164,7 +164,7 @@ export interface ProjectSeen {
 }
 
 /** For unit tests (#1382): an agent leaving the project, its change about to wait for the board's lock. */
-export const configTestHooks: { beforeBoardRetry?: (projectPath: string) => void; beforeConfigWrite?: (projectPath: string) => Promise<void>; beforeDefaultConfig?: (projectPath: string) => Promise<void> } = {}
+export const configTestHooks: { beforeBoardRetry?: (projectPath: string) => void; beforeConfigWrite?: (projectPath: string) => Promise<void>; beforeDefaultConfig?: (projectPath: string) => Promise<void>; afterConfigSeen?: (projectPath: string) => Promise<void> } = {}
 
 /** A file's version as its stat says (HI-2563): its inode, size and time changed; '' when it isn't there or can't be read. */
 async function keptStamp(path: string): Promise<string> {
@@ -275,6 +275,14 @@ export class WorkspaceService {
   private readAt = new WeakMap<ProjectInfo, number>()
   /** The projects the last refresh reported (lower-cased) and its listing's ticket: one missing was gone by then (#784). */
   private listedAt: { ticket: number; known: Set<string> } | null = null
+  /**
+   * The projects seen set up in this lifetime (HI-2564): lower-cased path → the ticket of the observation (markSetUp). A
+   * refresh never sets one up again whose project.json has gone (a folder half deleted, a reset): only an open or a change
+   * to it does. Not the id index, which drops a path as soon as its config is missing.
+   */
+  private setUpAt = new Map<string, number>()
+  /** Those a refresh found without their project.json, said once in the log. */
+  private goneSaid = new Set<string>()
   /**
    * Each project's unused worktrees as last listed (#400: lower-cased folder → project): the Changes tab may read their
    * git status and diffs (`assertChangesRoot`), nothing else. Replaced on each listing, so one removed since drops out.
@@ -666,6 +674,8 @@ export class WorkspaceService {
     this.configWrites.clear()
     this.configFloor = this.configStamp
     this.listedAt = null
+    this.setUpAt.clear()
+    this.goneSaid.clear()
     this.unusedRoots.clear()
     this.wsConfig = structuredClone(DEFAULT_WORKSPACE_CONFIG)
     // A new lifetime only once it is fully closed: work started while it was closing (its path still set) belongs to the
@@ -1254,6 +1264,24 @@ export class WorkspaceService {
    * `folders`: its slots and retired homes as that read found them (#1442), kept for later writes only when the read is
    * the newest (the same fence: a late read neither publishes nor caches folders a newer one has dropped).
    */
+  /**
+   * Records a project seen with its project.json (HI-2564, setUpAt), fenced as registerRoots is: `ticket` taken when the
+   * observation began. Nothing from another lifetime, nothing older than what is recorded, and nothing from before a
+   * listing that found the folder gone.
+   */
+  private markSetUp(projectPath: string, gen: number, ticket: number): void {
+    const key = projectPath.toLowerCase()
+    if (gen !== this.generation || ticket < (this.setUpAt.get(key) ?? 0)) return
+    if (this.listedAt && ticket < this.listedAt.ticket && !this.listedAt.known.has(key)) return
+    this.setUpAt.set(key, ticket)
+    this.goneSaid.delete(key)
+  }
+
+  /** For unit tests (HI-2564): the ticket a project's set-up was recorded at, or undefined. */
+  setUpTicket(projectPath: string): number | undefined {
+    return this.setUpAt.get(projectPath.toLowerCase())
+  }
+
   private registerRoots(projectPath: string, cfg: ProjectConfig, gen: number, ticket: number, folders?: readonly string[]): void {
     const key = projectPath.toLowerCase()
     if (gen !== this.generation || ticket < (this.rootsAt.get(key) ?? 0)) return
@@ -1328,6 +1356,9 @@ export class WorkspaceService {
   }
 
   async ensureProject(projectPath: string): Promise<void> {
+    // Its set-up recorded once it is done (HI-2564), as of now.
+    const gen = this.generation
+    const ticket = ++this.rootTickets
     // A project that came into the open workspace with a `.hive` of its own (copied in, restored): moved first (HI-2462),
     // so a fresh `.combwork` never strands its settings. The open's own move did every project there was then.
     if (this.path && !this.isAssistantHome(projectPath) && (await classify(this.path, projectPath, 'project')) === 'planned') {
@@ -1365,6 +1396,7 @@ export class WorkspaceService {
         if (existsSync(join(h, 'launch'))) await removePath(join(h, 'launch')).catch(() => undefined)
       })()
     ])
+    if (!this.isAssistantHome(projectPath) && existsSync(join(h, 'project.json'))) this.markSetUp(projectPath, gen, ticket)
   }
 
   private gitDir(projectPath: string): Promise<string | null> {
@@ -1675,7 +1707,23 @@ export class WorkspaceService {
     const ticket = ++this.rootTickets
     // A folder found since the workspace opened is made a project as opening makes one (#1423): its platform recorded
     // with its project.json, so it counts as made by 1.0 (it asks "How do you work?"), not as one from before.
-    if (!this.isAssistantHome(projectPath) && !existsSync(join(projectPath, HIVE_DIR, 'project.json'))) await this.ensureProject(projectPath).catch((e) => log.warn(`ensureProject ${userText(projectPath)}`, e))
+    // One set up in this lifetime whose project.json has gone isn't (HI-2564): a folder half way through a delete (its
+    // .combwork goes first) or a project reset by deleting it. Nothing is written for it, its exclude line neither; an
+    // open or a change to it sets it up again.
+    let gone = false
+    if (!this.isAssistantHome(projectPath)) {
+      const key = projectPath.toLowerCase()
+      if (existsSync(join(projectPath, HIVE_DIR, 'project.json'))) {
+        await configTestHooks.afterConfigSeen?.(projectPath)
+        this.markSetUp(projectPath, gen, ticket)
+      } else if (this.setUpAt.has(key)) {
+        gone = true
+        if (!this.goneSaid.has(key)) {
+          this.goneSaid.add(key)
+          log.info(`${userText(basename(projectPath))}: project.json gone: not set up again by a refresh (HI-2564)`)
+        }
+      } else await this.ensureProject(projectPath).catch((e) => log.warn(`ensureProject ${userText(projectPath)}`, e))
+    }
     const cfg = await took('its settings', this.projectConfig(projectPath)) // i18n-ignore: a part of a log line's timing
     this.registerRoots(projectPath, cfg, gen, ticket)
     const { live, restartNeeded, agents, folders } = await took("its agents' sessions and folders", WorkspaceService.liveProvider(projectPath, cfg, scope)) // i18n-ignore: a part of a log line's timing
@@ -1686,8 +1734,9 @@ export class WorkspaceService {
       took('its branch', this.branch(projectPath)), // i18n-ignore: a part of a log line's timing
       took('its MCP servers', this.unmanagedMcp(projectPath)), // i18n-ignore: a part of a log line's timing
       took('removed data', removedData(projectPath)), // i18n-ignore: a part of a log line's timing
-      // Ensured at each refresh, so a repository made later (git init) gets it too (#345).
-      this.isAssistantHome(projectPath) ? undefined : took('.combwork in git', hiveVcs(projectPath).catch(() => undefined)) // i18n-ignore: a part of a log line's timing
+      // Ensured at each refresh, so a repository made later (git init) gets it too (#345). Not for one gone (HI-2564),
+      // asked again as each write is made: its project.json may go while this read runs (HR2's round 1).
+      this.isAssistantHome(projectPath) ? undefined : took('.combwork in git', hiveVcs(projectPath, { readOnly: () => gone || (this.setUpAt.has(projectPath.toLowerCase()) && !existsSync(join(projectPath, HIVE_DIR, 'project.json'))) }).catch(() => undefined)) // i18n-ignore: a part of a log line's timing
     ])
     const info: ProjectInfo = {
       name: basename(projectPath),
@@ -1795,6 +1844,9 @@ export class WorkspaceService {
     for (const [project, at] of this.rootsAt) if (!known.has(project) && at < listed) this.rootsAt.delete(project)
     for (const project of this.folderRoots.keys()) if (!known.has(project) && !this.rootsAt.has(project)) this.folderRoots.delete(project)
     for (const [project, at] of this.savedAt) if (!this.listedAt.known.has(project) && at < listed) this.savedAt.delete(project)
+    // A project gone (HI-2564): a folder made again by that name later is a new one, set up as #1423 makes one.
+    for (const [project, at] of this.setUpAt) if (!known.has(project) && at < listed) this.setUpAt.delete(project)
+    for (const project of this.goneSaid) if (!known.has(project)) this.goneSaid.delete(project)
     for (const [project, w] of this.configWrites) if (!this.listedAt.known.has(project) && w.ticket < listed) this.forgetConfigWrites(project)
     // A project gone is said again if it comes back.
     for (const project of this.platformOffers.keys()) if (!known.has(project)) this.platformOffers.delete(project)
