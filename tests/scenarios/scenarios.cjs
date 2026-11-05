@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 123
+const FIXTURES_VERSION = 124
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -4275,18 +4275,29 @@ async function hiveStartedLaneCard(c, key, n) {
  * Two running lanes: Coder and Implementer on greet.js (#a, #b), Builder2 and Reviewer2 on the README (#c, and #d if
  * given). Each lane is registered as its builder registers its own (builderLane). Hive then starts each lane's first card
  * in Todo on its builder (HI-2029), as in life, and that start is waited for (HI-2278: it otherwise raced the subject):
- * #c, and #a unless `aColumn` puts it elsewhere (Review or Doing: then Coder isn't running, its lane not started by Hive).
+ * #c, and #a unless `aColumn` puts it elsewhere (Review or Doing: then Coder isn't running, its lane not started by Hive),
+ * and #c the same with `cColumn` (HI-2569: started by Hive, a model's Builder2 did #c for real and, with every rule off,
+ * took it to Done in the setup, its lane ended before the subject looked).
  */
-async function twoLanes(c, { d = false, aColumn = 'todo' } = {}) {
+async function twoLanes(c, { d = false, aColumn = 'todo', cColumn = 'todo' } = {}) {
   await team(c)
   await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', agent: 'coder', column: aColumn })
   await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder' })
-  await c.card('c', { title: 'README: usage', description: 'README.md: a Usage section with one example of greet().', agent: 'builder2' })
+  await c.card('c', { title: 'README: usage', description: 'README.md: a Usage section with one example of greet().', agent: 'builder2', column: cColumn })
   if (d) await c.card('d', { title: 'README: licence line', description: 'README.md: a line saying the licence is MIT.', agent: 'builder2' })
   for (const [key, builder, reviewer, cards] of [['coder', 'Coder', 'Implementer', [c.cards.a, c.cards.b]], ['builder2', 'Builder2', 'Reviewer2', [c.cards.c, ...(d ? [c.cards.d] : [])]]]) {
     await builderLane(c, key, { builder, reviewer, cards, name: `${builder}'s lane` })
-    if (key === 'builder2' || aColumn === 'todo') await hiveStartedLaneCard(c, key, cards[0])
+    if ((key === 'builder2' && cColumn === 'todo') || (key === 'coder' && aColumn === 'todo')) await hiveStartedLaneCard(c, key, cards[0])
   }
+}
+/**
+ * The premise of a setup whose Builder2 lane must still run as the subject looks (HI-2569): #c in Doing and its lane
+ * active, else the setup fails saying so, rather than the scenario waiting for a wake that can't come.
+ */
+async function builder2LaneRuns(c) {
+  const column = (await c.api('GET', `/v1/tasks/${c.cards.c}`)).body?.column
+  const lane = ((await c.api('GET', '/v1/lanes')).body ?? []).find((l) => l.builder?.name === 'Builder2')
+  if (column !== 'doing' || !lane) throw new Error(`setup: Builder2's lane isn't running on #${c.cards.c} in Doing: ${JSON.stringify({ column, lanes: ((await c.api('GET', '/v1/lanes?all=true')).body ?? []).map((l) => [l.builder?.name, l.state]) })}`)
 }
 /** What Hive's card wake to the Assistant ends with while lanes run (src/shared/watch.ts, the same: a unit test checks). */
 const LANES_RUNNING_TAIL = ' Lanes are still running (cw_lane list): before you end your turn, watch them again in one lane watch, with any card outside them as cards (cw_wait_for_tasks with lanes ["all"], cards, wake; run-lanes).'
@@ -4532,13 +4543,14 @@ module.exports.SCENARIOS.push(
     control: 'agents',
     mode: 'coordinator',
     async setup(c) {
-      await twoLanes(c, { aColumn: 'doing' })
+      // #c in Doing from the start (HI-2569): Hive starts no card on Builder2, which can't finish it in the setup.
+      await twoLanes(c, { aColumn: 'doing', cColumn: 'doing' })
       await c.api('POST', `/v1/tasks/${c.cards.a}/comments`, { text: 'Question for the user: should greet() throw on an empty name (A) or return "Hi" (B)?' })
       // As in a real lane: Coder asked and waits for the user (started, idle), and Builder2's lane carries on (#c in Doing,
       // Builder2 working), so there is running work to keep watching.
       await coderTask(c, '')
-      await c.api('PATCH', `/v1/tasks/${c.cards.c}`, { column: 'doing' })
       await busyCoder(c, 20, 300, c.agents.builder2)
+      await builder2LaneRuns(c)
     },
     prompt: (c) =>
       `[CW] #${c.cards.a} (Coder's card) is in Doing; latest comment by Coder: "Question for the user: should greet() throw on an empty name (A) or return "Hi" (B)?" Your card watch has ended: carry on (cw_read_task with latestComment for the comment in full).${LANES_RUNNING_TAIL}`,
@@ -4659,10 +4671,11 @@ module.exports.SCENARIOS.push(
     mode: 'coordinator',
     async setup(c) {
       // Running as in life: each builder works on its lane's current card in Doing (a model checks they are running).
-      await twoLanes(c, { aColumn: 'doing' })
-      await c.api('PATCH', `/v1/tasks/${c.cards.c}`, { column: 'doing' })
+      // #c in Doing from the start (HI-2569): Hive starts no card on Builder2, which works only on the long task below.
+      await twoLanes(c, { aColumn: 'doing', cColumn: 'doing' })
       await busyCoder(c, 20, 600)
       await busyCoder(c, 20, 600, c.agents.builder2)
+      await builder2LaneRuns(c)
       c.stage = 0
       c.wakes = 0
     },
@@ -5037,13 +5050,14 @@ module.exports.SCENARIOS.push(
     control: 'agents',
     mode: 'coordinator',
     async setup(c) {
-      await twoLanes(c)
+      // #c in Doing from the start (HI-2569): Hive starts no card on Builder2, which can't finish it in the setup.
+      await twoLanes(c, { cColumn: 'doing' })
       for (const k of ['a', 'b']) await c.api('PATCH', `/v1/tasks/${c.cards[k]}`, { column: 'done' })
       c.merged = landWork(c, false)
       await endLanes(c, ['Coder'])
-      // Builder2's lane carries on: its card in Doing, Builder2 working on it.
-      await c.api('PATCH', `/v1/tasks/${c.cards.c}`, { column: 'doing' })
+      // Builder2's lane carries on: its card in Doing, Builder2 working.
       await busyCoder(c, 20, 600, c.agents.builder2)
+      await builder2LaneRuns(c)
       c.running = ((await c.api('GET', '/v1/lanes')).body ?? []).find((l) => l.builder?.name === 'Builder2')?.id
       c.wake = await lanesEndedWake(c, ['Coder'])
     },
