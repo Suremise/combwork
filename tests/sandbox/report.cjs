@@ -10,6 +10,7 @@
  * was refused by an App Control policy before anything could run). Its checks are left out and, unless another check
  * failed, the report is NOT RUN with that reason.
  * Scenario 9 (HI-2592, run kind clean) is the rename's acceptance test: its scan (clean.cjs) must find no "hive" anywhere.
+ * Scenario 11 (HI-2602, run kind profile-move): the profile move the installer couldn't make, made by the app at start.
  */
 const { cleanChecks, hitsMarkdown } = require('./clean.cjs')
 const SCENARIOS = {
@@ -22,9 +23,10 @@ const SCENARIOS = {
   7: 'Install by hand over the previous release, running (/S --force-run)',
   8: "The installer's edge cases over the previous release, and a notification under the new app ID",
   9: 'A clean install used as a new user would, then searched: no "hive" anywhere (HI-2592)',
-  10: 'Upgrade from a 1.1 release candidate (--previous-rc, e.g. RC2), running, as its updater runs the installer (--updated /S --force-run): the names upgrade (HI-2587) moves only what is still old'
+  10: 'Upgrade from a 1.1 release candidate (--previous-rc, e.g. RC2), running, as its updater runs the installer (--updated /S --force-run): the names upgrade (HI-2587) moves only what is still old',
+  11: "The profile move the installer couldn't make (a file in %LOCALAPPDATA%\\Hive held as it ran): the app refuses to start while it is held, then moves it itself (HI-2602)"
 }
-const KINDS = ['fresh', 'upgrade', 'manual', 'edges', 'clean', 'upgrade-rc']
+const KINDS = ['fresh', 'upgrade', 'manual', 'edges', 'clean', 'upgrade-rc', 'profile-move']
 /** The names upgrade's checks after an upgrade (HI-2587), from 1.0 and from a release candidate alike. */
 const NAME_IDS = ['4.board-file', '4.board-backups', '4.log-file', '4.workspace-files', '4.copy-marker', '4.names-done', '4.no-old-names']
 /** electron-builder's APP_GUID for appId it.surmise.combwork (HI-2460): its uninstall entry's key. */
@@ -49,11 +51,16 @@ const REQUIRED = {
     // Each a step a new user takes.
     drivers: { s9: { scenario: 9, ids: ['9.first-run', '9.provider-on', '9.account', '9.workspace', '9.git-project', '9.agent-started', '9.agent-env', '9.card', '9.settings', '9.diagnostics', '9.export', '9.quit'], facts: ['version', 'workspace', 'exportDir'] } },
     shots: ['s9-desktop.jpg', 's9-start.png', 's9-agent.png', 's9-board.png', 's9-settings.png']
-  }
+  },
+  // HI-2602: profile-move.ps1's record (PROFILE_MOVE_IDS), not a driver's; the error box and the moved app's window.
+  'profile-move': { drivers: {}, shots: ['s11-refused.png', 's11-moved.png', 's11-desktop.jpg'] }
 }
 
 /** The edge cases' checks edges.ps1 must record (HI-2460). */
 const EDGE_IDS = ['8.wait', '8.wait-unchanged', '8.continues', '8.refuses', '8.refuses-unchanged', '8.running', '8.running-unchanged', '8.uninstall-fails', '8.uninstall-fails-unchanged', '8.fallback-running', '8.fallback-moved']
+
+/** The profile move's checks profile-move.ps1 must record (HI-2602), in its order. */
+const PROFILE_MOVE_IDS = ['11.hive-profile', '11.installer-held', '11.refused', '11.refused-unchanged', '11.moved', '11.record', '11.sign-in-checked', '11.sign-in-once']
 
 /** An upgrade over the previous release (scenario n, its files' prefix pre): the drivers' checks (HI-2460's too) and shots. */
 function overPrevious(n, pre, fromRc = false) {
@@ -123,7 +130,7 @@ function evaluate(meta, files) {
   // Every step the runner took must have succeeded: a failed command or timeout fails the report.
   for (const s of meta.steps || []) add(s.scenario, `Step: ${s.what}`, s.ok, s.detail)
   for (const kind of ran.filter(k => KINDS.includes(k))) {
-    for (const shot of REQUIRED[kind].shots) if (!(meta.shots || []).includes(shot)) add(Number(shot[1]) || 0, `Screenshot ${shot} collected`, false, 'missing')
+    for (const shot of REQUIRED[kind].shots) if (!(meta.shots || []).includes(shot)) add(Number(/^s(\d+)/.exec(shot)?.[1]) || 0, `Screenshot ${shot} collected`, false, 'missing')
   }
 
   if (ran.includes('fresh')) {
@@ -211,6 +218,18 @@ function evaluate(meta, files) {
     }
   }
 
+  if (ran.includes('profile-move')) {
+    const prev = need(11, 's11-prev-run')
+    if (prev) add(11, `Hive Desktop 1.0 installs (${prev.seconds} s)`, prev.exitCode === 0, `exit ${prev.exitCode}`)
+    const m = need(11, 's11-profile')
+    if (m) {
+      if (m.completed !== true) add(11, 'profile-move.ps1 finished', false, 'it stopped before the end')
+      const list = [].concat(m.checks || [])
+      for (const c of list) add(11, c.name, c.ok === true, c.detail)
+      for (const id of PROFILE_MOVE_IDS) if (!list.some(c => c.id === id)) add(11, `profile move check "${id}" ran`, false, 'missing from s11-profile.json')
+    }
+  }
+
   for (const id of meta.leftRunning || []) add(0, `CLEANUP: Sandbox ${id} confirmed stopped`, false, `CLEANUP NOT CONFIRMED: Sandbox ${id} may still be running`)
   if (!checks.length && !notRun.length) add(0, 'At least one check ran', false, 'nothing was checked')
 
@@ -279,4 +298,4 @@ function markdown(r) {
   return lines.join('\n')
 }
 
-module.exports = { evaluate, markdown, verdict, SCENARIOS, KINDS, REQUIRED, COMBWORK_GUID }
+module.exports = { evaluate, markdown, verdict, SCENARIOS, KINDS, REQUIRED, COMBWORK_GUID, PROFILE_MOVE_IDS }

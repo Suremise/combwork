@@ -1,13 +1,14 @@
 /**
  * Combwork's installer checks in Windows Sandbox (the Sandbox checks, a release step: RELEASING.md, tests/e2e/README.md):
  * fresh install and first run, first run with no CLIs, a CLI appearing while Combwork runs, the upgrade from the previous
- * release, uninstall, a new workspace, and a clean install searched for "hive" (HI-2592). Drives the windows-sandbox MCP server (the hive-mcp project's) over stdio, as
- * any MCP client does: one Sandbox for scenarios 1, 2, 3, 5 and 6, a second for 4, a third for 9. Network off throughout, fake CLIs
+ * release, uninstall, a new workspace, a clean install searched for "hive" (HI-2592), and the profile move the installer
+ * couldn't make, made by the app at start (HI-2602). Drives the windows-sandbox MCP server (the hive-mcp project's) over stdio, as
+ * any MCP client does: one Sandbox for scenarios 1, 2, 3, 5 and 6, a second for 4, a third for 9, a fourth for 11. Network off throughout, fake CLIs
  * only, nothing signed in; every command has a timeout. Writes a short report (report.md, report.json) with screenshots
  * to --report. Moved from the hive-mcp repo (servers/windows-sandbox/scenarios/hive-checks.js at c5dee8a, HI-2298).
  *
  *   npm run sandbox-checks -- --installer <Combwork-Setup-x.y.z.exe> [--previous <older installer>] [--hive <Combwork repo>]
- *        [--server <windows-sandbox server.js>] [--report <folder>] [--only fresh|upgrade|manual|edges|clean|upgrade-rc] [--short <installer>] [--wait-min N]
+ *        [--server <windows-sandbox server.js>] [--report <folder>] [--only fresh|upgrade|manual|edges|clean|upgrade-rc|profile-move] [--short <installer>] [--wait-min N]
  *        [--smart-app-control off] [--git <Git for Windows' folder>] [--previous-rc <a 1.1 release candidate's installer>]
  *
  * --previous-rc (HI-2587): a 1.1 release candidate (RC2), partly converted to Combwork's names, for scenario 10: the upgrade
@@ -153,15 +154,15 @@ function plan(argv) {
   // The edge cases' second installer (HI-2460): built with CW_TEST_SHORT_LEGACY_WAIT=1, its legacy-mutex wait 20 s.
   const short = opt('--short') && path.resolve(opt('--short'))
   if (!installer || !fs.existsSync(installer) || !versionOf(installer)) throw new Error('--installer must name an existing Combwork-Setup-<version>.exe (or Hive-Setup-, before HI-2458)')
-  // By default the release checks' three kinds (the clean install's since HI-2592); the install by hand over the previous release (manual, HI-2460) and the
+  // By default the release checks' four kinds (the clean install's since HI-2592, the app's profile move since HI-2602); the install by hand over the previous release (manual, HI-2460) and the
   // edge cases (edges) run when asked for (--only).
   // A release candidate given (HI-2587): its upgrade too, by default.
   const previousRc = opt('--previous-rc') && path.resolve(opt('--previous-rc'))
   if (previousRc && (!fs.existsSync(previousRc) || !versionOf(previousRc))) throw new Error('--previous-rc must name an existing Combwork-Setup-<version>.exe of a 1.1 release candidate')
   if (only === 'upgrade-rc' && !previousRc) throw new Error("--only upgrade-rc needs --previous-rc <a 1.1 release candidate's installer>")
-  const ran = only ? [only] : ['fresh', 'upgrade', 'clean', ...(previousRc ? ['upgrade-rc'] : [])]
+  const ran = only ? [only] : ['fresh', 'upgrade', 'clean', 'profile-move', ...(previousRc ? ['upgrade-rc'] : [])]
   let previous = opt('--previous') && path.resolve(opt('--previous'))
-  const overOld = ran.includes('upgrade') || ran.includes('manual') || ran.includes('edges')
+  const overOld = ran.includes('upgrade') || ran.includes('manual') || ran.includes('edges') || ran.includes('profile-move')
   if (ran.includes('edges') && (!short || !fs.existsSync(short))) throw new Error('--only edges needs --short <an installer built with CW_TEST_SHORT_LEGACY_WAIT=1>, beside --installer')
   if (!previous && overOld) {
     const dist = path.join(hive, 'dist')
@@ -299,7 +300,7 @@ function steps(srv, ctx) {
   return { run, ps, drive, desktop, collect, record, readSac, install }
 }
 
-const SCENARIO_OF = { fresh: 1, upgrade: 4, manual: 7, edges: 8, clean: 9, 'upgrade-rc': 10 }
+const SCENARIO_OF = { fresh: 1, upgrade: 4, manual: 7, edges: 8, clean: 9, 'upgrade-rc': 10, 'profile-move': 11 }
 // How long Settings gets to open inside the Sandbox before its screenshot (nothing there to wait on from the host); the
 // unit tests, whose fake server shows nothing, set it to 0.
 const SETTINGS_OPEN_MS = Number(process.env.CW_SANDBOX_TEST_SETTINGS_MS ?? 6000)
@@ -391,6 +392,17 @@ async function main(argv) {
       await time("9. a new user's first session", () => s.drive(9, '9. first session', 'clean', 's9', 900))
       await time('9. the search for "hive"', () => s.run(9, '9. search for "hive"', `C:\\tools\\node\\node.exe ${INSIDE}\\clean-scan.cjs scan s9`, { timeoutSec: 900 }))
       await s.collect(9, ['s9'])
+    },
+    // HI-2602: over Hive Desktop 1.0, a file in its local profile folder held as the installer runs, so the installer
+    // can't move that folder; the app then refuses to start while it is held, and moves it itself once it isn't
+    // (profileFolders.ts, HI-2594). Its own Sandbox: it needs a 1.0 profile no other scenario has moved.
+    'profile-move': async srv => {
+      const s = steps(srv, ctx)
+      await s.readSac()
+      await time('11. previous release install', () => s.install(11, '11. install previous', p.guestPrevious, '-Arguments "/S" -Name s11-prev', { timeoutSec: 300 }))
+      await time('11. the profile move, held then let go', () => s.ps(11, '11. the profile move (profile-move.ps1)', 'profile-move.ps1', `-New "${p.guestInstaller}"`, { timeoutSec: 1200 }))
+      await s.desktop(11, 's11-desktop')
+      await s.collect(11, ['s11'])
     },
     edges: async srv => {
       const s = steps(srv, ctx)

@@ -173,3 +173,32 @@ test('one kind not run and the other failing: FAILED, naming what was not run', 
   assert.ok(r.failed > 0)
   assert.match(verdict(r), /^FAILED: \d+ of \d+ checks; not run: fresh$/)
 })
+
+// Scenario 11 (HI-2602): the profile move the installer couldn't make, made by the app (profile-move.ps1's record).
+const { PROFILE_MOVE_IDS } = require('./sandbox/report.cjs')
+const moveOk = (): Json => ({
+  's11-prev-run': { exitCode: 0, seconds: 9 },
+  's11-profile': { completed: true, checks: PROFILE_MOVE_IDS.map((id: string) => ({ id, name: `check ${id}`, ok: true })), facts: { recordBy: 'installer' } }
+})
+const moveMeta = (over: Json = {}): Json => meta({ ran: ['profile-move'], shots: REQUIRED['profile-move'].shots, steps: [], ...over })
+
+test('the profile move: every check recorded and passing passes, under scenario 11', () => {
+  const r = evaluate(moveMeta(), moveOk())
+  assert.strictEqual(r.failed, 0, JSON.stringify(failedNames(r)))
+  assert.ok(r.checks.length === PROFILE_MOVE_IDS.length + 1 && r.checks.every((c: Json) => c.scenario === 11))
+  assert.match(markdown(r), /## 11\. The profile move the installer couldn't make[\s\S]*\| check 11\.refused \| pass \|/)
+})
+
+test('the profile move: a failing check, a missing one, an unfinished script, a failed install or a missing screenshot fails it', () => {
+  const f = moveOk()
+  f['s11-profile'].checks[2] = { id: '11.refused', name: 'refused', ok: false, detail: "title ''; exit 0" }
+  f['s11-profile'].checks = f['s11-profile'].checks.filter((c: Json) => c.id !== '11.sign-in-once')
+  f['s11-profile'].completed = false
+  f['s11-prev-run'].exitCode = 3
+  const r = evaluate(moveMeta({ shots: ['s11-moved.png', 's11-desktop.jpg'] }), f)
+  const failed = r.checks.filter((c: Json) => !c.ok).map((c: Json) => `${c.scenario}. ${c.name}`)
+  assert.deepStrictEqual(failed.sort(), ['11. Hive Desktop 1.0 installs (9 s)', '11. Screenshot s11-refused.png collected', '11. profile move check "11.sign-in-once" ran', '11. profile-move.ps1 finished', '11. refused'].sort())
+  assert.match(markdown(r), /- \*\*11\. refused\*\*: title ''; exit 0/)
+  // No record at all: said, never a silent pass.
+  assert.ok(failedNames(evaluate(moveMeta(), {})).includes('s11-profile: result recorded'))
+})
