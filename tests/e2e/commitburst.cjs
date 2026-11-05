@@ -68,7 +68,7 @@ const check = (name, ok, extra = '') => {
       const script = `const lib = require(process.argv[1]); const listeners = []
         const page = { on: (e, f) => { if (e === 'console') listeners.push(f) }, evaluate: async () => undefined }
         lib.watchCommitBursts({ windows: () => [page], on: () => {} })
-        for (const f of listeners) f({ text: () => '[hive commit chain] 60' })
+        for (const f of listeners) f({ text: () => '[combwork commit chain] 60' })
         if (process.argv[2] === 'accept') lib.acceptCommitChain('a test of the acceptance')
         process.exit(0)`
       const r = spawnSync(process.execPath, ['-e', script, path.join(__dirname, 'lib.cjs'), accept ? 'accept' : ''], { env: lib.baseEnv(), encoding: 'utf8', timeout: HUNG_MS })

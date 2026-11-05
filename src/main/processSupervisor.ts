@@ -815,9 +815,9 @@ public static class CombworkJobs {
   static string keepCombwork;
   static string keepSelf;
   /** Configures the keeper: its Combwork's identity ("pid:started", as its slot writers name it) and the folder. Its own identity, "pid:created". */
-  public static string Keeper(string hive, string dir) {
+  public static string Keeper(string combwork, string dir) {
     int me = System.Diagnostics.Process.GetCurrentProcess().Id;
-    keepCombwork = hive;
+    keepCombwork = combwork;
     keepDir = dir;
     keepSelf = me + ":" + CreatedOf(me);
     return keepSelf;

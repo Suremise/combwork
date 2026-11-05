@@ -66,7 +66,7 @@ export const projectViewKey = (cfg: Pick<ProjectConfig, 'id'>, projectPath: stri
 /** A project's read for the window this slow is logged with its parts' times (HI-1694). */
 const SLOW_PROJECT_READ_MS = 1000
 /** What the board keeps in .combwork (#1017): its database and the files beside it, the cards' old folders, backups and the deleted cards' staging. */
-const BOARD_FILES = /^(hive\.db(-wal|-shm|-journal)?|tasks|tasks\..+|backups|deleted-cards)$/
+const BOARD_FILES = /^(combwork\.db(-wal|-shm|-journal)?|tasks|tasks\..+|backups|deleted-cards)$/
 /** How often a workspace root whose folder went is tried again (#964). */
 const ROOT_WATCH_RETRY_MS = 3000
 /** The workspace's refusals and its notice, in the window's language (#850); agents (the Agent API) read their English. */

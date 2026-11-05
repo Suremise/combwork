@@ -35,7 +35,7 @@ import { dataFolder } from './combworkFolder'
  * the one owner of these resumes (lastRun.ts leaves it the agents it lists).
  */
 const log = createLogger('restart')
-const HIVE = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
+const COMBWORK = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 const RECORD_FILE = 'restart.json'
 
 const T = {
@@ -255,7 +255,7 @@ export async function recordClosing(reason: RestartReason, o: { snapshotMs?: num
   } else log.warn(`Reading the cards and lanes of the agents took over ${o.snapshotMs ?? 2000} ms as Combwork closed: every running conversation is kept to resume`)
   if (snapshot.length) log.info(`Recorded ${snapshot.length} agent(s) as Combwork closes (${reason}): ${snapshot.map((e) => `${userText(e.agentName)} in ${userText(e.project)}`).join(', ')}`) // i18n-ignore: a line of combwork.log
   if (reason !== 'quit' && snapshot.length) {
-    const tell = Promise.allSettled(snapshot.map((e) => inWorkspace(workspaceOf(e.projectPath), () => createDelivery(e.projectPath, { agentId: e.agentId, agentName: e.agentName, kind: 'control', from: HIVE, body: inDialectOf({ projectPath: e.projectPath, agentId: e.agentId }, restartingLine) }))))
+    const tell = Promise.allSettled(snapshot.map((e) => inWorkspace(workspaceOf(e.projectPath), () => createDelivery(e.projectPath, { agentId: e.agentId, agentName: e.agentName, kind: 'control', from: COMBWORK, body: inDialectOf({ projectPath: e.projectPath, agentId: e.agentId }, restartingLine) }))))
     await bounded(tell, o.tellMs ?? 1500, [])
   }
   return snapshot.length
@@ -714,7 +714,7 @@ async function tellAssistants(resumed: readonly RestartEntry[], not: readonly Re
     const versions = first.from && first.from !== app.getVersion() ? ` (${first.from} → ${app.getVersion()})` : ''
     const resumedList = r.resumed.map((e) => `${e.agentName} (${e.project})`).join(', ')
     const body = inDialectOf({ projectPath: home, agentId: ASSISTANT_AGENT_ID }, () => say(T.assistant, { quit: policy() === 'quit' ? 'yes' : 'no', versions, hasResumed: resumedList ? 'yes' : 'no', resumed: resumedList, hasNot: r.not.length ? 'yes' : 'no', not: r.not.map((e) => `${e.agentName} (${e.project}): ${e.state}${e.why ? `, ${e.why}` : ''}`).join('; ') }))
-    await leaveDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body }).catch((e) => log.warn('telling the Assistant what was resumed after the restart', e))
+    await leaveDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: COMBWORK, body }).catch((e) => log.warn('telling the Assistant what was resumed after the restart', e))
   }
 }
 

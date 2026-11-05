@@ -10,7 +10,7 @@ import { CW_DIR } from '../shared/defaults'
  * a few seconds, so agents in the same trouble come in one control delivery, then what the user can change about it. Its
  * inbox is agent-facing: English. Nothing is sent where the workspace has no Assistant set up yet.
  */
-const HIVE = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
+const COMBWORK = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 const GATHER_MS = 5000
 
 const gathered = new Map<string, { lines: string[]; timer: ReturnType<typeof setTimeout> }>()
@@ -28,7 +28,7 @@ export function noteForAssistant(projectPath: string, line: string, after: strin
     const lines = gathered.get(k)?.lines ?? []
     gathered.delete(k)
     void access(join(home, CW_DIR, 'project.json'))
-      .then(() => createDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body: `${lines.join(' ')} ${after}` }))
+      .then(() => createDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: COMBWORK, body: `${lines.join(' ')} ${after}` }))
       .catch(() => undefined)
   }, GATHER_MS)
   timer.unref?.()

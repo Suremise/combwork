@@ -31,7 +31,7 @@ import { dataFolder } from './combworkFolder'
  * agents resumed only if Settings → Sessions says so. Nothing is stopped unless the user says so.
  */
 const log = createLogger('lastRun')
-const HIVE = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
+const COMBWORK = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 
 /** What the last run left, found at this start: null when it quit normally (or this is the first run). */
 export interface UnexpectedClose {
@@ -354,7 +354,7 @@ async function tellAssistants(c: UnexpectedClose, r: ResumeReport | null, still:
     if (!existsSync(join(dataFolder(home), 'project.json'))) continue
     // Its workspace may be open in no window now (#1395): left on a lease, for its next open, not admitted for this.
     // Stored for its next start: the Default's words until stored text is said when read (5b, 6b).
-    await leaveDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body: inDefaultDialect(() => assistantLine(c, r, still)) }).catch((e) => log.warn('telling the Assistant Combwork closed unexpectedly', e))
+    await leaveDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: COMBWORK, body: inDefaultDialect(() => assistantLine(c, r, still)) }).catch((e) => log.warn('telling the Assistant Combwork closed unexpectedly', e))
   }
 }
 

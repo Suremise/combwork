@@ -1,4 +1,4 @@
-import type { ActivityFilter } from '@shared/activity'
+import type { ActivityFilter } from '../../shared/activity'
 
 /**
  * A project's Activity tab as it was left (HI-1743): its filters, the agent whose tab shows, and whether the agents' own
@@ -18,8 +18,36 @@ export interface ActivityView extends ActivityFilter {
   opened?: number
 }
 
+const PREFIX = 'combwork.activity.'
+/** The views' keys before 1.1 (HI-2610): the names upgrade's input here, read only by upgradeActivityViews. */
+const OLD_PREFIX = 'hive.activity.'
+
 // A project's by its path; the workspace level's by its workspace (workspaceActivityKey).
-const key = (project: string): string => `hive.activity.${project.toLowerCase()}`
+const key = (project: string): string => `${PREFIX}${project.toLowerCase()}`
+
+/**
+ * The names upgrade's step in this window's storage (HI-2610, nameUpgradeProfile.ts lists the profile's): each view kept
+ * under its key before 1.1 is moved to its key now, once, as the window starts and before a view is read. One already kept
+ * under the new key wins; the old key goes either way. Storage that can't be read or written: nothing is moved, and the
+ * view starts afresh.
+ */
+export function upgradeActivityViews(storage: Pick<Storage, 'length' | 'key' | 'getItem' | 'setItem' | 'removeItem'> = localStorage): void {
+  try {
+    const old: string[] = []
+    for (let i = 0; i < storage.length; i++) {
+      const k = storage.key(i)
+      if (k?.startsWith(OLD_PREFIX)) old.push(k)
+    }
+    for (const k of old) {
+      const now = PREFIX + k.slice(OLD_PREFIX.length)
+      const v = storage.getItem(k)
+      if (v !== null && storage.getItem(now) === null) storage.setItem(now, v)
+      storage.removeItem(k)
+    }
+  } catch {
+    // Blocked or full: the views start afresh.
+  }
+}
 
 /** The view kept for a project in this window's storage, or none; anything unreadable is dropped. */
 export function loadActivityView(project: string): ActivityView {

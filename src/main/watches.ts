@@ -1299,7 +1299,7 @@ async function tellReplyNow(store: Store, reply: Reply): Promise<void> {
   const line = inDialectOf({ projectPath: home, agentId: ASSISTANT_AGENT_ID }, () => `${NOTICE_PREFIX}${replyPart(reply.agentName, `(${basename(resolve(reply.projectPath))})`, reply.text, REPLY_CHARS, userName())}.`)
   let id: string
   try {
-    id = (await createDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'card-event', from: HIVE, body: line, source: 'reply', ref: `reply:${reply.seq}`, meta: { generation, run: RUN } })).id
+    id = (await createDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'card-event', from: COMBWORK, body: line, source: 'reply', ref: `reply:${reply.seq}`, meta: { generation, run: RUN } })).id
   } catch (e) {
     // Not handed over: the Assistant's watches tell it as before (its next one on that agent).
     if (reply.owner === 'sending') delete reply.owner
@@ -2204,7 +2204,7 @@ function toldOf(projectPath: string, agentId: string, n: number): { h: string | 
 
 /** Combwork's own deliveries come from it. */
 // agent-protocol: the sender's name a delivery is labelled with (deliveries name their senders)
-const HIVE = { kind: 'combwork', name: 'Combwork' } as const
+const COMBWORK = { kind: 'combwork', name: 'Combwork' } as const
 
 /** A watch's wake's key among its deliveries: the watch and when it fired (a restart finds the one it made). */
 const wakeRef = (rec: WatchRecord): string => `${rec.id}@${rec.fired?.at ?? ''}`
@@ -2539,7 +2539,7 @@ async function deliverFor(store: Store, rec: WatchRecord): Promise<void> {
     // rather than making another (the same watch and fire make the same one). Not saved: not handed over (tried again).
     const given = await locked(store, async () => {
       if (!current() || !rec.fired || rec.fired.delivery) return null
-      const d = await createDelivery(rec.projectPath, { agentId: rec.agentId, kind: 'card-event', from: HIVE, body: line, ...(rec.fired.cards.length ? { card: rec.fired.cards[0] } : {}), source: 'watch', ref: wakeRef(rec), replace: true, ...(returned ? { meta: { [returned]: true } } : {}), ...(rec.fired.again ? { again: say(T.againTyping) } : {}) })
+      const d = await createDelivery(rec.projectPath, { agentId: rec.agentId, kind: 'card-event', from: COMBWORK, body: line, ...(rec.fired.cards.length ? { card: rec.fired.cards[0] } : {}), source: 'watch', ref: wakeRef(rec), replace: true, ...(returned ? { meta: { [returned]: true } } : {}), ...(rec.fired.again ? { again: say(T.againTyping) } : {}) })
       rec.fired.line = line
       rec.fired.delivery = d.id
       // A lane watch's marks move only once its line is received: pending with it until then (saved, for a restart).
