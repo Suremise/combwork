@@ -1,7 +1,7 @@
 import { readdir, readFile, rename } from 'original-fs/promises'
 import { join } from 'path'
 import { EXCLUDE_COMMENT } from '../shared/combworkFolderMove'
-import { contentHash, COPY_MARKER, SwapAbandoned, swapOut, withFileLock, writeTextAtomic } from './fsutil'
+import { cleanSwaps, contentHash, ContentTooLarge, COPY_MARKER, SwapAbandoned, swapOut, SwapUnreadable, withFileLock, writeTextAtomic } from './fsutil'
 import { git } from './git'
 import { createLogger, userText } from './logger'
 import { gitDirOf, vcsOf } from './combworkVcs'
@@ -105,8 +105,38 @@ async function oldMarkers(folder: string): Promise<string[]> {
   return names.map((n) => join(skills, n)).filter((d) => present(join(d, OLD_COPY_MARKER)) && !present(join(d, COPY_MARKER)))
 }
 
+/** For a marker read's `.catch()`: none there (ENOENT), or the entry a file of the user's, not a folder (ENOTDIR). */
+const noMarker = (e: unknown): null | Promise<never> => (['ENOENT', 'ENOTDIR'].includes((e as NodeJS.ErrnoException | null)?.code ?? '') ? null : Promise.reject(e))
+
+/** A copy marker's hash, or null when there is none (no file, not JSON, no hash). */
+function markerHash(text: string | null): string | null {
+  if (text === null) return null
+  try {
+    const hash = (JSON.parse(text) as { hash?: unknown } | null)?.hash
+    return typeof hash === 'string' && hash ? hash : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * For contentHash's `.catch()`: null (not the marker's hash, so the copy is kept) when the content is what makes it
+ * differ: too large to be the copy, or a file of it gone as it was read (changed). Any other error fails the step.
+ */
+const unhashable = (e: unknown): null | Promise<never> => (e instanceof ContentTooLarge || (e as NodeJS.ErrnoException | null)?.code === 'ENOENT' ? null : Promise.reject(e))
+
 /** The prefix of Combwork's copies' folders in `.agents/skills` before HI-2463 (now `cw-`), read only here. */
 export const OLD_COPY_PREFIX = 'hive-'
+
+const isOld = (n: string): boolean => n.toLowerCase().startsWith(OLD_COPY_PREFIX)
+/** cleanSwaps' test, as delivery's (providers/common.ts unchangedCopy): a copy of Combwork's whose content is still its marker's hash. */
+async function unchangedCopy(aside: string): Promise<boolean> {
+  const marker = markerHash(await readFile(join(aside, COPY_MARKER), 'utf8').catch(noMarker))
+  return !!marker && (await contentHash(aside)) === marker
+}
+
+/** An old copy moved aside by a swap (swapIn's and swapOut's `.<name>.cw-old-…` and `.cw-back-…`), not yet put back. */
+const setAside = (n: string): boolean => /^\.hive-.+\.cw-(old|back)-\d+-\d+$/i.test(n)
 
 /**
  * Retires Combwork's copies under the old prefix in `<folder>/.agents/skills` (HI-2594; delivery retired them at each
@@ -119,20 +149,32 @@ export const OLD_COPY_PREFIX = 'hive-'
  */
 async function retireOldCopies(folder: string): Promise<void> {
   const skills = join(folder, '.agents', 'skills')
-  const names = (await readdir(skills).catch(ifAbsent([] as string[]))).filter((n) => n.toLowerCase().startsWith(OLD_COPY_PREFIX))
-  if (!names.length) return
+  const list = (): Promise<string[]> => readdir(skills).catch(ifAbsent([] as string[]))
+  const all = await list()
+  if (!all.some((n) => isOld(n) || setAside(n))) return
   await withFileLock(skills, async () => {
-    for (const n of names) {
+    // An old copy a swapOut moved aside and couldn't put back (an earlier run's failure, HR2's round 2 on HI-2612) is
+    // put back first, by delivery's own rule (cleanSwaps; removed only while a Combwork copy whose content is still its
+    // marker's hash, else kept beside as a conflict copy). One still aside fails the step: not retired, so not done.
+    if (all.some(setAside)) {
+      await cleanSwaps(skills, unchangedCopy)
+      if ((await list()).some(setAside)) throw new Error('An old copy set aside as it was being retired could not be put back') // i18n-ignore: an error the step's message wraps (service.nameUpgrade.failed), for the log
+    }
+    for (const n of (await list()).filter(isOld)) {
       const dest = join(skills, n)
-      const marker = await readFile(join(dest, COPY_MARKER), 'utf8').then((t) => (JSON.parse(t) as { hash?: unknown }).hash, () => undefined).catch(() => undefined)
-      if (typeof marker !== 'string' || !marker) continue
-      if ((await contentHash(dest).catch(() => null)) !== marker) continue
+      // No marker, or one that isn't a marker: the user's. One that can't be read now, or content that can't be hashed
+      // now (access denied, a file held), fails the step (HI-2612): kept, nothing recorded, and the next open looks again.
+      const marker = markerHash(await readFile(join(dest, COPY_MARKER), 'utf8').catch(noMarker))
+      if (!marker) continue
+      if ((await contentHash(dest).catch(unhashable)) !== marker) continue
       try {
         await swapOut(dest, marker)
         log.info(`retired the old copy ${userText(dest)}`)
       } catch (e) {
-        // Changed while it was being removed: the user's now, kept (put back, or beside it as a conflict copy).
-        if (e instanceof SwapAbandoned) log.info(`kept ${userText(dest)}: it changed as it was being retired`)
+        // Changed while it was being removed: the user's now, kept (put back, or beside it as a conflict copy). One it
+        // couldn't read again as it went (SwapUnreadable, HI-2612) is put back too, but fails the step: not the user's
+        // change, so the next open retires it.
+        if (e instanceof SwapAbandoned && !(e instanceof SwapUnreadable)) log.info(`kept ${userText(dest)}: it changed as it was being retired`)
         else throw e
       }
     }

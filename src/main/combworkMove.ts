@@ -340,9 +340,19 @@ function warn(host: string, state: HostState): void {
   }
 }
 
-/** A `.hive` made again beside a moved `.combwork` (an older Hive opened it since): said once, left as it is. */
+/**
+ * A `.hive` made again beside a moved `.combwork` (an older Hive opened it since): said once, left as it is. Only a
+ * warning, never a step (HI-2612): one that can't be looked at now is logged, not warned of, and nothing is recorded by it.
+ */
 async function warnRecreated(hosts: Looked[]): Promise<void> {
-  for (const h of hosts) if (h.marked && (await plainFolder(h.host, legacy(h.host)).catch(() => false)) && ours(legacy(h.host), h.kind)) warn(h.host, 'both')
+  for (const h of hosts) {
+    if (!h.marked) continue
+    try {
+      if ((await plainFolder(h.host, legacy(h.host))) && ours(legacy(h.host), h.kind)) warn(h.host, 'both')
+    } catch (e) {
+      log.warn(`couldn't look at ${userText(legacy(h.host))} beside its moved .combwork`, e)
+    }
+  }
 }
 
 const lockBusy = (h: { profile: string }): CombworkError => combworkError(M.busy, { profile: h.profile }, { kind: 'conflict' })

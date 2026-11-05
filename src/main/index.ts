@@ -1079,7 +1079,10 @@ app.whenReady().then(async () => {
   // cw-progress on every session's PATH (#137): shims in Combwork's bin folder, timings beside them; the old names'
   // shims removed first (the names upgrade, HI-2594).
   const binDir = join(app.getPath('userData'), 'bin')
-  void removeOldShims(binDir).then(() => installShims(binDir, { exec: process.execPath, script: unpackedScript('cw-progress.js'), data: join(app.getPath('userData'), 'progress') })).then((dir) => {
+  void removeOldShims(binDir).then((left) => {
+    if (left.length) log.warn(`The progress command's old shims were left for the next start: ${left.join('; ')}`)
+    return installShims(binDir, { exec: process.execPath, script: unpackedScript('cw-progress.js'), data: join(app.getPath('userData'), 'progress') })
+  }).then((dir) => {
     sessions.binDir = dir
     if (!dir) log.warn("Couldn't write the cw-progress command into Combwork's bin folder; sessions start without it")
   })
