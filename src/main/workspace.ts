@@ -1503,11 +1503,12 @@ export class WorkspaceService {
         if (changesConfig(patch)) {
           await configTestHooks.beforeConfigWrite?.(projectPath)
           // Checked as it goes into place, each try (HI-2563): a rename Windows refused while something outside held the
-          // file to write it would otherwise land on what that wrote. Then the file it replaced, `held` (HI-2565): one
-          // written whole just before the rename is put back.
-          const unchanged = async (held?: string): Promise<void> => {
-            if ((await keptStamp(held ?? file)) === readAt) return
-            log.info(`${userText(basename(projectPath))}: project.json changed while a change to it was made${held ? ', just before it was replaced: put back,' : ':'} read again (HI-2563)`)
+          // file to write it would otherwise land on what that wrote.
+          // Accepted (HI-2565): one written whole, in place, after this check and before the rename is replaced, Node having
+          // no rename that swaps or refuses. A real project arrives complete (copied or moved in, HI-2542), not in that moment.
+          const unchanged = async (): Promise<void> => {
+            if ((await keptStamp(file)) === readAt) return
+            log.info(`${userText(basename(projectPath))}: project.json changed while a change to it was made: read again (HI-2563)`)
             throw new KeptFileBusy(file)
           }
           await writeKeptJson(file, withLegacyProjectFields(withoutView(updated)), { existing: opts.existing, guard: unchanged })

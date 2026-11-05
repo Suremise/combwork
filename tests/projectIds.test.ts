@@ -689,41 +689,6 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
     }
   })
 
-  // HI-2565, the accounts suite's epsilon on HI-2484's branch: the project's own project.json written in place, whole,
-  // after the change's last check and before its rename (a moment when the main thread is busy), the rename not refused.
-  // What it replaced is checked once it is in place: the project's own is put back and read again, never lost.
-  it("a project.json written just before a change's rename isn't lost", async () => {
-    const wsPath = join(base, 'ws-config-before-rename')
-    project(wsPath, 'keep')
-    const w = createWorkspaceService()
-    await w.open(wsPath)
-    try {
-      await w.refreshesSettled()
-      const taken = join(wsPath, 'taken')
-      mkdirSync(taken)
-      await w.ensureProject(taken)
-      const file = join(taken, '.combwork', 'project.json')
-      const theirs = { version: 2, agents: [{ id: 'a-one', name: 'One', provider: 'claude-code' }] }
-      let written = 0
-      const { rename } = await import('original-fs/promises')
-      atomicTestHooks.renameOnce = async (from, to) => {
-        if (to.toLowerCase() === file.toLowerCase() && !written++) writeFileSync(file, JSON.stringify(theirs))
-        await rename(from, to)
-      }
-      const seen: number[] = []
-      await w.mutateProjectConfig(taken, (cfg) => (seen.push((cfg.agents ?? []).length), { id: 'p-0123456789ab' }), { existing: true })
-      expect(written).toBe(2)
-      expect(seen).toEqual([0, 1])
-      expect(projectJson(taken)).toMatchObject({ id: 'p-0123456789ab', agents: theirs.agents })
-      expect((await w.updateAgent(taken, 'a-one', { name: 'Uno' })).name).toBe('Uno')
-      // Nothing left beside it: no temp file, nor the copy of what the rename replaced.
-      expect(readdirSync(join(taken, '.combwork')).filter((n) => /\.(tmp|old)$/.test(n))).toEqual([])
-    } finally {
-      delete atomicTestHooks.renameOnce
-      await disposeWorkspaceService(w)
-    }
-  })
-
   /**
    * A workspace whose folder listings the test sets (`folders`), with every read of `gone`'s project.json held until
    * `release` (HR3's probe for HI-1668 round 1): the order reads list and settle in is the test's.
