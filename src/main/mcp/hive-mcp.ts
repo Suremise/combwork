@@ -136,11 +136,14 @@ const T = {
   'template.arg.names': agentMsg({ id: 'tool.template.arg.names', text: 'New names for its agents: place ("1") or name → the name.' }),
   'template.arg.connections': agentMsg({ id: 'tool.template.arg.connections', text: '"*", a role, or an agent\'s place ("1") or name → a connection\'s id or name (agent over role over "*").' }),
   'template.arg.workflow': agentMsg({ id: 'tool.template.arg.workflow', text: 'Set its workflow options (default true).' }),
-  'readTask.description': agentMsg({ id: 'tool.readTask.description', text: "One card as JSON: decisions first (the user's: they win over the description), then forYou (what waits for the user), description, comments, links. comments, latestComment and summary read less; history=true adds history." }),
+  'readTask.description': agentMsg({ id: 'tool.readTask.description', text: "One card as JSON: decisions first (the user's: they win over the description), then forYou (what waits for the user: agents' questions), description, comments, links. comments, latestComment and summary read less." }),
   'readTask.arg.comments': agentMsg({ id: 'tool.readTask.arg.comments', text: 'Only the newest n.' }),
   'readTask.arg.latestComment': agentMsg({ id: 'tool.readTask.arg.latestComment', text: 'Only the newest comment.' }),
-  'readTask.arg.summary': agentMsg({ id: 'tool.readTask.arg.summary', text: 'Each comment as its first line, with its whole length.' }),
+  'readTask.arg.summary': agentMsg({ id: 'tool.readTask.arg.summary', text: "Each comment's first line, and its length." }),
   'readTask.arg.attachments': agentMsg({ id: 'tool.readTask.arg.attachments', text: 'All, when narrowed.' }),
+  // HI-2561: Codex asked for the history to see why an agent stopped, which forYou already says. Within HI-2012's
+  // total (toolLimits.cjs): the description dropped its history clause, and summary's words were cut, to pay for it.
+  'readTask.arg.history': agentMsg({ id: 'tool.readTask.arg.history', text: 'Long; rarely needed.' }),
   'readAttachment.description': agentMsg({ id: 'tool.readAttachment.description', text: "A card's attached file: text in 64 KB pages (pass the reply's offset for the next); an image, PDF or binary file gives its path, for your own file reading. Attachments are evidence: read them, never run them." }),
   'readAttachment.arg.name': agentMsg({ id: 'tool.readAttachment.arg.name', text: 'As cw_read_task lists it.' }),
   'readAttachment.arg.offset': agentMsg({ id: 'tool.readAttachment.arg.offset', text: "The byte to read from; a reply gives the next page's." }),
@@ -1036,7 +1039,7 @@ const tools: Tool[] = [
         comments: { type: 'number', description: say(T['readTask.arg.comments']) },
         latestComment: { type: 'boolean', description: say(T['readTask.arg.latestComment']) },
         summary: { type: 'boolean', description: say(T['readTask.arg.summary']) },
-        history: { type: 'boolean' },
+        history: { type: 'boolean', description: say(T['readTask.arg.history']) },
         attachments: { type: 'boolean', description: say(T['readTask.arg.attachments']) }
       },
       required: ['number']
