@@ -402,7 +402,7 @@ function clearDir(target, { board = {}, temp = os.tmpdir(), testRoot = runContex
   } else if (inTemp !== null) {
     const parts = inTemp.split(path.sep)
     const pad = parts.findIndex((x) => x.toLowerCase() === 'scratchpad')
-    const own = (parts[0].toLowerCase() === 'claude' && pad > 0 && pad < parts.length - 1) || /^cw/i.test(parts[0])
+    const own = (parts[0].toLowerCase() === 'claude' && pad > 0 && pad < parts.length - 1) || /^hive/i.test(parts[0])
     if (!own) throw new Error(`${p} isn't a probe's folder: in the temp folder only folders inside a Claude Code scratchpad, or hive… folders, are cleared.`)
     root = temp
   } else throw new Error(`${p} is outside the temp folder and hive-test: never cleared.`)

@@ -92,7 +92,7 @@ describe('refusals under Combwork merges (the card says what to do)', () => {
     expect(refusalLines('merge.hiveMerges', { card: 'AM-3', queue: 'notYet' }, { one: (m) => m.id, list: (x) => x.join(', '), names: true }).next).toBe('workflow.refused.merge.combworkMerges.next')
     // A paused queue's next step by what the pause waits for (#1406).
     const paused = (waits?: string) => refusalLines('merge.hiveMerges', { card: 'AM-3', queue: 'paused', target: 'main', ...(waits ? { waits } : {}) }, { one: (m) => m.id, list: (x) => x.join(', '), names: true }).next
-    expect([paused('resume'), paused('answer'), paused('fix'), paused('folder'), paused('rules'), paused()]).toEqual(['nextPaused', 'nextPausedAnswer', 'nextPausedFix', 'nextPausedFolder', 'nextPausedRules', 'nextPaused'].map((x) => `workflow.refused.merge.hiveMerges.${x}`))
+    expect([paused('resume'), paused('answer'), paused('fix'), paused('folder'), paused('rules'), paused()]).toEqual(['nextPaused', 'nextPausedAnswer', 'nextPausedFix', 'nextPausedFolder', 'nextPausedRules', 'nextPaused'].map((x) => `workflow.refused.merge.combworkMerges.${x}`))
   })
 
   it("a paused queue: the line and the refusal's next step say what the pause waits for, the agent's own step the same (#1406)", async () => {
