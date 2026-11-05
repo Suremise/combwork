@@ -4,7 +4,7 @@
 // copies' markers renamed in the project and in a slot the board's records name, git's exclude comments Combwork's, and
 // the record written; the next open takes no lock. A run stopped at each step finishes at the next open; a new workspace
 // writes its record at once; a project with nothing old is left byte for byte.
-import { execFileSync } from 'child_process'
+import { execFileSync, spawn } from 'child_process'
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { DatabaseSync } from 'node:sqlite'
@@ -173,7 +173,7 @@ describe('the names upgrade at the open', () => {
     expectUpgraded(w)
   })
 
-  it("a project that comes into an upgraded workspace with an RC's .combwork gets its own steps by its own record, with no lock (HR2's round 1)", async () => {
+  it("a project that comes into an upgraded workspace with an RC's .combwork: its own steps by its own record, under the move's lock, refused while another Combwork has the workspace open (HR2's rounds 1 and 2)", async () => {
     const w = workspace('rc2')
     await open(w.ws)
     expectUpgraded(w)
@@ -188,15 +188,46 @@ describe('the names upgrade at the open', () => {
     git(beta, 'add', 'b.txt')
     git(beta, 'commit', '-q', '-m', 'b')
     git(beta, 'update-ref', 'refs/hive/cards/BE-1/1', 'HEAD')
-    const lock = join(w.ws, MOVE_LOCK_FILE)
-    const before = readFileSync(lock)
     expect(await projectNamesDone(beta)).toBe(false)
+    // An RC still has the workspace open (its presence marker, a live process): refused, nothing of beta's changed.
+    const other = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore', windowsHide: true })
+    const marker = join(w.ws, '.combwork', 'open', 'Combwork-rc2.json')
+    try {
+      write(marker, JSON.stringify({ pid: other.pid, profile: 'Combwork', hiveVersion: '1.1.0-rc.2', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() }))
+      await expect(moveFolders(w.ws, { only: beta })).rejects.toThrow(/open in another Combwork or Hive \(Combwork\)/)
+      expect(existsSync(join(beta, '.agents', 'skills', 'cw-handover', '.hive-copy'))).toBe(true)
+      expect(readFileSync(join(beta, '.git', 'info', 'exclude'), 'utf8')).toBe(OLD_EXCLUDE)
+      expect(git(beta, 'for-each-ref', '--format=%(refname)', 'refs/hive', 'refs/cw').trim()).toBe('refs/hive/cards/BE-1/1')
+      expect(await projectNamesDone(beta)).toBe(false)
+    } finally {
+      other.kill()
+      await new Promise((r) => (other.exitCode !== null ? r(undefined) : other.once('exit', () => r(undefined))))
+    }
+    // Once it has gone: the retry converts it under the lock and records it.
     await moveFolders(w.ws, { only: beta })
     expect(existsSync(join(beta, '.agents', 'skills', 'cw-handover', '.combwork-copy'))).toBe(true)
     expect(readFileSync(join(beta, '.git', 'info', 'exclude'), 'utf8')).not.toMatch(/Hive/)
     expect(git(beta, 'for-each-ref', '--format=%(refname)', 'refs/hive', 'refs/cw').trim()).toBe('refs/cw/cards/BE-1/1')
     expect(await projectNamesDone(beta)).toBe(true)
-    expect(readFileSync(lock).equals(before)).toBe(true)
+  })
+
+  it('a new project with nothing old is recorded with no lock, even while another Combwork has the workspace open', async () => {
+    const w = workspace('rc2')
+    await open(w.ws)
+    const gamma = join(w.ws, 'gamma')
+    write(join(gamma, '.combwork', 'project.json'), '{}')
+    git(w.ws, 'init', '-q', gamma)
+    const other = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore', windowsHide: true })
+    try {
+      write(join(w.ws, '.combwork', 'open', 'Combwork-other.json'), JSON.stringify({ pid: other.pid, profile: 'Combwork', appVersion: '1.1.0', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() }))
+      const lock = join(w.ws, MOVE_LOCK_FILE)
+      const before = readFileSync(lock)
+      await moveFolders(w.ws, { only: gamma })
+      expect(await projectNamesDone(gamma)).toBe(true)
+      expect(readFileSync(lock).equals(before)).toBe(true)
+    } finally {
+      other.kill()
+    }
   })
 
   it("a new workspace's first open writes nothing; once made, its record is there and its .gitignore keeps it out", async () => {

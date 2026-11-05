@@ -8,7 +8,7 @@ import { writeTextAtomic } from './fsutil'
 import { HiveError, errorText, hiveError } from './hiveError'
 import { createLogger } from './logger'
 import { upgradeWorkspaceFiles } from './nameUpgradeFiles'
-import { upgradeProject } from './nameUpgradeProjects'
+import { projectHasOld, upgradeProject } from './nameUpgradeProjects'
 
 /**
  * The one-way names upgrade (HI-2587, its design HI-2587/s15 with s20, s23 and s26): what 1.0 and the 1.1 release
@@ -67,6 +67,17 @@ const record = async (host: string): Promise<void> => {
 
 /** Whether a project's own steps have run (its record): looked at as a project comes into an open workspace. */
 export const projectNamesDone = (host: string): Promise<boolean> => recorded(host)
+
+/**
+ * A project with nothing of Hive's names left (a new one, or one converted elsewhere) recorded done at once, with no
+ * lock: nothing to change, so nothing can race another process (HR2's round 2). True when it was; false when something
+ * is old, for the steps under the move's lock.
+ */
+export async function recordIfNothingOld(host: string): Promise<boolean> {
+  if (await projectHasOld(host)) return false
+  await record(host)
+  return true
+}
 
 /** Whether a workspace may still have anything under an old name: looked at cheaply, on every open. */
 export async function workspaceNeeds(ws: string): Promise<boolean> {

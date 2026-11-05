@@ -16,7 +16,7 @@ import { createLogger, userText } from './logger'
 import { othersPresentByProcess } from './presence'
 import { dataFolder, ours, type HostKind } from './hiveFolder'
 import { withNamedLock } from './repoLock'
-import { projectNamesDone, upgradeWorkspace, workspaceNeeds } from './nameUpgrade'
+import { projectNamesDone, recordIfNothingOld, upgradeWorkspace, workspaceNeeds } from './nameUpgrade'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 import type { CardsAnswer, CardsRewrite, Checkpoint, CheckpointAnswer, CopyFolders, CopyFoldersAnswer } from './hiveMoveWorker'
 
@@ -363,14 +363,14 @@ async function moveNow(ws: string, o: MoveOptions & { only?: string }): Promise<
   // Nothing to rename, nothing under an old name (HI-2587), and the rewrites finished for the map as it is: no lock,
   // nothing written.
   // A single project (one that came later): its own steps by its own record, whatever the workspace's (HR2's round 1).
-  const namesDue = o.only ? !(await projectNamesDone(o.only)) : await workspaceNeeds(ws)
+  let namesDue = o.only ? !(await projectNamesDone(o.only)) : await workspaceNeeds(ws)
   const stop = (): void => {
     if (o.signal?.aborted || (o.stillOurs && !o.stillOurs())) throw hiveError(M.closed, undefined, { kind: 'conflict' })
   }
-  // A single project with no folder to move, only its names to upgrade: its own files, each step idempotent and each
-  // change one atomic write or rename, so no lock (nor the other process's refusal) is needed, as no folder moves.
-  if (o.only && !planned && namesDue) await upgradeWorkspace(ws, { stop, checkpoint: checkpointOffMain, copyFolders: copyFoldersOffMain, projects: [], only: o.only })
-  if (!planned && (o.only || !namesDue)) {
+  // A single project with nothing old (a new one, say): recorded done with no lock, as nothing changes. One with
+  // something old has its steps under the lock, after the other processes' refusal, as every move does (HR2's round 2).
+  if (o.only && !planned && namesDue && (await recordIfNothingOld(o.only))) namesDue = false
+  if (!planned && !namesDue) {
     const moves = await movesOf(ws, all)
     if (!moves.length || (await doneHash(ws)) === mapHash(moves)) {
       publish(ws, moves)
