@@ -160,7 +160,7 @@ export const GUARD_FNS: Record<GuardId, Guard> = {
     // Its last run's reason when it ran and didn't count (#1654): `none` when it didn't run or failed.
     const u = i.checkUncounted
     const why = { why: u?.whyNot ?? 'none', files: u?.changes?.length ? u.changes.join(', ') : 'none', copy: u?.isolatable ? 'yes' : 'no' } // i18n-ignore: select keys and paths, never shown as they are
-    return { rule: 'submit.checksPassed', values: { card: i.card.key, check: missing[0], revision: short(i.revision), command: `hive-progress --check ${missing[0]} --card ${i.card.key}`, ...why } } // i18n-ignore: a command, as typed
+    return { rule: 'submit.checksPassed', values: { card: i.card.key, check: missing[0], revision: short(i.revision), command: `cw-progress --check ${missing[0]} --card ${i.card.key}`, ...why } } // i18n-ignore: a command, as typed
   },
   'submit.identity': (i) => {
     const b = i.badIdentity

@@ -1,5 +1,5 @@
 {
-  "prose|call|Hive gives it {} in a slot": 1,
+  "prose|call|Combwork gives it {} in a slot": 1,
   "prose|return|{} is a card of your lane ({}). {}{}": 1,
   "prose|var|Design": 1,
   "prose|var|{} {}, for the reviewer's check (an answer names {}): {}": 1

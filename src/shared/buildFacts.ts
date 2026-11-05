@@ -45,15 +45,15 @@ export function buildFactOf(v: unknown): BuildFact | { error: string } {
 
 const KIND_WORDS: Record<BuildKind, string> = { beta: 'beta', baseline: 'baseline', rc: 'release candidate', release: 'release' }
 
-/** The journal entry's one line: "Built Hive 1.0.0-rc.1 (baseline) from 1fef5341 on 1.0.0". */
+/** The journal entry's one line: "Built Combwork 1.1.0-rc.1 (baseline) from 1fef5341 on 1.1.0". */
 export function buildFactSummary(f: BuildFact): string {
   const what = f.by === 'release' ? 'Uploaded a draft of' : 'Built'
-  return `${what} Hive ${f.version} (${KIND_WORDS[f.kind]}) from ${f.commit.slice(0, 8)}${f.branch ? ` on ${f.branch}` : ''}`
+  return `${what} Combwork ${f.version} (${KIND_WORDS[f.kind]}) from ${f.commit.slice(0, 8)}${f.branch ? ` on ${f.branch}` : ''}`
 }
 
 /** A build fact's one line read back (the window shows it in the user's language, #1534 round 1), or null for another line. */
 export function parseBuildSummary(summary: string): { by: BuildFact['by']; version: string; kind: BuildKind; commit: string; branch: string | null } | null {
-  const m = /^(Built|Uploaded a draft of) Hive (\S+) \((beta|baseline|release candidate|release)\) from ([0-9a-f]{7,64})(?: on (.+))?$/.exec(summary)
+  const m = /^(Built|Uploaded a draft of) Combwork (\S+) \((beta|baseline|release candidate|release)\) from ([0-9a-f]{7,64})(?: on (.+))?$/.exec(summary)
   if (!m) return null
   const kind = (Object.keys(KIND_WORDS) as BuildKind[]).find((k) => KIND_WORDS[k] === m[3])!
   return { by: m[1] === 'Built' ? 'dist' : 'release', version: m[2], kind, commit: m[4], branch: m[5] ?? null }
